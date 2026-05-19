@@ -43,3 +43,14 @@ func (vm *VM) TableGetForJIT(table, key runtime.Value) (runtime.Value, error) {
 func (vm *VM) TableSetForJIT(table, key, val runtime.Value) error {
 	return vm.tableSet(table, key, val)
 }
+
+// SetGlobalForJIT exposes OP_SETGLOBAL semantics to JIT slow paths. It must
+// keep the same readonly-binding checks as the bytecode interpreter; plain
+// SetGlobal is a host API and intentionally bypasses script-level const checks.
+func (vm *VM) SetGlobalForJIT(name string, val runtime.Value) error {
+	if vm.isGlobalReadOnly(name) {
+		return fmt.Errorf("cannot assign to readonly variable %q", name)
+	}
+	vm.SetGlobal(name, val)
+	return nil
+}

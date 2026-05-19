@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 430 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 434 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -79,6 +79,10 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `io_current_stream_more`: `io.input` / `io.output` 的当前流切换覆盖 path 与 file handle 两种入口，并验证全局 `io.read` / `io.write` / `io.lines` 和 closed-file diagnostics。
 - `http_router_json_edges_more`: `http.newRouter` method gating、response helper、handler error response，以及 `json.encode` 对 array/sparse/mixed table 与 NaN/Inf 的 Go-host 语义覆盖。
 - `time_color_hash_edges_more`: 固定 UTC time boundary、color operator metamethod、SHA-512 和 hash 参数错误路径覆盖。
+- `binary_numeric_fields_more`: `binary` / `string` pack/unpack 的 signed、unsigned、float、endian alias、token alias、offset 和 range error 覆盖。
+- `base64_raw_url_edges_more`: base64 empty/binary round-trip、standard padding、raw URL no-padding contract 和 decode error 路径覆盖。
+- `csv_options_quotes_more`: `csv.parse` 的 comment/lazyQuotes/trimSpace option 组合，以及 Go `encoding/csv` quoting 边界覆盖。
+- `control_coroutine_defer_more`: cached coroutine function values、Go-style `defer` LIFO under return/protected errors，以及 `const` capture/shadowing 语义覆盖。
 
 当前能力状态与设计取舍：
 

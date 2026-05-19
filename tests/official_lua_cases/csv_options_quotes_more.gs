@@ -1,0 +1,35 @@
+print("case:csv_options_quotes_more")
+
+mixed := csv.parse("# skip this row\n name, note, extra\n1, bare \"quote, keep\n2, \"bad \"quote\", done\n", {
+	comment: "#",
+	lazyQuotes: true,
+	trimSpace: true,
+})
+assert(#mixed == 3)
+assert(mixed[1][1] == "name")
+assert(mixed[1][2] == "note")
+assert(mixed[1][3] == "extra")
+assert(mixed[2][1] == "1")
+assert(mixed[2][2] == "bare \"quote")
+assert(mixed[2][3] == "keep")
+assert(mixed[3][1] == "2")
+assert(mixed[3][2] == "bad \"quote")
+assert(mixed[3][3] == "done")
+
+strictOk, strictErr := pcall(csv.parse, "a,b\n1,bare \"quote\n", {lazyQuotes: false})
+assert(strictOk == false)
+assert(type(strictErr) == "string")
+
+encoded := csv.encode({
+	{"plain", "a,b", "a\"b", "line\nbreak"},
+	{" leading", "trail ", ""},
+})
+assert(encoded == "plain,\"a,b\",\"a\"\"b\",\"line\nbreak\"\n\" leading\",trail ,\n")
+
+withHeaders := csv.encodeWithHeaders({
+	{name: "alpha,beta", quote: "x\"y", note: "two\nlines"},
+	{name: " plain", quote: "", note: "done"},
+}, {"name", "quote", "note"})
+assert(withHeaders == "name,quote,note\n\"alpha,beta\",\"x\"\"y\",\"two\nlines\"\n\" plain\",,done\n")
+
+print("ok")

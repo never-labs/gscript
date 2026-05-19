@@ -904,7 +904,9 @@ func (e *BaselineJITEngine) handleSetGlobal(ctx *ExecContext, regs []runtime.Val
 	name := proto.Constants[bx].Str()
 	absSlot := base + a
 	if absSlot < len(regs) {
-		e.callVM.SetGlobal(name, regs[absSlot])
+		if err := e.callVM.SetGlobalForJIT(name, regs[absSlot]); err != nil {
+			return err
+		}
 	}
 	if verPtr, ver, ok := e.callVM.GlobalValueVersionPtr(); ok {
 		ctx.Tier2GlobalVerPtr = uintptr(unsafe.Pointer(verPtr))

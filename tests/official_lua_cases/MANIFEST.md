@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 430.
+Current translated passing cases: 434.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -35,6 +35,7 @@ Current translated passing cases: 430.
 | `bitwise_bit32_wrap_more` | `bitwise.lua` | Additional `bit32.band` wrapping for positive and negative values around 2^33 and 2^40. |
 | `bitwise_direct_ops_more` | `bitwise.lua`, `bwcoercion.lua` | First-class bitwise expression operators, complement, bit-clear translation, shifts, and small accumulation loop. |
 | `bits_go_host_more` | `bitwise.lua`, `bwcoercion.lua` | Go-host 64-bit `bits` helper operations, rotations, bit tests/mutations, counts, and invalid shift diagnostics. |
+| `base64_raw_url_edges_more` | `strings.lua`, `api.lua` | Base64 empty/binary round trips, standard padding, and raw URL-safe no-padding/error behavior. |
 | `container_sort_go_host_more` | `api.lua`, `sort.lua` | Go-host container set/queue/stack/heap helpers and `sort` namespace ordering/search helpers. |
 | `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
@@ -333,8 +334,11 @@ Recent audit-added coverage:
 | `api_arith_metamethod_chain_more` | `api.lua`, `events.lua` | Arithmetic metamethod chaining for `__add`, `__mod`, and unary minus over wrapped table values. |
 | `big_generated_eval_env_more` | `big.lua` | Generated chunk/table execution with explicit environment mutation and large-enough array indexing. |
 | `binary_namespace_more` | `tpack.lua` | GScript `binary` namespace pack/unpack/size with Go-style endian and field tokens. |
+| `binary_numeric_fields_more` | `tpack.lua`, `strings.lua` | Binary and string pack/unpack numeric field coverage across signed, unsigned, float, endian, alias, and error paths. |
 | `bytes_hash_base64_go_host_more` | `api.lua`, `strings.lua` | Go-host `bytes`, `hash`, and `base64` helpers for buffers, encodings, checksums, HMAC, and error returns. |
 | `bytes_numeric_buffer_more` | `api.lua`, `strings.lua` | Go-host bytes buffer numeric little-endian writes, byte/string reads, hex round trips, concat, and reset behavior. |
+| `control_coroutine_defer_more` | `attrib.lua`, `coroutine.lua` | Cached coroutine functions, Go-style defer LIFO under return/protected errors, and const capture/shadowing semantics. |
+| `csv_options_quotes_more` | `api.lua`, `strings.lua` | CSV comment/lazy-quote options and Go encoding/csv quoting for comma, quote, newline, and leading-space fields. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `debug_host_helpers_more` | `db.lua` | Go-host `debug.traceback`, `debug.stack`, `debug.globals`, `debug.info`, `debug.value`, and `debug.goStack` diagnostics. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
