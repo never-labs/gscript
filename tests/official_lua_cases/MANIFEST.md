@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 380.
+Current translated passing cases: 381.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -244,6 +244,7 @@ Current translated passing cases: 380.
 | `sort_table_move` | `sort.lua` | `table.move` forward/backward/overlapping/empty moves. |
 | `sort_table_proxy_metamethods` | `sort.lua`, `events.lua` | `table.move`, `table.unpack`, and `table.sort` over proxy tables using `__index`, `__newindex`, and `__len`. |
 | `sort_unpack_ranges` | `sort.lua` | `table.unpack` direct assignment, bounded ranges, singleton ranges, and empty ranges. |
+| `sort_unpack_sparse_boundary_more` | `sort.lua` | Extreme sparse `table.unpack` ranges fail quickly at the host multi-return boundary instead of walking the whole range. |
 | `strings_basic` | `strings.lua` | String compare, sub/find/len/byte/char/case/rep/reverse basics. |
 | `strings_byte_ascii_indices` | `strings.lua` | ASCII `string.byte` positive/negative range indices and empty-range nil behavior. |
 | `strings_byte_char_edges` | `strings.lua` | `string.byte` and `string.char` edge checks that avoid known multi-return gaps. |

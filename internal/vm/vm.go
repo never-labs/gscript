@@ -690,7 +690,11 @@ func (vm *VM) RegisterTableProxyLib() {
 		if len(args) >= 3 {
 			j = vmToInt(args[2])
 		}
-		var result []runtime.Value
+		count, err := runtime.CheckTableUnpackRange(name, i, j)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]runtime.Value, 0, count)
 		for k := i; k <= j; k++ {
 			v, err := vm.tableGet(t, runtime.IntValue(k))
 			if err != nil {

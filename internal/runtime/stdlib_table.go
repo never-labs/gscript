@@ -6,6 +6,21 @@ import (
 	"strings"
 )
 
+// TableUnpackMaxResults is the explicit GScript host boundary for
+// table.unpack/table.spread multi-return expansion.
+const TableUnpackMaxResults = 1_000_000
+
+func CheckTableUnpackRange(name string, i, j int64) (int, error) {
+	if j < i {
+		return 0, nil
+	}
+	count := uint64(j) - uint64(i) + 1
+	if count > TableUnpackMaxResults {
+		return 0, fmt.Errorf("too many results to table.%s (limit %d)", name, TableUnpackMaxResults)
+	}
+	return int(count), nil
+}
+
 // buildTableLib creates the "table" standard library table.
 func buildTableLib() *Table {
 	t := NewTable()
@@ -201,7 +216,11 @@ func buildTableLib() *Table {
 		if len(args) >= 3 {
 			j = toInt(args[2])
 		}
-		var result []Value
+		count, err := CheckTableUnpackRange(name, i, j)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]Value, 0, count)
 		for k := i; k <= j; k++ {
 			result = append(result, tbl.RawGet(IntValue(k)))
 		}
@@ -688,7 +707,11 @@ func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {
 		if len(args) >= 3 {
 			j = toInt(args[2])
 		}
-		var result []Value
+		count, err := CheckTableUnpackRange(name, i, j)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]Value, 0, count)
 		for k := i; k <= j; k++ {
 			v, err := interp.tableGet(t, IntValue(k))
 			if err != nil {

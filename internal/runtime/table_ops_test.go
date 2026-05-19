@@ -434,6 +434,18 @@ func TestTableUnpackSubrange(t *testing.T) {
 	}
 }
 
+func TestTableUnpackSparseRangeBoundary(t *testing.T) {
+	interp := runProgram(t, `
+		t := {[1000000000]: "tail"}
+		ok, err := pcall(table.unpack, t, 1, 1000000000)
+		result := !ok && string.find(err, "too many results", 1, true) != nil
+	`)
+	result := interp.GetGlobal("result")
+	if !result.IsBool() || !result.Bool() {
+		t.Fatalf("expected table.unpack to reject extreme sparse range, got %v", result)
+	}
+}
+
 // --- Table identity ---
 
 func TestTableIdentityAfterAssignment(t *testing.T) {
