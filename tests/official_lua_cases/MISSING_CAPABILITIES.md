@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 383 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 389 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -31,6 +31,12 @@
 - `tracegc_stats_progress_more`: `collectgarbage("stats")` 的 Go-host 诊断形状和显式 collection 后进度字段。
 - `main_generated_chunk_eval_more` / `big_generated_eval_env_more` / `heavy_generated_concat_more`: 生成代码 compile/eval 的显式环境、边界表访问和拼接压力路径。
 - `calls_fixed_arity_nested_adjust_more`: 固定参数调用里的嵌套多返回参数按单值调整，同时保持数值互递归路径可 JIT。
+- `binary_namespace_more`: `binary.pack` / `binary.unpack` / `binary.size` 的 Go-style endian/field token API。
+- `strings_go_helpers_more`: `string.split`、trim variants、`replaceAll`、`join`、`title`、padding、`isNumeric` 等 Go-host helper。
+- `utf8_go_helpers_more`: `utf8.reverse`、codepoint `sub`、Unicode case conversion、`charclass`、validate/sanitize。
+- `debug_host_helpers_more`: `debug.traceback` / `stack` / `globals` / `info` / `value` / `goStack` 的 host 诊断面。
+- `files_file_lines_streams_more`: `file:lines()`、标准流表和 `io.type` open/closed 状态。
+- `table_go_helpers_more`: table keys/values/contains/indexOf/copy/merge/count/unique/reverse/slice/zip 等非回调 helper。
 
 真正仍需补齐或明确设计取舍的缺口：
 
