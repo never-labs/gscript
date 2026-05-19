@@ -7,8 +7,9 @@
 ## 2026-05-20 覆盖审计结论
 
 当前默认官方翻译集已扩展到 391 个 passing case。`KNOWN_FAILURES.md`
-仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
-实现队列。
+仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
+GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
+case 时如果再次发现问题才需要新增的能力候选。
 
 本轮新增 VM passing case 覆盖了三类此前主要靠 runtime 单测证明的能力：
 
@@ -40,7 +41,7 @@
 - `table_higher_order_vm_callbacks_more`: table map/filter/reduce/fromArray 在 VM 文件模式下调用脚本 callback。
 - `table_proxy_concat_flatten_more`: `table.concat` 通过 proxy `__len` / `__index` 读表，以及 inline nested table literal 供 `table.flatten` 正确消费。
 
-真正仍需补齐或明确设计取舍的缺口：
+当前能力状态与设计取舍：
 
 本轮继续补 passing case 时，另观察到这些 Lua 兼容细节尚未纳入 passing
 set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lua：
@@ -49,17 +50,24 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
   固定参数目标函数会按 arity 预登记把嵌套多返回实参压成单值。需要主动展开
   非尾部多返回时，GScript 仍推荐显式 `spread(...)` / `table.spread(...)`。
 - table library 已补 bounded proxy/metatable table 读写：`table.insert` /
-  `table.sort` / `table.remove` / `table.unpack` 与 `table.move` 会通过
-  `__index` / `__newindex` / `__len` 交互；passing official 覆盖了
+  `table.sort` / `table.remove` / `table.unpack` / `table.move` 与
+  `table.concat` 会通过 `__index` / `__newindex` / `__len` 交互；passing official 覆盖了
   `table.move` / `table.unpack` / `table.sort` / `table.insert` /
-  `table.remove`，并在 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 下通过。另有剩余风险是
-  其他 table helper 的逐项兼容边界。
+  `table.remove` / `table.concat`，并在 `GSCRIPT_OFFICIAL_CHECK_JIT=1`
+  下通过。
+- `table.keys` / `table.values` / `table.count` / `table.copy` /
+  `table.merge` / `table.unique` / `table.reverse` / `table.slice` /
+  `table.zip` 是 Go-host raw table helper：它们检查真实表内容，不走
+  `__pairs` 或虚拟 `__index` 字段。需要用户语义上的 proxy 遍历时，使用
+  `pairs`；需要 bounded array-style proxy 读写时，使用上面已 VM-aware 的 helper。
 - 极值 sparse `table.unpack` 范围已补 GScript host 边界：一次
   `table.unpack` / `table.spread` 最多展开 1,000,000 个返回值，超过时立即报
   “too many results” 错误，不逐项扫描 sparse range。
-当前没有 skipped known failures；此前明确记录的 VM `const`/`defer` parity 和 VM 文件模式 debug parity 已按 GScript/Go-host 语义补齐。后续继续翻译更大的官方切片时，如发现新能力缺口，再按本文件记录。
+当前没有 skipped known failures；此前明确记录的 VM `const`/`defer` parity、VM 文件模式 debug parity、VM table higher-order callback 和 table concat proxy 语义均已按 GScript/Go-host 语义补齐。后续继续翻译更大的官方切片时，如发现新能力缺口，再按本文件记录。
 
-| 能力候选 | 来源片段 | 说明 |
+## Covered GScript equivalents
+
+| 能力 | 来源片段 | 状态 |
 |---|---|---|
 | `debug` 标准库基础信息查询 | `db.lua`: `debug.getinfo`, `debug.getlocal`, `debug.getupvalue` | 已补 GScript 风格 `debug.info`、`debug.stack`、`debug.globals`、`debug.value`，暴露函数 kind/name/参数数量/vararg/upvalue 数、运行时调用栈和 globals 快照；不复刻 Lua 局部变量槽位枚举。VM 文件模式已有 `debug.info(function)` / `debug.value` 和 frame/source 诊断官方 passing case。 |
 | `debug.traceback` 与保护调用栈信息 | `db.lua` traceback checks, `errors.lua` line/stack-message checks | 已补 `debug.traceback([message])`，基于真实 script/native 调用栈生成稳定 GScript 格式；另提供 `debug.goStack()` 给 host 诊断 Go goroutine 栈。解释器与 VM 文件模式均带 source/name/line/column 元数据。 |
@@ -76,7 +84,20 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
 | UTF-8 strict/nonstrict validation helpers | `utf8.lua`: invalid byte sequences, non-strict decoding edge cases | 已补 `utf8.validate(s)` 结构化诊断和 `utf8.sanitize(s [, replacement])` 非严格清洗 API。严格路径继续由 `utf8.valid`/`utf8.len`/`utf8.codepoint`/`utf8.codes` 使用 Go `unicode/utf8` 规则；非严格路径显式 opt-in，不复刻 Lua 内部 nonstrict 参数形态。 |
 | Binary string packing/unpacking | `tpack.lua`: `string.pack`, `string.unpack`, `string.packsize` | 已补 GScript/Go 风格 `binary.pack`/`binary.unpack`/`binary.size`，并在 `string.pack`/`string.unpack`/`string.packsize` 暴露同一套兼容入口；格式串仍采用显式 endian 和 Go-style 字段 token，不声明 Lua 格式串逐字兼容。 |
 | Full file-handle and standard-stream IO controls | `files.lua`: `file:read`, `file:seek`, `file:flush`, `io.input`, `io.output`, `io.type`, `io.tmpfile`, close-file edge cases | 已补文件句柄 `read` 的 `"a"` 全量读取、`"l"` 去换行行读取、`"L"` 保留换行行读取、`"n"` 数字读取、`read(n)` 字节数读取、`read(0)` EOF probe 和一次多个格式项顺序多返回；同时已补 `seek`/`flush`、默认输入输出流 `io.input`/`io.output`、`io.type`、`io.tmpfile`、标准流表和关闭后状态。错误返回沿用文件操作 `nil, err`、参数错误抛运行时错误的现有风格。 |
-| Process entrypoint and script-loading controls | `main.lua`, `attrib.lua`: command-line args, `-e`/`-l` style loading, `dofile`, `loadfile`, `require`, process exit/status behavior | 已补 `Interpreter.SetArgs`、全局 `arg`、`process.args`、`process.entry`、host-controlled `process.exit`、基于脚本目录解析的 `dofile`/`loadfile`/`require` 路径逻辑，以及 `require("string")`/`require("math")` 等 builtin module alias 与 `package.loaded`。CLI 将 `-e`、REPL 和文件模式入口参数统一写入 runtime。 |
+| Process entrypoint and script-loading controls | `main.lua`, `attrib.lua`: command-line args, `-e`, script-level `dofile`, `loadfile`, `require`, process exit/status behavior | 已补 `Interpreter.SetArgs`、全局 `arg`、`process.args`、`process.entry`、host-controlled `process.exit`、基于脚本目录解析的 `dofile`/`loadfile`/`require` 路径逻辑，以及 `require("string")`/`require("math")` 等 builtin module alias 与 `package.loaded`。CLI 将 `-e`、REPL 和文件模式入口参数统一写入 runtime；当前不声明支持 Lua CLI `-l module` preload flag，脚本内预加载使用 `require`。 |
 | Runtime source compilation and generated-program execution | `big.lua`, `verybig.lua`, `heavy.lua`, `code.lua`: generated chunks executed with `load` | 已补 GScript 风格 `script.compile`/`script.eval`/`script.loadFile`/`script.runFile`，并保留兼容全局 `load`/`loadfile` 入口；支持显式 env/sandbox、sourceName/source 与 scriptDir 配置，不复刻 Lua chunk dump 语义。 |
 | Raw and multiline string literal ergonomics | `literals.lua`: long brackets, delimiter-level raw strings, escape suppression | 已支持 Go-style 反引号 raw string，可跨行且不解释反斜杠转义；不复刻 Lua `[=[...]=]` 分隔符层级。 |
 | First-class integer bit operations in expressions | `bwcoercion.lua`, `code.lua`: direct bitwise expressions and coercion stress | 已支持 Go-style 表达式运算符 `&`、`|`、`^`、`&^`、`<<`、`>>` 和一元 `^`，并保留 `bits` 标准库的 rotate/bit-position/count 辅助；不复刻 Lua `~` 语法。 |
+
+## Non-goals / compat-layer mappings
+
+这些不是当前运行时缺口，除非项目后续决定提供 Lua 逐字兼容层：
+
+- Lua `debug.getlocal` / `debug.getupvalue` / `debug.getinfo` 的局部槽位协议；GScript 使用 `debug.info`、`debug.stack`、`debug.globals`、`debug.value`。
+- Lua line/count/coroutine debug hooks；GScript 使用事件式 `debug.setHook`、`debug.emit`、`debug.setSink`。
+- Lua 私有 `T.testC` API 测试协议；GScript 使用 `testkit`。
+- Lua `string.dump` / stripped binary chunk；GScript 使用 source-level `script.compile` / `script.eval` 与 source diagnostics。
+- Lua `<const>` / `<close>` 语法；GScript 使用 Go-style `const` 与 `defer`。
+- Lua `_ENV` 隐式 upvalue；GScript 使用显式 `script.env` / `script.sandbox`。
+- Lua table `__gc` finalizer；GScript 资源清理由 `defer` 表达，GC 观测用 `collectgarbage("stats")`。
+- Lua long-bracket delimiter 语法和 Lua `~` bitwise 语法；GScript 使用 Go-style raw string 与 bitwise operators。
