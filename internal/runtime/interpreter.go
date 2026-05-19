@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 
@@ -85,6 +86,9 @@ func (interp *Interpreter) Output() []string {
 
 // registerBuiltins installs standard global functions.
 func (interp *Interpreter) registerBuiltins() {
+	gcMode := "incremental"
+	gcRunning := true
+
 	interp.globals.Define("print", FunctionValue(&GoFunction{
 		Name: "print",
 		Fn: func(args []Value) ([]Value, error) {
@@ -103,7 +107,7 @@ func (interp *Interpreter) registerBuiltins() {
 		Name: "type",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) == 0 {
-				return []Value{StringValue("nil")}, nil
+				return nil, fmt.Errorf("bad argument #1 to 'type' (value expected)")
 			}
 			return []Value{StringValue(args[0].TypeName())}, nil
 		},
@@ -113,9 +117,13 @@ func (interp *Interpreter) registerBuiltins() {
 		Name: "tostring",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) == 0 {
-				return []Value{StringValue("nil")}, nil
+				return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
 			}
-			return []Value{StringValue(args[0].String())}, nil
+			s, err := interp.luaToString(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return []Value{StringValue(s)}, nil
 		},
 	}))
 
@@ -123,7 +131,14 @@ func (interp *Interpreter) registerBuiltins() {
 		Name: "tonumber",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) == 0 {
-				return []Value{NilValue()}, nil
+				return nil, fmt.Errorf("bad argument #1 to 'tonumber' (value expected)")
+			}
+			if len(args) >= 2 {
+				v, ok := tonumberWithBase(args[0], args[1])
+				if !ok {
+					return []Value{NilValue()}, nil
+				}
+				return []Value{v}, nil
 			}
 			v, ok := args[0].ToNumber()
 			if !ok {
@@ -133,7 +148,14 @@ func (interp *Interpreter) registerBuiltins() {
 		},
 		Fast1: func(args []Value) (Value, error) {
 			if len(args) == 0 {
-				return NilValue(), nil
+				return NilValue(), fmt.Errorf("bad argument #1 to 'tonumber' (value expected)")
+			}
+			if len(args) >= 2 {
+				v, ok := tonumberWithBase(args[0], args[1])
+				if !ok {
+					return NilValue(), nil
+				}
+				return v, nil
 			}
 			v, ok := args[0].ToNumber()
 			if !ok {
@@ -152,6 +174,46 @@ func (interp *Interpreter) registerBuiltins() {
 		NativeData: StdToNumberIdentityPtr(),
 	}))
 
+	interp.globals.Define("collectgarbage", FunctionValue(&GoFunction{
+		Name: "collectgarbage",
+		Fn: func(args []Value) ([]Value, error) {
+			option := "collect"
+			if len(args) > 0 && !args[0].IsNil() {
+				if args[0].Type() != TypeString {
+					return nil, fmt.Errorf("bad argument #1 to 'collectgarbage' (string expected, got %s)", args[0].TypeName())
+				}
+				option = args[0].Str()
+			}
+
+			switch option {
+			case "collect":
+				goruntime.GC()
+				return []Value{IntValue(0)}, nil
+			case "stop":
+				gcRunning = false
+				return []Value{IntValue(0)}, nil
+			case "restart":
+				gcRunning = true
+				return []Value{IntValue(0)}, nil
+			case "isrunning":
+				return []Value{BoolValue(gcRunning)}, nil
+			case "count":
+				var stats goruntime.MemStats
+				goruntime.ReadMemStats(&stats)
+				return []Value{FloatValue(float64(stats.Alloc) / 1024)}, nil
+			case "step":
+				goruntime.GC()
+				return []Value{BoolValue(false)}, nil
+			case "incremental", "generational":
+				old := gcMode
+				gcMode = option
+				return []Value{StringValue(old)}, nil
+			default:
+				return nil, fmt.Errorf("bad argument #1 to 'collectgarbage' (invalid option '%s')", option)
+			}
+		},
+	}))
+
 	interp.globals.Define("setmetatable", FunctionValue(&GoFunction{
 		Name: "setmetatable",
 		Fn: func(args []Value) ([]Value, error) {
@@ -162,6 +224,9 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected, got %s)", args[0].TypeName())
 			}
 			tbl := args[0].Table()
+			if mt := tbl.GetMetatable(); mt != nil && !mt.RawGetString("__metatable").IsNil() {
+				return nil, fmt.Errorf("cannot change a protected metatable")
+			}
 			if args[1].IsNil() {
 				tbl.SetMetatable(nil)
 			} else if args[1].IsTable() {
@@ -185,6 +250,9 @@ func (interp *Interpreter) registerBuiltins() {
 			mt := args[0].Table().GetMetatable()
 			if mt == nil {
 				return []Value{NilValue()}, nil
+			}
+			if protected := mt.RawGetString("__metatable"); !protected.IsNil() {
+				return []Value{protected}, nil
 			}
 			return []Value{TableValue(mt)}, nil
 		},
@@ -227,6 +295,24 @@ func (interp *Interpreter) registerBuiltins() {
 		},
 	}))
 
+	interp.globals.Define("rawlen", FunctionValue(&GoFunction{
+		Name: "rawlen",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) == 0 {
+				return nil, fmt.Errorf("bad argument to 'rawlen' (value expected)")
+			}
+			a := args[0]
+			switch a.Type() {
+			case TypeString:
+				return []Value{IntValue(int64(StringLen(a)))}, nil
+			case TypeTable:
+				return []Value{IntValue(int64(a.Table().Length()))}, nil
+			default:
+				return nil, fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", a.TypeName())
+			}
+		},
+	}))
+
 	interp.globals.Define("len", FunctionValue(&GoFunction{
 		Name: "len",
 		Fn: func(args []Value) ([]Value, error) {
@@ -253,7 +339,7 @@ func (interp *Interpreter) registerBuiltins() {
 		Name: "error",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) == 0 {
-				return nil, &LuaError{Value: NilValue()}
+				return nil, &LuaError{Value: StringValue("<no error object>")}
 			}
 			return nil, &LuaError{Value: args[0]}
 		},
@@ -263,7 +349,7 @@ func (interp *Interpreter) registerBuiltins() {
 		Name: "pcall",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) == 0 {
-				return []Value{BoolValue(false), StringValue("pcall requires a function")}, nil
+				return nil, fmt.Errorf("bad argument #1 to 'pcall' (value expected)")
 			}
 			fn := args[0]
 			fnArgs := args[1:]
@@ -284,7 +370,7 @@ func (interp *Interpreter) registerBuiltins() {
 		Name: "xpcall",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) < 2 {
-				return []Value{BoolValue(false), StringValue("xpcall requires a function and a handler")}, nil
+				return nil, fmt.Errorf("bad argument #%d to 'xpcall' (value expected)", len(args)+1)
 			}
 			fn := args[0]
 			handler := args[1]
@@ -313,7 +399,10 @@ func (interp *Interpreter) registerBuiltins() {
 	interp.globals.Define("assert", FunctionValue(&GoFunction{
 		Name: "assert",
 		Fn: func(args []Value) ([]Value, error) {
-			if len(args) == 0 || !args[0].Truthy() {
+			if len(args) == 0 {
+				return nil, fmt.Errorf("bad argument #1 to 'assert' (value expected)")
+			}
+			if !args[0].Truthy() {
 				msg := "assertion failed"
 				if len(args) > 1 {
 					msg = args[1].String()
@@ -340,7 +429,10 @@ func (interp *Interpreter) registerBuiltins() {
 				Name: "ipairs_iterator",
 				Fn: func(_ []Value) ([]Value, error) {
 					i++
-					v := tbl.RawGet(IntValue(i))
+					v, err := interp.tableGet(TableValue(tbl), IntValue(i))
+					if err != nil {
+						return nil, err
+					}
 					if v.IsNil() {
 						return []Value{NilValue()}, nil
 					}
@@ -358,11 +450,13 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
 			}
 			tbl := args[0].Table()
-			if tbl.keysDirty {
-				tbl.rebuildKeys()
+			if mt := tbl.GetMetatable(); mt != nil {
+				mm := mt.RawGetString("__pairs")
+				if !mm.IsNil() {
+					return interp.callFunction(mm, []Value{args[0]})
+				}
 			}
-			keys := make([]Value, len(tbl.keys))
-			copy(keys, tbl.keys)
+			keys := tbl.PairsKeysSnapshot()
 			idx := 0
 			iter := &GoFunction{
 				Name: "pairs_iterator",
@@ -376,7 +470,7 @@ func (interp *Interpreter) registerBuiltins() {
 					return []Value{k, v}, nil
 				},
 			}
-			return []Value{FunctionValue(iter)}, nil
+			return []Value{FunctionValue(iter), args[0], NilValue()}, nil
 		},
 	}))
 
@@ -393,6 +487,9 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			nk, nv, ok := tbl.Next(key)
 			if !ok {
+				if !key.IsNil() && tbl.RawGet(key).IsNil() {
+					return nil, fmt.Errorf("invalid key to 'next'")
+				}
 				return []Value{NilValue()}, nil
 			}
 			return []Value{nk, nv}, nil
@@ -413,6 +510,9 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument #1 to 'select' (number or string expected)")
 			}
 			idx := int(n.Number())
+			if idx < 0 {
+				idx = len(args) + idx
+			}
 			if idx < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'select' (index out of range)")
 			}
@@ -730,6 +830,27 @@ func (interp *Interpreter) getMetamethod(val Value, event string) (Value, bool) 
 		return NilValue(), false
 	}
 	return mm, true
+}
+
+func (interp *Interpreter) luaToString(v Value) (string, error) {
+	if v.IsTable() {
+		if mt := v.Table().GetMetatable(); mt != nil {
+			if mm := mt.RawGetString("__tostring"); !mm.IsNil() {
+				results, err := interp.callFunction(mm, []Value{v})
+				if err != nil {
+					return "", err
+				}
+				if len(results) == 0 || !results[0].IsString() {
+					return "", fmt.Errorf("'__tostring' must return a string")
+				}
+				return results[0].Str(), nil
+			}
+			if name := mt.RawGetString("__name"); name.IsString() {
+				return name.Str() + ": " + strings.TrimPrefix(v.String(), "table: "), nil
+			}
+		}
+	}
+	return v.String(), nil
 }
 
 // tableGet retrieves a value from a table, with __index metamethod support.
@@ -1711,7 +1832,11 @@ func (interp *Interpreter) arith(op string, left, right Value) (Value, error) {
 			if b == 0 {
 				return NilValue(), fmt.Errorf("attempt to perform modulo by zero")
 			}
-			return IntValue(a % b), nil
+			r := a % b
+			if r != 0 && (r^b) < 0 {
+				r += b
+			}
+			return IntValue(r), nil
 		case "**":
 			if b >= 0 && b < 64 {
 				return IntValue(intPow(a, b)), nil
@@ -1738,7 +1863,11 @@ func (interp *Interpreter) arith(op string, left, right Value) (Value, error) {
 		if b == 0 {
 			return NilValue(), fmt.Errorf("attempt to perform modulo by zero")
 		}
-		return FloatValue(math.Mod(a, b)), nil
+		r := math.Mod(a, b)
+		if r != 0 && (r < 0) != (b < 0) {
+			r += b
+		}
+		return FloatValue(r), nil
 	case "**":
 		return FloatValue(math.Pow(a, b)), nil
 	default:
@@ -2183,6 +2312,63 @@ func (interp *Interpreter) evalTableLit(e *ast.TableLitExpr, env *Environment) (
 // ------------------------------------------------------------------
 // Number parsing
 // ------------------------------------------------------------------
+func tonumberWithBase(value, baseValue Value) (Value, bool) {
+	if !value.IsString() {
+		return NilValue(), false
+	}
+	base := toInt(baseValue)
+	if base < 2 || base > 36 {
+		return NilValue(), false
+	}
+	s := strings.TrimSpace(value.Str())
+	if s == "" {
+		return NilValue(), false
+	}
+	sign := int64(1)
+	switch s[0] {
+	case '+':
+		s = s[1:]
+	case '-':
+		sign = -1
+		s = s[1:]
+	}
+	if s == "" {
+		return NilValue(), false
+	}
+
+	var acc uint64
+	for i := 0; i < len(s); i++ {
+		d := digitValue(s[i])
+		if d < 0 || int64(d) >= base {
+			return NilValue(), false
+		}
+		acc = acc*uint64(base) + uint64(d)
+	}
+	if sign < 0 {
+		if acc <= uint64(math.MaxInt64)+1 {
+			return IntValue(-int64(acc)), true
+		}
+		return FloatValue(-float64(acc)), true
+	}
+	if acc <= uint64(math.MaxInt64) {
+		return IntValue(int64(acc)), true
+	}
+	return FloatValue(float64(acc)), true
+}
+
+func digitValue(c byte) int {
+	switch {
+	case c >= '0' && c <= '9':
+		return int(c - '0')
+	case c >= 'a' && c <= 'z':
+		return int(c-'a') + 10
+	case c >= 'A' && c <= 'Z':
+		return int(c-'A') + 10
+	default:
+		return -1
+	}
+}
+
 func parseNumber(s string) (Value, error) {
 	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 		return IntValue(i), nil

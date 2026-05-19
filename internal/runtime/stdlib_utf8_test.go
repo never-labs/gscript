@@ -33,8 +33,8 @@ func TestUTF8Len_invalid(t *testing.T) {
 	if !a.IsNil() {
 		t.Errorf("expected nil for invalid UTF-8, got %v", a)
 	}
-	if !err.IsString() || err.Str() == "" {
-		t.Errorf("expected error message, got %v", err)
+	if !err.IsInt() || err.Int() != 1 {
+		t.Errorf("expected invalid byte position 1, got %v", err)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestUTF8Codepoint(t *testing.T) {
 	interp := runProgram(t, `
 		a := utf8.codepoint("A", 1)
 		b := utf8.codepoint("中文", 1)
-		c := utf8.codepoint("中文", 2)
+		c := utf8.codepoint("中文", 4)
 	`)
 	a := interp.GetGlobal("a")
 	b := interp.GetGlobal("b")
@@ -93,7 +93,10 @@ func TestUTF8Codepoint_range(t *testing.T) {
 
 func TestUTF8Codes(t *testing.T) {
 	interp := runProgram(t, `
-		result := utf8.codes("AB")
+		result := {}
+		for p, c := range utf8.codes("AB") {
+			result[#result + 1] = {pos: p, code: c}
+		}
 	`)
 	tbl := interp.GetGlobal("result").Table()
 	if tbl.Length() != 2 {

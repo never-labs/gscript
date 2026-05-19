@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -180,6 +181,12 @@ func buildStringLib() *Table {
 		}
 		if len(args) >= 3 {
 			j = int(toInt(args[2]))
+		}
+		if i < 0 {
+			i = len(s) + i + 1
+		}
+		if j < 0 {
+			j = len(s) + j + 1
 		}
 		if i < 1 {
 			i = 1
@@ -375,7 +382,7 @@ func buildStringLib() *Table {
 			maxRepl = int(toInt(args[3]))
 		}
 
-		goPattern := luaPatternToRegex(pattern)
+		goPattern, captureKinds := luaPatternToRegexWithCaptures(pattern)
 		re, err := regexp.Compile(goPattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
@@ -385,13 +392,16 @@ func buildStringLib() *Table {
 		var result string
 		if repl.IsString() {
 			replStr := repl.Str()
-			result = re.ReplaceAllStringFunc(s, func(match string) string {
-				if maxRepl >= 0 && count >= maxRepl {
-					return match
-				}
-				count++
-				return replStr
-			})
+			if err := validateLuaReplacementString(replStr, len(captureKinds)); err != nil {
+				return nil, err
+			}
+			result = replaceLuaPatternString(s, re, captureKinds, replStr, maxRepl, &count)
+		} else if repl.IsTable() {
+			var err error
+			result, err = replaceLuaPatternTable(s, re, captureKinds, repl.Table(), maxRepl, &count)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			// For non-string replacement, just do string replacement
 			replStr := repl.String()
@@ -1194,7 +1204,7 @@ func stringFormatValue(args []Value) (Value, error) {
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
 		case 'c':
-			buf.WriteRune(rune(toInt(arg)))
+			buf.WriteString(fmt.Sprintf(fmtSpec, rune(toInt(arg))))
 		case 's':
 			s := arg.String()
 			if fmtSpec == "%s" {
@@ -1204,30 +1214,78 @@ func stringFormatValue(args []Value) (Value, error) {
 				buf.WriteString(fmt.Sprintf(goFmt, s))
 			}
 		case 'q':
-			s := arg.String()
-			buf.WriteByte('"')
-			for _, c := range s {
-				switch c {
-				case '"':
-					buf.WriteString(`\"`)
-				case '\\':
-					buf.WriteString(`\\`)
-				case '\n':
-					buf.WriteString(`\n`)
-				case '\r':
-					buf.WriteString(`\r`)
-				case '\000':
-					buf.WriteString(`\0`)
-				default:
-					buf.WriteRune(c)
-				}
+			q, err := luaQuoteLiteral(arg)
+			if err != nil {
+				return NilValue(), err
 			}
-			buf.WriteByte('"')
+			buf.WriteString(q)
+		case 'p':
+			ptr := luaPointerString(arg)
+			goFmt := strings.Replace(fmtSpec, "p", "s", 1)
+			buf.WriteString(fmt.Sprintf(goFmt, ptr))
 		default:
 			return NilValue(), fmt.Errorf("invalid format specifier '%%%c'", spec)
 		}
 	}
 	return StringValue(buf.String()), nil
+}
+
+func luaPointerString(v Value) string {
+	switch v.Type() {
+	case TypeNil, TypeBool, TypeInt, TypeFloat:
+		return "(null)"
+	default:
+		return fmt.Sprintf("0x%x", v.Raw())
+	}
+}
+
+func luaQuoteLiteral(v Value) (string, error) {
+	switch v.Type() {
+	case TypeNil:
+		return "nil", nil
+	case TypeBool:
+		if v.Bool() {
+			return "true", nil
+		}
+		return "false", nil
+	case TypeInt:
+		return strconv.FormatInt(v.Int(), 10), nil
+	case TypeFloat:
+		f := v.Float()
+		if math.IsInf(f, 1) {
+			return "1e9999", nil
+		}
+		if math.IsInf(f, -1) {
+			return "-1e9999", nil
+		}
+		if math.IsNaN(f) {
+			return "(0/0)", nil
+		}
+		return strconv.FormatFloat(f, 'g', -1, 64), nil
+	case TypeString:
+		var buf strings.Builder
+		buf.WriteByte('"')
+		for _, c := range v.Str() {
+			switch c {
+			case '"':
+				buf.WriteString(`\"`)
+			case '\\':
+				buf.WriteString(`\\`)
+			case '\n':
+				buf.WriteString(`\n`)
+			case '\r':
+				buf.WriteString(`\r`)
+			case '\000':
+				buf.WriteString(`\0`)
+			default:
+				buf.WriteRune(c)
+			}
+		}
+		buf.WriteByte('"')
+		return buf.String(), nil
+	default:
+		return "", fmt.Errorf("bad argument to 'string.format' (value has no literal form)")
+	}
 }
 
 // StringFormatValue applies the stdlib string.format implementation to a
@@ -1968,9 +2026,22 @@ func toFloat(v Value) float64 {
 	}
 }
 
+type luaPatternCaptureKind uint8
+
+const (
+	luaPatternCaptureText luaPatternCaptureKind = iota
+	luaPatternCapturePosition
+)
+
 // luaPatternToRegex converts a Lua-style pattern string to a Go regex string.
 func luaPatternToRegex(pattern string) string {
+	re, _ := luaPatternToRegexWithCaptures(pattern)
+	return re
+}
+
+func luaPatternToRegexWithCaptures(pattern string) (string, []luaPatternCaptureKind) {
 	var buf strings.Builder
+	var captureKinds []luaPatternCaptureKind
 	i := 0
 	n := len(pattern)
 
@@ -2075,8 +2146,15 @@ func luaPatternToRegex(pattern string) string {
 			}
 			prevMatchable = true
 		case '(':
-			buf.WriteByte('(')
-			i++
+			if i+1 < n && pattern[i+1] == ')' {
+				buf.WriteString("()")
+				captureKinds = append(captureKinds, luaPatternCapturePosition)
+				i += 2
+			} else {
+				buf.WriteByte('(')
+				captureKinds = append(captureKinds, luaPatternCaptureText)
+				i++
+			}
 			prevMatchable = false
 		case ')':
 			buf.WriteByte(')')
@@ -2122,7 +2200,138 @@ func luaPatternToRegex(pattern string) string {
 		}
 	}
 
-	return buf.String()
+	return buf.String(), captureKinds
+}
+
+func replaceLuaPatternString(s string, re *regexp.Regexp, captureKinds []luaPatternCaptureKind, repl string, maxRepl int, count *int) string {
+	matches := re.FindAllStringSubmatchIndex(s, -1)
+	if len(matches) == 0 {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range matches {
+		if maxRepl >= 0 && *count >= maxRepl {
+			break
+		}
+		start, end := loc[0], loc[1]
+		if start < last {
+			continue
+		}
+		b.WriteString(s[last:start])
+		b.WriteString(expandLuaReplacement(s, loc, captureKinds, repl))
+		last = end
+		(*count)++
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+func replaceLuaPatternTable(s string, re *regexp.Regexp, captureKinds []luaPatternCaptureKind, repl *Table, maxRepl int, count *int) (string, error) {
+	matches := re.FindAllStringSubmatchIndex(s, -1)
+	if len(matches) == 0 {
+		return s, nil
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range matches {
+		if maxRepl >= 0 && *count >= maxRepl {
+			break
+		}
+		start, end := loc[0], loc[1]
+		if start < last {
+			continue
+		}
+		key := luaReplacementTableKey(s, loc, captureKinds)
+		val := repl.RawGet(key)
+		replacement := s[start:end]
+		if !val.IsNil() && !(val.IsBool() && !val.Bool()) {
+			if val.IsString() || val.IsNumber() {
+				replacement = val.String()
+			} else {
+				return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
+			}
+		}
+		b.WriteString(s[last:start])
+		b.WriteString(replacement)
+		last = end
+		(*count)++
+	}
+	b.WriteString(s[last:])
+	return b.String(), nil
+}
+
+func luaReplacementTableKey(s string, loc []int, captureKinds []luaPatternCaptureKind) Value {
+	if len(captureKinds) == 0 || len(loc) < 4 || loc[2] < 0 {
+		return StringValue(s[loc[0]:loc[1]])
+	}
+	if captureKinds[0] == luaPatternCapturePosition {
+		return IntValue(int64(loc[2] + 1))
+	}
+	return StringValue(s[loc[2]:loc[3]])
+}
+
+func validateLuaReplacementString(repl string, captureCount int) error {
+	for i := 0; i < len(repl); i++ {
+		if repl[i] != '%' {
+			continue
+		}
+		if i+1 >= len(repl) {
+			return fmt.Errorf("invalid use of '%%' in replacement string")
+		}
+		i++
+		ch := repl[i]
+		if ch == '%' {
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			idx := int(ch - '0')
+			if idx == 0 {
+				continue
+			}
+			if captureCount == 0 {
+				if idx == 1 {
+					continue
+				}
+			} else if idx <= captureCount {
+				continue
+			}
+			return fmt.Errorf("invalid capture index %%%c", ch)
+		}
+		return fmt.Errorf("invalid use of '%%' in replacement string")
+	}
+	return nil
+}
+
+func expandLuaReplacement(s string, loc []int, captureKinds []luaPatternCaptureKind, repl string) string {
+	var b strings.Builder
+	for i := 0; i < len(repl); i++ {
+		if repl[i] != '%' || i+1 >= len(repl) {
+			b.WriteByte(repl[i])
+			continue
+		}
+		i++
+		ch := repl[i]
+		if ch == '%' {
+			b.WriteByte('%')
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			idx := int(ch - '0')
+			pos := idx * 2
+			if idx == 1 && len(loc) == 2 {
+				b.WriteString(s[loc[0]:loc[1]])
+			} else if idx > 0 && idx <= len(captureKinds) && captureKinds[idx-1] == luaPatternCapturePosition && pos+1 < len(loc) && loc[pos] >= 0 {
+				b.WriteString(strconv.Itoa(loc[pos] + 1))
+			} else if pos+1 < len(loc) && loc[pos] >= 0 {
+				b.WriteString(s[loc[pos]:loc[pos+1]])
+			}
+			continue
+		}
+		b.WriteByte('%')
+		b.WriteByte(ch)
+	}
+	return b.String()
 }
 
 // isRegexMeta returns true if the byte is a Go regex metacharacter that

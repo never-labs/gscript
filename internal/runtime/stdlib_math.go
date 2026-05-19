@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"time"
 )
 
 // buildMathLib creates the "math" standard library table.
 func buildMathLib() *Table {
 	t := NewTable()
+	randomSeed1 := time.Now().UnixNano()
+	randomSeed2 := int64(0)
+	rng := rand.New(rand.NewSource(randomSeed1))
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -43,10 +47,7 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.ceil'")
 		}
-		if args[0].IsInt() {
-			return []Value{args[0]}, nil
-		}
-		return []Value{IntValue(int64(math.Ceil(toFloat(args[0]))))}, nil
+		return []Value{mathCeilValue(args[0])}, nil
 	})
 
 	// math.floor(x) -> int
@@ -134,6 +135,22 @@ func buildMathLib() *Table {
 		return []Value{FloatValue(math.Atan(y))}, nil
 	})
 
+	// math.deg(x)
+	set("deg", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'math.deg'")
+		}
+		return []Value{FloatValue(toFloat(args[0]) * 180 / math.Pi)}, nil
+	})
+
+	// math.rad(x)
+	set("rad", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'math.rad'")
+		}
+		return []Value{FloatValue(toFloat(args[0]) * math.Pi / 180)}, nil
+	})
+
 	// math.exp(x)
 	set("exp", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -190,7 +207,21 @@ func buildMathLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'math.fmod'")
 		}
+		if (args[1].IsInt() && args[1].Int() == 0) || (args[1].IsFloat() && args[1].Float() == 0) {
+			return nil, fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
+		}
+		if args[0].IsInt() && args[1].IsInt() {
+			return []Value{IntValue(args[0].Int() % args[1].Int())}, nil
+		}
 		return []Value{FloatValue(math.Mod(toFloat(args[0]), toFloat(args[1])))}, nil
+	})
+
+	// math.ult(m, n) -> unsigned integer comparison
+	set("ult", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'math.ult'")
+		}
+		return []Value{BoolValue(uint64(toInt(args[0])) < uint64(toInt(args[1])))}, nil
 	})
 
 	// math.modf(x) -> int, frac
@@ -198,7 +229,14 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.modf'")
 		}
-		i, f := math.Modf(toFloat(args[0]))
+		if args[0].IsInt() {
+			return []Value{args[0], FloatValue(0)}, nil
+		}
+		x := toFloat(args[0])
+		if math.IsInf(x, 0) {
+			return []Value{FloatValue(x), FloatValue(0)}, nil
+		}
+		i, f := math.Modf(x)
 		return []Value{FloatValue(i), FloatValue(f)}, nil
 	})
 
@@ -212,31 +250,49 @@ func buildMathLib() *Table {
 
 	// math.random([m [, n]])
 	set("random", func(args []Value) ([]Value, error) {
+		if len(args) > 2 {
+			return nil, fmt.Errorf("wrong number of arguments")
+		}
 		if len(args) == 0 {
-			return []Value{FloatValue(rand.Float64())}, nil
+			return []Value{FloatValue(rng.Float64())}, nil
 		}
 		if len(args) == 1 {
 			m := toInt(args[0])
+			if m == 0 {
+				return []Value{IntValue(rng.Int63())}, nil
+			}
 			if m < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'math.random' (interval is empty)")
 			}
-			return []Value{IntValue(rand.Int63n(m) + 1)}, nil
+			return []Value{IntValue(rng.Int63n(m) + 1)}, nil
 		}
 		m := toInt(args[0])
 		n := toInt(args[1])
 		if m > n {
 			return nil, fmt.Errorf("bad argument #2 to 'math.random' (interval is empty)")
 		}
-		return []Value{IntValue(m + rand.Int63n(n-m+1))}, nil
+		return []Value{IntValue(m + rng.Int63n(n-m+1))}, nil
 	})
 
-	// math.randomseed(x)
+	// math.randomseed([x [, y]])
 	set("randomseed", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.randomseed'")
+		if len(args) > 2 {
+			return nil, fmt.Errorf("wrong number of arguments")
 		}
-		rand.Seed(toInt(args[0]))
-		return nil, nil
+		if len(args) == 0 {
+			randomSeed1 = time.Now().UnixNano() & ((1 << 47) - 1)
+			randomSeed2 = 0
+		} else {
+			randomSeed1 = toInt(args[0])
+			if len(args) >= 2 {
+				randomSeed2 = toInt(args[1])
+			} else {
+				randomSeed2 = 0
+			}
+		}
+		mixedSeed2 := int64(uint64(randomSeed2) * uint64(0x9e3779b97f4a7c15))
+		rng = rand.New(rand.NewSource(randomSeed1 ^ mixedSeed2))
+		return []Value{IntValue(randomSeed1), IntValue(randomSeed2)}, nil
 	})
 
 	// math.type(x) -> "integer" | "float" | false
@@ -262,6 +318,13 @@ func buildMathLib() *Table {
 		v := args[0]
 		if v.IsInt() {
 			return []Value{v}, nil
+		}
+		if v.IsString() {
+			if n, ok := v.ToNumber(); ok {
+				v = n
+			} else {
+				return []Value{NilValue()}, nil
+			}
 		}
 		if v.IsFloat() {
 			f := v.Float()
@@ -376,5 +439,20 @@ func mathFloorValue(arg Value) Value {
 	if arg.IsInt() {
 		return arg
 	}
-	return IntValue(int64(math.Floor(toFloat(arg))))
+	f := math.Floor(toFloat(arg))
+	if math.IsInf(f, 0) || math.IsNaN(f) || f < -(1<<47) || f > (1<<47)-1 {
+		return FloatValue(f)
+	}
+	return IntValue(int64(f))
+}
+
+func mathCeilValue(arg Value) Value {
+	if arg.IsInt() {
+		return arg
+	}
+	f := math.Ceil(toFloat(arg))
+	if math.IsInf(f, 0) || math.IsNaN(f) || f < -(1<<47) || f > (1<<47)-1 {
+		return FloatValue(f)
+	}
+	return IntValue(int64(f))
 }

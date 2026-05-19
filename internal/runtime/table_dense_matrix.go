@@ -224,6 +224,7 @@ func NewDenseMatrix(rows, cols int) *Table {
 		end := start + cols
 		row := DefaultHeap.AllocTable()
 		row.arrayKind = ArrayFloat
+		row.arrayZeroValid = cols > 0
 		row.floatArray = backing[start:end:end]
 		row.keysDirty = true
 		outer.array[i] = TableValue(row)

@@ -101,8 +101,8 @@ func TestBit32Arshift(t *testing.T) {
 		result := bit32.arshift(2147483648, 4)
 	`)
 	v := interp.GetGlobal("result")
-	// int32(-2147483648) >> 4 = -134217728
-	var expected int64 = -134217728
+	// int32(-2147483648) >> 4, returned as an unsigned 32-bit result.
+	var expected int64 = 4160749568
 	if v.Int() != expected {
 		t.Errorf("expected %d, got %d", expected, v.Int())
 	}

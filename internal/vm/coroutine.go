@@ -44,6 +44,7 @@ const (
 type VMCoroutine struct {
 	status     VMCoroutineStatus
 	closure    *Closure
+	goFunction *rt.GoFunction
 	started    bool
 	leafNoCall bool
 	wrapped    bool
@@ -85,6 +86,16 @@ func NewVMCoroutine(cl *Closure) *VMCoroutine {
 		status:     VMCoroutineSuspended,
 		closure:    cl,
 		leafNoCall: cl != nil && cl.Proto != nil && protoHasNoCalls(cl.Proto),
+	}
+}
+
+// NewVMGoCoroutine creates a coroutine wrapper for a native GoFunction. Native
+// functions cannot yield, so this coroutine runs exactly once and then becomes
+// dead, matching Lua's coroutine.create over C functions.
+func NewVMGoCoroutine(gf *rt.GoFunction) *VMCoroutine {
+	return &VMCoroutine{
+		status:     VMCoroutineSuspended,
+		goFunction: gf,
 	}
 }
 
@@ -161,9 +172,13 @@ func (vm *VM) newCoroutineLib() *rt.Table {
 			}
 			cl, ok := closureFromValue(args[0])
 			if !ok {
-				// Also accept GoFunctions — wrap in a tiny VM closure is not possible,
-				// but we can use the GoFunction approach.
-				return nil, fmt.Errorf("coroutine.create expects a GScript function, got Go function")
+				gf := args[0].GoFunction()
+				if gf == nil {
+					return nil, fmt.Errorf("coroutine.create expects a GScript function")
+				}
+				co := NewVMGoCoroutine(gf)
+				vm.recordCoroutineCreated(false)
+				return []rt.Value{rt.VMCoroutineValue(unsafe.Pointer(co), co)}, nil
 			}
 			co := NewVMCoroutine(cl)
 			vm.recordCoroutineCreated(false)
@@ -236,6 +251,27 @@ func (vm *VM) newCoroutineLib() *rt.Table {
 			}
 			cl, ok := closureFromValue(args[0])
 			if !ok {
+				if gf := args[0].GoFunction(); gf != nil {
+					dead := false
+					wrapper := &rt.GoFunction{
+						Name: "wrapped_go_coroutine",
+						Fn: func(wargs []rt.Value) ([]rt.Value, error) {
+							if dead {
+								return nil, fmt.Errorf("cannot resume dead coroutine")
+							}
+							dead = true
+							results, err := gf.Fn(wargs)
+							if err != nil {
+								return nil, err
+							}
+							if len(results) == 0 {
+								return []rt.Value{rt.NilValue()}, nil
+							}
+							return results, nil
+						},
+					}
+					return []rt.Value{rt.FunctionValue(wrapper)}, nil
+				}
 				return nil, fmt.Errorf("coroutine.wrap expects a GScript function")
 			}
 			co := NewVMCoroutine(cl)
@@ -624,6 +660,20 @@ func (vm *VM) resumeCoroutineRaw(co *VMCoroutine, args []rt.Value) (bool, []rt.V
 	}
 
 	co.status = VMCoroutineRunning
+
+	if co.goFunction != nil {
+		co.started = true
+		results, err := co.goFunction.Fn(args)
+		if results == nil {
+			results = []rt.Value{}
+		}
+		co.status = VMCoroutineDead
+		vm.recordCoroutineCompleted()
+		if err != nil {
+			return false, []rt.Value{rt.StringValue(err.Error())}, nil
+		}
+		return true, results, nil
+	}
 
 	if !co.started && co.leafNoCall {
 		co.started = true

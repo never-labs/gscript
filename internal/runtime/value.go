@@ -1309,6 +1309,12 @@ func (v Value) Truthy() bool {
 }
 
 func (v Value) Equal(other Value) bool {
+	if v.IsFloat() && math.IsNaN(v.Float()) {
+		return false
+	}
+	if other.IsFloat() && math.IsNaN(other.Float()) {
+		return false
+	}
 	// Fast path: identical bit patterns.
 	if uint64(v) == uint64(other) {
 		return true
@@ -1365,10 +1371,16 @@ func (v Value) ToNumber() (Value, bool) {
 			return v, true
 		}
 	}
+	if v, ok := parseLuaHexNumber(s); ok {
+		return v, true
+	}
 	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 		return IntValue(i), true
 	}
 	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		if math.IsInf(f, 0) || math.IsNaN(f) {
+			return NilValue(), false
+		}
 		return FloatValue(f), true
 	}
 	return NilValue(), false
@@ -1414,6 +1426,111 @@ func parseFastDecimalInt(s string) (Value, bool) {
 		return IntValue(-int64(n)), true
 	}
 	return IntValue(int64(n)), true
+}
+
+func parseLuaHexNumber(s string) (Value, bool) {
+	if len(s) < 3 {
+		return NilValue(), false
+	}
+	neg := false
+	i := 0
+	switch s[0] {
+	case '-':
+		neg = true
+		i++
+	case '+':
+		i++
+	}
+	if i+2 > len(s) || s[i] != '0' || (s[i+1] != 'x' && s[i+1] != 'X') {
+		return NilValue(), false
+	}
+	i += 2
+
+	mant := 0.0
+	digits := 0
+	hasDot := false
+	frac := 1.0 / 16.0
+	for i < len(s) {
+		c := s[i]
+		if c == '.' {
+			if hasDot {
+				return NilValue(), false
+			}
+			hasDot = true
+			i++
+			continue
+		}
+		d := hexDigitValue(c)
+		if d < 0 {
+			break
+		}
+		if hasDot {
+			mant += float64(d) * frac
+			frac /= 16.0
+		} else {
+			mant = mant*16.0 + float64(d)
+		}
+		digits++
+		i++
+	}
+	if digits == 0 {
+		return NilValue(), false
+	}
+
+	hasExp := false
+	exp := 0
+	expNeg := false
+	if i < len(s) && (s[i] == 'p' || s[i] == 'P') {
+		hasExp = true
+		i++
+		if i < len(s) {
+			switch s[i] {
+			case '-':
+				expNeg = true
+				i++
+			case '+':
+				i++
+			}
+		}
+		expDigits := 0
+		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+			exp = exp*10 + int(s[i]-'0')
+			expDigits++
+			i++
+		}
+		if expDigits == 0 {
+			return NilValue(), false
+		}
+	}
+	if i != len(s) {
+		return NilValue(), false
+	}
+	if expNeg {
+		exp = -exp
+	}
+	if hasExp {
+		mant = math.Ldexp(mant, exp)
+	}
+	if neg {
+		mant = -mant
+	}
+	if !hasDot && !hasExp && mant >= float64(math.MinInt64) && mant <= float64(math.MaxInt64) {
+		return IntValue(int64(mant)), true
+	}
+	return FloatValue(mant), true
+}
+
+func hexDigitValue(c byte) int {
+	switch {
+	case c >= '0' && c <= '9':
+		return int(c - '0')
+	case c >= 'a' && c <= 'f':
+		return int(c-'a') + 10
+	case c >= 'A' && c <= 'F':
+		return int(c-'A') + 10
+	default:
+		return -1
+	}
 }
 
 // ---------------------------------------------------------------------------

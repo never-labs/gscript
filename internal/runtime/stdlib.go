@@ -69,6 +69,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Low-level ---
 	interp.globals.Define("bit32", TableValue(buildBit32Lib()))
+	interp.globals.Define("bits", TableValue(buildBitsLib()))
 
 	// --- Random number generation ---
 	interp.globals.Define("rand", TableValue(buildRandLib()))

@@ -387,7 +387,7 @@ func TestBaselineGetTable_FloatArray(t *testing.T) {
 	compareVMvsJIT(t, `
 func f() {
     t := {1.5, 2.5, 3.5}
-    return t[0] + t[1] + t[2]
+    return t[1] + t[2] + t[3]
 }
 result := 0.0
 for i := 1; i <= 200; i++ { result = f() }

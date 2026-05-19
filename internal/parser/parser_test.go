@@ -745,6 +745,37 @@ func TestNestedUnary(t *testing.T) {
 	}
 }
 
+func TestPowerBindsTighterThanUnaryOnLeft(t *testing.T) {
+	prog := mustParse(t, `x := -2 ** 2`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	unary, ok := decl.Values[0].(*ast.UnaryExpr)
+	if !ok {
+		t.Fatalf("expected UnaryExpr, got %T", decl.Values[0])
+	}
+	pow, ok := unary.Operand.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected power operand, got %T", unary.Operand)
+	}
+	if pow.Op != "**" {
+		t.Fatalf("expected power op, got %q", pow.Op)
+	}
+}
+
+func TestPowerAcceptsUnaryExponent(t *testing.T) {
+	prog := mustParse(t, `x := 2 ** -2`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	pow, ok := decl.Values[0].(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected BinaryExpr, got %T", decl.Values[0])
+	}
+	if pow.Op != "**" {
+		t.Fatalf("expected power op, got %q", pow.Op)
+	}
+	if _, ok := pow.Right.(*ast.UnaryExpr); !ok {
+		t.Fatalf("expected unary exponent, got %T", pow.Right)
+	}
+}
+
 // ============================================================
 // Postfix expressions
 // ============================================================

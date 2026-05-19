@@ -66,16 +66,26 @@ func (t *Table) demoteToMixed() {
 	switch t.arrayKind {
 	case ArrayInt:
 		n := len(t.intArray)
+		zeroValid := t.arrayZeroValid
 		t.array = DefaultHeap.AllocValues(n, cap(t.intArray))
 		for i := 0; i < n; i++ {
-			t.array[i] = IntValue(t.intArray[i])
+			if i == 0 && !zeroValid {
+				t.array[i] = NilValue()
+			} else {
+				t.array[i] = IntValue(t.intArray[i])
+			}
 		}
 		t.intArray = nil
 	case ArrayFloat:
 		n := len(t.floatArray)
+		zeroValid := t.arrayZeroValid
 		t.array = DefaultHeap.AllocValues(n, cap(t.floatArray))
 		for i := 0; i < n; i++ {
-			t.array[i] = FloatValue(t.floatArray[i])
+			if i == 0 && !zeroValid {
+				t.array[i] = NilValue()
+			} else {
+				t.array[i] = FloatValue(t.floatArray[i])
+			}
 		}
 		t.floatArray = nil
 	case ArrayBool:
@@ -93,6 +103,7 @@ func (t *Table) demoteToMixed() {
 		}
 		t.boolArray = nil
 	}
+	t.arrayZeroValid = false
 	t.arrayKind = ArrayMixed
 }
 
@@ -152,6 +163,9 @@ func (t *Table) PlainIntArrayRegionForNumericKernel(lo, hi int) ([]int64, bool) 
 	if hi >= len(t.intArray) {
 		return nil, false
 	}
+	if lo == 0 && !t.arrayZeroValid {
+		return nil, false
+	}
 	return t.intArray[lo : hi+1], true
 }
 
@@ -202,6 +216,9 @@ func (t *Table) RawSetInt(key int64, val Value) {
 		case ArrayInt:
 			vk := classifyValueForArray(val)
 			if vk == ArrayInt {
+				if key == 0 {
+					t.arrayZeroValid = true
+				}
 				t.intArray[key] = valueToInt64(val)
 				return
 			}
@@ -211,6 +228,9 @@ func (t *Table) RawSetInt(key int64, val Value) {
 			return
 		case ArrayFloat:
 			if val.Type() == TypeFloat {
+				if key == 0 {
+					t.arrayZeroValid = true
+				}
 				t.floatArray[key] = val.Float()
 				return
 			}
@@ -244,12 +264,14 @@ func (t *Table) RawSetInt(key int64, val Value) {
 				switch vk {
 				case ArrayInt:
 					t.arrayKind = ArrayInt
+					t.arrayZeroValid = true
 					t.intArray = DefaultHeap.AllocInt64s(1, typedArrayCapWithHint(1, capHint))
 					t.intArray[0] = valueToInt64(val)
 					t.array = nil
 					return
 				case ArrayFloat:
 					t.arrayKind = ArrayFloat
+					t.arrayZeroValid = true
 					t.floatArray = DefaultHeap.AllocFloat64s(1, typedArrayCapWithHint(1, capHint))
 					t.floatArray[0] = val.Float()
 					t.array = nil
@@ -278,6 +300,9 @@ func (t *Table) RawSetInt(key int64, val Value) {
 		case ArrayInt:
 			vk := classifyValueForArray(val)
 			if vk == ArrayInt {
+				if key == 0 {
+					t.arrayZeroValid = true
+				}
 				arenaAppendInt64(DefaultHeap, &t.intArray, valueToInt64(val))
 				t.absorbKeys()
 				return
@@ -288,6 +313,9 @@ func (t *Table) RawSetInt(key int64, val Value) {
 			return
 		case ArrayFloat:
 			if val.Type() == TypeFloat {
+				if key == 0 {
+					t.arrayZeroValid = true
+				}
 				arenaAppendFloat64(DefaultHeap, &t.floatArray, val.Float())
 				t.absorbKeys()
 				return
@@ -321,12 +349,14 @@ func (t *Table) RawSetInt(key int64, val Value) {
 					switch vk {
 					case ArrayInt:
 						t.arrayKind = ArrayInt
+						t.arrayZeroValid = true
 						t.intArray = DefaultHeap.AllocInt64s(1, typedArrayCapWithHint(1, capHint))
 						t.intArray[0] = valueToInt64(val)
 						t.absorbKeys()
 						return
 					case ArrayFloat:
 						t.arrayKind = ArrayFloat
+						t.arrayZeroValid = true
 						t.floatArray = DefaultHeap.AllocFloat64s(1, typedArrayCapWithHint(1, capHint))
 						t.floatArray[0] = val.Float()
 						t.absorbKeys()
@@ -354,6 +384,7 @@ func (t *Table) RawSetInt(key int64, val Value) {
 						t.arrayKind = ArrayInt
 						t.intArray = DefaultHeap.AllocInt64s(1, typedArrayCapWithHint(1, capHint))
 						if !a0.IsNil() {
+							t.arrayZeroValid = true
 							t.intArray[0] = valueToInt64(a0)
 						}
 						arenaAppendInt64(DefaultHeap, &t.intArray, valueToInt64(val))
@@ -364,6 +395,7 @@ func (t *Table) RawSetInt(key int64, val Value) {
 						t.arrayKind = ArrayFloat
 						t.floatArray = DefaultHeap.AllocFloat64s(1, typedArrayCapWithHint(1, capHint))
 						if !a0.IsNil() {
+							t.arrayZeroValid = true
 							t.floatArray[0] = a0.Float()
 						}
 						arenaAppendFloat64(DefaultHeap, &t.floatArray, val.Float())
@@ -403,12 +435,8 @@ func (t *Table) RawSetInt(key int64, val Value) {
 		needed := int(key) + 1
 		switch t.arrayKind {
 		case ArrayInt:
-			vk := classifyValueForArray(val)
-			if vk == ArrayInt {
-				if needed > cap(t.intArray) {
-					t.intArray = DefaultHeap.GrowInt64s(t.intArray, growTypedArrayCap(cap(t.intArray), needed))
-				}
-				t.intArray = t.intArray[:needed]
+			if arrLen == 0 && key == 1 && classifyValueForArray(val) == ArrayInt {
+				t.intArray = DefaultHeap.AllocInt64s(needed, typedArrayCapWithHint(needed, t.typedArrayCapacityHint()))
 				t.intArray[key] = valueToInt64(val)
 				t.absorbKeys()
 				return
@@ -416,11 +444,8 @@ func (t *Table) RawSetInt(key int64, val Value) {
 			t.demoteToMixed()
 			// Fall through to mixed sparse expansion
 		case ArrayFloat:
-			if val.Type() == TypeFloat {
-				if needed > cap(t.floatArray) {
-					t.floatArray = DefaultHeap.GrowFloat64s(t.floatArray, growTypedArrayCap(cap(t.floatArray), needed))
-				}
-				t.floatArray = t.floatArray[:needed]
+			if arrLen == 0 && key == 1 && val.Type() == TypeFloat {
+				t.floatArray = DefaultHeap.AllocFloat64s(needed, typedArrayCapWithHint(needed, t.typedArrayCapacityHint()))
 				t.floatArray[key] = val.Float()
 				t.absorbKeys()
 				return
@@ -455,27 +480,26 @@ func (t *Table) RawSetInt(key int64, val Value) {
 				}
 				a0Compatible := a0.IsNil() || classifyValueForArray(a0) == vk
 				if a0Compatible {
+					typedNumericHasNoVisibleHole := key == 1 && a0.IsNil()
 					switch vk {
 					case ArrayInt:
-						t.arrayKind = ArrayInt
-						t.intArray = DefaultHeap.AllocInt64s(needed, typedArrayCapWithHint(needed, capHint))
-						if !a0.IsNil() {
-							t.intArray[0] = valueToInt64(a0)
+						if typedNumericHasNoVisibleHole {
+							t.arrayKind = ArrayInt
+							t.intArray = DefaultHeap.AllocInt64s(needed, typedArrayCapWithHint(needed, capHint))
+							t.intArray[key] = valueToInt64(val)
+							t.array = nil
+							t.absorbKeys()
+							return
 						}
-						t.intArray[key] = valueToInt64(val)
-						t.array = nil
-						t.absorbKeys()
-						return
 					case ArrayFloat:
-						t.arrayKind = ArrayFloat
-						t.floatArray = DefaultHeap.AllocFloat64s(needed, typedArrayCapWithHint(needed, capHint))
-						if !a0.IsNil() {
-							t.floatArray[0] = a0.Float()
+						if typedNumericHasNoVisibleHole {
+							t.arrayKind = ArrayFloat
+							t.floatArray = DefaultHeap.AllocFloat64s(needed, typedArrayCapWithHint(needed, capHint))
+							t.floatArray[key] = val.Float()
+							t.array = nil
+							t.absorbKeys()
+							return
 						}
-						t.floatArray[key] = val.Float()
-						t.array = nil
-						t.absorbKeys()
-						return
 					case ArrayBool:
 						t.arrayKind = ArrayBool
 						t.boolArray = DefaultHeap.AllocByteSlice(needed, typedArrayCapWithHint(needed, capHint)) // zeros = nil sentinel
@@ -576,6 +600,9 @@ func (t *Table) appendToTypedArray(val Value) {
 	case ArrayInt:
 		vk := classifyValueForArray(val)
 		if vk == ArrayInt {
+			if len(t.intArray) == 0 {
+				t.arrayZeroValid = true
+			}
 			arenaAppendInt64(DefaultHeap, &t.intArray, valueToInt64(val))
 		} else {
 			t.demoteToMixed()
@@ -583,6 +610,9 @@ func (t *Table) appendToTypedArray(val Value) {
 		}
 	case ArrayFloat:
 		if val.Type() == TypeFloat {
+			if len(t.floatArray) == 0 {
+				t.arrayZeroValid = true
+			}
 			arenaAppendFloat64(DefaultHeap, &t.floatArray, val.Float())
 		} else {
 			t.demoteToMixed()

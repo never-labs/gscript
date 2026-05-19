@@ -413,12 +413,13 @@ func TestArrayKindMixedFromStart(t *testing.T) {
 }
 
 func TestArrayKindSparseExpansion(t *testing.T) {
-	// Test sparse array expansion with typed arrays
+	// Sparse numeric writes must preserve Lua nil holes, so int arrays demote
+	// to mixed storage once a write skips over an array index.
 	tbl := NewTable()
 	tbl.RawSetInt(1, IntValue(10))
-	tbl.RawSetInt(5, IntValue(50)) // sparse - should trigger expansion
-	if tbl.arrayKind != ArrayInt {
-		t.Errorf("expected ArrayInt, got %d", tbl.arrayKind)
+	tbl.RawSetInt(5, IntValue(50))
+	if tbl.arrayKind != ArrayMixed {
+		t.Errorf("expected ArrayMixed for sparse int holes, got %d", tbl.arrayKind)
 	}
 	v1 := tbl.RawGetInt(1)
 	if !v1.IsInt() || v1.Int() != 10 {
@@ -428,10 +429,23 @@ func TestArrayKindSparseExpansion(t *testing.T) {
 	if !v5.IsInt() || v5.Int() != 50 {
 		t.Errorf("expected 50, got %v", v5)
 	}
-	// Check gaps return 0 (int zero, which is falsy like nil for sieve)
 	v2 := tbl.RawGetInt(2)
-	if !v2.IsInt() || v2.Int() != 0 {
-		t.Errorf("expected IntValue(0) for gap, got %v", v2)
+	if !v2.IsNil() {
+		t.Errorf("expected nil for sparse gap, got %v", v2)
+	}
+}
+
+func TestArrayKindDeleteAllDoesNotExposeTypedZero(t *testing.T) {
+	tbl := NewTable()
+	tbl.RawSetInt(1, IntValue(1))
+	tbl.RawSetInt(2, IntValue(1))
+	tbl.RawSetInt(1, NilValue())
+	tbl.RawSetInt(2, NilValue())
+	if v := tbl.RawGetInt(0); !v.IsNil() {
+		t.Fatalf("RawGetInt(0) after typed demotion = %v, want nil", v)
+	}
+	if k, v, ok := tbl.Next(NilValue()); ok || !k.IsNil() || !v.IsNil() {
+		t.Fatalf("Next after deleting all typed values = (%v, %v, %v), want nil nil false", k, v, ok)
 	}
 }
 

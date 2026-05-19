@@ -138,17 +138,15 @@ func TestModPositive(t *testing.T) {
 
 func TestModNegativeDividend(t *testing.T) {
 	v := getGlobal(t, `result := -7 % 3`, "result")
-	// Go semantics: -7 % 3 = -1
-	if !v.IsInt() || v.Int() != -1 {
-		t.Errorf("expected int -1, got %v", v)
+	if !v.IsInt() || v.Int() != 2 {
+		t.Errorf("expected int 2, got %v", v)
 	}
 }
 
 func TestModNegativeDivisor(t *testing.T) {
 	v := getGlobal(t, `result := 7 % -3`, "result")
-	// Go semantics: 7 % -3 = 1
-	if !v.IsInt() || v.Int() != 1 {
-		t.Errorf("expected int 1, got %v", v)
+	if !v.IsInt() || v.Int() != -2 {
+		t.Errorf("expected int -2, got %v", v)
 	}
 }
 

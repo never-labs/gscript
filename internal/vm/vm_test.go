@@ -1186,6 +1186,31 @@ ok2, v2 := coroutine.resume(co, 20)
 	expectGlobalInt(t, g, "v2", 21)
 }
 
+func TestVMCoroutineCreateGoFunction(t *testing.T) {
+	g := compileAndRun(t, `
+co := coroutine.create(assert)
+ok1, a, b := coroutine.resume(co, true, "native-ok")
+status1 := coroutine.status(co)
+ok2, msg2 := coroutine.resume(co, true)
+errco := coroutine.create(error)
+ok3, msg3 := coroutine.resume(errco, "native_error")
+status3 := coroutine.status(errco)
+`)
+	expectGlobalBool(t, g, "ok1", true)
+	expectGlobalBool(t, g, "a", true)
+	expectGlobalString(t, g, "b", "native-ok")
+	expectGlobalString(t, g, "status1", "dead")
+	expectGlobalBool(t, g, "ok2", false)
+	if msg := g["msg2"].String(); !strings.Contains(msg, "dead") {
+		t.Fatalf("msg2 = %q, want dead coroutine error", msg)
+	}
+	expectGlobalBool(t, g, "ok3", false)
+	if msg := g["msg3"].String(); !strings.Contains(msg, "native_error") {
+		t.Fatalf("msg3 = %q, want native_error", msg)
+	}
+	expectGlobalString(t, g, "status3", "dead")
+}
+
 // Test 3: coroutine.wrap creates an iterator function
 func TestVMCoroutineWrap(t *testing.T) {
 	g := compileAndRun(t, `

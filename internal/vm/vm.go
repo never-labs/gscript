@@ -1,8 +1,11 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -84,6 +87,7 @@ type VM struct {
 	coroutineCreateFn  *runtime.GoFunction
 	coroutineResumeFn  *runtime.GoFunction
 	coroutineYieldFn   *runtime.GoFunction
+	ipairsIteratorFn   *runtime.GoFunction
 }
 
 // SetMethodJIT sets the Method JIT engine for this VM.
@@ -321,6 +325,264 @@ func (vm *VM) SetGlobal(name string, val runtime.Value) {
 	vm.globalsMu.Unlock()
 }
 
+// RegisterProtectedCallLib installs VM-aware pcall/xpcall builtins so protected
+// calls can invoke ordinary VM closures.
+func (vm *VM) RegisterProtectedCallLib() {
+	vm.SetGlobal("pcall", runtime.FunctionValue(vm.newPCallFunction()))
+	vm.SetGlobal("xpcall", runtime.FunctionValue(vm.newXPCallFunction()))
+}
+
+// RegisterToStringLib installs a VM-aware tostring builtin so __tostring
+// metamethods implemented as VM closures can be invoked correctly.
+func (vm *VM) RegisterToStringLib() {
+	vm.SetGlobal("tostring", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "tostring",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) == 0 {
+				return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
+			}
+			s, err := vm.luaToString(args[0])
+			if err != nil {
+				return nil, err
+			}
+			return []runtime.Value{runtime.StringValue(s)}, nil
+		},
+	}))
+}
+
+func (vm *VM) luaToString(v runtime.Value) (string, error) {
+	if v.IsTable() {
+		if mt := v.Table().GetMetatable(); mt != nil {
+			if mm := mt.RawGetString("__tostring"); !mm.IsNil() {
+				results, err := vm.callValue(mm, []runtime.Value{v})
+				if err != nil {
+					return "", err
+				}
+				if len(results) == 0 || !results[0].IsString() {
+					return "", fmt.Errorf("'__tostring' must return a string")
+				}
+				return results[0].Str(), nil
+			}
+			if name := mt.RawGetString("__name"); name.IsString() {
+				return name.Str() + ": " + strings.TrimPrefix(v.String(), "table: "), nil
+			}
+		}
+	}
+	return v.String(), nil
+}
+
+func protectedErrorValue(err error) runtime.Value {
+	var luaErr *runtime.LuaError
+	if errors.As(err, &luaErr) {
+		return luaErr.Value
+	}
+	return runtime.StringValue(err.Error())
+}
+
+func (vm *VM) newPCallFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "pcall",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) == 0 {
+				return nil, fmt.Errorf("bad argument #1 to 'pcall' (value expected)")
+			}
+			results, err := vm.callValue(args[0], args[1:])
+			if err != nil {
+				return []runtime.Value{runtime.BoolValue(false), protectedErrorValue(err)}, nil
+			}
+			return append([]runtime.Value{runtime.BoolValue(true)}, results...), nil
+		},
+	}
+}
+
+func (vm *VM) newXPCallFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "xpcall",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 2 {
+				return nil, fmt.Errorf("bad argument #%d to 'xpcall' (value expected)", len(args)+1)
+			}
+			results, err := vm.callValue(args[0], args[2:])
+			if err == nil {
+				return append([]runtime.Value{runtime.BoolValue(true)}, results...), nil
+			}
+			handlerResults, handlerErr := vm.callValue(args[1], []runtime.Value{protectedErrorValue(err)})
+			if handlerErr != nil {
+				return []runtime.Value{runtime.BoolValue(false), protectedErrorValue(handlerErr)}, nil
+			}
+			msg := runtime.NilValue()
+			if len(handlerResults) > 0 {
+				msg = handlerResults[0]
+			}
+			return []runtime.Value{runtime.BoolValue(false), msg}, nil
+		},
+	}
+}
+
+// RegisterPairsLib installs a VM-aware pairs builtin so __pairs metamethods
+// can be ordinary VM closures.
+func (vm *VM) RegisterPairsLib() {
+	vm.SetGlobal("pairs", runtime.FunctionValue(vm.newPairsFunction()))
+}
+
+// RegisterTableSortLib installs a VM-aware table.sort so file-loaded VM
+// closures can be used as comparators.
+func (vm *VM) RegisterTableSortLib() {
+	tblVal, ok := vm.globals["table"]
+	if !ok || !tblVal.IsTable() {
+		return
+	}
+	tblVal.Table().RawSet(runtime.StringValue("sort"), runtime.FunctionValue(vm.newTableSortFunction()))
+}
+
+func (vm *VM) newTableSortFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "table.sort",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+			}
+			tbl := args[0].Table()
+			length := tbl.Length()
+			elems := make([]runtime.Value, length)
+			for i := 0; i < length; i++ {
+				elems[i] = tbl.RawGet(runtime.IntValue(int64(i + 1)))
+			}
+
+			var sortErr error
+			if len(args) >= 2 && args[1].IsFunction() {
+				comp := args[1]
+				sort.SliceStable(elems, func(a, b int) bool {
+					if sortErr != nil {
+						return false
+					}
+					results, err := vm.callValue(comp, []runtime.Value{elems[a], elems[b]})
+					if err != nil {
+						sortErr = err
+						return false
+					}
+					if len(results) > 0 && results[0].Truthy() {
+						reverse, err := vm.callValue(comp, []runtime.Value{elems[b], elems[a]})
+						if err != nil {
+							sortErr = err
+							return false
+						}
+						if len(reverse) > 0 && reverse[0].Truthy() {
+							sortErr = fmt.Errorf("invalid order function for sorting")
+							return false
+						}
+						return true
+					}
+					return false
+				})
+			} else {
+				sort.SliceStable(elems, func(a, b int) bool {
+					if sortErr != nil {
+						return false
+					}
+					less, err := vm.valueLessThan(elems[a], elems[b])
+					if err != nil {
+						sortErr = err
+						return false
+					}
+					return less
+				})
+			}
+			if sortErr != nil {
+				return nil, sortErr
+			}
+			for i, val := range elems {
+				tbl.RawSet(runtime.IntValue(int64(i+1)), val)
+			}
+			return nil, nil
+		},
+	}
+}
+
+// RegisterIPairsLib installs a VM-aware ipairs builtin so ordinary indexing
+// during iteration can invoke VM __index closures.
+func (vm *VM) RegisterIPairsLib() {
+	if vm.ipairsIteratorFn == nil {
+		vm.ipairsIteratorFn = vm.newIPairsIteratorFunction()
+	}
+	vm.SetGlobal("ipairs", runtime.FunctionValue(vm.newIPairsFunction()))
+}
+
+func (vm *VM) newIPairsFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "ipairs",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'ipairs' (table expected)")
+			}
+			return []runtime.Value{runtime.FunctionValue(vm.ipairsIteratorFn), args[0], runtime.IntValue(0)}, nil
+		},
+	}
+}
+
+func (vm *VM) newIPairsIteratorFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "ipairs_iterator",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'for iterator' (table expected)")
+			}
+			i := int64(0)
+			if len(args) >= 2 && !args[1].IsNil() {
+				if args[1].IsInt() {
+					i = args[1].Int()
+				} else if args[1].IsFloat() {
+					i = int64(args[1].Float())
+				} else {
+					return nil, fmt.Errorf("bad argument #2 to 'for iterator' (number expected)")
+				}
+			}
+			i++
+			key := runtime.IntValue(i)
+			v, err := vm.tableGet(args[0], key)
+			if err != nil {
+				return nil, err
+			}
+			if v.IsNil() {
+				return []runtime.Value{runtime.NilValue()}, nil
+			}
+			return []runtime.Value{key, v}, nil
+		},
+	}
+}
+
+func (vm *VM) newPairsFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "pairs",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
+			}
+			tbl := args[0].Table()
+			if mt := tbl.GetMetatable(); mt != nil {
+				mm := mt.RawGetString("__pairs")
+				if !mm.IsNil() {
+					return vm.callValue(mm, []runtime.Value{args[0]})
+				}
+			}
+			keys := tbl.PairsKeysSnapshot()
+			idx := 0
+			iter := &runtime.GoFunction{
+				Name: "pairs_iterator",
+				Fn: func(_ []runtime.Value) ([]runtime.Value, error) {
+					if idx >= len(keys) {
+						return []runtime.Value{runtime.NilValue()}, nil
+					}
+					k := keys[idx]
+					idx++
+					return []runtime.Value{k, tbl.RawGet(k)}, nil
+				},
+			}
+			return []runtime.Value{runtime.FunctionValue(iter), args[0], runtime.NilValue()}, nil
+		},
+	}
+}
+
 // PrepareTier2GlobalArray resolves the requested string constants as indexed
 // globals and returns the data needed by the Tier 2 indexed-global fast path.
 // The native path is enabled only for single-threaded VMs without per-VM
@@ -466,6 +728,11 @@ func New(globals map[string]runtime.Value) *VM {
 		noGlobalLock:       true, // single-threaded by default
 	}
 	v.RegisterCoroutineLib()
+	v.RegisterProtectedCallLib()
+	v.RegisterToStringLib()
+	v.RegisterIPairsLib()
+	v.RegisterPairsLib()
+	v.RegisterTableSortLib()
 	v.registerChannelBuiltins()
 	runtime.RegisterVM(v)
 	return v
@@ -592,6 +859,10 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		coroutineStats:     parent.coroutineStats,
 	}
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
+	child.setGlobalOverride("pcall", runtime.FunctionValue(child.newPCallFunction()))
+	child.setGlobalOverride("xpcall", runtime.FunctionValue(child.newXPCallFunction()))
+	child.setGlobalOverride("ipairs", runtime.FunctionValue(child.newIPairsFunction()))
+	child.setGlobalOverride("pairs", runtime.FunctionValue(child.newPairsFunction()))
 	runtime.RegisterVM(child)
 	return child
 }
@@ -629,6 +900,11 @@ func newIsolatedChildVM(parent *VM) *VM {
 		coroutineStats:     parent.coroutineStats,
 	}
 	child.RegisterCoroutineLib()
+	child.RegisterProtectedCallLib()
+	child.RegisterToStringLib()
+	child.RegisterIPairsLib()
+	child.RegisterPairsLib()
+	child.RegisterTableSortLib()
 	runtime.RegisterVM(child)
 	return child
 }
@@ -1513,7 +1789,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					frame.pc++
 				}
 			} else {
-				if (*bp).Equal(*cp) != (a != 0) {
+				eq, err := vm.valueEqual(*bp, *cp)
+				if err != nil {
+					return nil, err
+				}
+				if eq != (a != 0) {
 					frame.pc++
 				}
 			}
@@ -1547,9 +1827,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					frame.pc++
 				}
 			} else {
-				lt, ok := (*bp).LessThan(*cp)
-				if !ok {
-					return nil, fmt.Errorf("attempt to compare %s with %s at pc=%d B=%d C=%d bp=0x%x cp=0x%x", bp.TypeName(), cp.TypeName(), frame.pc-1, bidx, cidx, uint64(*bp), uint64(*cp))
+				lt, err := vm.valueLessThan(*bp, *cp)
+				if err != nil {
+					return nil, fmt.Errorf("%w at pc=%d B=%d C=%d bp=0x%x cp=0x%x", err, frame.pc-1, bidx, cidx, uint64(*bp), uint64(*cp))
 				}
 				if lt != (a != 0) {
 					frame.pc++
@@ -1585,11 +1865,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					frame.pc++
 				}
 			} else {
-				lt, ok := (*cp).LessThan(*bp)
-				if !ok {
-					return nil, fmt.Errorf("attempt to compare %s with %s", bp.TypeName(), cp.TypeName())
+				le, err := vm.valueLessEqual(*bp, *cp)
+				if err != nil {
+					return nil, err
 				}
-				if !lt != (a != 0) {
+				if le != (a != 0) {
 					frame.pc++
 				}
 			}
@@ -2367,7 +2647,14 @@ func (vm *VM) tryFastCoroutineCall(gf *runtime.GoFunction, base, a, nArgs, c int
 		}
 		cl, ok := closureFromValue(vm.regs[base+a+1])
 		if !ok {
-			return true, fmt.Errorf("coroutine.create expects a GScript function, got Go function")
+			gf := vm.regs[base+a+1].GoFunction()
+			if gf == nil {
+				return true, fmt.Errorf("coroutine.create expects a GScript function")
+			}
+			co := NewVMGoCoroutine(gf)
+			vm.recordCoroutineCreated(false)
+			vm.writeSingleCallResult(base+a, c, runtime.VMCoroutineValue(unsafe.Pointer(co), co))
+			return true, nil
 		}
 		co := NewVMCoroutine(cl)
 		vm.recordCoroutineCreated(false)
@@ -2408,7 +2695,14 @@ func (vm *VM) tryFastCoroutineCall(gf *runtime.GoFunction, base, a, nArgs, c int
 		}
 		cl, ok := closureFromValue(vm.regs[base+a+1])
 		if !ok {
-			return true, fmt.Errorf("coroutine.create expects a GScript function, got Go function")
+			gf := vm.regs[base+a+1].GoFunction()
+			if gf == nil {
+				return true, fmt.Errorf("coroutine.create expects a GScript function")
+			}
+			co := NewVMGoCoroutine(gf)
+			vm.recordCoroutineCreated(false)
+			vm.writeSingleCallResult(base+a, c, runtime.VMCoroutineValue(unsafe.Pointer(co), co))
+			return true, nil
 		}
 		co := NewVMCoroutine(cl)
 		vm.recordCoroutineCreated(false)
@@ -3006,6 +3300,63 @@ func (vm *VM) concatPair(a, b runtime.Value) (runtime.Value, error) {
 		return runtime.NilValue(), fmt.Errorf("attempt to concatenate a %s value", a.TypeName())
 	}
 	return runtime.NilValue(), fmt.Errorf("attempt to concatenate a %s value", b.TypeName())
+}
+
+func (vm *VM) valueEqual(a, b runtime.Value) (bool, error) {
+	if a.IsTable() && b.IsTable() {
+		if a.Table() == b.Table() {
+			return true, nil
+		}
+		mm, err := vm.getMetamethod(a, b, "__eq")
+		if err == nil && !mm.IsNil() {
+			results, err := vm.callValue(mm, []runtime.Value{a, b})
+			if err != nil {
+				return false, err
+			}
+			if len(results) > 0 {
+				return results[0].Truthy(), nil
+			}
+			return false, nil
+		}
+		return false, nil
+	}
+	return a.Equal(b), nil
+}
+
+func (vm *VM) valueLessThan(a, b runtime.Value) (bool, error) {
+	if lt, ok := a.LessThan(b); ok {
+		return lt, nil
+	}
+	mm, err := vm.getMetamethod(a, b, "__lt")
+	if err == nil && !mm.IsNil() {
+		results, err := vm.callValue(mm, []runtime.Value{a, b})
+		if err != nil {
+			return false, err
+		}
+		if len(results) > 0 {
+			return results[0].Truthy(), nil
+		}
+		return false, nil
+	}
+	return false, fmt.Errorf("attempt to compare %s with %s", a.TypeName(), b.TypeName())
+}
+
+func (vm *VM) valueLessEqual(a, b runtime.Value) (bool, error) {
+	if less, ok := a.LessThan(b); ok {
+		return less || a.Equal(b), nil
+	}
+	mm, err := vm.getMetamethod(a, b, "__le")
+	if err == nil && !mm.IsNil() {
+		results, err := vm.callValue(mm, []runtime.Value{a, b})
+		if err != nil {
+			return false, err
+		}
+		if len(results) > 0 {
+			return results[0].Truthy(), nil
+		}
+		return false, nil
+	}
+	return false, fmt.Errorf("attempt to compare %s with %s", a.TypeName(), b.TypeName())
 }
 
 func (vm *VM) getMetamethod(a, b runtime.Value, name string) (runtime.Value, error) {

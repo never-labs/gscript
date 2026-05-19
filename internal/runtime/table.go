@@ -45,11 +45,12 @@ type Table struct {
 	keys      []Value // ordered keys for Next() iteration
 	keysDirty bool
 	// Type-specialized array fields (placed at end to preserve existing offsets)
-	arrayKind  ArrayKind
-	shapeID    uint32 // shape identifier for field cache validation
-	intArray   []int64
-	floatArray []float64
-	boolArray  []byte // 1 byte per bool, no GC pointers → zero GC scan
+	arrayKind      ArrayKind
+	arrayZeroValid bool
+	shapeID        uint32 // shape identifier for field cache validation
+	intArray       []int64
+	floatArray     []float64
+	boolArray      []byte // 1 byte per bool, no GC pointers → zero GC scan
 	// Encoding: 0 = nil/unset, 1 = false, 2 = true
 	// shape is the hidden-class descriptor for the string-keyed fields.
 	// Always nil when shapeID == 0 (empty table or hash-mode table).
@@ -163,6 +164,7 @@ func NewTableSizedKind(arrayHint, hashHint int, kind ArrayKind) *Table {
 				t.array = DefaultHeap.AllocValues(1, sparseArrayMax+1)
 				t.arrayHint = capHint
 			}
+			t.array[0] = NilValue()
 		}
 	}
 	if hashHint > 0 && hashHint <= smallFieldCap {
@@ -181,6 +183,7 @@ func NewDenseMixedArrayTable(arrayHint, hashHint int) *Table {
 	}
 	t := DefaultHeap.AllocTable()
 	t.array = DefaultHeap.AllocValues(1, arrayHint+1)
+	t.array[0] = NilValue()
 	if hashHint > 0 && hashHint <= smallFieldCap {
 		t.svals = DefaultHeap.AllocValues(0, hashHint)
 	}
@@ -257,10 +260,16 @@ func (t *Table) rawGetForNextLocked(key Value) Value {
 		}
 		switch t.arrayKind {
 		case ArrayInt:
+			if k == 0 && !t.arrayZeroValid {
+				return NilValue()
+			}
 			if k >= 0 && k < int64(len(t.intArray)) {
 				return IntValue(t.intArray[k])
 			}
 		case ArrayFloat:
+			if k == 0 && !t.arrayZeroValid {
+				return NilValue()
+			}
 			if k >= 0 && k < int64(len(t.floatArray)) {
 				return FloatValue(t.floatArray[k])
 			}
@@ -322,10 +331,16 @@ func (t *Table) RawGetInt(key int64) Value {
 	tableArrayGetPath(key, t)
 	switch t.arrayKind {
 	case ArrayInt:
+		if key == 0 && !t.arrayZeroValid {
+			return NilValue()
+		}
 		if key >= 0 && key < int64(len(t.intArray)) {
 			return IntValue(t.intArray[key])
 		}
 	case ArrayFloat:
+		if key == 0 && !t.arrayZeroValid {
+			return NilValue()
+		}
 		if key >= 0 && key < int64(len(t.floatArray)) {
 			return FloatValue(t.floatArray[key])
 		}
@@ -1627,15 +1642,20 @@ func (t *Table) rebuildKeys() {
 		t.materializeLazyTreeLocked()
 	}
 	t.keys = t.keys[:0]
-	// Note: typed int/float arrays start from index 1 because we can't
-	// distinguish a user-written 0 from the default zero value at index 0.
-	// Mixed/bool arrays start from index 0 since we can check for nil.
+	// Typed int/float arrays track whether index 0 was explicitly written,
+	// because their zero value is otherwise indistinguishable from nil.
 	switch t.arrayKind {
 	case ArrayInt:
+		if t.arrayZeroValid && len(t.intArray) > 0 {
+			t.keys = append(t.keys, IntValue(0))
+		}
 		for i := 1; i < len(t.intArray); i++ {
 			t.keys = append(t.keys, IntValue(int64(i)))
 		}
 	case ArrayFloat:
+		if t.arrayZeroValid && len(t.floatArray) > 0 {
+			t.keys = append(t.keys, IntValue(0))
+		}
 		for i := 1; i < len(t.floatArray); i++ {
 			t.keys = append(t.keys, IntValue(int64(i)))
 		}
@@ -1689,11 +1709,11 @@ func (t *Table) needsKeyRebuild() bool {
 	}
 	switch t.arrayKind {
 	case ArrayInt:
-		if len(t.intArray) > 1 {
+		if t.arrayZeroValid || len(t.intArray) > 1 {
 			return true
 		}
 	case ArrayFloat:
-		if len(t.floatArray) > 1 {
+		if t.arrayZeroValid || len(t.floatArray) > 1 {
 			return true
 		}
 	case ArrayBool:
@@ -1730,6 +1750,21 @@ func (t *Table) needsKeyRebuild() bool {
 		}
 	}
 	return false
+}
+
+// PairsKeysSnapshot returns a stable key snapshot for pairs-style iteration.
+// It intentionally includes keys present at iteration start so deleting the
+// current key during traversal does not prevent later keys from being visited.
+func (t *Table) PairsKeysSnapshot() []Value {
+	if t == nil {
+		return nil
+	}
+	if t.needsKeyRebuild() {
+		t.rebuildKeys()
+	}
+	keys := make([]Value, len(t.keys))
+	copy(keys, t.keys)
+	return keys
 }
 
 // Next returns the next key/value pair after the given key.
@@ -1878,6 +1913,9 @@ func (t *Table) PlainFloatArrayForNumericKernel(n int) ([]float64, bool) {
 		return nil, false
 	}
 	if len(t.floatArray) < n {
+		return nil, false
+	}
+	if n > 0 && !t.arrayZeroValid {
 		return nil, false
 	}
 	return t.floatArray, true

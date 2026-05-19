@@ -394,10 +394,13 @@ func TestPcallCatchesErrorInLoop(t *testing.T) {
 
 func TestPcallNoArgs(t *testing.T) {
 	interp := runProgram(t, `
-		ok, msg := pcall()
+		ok, msg := pcall(pcall)
 	`)
 	if interp.GetGlobal("ok").Truthy() {
 		t.Errorf("pcall with no args should fail")
+	}
+	if interp.GetGlobal("msg").TypeName() != "string" {
+		t.Errorf("pcall with no args should return an error message")
 	}
 }
 

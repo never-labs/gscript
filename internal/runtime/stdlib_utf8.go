@@ -27,30 +27,58 @@ func buildUTF8Lib() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'utf8.len'")
 		}
 		s := args[0].Str()
-		if !utf8.ValidString(s) {
-			return []Value{NilValue(), StringValue("invalid UTF-8 string")}, nil
+		i := int64(1)
+		j := int64(len(s))
+		if len(args) >= 2 {
+			i = toInt(args[1])
 		}
-		return []Value{IntValue(int64(utf8.RuneCountInString(s)))}, nil
+		if len(args) >= 3 {
+			j = toInt(args[2])
+		}
+		if i < 0 {
+			i = int64(len(s)) + i + 1
+		}
+		if j < 0 {
+			j = int64(len(s)) + j + 1
+		}
+		if i < 1 || i > int64(len(s)+1) || j < 0 || j > int64(len(s)) {
+			return nil, fmt.Errorf("position out of bounds")
+		}
+		if j < i {
+			return []Value{IntValue(0)}, nil
+		}
+		count := int64(0)
+		for pos := int(i) - 1; pos <= int(j)-1; {
+			r, size := utf8.DecodeRuneInString(s[pos:])
+			if r == utf8.RuneError && size == 1 {
+				return []Value{NilValue(), IntValue(int64(pos + 1))}, nil
+			}
+			pos += size
+			count++
+		}
+		return []Value{IntValue(count)}, nil
 	})
 
 	// utf8.char(...) → string
 	set("char", func(args []Value) ([]Value, error) {
 		var buf strings.Builder
 		for _, arg := range args {
-			cp := rune(toInt(arg))
+			n := toInt(arg)
+			if n < 0 || n > 0x7fffffff {
+				return nil, fmt.Errorf("bad argument to 'utf8.char' (value out of range)")
+			}
+			cp := rune(n)
 			buf.WriteRune(cp)
 		}
 		return []Value{StringValue(buf.String())}, nil
 	})
 
-	// utf8.codepoint(s, i [, j]) → codepoints... (1-based codepoint indices)
+	// utf8.codepoint(s, i [, j]) -> codepoints... (1-based byte indices)
 	set("codepoint", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'utf8.codepoint'")
 		}
 		s := args[0].Str()
-		runes := []rune(s)
-
 		i := int64(1)
 		if len(args) >= 2 {
 			i = toInt(args[1])
@@ -59,44 +87,55 @@ func buildUTF8Lib() *Table {
 		if len(args) >= 3 {
 			j = toInt(args[2])
 		}
-
-		// Validate bounds
-		if i < 1 {
-			i = 1
+		if i < 0 {
+			i = int64(len(s)) + i + 1
 		}
-		if j > int64(len(runes)) {
-			j = int64(len(runes))
+		if j < 0 {
+			j = int64(len(s)) + j + 1
+		}
+		if i < 1 || i > int64(len(s)+1) || j > int64(len(s)) {
+			return nil, fmt.Errorf("out of bounds")
+		}
+		if j < i {
+			return []Value{}, nil
 		}
 
 		var results []Value
-		for idx := i; idx <= j; idx++ {
-			results = append(results, IntValue(int64(runes[idx-1])))
-		}
-		if len(results) == 0 {
-			return []Value{NilValue()}, nil
+		for pos := int(i) - 1; pos < len(s) && pos <= int(j)-1; {
+			r, size := utf8.DecodeRuneInString(s[pos:])
+			if r == utf8.RuneError && size == 1 {
+				return nil, fmt.Errorf("invalid UTF-8 code")
+			}
+			results = append(results, IntValue(int64(r)))
+			pos += size
 		}
 		return results, nil
 	})
 
-	// utf8.codes(s) → table of {pos, code} tables
+	// utf8.codes(s) -> iterator returning byte position and codepoint.
 	set("codes", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'utf8.codes'")
 		}
 		s := args[0].Str()
-		tbl := NewTable()
-		idx := int64(1)
-		bytePos := 0
-		for bytePos < len(s) {
-			r, size := utf8.DecodeRuneInString(s[bytePos:])
-			entry := NewTable()
-			entry.RawSet(StringValue("pos"), IntValue(int64(bytePos+1))) // 1-based
-			entry.RawSet(StringValue("code"), IntValue(int64(r)))
-			tbl.RawSet(IntValue(idx), TableValue(entry))
-			idx++
-			bytePos += size
+		bytePos := -1
+		iter := &GoFunction{
+			Name: "utf8.codes_iterator",
+			Fn: func(_ []Value) ([]Value, error) {
+				bytePos++
+				if bytePos >= len(s) {
+					return []Value{NilValue()}, nil
+				}
+				r, size := utf8.DecodeRuneInString(s[bytePos:])
+				if r == utf8.RuneError && size == 1 {
+					return nil, fmt.Errorf("invalid UTF-8 code")
+				}
+				pos := bytePos + 1
+				bytePos += size - 1
+				return []Value{IntValue(int64(pos)), IntValue(int64(r))}, nil
+			},
 		}
-		return []Value{TableValue(tbl)}, nil
+		return []Value{FunctionValue(iter)}, nil
 	})
 
 	// utf8.offset(s, n [, i]) → int (byte position of nth codepoint, 1-based)
@@ -106,24 +145,51 @@ func buildUTF8Lib() *Table {
 		}
 		s := args[0].Str()
 		n := toInt(args[1])
-		startByte := int64(0)
+		start := int64(1)
 		if len(args) >= 3 {
-			startByte = toInt(args[2]) - 1 // convert from 1-based to 0-based
+			start = toInt(args[2])
+		} else if n < 0 {
+			start = int64(len(s) + 1)
+		}
+		if start < 0 {
+			start = int64(len(s)) + start + 1
+		}
+		if start < 1 || start > int64(len(s)+1) {
+			return nil, fmt.Errorf("position out of bounds")
+		}
+		if n != 0 && start <= int64(len(s)) && isUTF8ContinuationByte(s[start-1]) {
+			return nil, fmt.Errorf("initial position is a continuation byte")
+		}
+		starts := utf8CodepointStarts(s)
+		if n == 0 {
+			pos := int(start) - 1
+			if pos < 0 || pos >= len(s) {
+				return []Value{NilValue()}, nil
+			}
+			for i := len(starts) - 1; i >= 0; i-- {
+				if starts[i] <= pos {
+					return []Value{IntValue(int64(starts[i] + 1))}, nil
+				}
+			}
+			return []Value{NilValue()}, nil
 		}
 
-		bytePos := int(startByte)
-		cpCount := int64(0)
-		for bytePos < len(s) {
-			cpCount++
-			if cpCount == n {
-				return []Value{IntValue(int64(bytePos + 1))}, nil // 1-based
-			}
-			_, size := utf8.DecodeRuneInString(s[bytePos:])
-			bytePos += size
+		pos := int(start) - 1
+		idx := 0
+		for idx < len(starts) && starts[idx] < pos {
+			idx++
 		}
-		// If n equals len+1, return position past end
-		if cpCount+1 == n {
-			return []Value{IntValue(int64(bytePos + 1))}, nil
+		var target int
+		if n > 0 {
+			target = idx + int(n) - 1
+		} else {
+			target = idx + int(n)
+		}
+		if target >= 0 && target < len(starts) {
+			return []Value{IntValue(int64(starts[target] + 1))}, nil
+		}
+		if target == len(starts) {
+			return []Value{IntValue(int64(len(s) + 1))}, nil
 		}
 		return []Value{NilValue()}, nil
 	})
@@ -229,4 +295,21 @@ func buildUTF8Lib() *Table {
 	})
 
 	return t
+}
+
+func utf8CodepointStarts(s string) []int {
+	starts := make([]int, 0, utf8.RuneCountInString(s))
+	for i := 0; i < len(s); {
+		starts = append(starts, i)
+		_, size := utf8.DecodeRuneInString(s[i:])
+		if size <= 0 {
+			size = 1
+		}
+		i += size
+	}
+	return starts
+}
+
+func isUTF8ContinuationByte(b byte) bool {
+	return b >= 0x80 && b <= 0xBF
 }

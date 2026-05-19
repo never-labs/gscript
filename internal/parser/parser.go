@@ -869,14 +869,14 @@ func (p *Parser) parseAdditive() (ast.Expr, error) {
 }
 
 func (p *Parser) parseMultiplicative() (ast.Expr, error) {
-	left, err := p.parsePower()
+	left, err := p.parseUnary()
 	if err != nil {
 		return nil, err
 	}
 
 	for p.match(lexer.TOKEN_STAR, lexer.TOKEN_SLASH, lexer.TOKEN_PERCENT) {
 		opTok := p.advance()
-		right, err := p.parsePower()
+		right, err := p.parseUnary()
 		if err != nil {
 			return nil, err
 		}
@@ -892,15 +892,16 @@ func (p *Parser) parseMultiplicative() (ast.Expr, error) {
 
 // parsePower handles the ** operator (RIGHT associative).
 func (p *Parser) parsePower() (ast.Expr, error) {
-	base, err := p.parseUnary()
+	base, err := p.parsePostfix()
 	if err != nil {
 		return nil, err
 	}
 
 	if p.check(lexer.TOKEN_POW) {
 		opTok := p.advance()
-		// Right associative: recurse
-		exp, err := p.parsePower()
+		// Lua exponentiation is right associative and binds tighter than
+		// unary operators on its left, while still accepting unary exponents.
+		exp, err := p.parseUnary()
 		if err != nil {
 			return nil, err
 		}
@@ -922,6 +923,19 @@ func (p *Parser) parseUnary() (ast.Expr, error) {
 		if err != nil {
 			return nil, err
 		}
+		if p.check(lexer.TOKEN_POW) {
+			opPow := p.advance()
+			exp, err := p.parseUnary()
+			if err != nil {
+				return nil, err
+			}
+			operand = &ast.BinaryExpr{
+				P:     p.tokenPos(opPow),
+				Left:  operand,
+				Op:    opPow.Value,
+				Right: exp,
+			}
+		}
 		return &ast.UnaryExpr{
 			P:       p.tokenPos(opTok),
 			Op:      opTok.Value,
@@ -938,7 +952,7 @@ func (p *Parser) parseUnary() (ast.Expr, error) {
 		}
 		return &ast.RecvExpr{P: pos, Channel: operand}, nil
 	}
-	return p.parsePostfix()
+	return p.parsePower()
 }
 
 func (p *Parser) parsePostfix() (ast.Expr, error) {

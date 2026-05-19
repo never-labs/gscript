@@ -19,8 +19,11 @@ func buildTableLib() *Table {
 
 	// table.insert(t, [pos,] value)
 	set("insert", func(args []Value) ([]Value, error) {
-		if len(args) < 2 || !args[0].IsTable() {
+		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+		}
+		if len(args) != 2 && len(args) != 3 {
+			return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
 		}
 		tbl := args[0].Table()
 		length := int64(tbl.Length())
@@ -32,6 +35,9 @@ func buildTableLib() *Table {
 		}
 		// Insert at position
 		pos := toInt(args[1])
+		if pos < 1 || pos > length+1 {
+			return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+		}
 		value := args[2]
 		// Shift elements right
 		for i := length; i >= pos; i-- {
@@ -51,6 +57,12 @@ func buildTableLib() *Table {
 		pos := length // default: remove last element
 		if len(args) >= 2 {
 			pos = toInt(args[1])
+		}
+		if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
+			return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+		}
+		if pos == length+1 {
+			return []Value{NilValue()}, nil
 		}
 
 		removed := tbl.RawGet(IntValue(pos))
@@ -86,7 +98,11 @@ func buildTableLib() *Table {
 		parts := make([]string, 0, j-i+1)
 		for k := i; k <= j; k++ {
 			v := tbl.RawGet(IntValue(k))
-			parts = append(parts, v.String())
+			s, ok := ConcatOperandString(v)
+			if !ok {
+				return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
+			}
+			parts = append(parts, s)
 		}
 		return []Value{StringValue(strings.Join(parts, sep))}, nil
 	})
@@ -130,8 +146,21 @@ func buildTableLib() *Table {
 					sortErr = fmt.Errorf("table.sort comparator must be a Go function or use default ordering")
 					return false
 				}
-				if len(results) > 0 {
-					return results[0].Truthy()
+				if len(results) > 0 && results[0].Truthy() {
+					var reverse []Value
+					var err error
+					if gf := comp.GoFunction(); gf != nil {
+						reverse, err = gf.Fn([]Value{elems[b], elems[a]})
+					}
+					if err != nil {
+						sortErr = err
+						return false
+					}
+					if len(reverse) > 0 && reverse[0].Truthy() {
+						sortErr = fmt.Errorf("invalid order function for sorting")
+						return false
+					}
+					return true
 				}
 				return false
 			})
@@ -516,8 +545,17 @@ func buildTableSortWithInterp(interp *Interpreter, tblLib *Table) {
 						sortErr = err
 						return false
 					}
-					if len(results) > 0 {
-						return results[0].Truthy()
+					if len(results) > 0 && results[0].Truthy() {
+						reverse, err := interp.callFunction(comp, []Value{elems[b], elems[a]})
+						if err != nil {
+							sortErr = err
+							return false
+						}
+						if len(reverse) > 0 && reverse[0].Truthy() {
+							sortErr = fmt.Errorf("invalid order function for sorting")
+							return false
+						}
+						return true
 					}
 					return false
 				})
