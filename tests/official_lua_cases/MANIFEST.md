@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 341.
+Current translated passing cases: 342.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -60,6 +60,7 @@ Current translated passing cases: 341.
 | `closure_repeat_until_upvalues` | `closure.lua` | Closures created inside repeat-until style loops close per-iteration locals correctly. |
 | `closure_tailcall_upvalue` | `closure.lua` | Upvalues captured by closures returned through a tail-call style vararg helper remain valid. |
 | `constructs_loops_tables` | `constructs.lua` | Conditional chains, translated loops, table constructors. |
+| `constructs_label_goto_control` | `goto.lua`, `constructs.lua` | Go-style `label:`/`goto label` forward, backward, loop-exit, and function-local control flow translated against equivalent Lua loops. |
 | `constructs_loop_break_count` | `constructs.lua` | Nested loops, `break`, and table writes. |
 | `constructs_loop_break_repeat_more` | `constructs.lua` | Nested counting loops plus repeat-until/break control-flow cases. |
 | `constructs_function_branches_more` | `constructs.lua` | Function branch returns, nil fallthrough, and table constructor expression fields. |

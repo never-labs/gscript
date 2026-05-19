@@ -537,6 +537,34 @@ func TestContinueStmt(t *testing.T) {
 	}
 }
 
+func TestLabelAndGotoStmt(t *testing.T) {
+	prog := mustParse(t, `start:
+goto start`)
+	if label, ok := prog.Stmts[0].(*ast.LabelStmt); !ok || label.Name != "start" {
+		t.Fatalf("expected label start, got %T %#v", prog.Stmts[0], prog.Stmts[0])
+	}
+	if jump, ok := prog.Stmts[1].(*ast.GotoStmt); !ok || jump.Name != "start" {
+		t.Fatalf("expected goto start, got %T %#v", prog.Stmts[1], prog.Stmts[1])
+	}
+}
+
+func TestLabelDoesNotStealMethodCallStmt(t *testing.T) {
+	prog := mustParse(t, `obj:run()`)
+	if _, ok := prog.Stmts[0].(*ast.CallStmt); !ok {
+		t.Fatalf("expected method call statement, got %T", prog.Stmts[0])
+	}
+}
+
+func TestLabelBeforeCallUsesSemicolonDisambiguation(t *testing.T) {
+	prog := mustParse(t, `done:; print("ok")`)
+	if label, ok := prog.Stmts[0].(*ast.LabelStmt); !ok || label.Name != "done" {
+		t.Fatalf("expected label done, got %T %#v", prog.Stmts[0], prog.Stmts[0])
+	}
+	if _, ok := prog.Stmts[1].(*ast.CallStmt); !ok {
+		t.Fatalf("expected call after label, got %T", prog.Stmts[1])
+	}
+}
+
 // ============================================================
 // Call statements
 // ============================================================

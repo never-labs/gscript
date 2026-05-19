@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -15,10 +16,10 @@ func TestIfElseIfElseFullChain(t *testing.T) {
 		val    int
 		expect int
 	}{
-		{5, 1},   // x < 10
-		{15, 2},  // x < 20
-		{25, 3},  // x < 30
-		{35, 4},  // else
+		{5, 1},  // x < 10
+		{15, 2}, // x < 20
+		{25, 3}, // x < 30
+		{35, 4}, // else
 	}
 	for _, tt := range tests {
 		v := getGlobal(t, `
@@ -72,6 +73,82 @@ func TestIfNoMatchNoElse(t *testing.T) {
 	`, "result")
 	if v.Str() != "unchanged" {
 		t.Errorf("expected 'unchanged', got %v", v)
+	}
+}
+
+// --- Go-style label/goto ---
+
+func TestGotoBackwardLabel(t *testing.T) {
+	v := getGlobal(t, `
+		i := 0
+		sum := 0
+	loop:
+		i++
+		if i > 5 {
+			goto done
+		}
+		if i == 3 {
+			goto loop
+		}
+		sum += i
+		goto loop
+	done:
+		result := sum
+	`, "result")
+	if !v.IsInt() || v.Int() != 12 {
+		t.Fatalf("expected 12, got %v", v)
+	}
+}
+
+func TestGotoOutOfNestedBlock(t *testing.T) {
+	v := getGlobal(t, `
+		result := 0
+		for {
+			result = 9
+			goto done
+		}
+	done:
+		result += 1
+	`, "result")
+	if !v.IsInt() || v.Int() != 10 {
+		t.Fatalf("expected 10, got %v", v)
+	}
+}
+
+func TestGotoDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "missing",
+			src:  `goto nowhere`,
+			want: `target not found`,
+		},
+		{
+			name: "duplicate",
+			src:  "again:\nagain:\n",
+			want: `duplicate label`,
+		},
+		{
+			name: "into block",
+			src:  "if true { inner: }\ngoto inner",
+			want: `deeper block scope`,
+		},
+		{
+			name: "over local",
+			src:  "goto later\nx := 1\nlater:",
+			want: `local declaration`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := runProgramExpectError(t, tt.src)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
+			}
+		})
 	}
 }
 
@@ -366,8 +443,8 @@ func TestTruthinessInLogicOps(t *testing.T) {
 	}{
 		{`result := nil || "default"`, "default"},
 		{`result := false || "default"`, "default"},
-		{`result := 0 || "default"`, "0"},        // 0 is truthy
-		{`result := "" || "default"`, ""},         // "" is truthy
+		{`result := 0 || "default"`, "0"}, // 0 is truthy
+		{`result := "" || "default"`, ""}, // "" is truthy
 	}
 	for _, tt := range tests {
 		v := getGlobal(t, tt.src, "result")

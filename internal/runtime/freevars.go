@@ -145,6 +145,10 @@ func (c *freeVarCollector) walkStmt(stmt ast.Stmt) {
 		// nothing
 	case *ast.ContinueStmt:
 		// nothing
+	case *ast.LabelStmt:
+		// nothing
+	case *ast.GotoStmt:
+		// nothing
 	}
 }
 

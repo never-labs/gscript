@@ -76,6 +76,31 @@ defer handle.close()
 Supported options: `collect`, `count`, `stats`, `step`, `stop`, `restart`,
 `isrunning`, `incremental`, and `generational`.
 
+## Core Control Flow
+
+GScript supports structured loops plus Go-style labels for rare state-machine
+or cleanup exits. Labels are written as `name:` and jumps as `goto name`.
+Labels are function-local and unique. A `goto` may jump forward, backward, or
+out of nested blocks, but it may not jump into a deeper block or skip a local
+declaration in the same block.
+When a label is immediately followed by a function-call statement, write an
+explicit semicolon after the label (`done:; print("ok")`) so it is not parsed as
+a method call (`done:print(...)`).
+
+```go
+retry:
+if !ready() {
+    goto retry
+}
+
+for {
+    if done() {
+        goto exit
+    }
+}
+exit:
+```
+
 ---
 
 ## string

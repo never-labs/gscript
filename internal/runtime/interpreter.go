@@ -1046,19 +1046,18 @@ func opToMetamethod(op string) string {
 
 // Exec executes a program (top-level statement list).
 func (interp *Interpreter) Exec(prog *ast.Program) error {
+	if err := ast.ValidateLabelControl(prog); err != nil {
+		return err
+	}
 	interp.pushDeferFrame()
-	for _, stmt := range prog.Stmts {
-		_, isRet, _, _, err := interp.execStmt(stmt, interp.globals)
-		if err != nil {
-			_ = interp.runAndPopDeferFrame()
-			return err
+	_, _, _, _, err := interp.execBlockInEnv(&ast.BlockStmt{P: prog.GetPos(), Stmts: prog.Stmts}, interp.globals)
+	if err != nil {
+		_ = interp.runAndPopDeferFrame()
+		var jump *gotoSignal
+		if errors.As(err, &jump) {
+			return fmt.Errorf("goto %q target not found", jump.name)
 		}
-		if isRet {
-			if err := interp.runAndPopDeferFrame(); err != nil {
-				return err
-			}
-			return nil // top-level return stops execution
-		}
+		return err
 	}
 	return interp.runAndPopDeferFrame()
 }
@@ -1073,19 +1072,23 @@ func (interp *Interpreter) ExecString(src string) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := ast.ValidateLabelControl(prog); err != nil {
+		return nil, err
+	}
 	// Execute and collect return values from the last return statement.
 	var lastRet []Value
 	interp.pushDeferFrame()
-	for _, stmt := range prog.Stmts {
-		retVals, isRet, _, _, err := interp.execStmt(stmt, interp.globals)
-		if err != nil {
-			_ = interp.runAndPopDeferFrame()
-			return nil, err
+	retVals, isRet, _, _, err := interp.execBlockInEnv(&ast.BlockStmt{P: prog.GetPos(), Stmts: prog.Stmts}, interp.globals)
+	if err != nil {
+		_ = interp.runAndPopDeferFrame()
+		var jump *gotoSignal
+		if errors.As(err, &jump) {
+			return nil, fmt.Errorf("goto %q target not found", jump.name)
 		}
-		if isRet {
-			lastRet = retVals
-			break
-		}
+		return nil, err
+	}
+	if isRet {
+		lastRet = retVals
 	}
 	if err := interp.runAndPopDeferFrame(); err != nil {
 		return nil, err
@@ -1097,6 +1100,14 @@ func (interp *Interpreter) ExecString(src string) ([]Value, error) {
 // Statement execution
 // ====================================================================
 
+type gotoSignal struct {
+	name string
+}
+
+func (g *gotoSignal) Error() string {
+	return "goto " + g.name
+}
+
 // execBlock executes a block of statements in a new child scope.
 // Returns (returnValues, isReturn, isBreak, isContinue, error).
 func (interp *Interpreter) execBlock(block *ast.BlockStmt, env *Environment) ([]Value, bool, bool, bool, error) {
@@ -1106,9 +1117,23 @@ func (interp *Interpreter) execBlock(block *ast.BlockStmt, env *Environment) ([]
 
 // execBlockInEnv executes a block in the given environment (without creating a new scope).
 func (interp *Interpreter) execBlockInEnv(block *ast.BlockStmt, env *Environment) ([]Value, bool, bool, bool, error) {
-	for _, stmt := range block.Stmts {
+	labels := make(map[string]int)
+	for i, stmt := range block.Stmts {
+		if label, ok := stmt.(*ast.LabelStmt); ok {
+			labels[label.Name] = i
+		}
+	}
+	for pc := 0; pc < len(block.Stmts); pc++ {
+		stmt := block.Stmts[pc]
 		retVals, isRet, isBrk, isCont, err := interp.execStmt(stmt, env)
 		if err != nil {
+			var jump *gotoSignal
+			if errors.As(err, &jump) {
+				if target, ok := labels[jump.name]; ok {
+					pc = target
+					continue
+				}
+			}
 			return nil, false, false, false, err
 		}
 		if isRet || isBrk || isCont {
@@ -1122,6 +1147,10 @@ func (interp *Interpreter) execBlockInEnv(block *ast.BlockStmt, env *Environment
 func (interp *Interpreter) execStmt(stmt ast.Stmt, env *Environment) ([]Value, bool, bool, bool, error) {
 	retVals, isRet, isBrk, isCont, err := interp.execStmtRaw(stmt, env)
 	if err != nil {
+		var jump *gotoSignal
+		if errors.As(err, &jump) {
+			return nil, false, false, false, err
+		}
 		return nil, false, false, false, interp.wrapRuntimeError(err, stmt.GetPos())
 	}
 	return retVals, isRet, isBrk, isCont, nil
@@ -1154,6 +1183,10 @@ func (interp *Interpreter) execStmtRaw(stmt ast.Stmt, env *Environment) ([]Value
 		return nil, false, true, false, nil
 	case *ast.ContinueStmt:
 		return nil, false, false, true, nil
+	case *ast.LabelStmt:
+		return nil, false, false, false, nil
+	case *ast.GotoStmt:
+		return nil, false, false, false, &gotoSignal{name: s.Name}
 	case *ast.FuncDeclStmt:
 		return interp.execFuncDecl(s, env)
 	case *ast.BlockStmt:
@@ -2527,6 +2560,10 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	retVals, isRet, _, _, err := interp.execBlockInEnv(proto.Body, callEnv)
 	deferErr := interp.runAndPopDeferFrame()
 	if err != nil {
+		var jump *gotoSignal
+		if errors.As(err, &jump) {
+			err = fmt.Errorf("goto %q target not found", jump.name)
+		}
 		_ = interp.emitDebugHook("error", "script", name, StringValue(err.Error()))
 		return nil, err
 	}

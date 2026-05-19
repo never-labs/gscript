@@ -77,6 +77,78 @@ func calls_leaf(x) {
 	}
 }
 
+func TestVMGotoLabels(t *testing.T) {
+	g := compileAndRun(t, `
+		i := 0
+		sum := 0
+	loop:
+		i++
+		if i > 5 {
+			goto done
+		}
+		if i == 3 {
+			goto loop
+		}
+		sum += i
+		goto loop
+	done:
+		result := sum
+	`)
+	expectGlobalInt(t, g, "result", 12)
+}
+
+func TestVMGotoOutOfNestedBlock(t *testing.T) {
+	g := compileAndRun(t, `
+		result := 0
+		for {
+			result = 9
+			goto done
+		}
+	done:
+		result += 1
+	`)
+	expectGlobalInt(t, g, "result", 10)
+}
+
+func TestVMGotoDiagnostics(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{name: "missing", src: `goto nowhere`, want: `target not found`},
+		{name: "duplicate", src: "again:\nagain:\n", want: `duplicate label`},
+		{name: "into block", src: "if true { inner: }\ngoto inner", want: `deeper block scope`},
+		{name: "over local", src: "goto later\nx := 1\nlater:", want: `local declaration`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := compileOrRunError(t, tt.src)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected %q error, got %v", tt.want, err)
+			}
+		})
+	}
+}
+
+func compileOrRunError(t *testing.T, src string) error {
+	t.Helper()
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return err
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return err
+	}
+	proto, err := Compile(prog)
+	if err != nil {
+		return err
+	}
+	_, err = New(runtime.NewInterpreterGlobals()).Execute(proto)
+	return err
+}
+
 func findNestedProtoForTest(proto *FuncProto, name string) *FuncProto {
 	if proto == nil {
 		return nil

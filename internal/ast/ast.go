@@ -217,6 +217,26 @@ func (s *ContinueStmt) nodeType() string { return "ContinueStmt" }
 func (s *ContinueStmt) GetPos() Pos      { return s.P }
 func (s *ContinueStmt) stmtNode()        {}
 
+// LabelStmt represents a Go-style statement label: name:
+type LabelStmt struct {
+	P    Pos
+	Name string
+}
+
+func (s *LabelStmt) nodeType() string { return "LabelStmt" }
+func (s *LabelStmt) GetPos() Pos      { return s.P }
+func (s *LabelStmt) stmtNode()        {}
+
+// GotoStmt represents a Go-style goto statement: goto name
+type GotoStmt struct {
+	P    Pos
+	Name string
+}
+
+func (s *GotoStmt) nodeType() string { return "GotoStmt" }
+func (s *GotoStmt) GetPos() Pos      { return s.P }
+func (s *GotoStmt) stmtNode()        {}
+
 // FuncDeclStmt represents a top-level named function declaration: func name(params) { body }
 type FuncDeclStmt struct {
 	P      Pos

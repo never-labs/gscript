@@ -15,11 +15,18 @@ import (
 
 // Compile compiles a top-level program into a FuncProto.
 func Compile(prog *ast.Program) (*FuncProto, error) {
+	if err := ast.ValidateLabelControl(prog); err != nil {
+		return nil, err
+	}
 	c := newCompiler(nil, "<main>", 0, false)
+	c.collectLabelDepths(prog.Stmts, c.depth)
 	for _, stmt := range prog.Stmts {
 		if err := c.compileStmt(stmt); err != nil {
 			return nil, err
 		}
+	}
+	if err := c.patchGotos(); err != nil {
+		return nil, err
 	}
 	c.emitReturn(0, 1)
 	return c.finish(), nil
@@ -49,15 +56,31 @@ type upvalInfo struct {
 }
 
 type compiler struct {
-	parent   *compiler
-	proto    *FuncProto
-	locals   []localVar
-	upvals   []upvalInfo
-	nextReg  int
-	maxReg   int
-	depth    int
-	loops    []loopInfo
-	isVarArg bool
+	parent      *compiler
+	proto       *FuncProto
+	locals      []localVar
+	upvals      []upvalInfo
+	nextReg     int
+	maxReg      int
+	depth       int
+	loops       []loopInfo
+	isVarArg    bool
+	labels      map[string]compiledLabel
+	labelDepths map[string]int
+	gotos       []compiledGoto
+}
+
+type compiledLabel struct {
+	pc    int
+	depth int
+	line  int
+}
+
+type compiledGoto struct {
+	name  string
+	pc    int
+	depth int
+	line  int
 }
 
 func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compiler {
@@ -67,7 +90,9 @@ func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compil
 			Name:        name,
 			LineDefined: line,
 		},
-		isVarArg: isVarArg,
+		isVarArg:    isVarArg,
+		labels:      make(map[string]compiledLabel),
+		labelDepths: make(map[string]int),
 	}
 }
 
@@ -334,6 +359,18 @@ func (c *compiler) emitCloseForJump() {
 	}
 }
 
+func (c *compiler) emitCloseCapturedAboveDepth(depth int) {
+	for i := len(c.locals) - 1; i >= 0; i-- {
+		if c.locals[i].depth <= depth {
+			break
+		}
+		if c.locals[i].captured {
+			c.emit(EncodeABC(OP_CLOSE, c.locals[i].reg, 0, 0), 0)
+			return
+		}
+	}
+}
+
 // --------------------------------------------------------------------
 // Finish: build the final FuncProto
 // --------------------------------------------------------------------
@@ -349,6 +386,44 @@ func (c *compiler) finish() *FuncProto {
 	c.proto.LeafNoCall = protoHasNoCalls(c.proto)
 	c.proto.NoGlobalOps = protoHasNoGlobalOps(c.proto)
 	return c.proto
+}
+
+func (c *compiler) patchGotos() error {
+	for _, g := range c.gotos {
+		label, ok := c.labels[g.name]
+		if !ok {
+			return fmt.Errorf("line %d: goto %q target not found", g.line, g.name)
+		}
+		c.patchJumpTo(g.pc, label.pc)
+	}
+	return nil
+}
+
+func (c *compiler) collectLabelDepths(stmts []ast.Stmt, depth int) {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *ast.LabelStmt:
+			c.labelDepths[s.Name] = depth
+		case *ast.BlockStmt:
+			c.collectLabelDepths(s.Stmts, depth+1)
+		case *ast.IfStmt:
+			c.collectLabelDepths(s.Body.Stmts, depth+1)
+			for _, ei := range s.ElseIfs {
+				c.collectLabelDepths(ei.Body.Stmts, depth+1)
+			}
+			if s.ElseBody != nil {
+				c.collectLabelDepths(s.ElseBody.Stmts, depth+1)
+			}
+		case *ast.ForStmt:
+			c.collectLabelDepths(s.Body.Stmts, depth+1)
+		case *ast.ForNumStmt:
+			c.collectLabelDepths(s.Body.Stmts, depth+2)
+		case *ast.ForRangeStmt:
+			c.collectLabelDepths(s.Body.Stmts, depth+2)
+		case *ast.FuncDeclStmt:
+			// Labels are function-local; nested functions collect separately.
+		}
+	}
 }
 
 func protoHasNoGlobalOps(proto *FuncProto) bool {
@@ -411,6 +486,10 @@ func (c *compiler) compileStmt(stmt ast.Stmt) error {
 		return c.compileBreakStmt(s)
 	case *ast.ContinueStmt:
 		return c.compileContinueStmt(s)
+	case *ast.LabelStmt:
+		return c.compileLabelStmt(s)
+	case *ast.GotoStmt:
+		return c.compileGotoStmt(s)
 	case *ast.FuncDeclStmt:
 		return c.compileFuncDeclStmt(s)
 	case *ast.BlockStmt:
@@ -1508,6 +1587,26 @@ func (c *compiler) compileContinueStmt(s *ast.ContinueStmt) error {
 	c.emitCloseForJump()
 	jmp := c.emitJump(s.P.Line)
 	loop.continueJumps = append(loop.continueJumps, jmp)
+	return nil
+}
+
+func (c *compiler) compileLabelStmt(s *ast.LabelStmt) error {
+	c.labels[s.Name] = compiledLabel{pc: c.currentPC(), depth: c.depth, line: s.P.Line}
+	return nil
+}
+
+func (c *compiler) compileGotoStmt(s *ast.GotoStmt) error {
+	if label, ok := c.labels[s.Name]; ok {
+		c.emitCloseCapturedAboveDepth(label.depth)
+		jmp := c.emitJump(s.P.Line)
+		c.patchJumpTo(jmp, label.pc)
+		return nil
+	}
+	if targetDepth, ok := c.labelDepths[s.Name]; ok {
+		c.emitCloseCapturedAboveDepth(targetDepth)
+	}
+	jmp := c.emitJump(s.P.Line)
+	c.gotos = append(c.gotos, compiledGoto{name: s.Name, pc: jmp, depth: c.depth, line: s.P.Line})
 	return nil
 }
 
@@ -2858,11 +2957,15 @@ func (c *compiler) compileFunction(name string, params []ast.FuncParam, body *as
 		child.addLocal(p.Name)
 		numFixedParams++
 	}
+	child.collectLabelDepths(body.Stmts, child.depth)
 
 	for _, stmt := range body.Stmts {
 		if err := child.compileStmt(stmt); err != nil {
 			return 0, err
 		}
+	}
+	if err := child.patchGotos(); err != nil {
+		return 0, err
 	}
 
 	child.leaveScope()

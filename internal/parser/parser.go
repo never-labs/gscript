@@ -130,6 +130,8 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		return p.parseBreakStmt()
 	case lexer.TOKEN_CONTINUE:
 		return p.parseContinueStmt()
+	case lexer.TOKEN_GOTO:
+		return p.parseGotoStmt()
 	case lexer.TOKEN_GO:
 		return p.parseGoStmt()
 	case lexer.TOKEN_DEFER:
@@ -137,8 +139,19 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 	case lexer.TOKEN_CONST:
 		return p.parseConstDeclStmt()
 	default:
+		if p.isLabelStmt() {
+			return p.parseLabelStmt()
+		}
 		return p.parseExpressionStmt()
 	}
+}
+
+func (p *Parser) isLabelStmt() bool {
+	if p.peek().Type != lexer.TOKEN_IDENT || p.peekAt(1).Type != lexer.TOKEN_COLON {
+		return false
+	}
+	// obj:method(...) remains a method-call expression statement.
+	return !(p.peekAt(2).Type == lexer.TOKEN_IDENT && p.peekAt(3).Type == lexer.TOKEN_LPAREN)
 }
 
 func (p *Parser) parseFuncDeclOrExprStmt() (ast.Stmt, error) {
@@ -520,6 +533,26 @@ func (p *Parser) parseBreakStmt() (ast.Stmt, error) {
 func (p *Parser) parseContinueStmt() (ast.Stmt, error) {
 	tok := p.advance()
 	return &ast.ContinueStmt{P: p.tokenPos(tok)}, nil
+}
+
+func (p *Parser) parseLabelStmt() (ast.Stmt, error) {
+	nameTok, err := p.expect(lexer.TOKEN_IDENT)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := p.expect(lexer.TOKEN_COLON); err != nil {
+		return nil, err
+	}
+	return &ast.LabelStmt{P: p.tokenPos(nameTok), Name: nameTok.Value}, nil
+}
+
+func (p *Parser) parseGotoStmt() (ast.Stmt, error) {
+	tok := p.advance()
+	nameTok, err := p.expect(lexer.TOKEN_IDENT)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.GotoStmt{P: p.tokenPos(tok), Name: nameTok.Value}, nil
 }
 
 func (p *Parser) parseGoStmt() (ast.Stmt, error) {
