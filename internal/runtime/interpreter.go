@@ -24,6 +24,7 @@ type Interpreter struct {
 	scriptDir  string           // directory of the main script (for require path resolution)
 	args       []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack  []DebugFrame     // active runtime calls, oldest to newest
+	deferStack [][]deferredCall // active function-scope deferred calls
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -1019,16 +1020,21 @@ func opToMetamethod(op string) string {
 
 // Exec executes a program (top-level statement list).
 func (interp *Interpreter) Exec(prog *ast.Program) error {
+	interp.pushDeferFrame()
 	for _, stmt := range prog.Stmts {
 		_, isRet, _, _, err := interp.execStmt(stmt, interp.globals)
 		if err != nil {
+			_ = interp.runAndPopDeferFrame()
 			return err
 		}
 		if isRet {
+			if err := interp.runAndPopDeferFrame(); err != nil {
+				return err
+			}
 			return nil // top-level return stops execution
 		}
 	}
-	return nil
+	return interp.runAndPopDeferFrame()
 }
 
 // ExecString parses and executes a source string, returning any top-level return values.
@@ -1043,15 +1049,20 @@ func (interp *Interpreter) ExecString(src string) ([]Value, error) {
 	}
 	// Execute and collect return values from the last return statement.
 	var lastRet []Value
+	interp.pushDeferFrame()
 	for _, stmt := range prog.Stmts {
 		retVals, isRet, _, _, err := interp.execStmt(stmt, interp.globals)
 		if err != nil {
+			_ = interp.runAndPopDeferFrame()
 			return nil, err
 		}
 		if isRet {
 			lastRet = retVals
 			break
 		}
+	}
+	if err := interp.runAndPopDeferFrame(); err != nil {
+		return nil, err
 	}
 	return lastRet, nil
 }
@@ -1115,10 +1126,86 @@ func (interp *Interpreter) execStmt(stmt ast.Stmt, env *Environment) ([]Value, b
 		return interp.execBlock(s, env)
 	case *ast.GoStmt:
 		return interp.execGo(s, env)
+	case *ast.DeferStmt:
+		return interp.execDefer(s, env)
 	case *ast.SendStmt:
 		return interp.execSend(s, env)
 	default:
 		return nil, false, false, false, fmt.Errorf("unknown statement type: %T", stmt)
+	}
+}
+
+type deferredCall struct {
+	fn   Value
+	args []Value
+}
+
+func (interp *Interpreter) pushDeferFrame() {
+	interp.deferStack = append(interp.deferStack, nil)
+}
+
+func (interp *Interpreter) runAndPopDeferFrame() error {
+	if len(interp.deferStack) == 0 {
+		return nil
+	}
+	idx := len(interp.deferStack) - 1
+	calls := interp.deferStack[idx]
+	interp.deferStack = interp.deferStack[:idx]
+
+	var firstErr error
+	for i := len(calls) - 1; i >= 0; i-- {
+		if _, err := interp.callFunction(calls[i].fn, calls[i].args); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func (interp *Interpreter) execDefer(s *ast.DeferStmt, env *Environment) ([]Value, bool, bool, bool, error) {
+	call, err := interp.prepareDeferredCall(s.Call, env)
+	if err != nil {
+		return nil, false, false, false, err
+	}
+	if len(interp.deferStack) == 0 {
+		if _, err := interp.callFunction(call.fn, call.args); err != nil {
+			return nil, false, false, false, err
+		}
+		return nil, false, false, false, nil
+	}
+	idx := len(interp.deferStack) - 1
+	interp.deferStack[idx] = append(interp.deferStack[idx], call)
+	return nil, false, false, false, nil
+}
+
+func (interp *Interpreter) prepareDeferredCall(expr ast.Expr, env *Environment) (deferredCall, error) {
+	switch call := expr.(type) {
+	case *ast.CallExpr:
+		fn, err := interp.evalExprSingle(call.Func, env)
+		if err != nil {
+			return deferredCall{}, err
+		}
+		args, err := interp.evalExprList(call.Args, env)
+		if err != nil {
+			return deferredCall{}, err
+		}
+		return deferredCall{fn: fn, args: args}, nil
+	case *ast.MethodCallExpr:
+		obj, err := interp.evalExprSingle(call.Object, env)
+		if err != nil {
+			return deferredCall{}, err
+		}
+		method, err := interp.methodValue(obj, call.Method)
+		if err != nil {
+			return deferredCall{}, err
+		}
+		args, err := interp.evalExprList(call.Args, env)
+		if err != nil {
+			return deferredCall{}, err
+		}
+		args = append([]Value{obj}, args...)
+		return deferredCall{fn: method, args: args}, nil
+	default:
+		return deferredCall{}, fmt.Errorf("defer statement requires a function call")
 	}
 }
 
@@ -2170,20 +2257,9 @@ func (interp *Interpreter) evalMethodCall(e *ast.MethodCallExpr, env *Environmen
 		return nil, err
 	}
 
-	var method Value
-	if obj.IsTable() {
-		method, err = interp.tableGet(obj, StringValue(e.Method))
-		if err != nil {
-			return nil, err
-		}
-	} else if obj.IsString() && interp.stringMeta != nil {
-		// String method call: look up in string metatable's __index table
-		idx := interp.stringMeta.RawGet(StringValue("__index"))
-		if idx.IsTable() {
-			method = idx.Table().RawGet(StringValue(e.Method))
-		}
-	} else {
-		return nil, fmt.Errorf("attempt to call method on a %s value", obj.TypeName())
+	method, err := interp.methodValue(obj, e.Method)
+	if err != nil {
+		return nil, err
 	}
 
 	if !method.IsFunction() {
@@ -2198,6 +2274,19 @@ func (interp *Interpreter) evalMethodCall(e *ast.MethodCallExpr, env *Environmen
 	args = append([]Value{obj}, args...)
 
 	return interp.callFunction(method, args)
+}
+
+func (interp *Interpreter) methodValue(obj Value, methodName string) (Value, error) {
+	if obj.IsTable() {
+		return interp.tableGet(obj, StringValue(methodName))
+	}
+	if obj.IsString() && interp.stringMeta != nil {
+		idx := interp.stringMeta.RawGet(StringValue("__index"))
+		if idx.IsTable() {
+			return idx.Table().RawGet(StringValue(methodName)), nil
+		}
+	}
+	return NilValue(), fmt.Errorf("attempt to call method on a %s value", obj.TypeName())
 }
 
 // callFunction invokes a function value with the given arguments.
@@ -2246,6 +2335,7 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	}
 	interp.pushDebugFrame(name, "script")
 	defer interp.popDebugFrame()
+	interp.pushDeferFrame()
 
 	// Bind parameters (as new local variables -- these shadow any captured upvalues)
 	nParams := len(proto.Params)
@@ -2272,8 +2362,12 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	}
 
 	retVals, isRet, _, _, err := interp.execBlockInEnv(proto.Body, callEnv)
+	deferErr := interp.runAndPopDeferFrame()
 	if err != nil {
 		return nil, err
+	}
+	if deferErr != nil {
+		return nil, deferErr
 	}
 	if isRet {
 		return retVals, nil

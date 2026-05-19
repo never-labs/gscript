@@ -171,15 +171,20 @@ func (interp *Interpreter) execProgramWithOptions(prog *ast.Program, opts Script
 
 func (interp *Interpreter) execProgram(prog *ast.Program, env *Environment) ([]Value, error) {
 	var lastRet []Value
+	interp.pushDeferFrame()
 	for _, stmt := range prog.Stmts {
 		retVals, isRet, _, _, err := interp.execStmt(stmt, env)
 		if err != nil {
+			_ = interp.runAndPopDeferFrame()
 			return nil, err
 		}
 		if isRet {
 			lastRet = retVals
 			break
 		}
+	}
+	if err := interp.runAndPopDeferFrame(); err != nil {
+		return nil, err
 	}
 	return lastRet, nil
 }

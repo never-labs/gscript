@@ -110,6 +110,16 @@ func (s *GoStmt) nodeType() string { return "GoStmt" }
 func (s *GoStmt) GetPos() Pos      { return s.P }
 func (s *GoStmt) stmtNode()        {}
 
+// DeferStmt represents a deferred call: defer f(args).
+type DeferStmt struct {
+	P    Pos
+	Call Expr // must be *CallExpr or *MethodCallExpr
+}
+
+func (s *DeferStmt) nodeType() string { return "DeferStmt" }
+func (s *DeferStmt) GetPos() Pos      { return s.P }
+func (s *DeferStmt) stmtNode()        {}
+
 // SendStmt represents a channel send: ch <- value
 type SendStmt struct {
 	P       Pos
@@ -123,11 +133,11 @@ func (s *SendStmt) stmtNode()        {}
 
 // IfStmt represents if/elseif/else chains.
 type IfStmt struct {
-	P          Pos
-	Cond       Expr
-	Body       *BlockStmt
-	ElseIfs    []ElseIfClause
-	ElseBody   *BlockStmt // nil if no else
+	P        Pos
+	Cond     Expr
+	Body     *BlockStmt
+	ElseIfs  []ElseIfClause
+	ElseBody *BlockStmt // nil if no else
 }
 
 // ElseIfClause represents a single elseif branch.
@@ -156,11 +166,11 @@ func (s *ForNumStmt) stmtNode()        {}
 
 // ForRangeStmt represents a range-based for loop: for k, v := range expr { }
 type ForRangeStmt struct {
-	P      Pos
-	Key    string // first variable name
-	Value  string // second variable name (may be empty)
-	Iter   Expr   // the expression being iterated
-	Body   *BlockStmt
+	P     Pos
+	Key   string // first variable name
+	Value string // second variable name (may be empty)
+	Iter  Expr   // the expression being iterated
+	Body  *BlockStmt
 }
 
 func (s *ForRangeStmt) nodeType() string { return "ForRangeStmt" }

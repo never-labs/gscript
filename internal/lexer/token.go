@@ -34,9 +34,10 @@ const (
 	TOKEN_VAR      // var
 	TOKEN_GO       // go
 	TOKEN_CHAN     // chan
+	TOKEN_DEFER    // defer
 
 	// Channel operator
-	TOKEN_ARROW    // <-
+	TOKEN_ARROW // <-
 
 	// Assignment operators
 	TOKEN_ASSIGN       // =
@@ -114,7 +115,8 @@ var tokenNames = map[TokenType]string{
 	TOKEN_VAR:      "VAR",
 	TOKEN_GO:       "GO",
 	TOKEN_CHAN:     "CHAN",
-	TOKEN_ARROW:   "ARROW",
+	TOKEN_DEFER:    "DEFER",
+	TOKEN_ARROW:    "ARROW",
 
 	TOKEN_ASSIGN:       "ASSIGN",
 	TOKEN_DECLARE:      "DECLARE",
@@ -198,6 +200,7 @@ var keywords = map[string]TokenType{
 	"nil":      TOKEN_NIL,
 	"go":       TOKEN_GO,
 	"chan":     TOKEN_CHAN,
+	"defer":    TOKEN_DEFER,
 }
 
 // LookupIdent checks if an identifier is a keyword and returns the

@@ -132,6 +132,8 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		return p.parseContinueStmt()
 	case lexer.TOKEN_GO:
 		return p.parseGoStmt()
+	case lexer.TOKEN_DEFER:
+		return p.parseDeferStmt()
 	default:
 		return p.parseExpressionStmt()
 	}
@@ -537,6 +539,24 @@ func (p *Parser) parseGoStmt() (ast.Stmt, error) {
 	}
 
 	return &ast.GoStmt{P: pos, Call: expr}, nil
+}
+
+func (p *Parser) parseDeferStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'defer'
+	pos := p.tokenPos(tok)
+
+	expr, err := p.parseExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	switch expr.(type) {
+	case *ast.CallExpr, *ast.MethodCallExpr:
+	default:
+		return nil, p.errorf("defer statement requires a function call")
+	}
+
+	return &ast.DeferStmt{P: pos, Call: expr}, nil
 }
 
 func (p *Parser) parseSendStmt(pos ast.Pos, chExpr ast.Expr) (ast.Stmt, error) {
