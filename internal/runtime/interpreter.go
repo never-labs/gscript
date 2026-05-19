@@ -380,6 +380,12 @@ func (interp *Interpreter) registerBuiltins() {
 			if !args[0].IsTable() {
 				return nil, fmt.Errorf("bad argument #1 to 'rawset' (table expected, got %s)", args[0].TypeName())
 			}
+			if args[1].IsNil() {
+				return nil, fmt.Errorf("table index is nil")
+			}
+			if args[1].IsFloat() && math.IsNaN(args[1].Float()) {
+				return nil, fmt.Errorf("table index is NaN")
+			}
 			args[0].Table().RawSet(args[1], args[2])
 			return []Value{args[0]}, nil
 		},

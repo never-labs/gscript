@@ -1,0 +1,107 @@
+print("case:table_raw_helpers_more")
+
+expect_error := func(f) {
+  ok, err := pcall(f)
+  assert(!ok && type(err) == "string")
+}
+
+src := {a: "red", b: "blue", c: "red", n: 7}
+arr := table.toArray(src)
+assert(#arr == table.count(src))
+
+red := 0
+blue := 0
+seven := 0
+for i := 1; i <= #arr; i++ {
+  if arr[i] == "red" {
+    red++
+  } else {
+    if arr[i] == "blue" {
+      blue++
+    } else {
+      if arr[i] == 7 {
+        seven++
+      } else {
+        error("unexpected toArray value")
+      }
+    }
+  }
+}
+assert(red == 2 && blue == 1 && seven == 1)
+assert(table.count(arr) == #arr)
+expect_error(func() { table.toArray() })
+expect_error(func() { table.toArray("not a table") })
+
+shared := {tag: "same"}
+other := {tag: "same"}
+uniq := table.unique({1, 1.0, "1", true, true, shared, shared, other, 2, 2})
+assert(#uniq == 6)
+assert(uniq[1] == 1)
+assert(type(uniq[1]) == "number")
+assert(uniq[2] == "1")
+assert(uniq[3] == true)
+assert(rawequal(uniq[4], shared))
+assert(rawequal(uniq[5], other))
+assert(uniq[6] == 2)
+expect_error(func() { table.unique() })
+expect_error(func() { table.unique(false) })
+
+log := {}
+backing := {}
+t := setmetatable({present: 11}, {
+  __index: func(_, k) {
+    log[#log + 1] = "index:" .. k
+    return "fallback"
+  },
+  __newindex: func(_, k, v) {
+    log[#log + 1] = "new:" .. k .. ":" .. v
+    backing[k] = v
+  },
+  __len: func(_) {
+    return 99
+  },
+  __eq: func(_, _) {
+    return true
+  },
+})
+
+assert(t.missing == "fallback")
+assert(rawget(t, "missing") == nil)
+assert(log[1] == "index:missing")
+
+t.created = 12
+assert(rawget(t, "created") == nil)
+assert(backing.created == 12)
+assert(log[2] == "new:created:12")
+
+assert(rawset(t, "created", 13) == t)
+assert(rawget(t, "created") == 13)
+rawset(t, "created", nil)
+assert(rawget(t, "created") == nil)
+
+assert(#t == 99)
+assert(rawlen(t) == 0)
+assert(rawlen("abc") == 3)
+
+same_shape := setmetatable({present: 11}, getmetatable(t))
+assert(t == same_shape)
+assert(!rawequal(t, same_shape))
+assert(rawequal(t, t))
+assert(rawequal(1, 1.0))
+
+assert(rawget(t, nil) == nil)
+assert(rawget(t, "present", "extra") == 11)
+rawset(t, "extra", "ok", "ignored")
+assert(rawget(t, "extra") == "ok")
+
+expect_error(func() { rawget() })
+expect_error(func() { rawget(1, "x") })
+expect_error(func() { rawset() })
+expect_error(func() { rawset({}, nil, 1) })
+expect_error(func() { rawset({}, 0 / 0, 1) })
+expect_error(func() { rawset(1, "x", 1) })
+expect_error(func() { rawlen() })
+expect_error(func() { rawlen(34) })
+expect_error(func() { rawequal() })
+
+print("ok")

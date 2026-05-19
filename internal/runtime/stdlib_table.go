@@ -433,13 +433,20 @@ func buildTableLib() *Table {
 		}
 		tbl := args[0].Table()
 		result := NewTable()
-		seen := make(map[Value]bool)
+		seen := make([]Value, 0)
 		length := tbl.Length()
 		idx := int64(1)
 		for i := int64(1); i <= int64(length); i++ {
 			v := tbl.RawGet(IntValue(i))
-			if !seen[v] {
-				seen[v] = true
+			duplicate := false
+			for _, prior := range seen {
+				if prior.Equal(v) {
+					duplicate = true
+					break
+				}
+			}
+			if !duplicate {
+				seen = append(seen, v)
 				result.RawSet(IntValue(idx), v)
 				idx++
 			}

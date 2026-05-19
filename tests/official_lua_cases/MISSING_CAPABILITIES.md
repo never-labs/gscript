@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 423 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 427 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -38,11 +38,13 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `debug_host_helpers_more`: `debug.traceback` / `stack` / `globals` / `info` / `value` / `goStack` 的 host 诊断面。
 - `files_file_lines_streams_more`: `file:lines()`、标准流表和 `io.type` open/closed 状态。
 - `table_go_helpers_more`: table keys/values/contains/indexOf/copy/merge/count/unique/reverse/slice/zip 等非回调 helper。
+- `table_raw_helpers_more`: `table.toArray` / `table.unique` 与 rawget/rawset/rawlen/rawequal raw helper 语义、invalid nil/NaN key diagnostics。
 - `table_higher_order_vm_callbacks_more`: table map/filter/reduce/fromArray 在 VM 文件模式下调用脚本 callback。
 - `table_proxy_concat_flatten_more`: `table.concat` 通过 proxy `__len` / `__index` 读表，以及 inline nested table literal 供 `table.flatten` 正确消费。
 - `go_channel_host_more`: Go-style channel/goroutine 在 VM 文件模式下覆盖 buffered producer、range over closed channel、closed receive 和容量/关闭错误路径。
 - `matrix_host_dense_more`: `matrix.dense` / `matrix.getf` / `matrix.setf` 在脚本层覆盖 flat backing 读写、普通索引一致性和稳定参数错误。
 - `attrib_require_go_host_modules_more`: Go-host 标准库模块通过 `require` 和 `package.loaded` 保持全局表身份一致。
+- `attrib_require_all_stdlib_more`: 剩余 Go-host stdlib 模块通过 `require` 和 `package.loaded` 保持全局表身份一致，包括 stub-safe `rl`。
 - `http_background_server_more`: `http.listen` / `router.listen` 支持 `{background: true}`，返回可 `close` / `shutdown` / `wait` 的 server handle，脚本层可稳定做本地请求回环测试。
 - `json_go_host_more`: `json.encode` / `decode` / `pretty` 在脚本层覆盖嵌套结构、round-trip、非法 JSON 和 trailing data 拒绝。
 - `regexp_go_host_more`: Go RE2 风格 `regexp` helper 和 compiled object 覆盖 match/find/submatch/split/replace 与 invalid pattern 错误。
@@ -62,9 +64,11 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `vec_color_go_host_more`: `vec` / `color` helper 覆盖 vector constructors、length/dot/cross/normalize/clamp，以及 RGB/hex/alpha/invert/lerp 和 invalid input。
 - `vec_color_geometry_hsl_more`: vec geometry helpers 与 color HSL/HSV/lighten/darken/grayscale/mix/withAlpha transform 覆盖。
 - `container_sort_go_host_more`: `container` / `sort` helper 覆盖 set/queue/stack/heap、ascending/descending/reverse、binary search、unique、partition 和 key sort。
+- `sort_callback_helpers_more`: `sort.by` comparator 与 `sort.min` / `max` key callback 在 VM 文件模式下调用脚本 closure，并传播 callback error。
 - `crypto_go_host_more`: `crypto` helper 覆盖 constant-time equality、AES-GCM round-trip、decrypt error returns、random byte/hex shape 和 key-size validation。
 - `rand_go_host_more`: `rand` helper 覆盖 seeded replay、range/shape invariants、choice/shuffle/sample/weighted helpers、UUID/bytes shape 和参数校验。
 - `log_go_host_more`: `log` helper 覆盖 level constants、format、deterministic log output、history/count/clear 和 level filtering。
+- `math_go_helpers_more`: `math.clamp` / `lerp` / `sign` / `round` / `trunc` / `floorDiv` / `hypot` / `isnan` / `isinf` 的 Go-host helper 覆盖。
 - `os_go_host_env_expand_more`: `os` helper 覆盖环境变量 get/set/unset、ExpandEnv 风格展开和参数错误。
 - `os_time_date_host_more`: `os.time` / `clock` / fixed `date` formatting / hostname / pid / args 的 Go-host 诊断形状覆盖。
 - `process_go_host_entry_exit_more`: `process` helper 覆盖 host-controlled args/entrypoint 与可捕获的 process exit error。

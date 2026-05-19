@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 423.
+Current translated passing cases: 427.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -40,6 +40,7 @@ Current translated passing cases: 423.
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
 | `attrib_require_go_host_modules_more` | `attrib.lua` | Go-host standard-library modules return their global table from `require` and share identity through `package.loaded`. |
+| `attrib_require_all_stdlib_more` | `attrib.lua` | Full Go-host stdlib require/package.loaded identity sweep across remaining module tables, including stub-safe `rl`. |
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |
@@ -352,6 +353,7 @@ Recent audit-added coverage:
 | `main_script_file_vm_more` | `main.lua`, `code.lua` | VM-aware `script.eval`/`compile`/`loadFile`/`runFile` with current globals, relative file loading, env sync, and sandbox options. |
 | `main_vm_loader_more` | `main.lua`, `attrib.lua` | VM-aware global `load`/`loadfile`/`dofile` and file-backed `require` share current globals, relative script directory, and `package.loaded` cache. |
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
+| `math_go_helpers_more` | `math.lua`, `api.lua` | Go-host math helpers for clamp, lerp, sign, round, trunc, floor division, hypot, NaN/Inf checks, and error paths. |
 | `net_http_background_roundtrip_more` | `api.lua`, `main.lua` | Go-host `net` client helpers against local background HTTP server, including JSON response parsing and error returns. |
 | `net_http_methods_more` | `api.lua`, `main.lua` | Go-host loopback HTTP methods for PUT/PATCH/DELETE and configurable `net.request` headers, body, timeout, and redirect behavior. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
@@ -362,9 +364,11 @@ Recent audit-added coverage:
 | `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
+| `sort_callback_helpers_more` | `sort.lua`, `api.lua` | Go-host sort helpers invoking VM comparator/key callbacks, including callback error propagation through `pcall`. |
 | `table_go_helpers_more` | `sort.lua` | GScript Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |
 | `table_higher_order_vm_callbacks_more` | `sort.lua` | GScript table higher-order helpers `map`, `filter`, `reduce`, and `fromArray` with VM script callbacks. |
 | `table_proxy_concat_flatten_more` | `sort.lua`, `events.lua` | `table.concat` over proxy tables and `table.flatten` over inline nested table literals. |
+| `table_raw_helpers_more` | `sort.lua`, `api.lua` | Go-host table.toArray/table.unique plus rawget/rawset/rawlen/rawequal raw semantics and invalid-key diagnostics. |
 | `tracegc_stats_progress_more` | `tracegc.lua`, `gc.lua` | Go-host GC stats shape and explicit collection progress compared with Lua `collectgarbage` count/running observability. |
 | `utf8_go_helpers_more` | `utf8.lua` | GScript Go-host UTF-8 helpers: reverse, codepoint substring, Unicode case conversion, char classes, validate, and sanitize. |
 | `verybig_method_constants_more` | `verybig.lua` | Large constant table access with method calls, self chaining, and closure reads beyond the RK-style boundary. |
