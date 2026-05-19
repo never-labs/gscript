@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 405 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 407 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -54,6 +54,8 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `csv_go_host_more`: `csv.parse` / `parseWithHeaders` / `encode` / `encodeWithHeaders` 覆盖 quoted fields、自定义分隔符、header 映射和 malformed input。
 - `bits_go_host_more`: Go-style 64-bit `bits` helper 覆盖按位组合、shift/rotate、bit position 操作、count 和参数错误。
 - `uuid_go_host_more`: `uuid` helper 覆盖 nil UUID、validation、parse metadata 和 generated UUID shape。
+- `vec_color_go_host_more`: `vec` / `color` helper 覆盖 vector constructors、length/dot/cross/normalize/clamp，以及 RGB/hex/alpha/invert/lerp 和 invalid input。
+- `container_sort_go_host_more`: `container` / `sort` helper 覆盖 set/queue/stack/heap、ascending/descending/reverse、binary search、unique、partition 和 key sort。
 
 当前能力状态与设计取舍：
 

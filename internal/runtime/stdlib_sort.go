@@ -103,31 +103,39 @@ func buildSortLib(interp *Interpreter) *Table {
 		tbl := args[0].Table()
 		keyFn := args[1]
 		elems := extractArray(tbl)
+		type keyedValue struct {
+			value Value
+			key   Value
+		}
+		pairs := make([]keyedValue, len(elems))
 
 		// Pre-compute keys
-		keys := make([]Value, len(elems))
 		for i, elem := range elems {
 			results, err := interp.callFunction(keyFn, []Value{elem})
 			if err != nil {
 				return nil, err
 			}
+			pairs[i].value = elem
 			if len(results) > 0 {
-				keys[i] = results[0]
+				pairs[i].key = results[0]
 			} else {
-				keys[i] = NilValue()
+				pairs[i].key = NilValue()
 			}
 		}
 
 		var sortErr error
-		sort.SliceStable(elems, func(a, b int) bool {
+		sort.SliceStable(pairs, func(a, b int) bool {
 			if sortErr != nil {
 				return false
 			}
-			less, ok := keys[a].LessThan(keys[b])
+			less, ok := pairs[a].key.LessThan(pairs[b].key)
 			return ok && less
 		})
 		if sortErr != nil {
 			return nil, sortErr
+		}
+		for i, pair := range pairs {
+			elems[i] = pair.value
 		}
 		writeBack(tbl, elems)
 		return []Value{args[0]}, nil

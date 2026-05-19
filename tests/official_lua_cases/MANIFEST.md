@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 405.
+Current translated passing cases: 407.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -35,6 +35,7 @@ Current translated passing cases: 405.
 | `bitwise_bit32_wrap_more` | `bitwise.lua` | Additional `bit32.band` wrapping for positive and negative values around 2^33 and 2^40. |
 | `bitwise_direct_ops_more` | `bitwise.lua`, `bwcoercion.lua` | First-class bitwise expression operators, complement, bit-clear translation, shifts, and small accumulation loop. |
 | `bits_go_host_more` | `bitwise.lua`, `bwcoercion.lua` | Go-host 64-bit `bits` helper operations, rotations, bit tests/mutations, counts, and invalid shift diagnostics. |
+| `container_sort_go_host_more` | `api.lua`, `sort.lua` | Go-host container set/queue/stack/heap helpers and `sort` namespace ordering/search helpers. |
 | `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
@@ -307,6 +308,7 @@ Current translated passing cases: 405.
 | `utf8_offset_len_errors` | `utf8.lua` | `utf8.offset` and indexed `utf8.len` position bounds and continuation-byte errors. |
 | `utf8_validation_helpers_more` | `utf8.lua` | Go-style structured UTF-8 validation diagnostics and non-strict sanitization helpers over invalid edge sequences. |
 | `uuid_go_host_more` | `api.lua`, `strings.lua` | Go-host UUID nil value, validation, parsing, version/variant metadata, and generated UUID shape checks. |
+| `vec_color_go_host_more` | `api.lua`, `math.lua` | Go-host vector and color helper constructors, predicates, arithmetic helpers, conversion, and invalid input diagnostics. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
 | `vararg_call_unpack_more` | `vararg.lua` | `table.unpack`-driven call forwarding, explicit nil-count handling, fixed-parameter adjustment, and vararg builtin dispatch. |
 | `vararg_method_recursive_more` | `vararg.lua` | Method-call vararg indexing plus recursive vararg forwarding through nested one-less helpers. |
