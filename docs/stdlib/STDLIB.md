@@ -23,6 +23,11 @@ GScript ships with a comprehensive standard library covering application develop
 | [regexp](#regexp) | `regexp` | Regular expressions (RE2) |
 | [utf8](#utf8) | `utf8` | Unicode/UTF-8 string operations |
 | [bit32](#bit32) | `bit32` | 32-bit bitwise operations |
+| [bits](#bits) | `bits` | 64-bit bitwise operations |
+| [binary](#binary) | `binary` | Binary packing/unpacking |
+| [process](#process) | `process` | Process args, exit, and command execution |
+| [script](#script) | `script` | Compile/evaluate/load script chunks |
+| [debug](#debug) | `debug` | Runtime diagnostics and source info |
 | [http](#http) | `http` | HTTP server |
 | [gl](#gl) | `gl` | OpenGL 2D drawing |
 | [coroutine](#coroutine) | `coroutine` | Coroutine control (built-in) |
@@ -116,6 +121,8 @@ math.type(x)     // "integer" | "float" | false
 
 ## io
 
+File I/O. See [io.md](io.md).
+
 ```go
 io.write("hello ")
 io.write("world\n")
@@ -124,9 +131,21 @@ all  := io.read("*a")   // read all
 num  := io.read("*n")   // read number
 
 f := io.open("file.txt", "r")  // "r" "w" "a" "rb" "wb"
-content := f.read("*a")
-for line := range f.lines() { print(line) }
-f.close()
+content := f:read("*a")
+f:seek("set", 0)
+f:flush()
+for line := range f:lines() { print(line) }
+f:close()
+
+oldIn := io.input()
+oldOut := io.output()
+tmp := io.tmpfile()
+io.output(tmp)
+io.write("buffered")
+io.flush()
+print(io.type(tmp))      // "file"
+io.output(oldOut)
+io.input(oldIn)
 ```
 
 ---
@@ -540,6 +559,116 @@ bit32.replace(0xFF00, 0xA, 8, 4)  // 0xFA00
 bit32.countbits(0xFF)       // 8
 bit32.highbit(0b1010)       // 3 (highest set bit position)
 bit32.toHex(255)            // "0x000000FF"
+```
+
+---
+
+## bits
+
+64-bit integer bit operations. See [bits.md](bits.md).
+
+```go
+bits.and(255, 15)       // 15
+bits.or(240, 15)        // 255
+bits.xor(255, 15)       // 240
+bits.not(0)             // -1
+
+bits.shl(1, 8)          // 256
+bits.shr(256, 8)        // 1
+bits.sar(-8, 1)         // -4
+bits.rotl(1, 4)         // 16
+bits.rotr(16, 4)        // 1
+
+bits.test(10, 1)        // true
+bits.set(0, 3)          // 8
+bits.clear(15, 1)       // 13
+bits.toggle(8, 3)       // 0
+bits.ones(255)          // 8
+bits.leadingZeros(1)    // 63
+bits.trailingZeros(16)  // 4
+
+// Expression syntax is also available:
+mask := (1 << 8) - 1
+value := (flags & mask) | 4
+value = value &^ 2       // bit clear
+value = value ^ 1        // xor
+```
+
+---
+
+## binary
+
+Binary string encoding/decoding. See [binary.md](binary.md).
+
+```go
+packed := binary.pack("be:u16 i32 f32 string bytes:3", 258, -7, 1.5, "go", "abc")
+a, b, c, s, raw, next := binary.unpack("be:u16 i32 f32 string bytes:3", packed)
+
+binary.size("u16 u32 bytes:3")  // 9
+n, err := binary.size("string") // nil, "variable-size field..."
+```
+
+---
+
+## process
+
+Process environment, arguments, host-controlled exit, and subprocess helpers.
+See [process.md](process.md).
+
+```go
+argv := process.args()       // argv[0] is script path/entry name
+entry := process.entry()     // {file, dir, args}
+process.setArgs("tool.gs", "build", "--fast")
+
+result := process.run({"echo", "hello"})
+out, err := process.exec("echo", "hello")
+sh := process.shell("echo $HOME")
+path := process.which("gscript")
+pid := process.pid()
+env := process.env()
+
+process.exit(0)              // raises a host-visible process exit signal
+```
+
+---
+
+## script
+
+Compile, evaluate, and load GScript source. See [script.md](script.md).
+
+```go
+fn := script.compile("return 1 + 2", {sourceName: "generated.gs"})
+print(fn())                  // 3
+
+result := script.eval("return name", {env: {name: "gscript"}})
+chunk := script.loadFile("plugin.gs", {scriptDir: "plugins"})
+script.runFile("main.gs", {sourceName: "virtual/main.gs"})
+
+dir := script.dir()
+old := script.setDir("scripts")
+```
+
+---
+
+## debug
+
+Runtime diagnostics and source-aware stack information. See [debug.md](debug.md).
+
+```go
+info := debug.info(0)
+print(info.sourceName, info.line, info.column)
+
+stack := debug.stack()
+trace := debug.traceback("boom")
+fnInfo := debug.info(someFunction)
+value := debug.value({x: 1})
+
+debug.setHook(func(event) {
+    print(event.type, event.kind, event.name)
+}, {call: true, return: true, script: true, native: false})
+
+debug.emit("progress", {done: 10})
+debug.setHook(nil)
 ```
 
 ---

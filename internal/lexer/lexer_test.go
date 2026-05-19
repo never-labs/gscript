@@ -149,6 +149,18 @@ func TestIntegerLiterals(t *testing.T) {
 	})
 }
 
+func TestGoStyleIntegerLiterals(t *testing.T) {
+	expectTokens(t, "0xFF 0Xff 0b1010 0B11 0o755 0O644 1_000_000", []Token{
+		{Type: TOKEN_NUMBER, Value: "0xFF"},
+		{Type: TOKEN_NUMBER, Value: "0Xff"},
+		{Type: TOKEN_NUMBER, Value: "0b1010"},
+		{Type: TOKEN_NUMBER, Value: "0B11"},
+		{Type: TOKEN_NUMBER, Value: "0o755"},
+		{Type: TOKEN_NUMBER, Value: "0O644"},
+		{Type: TOKEN_NUMBER, Value: "1_000_000"},
+	})
+}
+
 func TestFloatLiterals(t *testing.T) {
 	expectTokens(t, "3.14 0.5 100.0", []Token{
 		{Type: TOKEN_NUMBER, Value: "3.14"},
@@ -163,6 +175,13 @@ func TestScientificNotation(t *testing.T) {
 		{Type: TOKEN_NUMBER, Value: "1.5e-3"},
 		{Type: TOKEN_NUMBER, Value: "2E+4"},
 		{Type: TOKEN_NUMBER, Value: "3.0e0"},
+	})
+}
+
+func TestGoStyleUnderscoreFloatLiterals(t *testing.T) {
+	expectTokens(t, "1_2.3_4 1_2e3_4", []Token{
+		{Type: TOKEN_NUMBER, Value: "1_2.3_4"},
+		{Type: TOKEN_NUMBER, Value: "1_2e3_4"},
 	})
 }
 
@@ -183,6 +202,9 @@ func TestStringEscapeSequences(t *testing.T) {
 		{`"back\\slash"`, "back\\slash"},
 		{`"a\"b"`, "a\"b"},
 		{`"cr\rhere"`, "cr\rhere"},
+		{`"bell\a back\b form\f vert\v"`, "bell\a back\b form\f vert\v"},
+		{`"\x41\u0042\U00000043"`, "ABC"},
+		{`"\000\065\255"`, string([]byte{0, 65, 255})},
 	}
 	for _, tt := range tests {
 		lex := New(tt.input)

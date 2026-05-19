@@ -30,6 +30,20 @@ func TestExec(t *testing.T) {
 	}
 }
 
+func TestExecGoStyleNumberLiteralsWithVM(t *testing.T) {
+	vm := gs.New(gs.WithVM())
+	if err := vm.Exec(`result := 0xFF + 0b1010 + 0o20 + 1_000`); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(1281) {
+		t.Fatalf("expected 1281, got %v (%T)", got, got)
+	}
+}
+
 func TestExecError(t *testing.T) {
 	vm := gs.New()
 	err := vm.Exec(`x :=`)

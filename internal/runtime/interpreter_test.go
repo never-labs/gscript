@@ -73,6 +73,18 @@ func TestArithmeticIntMul(t *testing.T) {
 	}
 }
 
+func TestGoStyleNumberLiterals(t *testing.T) {
+	v := getGlobal(t, `result := 0xFF + 0b1010 + 0o20 + 1_000`, "result")
+	if !v.IsInt() || v.Int() != 1281 {
+		t.Errorf("expected int 1281, got %v", v)
+	}
+
+	f := getGlobal(t, `result := 1_2.5 + 1e1`, "result")
+	if !f.IsFloat() || f.Float() != 22.5 {
+		t.Errorf("expected float 22.5, got %v", f)
+	}
+}
+
 func TestArithmeticIntDivExact(t *testing.T) {
 	v := getGlobal(t, `result := 10 / 2`, "result")
 	if !v.IsInt() || v.Int() != 5 {

@@ -7,11 +7,9 @@ should be fixed before translating dependent slices.
 | Area | Current gap |
 |---|---|
 | Floor division | GScript lexes `//` as a line comment, so Lua floor-division slices need syntax support or a faithful translated helper. |
-| Bitwise operators | Lua operators such as `|`, `&`, `~`, `<<`, and `>>` are not accepted by the GScript lexer. |
-| Hexadecimal numerals | GScript rejected `0xFFFFFFFF` in file mode; translated cases use decimal equivalents where possible. |
 | Numeric table key `0` | Fixed for newly allocated mixed array tables; still needs broader regression coverage across typed/dense table paths. |
 | Typed numeric table key `0` | Dense typed int arrays can still return numeric zero for an unset `t[0]`; seen while translating `constructs.lua` loop-table checks. |
-| Numeric/control escapes | Lua-style numeric/control string escapes such as `"\000"` and `\a\b\f\r\v` are not fully equivalent in GScript string literals/patterns. |
+| Pattern escape compatibility | GScript string literals now support Go-style control, hex, Unicode, and decimal byte escapes; translated Lua pattern slices still need case-by-case mapping to GScript string/regexp semantics. |
 | Nested multireturn in file mode | `table.unpack(a)` or `string.byte(...)` nested under another call/table constructor can collapse differently when loaded from a `.gs` file. |
 | Table constructors with recursive multireturns | Official `constructs.lua` cases like `{f(3), f(5), f(10)}` do not yet match Lua in `.gs` file mode. |
 | Parenthesized call adjustment | Lua adjusts `(f())` to one result; GScript probes returned multiple values. |

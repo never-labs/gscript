@@ -2696,7 +2696,7 @@ func digitValue(c byte) int {
 }
 
 func parseNumber(s string) (Value, error) {
-	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+	if i, err := strconv.ParseInt(s, 0, 64); err == nil {
 		return IntValue(i), nil
 	}
 	if f, err := strconv.ParseFloat(s, 64); err == nil {

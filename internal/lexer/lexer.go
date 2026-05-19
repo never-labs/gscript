@@ -1,6 +1,10 @@
 package lexer
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"unicode/utf8"
+)
 
 // Lexer tokenizes GScript source code.
 type Lexer struct {
@@ -175,17 +179,57 @@ func (l *Lexer) readString() (Token, error) {
 			}
 			esc := l.advance()
 			switch esc {
+			case 'a':
+				result = append(result, '\a')
+			case 'b':
+				result = append(result, '\b')
+			case 'f':
+				result = append(result, '\f')
 			case 'n':
 				result = append(result, '\n')
 			case 't':
 				result = append(result, '\t')
 			case 'r':
 				result = append(result, '\r')
+			case 'v':
+				result = append(result, '\v')
 			case '\\':
 				result = append(result, '\\')
 			case '"':
 				result = append(result, '"')
+			case 'x':
+				b, err := l.readFixedHexEscape(2, startLine, startCol)
+				if err != nil {
+					return Token{}, err
+				}
+				result = append(result, byte(b))
+			case 'u':
+				r, err := l.readFixedHexEscape(4, startLine, startCol)
+				if err != nil {
+					return Token{}, err
+				}
+				if !utf8.ValidRune(rune(r)) {
+					return Token{}, fmt.Errorf("invalid unicode escape at %d:%d", startLine, startCol)
+				}
+				result = append(result, string(rune(r))...)
+			case 'U':
+				r, err := l.readFixedHexEscape(8, startLine, startCol)
+				if err != nil {
+					return Token{}, err
+				}
+				if !utf8.ValidRune(rune(r)) {
+					return Token{}, fmt.Errorf("invalid unicode escape at %d:%d", startLine, startCol)
+				}
+				result = append(result, string(rune(r))...)
 			default:
+				if isDigit(esc) {
+					b, err := l.readDecimalByteEscape(esc, startLine, startCol)
+					if err != nil {
+						return Token{}, err
+					}
+					result = append(result, byte(b))
+					continue
+				}
 				// Unrecognized escape: keep backslash and character
 				result = append(result, '\\', esc)
 			}
@@ -194,6 +238,35 @@ func (l *Lexer) readString() (Token, error) {
 		result = append(result, l.advance())
 	}
 	return Token{}, fmt.Errorf("unterminated string at %d:%d", startLine, startCol)
+}
+
+func (l *Lexer) readFixedHexEscape(width int, startLine, startCol int) (int64, error) {
+	start := l.pos
+	for i := 0; i < width; i++ {
+		if !isHexDigit(l.peekAt(i)) {
+			return 0, fmt.Errorf("invalid hex escape at %d:%d", startLine, startCol)
+		}
+	}
+	for i := 0; i < width; i++ {
+		l.advance()
+	}
+	v, err := strconv.ParseInt(l.source[start:l.pos], 16, 32)
+	if err != nil {
+		return 0, fmt.Errorf("invalid hex escape at %d:%d", startLine, startCol)
+	}
+	return v, nil
+}
+
+func (l *Lexer) readDecimalByteEscape(first byte, startLine, startCol int) (int64, error) {
+	digits := []byte{first}
+	for len(digits) < 3 && isDigit(l.peek()) {
+		digits = append(digits, l.advance())
+	}
+	v, err := strconv.ParseInt(string(digits), 10, 16)
+	if err != nil || v > 255 {
+		return 0, fmt.Errorf("invalid decimal byte escape at %d:%d", startLine, startCol)
+	}
+	return v, nil
 }
 
 // readRawString reads a Go-style backtick string literal.
@@ -214,21 +287,31 @@ func (l *Lexer) readRawString() (Token, error) {
 	return Token{}, fmt.Errorf("unterminated raw string at %d:%d", startLine, startCol)
 }
 
-// readNumber reads an integer or floating-point number, including scientific notation.
+// readNumber reads a Go-style integer or floating-point number.
 func (l *Lexer) readNumber() (Token, error) {
 	startLine := l.line
 	startCol := l.col
 	startPos := l.pos
 
-	// Read digits
-	for l.pos < len(l.source) && isDigit(l.peek()) {
+	if l.peek() == '0' && isIntBasePrefix(l.peekAt(1)) {
+		l.advance() // consume 0
+		l.advance() // consume base prefix
+		for l.pos < len(l.source) && isBaseLiteralChar(l.peek()) {
+			l.advance()
+		}
+		value := l.source[startPos:l.pos]
+		return Token{Type: TOKEN_NUMBER, Value: value, Line: startLine, Column: startCol}, nil
+	}
+
+	// Read integer digits.
+	for l.pos < len(l.source) && isDigitOrUnderscore(l.peek()) {
 		l.advance()
 	}
 
 	// Check for decimal point — but not if followed by another dot (which is CONCAT "..")
 	if l.pos < len(l.source) && l.peek() == '.' && l.peekAt(1) != '.' {
 		l.advance() // consume .
-		for l.pos < len(l.source) && isDigit(l.peek()) {
+		for l.pos < len(l.source) && isDigitOrUnderscore(l.peek()) {
 			l.advance()
 		}
 	}
@@ -239,7 +322,7 @@ func (l *Lexer) readNumber() (Token, error) {
 		if l.pos < len(l.source) && (l.peek() == '+' || l.peek() == '-') {
 			l.advance() // consume sign
 		}
-		for l.pos < len(l.source) && isDigit(l.peek()) {
+		for l.pos < len(l.source) && isDigitOrUnderscore(l.peek()) {
 			l.advance()
 		}
 	}
@@ -461,6 +544,22 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 // isDigit returns true for ASCII digits.
 func isDigit(ch byte) bool {
 	return ch >= '0' && ch <= '9'
+}
+
+func isDigitOrUnderscore(ch byte) bool {
+	return isDigit(ch) || ch == '_'
+}
+
+func isHexDigit(ch byte) bool {
+	return isDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
+}
+
+func isIntBasePrefix(ch byte) bool {
+	return ch == 'x' || ch == 'X' || ch == 'b' || ch == 'B' || ch == 'o' || ch == 'O'
+}
+
+func isBaseLiteralChar(ch byte) bool {
+	return isLetterOrDigit(ch) || ch == '_'
 }
 
 // isLetter returns true for ASCII letters and underscore.

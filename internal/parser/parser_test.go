@@ -65,6 +65,27 @@ func TestNumberLiteral(t *testing.T) {
 	}
 }
 
+func TestGoStyleNumberLiteral(t *testing.T) {
+	prog := mustParse(t, `x := 0xFF; y := 0b1010; z := 1_000`)
+	if len(prog.Stmts) != 3 {
+		t.Fatalf("expected 3 statements, got %d", len(prog.Stmts))
+	}
+	want := []string{"0xFF", "0b1010", "1_000"}
+	for i, w := range want {
+		decl, ok := prog.Stmts[i].(*ast.DeclareStmt)
+		if !ok {
+			t.Fatalf("stmt[%d]: expected DeclareStmt, got %T", i, prog.Stmts[i])
+		}
+		num, ok := decl.Values[0].(*ast.NumberLit)
+		if !ok {
+			t.Fatalf("stmt[%d]: expected NumberLit, got %T", i, decl.Values[0])
+		}
+		if num.Value != w {
+			t.Errorf("stmt[%d]: expected %q, got %q", i, w, num.Value)
+		}
+	}
+}
+
 func TestStringLiteral(t *testing.T) {
 	prog := mustParse(t, `s := "hello"`)
 	decl := prog.Stmts[0].(*ast.DeclareStmt)

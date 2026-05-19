@@ -77,3 +77,59 @@ Return a table of all environment variables as key-value pairs.
 env := process.env()
 path := env.PATH
 ```
+
+### process.args() -> table
+
+Return the current script argument table.
+
+When the interpreter has script arguments configured, index `0` contains the
+entry script name/path and indexes `1..n` contain the user arguments. If no
+interpreter arguments are configured, this falls back to the host process
+`os.Args` using the same zero-based convention.
+
+```
+args := process.args()
+print(args[0])   -- script file or host argv[0]
+print(args[1])   -- first script argument
+```
+
+### process.entry() -> table
+
+Return entrypoint metadata for the current script:
+
+- `file` -- current entry script path/name, or `nil` if none is configured
+- `dir` -- current script directory used for relative script/module loading
+- `args` -- the same table returned by `process.args()`
+
+```
+entry := process.entry()
+print(entry.file)
+print(entry.dir)
+print(entry.args[1])
+```
+
+### process.setArgs(script, args...)
+
+Set the interpreter-backed script argument list. This is mainly useful for
+embedders and tests that need to emulate command-line execution.
+
+```
+process.setArgs("tool.gs", "build", "--fast")
+args := process.args()
+-- args[0] == "tool.gs"
+-- args[1] == "build"
+-- args[2] == "--fast"
+```
+
+### process.exit([code])
+
+Signal host-controlled process termination. The CLI turns this into an OS exit
+status; embedders can catch the process-exit error instead of terminating.
+
+`code` defaults to `0`. A numeric code is used directly. Boolean `false` maps to
+exit code `1`; boolean `true` maps to `0`.
+
+```
+process.exit(0)
+process.exit(false)  -- exit code 1
+```
