@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 390 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 391 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -38,6 +38,7 @@
 - `files_file_lines_streams_more`: `file:lines()`、标准流表和 `io.type` open/closed 状态。
 - `table_go_helpers_more`: table keys/values/contains/indexOf/copy/merge/count/unique/reverse/slice/zip 等非回调 helper。
 - `table_higher_order_vm_callbacks_more`: table map/filter/reduce/fromArray 在 VM 文件模式下调用脚本 callback。
+- `table_proxy_concat_flatten_more`: `table.concat` 通过 proxy `__len` / `__index` 读表，以及 inline nested table literal 供 `table.flatten` 正确消费。
 
 真正仍需补齐或明确设计取舍的缺口：
 

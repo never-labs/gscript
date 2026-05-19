@@ -792,6 +792,46 @@ func (vm *VM) RegisterTableProxyLib() {
 			return []runtime.Value{removed}, nil
 		},
 	}))
+	tbl.RawSet(runtime.StringValue("concat"), runtime.FunctionValue(&runtime.GoFunction{
+		Name: "table.concat",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.concat' (table expected)")
+			}
+			t := args[0]
+			sep := ""
+			if len(args) >= 2 && args[1].IsString() {
+				sep = args[1].Str()
+			}
+			i := int64(1)
+			j, err := vm.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			if len(args) >= 3 {
+				i = vmToInt(args[2])
+			}
+			if len(args) >= 4 {
+				j = vmToInt(args[3])
+			}
+			parts := make([]string, 0)
+			if j >= i {
+				parts = make([]string, 0, j-i+1)
+			}
+			for k := i; k <= j; k++ {
+				v, err := vm.tableGet(t, runtime.IntValue(k))
+				if err != nil {
+					return nil, err
+				}
+				s, ok := runtime.ConcatOperandString(v)
+				if !ok {
+					return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
+				}
+				parts = append(parts, s)
+			}
+			return []runtime.Value{runtime.StringValue(strings.Join(parts, sep))}, nil
+		},
+	}))
 	tableUnpack := func(name string, args []runtime.Value) ([]runtime.Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)

@@ -1,0 +1,27 @@
+print("case:table_proxy_concat_flatten_more")
+
+backing := {[1]: "a", [2]: "b", [3]: "c"}
+reads := 0
+proxy := setmetatable({}, {
+  __len: func() { return 3 },
+  __index: func(_, k) {
+    reads = reads + 1
+    return backing[k]
+  },
+})
+
+assert(table.concat(proxy, ":") == "a:b:c")
+assert(reads == 3)
+assert(table.concat(proxy, "", 2, 3) == "bc")
+
+inline := {1, {2, 3}, 4}
+assert(#inline == 3 && inline[1] == 1 && inline[3] == 4)
+assert(type(inline[2]) == "table" && inline[2][1] == 2 && inline[2][2] == 3)
+
+flat := table.flatten(inline)
+assert(#flat == 4 && flat[1] == 1 && flat[2] == 2 && flat[3] == 3 && flat[4] == 4)
+
+partial := table.flatten({1, {2, {3}}, 4}, 1)
+assert(#partial == 4 && partial[1] == 1 && partial[2] == 2 && type(partial[3]) == "table" && partial[4] == 4)
+
+print("ok")

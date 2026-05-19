@@ -2861,6 +2861,7 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 			if err := c.compileExprTo(f.Value, valueReg); err != nil {
 				return err
 			}
+			c.nextReg = valueReg + 1
 			arrayIdx++
 			pendingArrayCount++
 
