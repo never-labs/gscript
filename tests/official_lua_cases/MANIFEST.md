@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 398.
+Current translated passing cases: 402.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -319,6 +319,7 @@ Recent audit-added coverage:
 | `api_arith_metamethod_chain_more` | `api.lua`, `events.lua` | Arithmetic metamethod chaining for `__add`, `__mod`, and unary minus over wrapped table values. |
 | `big_generated_eval_env_more` | `big.lua` | Generated chunk/table execution with explicit environment mutation and large-enough array indexing. |
 | `binary_namespace_more` | `tpack.lua` | GScript `binary` namespace pack/unpack/size with Go-style endian and field tokens. |
+| `bytes_hash_base64_go_host_more` | `api.lua`, `strings.lua` | Go-host `bytes`, `hash`, and `base64` helpers for buffers, encodings, checksums, HMAC, and error returns. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `debug_host_helpers_more` | `db.lua` | Go-host `debug.traceback`, `debug.stack`, `debug.globals`, `debug.info`, `debug.value`, and `debug.goStack` diagnostics. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
@@ -334,7 +335,10 @@ Recent audit-added coverage:
 | `json_go_host_more` | `api.lua`, `strings.lua` | Go-host `json` encode/decode/pretty round trips, nested values, invalid JSON, and trailing-data rejection. |
 | `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
+| `net_http_background_roundtrip_more` | `api.lua`, `main.lua` | Go-host `net` client helpers against local background HTTP server, including JSON response parsing and error returns. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
+| `time_compress_encoding_go_host_more` | `main.lua`, `strings.lua` | Deterministic Go-host `time`, `compress`, and `encoding` helpers over fixed timestamps, round trips, and decode errors. |
+| `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `table_go_helpers_more` | `sort.lua` | GScript Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |

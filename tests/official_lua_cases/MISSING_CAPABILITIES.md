@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 398 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 402 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -47,6 +47,10 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `json_go_host_more`: `json.encode` / `decode` / `pretty` 在脚本层覆盖嵌套结构、round-trip、非法 JSON 和 trailing data 拒绝。
 - `regexp_go_host_more`: Go RE2 风格 `regexp` helper 和 compiled object 覆盖 match/find/submatch/split/replace 与 invalid pattern 错误。
 - `fs_path_go_host_more`: Go-host `fs` / `path` helper 覆盖临时路径、读写追加、stat、copy/rename、readdir、removeAll 和 path match/clean/split。
+- `url_go_host_more`: Go-host URL parse/build/escape/query/join helper 覆盖结构化字段、query table、invalid escape 和 validity checks。
+- `bytes_hash_base64_go_host_more`: `bytes` buffer、hex/XOR/repeat/concat、base64/url-base64、hash/HMAC/CRC32 覆盖 deterministic binary helper。
+- `time_compress_encoding_go_host_more`: 固定时间格式化/解析/diff，gzip/zlib/deflate round-trip，以及 hex/base32/INI/XML 编解码覆盖。
+- `net_http_background_roundtrip_more`: `net.get` / `post` / `request` 通过本地 `http.listen(..., {background:true})` 覆盖 response shape、JSON helper、404 和参数错误路径。
 
 当前能力状态与设计取舍：
 
