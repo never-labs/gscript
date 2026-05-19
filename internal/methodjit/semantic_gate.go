@@ -41,7 +41,10 @@ func jitShouldStayInInterpreter(proto *vm.FuncProto) bool {
 	}
 	return proto.Name == "<main>" ||
 		jitUnsupportedMultiReturn(proto) ||
-		jitUnsupportedClosureArithmetic(proto)
+		jitUnsupportedClosureArithmetic(proto) ||
+		jitUnsupportedDynamicOperators(proto) ||
+		jitUnsupportedComparisonBranch(proto) ||
+		jitUnsupportedCallBoundary(proto)
 }
 
 func jitSemanticGateEnabled() bool {
@@ -56,6 +59,45 @@ func jitUnsupportedClosureArithmetic(proto *vm.FuncProto) bool {
 	for _, inst := range proto.Code {
 		switch vm.DecodeOp(inst) {
 		case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_DIV, vm.OP_MOD:
+			return true
+		}
+	}
+	return false
+}
+
+func jitUnsupportedComparisonBranch(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, inst := range proto.Code {
+		switch vm.DecodeOp(inst) {
+		case vm.OP_EQ, vm.OP_LT, vm.OP_LE:
+			return true
+		}
+	}
+	return false
+}
+
+func jitUnsupportedCallBoundary(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, inst := range proto.Code {
+		switch vm.DecodeOp(inst) {
+		case vm.OP_CALL, vm.OP_CALLTABLE, vm.OP_SELF, vm.OP_TFORCALL, vm.OP_TFORLOOP, vm.OP_RESUME, vm.OP_YIELD:
+			return true
+		}
+	}
+	return false
+}
+
+func jitUnsupportedDynamicOperators(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, inst := range proto.Code {
+		switch vm.DecodeOp(inst) {
+		case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_DIV, vm.OP_MOD, vm.OP_POW, vm.OP_UNM, vm.OP_LEN, vm.OP_CONCAT:
 			return true
 		}
 	}

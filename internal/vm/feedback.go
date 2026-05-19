@@ -190,6 +190,33 @@ const (
 
 const argArrayElementShapeSampleLimit = 8
 const tableKeyValueShapeSampleLimit = 16
+const argArrayElementShapeNestedDepthLimit = 2
+
+type tableShapeObservation struct {
+	visited map[*runtime.Table]struct{}
+}
+
+func newTableShapeObservation() *tableShapeObservation {
+	return &tableShapeObservation{visited: make(map[*runtime.Table]struct{}, argArrayElementShapeSampleLimit)}
+}
+
+func (obs *tableShapeObservation) enter(tbl *runtime.Table) bool {
+	if obs == nil || tbl == nil {
+		return false
+	}
+	if _, ok := obs.visited[tbl]; ok {
+		return false
+	}
+	obs.visited[tbl] = struct{}{}
+	return true
+}
+
+func (obs *tableShapeObservation) leave(tbl *runtime.Table) {
+	if obs == nil || tbl == nil {
+		return
+	}
+	delete(obs.visited, tbl)
+}
 
 // ArgArrayElementShapeFeedback records the stable shape of table values stored
 // in an array argument's first element. It is intentionally conservative: the
@@ -318,21 +345,29 @@ func (af *ArgArrayElementShapeFeedback) observeElementTable(tbl *runtime.Table) 
 }
 
 func (af *ArgArrayElementShapeFeedback) ObserveTableValue(tbl *runtime.Table) {
-	af.observeTableValueDepth(tbl, false, 2)
+	af.observeTableValueDepth(tbl, false, argArrayElementShapeNestedDepthLimit)
 }
 
 func (af *ArgArrayElementShapeFeedback) observeTableValue(tbl *runtime.Table, invalidOnEmpty bool) {
-	af.observeTableValueDepth(tbl, invalidOnEmpty, 2)
+	af.observeTableValueDepth(tbl, invalidOnEmpty, argArrayElementShapeNestedDepthLimit)
 }
 
 func (af *ArgArrayElementShapeFeedback) observeTableValueDepth(tbl *runtime.Table, invalidOnEmpty bool, depth int) {
+	af.observeTableValueDepthCtx(tbl, invalidOnEmpty, depth, newTableShapeObservation())
+}
+
+func (af *ArgArrayElementShapeFeedback) observeTableValueDepthCtx(tbl *runtime.Table, invalidOnEmpty bool, depth int, obs *tableShapeObservation) {
 	if af == nil || tbl == nil {
 		return
 	}
+	if depth < 0 || !obs.enter(tbl) {
+		return
+	}
+	defer obs.leave(tbl)
 	shapeID := tbl.ShapeID()
 	fields := tbl.ShapeFieldNames()
 	if depth > 0 {
-		af.observeStringValueTables(tbl, depth-1)
+		af.observeStringValueTables(tbl, depth-1, obs)
 	}
 	if shapeID == 0 || len(fields) == 0 {
 		if invalidOnEmpty {
@@ -349,12 +384,14 @@ func (af *ArgArrayElementShapeFeedback) observeTableValueDepth(tbl *runtime.Tabl
 	}
 	af.observeShapeCase(tbl, shapeID, fields)
 	af.observeFieldTypes(tbl, fields)
-	af.observeNestedTables(tbl, fields)
+	if depth > 0 {
+		af.observeNestedTables(tbl, fields, depth-1, obs)
+	}
 	af.observeArrayElements(tbl)
 	af.Count++
 }
 
-func (af *ArgArrayElementShapeFeedback) observeStringValueTables(tbl *runtime.Table, depth int) {
+func (af *ArgArrayElementShapeFeedback) observeStringValueTables(tbl *runtime.Table, depth int, obs *tableShapeObservation) {
 	if af == nil || tbl == nil {
 		return
 	}
@@ -365,7 +402,7 @@ func (af *ArgArrayElementShapeFeedback) observeStringValueTables(tbl *runtime.Ta
 		if af.StringValueShape == nil {
 			af.StringValueShape = &ArgArrayElementShapeFeedback{}
 		}
-		af.StringValueShape.observeTableValueDepth(value.Table(), false, depth)
+		af.StringValueShape.observeTableValueDepthCtx(value.Table(), false, depth, obs)
 	})
 }
 
@@ -549,7 +586,7 @@ func (rf IntRangeFeedback) StableRange() (min, max int64, ok bool) {
 	return rf.Min, rf.Max, true
 }
 
-func (af *ArgArrayElementShapeFeedback) observeNestedTables(tbl *runtime.Table, fields []string) {
+func (af *ArgArrayElementShapeFeedback) observeNestedTables(tbl *runtime.Table, fields []string, depth int, obs *tableShapeObservation) {
 	if af == nil || tbl == nil || len(fields) == 0 {
 		return
 	}
@@ -570,7 +607,9 @@ func (af *ArgArrayElementShapeFeedback) observeNestedTables(tbl *runtime.Table, 
 			af.Nested = make(map[string]ArgArrayElementShapeFeedback)
 		}
 		nested := af.Nested[field]
-		nested.observeStringValueTables(nestedTable, 1)
+		if depth > 0 {
+			nested.observeStringValueTables(nestedTable, depth-1, obs)
+		}
 		hasStringValue := nested.StringValueShape != nil
 		if !hasShape && !hasArrayElement && !hasStringValue {
 			continue

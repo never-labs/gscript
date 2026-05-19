@@ -432,6 +432,24 @@ func TestArgArrayElementShapeFeedback_ObservesNestedStringMapValueShape(t *testi
 	}
 }
 
+func TestArgArrayElementShapeFeedback_SelfReferentialTablesDoNotRecurse(t *testing.T) {
+	var fb ArgArrayElementShapeFeedback
+	root := runtime.NewTable()
+	root.RawSetString("self", runtime.TableValue(root))
+	root.RawSetString("count", runtime.IntValue(1))
+
+	fb.ObserveTableValue(root)
+	if fb.Count != 1 {
+		t.Fatalf("count=%d want 1", fb.Count)
+	}
+	if _, _, ok := fb.StableShape(); !ok {
+		t.Fatalf("expected shallow self-referential table shape to remain observable: %#v", fb)
+	}
+	if nested, ok := fb.Nested["self"]; ok && nested.Count > 1 {
+		t.Fatalf("self-referential nested feedback recursed repeatedly: %#v", nested)
+	}
+}
+
 func TestTableAccessFeedback_MetatableSeen(t *testing.T) {
 	var tk TableKeyFeedback
 	tbl := runtime.NewTable()

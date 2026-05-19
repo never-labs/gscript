@@ -35,6 +35,30 @@ func make(a) {
 	}
 }
 
+func TestJITSemanticGateRejectsComparisonBranches(t *testing.T) {
+	top := compileTop(t, `func f(a) { if a < 10 { return 1 } }`)
+	fn := findFirstProtoWithName(t, top, "f")
+	if !jitShouldStayInInterpreter(fn) {
+		t.Fatal("comparison branch function should stay interpreted until JIT comparison semantics are complete")
+	}
+}
+
+func TestJITSemanticGateRejectsCallBoundaries(t *testing.T) {
+	top := compileTop(t, `func f(g) { return g(1) }`)
+	fn := findFirstProtoWithName(t, top, "f")
+	if !jitShouldStayInInterpreter(fn) {
+		t.Fatal("call boundary function should stay interpreted until JIT call/error boundaries are complete")
+	}
+}
+
+func TestJITSemanticGateRejectsDynamicOperators(t *testing.T) {
+	top := compileTop(t, `func f(a, b) { return a + b }`)
+	fn := findFirstProtoWithName(t, top, "f")
+	if !jitShouldStayInInterpreter(fn) {
+		t.Fatal("dynamic operator function should stay interpreted until JIT type/error fallbacks are complete")
+	}
+}
+
 func findFirstProtoWithName(t *testing.T, root *vm.FuncProto, name string) *vm.FuncProto {
 	t.Helper()
 	if root.Name == name {
