@@ -3,6 +3,11 @@
 The `debug` library exposes runtime diagnostics, source-aware stack frames, and
 coarse event hooks.
 
+VM note: file-mode VM execution currently has passing coverage for
+`debug.info(function)` and `debug.value`. Stack-frame/source metadata and
+call/return hook events have runtime/interpreter coverage, with fuller VM
+parity tracked in `tests/official_lua_cases/MISSING_CAPABILITIES.md`.
+
 ## Source Information
 
 Stack frames and script functions can include:

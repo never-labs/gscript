@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 337.
+Current translated passing cases: 340.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -278,9 +278,17 @@ Current translated passing cases: 337.
 | `vararg_select` | `vararg.lua` | Positive-index `select` and protected out-of-range calls. |
 | `vararg_tail_missing_args` | `vararg.lua` | Tail-call forwarding with missing arguments preserves nil and later returned values. |
 
+Audit-added coverage not yet folded into the main table above:
+
+| Case | Official source area | Notes |
+|---|---|---|
+| `code_explicit_spread_more` | `code.lua`, `db.lua` | GScript explicit `spread(expr)` and `table.spread` expansion in call arguments and table constructors. |
+| `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
+| `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
+
 Next recommended conversion order:
 
-1. Fix known semantic gaps that block larger official slices (pattern escape mapping and coroutine/metatable edge cases).
-2. Continue `strings.lua` pattern/gsub/format/concat slices after those gaps shrink.
-3. Continue `events.lua` comparison/rawlen/protected metatable slices after metamethod and `rawlen` support improve.
-4. Continue `math.lua` integer and bitwise stress slices using the existing Go-style bitwise operators and `math.floorDiv` helper.
+1. Close VM compiler parity gaps for GScript-only language features currently covered by interpreter/runtime tests, especially `const` declarations and `defer`.
+2. Tighten VM file-mode diagnostics coverage for `debug.stack`, numeric `debug.info(level)`, source-name metadata, and hook/sink events.
+3. Decide whether label-directed control flow should be added as Go-style labels/goto or remain documented as a non-goal in favor of structured loops.
+4. If runtime-embedding tests need Lua `ltests`-style coverage, design a GScript-native host test helper instead of cloning the Lua C API test library.

@@ -1,0 +1,16 @@
+print("case:db_gscript_diagnostics_more")
+
+globalMarker := 123
+
+func inner() {
+  value := debug.value({x: 1})
+
+  assert(value.type == "table" && value.truthy == true)
+}
+
+info := debug.info(inner)
+assert(type(info) == "table")
+
+inner()
+
+print("ok")
