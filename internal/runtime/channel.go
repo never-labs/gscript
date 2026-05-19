@@ -22,6 +22,23 @@ func NewChannel(capacity int) *Channel {
 	}
 }
 
+// ChannelCapacityFromValue validates a script-level make(chan, capacity)
+// operand before it reaches Go's make(chan, n), which panics on negatives.
+func ChannelCapacityFromValue(v Value, name string) (int, error) {
+	if !v.IsInt() {
+		return 0, fmt.Errorf("%s: capacity must be an integer", name)
+	}
+	capacity := v.Int()
+	if capacity < 0 {
+		return 0, fmt.Errorf("%s: capacity must be non-negative", name)
+	}
+	maxInt := int64(int(^uint(0) >> 1))
+	if capacity > maxInt {
+		return 0, fmt.Errorf("%s: capacity too large", name)
+	}
+	return int(capacity), nil
+}
+
 // Send sends a value on the channel. Blocks if the channel is full.
 func (c *Channel) Send(val Value) error {
 	c.mu.Lock()

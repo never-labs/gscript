@@ -118,6 +118,18 @@ func (interp *Interpreter) markPackageLoaded(name string, module Value) {
 	loaded.Table().RawSetString(name, module)
 }
 
+func (interp *Interpreter) packageLoaded(name string) Value {
+	pkg, ok := interp.globals.Get("package")
+	if !ok || !pkg.IsTable() {
+		return NilValue()
+	}
+	loaded := pkg.Table().RawGetString("loaded")
+	if !loaded.IsTable() {
+		return NilValue()
+	}
+	return loaded.Table().RawGetString(name)
+}
+
 // SetArgs sets the script entrypoint arguments and updates the global arg table.
 // The resulting table follows GScript's Lua-compatible convention:
 // arg[0] is the script name, and arg[1..n] are user arguments.
@@ -641,6 +653,11 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument #1 to 'require' (string expected)")
 			}
 			name := args[0].Str()
+
+			if loaded := interp.packageLoaded(name); !loaded.IsNil() {
+				interp.modules[name] = loaded
+				return []Value{loaded}, nil
+			}
 
 			// Check loaded cache
 			if loaded, ok := interp.modules[name]; ok {
@@ -1904,7 +1921,10 @@ func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value
 			if err != nil {
 				return nil, err
 			}
-			cap = int(sizeVal.Int())
+			cap, err = ChannelCapacityFromValue(sizeVal, "make(chan)")
+			if err != nil {
+				return nil, err
+			}
 		}
 		ch := NewChannel(cap)
 		return []Value{ChannelValue(ch)}, nil

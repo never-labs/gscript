@@ -331,6 +331,17 @@ func (vm *VM) SetGlobal(name string, val runtime.Value) {
 	vm.globalsMu.Unlock()
 }
 
+func (vm *VM) setPackageLoaded(name string, val runtime.Value) {
+	pkgVal, ok := vm.globals["package"]
+	if !ok || !pkgVal.IsTable() {
+		return
+	}
+	loaded := pkgVal.Table().RawGet(runtime.StringValue("loaded"))
+	if loaded.IsTable() {
+		loaded.Table().RawSetString(name, val)
+	}
+}
+
 // RegisterProtectedCallLib installs VM-aware pcall/xpcall builtins so protected
 // calls can invoke ordinary VM closures.
 func (vm *VM) RegisterProtectedCallLib() {
@@ -1384,12 +1395,7 @@ func (vm *VM) RegisterStringLib() {
 	meta := runtime.NewTable()
 	meta.RawSet(runtime.StringValue("__index"), runtime.TableValue(strLib))
 	vm.stringMeta = meta
-	if pkgVal, ok := vm.globals["package"]; ok && pkgVal.IsTable() {
-		loaded := pkgVal.Table().RawGet(runtime.StringValue("loaded"))
-		if loaded.IsTable() {
-			loaded.Table().RawSetString("string", runtime.TableValue(strLib))
-		}
-	}
+	vm.setPackageLoaded("string", runtime.TableValue(strLib))
 }
 
 // Execute runs a top-level function prototype.
@@ -3262,10 +3268,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			capacity := 0
 			if cc == 1 {
 				sizeVal := vm.regs[base+b]
-				if sizeVal.IsInt() {
-					capacity = int(sizeVal.Int())
-				} else if sizeVal.IsFloat() {
-					capacity = int(sizeVal.Float())
+				var err error
+				capacity, err = runtime.ChannelCapacityFromValue(sizeVal, "make(chan)")
+				if err != nil {
+					return nil, err
 				}
 			}
 			ch := runtime.NewChannel(capacity)

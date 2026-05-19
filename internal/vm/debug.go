@@ -9,7 +9,9 @@ import (
 )
 
 func (vm *VM) RegisterDebugLib() {
-	vm.SetGlobal("debug", runtime.TableValue(vm.newDebugLib()))
+	debugLib := runtime.TableValue(vm.newDebugLib())
+	vm.SetGlobal("debug", debugLib)
+	vm.setPackageLoaded("debug", debugLib)
 }
 
 func (vm *VM) newDebugLib() *runtime.Table {

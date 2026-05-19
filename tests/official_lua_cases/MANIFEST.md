@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 391.
+Current translated passing cases: 394.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -37,6 +37,7 @@ Current translated passing cases: 391.
 | `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
+| `attrib_require_go_host_modules_more` | `attrib.lua` | Go-host standard-library modules return their global table from `require` and share identity through `package.loaded`. |
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |
@@ -249,7 +250,7 @@ Current translated passing cases: 391.
 | `sort_unpack_sparse_boundary_more` | `sort.lua` | Extreme sparse `table.unpack` ranges fail quickly at the host multi-return boundary instead of walking the whole range. |
 | `strings_basic` | `strings.lua` | String compare, sub/find/len/byte/char/case/rep/reverse basics. |
 | `strings_byte_ascii_indices` | `strings.lua` | ASCII `string.byte` positive/negative range indices and empty-range nil behavior. |
-| `strings_byte_char_edges` | `strings.lua` | `string.byte` and `string.char` edge checks that avoid known multi-return gaps. |
+| `strings_byte_char_edges` | `strings.lua` | `string.byte` and `string.char` edge checks over bounded byte ranges and invalid character values. |
 | `strings_byte_char_more2` | `strings.lua` | Additional `string.byte` index ranges, nil results, newline bytes, `string.char(255)`, and empty `string.char`. |
 | `strings_char_ascii_more` | `strings.lua` | Additional ASCII `string.char` formatting and round-trip byte checks. |
 | `strings_compare_binary_more` | `strings.lua` | Binary-safe string comparison ordering, including embedded NUL bytes and prefix ordering. |
@@ -310,7 +311,7 @@ Current translated passing cases: 391.
 | `vararg_select` | `vararg.lua` | Positive-index `select` and protected out-of-range calls. |
 | `vararg_tail_missing_args` | `vararg.lua` | Tail-call forwarding with missing arguments preserves nil and later returned values. |
 
-Audit-added coverage not yet folded into the main table above:
+Recent audit-added coverage:
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -326,8 +327,10 @@ Audit-added coverage not yet folded into the main table above:
 | `files_seek_overwrite_more` | `files.lua` | File-handle `seek` position reporting and overwrite semantics followed by whole-file readback. |
 | `files_tmpfile_flush_type_more` | `files.lua` | `io.tmpfile`, `file:flush`, seek-to-start readback, and closed-file `io.type` reporting. |
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
+| `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
 | `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
+| `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `table_go_helpers_more` | `sort.lua` | GScript Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |
@@ -423,5 +426,5 @@ Audit-added coverage not yet folded into the main table above:
 Next recommended conversion order:
 
 1. Continue broad `api.lua` translations using `testkit`, raw operations, protected calls, and existing debug/runtime diagnostics.
-2. Fold the audit-added coverage rows into the main manifest table and keep this appendix as a short change log only.
+2. Keep recent audit-added coverage as a short change log and fold it into the main alphabetical table during larger manifest maintenance.
 3. Continue compatibility slices in `strings.lua`, `events.lua`, and `math.lua` where existing Go-style APIs provide feature-equivalent coverage.

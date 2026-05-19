@@ -1,0 +1,33 @@
+print("case:attrib_require_go_host_modules_more")
+
+jsonMod := require("json")
+bytesMod := require("bytes")
+binaryMod := require("binary")
+processMod := require("process")
+scriptMod := require("script")
+debugMod := require("debug")
+matrixMod := require("matrix")
+cryptoMod := require("crypto")
+
+assert(jsonMod == json)
+assert(bytesMod == bytes)
+assert(binaryMod == binary)
+assert(processMod == process)
+assert(scriptMod == script)
+assert(debugMod == debug)
+assert(matrixMod == matrix)
+assert(cryptoMod == crypto)
+
+assert(package.loaded.json == json)
+assert(package.loaded.bytes == bytes)
+assert(package.loaded.binary == binary)
+assert(package.loaded.process == process)
+assert(package.loaded.script == script)
+assert(package.loaded.debug == debug)
+assert(package.loaded.matrix == matrix)
+assert(package.loaded.crypto == crypto)
+
+assert(require("json") == jsonMod)
+assert(require("matrix") == matrixMod)
+
+print("ok")

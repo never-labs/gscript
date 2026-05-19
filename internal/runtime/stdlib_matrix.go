@@ -79,6 +79,9 @@ func matrixDenseValue(rowsValue, colsValue Value) (Value, error) {
 	}
 	rows := int(rowsValue.Int())
 	cols := int(colsValue.Int())
+	if rows < 0 || cols < 0 {
+		return NilValue(), fmt.Errorf("matrix.dense: rows and cols must be non-negative")
+	}
 	return TableValue(NewDenseMatrix(rows, cols)), nil
 }
 
@@ -117,6 +120,9 @@ func matrixDenseAccess(matrixValue, rowValue, colValue Value, name string) (*Tab
 	m := matrixValue.Table()
 	if m.dmStride <= 0 {
 		return nil, 0, 0, 0, fmt.Errorf("%s: argument 1 is not a DenseMatrix", name)
+	}
+	if !rowValue.IsInt() || !colValue.IsInt() {
+		return nil, 0, 0, 0, fmt.Errorf("%s: row and column must be integers", name)
 	}
 	i := int(rowValue.Int())
 	j := int(colValue.Int())

@@ -1,17 +1,17 @@
 # GScript 后续能力候选
 
-这些条目来自继续翻译官方 Lua 5.4.8 `db.lua`、`api.lua`、`errors.lua` 时遇到的阻塞点。当前阶段只补充 passing tests，因此未把这些片段加入测试用例。
+这些条目最初来自继续翻译官方 Lua 5.4.8 `db.lua`、`api.lua`、`errors.lua` 时遇到的阻塞点。随着后续补齐实现与 passing tests，本文现在是能力 ledger：记录已经覆盖的 GScript 等价能力、明确非目标，以及后续翻译官方 case 时如果再次发现问题才需要新增的候选项。
 
 记录原则：这些不是“必须逐字复刻 Lua”的清单。涉及标准库时，优先考虑用 Go 标准库实现功能对等的 GScript API；语法、错误文案、调试字段和边界行为可以按 GScript/Go 运行时模型设计，再按需要提供 Lua 兼容层。
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 391 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 394 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
 
-本轮新增 VM passing case 覆盖了三类此前主要靠 runtime 单测证明的能力：
+本轮新增 VM passing case 覆盖了以下此前主要靠 runtime 单测证明的能力：
 
 - `code_explicit_spread_more`: 显式 `spread(expr)` / `table.spread` 在调用参数和表构造中的展开。
 - `db_gscript_diagnostics_more`: `debug.info(function)` 和 `debug.value` 的文件模式 VM 可用性。
@@ -40,6 +40,9 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `table_go_helpers_more`: table keys/values/contains/indexOf/copy/merge/count/unique/reverse/slice/zip 等非回调 helper。
 - `table_higher_order_vm_callbacks_more`: table map/filter/reduce/fromArray 在 VM 文件模式下调用脚本 callback。
 - `table_proxy_concat_flatten_more`: `table.concat` 通过 proxy `__len` / `__index` 读表，以及 inline nested table literal 供 `table.flatten` 正确消费。
+- `go_channel_host_more`: Go-style channel/goroutine 在 VM 文件模式下覆盖 buffered producer、range over closed channel、closed receive 和容量/关闭错误路径。
+- `matrix_host_dense_more`: `matrix.dense` / `matrix.getf` / `matrix.setf` 在脚本层覆盖 flat backing 读写、普通索引一致性和稳定参数错误。
+- `attrib_require_go_host_modules_more`: Go-host 标准库模块通过 `require` 和 `package.loaded` 保持全局表身份一致。
 
 当前能力状态与设计取舍：
 
