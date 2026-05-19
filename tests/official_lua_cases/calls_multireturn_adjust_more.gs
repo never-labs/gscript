@@ -19,6 +19,16 @@ assert(a == 10 && b == nil && c == nil)
 n, x, y := count((triple()))
 assert(n == 1 && x == 10 && y == nil)
 
+n3, a3, b3, c3, d3 := count(triple(), triple())
+assert(n3 == 4 && a3 == 10 && b3 == 10 && c3 == 20 && d3 == 30)
+
+d1, d2, d3, d4, d5 := triple(), triple()
+assert(d1 == 10 && d2 == 10 && d3 == 20 && d4 == 30 && d5 == nil)
+
+a1, a2, a3, a4, a5 := 0, 0, 0, 0, 0
+a1, a2, a3, a4, a5 = triple(), triple()
+assert(a1 == 10 && a2 == 10 && a3 == 20 && a4 == 30 && a5 == nil)
+
 unpacked := {1, 2, 3}
 n2, u1, u2, u3, u4 := count(0, table.unpack(unpacked), 4)
 assert(n2 == 3 && u1 == 0 && u2 == 1 && u3 == 4 && u4 == nil)

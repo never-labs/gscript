@@ -550,15 +550,8 @@ func (c *compiler) compileDeclareStmt(s *ast.DeclareStmt) error {
 	}
 
 	tempBase := c.nextReg
-	for i := 0; i < nNames; i++ {
-		if i < nValues {
-			if err := c.compileExprTo(s.Values[i], c.allocReg()); err != nil {
-				return err
-			}
-		} else {
-			r := c.allocReg()
-			c.emitABC(OP_LOADNIL, r, 0, 0, s.P.Line)
-		}
+	if err := c.compileAdjustedExprList(s.Values, nNames, s.P.Line); err != nil {
+		return err
 	}
 	c.freeRegs(nNames)
 
@@ -618,23 +611,20 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 		}
 	}
 
+	tempBase := c.nextReg
+	if err := c.compileAdjustedExprList(s.Values, nNames, s.P.Line); err != nil {
+		return err
+	}
 	for i := 0; i < nNames; i++ {
-		reg := c.allocReg()
-		if i < nValues {
-			if err := c.compileExprTo(s.Values[i], reg); err != nil {
-				return err
-			}
-		} else {
-			c.emitABC(OP_LOADNIL, reg, 0, 0, s.P.Line)
-		}
+		reg := tempBase + i
 		nameK := c.stringConst(s.Names[i])
 		if s.ReadOnly {
 			c.emitABx(OP_SETGLOBALRO, reg, nameK, s.P.Line)
 		} else {
 			c.emitABx(OP_SETGLOBAL, reg, nameK, s.P.Line)
 		}
-		c.freeReg()
 	}
+	c.nextReg = tempBase
 	return nil
 }
 
@@ -685,15 +675,8 @@ func (c *compiler) compileAssignStmt(s *ast.AssignStmt) error {
 	// Evaluate all values into temp registers. Keep them allocated
 	// during the assignment phase so they don't get overwritten.
 	tempBase := c.nextReg
-	for i := 0; i < nTargets; i++ {
-		if i < nValues {
-			if err := c.compileExprTo(s.Values[i], c.allocReg()); err != nil {
-				return err
-			}
-		} else {
-			r := c.allocReg()
-			c.emitABC(OP_LOADNIL, r, 0, 0, s.P.Line)
-		}
+	if err := c.compileAdjustedExprList(s.Values, nTargets, s.P.Line); err != nil {
+		return err
 	}
 	// Do NOT free value registers yet — assignments may allocate temp
 	// registers for table/field targets, which would overlap.
@@ -705,6 +688,36 @@ func (c *compiler) compileAssignStmt(s *ast.AssignStmt) error {
 	}
 	// Now free all value registers
 	c.nextReg = tempBase
+	return nil
+}
+
+func (c *compiler) compileAdjustedExprList(values []ast.Expr, nResults int, line int) error {
+	for i := 0; i < nResults; i++ {
+		reg := c.allocReg()
+		if i >= len(values) {
+			c.emitABC(OP_LOADNIL, reg, 0, 0, line)
+			continue
+		}
+		if i == len(values)-1 {
+			switch v := values[i].(type) {
+			case *ast.CallExpr:
+				return c.compileCallExprMulti(v, reg, nResults-i)
+			case *ast.MethodCallExpr:
+				return c.compileMethodCallExprMulti(v, reg, nResults-i)
+			case *ast.VarArgExpr:
+				c.emitABC(OP_VARARG, reg, nResults-i+1, 0, line)
+				c.nextReg = reg + (nResults - i)
+				if c.nextReg > c.maxReg {
+					c.maxReg = c.nextReg
+				}
+				return nil
+			}
+		}
+		if err := c.compileExprTo(values[i], reg); err != nil {
+			return err
+		}
+		c.nextReg = reg + 1
+	}
 	return nil
 }
 
@@ -1035,12 +1048,14 @@ func (c *compiler) compileCallExprDiscard(call *ast.CallExpr, line int) error {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
 				continue
 			case *ast.MethodCallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileMethodCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
@@ -1092,12 +1107,14 @@ func (c *compiler) compileGoCallExpr(call *ast.CallExpr, line int) error {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
 				continue
 			case *ast.MethodCallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileMethodCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
@@ -1174,12 +1191,14 @@ func (c *compiler) compileDeferCallExpr(call *ast.CallExpr, line int) error {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
 				continue
 			case *ast.MethodCallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileMethodCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
@@ -2201,20 +2220,36 @@ func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults i
 		return err
 	}
 
-	// R134+R136: nested Call/MethodCall args compile to a fresh scratch
-	// reg then MOVE to argReg — decouples inner-call result slot from
-	// outer-call arg slot so Tier 2's slotMap doesn't conflate them
-	// (fixes ack hang at np>=2). VarArg keeps Lua multi-return (no JIT).
 	nArgs := len(call.Args)
 	lastArgIsMulti := false
 	for i, arg := range call.Args {
 		argReg := c.allocReg()
 		savedArgTop := c.nextReg
-		if _, ok := arg.(*ast.VarArgExpr); ok && i == nArgs-1 {
-			lastArgIsMulti = true
-			c.emitABC(OP_VARARG, argReg, 0, 0, line)
-			continue
+		if i == nArgs-1 {
+			switch a := arg.(type) {
+			case *ast.CallExpr:
+				lastArgIsMulti = true
+				c.proto.JITDisabled = true
+				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
+					return err
+				}
+				continue
+			case *ast.MethodCallExpr:
+				lastArgIsMulti = true
+				c.proto.JITDisabled = true
+				if err := c.compileMethodCallExprMulti(a, argReg, -1); err != nil {
+					return err
+				}
+				continue
+			case *ast.VarArgExpr:
+				lastArgIsMulti = true
+				c.emitABC(OP_VARARG, argReg, 0, 0, line)
+				continue
+			}
 		}
+		// Non-final nested calls compile to a fresh scratch reg then MOVE to
+		// argReg, preserving list-adjustment's single-value collapse without
+		// aliasing the inner call result slot with the outer argument slot.
 		switch arg.(type) {
 		case *ast.CallExpr, *ast.MethodCallExpr:
 			saved := c.nextReg
@@ -2363,12 +2398,14 @@ func (c *compiler) compileCoroutineBuiltinCall(call *ast.CallExpr, dest int, nRe
 			switch a := arg.(type) {
 			case *ast.CallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}
 				continue
 			case *ast.MethodCallExpr:
 				lastArgIsMulti = true
+				c.proto.JITDisabled = true
 				if err := c.compileMethodCallExprMulti(a, argReg, -1); err != nil {
 					return err
 				}

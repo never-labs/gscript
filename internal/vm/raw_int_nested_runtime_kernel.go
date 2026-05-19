@@ -173,7 +173,7 @@ func rawIntNestedParseZeroCase(proto *FuncProto, pc int) (next int, zeroArg, mSt
 
 func rawIntNestedParseNestedCase(proto *FuncProto, pc int) (mStep, nStep int64, selfName string, next int, ok bool) {
 	code := proto.Code
-	if pc+10 >= len(code) {
+	if pc+9 >= len(code) {
 		return 0, 0, "", 0, false
 	}
 	outerSlot, outerName, ok := rawIntNestedSelfGlobal(proto, pc)
@@ -196,16 +196,34 @@ func rawIntNestedParseNestedCase(proto *FuncProto, pc int) (mStep, nStep int64, 
 		return 0, 0, "", 0, false
 	}
 	if DecodeOp(code[pc+7]) != OP_CALL || DecodeA(code[pc+7]) != innerSlot ||
-		DecodeB(code[pc+7]) != 3 || DecodeC(code[pc+7]) != 2 {
+		DecodeB(code[pc+7]) != 3 {
 		return 0, 0, "", 0, false
 	}
-	if DecodeOp(code[pc+8]) != OP_MOVE || DecodeA(code[pc+8]) != outerSlot+2 || DecodeB(code[pc+8]) != innerSlot {
+	switch DecodeC(code[pc+7]) {
+	case 2:
+		if DecodeOp(code[pc+8]) != OP_MOVE || DecodeA(code[pc+8]) != outerSlot+2 || DecodeB(code[pc+8]) != innerSlot {
+			return 0, 0, "", 0, false
+		}
+		if !rawIntNestedTailSelfCallReturn(code[pc+9], code[pc+10], outerSlot) {
+			return 0, 0, "", 0, false
+		}
+		return mStepValue, nStepValue, outerName, pc + 11, true
+	case 0:
+		callInst := code[pc+8]
+		returnInst := code[pc+9]
+		if DecodeOp(callInst) != OP_CALL ||
+			DecodeA(callInst) != outerSlot ||
+			DecodeB(callInst) != 0 ||
+			DecodeC(callInst) != 0 ||
+			DecodeOp(returnInst) != OP_RETURN ||
+			DecodeA(returnInst) != outerSlot ||
+			DecodeB(returnInst) != 0 {
+			return 0, 0, "", 0, false
+		}
+		return mStepValue, nStepValue, outerName, pc + 10, true
+	default:
 		return 0, 0, "", 0, false
 	}
-	if !rawIntNestedTailSelfCallReturn(code[pc+9], code[pc+10], outerSlot) {
-		return 0, 0, "", 0, false
-	}
-	return mStepValue, nStepValue, outerName, pc + 11, true
 }
 
 func rawIntNestedLoadInt(proto *FuncProto, pc int) (slot int, value int64, ok bool) {
