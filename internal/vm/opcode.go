@@ -34,7 +34,14 @@ const (
 	OP_DIV    // A B C : R(A) = RK(B) / RK(C)
 	OP_MOD    // A B C : R(A) = RK(B) % RK(C)
 	OP_POW    // A B C : R(A) = RK(B) ** RK(C)
+	OP_BAND   // A B C : R(A) = RK(B) & RK(C)
+	OP_BOR    // A B C : R(A) = RK(B) | RK(C)
+	OP_BXOR   // A B C : R(A) = RK(B) ^ RK(C)
+	OP_BANDN  // A B C : R(A) = RK(B) &^ RK(C)
+	OP_SHL    // A B C : R(A) = RK(B) << RK(C)
+	OP_SHR    // A B C : R(A) = RK(B) >> RK(C)
 	OP_UNM    // A B   : R(A) = -R(B)
+	OP_BNOT   // A B   : R(A) = ^R(B)
 	OP_NOT    // A B   : R(A) = !R(B)
 	OP_LEN    // A B   : R(A) = #R(B)
 	OP_CONCAT // A B C : R(A) = R(B) .. R(B+1) .. ... .. R(C)
@@ -198,7 +205,14 @@ var opNames = [...]string{
 	OP_DIV:         "DIV",
 	OP_MOD:         "MOD",
 	OP_POW:         "POW",
+	OP_BAND:        "BAND",
+	OP_BOR:         "BOR",
+	OP_BXOR:        "BXOR",
+	OP_BANDN:       "BANDN",
+	OP_SHL:         "SHL",
+	OP_SHR:         "SHR",
 	OP_UNM:         "UNM",
+	OP_BNOT:        "BNOT",
 	OP_NOT:         "NOT",
 	OP_LEN:         "LEN",
 	OP_CONCAT:      "CONCAT",

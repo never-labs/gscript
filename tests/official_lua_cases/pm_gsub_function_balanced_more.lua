@@ -1,0 +1,14 @@
+print("case:pm_gsub_function_balanced_more")
+
+local function isbalanced (s)
+  return not string.find(string.gsub(s, "%b()", ""), "[()]")
+end
+
+assert(isbalanced("(9 ((8))(\0) 7) \0\0 a b ()(c)() a"))
+assert(not isbalanced("(9 ((8) 7) a b (\0 c) a"))
+assert(string.gsub("alo 'oi' alo", "%b''", '"') == 'alo " alo')
+
+local a, b = string.gsub("um (dois) tres (quatro)", "(%(%w+%))", '"')
+assert(a == 'um " tres "' and b == 2)
+
+print("ok")

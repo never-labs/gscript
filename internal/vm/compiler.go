@@ -1917,6 +1917,18 @@ func (c *compiler) compileBinaryExpr(e *ast.BinaryExpr, dest int) error {
 		opcode = OP_MOD
 	case "**":
 		opcode = OP_POW
+	case "&":
+		opcode = OP_BAND
+	case "|":
+		opcode = OP_BOR
+	case "^":
+		opcode = OP_BXOR
+	case "&^":
+		opcode = OP_BANDN
+	case "<<":
+		opcode = OP_SHL
+	case ">>":
+		opcode = OP_SHR
 	default:
 		return fmt.Errorf("line %d: unsupported binary operator %q", line, e.Op)
 	}
@@ -2150,6 +2162,8 @@ func (c *compiler) compileUnaryExpr(e *ast.UnaryExpr, dest int) error {
 	switch e.Op {
 	case "-":
 		op = OP_UNM
+	case "^":
+		op = OP_BNOT
 	case "!":
 		op = OP_NOT
 	case "#":
@@ -3215,8 +3229,22 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("MOD        R%d R%d R%d", a, b, cc)
 		case OP_POW:
 			desc = fmt.Sprintf("POW        R%d R%d R%d", a, b, cc)
+		case OP_BAND:
+			desc = fmt.Sprintf("BAND       R%d R%d R%d", a, b, cc)
+		case OP_BOR:
+			desc = fmt.Sprintf("BOR        R%d R%d R%d", a, b, cc)
+		case OP_BXOR:
+			desc = fmt.Sprintf("BXOR       R%d R%d R%d", a, b, cc)
+		case OP_BANDN:
+			desc = fmt.Sprintf("BANDN      R%d R%d R%d", a, b, cc)
+		case OP_SHL:
+			desc = fmt.Sprintf("SHL        R%d R%d R%d", a, b, cc)
+		case OP_SHR:
+			desc = fmt.Sprintf("SHR        R%d R%d R%d", a, b, cc)
 		case OP_UNM:
 			desc = fmt.Sprintf("UNM        R%d R%d", a, b)
+		case OP_BNOT:
+			desc = fmt.Sprintf("BNOT       R%d R%d", a, b)
 		case OP_NOT:
 			desc = fmt.Sprintf("NOT        R%d R%d", a, b)
 		case OP_LEN:

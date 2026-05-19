@@ -95,6 +95,29 @@ func (interp *Interpreter) ScriptDir() string {
 	return interp.scriptDir
 }
 
+func (interp *Interpreter) builtinModule(name string) (Value, bool) {
+	for _, moduleName := range stdlibModuleNames {
+		if name != moduleName {
+			continue
+		}
+		v, ok := interp.globals.Get(name)
+		return v, ok && v.IsTable()
+	}
+	return NilValue(), false
+}
+
+func (interp *Interpreter) markPackageLoaded(name string, module Value) {
+	pkg, ok := interp.globals.Get("package")
+	if !ok || !pkg.IsTable() {
+		return
+	}
+	loaded := pkg.Table().RawGetString("loaded")
+	if !loaded.IsTable() {
+		return
+	}
+	loaded.Table().RawSetString(name, module)
+}
+
 // SetArgs sets the script entrypoint arguments and updates the global arg table.
 // The resulting table follows GScript's Lua-compatible convention:
 // arg[0] is the script name, and arg[1..n] are user arguments.
@@ -623,6 +646,11 @@ func (interp *Interpreter) registerBuiltins() {
 			if loaded, ok := interp.modules[name]; ok {
 				return []Value{loaded}, nil
 			}
+			if module, ok := interp.builtinModule(name); ok {
+				interp.modules[name] = module
+				interp.markPackageLoaded(name, module)
+				return []Value{module}, nil
+			}
 
 			filename := interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
 			if _, err := os.Stat(filename); err != nil {
@@ -638,6 +666,7 @@ func (interp *Interpreter) registerBuiltins() {
 			} else {
 				interp.modules[name] = BoolValue(true)
 			}
+			interp.markPackageLoaded(name, interp.modules[name])
 			return []Value{interp.modules[name]}, nil
 		},
 	}))

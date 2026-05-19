@@ -1,5 +1,45 @@
 package runtime
 
+var stdlibModuleNames = []string{
+	"base64",
+	"binary",
+	"bit32",
+	"bits",
+	"bytes",
+	"color",
+	"compress",
+	"container",
+	"crypto",
+	"csv",
+	"debug",
+	"encoding",
+	"fs",
+	"hash",
+	"http",
+	"io",
+	"json",
+	"log",
+	"math",
+	"matrix",
+	"net",
+	"os",
+	"path",
+	"process",
+	"rand",
+	"regexp",
+	"rl",
+	"script",
+	"sort",
+	"string",
+	"table",
+	"testkit",
+	"time",
+	"url",
+	"utf8",
+	"uuid",
+	"vec",
+}
+
 // registerStdlib registers all standard library tables as globals.
 // This is called from New() after registerBuiltins().
 func (interp *Interpreter) registerStdlib() {
@@ -95,4 +135,20 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Logging ---
 	interp.globals.Define("log", TableValue(buildLogLib()))
+
+	interp.registerPackageLib()
+}
+
+func (interp *Interpreter) registerPackageLib() {
+	pkg := NewTable()
+	loaded := NewTable()
+	for _, name := range stdlibModuleNames {
+		if v, ok := interp.globals.Get(name); ok && v.IsTable() {
+			interp.modules[name] = v
+			loaded.RawSetString(name, v)
+		}
+	}
+	pkg.RawSetString("loaded", TableValue(loaded))
+	pkg.RawSetString("path", StringValue(interp.scriptDir))
+	interp.globals.Define("package", TableValue(pkg))
 }

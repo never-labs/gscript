@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 344 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 375 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -17,14 +17,18 @@
 - `db_vm_debug_parity_more`: VM 文件模式 `debug.stack`、numeric `debug.info(level)`、sourceName/line/column/function name metadata，以及 debug hook/sink 事件可观测性。
 - `main_script_process_more`: `script.eval`/`script.compile` 环境注入，以及 `process.setArgs`/`process.args`/`process.entry`。
 - `attrib_const_defer_gscript`: VM compiler 对 Go-style `const` 只读 binding 与 `defer` LIFO cleanup 的支持，覆盖错误路径 drain。
+- `attrib_require_builtin_modules_more`: builtin 标准库模块可通过 `require` 返回同一个表，并同步到 `package.loaded`。
+- `bitwise_direct_ops_more`: VM compiler/runtime 对 Go-style 直接位运算表达式的支持。
+- `files_seek_overwrite_more` / `files_tmpfile_flush_type_more`: 文件 seek、flush、tmpfile、关闭状态和回读行为。
+- `api_arith_metamethod_chain_more`: `__add` / `__mod` / `__unm` 算术 metamethod 链式组合。
+- `tracegc_stats_progress_more`: `collectgarbage("stats")` 的 Go-host 诊断形状和显式 collection 后进度字段。
+- `main_generated_chunk_eval_more` / `big_generated_eval_env_more` / `heavy_generated_concat_more`: 生成代码 compile/eval 的显式环境、边界表访问和拼接压力路径。
 
 真正仍需补齐或明确设计取舍的缺口：
 
 本轮继续补 passing case 时，另观察到这些 Lua 兼容细节尚未纳入 passing
 set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lua：
 
-- `require("string") == string` / `require("math") == math` 这类 builtin
-  module alias 与 `package.*` metadata。
 - 普通多表达式赋值/调用参数中，Lua 会对非最后表达式的多返回调用自动
   调整为单值；GScript 当前更适合用显式括号或 `spread(...)` 表达意图。
 - `coroutine.resume` 对 `coroutine.yield(a, b, ...)` 的多个 yield 值透传
@@ -36,6 +40,9 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
   runtime support 或明确的兼容边界。
 - `__concat` 数字操作数保留：官方 Lua 期望数字操作数以 number 传入
   metamethod；GScript 当前部分路径会先做字符串化。
+- `file:read("L")`、一次 read 多个格式项，以及 `file:read(n)` 字节数
+  读取尚未达到官方 `files.lua` 期望；当前 passing set 覆盖了 `"a"` 全量读取、
+  `"l"` 行读取、`"n"` 数字读取、seek/write/flush/tmpfile 等稳定子集。
 
 当前没有 skipped known failures；此前明确记录的 VM `const`/`defer` parity 和 VM 文件模式 debug parity 已按 GScript/Go-host 语义补齐。后续继续翻译更大的官方切片时，如发现新能力缺口，再按本文件记录。
 
@@ -55,8 +62,9 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
 | GC finalizer tracing and runner-integrated progress output | `tracegc.lua`: table `__gc`, repeated remarking for finalization, `io.stderr` progress writes; `all.lua`: `require"tracegc".start()` | 已补 Go runtime 风格 `collectgarbage("stats")`，返回 alloc/sys/heapObjects/numGC/rootLog/running/mode 诊断表，供 runner 和测试观测 GC 状态；对象 finalizer 调度不按 Lua `__gc` 复刻，资源清理由 GScript `defer` 承担。 |
 | UTF-8 strict/nonstrict validation helpers | `utf8.lua`: invalid byte sequences, non-strict decoding edge cases | 已补 `utf8.validate(s)` 结构化诊断和 `utf8.sanitize(s [, replacement])` 非严格清洗 API。严格路径继续由 `utf8.valid`/`utf8.len`/`utf8.codepoint`/`utf8.codes` 使用 Go `unicode/utf8` 规则；非严格路径显式 opt-in，不复刻 Lua 内部 nonstrict 参数形态。 |
 | Binary string packing/unpacking | `tpack.lua`: `string.pack`, `string.unpack`, `string.packsize` | 已补 GScript/Go 风格 `binary.pack`/`binary.unpack`/`binary.size`，并在 `string.pack`/`string.unpack`/`string.packsize` 暴露同一套兼容入口；格式串仍采用显式 endian 和 Go-style 字段 token，不声明 Lua 格式串逐字兼容。 |
+| Pattern iterator start positions and function replacements | `pm.lua`: `string.gmatch(s, p, init)`, function-valued `string.gsub` replacements | 本轮补 strings/pm passing case 时观察到：GScript `string.gmatch` 当前忽略第三个初始位置参数；`string.gsub` 的 replacement 若传函数值会按普通值字符串化，而不是按 Lua 调用该函数并用 nil/false 表示 no-substitution。范围较大，先记录，不放入 passing set。 |
 | Full file-handle and standard-stream IO controls | `files.lua`: `file:seek`, `file:flush`, `io.input`, `io.output`, `io.type`, `io.tmpfile`, close-file edge cases | 已补文件句柄 `seek`/`flush`、默认输入输出流 `io.input`/`io.output`、`io.type`、`io.tmpfile`、标准流表和关闭后状态。错误返回沿用文件操作 `nil, err`、参数错误抛运行时错误的现有风格。 |
-| Process entrypoint and script-loading controls | `main.lua`: command-line args, `-e`/`-l` style loading, `dofile`, `loadfile`, `require`, process exit/status behavior | 已补 `Interpreter.SetArgs`、全局 `arg`、`process.args`、`process.entry`、host-controlled `process.exit`、以及基于脚本目录解析的 `dofile`/`loadfile`/`require` 路径逻辑。CLI 将 `-e`、REPL 和文件模式入口参数统一写入 runtime。 |
+| Process entrypoint and script-loading controls | `main.lua`, `attrib.lua`: command-line args, `-e`/`-l` style loading, `dofile`, `loadfile`, `require`, process exit/status behavior | 已补 `Interpreter.SetArgs`、全局 `arg`、`process.args`、`process.entry`、host-controlled `process.exit`、基于脚本目录解析的 `dofile`/`loadfile`/`require` 路径逻辑，以及 `require("string")`/`require("math")` 等 builtin module alias 与 `package.loaded`。CLI 将 `-e`、REPL 和文件模式入口参数统一写入 runtime。 |
 | Runtime source compilation and generated-program execution | `big.lua`, `verybig.lua`, `heavy.lua`, `code.lua`: generated chunks executed with `load` | 已补 GScript 风格 `script.compile`/`script.eval`/`script.loadFile`/`script.runFile`，并保留兼容全局 `load`/`loadfile` 入口；支持显式 env/sandbox、sourceName/source 与 scriptDir 配置，不复刻 Lua chunk dump 语义。 |
 | Raw and multiline string literal ergonomics | `literals.lua`: long brackets, delimiter-level raw strings, escape suppression | 已支持 Go-style 反引号 raw string，可跨行且不解释反斜杠转义；不复刻 Lua `[=[...]=]` 分隔符层级。 |
 | First-class integer bit operations in expressions | `bwcoercion.lua`, `code.lua`: direct bitwise expressions and coercion stress | 已支持 Go-style 表达式运算符 `&`、`|`、`^`、`&^`、`<<`、`>>` 和一元 `^`，并保留 `bits` 标准库的 rotate/bit-position/count 辅助；不复刻 Lua `~` 语法。 |

@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 360.
+Current translated passing cases: 375.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -33,8 +33,10 @@ Current translated passing cases: 360.
 | `bitwise_bit32_shifts` | `bitwise.lua` | `bit32.lshift`, `rshift`, and unsigned-result `arshift` edge cases. |
 | `bitwise_bit32_varargs` | `bitwise.lua` | `bit32` empty and multi-argument `band`/`bor`/`bxor`/`btest` defaults. |
 | `bitwise_bit32_wrap_more` | `bitwise.lua` | Additional `bit32.band` wrapping for positive and negative values around 2^33 and 2^40. |
+| `bitwise_direct_ops_more` | `bitwise.lua`, `bwcoercion.lua` | First-class bitwise expression operators, complement, bit-clear translation, shifts, and small accumulation loop. |
 | `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
+| `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |
@@ -132,6 +134,7 @@ Current translated passing cases: 360.
 | `math_fmod_integer_more` | `math.lua` | `math.fmod` integer/float result-type behavior over signed operands and zero-divisor errors. |
 | `math_implicit_conversion_more` | `math.lua` | Implicit arithmetic conversion for numeric strings across multiplication, addition, subtraction, division, and unary minus. |
 | `math_lib_basic` | `math.lua` | Common math library functions and `math.type`. |
+| `math_log_angle_more` | `math.lua` | Additional angle conversion, two-argument `atan`, logarithm base conversion, and trigonometric identity checks. |
 | `math_modf_huge` | `math.lua` | `math.modf`, `math.huge`. |
 | `math_modf_finite_edges` | `math.lua` | `math.modf` over positive/negative fractions and large finite integral floats. |
 | `math_modf_inf_integer` | `math.lua` | `math.modf` over infinities and integer arguments, including returned numeric subtypes. |
@@ -210,6 +213,7 @@ Current translated passing cases: 360.
 | `pm_gsub_capture_reorder_more` | `pm.lua` | Additional `gsub` replacement capture reordering, whole-match replacement, and replacement limits. |
 | `pm_gsub_empty_match_more` | `pm.lua` | Empty-match `gsub` progression plus start/end anchors on empty subjects. |
 | `pm_gsub_error_subset_more` | `pm.lua` | `gsub` replacement-string errors for invalid capture indexes and invalid percent escapes. |
+| `pm_gsub_function_balanced_more` | `pm.lua` | Balanced `%b` patterns plus function-valued `gsub` replacements with nil-return no-substitution behavior. |
 | `pm_gsub_replacement_more` | `pm.lua` | Additional `gsub` capture replacement, empty-subject anchors, empty-match replacement progression, and replacement limits. |
 | `pm_gsub_table_fallback_more` | `pm.lua` | `gsub` table replacements with missing keys, false values, position captures, and fallback to original text. |
 | `pm_gsub_table_replacement_more` | `pm.lua` | `gsub` table replacements by whole match/first capture, missing replacement fallback, and invalid replacement value errors. |
@@ -221,6 +225,7 @@ Current translated passing cases: 360.
 | `pm_match_classes_more2` | `pm.lua` | Additional pattern class and repetition checks for `%l`, `%a`, `*`, `+`, escaped `$`, and missing matches. |
 | `pm_match_repetition` | `pm.lua` | Greedy repetition pattern matches. |
 | `pm_malformed_pattern_errors_more` | `pm.lua` | Malformed pattern inputs for unfinished captures and malformed character classes raise errors. |
+| `pm_pattern_nul_magic_more` | `pm.lua` | NUL bytes inside patterns, character classes, escaped NUL matches, and magic characters after NUL. |
 | `sort_custom_comparator` | `sort.lua` | VM-closure comparators for descending sort, empty arrays, equal elements, and string ordering checks. |
 | `sort_invalid_order_function` | `sort.lua` | `table.sort` does not call comparators for empty ranges and rejects inconsistent order functions. |
 | `sort_binary_string_order_more` | `sort.lua` | Default `table.sort` byte ordering over strings including an embedded-NUL prefix. |
@@ -266,6 +271,7 @@ Current translated passing cases: 360.
 | `strings_rep_tostring_ascii_more` | `strings.lua` | Additional ASCII `upper`/`lower`, `rep` separator, empty reverse, repeated lengths, and primitive `tostring` checks. |
 | `strings_sub_find_len_ascii_more` | `strings.lua` | Additional ASCII `string.sub`, `string.find`, empty-find, and length boundary checks. |
 | `strings_string_pack_go_style` | `tpack.lua` | GScript string namespace binary pack/unpack/packsize compatibility using Go-style formats. |
+| `strings_string_pack_more` | `tpack.lua` | Additional pack/unpack integer, fixed-byte, endian, offset, and fixed-size coverage translated to GScript's Go-style binary formats. |
 | `strings_sub_boundary_more` | `strings.lua` | `string.sub` omitted end, empty ranges, negative indices, and `math.mininteger`/`maxinteger` boundaries. |
 | `strings_table_concat_binary` | `strings.lua` | `table.concat` with NUL-containing strings and long repeated ranges. |
 | `strings_table_concat_empty_errors_more` | `strings.lua` | Additional `table.concat` empty ranges and bad argument/value errors. |
@@ -287,6 +293,7 @@ Current translated passing cases: 360.
 | `utf8_codes_iterator` | `utf8.lua` | `utf8.codes` iterator, byte positions, and `utf8.offset(..., 0)` current-character behavior. |
 | `utf8_invalid_sequences_more` | `utf8.lua` | Invalid UTF-8 continuation, overlong, surrogate, and out-of-range sequences across len/codepoint/codes/offset. |
 | `utf8_multibyte_offsets` | `utf8.lua` | Multibyte UTF-8 length, offsets, codepoints. |
+| `utf8_len_range_more` | `utf8.lua` | UTF-8 length, offsets, negative offsets, and codepoint ranges over a mixed multibyte/NUL string. |
 | `utf8_offset_len_errors` | `utf8.lua` | `utf8.offset` and indexed `utf8.len` position bounds and continuation-byte errors. |
 | `utf8_validation_helpers_more` | `utf8.lua` | Go-style structured UTF-8 validation diagnostics and non-strict sanitization helpers over invalid edge sequences. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
@@ -301,10 +308,18 @@ Audit-added coverage not yet folded into the main table above:
 | Case | Official source area | Notes |
 |---|---|---|
 | `code_explicit_spread_more` | `code.lua`, `db.lua` | GScript explicit `spread(expr)` and `table.spread` expansion in call arguments and table constructors. |
+| `api_arith_metamethod_chain_more` | `api.lua`, `events.lua` | Arithmetic metamethod chaining for `__add`, `__mod`, and unary minus over wrapped table values. |
+| `big_generated_eval_env_more` | `big.lua` | Generated chunk/table execution with explicit environment mutation and large-enough array indexing. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
+| `files_seek_overwrite_more` | `files.lua` | File-handle `seek` position reporting and overwrite semantics followed by whole-file readback. |
+| `files_tmpfile_flush_type_more` | `files.lua` | `io.tmpfile`, `file:flush`, seek-to-start readback, and closed-file `io.type` reporting. |
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
+| `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
+| `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
+| `tracegc_stats_progress_more` | `tracegc.lua`, `gc.lua` | Go-host GC stats shape and explicit collection progress compared with Lua `collectgarbage` count/running observability. |
+| `verybig_method_constants_more` | `verybig.lua` | Large constant table access with method calls, self chaining, and closure reads beyond the RK-style boundary. |
 
 Next recommended conversion order:
 

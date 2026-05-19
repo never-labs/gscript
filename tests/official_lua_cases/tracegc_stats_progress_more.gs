@@ -1,0 +1,22 @@
+print("case:tracegc_stats_progress_more")
+
+before := collectgarbage("stats")
+assert(type(before.allocBytes) == "number")
+assert(type(before.heapObjects) == "number")
+assert(type(before.numGC) == "number")
+assert(type(before.rootLog) == "number")
+assert(type(before.running) == "boolean")
+assert(type(before.mode) == "string")
+
+t := {}
+for i := 1; i <= 200; i = i + 1 {
+  t[i] = {i, tostring(i)}
+}
+
+collectgarbage("collect")
+after := collectgarbage("stats")
+assert(type(after.allocBytes) == "number")
+assert(after.numGC >= before.numGC)
+assert(after.mode == before.mode || type(after.mode) == "string")
+
+print("ok")

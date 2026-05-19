@@ -1971,6 +1971,27 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			vm.regs[base+a] = r
 
+		case OP_BAND, OP_BOR, OP_BXOR, OP_BANDN, OP_SHL, OP_SHR:
+			a := DecodeA(inst)
+			bidx := DecodeB(inst)
+			cidx := DecodeC(inst)
+			var bv, cv runtime.Value
+			if bidx >= RKBit {
+				bv = constants[bidx-RKBit]
+			} else {
+				bv = vm.regs[base+bidx]
+			}
+			if cidx >= RKBit {
+				cv = constants[cidx-RKBit]
+			} else {
+				cv = vm.regs[base+cidx]
+			}
+			r, err := bitwiseBinary(op, bv, cv)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = r
+
 		case OP_UNM:
 			a := DecodeA(inst)
 			bv := vm.regs[base+DecodeB(inst)]
@@ -1979,6 +2000,15 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				return nil, wrapLineErr(frame, err)
 			}
 			vm.regs[base+a] = r
+
+		case OP_BNOT:
+			a := DecodeA(inst)
+			bv := vm.regs[base+DecodeB(inst)]
+			n, err := bitwiseInt(bv)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.regs[base+a] = runtime.IntValue(^n)
 
 		case OP_NOT:
 			a := DecodeA(inst)
@@ -3148,14 +3178,14 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if DecodesBx(inst) < 0 {
 				return true
 			}
-		case OP_MOVE, OP_UNM, OP_NOT, OP_LEN:
+		case OP_MOVE, OP_UNM, OP_BNOT, OP_NOT, OP_LEN:
 			if b == payloadReg {
 				return false
 			}
 			if a == payloadReg {
 				return true
 			}
-		case OP_GETTABLE, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_POW, OP_EQ, OP_LT, OP_LE:
+		case OP_GETTABLE, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_POW, OP_BAND, OP_BOR, OP_BXOR, OP_BANDN, OP_SHL, OP_SHR, OP_EQ, OP_LT, OP_LE:
 			if b == payloadReg || (cc < RKBit && cc == payloadReg) {
 				return false
 			}
@@ -3495,6 +3525,69 @@ func (vm *VM) arithMod(a, b runtime.Value) (runtime.Value, error) {
 		return runtime.FloatValue(r), nil
 	}
 	return vm.arith(a, b, "__mod", func(x, y float64) float64 { return math.Mod(x, y) })
+}
+
+func bitwiseInt(v runtime.Value) (int64, error) {
+	n, ok := v.ToNumber()
+	if !ok {
+		return 0, fmt.Errorf("attempt to perform bitwise operation on %s", v.TypeName())
+	}
+	if n.IsInt() {
+		return n.Int(), nil
+	}
+	return int64(n.Float()), nil
+}
+
+func bitwiseShift(v runtime.Value) (uint, error) {
+	n, err := bitwiseInt(v)
+	if err != nil {
+		return 0, err
+	}
+	if n < 0 {
+		return 0, fmt.Errorf("negative shift count")
+	}
+	return uint(n), nil
+}
+
+func bitwiseBinary(op Opcode, a, b runtime.Value) (runtime.Value, error) {
+	x, err := bitwiseInt(a)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	y, err := bitwiseInt(b)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	switch op {
+	case OP_BAND:
+		return runtime.IntValue(x & y), nil
+	case OP_BOR:
+		return runtime.IntValue(x | y), nil
+	case OP_BXOR:
+		return runtime.IntValue(x ^ y), nil
+	case OP_BANDN:
+		return runtime.IntValue(x &^ y), nil
+	case OP_SHL:
+		shift, err := bitwiseShift(b)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		if shift >= 64 {
+			return runtime.IntValue(0), nil
+		}
+		return runtime.IntValue(int64(uint64(x) << shift)), nil
+	case OP_SHR:
+		shift, err := bitwiseShift(b)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		if shift >= 64 {
+			return runtime.IntValue(0), nil
+		}
+		return runtime.IntValue(int64(uint64(x) >> shift)), nil
+	default:
+		return runtime.NilValue(), fmt.Errorf("unsupported bitwise opcode %s", OpName(op))
+	}
 }
 
 func (vm *VM) unaryMinus(v runtime.Value) (runtime.Value, error) {
