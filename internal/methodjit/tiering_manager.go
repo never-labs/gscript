@@ -376,6 +376,9 @@ func (tm *TieringManager) getProfile(proto *vm.FuncProto) FuncProfile {
 // density, call patterns) to decide promotion thresholds instead of a simple
 // call count.
 func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
+	if jitSemanticGateEnabled() && jitShouldStayInInterpreter(proto) {
+		return nil
+	}
 	if tm.envR154Trace {
 		_, compiled := tm.tier2CompiledFor(proto)
 		fmt.Fprintf(os.Stderr, "[R154] TryCompile proto=%q CallCount=%d tier2Compiled_has=%v tier2Failed=%v\n",
@@ -623,7 +626,9 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 		// may bypass the performance-only call-in-loop prefilter, but it must
 		// not bypass restart-safety: replayed side effects are correctness bugs.
 		osrGate := allowGate("OSR", "not considered")
-		if profile.HasLoop && profile.LoopDepth >= 1 && !decision.SuppressedRecursivePartition && !tm.tier2HasFailed(proto) {
+		if jitSemanticGateEnabled() && proto.Name == "<main>" {
+			osrGate = blockGate("OSREligibility", "top-level restart would replay observable effects")
+		} else if profile.HasLoop && profile.LoopDepth >= 1 && !decision.SuppressedRecursivePartition && !tm.tier2HasFailed(proto) {
 			if profile.LoopDepth < 2 || hasFieldDispatchCallInLoop(proto) {
 				osrGate = tm.osrRestartSafetyGate(proto, profile)
 			}
@@ -636,7 +641,7 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 		} else if profile.HasLoop {
 			osrGate = blockGate("OSREligibility", "loop is not eligible for OSR arming")
 		}
-		if profile.HasLoop && profile.LoopDepth >= 1 && !decision.SuppressedRecursivePartition && !tm.tier2HasFailed(proto) &&
+		if (!jitSemanticGateEnabled() || proto.Name != "<main>") && profile.HasLoop && profile.LoopDepth >= 1 && !decision.SuppressedRecursivePartition && !tm.tier2HasFailed(proto) &&
 			osrGate.Allowed {
 			tm.tier1.SetOSRCounter(proto, osrDefaultIterations)
 			tm.traceEvent("osr_armed", "tier1", proto, map[string]any{
