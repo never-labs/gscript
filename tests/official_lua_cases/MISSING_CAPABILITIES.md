@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 382 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 383 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -30,14 +30,16 @@
 - `api_arith_metamethod_chain_more`: `__add` / `__mod` / `__unm` 算术 metamethod 链式组合。
 - `tracegc_stats_progress_more`: `collectgarbage("stats")` 的 Go-host 诊断形状和显式 collection 后进度字段。
 - `main_generated_chunk_eval_more` / `big_generated_eval_env_more` / `heavy_generated_concat_more`: 生成代码 compile/eval 的显式环境、边界表访问和拼接压力路径。
+- `calls_fixed_arity_nested_adjust_more`: 固定参数调用里的嵌套多返回参数按单值调整，同时保持数值互递归路径可 JIT。
 
 真正仍需补齐或明确设计取舍的缺口：
 
 本轮继续补 passing case 时，另观察到这些 Lua 兼容细节尚未纳入 passing
 set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lua：
 
-- 普通多表达式赋值/调用参数中，Lua 会对非最后表达式的多返回调用自动
-  调整为单值；GScript 当前更适合用显式括号或 `spread(...)` 表达意图。
+- 普通多表达式赋值、表构造和调用参数中的多返回调整已有 passing 覆盖；
+  固定参数目标函数会按 arity 预登记把嵌套多返回实参压成单值。需要主动展开
+  非尾部多返回时，GScript 仍推荐显式 `spread(...)` / `table.spread(...)`。
 - table library 已补 bounded proxy/metatable table 读写：`table.insert` /
   `table.sort` / `table.remove` / `table.unpack` 与 `table.move` 会通过
   `__index` / `__newindex` / `__len` 交互；passing official 覆盖了
@@ -54,7 +56,7 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
 | `debug` 标准库基础信息查询 | `db.lua`: `debug.getinfo`, `debug.getlocal`, `debug.getupvalue` | 已补 GScript 风格 `debug.info`、`debug.stack`、`debug.globals`、`debug.value`，暴露函数 kind/name/参数数量/vararg/upvalue 数、运行时调用栈和 globals 快照；不复刻 Lua 局部变量槽位枚举。VM 文件模式已有 `debug.info(function)` / `debug.value` 和 frame/source 诊断官方 passing case。 |
 | `debug.traceback` 与保护调用栈信息 | `db.lua` traceback checks, `errors.lua` line/stack-message checks | 已补 `debug.traceback([message])`，基于真实 script/native 调用栈生成稳定 GScript 格式；另提供 `debug.goStack()` 给 host 诊断 Go goroutine 栈。解释器与 VM 文件模式均带 source/name/line/column 元数据。 |
 | 调试 hook | `db.lua`: `debug.sethook`, `debug.gethook` | 已补 GScript 事件式 `debug.setHook`/`debug.getHook`/`debug.emit`/`debug.setSink`，支持 script/native call/return/error 和显式 diagnostic emit 事件；不复刻 Lua line/count/coroutine hook。runtime/interpreter 与 VM 文件模式均有覆盖。 |
-| 嵌套调用/构造中的多返回展开 | `db.lua`: transfer-value checks using `table.unpack`, returned varargs, and table constructors | 已补 GScript 风格显式展开：`spread(expr)` 可在调用参数/表构造任意位置展开 `expr` 的多返回；`table.spread(t [, i [, j]])` 可将表区间作为多返回显式展开。普通调用/构造仍保留既有“最后一项自动展开”兼容行为；`table.values(t)` 维持原有“返回值数组表”API，不作为展开标记。Lua 兼容层后续可把需要的 `table.unpack` 嵌套场景翻译到显式 spread 形式。 |
+| 嵌套调用/构造中的多返回展开 | `db.lua`: transfer-value checks using `table.unpack`, returned varargs, and table constructors | 已补 GScript 风格显式展开：`spread(expr)` 可在调用参数/表构造任意位置展开 `expr` 的多返回；`table.spread(t [, i [, j]])` 可将表区间作为多返回显式展开。普通赋值、调用和构造保留 Lua 风格的尾部自动展开/非尾部单值调整；固定参数目标函数会按 arity 预登记把嵌套多返回实参压成单值。`table.values(t)` 维持原有“返回值数组表”API，不作为展开标记。Lua 兼容层后续可把需要的 `table.unpack` 非尾部展开场景翻译到显式 spread 形式。 |
 | C API 测试库替代层 | `api.lua`: `T.testC`, `T.makeCfunc`, `T.checkmemory` | 已补 GScript/Go-host 风格 `testkit` 标准库：`memory`/`snapshot`/`diff`/`checkMemory` 提供内存诊断，`value`/`typeOf`/`equal` 提供值检查，`protect` 提供结构化保护调用结果，`functionInfo`/`sameFunction` 提供 native/script 函数身份和基础 introspection；不复刻 Lua 私有 `T.testC` 指令协议。 |
 | `load`/`string.dump` 调试信息交互 | `db.lua`, `errors.lua` stripped chunk checks | 已通过 `script.compile`/`script.eval`/`script.loadFile`/全局 `load`/`loadfile` 的 sourceName（字符串第二参数或 `{sourceName: ...}` / `{source: ...}`）和 `SourceError` 保留源码名、行列与底层错误；不提供 Lua `string.dump`/stripped chunk 二进制语义，调试侧由 `debug.traceback`/`debug.info` 覆盖。 |
 | 精细错误位置与 token 诊断 | `errors.lua`: syntax/runtime line checks and token-message checks | 已补 `SourceError` 包装 lexer/parser/runtime 错误，稳定输出 `source:line:column: error` 形态并支持 Go `errors.As` 解包；lexer/parser 保留字符或 token 类型/文本，错误文案保持 GScript 风格。 |

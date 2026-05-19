@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 382.
+Current translated passing cases: 383.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -57,6 +57,7 @@ Current translated passing cases: 382.
 | `calls_type_basic` | `calls.lua` | `type` over core values and builtins. |
 | `calls_call_chain` | `calls.lua` | Chained `__call` metatables ending in `table.pack`. |
 | `calls_extra_builtin_args_more` | `calls.lua` | Extra arguments to raw/table/math builtins are ignored where Lua specifies fixed-argument behavior. |
+| `calls_fixed_arity_nested_adjust_more` | `calls.lua` | Fixed-arity calls collapse nested multi-return arguments to one value and numeric mutual recursion remains JIT-compatible. |
 | `closure_upvalues` | `closure.lua` | Closure capture and independent upvalues. |
 | `closure_for_control` | `closure.lua` | Independent closure captures for loop-created locals. |
 | `closure_identity_more` | `closure.lua` | Distinct closures created in loops and stable identity when returning the same captured closure. |
