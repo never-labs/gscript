@@ -56,11 +56,12 @@ func (s *AssignStmt) nodeType() string { return "AssignStmt" }
 func (s *AssignStmt) GetPos() Pos      { return s.P }
 func (s *AssignStmt) stmtNode()        {}
 
-// DeclareStmt represents short variable declaration: a, b := 1, 2
+// DeclareStmt represents variable declaration: a, b := 1, 2; const a = 1
 type DeclareStmt struct {
-	P      Pos
-	Names  []string
-	Values []Expr
+	P        Pos
+	Names    []string
+	Values   []Expr
+	ReadOnly bool
 }
 
 func (s *DeclareStmt) nodeType() string { return "DeclareStmt" }

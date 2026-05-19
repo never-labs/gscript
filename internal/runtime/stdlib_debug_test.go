@@ -68,3 +68,53 @@ func TestDebugFunctionInfoGlobalsAndValue(t *testing.T) {
 		t.Fatalf("value.truthy = false, want true")
 	}
 }
+
+func TestDebugHookAndSink(t *testing.T) {
+	interp := New()
+
+	execBinaryIOTest(t, interp, `
+		events := {}
+		sinkEvents := {}
+		func hook(event) {
+			events[#events + 1] = event.type .. ":" .. event.kind .. ":" .. event.name
+		}
+		func sink(event) {
+			sinkEvents[#sinkEvents + 1] = event.name .. ":" .. event.data
+		}
+		debug.setHook(hook, {script: true, native: false})
+		debug.setSink(sink)
+		func work() {
+			debug.emit("progress", "ok")
+			return 1
+		}
+		value := work()
+		gotHook, opts := debug.getHook()
+		debug.setHook(nil)
+		debug.setSink(nil)
+	`)
+
+	if got := interp.GetGlobal("value").Int(); got != 1 {
+		t.Fatalf("value = %d, want 1", got)
+	}
+	events := interp.GetGlobal("events").Table()
+	if got := events.RawGet(IntValue(1)).Str(); got != "call:script:work" {
+		t.Fatalf("events[1] = %q, want call:script:work", got)
+	}
+	if got := events.RawGet(IntValue(2)).Str(); got != "emit:diagnostic:progress" {
+		t.Fatalf("events[2] = %q, want emit:diagnostic:progress", got)
+	}
+	if got := events.RawGet(IntValue(3)).Str(); got != "return:script:work" {
+		t.Fatalf("events[3] = %q, want return:script:work", got)
+	}
+	if !interp.GetGlobal("gotHook").IsFunction() {
+		t.Fatalf("gotHook should be function")
+	}
+	opts := interp.GetGlobal("opts").Table()
+	if !opts.RawGetString("call").Bool() || opts.RawGetString("native").Bool() {
+		t.Fatalf("unexpected hook opts")
+	}
+	sinkEvents := interp.GetGlobal("sinkEvents").Table()
+	if got := sinkEvents.RawGet(IntValue(1)).Str(); got != "progress:ok" {
+		t.Fatalf("sinkEvents[1] = %q, want progress:ok", got)
+	}
+}

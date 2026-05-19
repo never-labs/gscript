@@ -132,6 +132,26 @@ func TestMultiDeclareStmt(t *testing.T) {
 	}
 }
 
+func TestConstDeclareStmt(t *testing.T) {
+	tests := []string{
+		`const x := 1`,
+		`const x = 1`,
+	}
+	for _, src := range tests {
+		prog := mustParse(t, src)
+		decl, ok := prog.Stmts[0].(*ast.DeclareStmt)
+		if !ok {
+			t.Fatalf("expected DeclareStmt for %q, got %T", src, prog.Stmts[0])
+		}
+		if !decl.ReadOnly {
+			t.Fatalf("expected readonly declaration for %q", src)
+		}
+		if len(decl.Names) != 1 || decl.Names[0] != "x" {
+			t.Errorf("expected ['x'], got %v", decl.Names)
+		}
+	}
+}
+
 func TestAssignStmt(t *testing.T) {
 	prog := mustParse(t, `x = 10`)
 	assign, ok := prog.Stmts[0].(*ast.AssignStmt)

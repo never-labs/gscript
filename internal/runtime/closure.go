@@ -20,7 +20,8 @@ type FuncProto struct {
 // closure hold a pointer to the same Upvalue, allowing mutations to be visible
 // from both sides.
 type Upvalue struct {
-	val *Value
+	val      *Value
+	readOnly bool
 }
 
 // NewUpvalue creates a new Upvalue pointing at the given value.
@@ -28,11 +29,20 @@ func NewUpvalue(v *Value) *Upvalue {
 	return &Upvalue{val: v}
 }
 
+// NewReadOnlyUpvalue creates a new Upvalue that cannot be rebound through
+// normal variable assignment.
+func NewReadOnlyUpvalue(v *Value) *Upvalue {
+	return &Upvalue{val: v, readOnly: true}
+}
+
 // Get returns the current value.
 func (u *Upvalue) Get() Value { return *u.val }
 
 // Set assigns a new value.
 func (u *Upvalue) Set(v Value) { *u.val = v }
+
+// ReadOnly reports whether this binding rejects variable reassignment.
+func (u *Upvalue) ReadOnly() bool { return u.readOnly }
 
 // Closure is a function prototype paired with captured upvalues and the
 // defining environment.

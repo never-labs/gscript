@@ -35,6 +35,7 @@ const (
 	TOKEN_GO       // go
 	TOKEN_CHAN     // chan
 	TOKEN_DEFER    // defer
+	TOKEN_CONST    // const
 
 	// Channel operator
 	TOKEN_ARROW // <-
@@ -116,6 +117,7 @@ var tokenNames = map[TokenType]string{
 	TOKEN_GO:       "GO",
 	TOKEN_CHAN:     "CHAN",
 	TOKEN_DEFER:    "DEFER",
+	TOKEN_CONST:    "CONST",
 	TOKEN_ARROW:    "ARROW",
 
 	TOKEN_ASSIGN:       "ASSIGN",
@@ -201,6 +203,7 @@ var keywords = map[string]TokenType{
 	"go":       TOKEN_GO,
 	"chan":     TOKEN_CHAN,
 	"defer":    TOKEN_DEFER,
+	"const":    TOKEN_CONST,
 }
 
 // LookupIdent checks if an identifier is a keyword and returns the

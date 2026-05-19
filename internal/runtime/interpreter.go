@@ -25,6 +25,10 @@ type Interpreter struct {
 	args       []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack  []DebugFrame     // active runtime calls, oldest to newest
 	deferStack [][]deferredCall // active function-scope deferred calls
+	debugHook  Value            // optional GScript diagnostic hook
+	debugOpts  DebugHookOptions // filters for debugHook
+	debugSink  Value            // optional explicit diagnostic sink
+	debugBusy  bool             // prevents debug hooks from recursively firing
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -232,6 +236,19 @@ func (interp *Interpreter) registerBuiltins() {
 				var stats goruntime.MemStats
 				goruntime.ReadMemStats(&stats)
 				return []Value{FloatValue(float64(stats.Alloc) / 1024)}, nil
+			case "stats":
+				var stats goruntime.MemStats
+				goruntime.ReadMemStats(&stats)
+				tbl := NewTable()
+				tbl.RawSetString("allocBytes", IntValue(int64(stats.Alloc)))
+				tbl.RawSetString("allocKB", FloatValue(float64(stats.Alloc)/1024))
+				tbl.RawSetString("sysBytes", IntValue(int64(stats.Sys)))
+				tbl.RawSetString("heapObjects", IntValue(int64(stats.HeapObjects)))
+				tbl.RawSetString("numGC", IntValue(int64(stats.NumGC)))
+				tbl.RawSetString("rootLog", IntValue(GCRootLogSize()))
+				tbl.RawSetString("running", BoolValue(gcRunning))
+				tbl.RawSetString("mode", StringValue(gcMode))
+				return []Value{TableValue(tbl)}, nil
 			case "step":
 				goruntime.GC()
 				return []Value{BoolValue(false)}, nil
@@ -1285,7 +1302,14 @@ func (interp *Interpreter) execDeclare(s *ast.DeclareStmt, env *Environment) ([]
 		if i < len(vals) {
 			v = vals[i]
 		}
-		env.Define(name, v)
+		if env.IsLocalReadOnly(name) {
+			return nil, false, false, false, fmt.Errorf("cannot redeclare readonly variable %q", name)
+		}
+		if s.ReadOnly {
+			env.DefineReadOnly(name, v)
+		} else {
+			env.Define(name, v)
+		}
 	}
 	return nil, false, false, false, nil
 }
@@ -1314,6 +1338,9 @@ func (interp *Interpreter) execAssign(s *ast.AssignStmt, env *Environment) ([]Va
 func (interp *Interpreter) assignTarget(target ast.Expr, val Value, env *Environment) error {
 	switch t := target.(type) {
 	case *ast.IdentExpr:
+		if env.IsReadOnly(t.Name) {
+			return fmt.Errorf("cannot assign to readonly variable %q", t.Name)
+		}
 		if !env.Set(t.Name, val) {
 			// If variable doesn't exist anywhere, create it in the current env
 			// (like a global implicit declaration)
@@ -2309,7 +2336,18 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	if gf := fn.GoFunction(); gf != nil {
 		interp.pushDebugFrame(gf.Name, "native")
 		defer interp.popDebugFrame()
-		return gf.Fn(args)
+		if err := interp.emitDebugHook("call", "native", gf.Name, NilValue()); err != nil {
+			return nil, err
+		}
+		results, err := gf.Fn(args)
+		if err != nil {
+			_ = interp.emitDebugHook("error", "native", gf.Name, StringValue(err.Error()))
+			return nil, err
+		}
+		if err := interp.emitDebugHook("return", "native", gf.Name, NilValue()); err != nil {
+			return nil, err
+		}
+		return results, nil
 	}
 
 	cl := fn.Closure()
@@ -2336,6 +2374,10 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	interp.pushDebugFrame(name, "script")
 	defer interp.popDebugFrame()
 	interp.pushDeferFrame()
+	if err := interp.emitDebugHook("call", "script", name, NilValue()); err != nil {
+		_ = interp.runAndPopDeferFrame()
+		return nil, err
+	}
 
 	// Bind parameters (as new local variables -- these shadow any captured upvalues)
 	nParams := len(proto.Params)
@@ -2364,10 +2406,15 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	retVals, isRet, _, _, err := interp.execBlockInEnv(proto.Body, callEnv)
 	deferErr := interp.runAndPopDeferFrame()
 	if err != nil {
+		_ = interp.emitDebugHook("error", "script", name, StringValue(err.Error()))
 		return nil, err
 	}
 	if deferErr != nil {
+		_ = interp.emitDebugHook("error", "script", name, StringValue(deferErr.Error()))
 		return nil, deferErr
+	}
+	if err := interp.emitDebugHook("return", "script", name, NilValue()); err != nil {
+		return nil, err
 	}
 	if isRet {
 		return retVals, nil

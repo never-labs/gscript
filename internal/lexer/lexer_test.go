@@ -231,7 +231,7 @@ func TestIdentifiers(t *testing.T) {
 }
 
 func TestKeywords(t *testing.T) {
-	expectTokens(t, "func return if else elseif for range break continue in var", []Token{
+	expectTokens(t, "func return if else elseif for range break continue in var const", []Token{
 		{Type: TOKEN_FUNC, Value: "func"},
 		{Type: TOKEN_RETURN, Value: "return"},
 		{Type: TOKEN_IF, Value: "if"},
@@ -243,6 +243,7 @@ func TestKeywords(t *testing.T) {
 		{Type: TOKEN_CONTINUE, Value: "continue"},
 		{Type: TOKEN_IN, Value: "in"},
 		{Type: TOKEN_VAR, Value: "var"},
+		{Type: TOKEN_CONST, Value: "const"},
 	})
 }
 

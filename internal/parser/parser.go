@@ -134,6 +134,8 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		return p.parseGoStmt()
 	case lexer.TOKEN_DEFER:
 		return p.parseDeferStmt()
+	case lexer.TOKEN_CONST:
+		return p.parseConstDeclStmt()
 	default:
 		return p.parseExpressionStmt()
 	}
@@ -566,6 +568,36 @@ func (p *Parser) parseSendStmt(pos ast.Pos, chExpr ast.Expr) (ast.Stmt, error) {
 		return nil, err
 	}
 	return &ast.SendStmt{P: pos, Channel: chExpr, Value: val}, nil
+}
+
+func (p *Parser) parseConstDeclStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'const'
+	pos := p.tokenPos(tok)
+
+	var names []string
+	for {
+		nameTok, err := p.expect(lexer.TOKEN_IDENT)
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, nameTok.Value)
+		if !p.check(lexer.TOKEN_COMMA) {
+			break
+		}
+		p.advance() // consume ','
+	}
+
+	if !p.check(lexer.TOKEN_DECLARE) && !p.check(lexer.TOKEN_ASSIGN) {
+		return nil, p.errorf("expected ':=' or '=' after const declaration")
+	}
+	p.advance() // consume ':=' or '='
+
+	values, err := p.parseExprList()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ast.DeclareStmt{P: pos, Names: names, Values: values, ReadOnly: true}, nil
 }
 
 // parseExpressionStmt parses an expression statement and determines what kind

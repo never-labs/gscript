@@ -34,6 +34,9 @@ func (e *Environment) Get(name string) (Value, bool) {
 func (e *Environment) Set(name string, val Value) bool {
 	uv, ok := e.vars[name]
 	if ok {
+		if uv.ReadOnly() {
+			return false
+		}
 		uv.Set(val)
 		return true
 	}
@@ -47,6 +50,30 @@ func (e *Environment) Set(name string, val Value) bool {
 func (e *Environment) Define(name string, val Value) {
 	v := val // make a local copy so the Upvalue points at stable storage
 	e.vars[name] = NewUpvalue(&v)
+}
+
+// DefineReadOnly creates a new read-only variable in the current scope.
+func (e *Environment) DefineReadOnly(name string, val Value) {
+	v := val // make a local copy so the Upvalue points at stable storage
+	e.vars[name] = NewReadOnlyUpvalue(&v)
+}
+
+// IsReadOnly reports whether name resolves to a read-only binding.
+func (e *Environment) IsReadOnly(name string) bool {
+	uv, ok := e.vars[name]
+	if ok {
+		return uv.ReadOnly()
+	}
+	if e.parent != nil {
+		return e.parent.IsReadOnly(name)
+	}
+	return false
+}
+
+// IsLocalReadOnly reports whether name is read-only in this exact scope.
+func (e *Environment) IsLocalReadOnly(name string) bool {
+	uv, ok := e.vars[name]
+	return ok && uv.ReadOnly()
 }
 
 // GetUpvalue returns the *Upvalue for a name in the scope chain, for closure capture.
