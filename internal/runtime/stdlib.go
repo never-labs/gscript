@@ -44,7 +44,7 @@ var stdlibModuleNames = []string{
 // This is called from New() after registerBuiltins().
 func (interp *Interpreter) registerStdlib() {
 	// String library
-	strLib := buildStringLib()
+	strLib := BuildStringLibWithCaller(interp.callFunction)
 	interp.globals.Define("string", TableValue(strLib))
 
 	// Set up string metatable so "hello":upper() works
@@ -53,6 +53,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// Table library (sort + higher-order functions need interp)
 	tblLib := buildTableLib()
+	buildTableProxyWithInterp(interp, tblLib)
 	buildTableSortWithInterp(interp, tblLib)
 	buildTableHigherOrderWithInterp(interp, tblLib)
 	interp.globals.Define("table", TableValue(tblLib))

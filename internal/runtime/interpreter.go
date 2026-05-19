@@ -1049,6 +1049,23 @@ func (interp *Interpreter) tableSetDepth(t Value, key, val Value, depth int) err
 	return nil
 }
 
+func (interp *Interpreter) tableLenInt(t Value) (int64, error) {
+	if !t.IsTable() {
+		return 0, fmt.Errorf("attempt to get length of a %s value", t.TypeName())
+	}
+	if mm, ok := interp.getMetamethod(t, "__len"); ok {
+		results, err := interp.callFunction(mm, []Value{t})
+		if err != nil {
+			return 0, err
+		}
+		if len(results) == 0 {
+			return 0, nil
+		}
+		return toInt(results[0]), nil
+	}
+	return int64(t.Table().Length()), nil
+}
+
 // opToMetamethod maps arithmetic operators to metamethod names.
 func opToMetamethod(op string) string {
 	switch op {

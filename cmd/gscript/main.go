@@ -248,7 +248,6 @@ func runStringVMWithSource(interp *runtime.Interpreter, src, sourceName string, 
 	setProtoSource(proto, sourceName)
 	globals := interp.ExportGlobals()
 	bvm := bytecodevm.New(globals)
-	bvm.SetStringMeta(interp.StringMeta())
 	if jitOpts.ShowCoroutineStats {
 		bvm.EnableCoroutineStats()
 	}

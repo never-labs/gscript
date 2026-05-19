@@ -339,6 +339,14 @@ func (h *gscriptFileHandle) readOne(format Value) (Value, error) {
 		if n < 0 {
 			return NilValue(), fmt.Errorf("invalid read count: %d", n)
 		}
+		if n == 0 {
+			if _, err := h.reader.Peek(1); err == io.EOF {
+				return NilValue(), nil
+			} else if err != nil {
+				return NilValue(), err
+			}
+			return StringValue(""), nil
+		}
 		buf := make([]byte, n)
 		read, err := io.ReadFull(h.reader, buf)
 		if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
@@ -362,6 +370,15 @@ func (h *gscriptFileHandle) readOne(format Value) (Value, error) {
 			return NilValue(), nil
 		}
 		return StringValue(strings.TrimRight(line, "\n\r")), nil
+	case "*L", "L":
+		line, err := h.reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return NilValue(), err
+		}
+		if len(line) == 0 && err == io.EOF {
+			return NilValue(), nil
+		}
+		return StringValue(line), nil
 	case "*a", "a":
 		data, err := io.ReadAll(h.reader)
 		if err != nil {

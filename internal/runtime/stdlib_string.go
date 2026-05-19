@@ -53,8 +53,14 @@ func NativeStringFormatIntCachePtr() unsafe.Pointer {
 	return unsafe.Pointer(&nativeStringFormatIntCache[0])
 }
 
-// buildStringLib creates the "string" standard library table and returns it.
-func buildStringLib() *Table {
+// FunctionCaller invokes a GScript function value from the active execution
+// engine. Stdlib functions that accept callbacks use it to stay VM-aware.
+type FunctionCaller func(Value, []Value) ([]Value, error)
+
+// BuildStringLibWithCaller creates the "string" standard library table using
+// caller for function-valued replacements. A nil caller still supports native
+// GoFunction callbacks.
+func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -357,7 +363,7 @@ func buildStringLib() *Table {
 		return result, nil
 	})
 
-	// string.gmatch(s, pattern) -> iterator
+	// string.gmatch(s, pattern [, init]) -> iterator
 	set("gmatch", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'string.gmatch'")
@@ -367,9 +373,29 @@ func buildStringLib() *Table {
 		}
 		s := args[0].Str()
 		pattern := args[1].Str()
+		init := 1
+		if len(args) >= 3 {
+			init = int(toInt(args[2]))
+		}
+		if init < 0 {
+			init = len(s) + init + 1
+		}
+		if init < 1 {
+			init = 1
+		}
+		if init > len(s)+1 {
+			iter := &GoFunction{
+				Name: "gmatch_iterator",
+				Fn: func(_ []Value) ([]Value, error) {
+					return []Value{NilValue()}, nil
+				},
+			}
+			return []Value{FunctionValue(iter)}, nil
+		}
+		searchStr := s[init-1:]
 
 		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
-			allMatches := findAllBalancedRanges(s, open, close)
+			allMatches := findAllBalancedRanges(searchStr, open, close)
 			idx := 0
 			iter := &GoFunction{
 				Name: "gmatch_iterator",
@@ -379,7 +405,7 @@ func buildStringLib() *Table {
 					}
 					loc := allMatches[idx]
 					idx++
-					return []Value{StringValue(s[loc[0]:loc[1]])}, nil
+					return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 				},
 			}
 			return []Value{FunctionValue(iter)}, nil
@@ -389,7 +415,7 @@ func buildStringLib() *Table {
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
-		allMatches := prog.findAllSubmatchIndex(re, s)
+		allMatches := prog.findAllSubmatchIndex(re, searchStr)
 		idx := 0
 		iter := &GoFunction{
 			Name: "gmatch_iterator",
@@ -400,13 +426,17 @@ func buildStringLib() *Table {
 				loc := allMatches[idx]
 				idx++
 				if len(prog.captureSlots) == 0 {
-					return []Value{StringValue(s[loc[0]:loc[1]])}, nil
+					return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 				}
 				result := make([]Value, 0, len(prog.captureSlots))
-				for _, slot := range prog.captureSlots {
+				for i, slot := range prog.captureSlots {
 					pos := slot * 2
 					if pos+1 < len(loc) && loc[pos] >= 0 {
-						result = append(result, StringValue(s[loc[pos]:loc[pos+1]]))
+						if prog.captureKinds[i] == luaPatternCapturePosition {
+							result = append(result, IntValue(int64(loc[pos]+init)))
+						} else {
+							result = append(result, StringValue(searchStr[loc[pos]:loc[pos+1]]))
+						}
 					} else {
 						result = append(result, NilValue())
 					}
@@ -448,6 +478,12 @@ func buildStringLib() *Table {
 				if err != nil {
 					return nil, err
 				}
+			} else if repl.IsFunction() {
+				var err error
+				result, err = replaceBalancedPatternFunction(s, open, close, repl, caller, maxRepl, &count)
+				if err != nil {
+					return nil, err
+				}
 			} else {
 				result = replaceBalancedPatternRaw(s, open, close, repl.String(), maxRepl, &count)
 			}
@@ -471,6 +507,12 @@ func buildStringLib() *Table {
 		} else if repl.IsTable() {
 			var err error
 			result, err = replaceLuaPatternTable(s, re, prog, repl.Table(), maxRepl, &count)
+			if err != nil {
+				return nil, err
+			}
+		} else if repl.IsFunction() {
+			var err error
+			result, err = replaceLuaPatternFunction(s, re, prog, repl, caller, maxRepl, &count)
 			if err != nil {
 				return nil, err
 			}
@@ -837,6 +879,24 @@ func buildStringLib() *Table {
 	})
 
 	return t
+}
+
+// RefreshStringLibWithCaller updates an existing string library table in place,
+// preserving module identity for require/package.loaded users.
+func RefreshStringLibWithCaller(t *Table, caller FunctionCaller) *Table {
+	if t == nil {
+		return BuildStringLibWithCaller(caller)
+	}
+	fresh := BuildStringLibWithCaller(caller)
+	for key, val, ok := fresh.Next(NilValue()); ok; key, val, ok = fresh.Next(key) {
+		t.RawSet(key, val)
+	}
+	return t
+}
+
+// buildStringLib creates the "string" standard library table and returns it.
+func buildStringLib() *Table {
+	return BuildStringLibWithCaller(nil)
 }
 
 func stringSubValue(args []Value) (Value, error) {
@@ -2655,6 +2715,12 @@ func replaceBalancedPatternTable(s string, open, close byte, repl *Table, maxRep
 	})
 }
 
+func replaceBalancedPatternFunction(s string, open, close byte, fn Value, caller FunctionCaller, maxRepl int, count *int) (string, error) {
+	return replaceBalancedPattern(s, open, close, maxRepl, count, func(loc []int) (string, error) {
+		return callLuaReplacementFunction(s, loc, luaPatternProgram{}, fn, caller)
+	})
+}
+
 func replaceBalancedPattern(s string, open, close byte, maxRepl int, count *int, repl func([]int) (string, error)) (string, error) {
 	var b strings.Builder
 	last := 0
@@ -2679,6 +2745,34 @@ func replaceBalancedPattern(s string, open, close byte, maxRepl int, count *int,
 	}
 	if *count == 0 {
 		return s, nil
+	}
+	b.WriteString(s[last:])
+	return b.String(), nil
+}
+
+func replaceLuaPatternFunction(s string, re *regexp.Regexp, prog luaPatternProgram, fn Value, caller FunctionCaller, maxRepl int, count *int) (string, error) {
+	matches := prog.findAllSubmatchIndex(re, s)
+	if len(matches) == 0 {
+		return s, nil
+	}
+	var b strings.Builder
+	last := 0
+	for _, loc := range matches {
+		if maxRepl >= 0 && *count >= maxRepl {
+			break
+		}
+		start, end := loc[0], loc[1]
+		if start < last {
+			continue
+		}
+		replacement, err := callLuaReplacementFunction(s, loc, prog, fn, caller)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(s[last:start])
+		b.WriteString(replacement)
+		last = end
+		(*count)++
 	}
 	b.WriteString(s[last:])
 	return b.String(), nil
@@ -2740,6 +2834,55 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, prog luaPatternProgram,
 	}
 	b.WriteString(s[last:])
 	return b.String(), nil
+}
+
+func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn Value, caller FunctionCaller) (string, error) {
+	results, err := callGScriptFunction(fn, luaReplacementFunctionArgs(s, loc, prog), caller)
+	if err != nil {
+		return "", err
+	}
+	replacement := s[loc[0]:loc[1]]
+	if len(results) == 0 {
+		return replacement, nil
+	}
+	val := results[0]
+	if val.IsNil() || (val.IsBool() && !val.Bool()) {
+		return replacement, nil
+	}
+	if val.IsString() || val.IsNumber() {
+		return val.String(), nil
+	}
+	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
+}
+
+func callGScriptFunction(fn Value, args []Value, caller FunctionCaller) ([]Value, error) {
+	if caller != nil {
+		return caller(fn, args)
+	}
+	if gf := fn.GoFunction(); gf != nil {
+		return gf.Fn(args)
+	}
+	return nil, fmt.Errorf("attempt to call a %s value", fn.TypeName())
+}
+
+func luaReplacementFunctionArgs(s string, loc []int, prog luaPatternProgram) []Value {
+	if len(prog.captureKinds) == 0 || len(prog.captureSlots) == 0 {
+		return []Value{StringValue(s[loc[0]:loc[1]])}
+	}
+	args := make([]Value, 0, len(prog.captureSlots))
+	for i, slot := range prog.captureSlots {
+		pos := slot * 2
+		if pos+1 >= len(loc) || loc[pos] < 0 {
+			args = append(args, NilValue())
+			continue
+		}
+		if prog.captureKinds[i] == luaPatternCapturePosition {
+			args = append(args, IntValue(int64(loc[pos]+1)))
+		} else {
+			args = append(args, StringValue(s[loc[pos]:loc[pos+1]]))
+		}
+	}
+	return args
 }
 
 func luaReplacementTableKey(s string, loc []int, prog luaPatternProgram) Value {

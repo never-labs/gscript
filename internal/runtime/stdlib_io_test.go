@@ -102,3 +102,41 @@ func TestIOInputOutputAndTmpfile(t *testing.T) {
 		t.Fatalf("tmpType = %q, want closed file", got)
 	}
 }
+
+func TestIOReadFormatsLineWithNewlineBytesAndMultipleResults(t *testing.T) {
+	interp := New()
+	path := filepath.Join(t.TempDir(), "read-formats.txt")
+	interp.SetGlobal("file", StringValue(path))
+
+	execBinaryIOTest(t, interp, `
+		f := io.open(file, "w")
+		assert(f:write("first\nsecond\nrest!"))
+		assert(f:close())
+
+		f = io.open(file, "r")
+		lineWithEnd, lineWithoutEnd, chunk := f:read("L", "l", 4)
+		empty := f:read(0)
+		tail := f:read(100)
+		atEOF := f:read(1)
+		assert(f:close())
+	`)
+
+	if got := interp.GetGlobal("lineWithEnd").Str(); got != "first\n" {
+		t.Fatalf("lineWithEnd = %q, want first with newline", got)
+	}
+	if got := interp.GetGlobal("lineWithoutEnd").Str(); got != "second" {
+		t.Fatalf("lineWithoutEnd = %q, want second", got)
+	}
+	if got := interp.GetGlobal("chunk").Str(); got != "rest" {
+		t.Fatalf("chunk = %q, want rest", got)
+	}
+	if got := interp.GetGlobal("empty").Str(); got != "" {
+		t.Fatalf("empty = %q, want empty string", got)
+	}
+	if got := interp.GetGlobal("tail").Str(); got != "!" {
+		t.Fatalf("tail = %q, want !", got)
+	}
+	if !interp.GetGlobal("atEOF").IsNil() {
+		t.Fatalf("atEOF = %v, want nil", interp.GetGlobal("atEOF"))
+	}
+}

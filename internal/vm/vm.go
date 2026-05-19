@@ -524,11 +524,21 @@ func (vm *VM) newTableSortFunction() *runtime.GoFunction {
 			if len(args) < 1 || !args[0].IsTable() {
 				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
 			}
-			tbl := args[0].Table()
-			length := tbl.Length()
-			elems := make([]runtime.Value, length)
-			for i := 0; i < length; i++ {
-				elems[i] = tbl.RawGet(runtime.IntValue(int64(i + 1)))
+			t := args[0]
+			length, err := vm.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			if length < 0 {
+				length = 0
+			}
+			elems := make([]runtime.Value, int(length))
+			for i := 0; i < len(elems); i++ {
+				v, err := vm.tableGet(t, runtime.IntValue(int64(i+1)))
+				if err != nil {
+					return nil, err
+				}
+				elems[i] = v
 			}
 
 			var sortErr error
@@ -574,11 +584,172 @@ func (vm *VM) newTableSortFunction() *runtime.GoFunction {
 				return nil, sortErr
 			}
 			for i, val := range elems {
-				tbl.RawSet(runtime.IntValue(int64(i+1)), val)
+				if err := vm.tableSet(t, runtime.IntValue(int64(i+1)), val); err != nil {
+					return nil, err
+				}
 			}
 			return nil, nil
 		},
 	}
+}
+
+// RegisterTableProxyLib installs VM-aware table functions that honor __index,
+// __newindex, and __len for proxy tables.
+func (vm *VM) RegisterTableProxyLib() {
+	tblVal, ok := vm.globals["table"]
+	if !ok || !tblVal.IsTable() {
+		return
+	}
+	tbl := tblVal.Table()
+	tbl.RawSet(runtime.StringValue("insert"), runtime.FunctionValue(&runtime.GoFunction{
+		Name: "table.insert",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+			}
+			if len(args) != 2 && len(args) != 3 {
+				return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
+			}
+			t := args[0]
+			length, err := vm.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			if len(args) == 2 {
+				return nil, vm.tableSet(t, runtime.IntValue(length+1), args[1])
+			}
+			pos := vmToInt(args[1])
+			if pos < 1 || pos > length+1 {
+				return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+			}
+			for i := length; i >= pos; i-- {
+				v, err := vm.tableGet(t, runtime.IntValue(i))
+				if err != nil {
+					return nil, err
+				}
+				if err := vm.tableSet(t, runtime.IntValue(i+1), v); err != nil {
+					return nil, err
+				}
+			}
+			return nil, vm.tableSet(t, runtime.IntValue(pos), args[2])
+		},
+	}))
+	tbl.RawSet(runtime.StringValue("remove"), runtime.FunctionValue(&runtime.GoFunction{
+		Name: "table.remove",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
+			}
+			t := args[0]
+			length, err := vm.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			pos := length
+			if len(args) >= 2 {
+				pos = vmToInt(args[1])
+			}
+			if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
+				return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+			}
+			if pos == length+1 {
+				return []runtime.Value{runtime.NilValue()}, nil
+			}
+			removed, err := vm.tableGet(t, runtime.IntValue(pos))
+			if err != nil {
+				return nil, err
+			}
+			for i := pos; i < length; i++ {
+				v, err := vm.tableGet(t, runtime.IntValue(i+1))
+				if err != nil {
+					return nil, err
+				}
+				if err := vm.tableSet(t, runtime.IntValue(i), v); err != nil {
+					return nil, err
+				}
+			}
+			if err := vm.tableSet(t, runtime.IntValue(length), runtime.NilValue()); err != nil {
+				return nil, err
+			}
+			return []runtime.Value{removed}, nil
+		},
+	}))
+	tableUnpack := func(name string, args []runtime.Value) ([]runtime.Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
+		}
+		t := args[0]
+		i := int64(1)
+		j, err := vm.tableLenInt(t)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) >= 2 {
+			i = vmToInt(args[1])
+		}
+		if len(args) >= 3 {
+			j = vmToInt(args[2])
+		}
+		var result []runtime.Value
+		for k := i; k <= j; k++ {
+			v, err := vm.tableGet(t, runtime.IntValue(k))
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, v)
+		}
+		return result, nil
+	}
+	tbl.RawSet(runtime.StringValue("unpack"), runtime.FunctionValue(&runtime.GoFunction{Name: "table.unpack", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+		return tableUnpack("unpack", args)
+	}}))
+	tbl.RawSet(runtime.StringValue("spread"), runtime.FunctionValue(&runtime.GoFunction{Name: "table.spread", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+		return tableUnpack("spread", args)
+	}}))
+	tbl.RawSet(runtime.StringValue("move"), runtime.FunctionValue(&runtime.GoFunction{
+		Name: "table.move",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 4 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument to 'table.move'")
+			}
+			src := args[0]
+			f := vmToInt(args[1])
+			e := vmToInt(args[2])
+			tPos := vmToInt(args[3])
+			dst := src
+			if len(args) >= 5 {
+				if !args[4].IsTable() {
+					return nil, fmt.Errorf("bad argument to 'table.move'")
+				}
+				dst = args[4]
+			}
+			if e >= f {
+				count := e - f + 1
+				if tPos <= f || src.Table() != dst.Table() {
+					for i := int64(0); i < count; i++ {
+						v, err := vm.tableGet(src, runtime.IntValue(f+i))
+						if err != nil {
+							return nil, err
+						}
+						if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
+							return nil, err
+						}
+					}
+				} else {
+					for i := count - 1; i >= 0; i-- {
+						v, err := vm.tableGet(src, runtime.IntValue(f+i))
+						if err != nil {
+							return nil, err
+						}
+						if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+			return []runtime.Value{dst}, nil
+		},
+	}))
 }
 
 // RegisterIPairsLib installs a VM-aware ipairs builtin so ordinary indexing
@@ -829,7 +1000,9 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterToStringLib()
 	v.RegisterIPairsLib()
 	v.RegisterPairsLib()
+	v.RegisterTableProxyLib()
 	v.RegisterTableSortLib()
+	v.RegisterStringLib()
 	v.RegisterDebugLib()
 	v.registerChannelBuiltins()
 	runtime.RegisterVM(v)
@@ -1004,7 +1177,9 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterToStringLib()
 	child.RegisterIPairsLib()
 	child.RegisterPairsLib()
+	child.RegisterTableProxyLib()
 	child.RegisterTableSortLib()
+	child.RegisterStringLib()
 	child.RegisterDebugLib()
 	runtime.RegisterVM(child)
 	return child
@@ -1030,6 +1205,27 @@ func (vm *VM) registerChannelBuiltins() {
 // SetStringMeta sets the string metatable.
 func (vm *VM) SetStringMeta(meta *runtime.Table) {
 	vm.stringMeta = meta
+}
+
+// RegisterStringLib installs VM-aware string callbacks such as function-valued
+// string.gsub replacements.
+func (vm *VM) RegisterStringLib() {
+	var strLib *runtime.Table
+	if existing, ok := vm.globals["string"]; ok && existing.IsTable() {
+		strLib = runtime.RefreshStringLibWithCaller(existing.Table(), vm.callValue)
+	} else {
+		strLib = runtime.BuildStringLibWithCaller(vm.callValue)
+		vm.SetGlobal("string", runtime.TableValue(strLib))
+	}
+	meta := runtime.NewTable()
+	meta.RawSet(runtime.StringValue("__index"), runtime.TableValue(strLib))
+	vm.stringMeta = meta
+	if pkgVal, ok := vm.globals["package"]; ok && pkgVal.IsTable() {
+		loaded := pkgVal.Table().RawGet(runtime.StringValue("loaded"))
+		if loaded.IsTable() {
+			loaded.Table().RawSetString("string", runtime.TableValue(strLib))
+		}
+	}
 }
 
 // Execute runs a top-level function prototype.
@@ -3456,6 +3652,34 @@ func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) er
 
 	tbl.RawSet(key, val)
 	return nil
+}
+
+func (vm *VM) tableLenInt(t runtime.Value) (int64, error) {
+	if !t.IsTable() {
+		return 0, fmt.Errorf("attempt to get length of a %s value", t.TypeName())
+	}
+	l, err := vm.length(t)
+	if err != nil {
+		return 0, err
+	}
+	return vmToInt(l), nil
+}
+
+func vmToInt(v runtime.Value) int64 {
+	switch v.Type() {
+	case runtime.TypeInt:
+		return v.Int()
+	case runtime.TypeFloat:
+		return int64(v.Float())
+	case runtime.TypeString:
+		n, ok := v.ToNumber()
+		if ok {
+			return vmToInt(n)
+		}
+		return 0
+	default:
+		return 0
+	}
 }
 
 // ---- Arithmetic helpers ----

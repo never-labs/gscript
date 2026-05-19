@@ -527,12 +527,22 @@ func buildTableSortWithInterp(interp *Interpreter, tblLib *Table) {
 			if len(args) < 1 || !args[0].IsTable() {
 				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
 			}
-			tbl := args[0].Table()
-			length := tbl.Length()
+			t := args[0]
+			length, err := interp.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			if length < 0 {
+				length = 0
+			}
 
-			elems := make([]Value, length)
-			for i := 0; i < length; i++ {
-				elems[i] = tbl.RawGet(IntValue(int64(i + 1)))
+			elems := make([]Value, int(length))
+			for i := 0; i < len(elems); i++ {
+				v, err := interp.tableGet(t, IntValue(int64(i+1)))
+				if err != nil {
+					return nil, err
+				}
+				elems[i] = v
 			}
 
 			var sortErr error
@@ -577,9 +587,166 @@ func buildTableSortWithInterp(interp *Interpreter, tblLib *Table) {
 			}
 
 			for i, v := range elems {
-				tbl.RawSet(IntValue(int64(i+1)), v)
+				if err := interp.tableSet(t, IntValue(int64(i+1)), v); err != nil {
+					return nil, err
+				}
 			}
 			return nil, nil
+		},
+	}))
+}
+
+func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {
+	tblLib.RawSet(StringValue("insert"), FunctionValue(&GoFunction{
+		Name: "table.insert",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+			}
+			if len(args) != 2 && len(args) != 3 {
+				return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
+			}
+			t := args[0]
+			length, err := interp.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			if len(args) == 2 {
+				return nil, interp.tableSet(t, IntValue(int64(length+1)), args[1])
+			}
+			pos := toInt(args[1])
+			if pos < 1 || pos > int64(length)+1 {
+				return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+			}
+			for i := int64(length); i >= pos; i-- {
+				v, err := interp.tableGet(t, IntValue(i))
+				if err != nil {
+					return nil, err
+				}
+				if err := interp.tableSet(t, IntValue(i+1), v); err != nil {
+					return nil, err
+				}
+			}
+			return nil, interp.tableSet(t, IntValue(pos), args[2])
+		},
+	}))
+
+	tblLib.RawSet(StringValue("remove"), FunctionValue(&GoFunction{
+		Name: "table.remove",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
+			}
+			t := args[0]
+			length, err := interp.tableLenInt(t)
+			if err != nil {
+				return nil, err
+			}
+			pos := int64(length)
+			if len(args) >= 2 {
+				pos = toInt(args[1])
+			}
+			if pos < 0 || pos > int64(length)+1 || (pos == 0 && length > 0) {
+				return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+			}
+			if pos == int64(length)+1 {
+				return []Value{NilValue()}, nil
+			}
+			removed, err := interp.tableGet(t, IntValue(pos))
+			if err != nil {
+				return nil, err
+			}
+			for i := pos; i < int64(length); i++ {
+				v, err := interp.tableGet(t, IntValue(i+1))
+				if err != nil {
+					return nil, err
+				}
+				if err := interp.tableSet(t, IntValue(i), v); err != nil {
+					return nil, err
+				}
+			}
+			if err := interp.tableSet(t, IntValue(int64(length)), NilValue()); err != nil {
+				return nil, err
+			}
+			return []Value{removed}, nil
+		},
+	}))
+
+	tableUnpack := func(name string, args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
+		}
+		t := args[0]
+		i := int64(1)
+		j, err := interp.tableLenInt(t)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) >= 2 {
+			i = toInt(args[1])
+		}
+		if len(args) >= 3 {
+			j = toInt(args[2])
+		}
+		var result []Value
+		for k := i; k <= j; k++ {
+			v, err := interp.tableGet(t, IntValue(k))
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, v)
+		}
+		return result, nil
+	}
+	tblLib.RawSet(StringValue("unpack"), FunctionValue(&GoFunction{Name: "table.unpack", Fn: func(args []Value) ([]Value, error) {
+		return tableUnpack("unpack", args)
+	}}))
+	tblLib.RawSet(StringValue("spread"), FunctionValue(&GoFunction{Name: "table.spread", Fn: func(args []Value) ([]Value, error) {
+		return tableUnpack("spread", args)
+	}}))
+
+	tblLib.RawSet(StringValue("move"), FunctionValue(&GoFunction{
+		Name: "table.move",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 4 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument to 'table.move'")
+			}
+			src := args[0]
+			f := toInt(args[1])
+			e := toInt(args[2])
+			tPos := toInt(args[3])
+			dst := src
+			if len(args) >= 5 {
+				if !args[4].IsTable() {
+					return nil, fmt.Errorf("bad argument to 'table.move'")
+				}
+				dst = args[4]
+			}
+			if e >= f {
+				count := e - f + 1
+				if tPos <= f || src.Table() != dst.Table() {
+					for i := int64(0); i < count; i++ {
+						v, err := interp.tableGet(src, IntValue(f+i))
+						if err != nil {
+							return nil, err
+						}
+						if err := interp.tableSet(dst, IntValue(tPos+i), v); err != nil {
+							return nil, err
+						}
+					}
+				} else {
+					for i := count - 1; i >= 0; i-- {
+						v, err := interp.tableGet(src, IntValue(f+i))
+						if err != nil {
+							return nil, err
+						}
+						if err := interp.tableSet(dst, IntValue(tPos+i), v); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+			return []Value{dst}, nil
 		},
 	}))
 }

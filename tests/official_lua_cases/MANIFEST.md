@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 375.
+Current translated passing cases: 379.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -76,6 +76,7 @@ Current translated passing cases: 375.
 | `constructs_precedence` | `constructs.lua` | Arithmetic, concat, logical precedence, unary/power precedence. |
 | `constructs_short_circuit` | `constructs.lua` | `and`/`or` short-circuit value semantics and comparisons. |
 | `coroutine_create_gofunction` | `coroutine.lua` | `coroutine.create`/`resume` over native functions, including errors and dead status. |
+| `coroutine_multi_yield_resume_more` | `coroutine.lua` | Multi-value `coroutine.yield` propagation through `coroutine.resume`, including interior nil and resume arguments. |
 | `coroutine_self_resume_status_more` | `coroutine.lua` | Coroutine resume/status progression across suspended yields, return, and repeated dead-coroutine resumes. |
 | `coroutine_status_yieldable_more` | `coroutine.lua` | Coroutine status transitions around yield/resume plus `coroutine.isyieldable` inside and outside a coroutine. |
 | `coroutine_wrap_basic` | `coroutine.lua` | `coroutine.wrap`, yield/resume values, simple generator. |
@@ -220,6 +221,7 @@ Current translated passing cases: 375.
 | `pm_gsub_trim` | `pm.lua` | Simple `gsub`, trimming, whitespace replacement, empty-string anchors. |
 | `pm_gmatch_words_more` | `pm.lua` | `gmatch` iteration over word captures and multi-capture numeric assignments. |
 | `pm_gmatch_numeric_pairs_more` | `pm.lua` | `gmatch` two-capture numeric assignments into a table followed by `pairs` verification. |
+| `pm_pattern_runtime_more` | `pm.lua` | Pattern runtime callbacks: `gmatch` start positions and function-valued `gsub` replacements with nil/false no-substitution. |
 | `pm_match_captures_ascii` | `pm.lua` | ASCII `string.match` captures with `%w`, `%d`, empty captures, and anchored failure cases. |
 | `pm_match_classes_repetition_more` | `pm.lua` | Additional pattern repetition, anchors, minimal matches, negated classes, and `%S`/`%C` classes. |
 | `pm_match_classes_more2` | `pm.lua` | Additional pattern class and repetition checks for `%l`, `%a`, `*`, `+`, escaped `$`, and missing matches. |
@@ -239,6 +241,7 @@ Current translated passing cases: 375.
 | `sort_pack_nil_counts_more` | `sort.lua` | Additional `table.pack` count preservation across interior and trailing nil arguments. |
 | `sort_table_insert_remove_concat` | `sort.lua` | `table.insert`, `table.remove`, `table.concat`. |
 | `sort_table_move` | `sort.lua` | `table.move` forward/backward/overlapping/empty moves. |
+| `sort_table_proxy_metamethods` | `sort.lua`, `events.lua` | `table.move`, `table.unpack`, and `table.sort` over proxy tables using `__index`, `__newindex`, and `__len`. |
 | `sort_unpack_ranges` | `sort.lua` | `table.unpack` direct assignment, bounded ranges, singleton ranges, and empty ranges. |
 | `strings_basic` | `strings.lua` | String compare, sub/find/len/byte/char/case/rep/reverse basics. |
 | `strings_byte_ascii_indices` | `strings.lua` | ASCII `string.byte` positive/negative range indices and empty-range nil behavior. |
@@ -312,6 +315,7 @@ Audit-added coverage not yet folded into the main table above:
 | `big_generated_eval_env_more` | `big.lua` | Generated chunk/table execution with explicit environment mutation and large-enough array indexing. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
+| `files_io_read_formats_more` | `files.lua` | File `read` line-with-newline format, byte-count reads, zero-byte EOF probe, partial EOF reads, and ordered multi-format returns. |
 | `files_seek_overwrite_more` | `files.lua` | File-handle `seek` position reporting and overwrite semantics followed by whole-file readback. |
 | `files_tmpfile_flush_type_more` | `files.lua` | `io.tmpfile`, `file:flush`, seek-to-start readback, and closed-file `io.type` reporting. |
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
