@@ -593,6 +593,124 @@ func (vm *VM) newTableSortFunction() *runtime.GoFunction {
 	}
 }
 
+// RegisterTableHigherOrderLib installs VM-aware table higher-order helpers so
+// file-loaded VM closures can be used as callbacks.
+func (vm *VM) RegisterTableHigherOrderLib() {
+	tblVal, ok := vm.globals["table"]
+	if !ok || !tblVal.IsTable() {
+		return
+	}
+	tbl := tblVal.Table()
+	tbl.RawSet(runtime.StringValue("filter"), runtime.FunctionValue(vm.newTableFilterFunction()))
+	tbl.RawSet(runtime.StringValue("map"), runtime.FunctionValue(vm.newTableMapFunction()))
+	tbl.RawSet(runtime.StringValue("reduce"), runtime.FunctionValue(vm.newTableReduceFunction()))
+	tbl.RawSet(runtime.StringValue("fromArray"), runtime.FunctionValue(vm.newTableFromArrayFunction()))
+}
+
+func (vm *VM) newTableFilterFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "table.filter",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 2 || !args[0].IsTable() || !args[1].IsFunction() {
+				return nil, fmt.Errorf("bad argument to 'table.filter'")
+			}
+			src := args[0].Table()
+			fn := args[1]
+			result := runtime.NewTable()
+			out := int64(1)
+			for i := int64(1); i <= int64(src.Length()); i++ {
+				v := src.RawGet(runtime.IntValue(i))
+				results, err := vm.callValue(fn, []runtime.Value{v, runtime.IntValue(i)})
+				if err != nil {
+					return nil, err
+				}
+				if len(results) > 0 && results[0].Truthy() {
+					result.RawSet(runtime.IntValue(out), v)
+					out++
+				}
+			}
+			return []runtime.Value{runtime.TableValue(result)}, nil
+		},
+	}
+}
+
+func (vm *VM) newTableMapFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "table.map",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 2 || !args[0].IsTable() || !args[1].IsFunction() {
+				return nil, fmt.Errorf("bad argument to 'table.map'")
+			}
+			src := args[0].Table()
+			fn := args[1]
+			result := runtime.NewTable()
+			for i := int64(1); i <= int64(src.Length()); i++ {
+				v := src.RawGet(runtime.IntValue(i))
+				results, err := vm.callValue(fn, []runtime.Value{v, runtime.IntValue(i)})
+				if err != nil {
+					return nil, err
+				}
+				if len(results) > 0 {
+					result.RawSet(runtime.IntValue(i), results[0])
+				} else {
+					result.RawSet(runtime.IntValue(i), runtime.NilValue())
+				}
+			}
+			return []runtime.Value{runtime.TableValue(result)}, nil
+		},
+	}
+}
+
+func (vm *VM) newTableReduceFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "table.reduce",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 3 || !args[0].IsTable() || !args[1].IsFunction() {
+				return nil, fmt.Errorf("bad argument to 'table.reduce'")
+			}
+			src := args[0].Table()
+			fn := args[1]
+			acc := args[2]
+			for i := int64(1); i <= int64(src.Length()); i++ {
+				v := src.RawGet(runtime.IntValue(i))
+				results, err := vm.callValue(fn, []runtime.Value{acc, v})
+				if err != nil {
+					return nil, err
+				}
+				if len(results) > 0 {
+					acc = results[0]
+				}
+			}
+			return []runtime.Value{acc}, nil
+		},
+	}
+}
+
+func (vm *VM) newTableFromArrayFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "table.fromArray",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 2 || !args[0].IsTable() || !args[1].IsFunction() {
+				return nil, fmt.Errorf("bad argument to 'table.fromArray'")
+			}
+			src := args[0].Table()
+			fn := args[1]
+			result := runtime.NewTable()
+			for i := int64(1); i <= int64(src.Length()); i++ {
+				v := src.RawGet(runtime.IntValue(i))
+				keys, err := vm.callValue(fn, []runtime.Value{v})
+				if err != nil {
+					return nil, err
+				}
+				if len(keys) > 0 {
+					result.RawSet(keys[0], v)
+				}
+			}
+			return []runtime.Value{runtime.TableValue(result)}, nil
+		},
+	}
+}
+
 // RegisterTableProxyLib installs VM-aware table functions that honor __index,
 // __newindex, and __len for proxy tables.
 func (vm *VM) RegisterTableProxyLib() {
@@ -1006,6 +1124,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterPairsLib()
 	v.RegisterTableProxyLib()
 	v.RegisterTableSortLib()
+	v.RegisterTableHigherOrderLib()
 	v.RegisterStringLib()
 	v.RegisterDebugLib()
 	v.registerChannelBuiltins()
@@ -1183,6 +1302,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterPairsLib()
 	child.RegisterTableProxyLib()
 	child.RegisterTableSortLib()
+	child.RegisterTableHigherOrderLib()
 	child.RegisterStringLib()
 	child.RegisterDebugLib()
 	runtime.RegisterVM(child)

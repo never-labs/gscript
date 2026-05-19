@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 389 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 390 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -37,6 +37,7 @@
 - `debug_host_helpers_more`: `debug.traceback` / `stack` / `globals` / `info` / `value` / `goStack` 的 host 诊断面。
 - `files_file_lines_streams_more`: `file:lines()`、标准流表和 `io.type` open/closed 状态。
 - `table_go_helpers_more`: table keys/values/contains/indexOf/copy/merge/count/unique/reverse/slice/zip 等非回调 helper。
+- `table_higher_order_vm_callbacks_more`: table map/filter/reduce/fromArray 在 VM 文件模式下调用脚本 callback。
 
 真正仍需补齐或明确设计取舍的缺口：
 

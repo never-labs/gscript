@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 389.
+Current translated passing cases: 390.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -331,6 +331,7 @@ Audit-added coverage not yet folded into the main table above:
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `table_go_helpers_more` | `sort.lua` | GScript Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |
+| `table_higher_order_vm_callbacks_more` | `sort.lua` | GScript table higher-order helpers `map`, `filter`, `reduce`, and `fromArray` with VM script callbacks. |
 | `tracegc_stats_progress_more` | `tracegc.lua`, `gc.lua` | Go-host GC stats shape and explicit collection progress compared with Lua `collectgarbage` count/running observability. |
 | `utf8_go_helpers_more` | `utf8.lua` | GScript Go-host UTF-8 helpers: reverse, codepoint substring, Unicode case conversion, char classes, validate, and sanitize. |
 | `verybig_method_constants_more` | `verybig.lua` | Large constant table access with method calls, self chaining, and closure reads beyond the RK-style boundary. |
