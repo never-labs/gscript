@@ -740,6 +740,10 @@ gen := coroutine.wrap(func() {
 for { v := gen(); if v == nil { break }; print(v) }
 ```
 
+`pairs(t)` is a host builtin. A `__pairs` metamethod may return a custom
+iterator triple, but it must not call `coroutine.yield` while setting up that
+triple. Use `coroutine.wrap` for yielding iterators.
+
 | Function | Description |
 |----------|-------------|
 | `coroutine.create(f)` | Create coroutine |

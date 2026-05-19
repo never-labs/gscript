@@ -1009,6 +1009,9 @@ func (vm *VM) NewObjectNFromSlots(proto *FuncProto, ctorIdx, absDst, absStart in
 }
 
 func protoHasNoCalls(proto *FuncProto) bool {
+	if proto == nil {
+		return true
+	}
 	for _, inst := range proto.Code {
 		switch DecodeOp(inst) {
 		case OP_CALL, OP_CALLTABLE, OP_YIELD, OP_RESUME, OP_TFORCALL, OP_GO:
@@ -1016,6 +1019,23 @@ func protoHasNoCalls(proto *FuncProto) bool {
 		}
 	}
 	return true
+}
+
+func protoContainsOp(proto *FuncProto, target Opcode) bool {
+	if proto == nil {
+		return false
+	}
+	for _, inst := range proto.Code {
+		if DecodeOp(inst) == target {
+			return true
+		}
+	}
+	for _, child := range proto.Protos {
+		if protoContainsOp(child, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func (vm *VM) coroutineResumeResults(ok bool, values []rt.Value) []rt.Value {

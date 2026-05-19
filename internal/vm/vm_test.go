@@ -1793,6 +1793,32 @@ for v := range counter(4) {
 	expectGlobalInt(t, g, "sum", 10)
 }
 
+func TestVMCoroutinePairsSetupYieldDiagnostic(t *testing.T) {
+	g := compileAndRun(t, `
+target := {}
+setmetatable(target, {
+	__pairs: func(t) {
+		coroutine.yield("setup")
+		return next, t, nil
+	},
+})
+
+co := coroutine.create(func() {
+	for k, v := range pairs(target) {
+		_ = k
+		_ = v
+	}
+})
+
+ok, msg := coroutine.resume(co)
+`)
+	expectGlobalBool(t, g, "ok", false)
+	msg := g["msg"]
+	if !msg.IsString() || !strings.Contains(msg.Str(), "__pairs cannot yield through the host pairs() setup") {
+		t.Fatalf("msg = %v, want __pairs yield diagnostic", msg)
+	}
+}
+
 // ============================================================================
 // Goroutine Tests
 // ============================================================================

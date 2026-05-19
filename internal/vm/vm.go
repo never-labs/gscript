@@ -562,6 +562,20 @@ func (vm *VM) newPairsFunction() *runtime.GoFunction {
 			if mt := tbl.GetMetatable(); mt != nil {
 				mm := mt.RawGetString("__pairs")
 				if !mm.IsNil() {
+					if cl, ok := closureFromValue(mm); ok && vm.activeCoroutine() != nil && protoContainsOp(cl.Proto, OP_YIELD) {
+						return nil, fmt.Errorf("__pairs cannot yield through the host pairs() setup; return a coroutine-backed iterator instead")
+					}
+					if cl, ok := closureFromValue(mm); ok {
+						newBase := vm.top
+						if vm.frameCount > 0 {
+							curFrame := &vm.frames[vm.frameCount-1]
+							minBase := curFrame.base + curFrame.closure.Proto.MaxStack
+							if newBase < minBase {
+								newBase = minBase
+							}
+						}
+						return vm.call(cl, []runtime.Value{args[0]}, newBase, -1)
+					}
 					return vm.callValue(mm, []runtime.Value{args[0]})
 				}
 			}
