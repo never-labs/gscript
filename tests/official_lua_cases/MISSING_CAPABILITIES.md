@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 413 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 414 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -62,6 +62,7 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `os_go_host_env_expand_more`: `os` helper 覆盖环境变量 get/set/unset、ExpandEnv 风格展开和参数错误。
 - `process_go_host_entry_exit_more`: `process` helper 覆盖 host-controlled args/entrypoint 与可捕获的 process exit error。
 - `main_script_file_vm_more`: `script` helper 在 VM 文件模式下覆盖当前 VM globals、相对文件加载、env sync 和 sandbox，不再退回 tree-walker chunk。
+- `main_vm_loader_more`: 全局 `load` / `loadfile` / `dofile` / file-backed `require` 在 VM 文件模式下执行 bytecode chunk，共享当前 globals、相对 script dir 与 `package.loaded` cache。
 
 当前能力状态与设计取舍：
 

@@ -105,10 +105,7 @@ func (vm *VM) exec(src, filename string) error {
 		}
 		// Persist the bytecode VM for future Call routing
 		vm.bvm = bvm
-		// Sync globals back to interpreter
-		for name := range globals {
-			vm.interp.SetGlobal(name, bvm.GetGlobal(name))
-		}
+		vm.syncBytecodeGlobals()
 		return nil
 	}
 
@@ -170,6 +167,15 @@ func setBytecodeSource(proto *bytecodevm.FuncProto, filename string) {
 	}
 	for _, child := range proto.Protos {
 		setBytecodeSource(child, filename)
+	}
+}
+
+func (vm *VM) syncBytecodeGlobals() {
+	if vm.bvm == nil {
+		return
+	}
+	for name, val := range vm.bvm.Globals() {
+		vm.interp.SetGlobal(name, val)
 	}
 }
 
@@ -355,6 +361,9 @@ func (vm *VM) BindMethod(className, methodName string, fn interface{}) error {
 // CallFunction exposes the interpreter's CallFunction for advanced use.
 // Useful when you have a runtime.Value function and want to call it.
 func (vm *VM) CallFunction(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	if vm.bvm != nil {
+		return vm.bvm.CallValue(fn, args)
+	}
 	return vm.interp.CallFunction(fn, args)
 }
 

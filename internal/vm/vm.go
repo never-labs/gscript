@@ -1430,6 +1430,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterHTTPLib()
 	v.RegisterDebugLib()
 	v.RegisterScriptLib()
+	v.RegisterLoaderLib()
 	v.registerChannelBuiltins()
 	runtime.RegisterVM(v)
 	return v
@@ -1611,6 +1612,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterHTTPLib()
 	child.RegisterDebugLib()
 	child.RegisterScriptLib()
+	child.RegisterLoaderLib()
 	child.scriptDir = parent.scriptDir
 	runtime.RegisterVM(child)
 	return child
@@ -1749,6 +1751,91 @@ func (vm *VM) RegisterScriptLib() {
 	vm.setPackageLoaded("script", val)
 }
 
+func (vm *VM) RegisterLoaderLib() {
+	vm.SetGlobal("load", runtime.FunctionValue(&runtime.GoFunction{Name: "load", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("bad argument #1 to 'load' (string expected)")
+		}
+		opt := runtime.NilValue()
+		if len(args) >= 2 {
+			opt = args[1]
+		}
+		fn, err := vm.compileScriptChunk(args[0].Str(), opt, "<load>")
+		if err != nil {
+			return []runtime.Value{runtime.NilValue(), runtime.StringValue(err.Error())}, nil
+		}
+		return fn, nil
+	}}))
+	vm.SetGlobal("loadstring", vm.GetGlobal("load"))
+	vm.SetGlobal("loadfile", runtime.FunctionValue(&runtime.GoFunction{Name: "loadfile", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("bad argument #1 to 'loadfile' (string expected)")
+		}
+		opt := runtime.NilValue()
+		if len(args) >= 2 {
+			opt = args[1]
+		}
+		fn, err := vm.loadScriptFile(args[0].Str(), opt)
+		if err != nil {
+			return []runtime.Value{runtime.NilValue(), runtime.StringValue(err.Error())}, nil
+		}
+		return fn, nil
+	}}))
+	vm.SetGlobal("dofile", runtime.FunctionValue(&runtime.GoFunction{Name: "dofile", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("bad argument #1 to 'dofile' (string expected)")
+		}
+		fn, err := vm.loadScriptFile(args[0].Str(), runtime.NilValue())
+		if err != nil {
+			return nil, err
+		}
+		return vm.callValue(fn[0], nil)
+	}}))
+	vm.SetGlobal("require", runtime.FunctionValue(&runtime.GoFunction{Name: "require", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("bad argument #1 to 'require' (string expected)")
+		}
+		name := args[0].Str()
+		if loaded := vm.packageLoaded(name); !loaded.IsNil() {
+			return []runtime.Value{loaded}, nil
+		}
+		if module := vm.GetGlobal(name); module.IsTable() || module.IsFunction() {
+			vm.setPackageLoaded(name, module)
+			return []runtime.Value{module}, nil
+		}
+		filename := vm.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+		if _, err := os.Stat(filename); err != nil {
+			return nil, fmt.Errorf("module '%s' not found", name)
+		}
+		fn, err := vm.loadScriptFile(filename, runtime.NilValue())
+		if err != nil {
+			return nil, err
+		}
+		results, err := vm.callValue(fn[0], nil)
+		if err != nil {
+			return nil, err
+		}
+		module := runtime.BoolValue(true)
+		if len(results) > 0 {
+			module = results[0]
+		}
+		vm.setPackageLoaded(name, module)
+		return []runtime.Value{module}, nil
+	}}))
+}
+
+func (vm *VM) packageLoaded(name string) runtime.Value {
+	pkg := vm.GetGlobal("package")
+	if !pkg.IsTable() {
+		return runtime.NilValue()
+	}
+	loaded := pkg.Table().RawGetString("loaded")
+	if !loaded.IsTable() {
+		return runtime.NilValue()
+	}
+	return loaded.Table().RawGetString(name)
+}
+
 type vmScriptConfig struct {
 	sourceName string
 	scriptDir  string
@@ -1792,7 +1879,11 @@ func (vm *VM) loadScriptFile(filename string, opt runtime.Value) ([]runtime.Valu
 	if err != nil {
 		return nil, err
 	}
-	resolved := vm.resolveScriptPathWithDir(filename, cfg.scriptDir)
+	resolveDir := cfg.scriptDir
+	if resolveDir == "" {
+		resolveDir = vm.scriptDir
+	}
+	resolved := vm.resolveScriptPathWithDir(filename, resolveDir)
 	src, err := os.ReadFile(resolved)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open %s: %s", resolved, err)
@@ -1839,7 +1930,7 @@ func setProtoSource(proto *FuncProto, sourceName string) {
 
 func (vm *VM) scriptConfigFromValue(opt runtime.Value, defaultSource string) (vmScriptConfig, error) {
 	cfg := vmScriptConfig{sourceName: defaultSource}
-	if opt.IsNil() {
+	if vmScriptOptionIsNil(opt) {
 		return cfg, nil
 	}
 	if opt.IsString() {
@@ -1881,6 +1972,10 @@ func (vm *VM) scriptConfigFromValue(opt runtime.Value, defaultSource string) (vm
 		cfg.env = envVal.Table()
 	}
 	return cfg, nil
+}
+
+func vmScriptOptionIsNil(opt runtime.Value) bool {
+	return opt.IsNil() || uint64(opt) == 0
 }
 
 func vmScriptConfigValue(cfg vmScriptConfig) runtime.Value {
