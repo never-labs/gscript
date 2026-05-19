@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 419.
+Current translated passing cases: 423.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -316,6 +316,7 @@ Current translated passing cases: 419.
 | `utf8_validation_helpers_more` | `utf8.lua` | Go-style structured UTF-8 validation diagnostics and non-strict sanitization helpers over invalid edge sequences. |
 | `uuid_go_host_more` | `api.lua`, `strings.lua` | Go-host UUID nil value, validation, parsing, version/variant metadata, and generated UUID shape checks. |
 | `vec_color_go_host_more` | `api.lua`, `math.lua` | Go-host vector and color helper constructors, predicates, arithmetic helpers, conversion, and invalid input diagnostics. |
+| `vec_color_geometry_hsl_more` | `api.lua`, `math.lua` | Go-host vector geometry helpers and color HSL/HSV/lighten/darken/grayscale/mix/alpha transforms. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
 | `vararg_call_unpack_more` | `vararg.lua` | `table.unpack`-driven call forwarding, explicit nil-count handling, fixed-parameter adjustment, and vararg builtin dispatch. |
 | `vararg_method_recursive_more` | `vararg.lua` | Method-call vararg indexing plus recursive vararg forwarding through nested one-less helpers. |
@@ -332,6 +333,7 @@ Recent audit-added coverage:
 | `big_generated_eval_env_more` | `big.lua` | Generated chunk/table execution with explicit environment mutation and large-enough array indexing. |
 | `binary_namespace_more` | `tpack.lua` | GScript `binary` namespace pack/unpack/size with Go-style endian and field tokens. |
 | `bytes_hash_base64_go_host_more` | `api.lua`, `strings.lua` | Go-host `bytes`, `hash`, and `base64` helpers for buffers, encodings, checksums, HMAC, and error returns. |
+| `bytes_numeric_buffer_more` | `api.lua`, `strings.lua` | Go-host bytes buffer numeric little-endian writes, byte/string reads, hex round trips, concat, and reset behavior. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `debug_host_helpers_more` | `db.lua` | Go-host `debug.traceback`, `debug.stack`, `debug.globals`, `debug.info`, `debug.value`, and `debug.goStack` diagnostics. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
@@ -351,9 +353,11 @@ Recent audit-added coverage:
 | `main_vm_loader_more` | `main.lua`, `attrib.lua` | VM-aware global `load`/`loadfile`/`dofile` and file-backed `require` share current globals, relative script directory, and `package.loaded` cache. |
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
 | `net_http_background_roundtrip_more` | `api.lua`, `main.lua` | Go-host `net` client helpers against local background HTTP server, including JSON response parsing and error returns. |
+| `net_http_methods_more` | `api.lua`, `main.lua` | Go-host loopback HTTP methods for PUT/PATCH/DELETE and configurable `net.request` headers, body, timeout, and redirect behavior. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
 | `regexp_submatch_limits_more` | `pm.lua`, `strings.lua` | Go RE2 all-submatch helpers, compiled regexp limits, split/find limits, and subexpression counts. |
 | `time_compress_encoding_go_host_more` | `main.lua`, `strings.lua` | Deterministic Go-host `time`, `compress`, and `encoding` helpers over fixed timestamps, round trips, and decode errors. |
+| `compress_error_levels_more` | `main.lua`, `strings.lua` | Go-host gzip/zlib/deflate explicit compression levels, fallback levels, bad-input errors, and missing-argument diagnostics. |
 | `encoding_ini_xml_roundtrip_more` | `strings.lua`, `main.lua` | Go-host INI encode/decode round trips, XML escape/unescape numeric entities, and malformed base32 decode errors. |
 | `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |

@@ -1,0 +1,52 @@
+print("case:bytes_numeric_buffer_more")
+
+buf := bytes.new()
+assert(buf.len() == 0)
+
+buf.writeInt8(-1)
+buf.writeInt16(0x1234)
+buf.writeInt32(0x01020304)
+buf.writeFloat32(1.5)
+buf.writeFloat64(-2.25)
+
+assert(buf.len() == 19)
+assert(buf.toHex() == "ff3412040302010000c03f00000000000002c0")
+assert(buf.toString() == "\255\52\18\4\3\2\1\0\0\192\63\0\0\0\0\0\0\2\192")
+
+assert(buf.readByte(1) == 255)
+assert(buf.readByte(2) == 52)
+assert(buf.readByte(3) == 18)
+assert(buf.readByte(4) == 4)
+assert(buf.readByte(7) == 1)
+assert(buf.readByte(8) == 0)
+assert(buf.readByte(11) == 63)
+assert(buf.readByte(19) == 192)
+assert(buf.readByte(0) == nil)
+assert(buf.readByte(20) == nil)
+
+assert(bytes.toHex(buf.readString(1, 3)) == "ff3412")
+assert(bytes.toHex(buf.readString(8, 11)) == "0000c03f")
+assert(buf.readString(-5, 1) == "\255")
+assert(buf.readString(20, 25) == "")
+
+bt := buf.bytes()
+assert(#bt == 19)
+assert(bt[1] == 255)
+assert(bt[2] == 52)
+assert(bt[3] == 18)
+assert(bt[8] == 0)
+assert(bt[11] == 63)
+assert(bt[19] == 192)
+
+copy := bytes.fromHex(buf.toHex())
+assert(copy.toString() == buf.toString())
+assert(bytes.concat(bytes.fromString("num:"), copy.readString(1, 3)) == "num:\255\52\18")
+
+buf.reset()
+assert(buf.len() == 0)
+buf.writeByte(0)
+buf.writeByte(255)
+assert(buf.toHex() == "00ff")
+assert(buf.readString(1, 2) == "\0\255")
+
+print("ok")

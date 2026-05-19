@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 419 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 423 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -50,13 +50,17 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `fs_path_glob_cwd_more`: `fs.cwd` / `fs.chdir` / `fs.glob` / `fs.tempdir` 和 `path.abs` / `isAbs` / `rel` / separator helpers 覆盖 cwd 状态与临时目录恢复。
 - `url_go_host_more`: Go-host URL parse/build/escape/query/join helper 覆盖结构化字段、query table、invalid escape 和 validity checks。
 - `bytes_hash_base64_go_host_more`: `bytes` buffer、hex/XOR/repeat/concat、base64/url-base64、hash/HMAC/CRC32 覆盖 deterministic binary helper。
+- `bytes_numeric_buffer_more`: `bytes.new()` buffer 覆盖 numeric little-endian writes、byte/string reads、hex round-trip、concat/fromString 和 reset。
 - `time_compress_encoding_go_host_more`: 固定时间格式化/解析/diff，gzip/zlib/deflate round-trip，以及 hex/base32/INI/XML 编解码覆盖。
+- `compress_error_levels_more`: gzip/zlib/deflate explicit/fallback compression levels、bad input decode errors 和 missing-argument diagnostics。
 - `encoding_ini_xml_roundtrip_more`: INI encode/decode round-trip、XML escape/unescape numeric entity round-trip 和 malformed base32/base32hex decode error 路径。
 - `net_http_background_roundtrip_more`: `net.get` / `post` / `request` 通过本地 `http.listen(..., {background:true})` 覆盖 response shape、JSON helper、404 和参数错误路径。
+- `net_http_methods_more`: `net.put` / `patch` / `delete` / configurable `request` 覆盖 loopback method/body/header/timeout/followRedirects 行为。
 - `csv_go_host_more`: `csv.parse` / `parseWithHeaders` / `encode` / `encodeWithHeaders` 覆盖 quoted fields、自定义分隔符、header 映射和 malformed input。
 - `bits_go_host_more`: Go-style 64-bit `bits` helper 覆盖按位组合、shift/rotate、bit position 操作、count 和参数错误。
 - `uuid_go_host_more`: `uuid` helper 覆盖 nil UUID、validation、parse metadata 和 generated UUID shape。
 - `vec_color_go_host_more`: `vec` / `color` helper 覆盖 vector constructors、length/dot/cross/normalize/clamp，以及 RGB/hex/alpha/invert/lerp 和 invalid input。
+- `vec_color_geometry_hsl_more`: vec geometry helpers 与 color HSL/HSV/lighten/darken/grayscale/mix/withAlpha transform 覆盖。
 - `container_sort_go_host_more`: `container` / `sort` helper 覆盖 set/queue/stack/heap、ascending/descending/reverse、binary search、unique、partition 和 key sort。
 - `crypto_go_host_more`: `crypto` helper 覆盖 constant-time equality、AES-GCM round-trip、decrypt error returns、random byte/hex shape 和 key-size validation。
 - `rand_go_host_more`: `rand` helper 覆盖 seeded replay、range/shape invariants、choice/shuffle/sample/weighted helpers、UUID/bytes shape 和参数校验。
