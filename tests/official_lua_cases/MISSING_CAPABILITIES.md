@@ -9,6 +9,7 @@
 | `debug` 标准库基础信息查询 | `db.lua`: `debug.getinfo`, `debug.getlocal`, `debug.getupvalue` | 可先提供适合 GScript/Go 运行时的函数、行号、参数、upvalue 与局部变量可观测模型，不必逐字复刻 Lua 的所有字段。 |
 | `debug.traceback` 与保护调用栈信息 | `db.lua` traceback checks, `errors.lua` line/stack-message checks | 可结合 Go 风格错误栈输出设计稳定格式，再为 Lua 兼容层提供常见字段和层级参数。 |
 | 调试 hook | `db.lua`: `debug.sethook`, `debug.gethook` | 官方测试依赖 call/return/line/count hook 和协程 hook；GScript 后续可按 VM 指令或源码行建立更明确的 hook 语义。 |
+| 嵌套调用/构造中的多返回展开 | `db.lua`: transfer-value checks using `table.unpack`, returned varargs, and table constructors | 当前新增 case 只覆盖直接赋值和显式 vararg packing 的稳定子集。后续可设计 GScript/Go 风格的显式 spread 或多返回传递规则，再决定 Lua 兼容层如何映射嵌套函数调用与表构造位置。 |
 | C API 测试库替代层 | `api.lua`: `T.testC`, `T.makeCfunc`, `T.checkmemory` | 官方 `api.lua` 大量依赖 Lua C 测试库。GScript 可考虑提供面向自身 runtime 的测试辅助库，而不是逐字实现 `ltests`。 |
 | `load`/`string.dump` 调试信息交互 | `db.lua`, `errors.lua` stripped chunk checks | 若 GScript 后续支持编译/反序列化 chunk，可定义是否保留源码名、行表和局部变量名。 |
 | 精细错误位置与 token 诊断 | `errors.lua`: syntax/runtime line checks and token-message checks | 当前 passing tests 只校验错误发生和值传播；后续可逐步稳定行号、调用层级和 token 文案，文案可保持 GScript 风格。 |
