@@ -84,6 +84,9 @@ const (
 	OP_NEWOBJECTN // A B C : R(A) = small string table, ctor=B, values starting at R(C)
 	OP_YIELD      // A B C : coroutine.yield(R(A+1)..R(A+B-1)); result convention matches CALL
 	OP_RESUME     // A B C : coroutine.resume(R(A+1)..R(A+B-1)); result convention matches CALL
+	OP_SETLISTDYN // A B C : R(A)[R(B)..] = R(C)..top-1; R(B) += count
+	OP_CALLTABLE  // A B C : R(A).. = R(A)(R(B)[1..R(B).n]); C matches CALL result convention
+	OP_SETTOP     // A     : top = R(A)
 
 	OP_MAX // sentinel
 )
@@ -218,6 +221,9 @@ var opNames = [...]string{
 	OP_MAKECHAN:   "MAKECHAN",
 	OP_SEND:       "SEND",
 	OP_RECV:       "RECV",
+	OP_SETLISTDYN: "SETLISTDYN",
+	OP_CALLTABLE:  "CALLTABLE",
+	OP_SETTOP:     "SETTOP",
 }
 
 // OpName returns the name of an opcode.

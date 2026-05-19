@@ -9,8 +9,11 @@ import (
 // DebugFrame describes one active runtime call. It is intentionally GScript
 // shaped rather than a Lua debug.getinfo clone.
 type DebugFrame struct {
-	Name string
-	Kind string
+	Name       string
+	Kind       string
+	SourceName string
+	Line       int
+	Column     int
 }
 
 // DebugHookOptions describes the coarse-grained GScript debug hook filters.
@@ -155,6 +158,17 @@ func DebugHookWants(opts DebugHookOptions, eventType, kind string) bool {
 
 func (interp *Interpreter) pushDebugFrame(name, kind string) {
 	interp.callStack = append(interp.callStack, DebugFrame{Name: name, Kind: kind})
+}
+
+func (interp *Interpreter) pushDebugFrameWithSource(name, kind, sourceName string, line, column int) {
+	frame := DebugFrame{
+		Name:       name,
+		Kind:       kind,
+		SourceName: sourceName,
+		Line:       line,
+		Column:     column,
+	}
+	interp.callStack = append(interp.callStack, frame)
 }
 
 func (interp *Interpreter) popDebugFrame() {
@@ -361,6 +375,13 @@ func debugFrameTable(index int, frame DebugFrame) *Table {
 	out.RawSetString("index", IntValue(int64(index)))
 	out.RawSetString("name", StringValue(frame.Name))
 	out.RawSetString("kind", StringValue(frame.Kind))
+	if frame.SourceName != "" {
+		out.RawSetString("sourceName", StringValue(frame.SourceName))
+	}
+	if frame.Line > 0 {
+		out.RawSetString("line", IntValue(int64(frame.Line)))
+		out.RawSetString("column", IntValue(int64(frame.Column)))
+	}
 	return out
 }
 
@@ -379,6 +400,13 @@ func debugFunctionInfo(fn Value) *Table {
 		}
 		out.RawSetString("name", StringValue(name))
 		out.RawSetString("kind", StringValue("script"))
+		if cl.Proto.SourceName != "" {
+			out.RawSetString("sourceName", StringValue(cl.Proto.SourceName))
+		}
+		if cl.Proto.Line > 0 {
+			out.RawSetString("line", IntValue(int64(cl.Proto.Line)))
+			out.RawSetString("column", IntValue(int64(cl.Proto.Column)))
+		}
 		out.RawSetString("params", IntValue(int64(len(cl.Proto.Params))))
 		out.RawSetString("vararg", BoolValue(cl.Proto.HasVarArg))
 		out.RawSetString("upvalues", IntValue(int64(len(cl.Upvalues))))
@@ -402,6 +430,12 @@ func formatDebugTraceback(message string, frames []DebugFrame) string {
 		b.WriteString(frame.Kind)
 		b.WriteString(" ")
 		b.WriteString(frame.Name)
+		if frame.SourceName != "" && frame.Line > 0 {
+			b.WriteString(" @ ")
+			b.WriteString(frame.SourceName)
+			b.WriteString(":")
+			b.WriteString(fmt.Sprintf("%d:%d", frame.Line, frame.Column))
+		}
 	}
 	return b.String()
 }

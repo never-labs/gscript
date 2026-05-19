@@ -1108,6 +1108,39 @@ func TestMultiReturnDeclarationWithPriorLocals(t *testing.T) {
 	expectGlobalInt(t, g, "result", 123)
 }
 
+func TestExplicitSpreadNestedCall(t *testing.T) {
+	g := compileAndRun(t, `
+		func pair() { return 10, 20 }
+		func sum(a, b, c, d) { return a + b + c + d }
+		result := sum(1, spread(pair()), 4)
+	`)
+	expectGlobalInt(t, g, "result", 35)
+}
+
+func TestExplicitTableSpreadNestedCall(t *testing.T) {
+	g := compileAndRun(t, `
+		func join(a, b, c, d) { return a .. b .. c .. d }
+		result := join("a", table.spread({"b", "c"}), "d")
+	`)
+	if got := g["result"]; !got.IsString() || got.Str() != "abcd" {
+		t.Fatalf("result = %v, want abcd", got)
+	}
+}
+
+func TestExplicitSpreadTableConstructor(t *testing.T) {
+	g := compileAndRun(t, `
+		func pair() { return 2, 3 }
+		t := {1, spread(pair()), 4, table.spread({5, 6})}
+	`)
+	tbl := g["t"].Table()
+	for i, want := range []int64{1, 2, 3, 4, 5, 6} {
+		got := tbl.RawGet(runtime.IntValue(int64(i + 1)))
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("t[%d] = %v, want %d", i+1, got, want)
+		}
+	}
+}
+
 func TestStringNumberCoercion(t *testing.T) {
 	// String-to-number coercion in arithmetic (Lua semantics)
 	g := compileAndRun(t, `

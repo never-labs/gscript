@@ -1011,7 +1011,7 @@ func (vm *VM) NewObjectNFromSlots(proto *FuncProto, ctorIdx, absDst, absStart in
 func protoHasNoCalls(proto *FuncProto) bool {
 	for _, inst := range proto.Code {
 		switch DecodeOp(inst) {
-		case OP_CALL, OP_YIELD, OP_RESUME, OP_TFORCALL, OP_GO:
+		case OP_CALL, OP_CALLTABLE, OP_YIELD, OP_RESUME, OP_TFORCALL, OP_GO:
 			return false
 		}
 	}

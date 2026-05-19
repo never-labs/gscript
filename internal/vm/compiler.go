@@ -227,6 +227,11 @@ func (c *compiler) emitReturn(a, b int) int {
 	return c.emitABC(OP_RETURN, a, b, 0, 0)
 }
 
+func (c *compiler) emitSpreadOp(op Opcode, a, b, cc int, line int) int {
+	c.proto.JITDisabled = true
+	return c.emitABC(op, a, b, cc, line)
+}
+
 func (c *compiler) patchJump(jmpPos int) {
 	target := len(c.proto.Code)
 	offset := target - jmpPos - 1
@@ -239,6 +244,46 @@ func (c *compiler) patchJumpTo(jmpPos int, target int) {
 }
 
 func (c *compiler) currentPC() int { return len(c.proto.Code) }
+
+func explicitSpreadExpr(expr ast.Expr) (ast.Expr, bool) {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return nil, false
+	}
+	if spreadExpr, ok := globalSpreadExpr(call); ok {
+		return spreadExpr, true
+	}
+	if isTableSpreadCall(call) {
+		return call, true
+	}
+	return nil, false
+}
+
+func globalSpreadExpr(call *ast.CallExpr) (ast.Expr, bool) {
+	if ident, ok := call.Func.(*ast.IdentExpr); ok && ident.Name == "spread" && len(call.Args) == 1 {
+		return call.Args[0], true
+	}
+	return nil, false
+}
+
+func isTableSpreadCall(call *ast.CallExpr) bool {
+	if field, ok := call.Func.(*ast.FieldExpr); ok {
+		if ident, ok := field.Table.(*ast.IdentExpr); ok && ident.Name == "table" &&
+			field.Field == "spread" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasExplicitSpread(exprs []ast.Expr) bool {
+	for _, expr := range exprs {
+		if _, ok := explicitSpreadExpr(expr); ok {
+			return true
+		}
+	}
+	return false
+}
 
 // --------------------------------------------------------------------
 // Loop management
@@ -844,6 +889,9 @@ func (c *compiler) compileCallStmt(s *ast.CallStmt) error {
 }
 
 func (c *compiler) compileCallExprDiscard(call *ast.CallExpr, line int) error {
+	if hasExplicitSpread(call.Args) {
+		return c.compileCallExprMulti(call, c.nextReg, 0)
+	}
 	if op, ok := c.staticCoroutineBuiltinOp(call); ok {
 		return c.compileCoroutineBuiltinCall(call, c.nextReg, -1, line, op)
 	}
@@ -1893,6 +1941,12 @@ func (c *compiler) compileUnaryExpr(e *ast.UnaryExpr, dest int) error {
 
 func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults int) error {
 	line := call.P.Line
+	if spreadExpr, ok := globalSpreadExpr(call); ok {
+		return c.compileExplicitSpreadExprMulti(spreadExpr, dest, nResults, line)
+	}
+	if hasExplicitSpread(call.Args) {
+		return c.compileCallExprWithExplicitSpread(call, dest, nResults)
+	}
 	if op, ok := c.staticCoroutineBuiltinOp(call); ok {
 		return c.compileCoroutineBuiltinCall(call, dest, nResults, line, op)
 	}
@@ -1943,6 +1997,80 @@ func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults i
 	}
 
 	c.emitABC(OP_CALL, funcReg, b, cc, line)
+
+	c.nextReg = savedReg
+	if nResults > 0 {
+		needed := dest + nResults
+		if needed > c.nextReg {
+			c.nextReg = needed
+			if c.nextReg > c.maxReg {
+				c.maxReg = c.nextReg
+			}
+		}
+	}
+	return nil
+}
+
+func (c *compiler) compileExplicitSpreadExprMulti(expr ast.Expr, dest int, nResults int, line int) error {
+	c.proto.JITDisabled = true
+	switch v := expr.(type) {
+	case *ast.CallExpr:
+		return c.compileCallExprMulti(v, dest, nResults)
+	case *ast.MethodCallExpr:
+		return c.compileMethodCallExprMulti(v, dest, nResults)
+	case *ast.VarArgExpr:
+		if nResults == -1 {
+			c.emitABC(OP_VARARG, dest, 0, 0, line)
+			return nil
+		}
+		c.emitABC(OP_VARARG, dest, nResults+1, 0, line)
+		return nil
+	default:
+		if nResults == 0 {
+			tmp := c.allocReg()
+			if err := c.compileExprTo(expr, tmp); err != nil {
+				return err
+			}
+			c.freeReg()
+			return nil
+		}
+		if err := c.compileExprTo(expr, dest); err != nil {
+			return err
+		}
+		if nResults == -1 {
+			c.emitSpreadOp(OP_SETTOP, dest+1, 0, 0, line)
+			return nil
+		}
+		for i := 1; i < nResults; i++ {
+			c.emitABC(OP_LOADNIL, dest+i, 0, 0, line)
+		}
+		return nil
+	}
+}
+
+func (c *compiler) compileCallExprWithExplicitSpread(call *ast.CallExpr, dest int, nResults int) error {
+	line := call.P.Line
+	savedReg := c.nextReg
+	c.nextReg = dest
+
+	funcReg := c.allocReg()
+	if err := c.compileExprTo(call.Func, funcReg); err != nil {
+		return err
+	}
+	argsTableReg := c.allocReg()
+	idxReg := c.allocReg()
+	c.emitABC(OP_NEWTABLE, argsTableReg, len(call.Args), 1, line)
+	c.emitAsBx(OP_LOADINT, idxReg, 1, line)
+	if err := c.compileExplicitSpreadArgList(argsTableReg, idxReg, call.Args, line); err != nil {
+		return err
+	}
+	c.emitArgCount(argsTableReg, idxReg, line)
+
+	cc := nResults + 1
+	if nResults == -1 {
+		cc = 0
+	}
+	c.emitSpreadOp(OP_CALLTABLE, funcReg, argsTableReg, cc, line)
 
 	c.nextReg = savedReg
 	if nResults > 0 {
@@ -2025,6 +2153,9 @@ func (c *compiler) compileCoroutineBuiltinCall(call *ast.CallExpr, dest int, nRe
 
 func (c *compiler) compileMethodCallExprMulti(call *ast.MethodCallExpr, dest int, nResults int) error {
 	line := call.P.Line
+	if hasExplicitSpread(call.Args) {
+		return c.compileMethodCallExprWithExplicitSpread(call, dest, nResults)
+	}
 	savedReg := c.nextReg
 
 	c.nextReg = dest
@@ -2090,6 +2221,115 @@ func (c *compiler) compileMethodCallExprMulti(call *ast.MethodCallExpr, dest int
 		}
 	}
 	return nil
+}
+
+func (c *compiler) compileMethodCallExprWithExplicitSpread(call *ast.MethodCallExpr, dest int, nResults int) error {
+	line := call.P.Line
+	savedReg := c.nextReg
+	c.nextReg = dest
+
+	selfReg := c.allocReg()
+	_ = c.allocReg()
+	objReg := c.allocReg()
+	if err := c.compileExprTo(call.Object, objReg); err != nil {
+		return err
+	}
+	c.emitMethodLookup(selfReg, objReg, c.stringConst(call.Method), line)
+	c.freeReg()
+
+	argsTableReg := c.allocReg()
+	idxReg := c.allocReg()
+	c.emitABC(OP_NEWTABLE, argsTableReg, len(call.Args)+1, 1, line)
+	c.emitAsBx(OP_LOADINT, idxReg, 1, line)
+	c.compileAppendSingle(argsTableReg, idxReg, selfReg+1, line)
+	if err := c.compileExplicitSpreadArgList(argsTableReg, idxReg, call.Args, line); err != nil {
+		return err
+	}
+	c.emitArgCount(argsTableReg, idxReg, line)
+
+	cc := nResults + 1
+	if nResults == -1 {
+		cc = 0
+	}
+	c.emitSpreadOp(OP_CALLTABLE, selfReg, argsTableReg, cc, line)
+
+	c.nextReg = savedReg
+	if nResults > 0 {
+		needed := dest + nResults
+		if needed > c.nextReg {
+			c.nextReg = needed
+			if c.nextReg > c.maxReg {
+				c.maxReg = c.nextReg
+			}
+		}
+	}
+	return nil
+}
+
+func (c *compiler) compileExplicitSpreadArgList(tableReg, idxReg int, args []ast.Expr, line int) error {
+	for _, arg := range args {
+		if spreadExpr, ok := explicitSpreadExpr(arg); ok {
+			if err := c.compileAppendSpread(tableReg, idxReg, spreadExpr, line); err != nil {
+				return err
+			}
+			continue
+		}
+		valueReg := c.allocReg()
+		if err := c.compileExprTo(arg, valueReg); err != nil {
+			return err
+		}
+		c.compileAppendSingle(tableReg, idxReg, valueReg, line)
+		c.freeReg()
+	}
+	return nil
+}
+
+func (c *compiler) compileAppendSingle(tableReg, idxReg, valueReg int, line int) {
+	c.emitABC(OP_SETTABLE, tableReg, idxReg, valueReg, line)
+	oneReg := c.allocReg()
+	c.emitAsBx(OP_LOADINT, oneReg, 1, line)
+	c.emitABC(OP_ADD, idxReg, idxReg, oneReg, line)
+	c.freeReg()
+}
+
+func (c *compiler) compileAppendSpread(tableReg, idxReg int, expr ast.Expr, line int) error {
+	switch v := expr.(type) {
+	case *ast.CallExpr:
+		valueReg := c.nextReg
+		if err := c.compileCallExprMulti(v, valueReg, -1); err != nil {
+			return err
+		}
+		c.emitSpreadOp(OP_SETLISTDYN, tableReg, idxReg, valueReg, line)
+		c.nextReg = valueReg
+	case *ast.MethodCallExpr:
+		valueReg := c.nextReg
+		if err := c.compileMethodCallExprMulti(v, valueReg, -1); err != nil {
+			return err
+		}
+		c.emitSpreadOp(OP_SETLISTDYN, tableReg, idxReg, valueReg, line)
+		c.nextReg = valueReg
+	case *ast.VarArgExpr:
+		valueReg := c.nextReg
+		c.emitABC(OP_VARARG, valueReg, 0, 0, line)
+		c.emitSpreadOp(OP_SETLISTDYN, tableReg, idxReg, valueReg, line)
+	default:
+		valueReg := c.allocReg()
+		if err := c.compileExprTo(expr, valueReg); err != nil {
+			return err
+		}
+		c.compileAppendSingle(tableReg, idxReg, valueReg, line)
+		c.freeReg()
+	}
+	return nil
+}
+
+func (c *compiler) emitArgCount(tableReg, idxReg int, line int) {
+	countReg := c.allocReg()
+	oneReg := c.allocReg()
+	c.emitAsBx(OP_LOADINT, oneReg, 1, line)
+	c.emitABC(OP_SUB, countReg, idxReg, oneReg, line)
+	c.emitABC(OP_SETFIELD, tableReg, c.stringConst("n"), countReg, line)
+	c.freeRegs(2)
 }
 
 func (c *compiler) emitMethodLookup(selfReg, objReg, methodK, line int) {
@@ -2159,6 +2399,9 @@ type staticStringField struct {
 
 func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 	line := e.P.Line
+	if hasExplicitSpreadTableField(e) {
+		return c.compileTableLitExprWithExplicitSpread(e, dest, line)
+	}
 	if ok, err := c.compileTwoFieldTableLitExpr(e, dest, line); ok || err != nil {
 		return err
 	}
@@ -2303,6 +2546,90 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 		}
 	}
 
+	return nil
+}
+
+func hasExplicitSpreadTableField(e *ast.TableLitExpr) bool {
+	for _, f := range e.Fields {
+		if f.Key == nil {
+			if _, ok := explicitSpreadExpr(f.Value); ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c *compiler) compileTableLitExprWithExplicitSpread(e *ast.TableLitExpr, dest int, line int) error {
+	arrayCount := 0
+	hashCount := 0
+	for _, f := range e.Fields {
+		if f.Key == nil {
+			arrayCount++
+		} else if !isNilLiteral(f.Value) {
+			hashCount++
+		}
+	}
+	c.emitABC(OP_NEWTABLE, dest, arrayCount, hashCount, line)
+
+	tempBase := c.nextReg
+	idxReg := c.allocReg()
+	c.emitAsBx(OP_LOADINT, idxReg, 1, line)
+
+	for _, f := range e.Fields {
+		if f.Key == nil {
+			if spreadExpr, ok := explicitSpreadExpr(f.Value); ok {
+				if err := c.compileAppendSpread(dest, idxReg, spreadExpr, line); err != nil {
+					return err
+				}
+				continue
+			}
+			valueReg := c.allocReg()
+			if err := c.compileExprTo(f.Value, valueReg); err != nil {
+				return err
+			}
+			c.compileAppendSingle(dest, idxReg, valueReg, line)
+			c.freeReg()
+			continue
+		}
+
+		if strKey, ok := f.Key.(*ast.StringLit); ok {
+			if isNilLiteral(f.Value) {
+				continue
+			}
+			fieldK := c.stringConst(strKey.Value)
+			valReg := c.allocReg()
+			if err := c.compileExprTo(f.Value, valReg); err != nil {
+				return err
+			}
+			c.emitABC(OP_SETFIELD, dest, fieldK, valReg, line)
+			c.freeReg()
+		} else if identKey, ok := f.Key.(*ast.IdentExpr); ok {
+			if isNilLiteral(f.Value) {
+				continue
+			}
+			fieldK := c.stringConst(identKey.Name)
+			valReg := c.allocReg()
+			if err := c.compileExprTo(f.Value, valReg); err != nil {
+				return err
+			}
+			c.emitABC(OP_SETFIELD, dest, fieldK, valReg, line)
+			c.freeReg()
+		} else {
+			keyReg := c.allocReg()
+			if err := c.compileExprTo(f.Key, keyReg); err != nil {
+				return err
+			}
+			valReg := c.allocReg()
+			if err := c.compileExprTo(f.Value, valReg); err != nil {
+				return err
+			}
+			c.emitABC(OP_SETTABLE, dest, keyReg, valReg, line)
+			c.freeRegs(2)
+		}
+	}
+
+	c.nextReg = tempBase
 	return nil
 }
 
@@ -2627,6 +2954,8 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("SETFIELD   R%d K%d R%d", a, b, cc)
 		case OP_SETLIST:
 			desc = fmt.Sprintf("SETLIST    R%d count=%d batch=%d", a, b, cc)
+		case OP_SETLISTDYN:
+			desc = fmt.Sprintf("SETLISTDYN R%d idx=R%d values=R%d..top", a, b, cc)
 		case OP_APPEND:
 			desc = fmt.Sprintf("APPEND     R%d R%d", a, b)
 		case OP_ADD:
@@ -2664,6 +2993,8 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("JMP        %d  ; to %d", sbx, target)
 		case OP_CALL:
 			desc = fmt.Sprintf("CALL       R%d B=%d C=%d", a, b, cc)
+		case OP_CALLTABLE:
+			desc = fmt.Sprintf("CALLTABLE  R%d args=R%d C=%d", a, b, cc)
 		case OP_YIELD:
 			desc = fmt.Sprintf("YIELD      R%d B=%d C=%d", a, b, cc)
 		case OP_RESUME:
@@ -2694,6 +3025,8 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("SEND       R%d <- R%d", a, b)
 		case OP_RECV:
 			desc = fmt.Sprintf("RECV       R%d = <-R%d", a, b)
+		case OP_SETTOP:
+			desc = fmt.Sprintf("SETTOP     R%d", a)
 		default:
 			desc = fmt.Sprintf("%-10s %d %d %d", OpName(op), a, b, cc)
 		}

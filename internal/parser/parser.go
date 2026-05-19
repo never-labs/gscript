@@ -797,8 +797,8 @@ func (p *Parser) canStartExpr() bool {
 // 2. && (and)
 // 3. == != < <= > >=  (comparison)
 // 4. .. (concat) - RIGHT associative
-// 5. + -  (additive)
-// 6. * / %  (multiplicative)
+// 5. + - | ^  (additive / bitwise-or-xor)
+// 6. * / % << >> & &^  (multiplicative / bitwise-and-shift)
 // 7. ** (pow) - RIGHT associative
 // 8. Unary: - ! #
 // 9. Postfix: . [] ()
@@ -904,7 +904,7 @@ func (p *Parser) parseAdditive() (ast.Expr, error) {
 		return nil, err
 	}
 
-	for p.match(lexer.TOKEN_PLUS, lexer.TOKEN_MINUS) {
+	for p.match(lexer.TOKEN_PLUS, lexer.TOKEN_MINUS, lexer.TOKEN_BIT_OR, lexer.TOKEN_BIT_XOR) {
 		opTok := p.advance()
 		right, err := p.parseMultiplicative()
 		if err != nil {
@@ -926,7 +926,8 @@ func (p *Parser) parseMultiplicative() (ast.Expr, error) {
 		return nil, err
 	}
 
-	for p.match(lexer.TOKEN_STAR, lexer.TOKEN_SLASH, lexer.TOKEN_PERCENT) {
+	for p.match(lexer.TOKEN_STAR, lexer.TOKEN_SLASH, lexer.TOKEN_PERCENT,
+		lexer.TOKEN_SHL, lexer.TOKEN_SHR, lexer.TOKEN_BIT_AND, lexer.TOKEN_BIT_AND_NOT) {
 		opTok := p.advance()
 		right, err := p.parseUnary()
 		if err != nil {
@@ -969,7 +970,7 @@ func (p *Parser) parsePower() (ast.Expr, error) {
 }
 
 func (p *Parser) parseUnary() (ast.Expr, error) {
-	if p.match(lexer.TOKEN_MINUS, lexer.TOKEN_NOT, lexer.TOKEN_LEN) {
+	if p.match(lexer.TOKEN_MINUS, lexer.TOKEN_NOT, lexer.TOKEN_LEN, lexer.TOKEN_BIT_XOR) {
 		opTok := p.advance()
 		operand, err := p.parseUnary()
 		if err != nil {

@@ -1544,6 +1544,29 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				t.RawSetInt(int64(offset+i), vm.regs[base+a+i])
 			}
 
+		case OP_SETLISTDYN:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+			t := vm.regs[base+a].Table()
+			if t == nil {
+				return nil, fmt.Errorf("SETLISTDYN on non-table")
+			}
+			idxVal := vm.regs[base+b]
+			if !idxVal.IsInt() {
+				return nil, fmt.Errorf("SETLISTDYN index is %s", idxVal.TypeName())
+			}
+			start := idxVal.Int()
+			valueStart := base + c
+			count := vm.top - valueStart
+			if count < 0 {
+				count = 0
+			}
+			for i := 0; i < count; i++ {
+				t.RawSetInt(start+int64(i), vm.regs[valueStart+i])
+			}
+			vm.regs[base+b] = runtime.IntValue(start + int64(count))
+
 		case OP_APPEND:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -1933,6 +1956,35 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				return nil, wrapLineErr(frame, err)
 			}
 			vm.finishCoroutineResumeToSlots(base+a, c, okResult, values)
+
+		case OP_CALLTABLE:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			c := DecodeC(inst)
+
+			fnVal := vm.regs[base+a]
+			argsVal := vm.regs[base+b]
+			if !argsVal.IsTable() {
+				return nil, fmt.Errorf("CALLTABLE args on non-table")
+			}
+			argsTable := argsVal.Table()
+			nVal := argsTable.RawGet(runtime.StringValue("n"))
+			nArgs := int64(argsTable.Length())
+			if nVal.IsInt() {
+				nArgs = nVal.Int()
+			}
+			if nArgs < 0 {
+				nArgs = 0
+			}
+			args := make([]runtime.Value, int(nArgs))
+			for i := int64(1); i <= nArgs; i++ {
+				args[i-1] = argsTable.RawGetInt(i)
+			}
+			results, err := vm.callValue(fnVal, args)
+			if err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
+			vm.writeCallResults(base+a, c, results)
 
 		case OP_CALL:
 			a := DecodeA(inst)
@@ -2467,6 +2519,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 				}
 			}
+
+		case OP_SETTOP:
+			a := DecodeA(inst)
+			vm.top = base + a
 
 		case OP_SELF:
 			a := DecodeA(inst)

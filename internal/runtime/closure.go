@@ -9,10 +9,13 @@ import (
 // FuncProto holds the parsed function information (shared across all closures
 // created from the same source function definition).
 type FuncProto struct {
-	Params    []string // parameter names
-	HasVarArg bool     // whether the last param is vararg
-	Body      *ast.BlockStmt
-	Name      string // for error messages
+	Params     []string // parameter names
+	HasVarArg  bool     // whether the last param is vararg
+	Body       *ast.BlockStmt
+	Name       string // for error messages
+	SourceName string // diagnostic source name
+	Line       int    // declaration line
+	Column     int    // declaration column
 }
 
 // Upvalue is a shared mutable reference to a Value.

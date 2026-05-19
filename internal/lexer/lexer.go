@@ -333,6 +333,10 @@ func (l *Lexer) readOperator(startLine, startCol int) (Token, error) {
 			l.advance()
 			return makeToken(TOKEN_LE, "<="), nil
 		}
+		if l.peek() == '<' {
+			l.advance()
+			return makeToken(TOKEN_SHL, "<<"), nil
+		}
 		if l.peek() == '-' {
 			l.advance()
 			return makeToken(TOKEN_ARROW, "<-"), nil
@@ -344,6 +348,10 @@ func (l *Lexer) readOperator(startLine, startCol int) (Token, error) {
 		if l.peek() == '=' {
 			l.advance()
 			return makeToken(TOKEN_GE, ">="), nil
+		}
+		if l.peek() == '>' {
+			l.advance()
+			return makeToken(TOKEN_SHR, ">>"), nil
 		}
 		return makeToken(TOKEN_GT, ">"), nil
 
@@ -397,7 +405,11 @@ func (l *Lexer) readOperator(startLine, startCol int) (Token, error) {
 			l.advance()
 			return makeToken(TOKEN_AND, "&&"), nil
 		}
-		return Token{}, fmt.Errorf("unexpected character '&' at %d:%d (did you mean '&&'?)", startLine, startCol)
+		if l.peek() == '^' {
+			l.advance()
+			return makeToken(TOKEN_BIT_AND_NOT, "&^"), nil
+		}
+		return makeToken(TOKEN_BIT_AND, "&"), nil
 
 	case '|':
 		l.advance()
@@ -405,7 +417,11 @@ func (l *Lexer) readOperator(startLine, startCol int) (Token, error) {
 			l.advance()
 			return makeToken(TOKEN_OR, "||"), nil
 		}
-		return Token{}, fmt.Errorf("unexpected character '|' at %d:%d (did you mean '||'?)", startLine, startCol)
+		return makeToken(TOKEN_BIT_OR, "|"), nil
+
+	case '^':
+		l.advance()
+		return makeToken(TOKEN_BIT_XOR, "^"), nil
 
 	case '.':
 		l.advance()

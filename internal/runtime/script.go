@@ -59,7 +59,7 @@ func (interp *Interpreter) NewScriptEnvironment(vars map[string]Value, isolated 
 // executes the generated program and returns any top-level return values.
 func (interp *Interpreter) CompileString(src string, options ...ScriptOption) (Value, error) {
 	opts := interp.scriptOptions(options...)
-	prog, err := parseProgram(src)
+	prog, err := parseProgram(src, opts.SourceName)
 	if err != nil {
 		return NilValue(), err
 	}
@@ -69,7 +69,7 @@ func (interp *Interpreter) CompileString(src string, options ...ScriptOption) (V
 // EvalString parses and immediately executes src with optional env controls.
 func (interp *Interpreter) EvalString(src string, options ...ScriptOption) ([]Value, error) {
 	opts := interp.scriptOptions(options...)
-	prog, err := parseProgram(src)
+	prog, err := parseProgram(src, opts.SourceName)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (interp *Interpreter) LoadFile(filename string, options ...ScriptOption) (V
 			opts.ScriptDir = filepath.Dir(abs)
 		}
 	}
-	prog, err := parseProgram(string(src))
+	prog, err := parseProgram(string(src), opts.SourceName)
 	if err != nil {
 		return NilValue(), err
 	}
@@ -108,14 +108,14 @@ func (interp *Interpreter) RunFile(filename string, options ...ScriptOption) ([]
 	return interp.callFunction(fn, nil)
 }
 
-func parseProgram(src string) (*ast.Program, error) {
+func parseProgram(src string, sourceName string) (*ast.Program, error) {
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
-		return nil, err
+		return nil, wrapCompileError(err, sourceName)
 	}
 	prog, err := parser.New(tokens).Parse()
 	if err != nil {
-		return nil, err
+		return nil, wrapCompileError(err, sourceName)
 	}
 	return prog, nil
 }
@@ -152,15 +152,18 @@ func (interp *Interpreter) execProgramWithOptions(prog *ast.Program, opts Script
 
 	oldGlobals := interp.globals
 	oldScriptDir := interp.scriptDir
+	oldSourceName := interp.currentSourceName
 	if env != nil {
 		interp.globals = env
 	}
 	if opts.ScriptDir != "" {
 		interp.scriptDir = opts.ScriptDir
 	}
+	interp.currentSourceName = opts.SourceName
 	defer func() {
 		interp.globals = oldGlobals
 		interp.scriptDir = oldScriptDir
+		interp.currentSourceName = oldSourceName
 		if syncBack != nil {
 			syncBack()
 		}
@@ -259,7 +262,7 @@ func buildScriptLib(interp *Interpreter) *Table {
 		if err != nil {
 			return nil, err
 		}
-		prog, err := parseProgram(args[0].Str())
+		prog, err := parseProgram(args[0].Str(), cfg.opts.SourceName)
 		if err != nil {
 			return nil, err
 		}
@@ -334,7 +337,7 @@ func (interp *Interpreter) compileStringWithConfig(src string, opt Value, source
 	if err != nil {
 		return NilValue(), err
 	}
-	prog, err := parseProgram(src)
+	prog, err := parseProgram(src, cfg.opts.SourceName)
 	if err != nil {
 		return NilValue(), err
 	}
@@ -367,16 +370,43 @@ func (interp *Interpreter) scriptConfigFromValue(opt Value, sourceName string) (
 	if opt.IsNil() {
 		return cfg, nil
 	}
+	if opt.IsString() {
+		cfg.opts.SourceName = opt.Str()
+		return cfg, nil
+	}
 	if !opt.IsTable() {
-		return cfg, fmt.Errorf("script environment options must be a table")
+		return cfg, fmt.Errorf("script environment options must be a table, string, or nil")
 	}
 
 	tbl := opt.Table()
+	if v := tbl.RawGetString("sourceName"); !v.IsNil() {
+		if !v.IsString() {
+			return cfg, fmt.Errorf("script environment option 'sourceName' must be a string")
+		}
+		cfg.opts.SourceName = v.Str()
+	}
+	if v := tbl.RawGetString("source"); !v.IsNil() {
+		if !v.IsString() {
+			return cfg, fmt.Errorf("script environment option 'source' must be a string")
+		}
+		cfg.opts.SourceName = v.Str()
+	}
+	if v := tbl.RawGetString("scriptDir"); !v.IsNil() {
+		if !v.IsString() {
+			return cfg, fmt.Errorf("script environment option 'scriptDir' must be a string")
+		}
+		cfg.opts.ScriptDir = v.Str()
+	}
 	envVal := tbl.RawGetString("env")
 	if envVal.IsNil() {
-		envVal = opt
+		if !scriptOptionsTableHasConfigKeys(tbl) {
+			envVal = opt
+		}
 	} else if !envVal.IsTable() {
 		return cfg, fmt.Errorf("script environment option 'env' must be a table")
+	}
+	if envVal.IsNil() {
+		return cfg, nil
 	}
 	envTable := envVal.Table()
 	sandbox := tbl.RawGetString("sandbox").Truthy()
@@ -399,6 +429,15 @@ func scriptEnvOptions(seed *Table, sandbox bool) *Table {
 	opts.RawSetString("env", TableValue(seed))
 	opts.RawSetString("sandbox", BoolValue(sandbox))
 	return opts
+}
+
+func scriptOptionsTableHasConfigKeys(tbl *Table) bool {
+	for _, key := range []string{"env", "sandbox", "sourceName", "source", "scriptDir"} {
+		if !tbl.RawGetString(key).IsNil() {
+			return true
+		}
+	}
+	return false
 }
 
 func environmentFromTable(tbl *Table, parent *Environment) *Environment {

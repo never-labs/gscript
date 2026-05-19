@@ -69,6 +69,14 @@ const (
 	TOKEN_OR  // ||
 	TOKEN_NOT // !
 
+	// Bitwise operators
+	TOKEN_BIT_AND     // &
+	TOKEN_BIT_OR      // |
+	TOKEN_BIT_XOR     // ^
+	TOKEN_BIT_AND_NOT // &^
+	TOKEN_SHL         // <<
+	TOKEN_SHR         // >>
+
 	// String/misc operators
 	TOKEN_CONCAT   // ..
 	TOKEN_LEN      // #
@@ -144,6 +152,13 @@ var tokenNames = map[TokenType]string{
 	TOKEN_AND: "AND",
 	TOKEN_OR:  "OR",
 	TOKEN_NOT: "NOT",
+
+	TOKEN_BIT_AND:     "BIT_AND",
+	TOKEN_BIT_OR:      "BIT_OR",
+	TOKEN_BIT_XOR:     "BIT_XOR",
+	TOKEN_BIT_AND_NOT: "BIT_AND_NOT",
+	TOKEN_SHL:         "SHL",
+	TOKEN_SHR:         "SHR",
 
 	TOKEN_CONCAT:   "CONCAT",
 	TOKEN_LEN:      "LEN",

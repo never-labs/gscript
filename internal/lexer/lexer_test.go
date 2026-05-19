@@ -105,6 +105,17 @@ func TestLogicOperators(t *testing.T) {
 	})
 }
 
+func TestBitwiseOperators(t *testing.T) {
+	expectTokens(t, "& | ^ &^ << >>", []Token{
+		{Type: TOKEN_BIT_AND, Value: "&"},
+		{Type: TOKEN_BIT_OR, Value: "|"},
+		{Type: TOKEN_BIT_XOR, Value: "^"},
+		{Type: TOKEN_BIT_AND_NOT, Value: "&^"},
+		{Type: TOKEN_SHL, Value: "<<"},
+		{Type: TOKEN_SHR, Value: ">>"},
+	})
+}
+
 func TestIncrementDecrement(t *testing.T) {
 	expectTokens(t, "++ --", []Token{
 		{Type: TOKEN_INC, Value: "++"},

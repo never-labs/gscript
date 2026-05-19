@@ -188,9 +188,9 @@ func buildTableLib() *Table {
 	})
 
 	// table.unpack(t [, i [, j]]) -> values
-	set("unpack", func(args []Value) ([]Value, error) {
+	tableUnpack := func(name string, args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.unpack' (table expected)")
+			return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
 		}
 		tbl := args[0].Table()
 		i := int64(1)
@@ -206,7 +206,9 @@ func buildTableLib() *Table {
 			result = append(result, tbl.RawGet(IntValue(k)))
 		}
 		return result, nil
-	})
+	}
+	set("unpack", func(args []Value) ([]Value, error) { return tableUnpack("unpack", args) })
+	set("spread", func(args []Value) ([]Value, error) { return tableUnpack("spread", args) })
 
 	// table.move(a1, f, e, t [, a2]) -> a2
 	set("move", func(args []Value) ([]Value, error) {

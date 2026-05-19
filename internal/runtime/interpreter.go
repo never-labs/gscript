@@ -16,19 +16,20 @@ import (
 
 // Interpreter is the tree-walking evaluator for GScript programs.
 type Interpreter struct {
-	globals    *Environment
-	output     []string         // captured print output (for testing)
-	currentCo  *Coroutine       // non-nil when running inside a coroutine
-	modules    map[string]Value // require() cache
-	stringMeta *Table           // metatable for string values (__index → string lib)
-	scriptDir  string           // directory of the main script (for require path resolution)
-	args       []string         // current script entrypoint args: [0]=script, [1:]=user args
-	callStack  []DebugFrame     // active runtime calls, oldest to newest
-	deferStack [][]deferredCall // active function-scope deferred calls
-	debugHook  Value            // optional GScript diagnostic hook
-	debugOpts  DebugHookOptions // filters for debugHook
-	debugSink  Value            // optional explicit diagnostic sink
-	debugBusy  bool             // prevents debug hooks from recursively firing
+	globals           *Environment
+	output            []string         // captured print output (for testing)
+	currentCo         *Coroutine       // non-nil when running inside a coroutine
+	modules           map[string]Value // require() cache
+	stringMeta        *Table           // metatable for string values (__index → string lib)
+	scriptDir         string           // directory of the main script (for require path resolution)
+	currentSourceName string           // source name for diagnostics while executing parsed source
+	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
+	callStack         []DebugFrame     // active runtime calls, oldest to newest
+	deferStack        [][]deferredCall // active function-scope deferred calls
+	debugHook         Value            // optional GScript diagnostic hook
+	debugOpts         DebugHookOptions // filters for debugHook
+	debugSink         Value            // optional explicit diagnostic sink
+	debugBusy         bool             // prevents debug hooks from recursively firing
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -458,6 +459,13 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, &LuaError{Value: errVal}
 			}
 			return args, nil // return all args on success
+		},
+	}))
+
+	interp.globals.Define("spread", FunctionValue(&GoFunction{
+		Name: "spread",
+		Fn: func(args []Value) ([]Value, error) {
+			return args, nil
 		},
 	}))
 
@@ -1111,6 +1119,14 @@ func (interp *Interpreter) execBlockInEnv(block *ast.BlockStmt, env *Environment
 
 // execStmt dispatches a single statement.
 func (interp *Interpreter) execStmt(stmt ast.Stmt, env *Environment) ([]Value, bool, bool, bool, error) {
+	retVals, isRet, isBrk, isCont, err := interp.execStmtRaw(stmt, env)
+	if err != nil {
+		return nil, false, false, false, interp.wrapRuntimeError(err, stmt.GetPos())
+	}
+	return retVals, isRet, isBrk, isCont, nil
+}
+
+func (interp *Interpreter) execStmtRaw(stmt ast.Stmt, env *Environment) ([]Value, bool, bool, bool, error) {
 	switch s := stmt.(type) {
 	case *ast.DeclareStmt:
 		return interp.execDeclare(s, env)
@@ -1642,8 +1658,11 @@ func (interp *Interpreter) execReturn(s *ast.ReturnStmt, env *Environment) ([]Va
 // ------------------------------------------------------------------
 func (interp *Interpreter) execFuncDecl(s *ast.FuncDeclStmt, env *Environment) ([]Value, bool, bool, bool, error) {
 	proto := &FuncProto{
-		Name: s.Name,
-		Body: s.Body,
+		Name:       s.Name,
+		Body:       s.Body,
+		SourceName: interp.currentSourceName,
+		Line:       s.P.Line,
+		Column:     s.P.Column,
 	}
 	paramNames := make([]string, 0, len(s.Params))
 	for _, p := range s.Params {
@@ -1682,6 +1701,14 @@ func (interp *Interpreter) execFuncDecl(s *ast.FuncDeclStmt, env *Environment) (
 // evalExpr evaluates an expression and returns a slice of Values.
 // Most expressions return a single-element slice; CallExpr may return multiple.
 func (interp *Interpreter) evalExpr(expr ast.Expr, env *Environment) ([]Value, error) {
+	vals, err := interp.evalExprRaw(expr, env)
+	if err != nil {
+		return nil, interp.wrapRuntimeError(err, expr.GetPos())
+	}
+	return vals, nil
+}
+
+func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value, error) {
 	switch e := expr.(type) {
 	case *ast.NumberLit:
 		v, err := parseNumber(e.Value)
@@ -1838,6 +1865,14 @@ func (interp *Interpreter) evalExprList(exprs []ast.Expr, env *Environment) ([]V
 	}
 	var result []Value
 	for i, expr := range exprs {
+		if spreadExpr, ok := explicitSpreadExpr(expr); ok {
+			vals, err := interp.evalExpr(spreadExpr, env)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, vals...)
+			continue
+		}
 		vals, err := interp.evalExpr(expr, env)
 		if err != nil {
 			return nil, err
@@ -1855,6 +1890,26 @@ func (interp *Interpreter) evalExprList(exprs []ast.Expr, env *Environment) ([]V
 		}
 	}
 	return result, nil
+}
+
+// explicitSpreadExpr recognizes GScript's explicit multi-value expansion forms.
+// spread(expr) expands expr's values, while table.spread is an ordinary
+// multi-return call that opts in to expansion at any list position.
+func explicitSpreadExpr(expr ast.Expr) (ast.Expr, bool) {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok {
+		return nil, false
+	}
+	if ident, ok := call.Func.(*ast.IdentExpr); ok && ident.Name == "spread" && len(call.Args) == 1 {
+		return call.Args[0], true
+	}
+	if field, ok := call.Func.(*ast.FieldExpr); ok {
+		if ident, ok := field.Table.(*ast.IdentExpr); ok && ident.Name == "table" &&
+			field.Field == "spread" {
+			return call, true
+		}
+	}
+	return nil, false
 }
 
 // ------------------------------------------------------------------
@@ -1895,6 +1950,8 @@ func (interp *Interpreter) evalBinary(e *ast.BinaryExpr, env *Environment) (Valu
 	switch e.Op {
 	case "+", "-", "*", "/", "%", "**":
 		return interp.arith(e.Op, left, right)
+	case "&", "|", "^", "&^", "<<", ">>":
+		return interp.bitwise(e.Op, left, right)
 	case "..":
 		return interp.concat(left, right)
 	case "==":
@@ -1937,6 +1994,46 @@ func (interp *Interpreter) evalBinary(e *ast.BinaryExpr, env *Environment) (Valu
 		return BoolValue(res), nil
 	default:
 		return NilValue(), fmt.Errorf("unknown binary operator: %s", e.Op)
+	}
+}
+
+func (interp *Interpreter) bitwise(op string, left, right Value) (Value, error) {
+	l, lok := left.ToNumber()
+	r, rok := right.ToNumber()
+	if !lok || !rok {
+		return NilValue(), fmt.Errorf("attempt to perform bitwise operation on a %s value", map[bool]string{true: right.TypeName(), false: left.TypeName()}[lok])
+	}
+	a, b := toInt(l), toInt(r)
+	switch op {
+	case "&":
+		return IntValue(a & b), nil
+	case "|":
+		return IntValue(a | b), nil
+	case "^":
+		return IntValue(a ^ b), nil
+	case "&^":
+		return IntValue(a &^ b), nil
+	case "<<":
+		if b < 0 {
+			return NilValue(), fmt.Errorf("negative shift count")
+		}
+		if b >= 64 {
+			return IntValue(0), nil
+		}
+		return IntValue(int64(uint64(a) << uint(b))), nil
+	case ">>":
+		if b < 0 {
+			return NilValue(), fmt.Errorf("negative shift count")
+		}
+		if b >= 64 {
+			if a < 0 {
+				return IntValue(-1), nil
+			}
+			return IntValue(0), nil
+		}
+		return IntValue(a >> uint(b)), nil
+	default:
+		return NilValue(), fmt.Errorf("unknown bitwise operator: %s", op)
 	}
 }
 
@@ -2255,6 +2352,12 @@ func (interp *Interpreter) evalUnary(e *ast.UnaryExpr, env *Environment) (Value,
 		default:
 			return NilValue(), fmt.Errorf("attempt to get length of a %s value", operand.TypeName())
 		}
+	case "^":
+		n, ok := operand.ToNumber()
+		if !ok {
+			return NilValue(), fmt.Errorf("attempt to perform bitwise operation on a %s value", operand.TypeName())
+		}
+		return IntValue(^toInt(n)), nil
 	default:
 		return NilValue(), fmt.Errorf("unknown unary operator: %s", e.Op)
 	}
@@ -2371,9 +2474,16 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	if name == "" {
 		name = "<anonymous>"
 	}
-	interp.pushDebugFrame(name, "script")
+	interp.pushDebugFrameWithSource(name, "script", proto.SourceName, proto.Line, proto.Column)
 	defer interp.popDebugFrame()
 	interp.pushDeferFrame()
+	oldSourceName := interp.currentSourceName
+	if proto.SourceName != "" {
+		interp.currentSourceName = proto.SourceName
+	}
+	defer func() {
+		interp.currentSourceName = oldSourceName
+	}()
 	if err := interp.emitDebugHook("call", "script", name, NilValue()); err != nil {
 		_ = interp.runAndPopDeferFrame()
 		return nil, err
@@ -2433,8 +2543,11 @@ func (interp *Interpreter) CallFunction(fn Value, args []Value) ([]Value, error)
 // ------------------------------------------------------------------
 func (interp *Interpreter) makeClosure(params []ast.FuncParam, body *ast.BlockStmt, name string, env *Environment) Value {
 	proto := &FuncProto{
-		Name: name,
-		Body: body,
+		Name:       name,
+		Body:       body,
+		SourceName: interp.currentSourceName,
+		Line:       body.P.Line,
+		Column:     body.P.Column,
 	}
 	paramNames := make([]string, 0, len(params))
 	for _, p := range params {
@@ -2474,6 +2587,17 @@ func (interp *Interpreter) evalTableLit(e *ast.TableLitExpr, env *Environment) (
 	for i, field := range e.Fields {
 		if field.Key == nil {
 			// Array-style (positional)
+			if spreadExpr, ok := explicitSpreadExpr(field.Value); ok {
+				vals, err := interp.evalExpr(spreadExpr, env)
+				if err != nil {
+					return NilValue(), err
+				}
+				for _, v := range vals {
+					tbl.RawSet(IntValue(arrayIdx), v)
+					arrayIdx++
+				}
+				continue
+			}
 			var val Value
 			var err error
 			if i == len(e.Fields)-1 {
