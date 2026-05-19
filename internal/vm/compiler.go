@@ -19,6 +19,7 @@ func Compile(prog *ast.Program) (*FuncProto, error) {
 		return nil, err
 	}
 	c := newCompiler(nil, "<main>", 0, false)
+	c.collectFunctionArities(prog.Stmts)
 	c.collectLabelDepths(prog.Stmts, c.depth)
 	for _, stmt := range prog.Stmts {
 		if err := c.compileStmt(stmt); err != nil {
@@ -71,6 +72,8 @@ type compiler struct {
 	labels         map[string]compiledLabel
 	labelDepths    map[string]int
 	gotos          []compiledGoto
+	funcArities    map[string]functionArity
+	arityScopes    []map[string]*functionArity
 }
 
 type compiledLabel struct {
@@ -86,7 +89,19 @@ type compiledGoto struct {
 	line  int
 }
 
+type functionArity struct {
+	numParams int
+	vararg    bool
+}
+
 func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compiler {
+	var arities map[string]functionArity
+	if parent != nil {
+		arities = parent.funcArities
+	}
+	if arities == nil {
+		arities = make(map[string]functionArity)
+	}
 	return &compiler{
 		parent: parent,
 		proto: &FuncProto{
@@ -96,6 +111,7 @@ func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compil
 		isVarArg:    isVarArg,
 		labels:      make(map[string]compiledLabel),
 		labelDepths: make(map[string]int),
+		funcArities: arities,
 	}
 }
 
@@ -103,6 +119,49 @@ func newCompiler(parent *compiler, name string, line int, isVarArg bool) *compil
 // Declarations at this level create globals rather than locals.
 func (c *compiler) isMainTopLevel() bool {
 	return c.parent == nil && c.depth == 0
+}
+
+func (c *compiler) collectFunctionArities(stmts []ast.Stmt) {
+	if c == nil || c.funcArities == nil {
+		return
+	}
+	for _, stmt := range stmts {
+		fn, ok := stmt.(*ast.FuncDeclStmt)
+		if !ok {
+			continue
+		}
+		numParams, vararg := countFixedFunctionParams(fn.Params)
+		c.setFunctionArity(fn.Name, functionArity{numParams: numParams, vararg: vararg})
+	}
+}
+
+func (c *compiler) setFunctionArity(name string, arity functionArity) {
+	if c == nil || c.funcArities == nil || name == "" {
+		return
+	}
+	if len(c.arityScopes) > 0 {
+		scope := c.arityScopes[len(c.arityScopes)-1]
+		if _, recorded := scope[name]; !recorded {
+			if prev, ok := c.funcArities[name]; ok {
+				prevCopy := prev
+				scope[name] = &prevCopy
+			} else {
+				scope[name] = nil
+			}
+		}
+	}
+	c.funcArities[name] = arity
+}
+
+func countFixedFunctionParams(params []ast.FuncParam) (int, bool) {
+	numFixedParams := 0
+	for _, p := range params {
+		if p.IsVarArg {
+			return numFixedParams, true
+		}
+		numFixedParams++
+	}
+	return numFixedParams, false
 }
 
 // --------------------------------------------------------------------
@@ -134,7 +193,10 @@ func (c *compiler) freeRegs(n int) { c.nextReg -= n }
 // Scoping
 // --------------------------------------------------------------------
 
-func (c *compiler) enterScope() { c.depth++ }
+func (c *compiler) enterScope() {
+	c.depth++
+	c.arityScopes = append(c.arityScopes, make(map[string]*functionArity))
+}
 
 func (c *compiler) leaveScope() {
 	hasCaptured := false
@@ -158,6 +220,17 @@ func (c *compiler) leaveScope() {
 	c.locals = c.locals[:len(c.locals)-count]
 	if count > 0 {
 		c.freeRegs(count)
+	}
+	if len(c.arityScopes) > 0 {
+		scope := c.arityScopes[len(c.arityScopes)-1]
+		for name, prev := range scope {
+			if prev == nil {
+				delete(c.funcArities, name)
+			} else {
+				c.funcArities[name] = *prev
+			}
+		}
+		c.arityScopes = c.arityScopes[:len(c.arityScopes)-1]
 	}
 	c.depth--
 }
@@ -1792,6 +1865,7 @@ func (c *compiler) compileFuncDeclStmt(s *ast.FuncDeclStmt) error {
 
 func (c *compiler) compileBlockStmt(s *ast.BlockStmt) error {
 	c.enterScope()
+	c.collectFunctionArities(s.Stmts)
 	for _, st := range s.Stmts {
 		if err := c.compileStmt(st); err != nil {
 			return err
@@ -2225,7 +2299,8 @@ func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults i
 	for i, arg := range call.Args {
 		argReg := c.allocReg()
 		savedArgTop := c.nextReg
-		if i == nArgs-1 {
+		expandFinalArg := i == nArgs-1 && !c.callTargetsFixedArityFunction(call)
+		if expandFinalArg {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
 				lastArgIsMulti = true
@@ -2326,6 +2401,21 @@ func (c *compiler) compileExplicitSpreadExprMulti(expr ast.Expr, dest int, nResu
 		}
 		return nil
 	}
+}
+
+func (c *compiler) callTargetsFixedArityFunction(call *ast.CallExpr) bool {
+	if call == nil || c == nil {
+		return false
+	}
+	fn, ok := call.Func.(*ast.IdentExpr)
+	if !ok {
+		return false
+	}
+	if c.proto != nil && c.proto.Name != "" && !c.proto.IsVarArg && fn.Name == c.proto.Name {
+		return len(call.Args) == c.proto.NumParams
+	}
+	arity, ok := c.funcArities[fn.Name]
+	return ok && !arity.vararg && len(call.Args) == arity.numParams
 }
 
 func (c *compiler) compileCallExprWithExplicitSpread(call *ast.CallExpr, dest int, nResults int) error {
@@ -3118,24 +3208,22 @@ func (c *compiler) compileFuncLitExpr(e *ast.FuncLitExpr, dest int) error {
 // --------------------------------------------------------------------
 
 func (c *compiler) compileFunction(name string, params []ast.FuncParam, body *ast.BlockStmt, line int) (int, error) {
-	isVarArg := false
-	for _, p := range params {
-		if p.IsVarArg {
-			isVarArg = true
-		}
+	numFixedParams, isVarArg := countFixedFunctionParams(params)
+	if c != nil {
+		c.setFunctionArity(name, functionArity{numParams: numFixedParams, vararg: isVarArg})
 	}
 
 	child := newCompiler(c, name, line, isVarArg)
 	child.enterScope()
 
-	numFixedParams := 0
 	for _, p := range params {
 		if p.IsVarArg {
 			break
 		}
 		child.addLocal(p.Name)
-		numFixedParams++
 	}
+	child.proto.NumParams = numFixedParams
+	child.collectFunctionArities(body.Stmts)
 	child.collectLabelDepths(body.Stmts, child.depth)
 
 	for _, stmt := range body.Stmts {

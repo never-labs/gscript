@@ -250,12 +250,18 @@ func AnalyzeSpecializedABI(proto *vm.FuncProto) SpecializedABI {
 			if getSpecializedSlot(slots, a) != specializedSlotSelfFunc {
 				return specializedABIReject("non-self call")
 			}
-			if b == 0 || b-1 != proto.NumParams {
-				return specializedABIReject("dynamic call arity")
-			}
-			for arg := a + 1; arg <= a+b-1; arg++ {
-				if !specializedABIRepIsRawInt(getSpecializedSlot(slots, arg)) {
-					return specializedABIReject("non-int call argument")
+			if b == 0 {
+				if !specializedABIDynamicRecursiveArgsAreRawInt(slots, a, proto.NumParams) {
+					return specializedABIReject("dynamic call arity")
+				}
+			} else {
+				if b-1 != proto.NumParams {
+					return specializedABIReject("dynamic call arity")
+				}
+				for arg := a + 1; arg <= a+b-1; arg++ {
+					if !specializedABIRepIsRawInt(getSpecializedSlot(slots, arg)) {
+						return specializedABIReject("non-int call argument")
+					}
 				}
 			}
 			switch c {
@@ -983,12 +989,18 @@ func qualifiesForNumericCrossRecursiveCandidate(proto *vm.FuncProto) bool {
 			if callee != specializedSlotSelfFunc && callee != specializedSlotOtherFunc {
 				return false
 			}
-			if b == 0 || b-1 != proto.NumParams {
-				return false
-			}
-			for arg := a + 1; arg <= a+b-1; arg++ {
-				if !specializedABIRepIsRawInt(getSpecializedSlot(slots, arg)) {
+			if b == 0 {
+				if !specializedABIDynamicRecursiveArgsAreRawInt(slots, a, proto.NumParams) {
 					return false
+				}
+			} else {
+				if b-1 != proto.NumParams {
+					return false
+				}
+				for arg := a + 1; arg <= a+b-1; arg++ {
+					if !specializedABIRepIsRawInt(getSpecializedSlot(slots, arg)) {
+						return false
+					}
 				}
 			}
 			if callee == specializedSlotSelfFunc {
@@ -997,6 +1009,12 @@ func qualifiesForNumericCrossRecursiveCandidate(proto *vm.FuncProto) bool {
 				sawPeerCall = true
 			}
 			switch c {
+			case 0:
+				if callee == specializedSlotSelfFunc {
+					setSpecializedSlot(slots, a, specializedSlotSelfCallRawInt)
+				} else {
+					setSpecializedSlot(slots, a, specializedSlotRawInt)
+				}
 			case 2:
 				setSpecializedSlot(slots, a, specializedSlotRawInt)
 			case 1:
@@ -2465,6 +2483,18 @@ func specializedABIRKIsRawInt(slots []specializedSlotRep, proto *vm.FuncProto, i
 
 func specializedABIRepIsRawInt(rep specializedSlotRep) bool {
 	return rep == specializedSlotRawInt || rep == specializedSlotSelfCallRawInt
+}
+
+func specializedABIDynamicRecursiveArgsAreRawInt(slots []specializedSlotRep, callSlot, numParams int) bool {
+	if numParams <= 0 {
+		return false
+	}
+	for arg := callSlot + 1; arg < callSlot+numParams; arg++ {
+		if !specializedABIRepIsRawInt(getSpecializedSlot(slots, arg)) {
+			return false
+		}
+	}
+	return getSpecializedSlot(slots, callSlot+numParams) == specializedSlotSelfCallRawInt
 }
 
 func specializedABIConstIsInt(proto *vm.FuncProto, idx int) bool {

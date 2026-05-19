@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 381 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 382 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -26,6 +26,7 @@
 - `sort_table_proxy_metamethods`: `table.move` / `table.unpack` / `table.sort` 通过 `__index`、`__newindex`、`__len` 与 proxy table 交互。
 - `events_concat_numeric_operand_more`: VM concat 链在触发 `__concat` 时保持右结合调度，并把相邻数字操作数按 number 传给 metamethod。
 - `sort_unpack_sparse_boundary_more`: 极值 sparse `table.unpack` / `table.spread` 范围超过 host 多返回上限时快速报错，避免逐项扫描。
+- `nextvar_table_insert_remove_proxy_metamethods`: `table.insert` / `table.remove` 的 proxy table 路径在 JIT slow path 下走 VM `__index` / `__newindex` 语义。
 - `api_arith_metamethod_chain_more`: `__add` / `__mod` / `__unm` 算术 metamethod 链式组合。
 - `tracegc_stats_progress_more`: `collectgarbage("stats")` 的 Go-host 诊断形状和显式 collection 后进度字段。
 - `main_generated_chunk_eval_more` / `big_generated_eval_env_more` / `heavy_generated_concat_more`: 生成代码 compile/eval 的显式环境、边界表访问和拼接压力路径。
@@ -40,10 +41,9 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
 - table library 已补 bounded proxy/metatable table 读写：`table.insert` /
   `table.sort` / `table.remove` / `table.unpack` 与 `table.move` 会通过
   `__index` / `__newindex` / `__len` 交互；passing official 覆盖了
-  `table.move` / `table.unpack` / `table.sort`。`table.insert` /
-  `table.remove` 的 proxy 路径在 VM 下可用，但 official JIT semantic gate
-  文件模式下仍会触发 Tier2 closure/indexing 旧边界，暂不放入 passing set。
-  另有剩余风险是极大范围与其他 table helper 的逐项兼容边界。
+  `table.move` / `table.unpack` / `table.sort` / `table.insert` /
+  `table.remove`，并在 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 下通过。另有剩余风险是
+  其他 table helper 的逐项兼容边界。
 - 极值 sparse `table.unpack` 范围已补 GScript host 边界：一次
   `table.unpack` / `table.spread` 最多展开 1,000,000 个返回值，超过时立即报
   “too many results” 错误，不逐项扫描 sparse range。

@@ -236,7 +236,7 @@ func newMutualRecursiveIntSCCCompiled(proto *vm.FuncProto, globals map[string]*v
 }
 
 func (tm *TieringManager) compileMutualRecursiveIntSCCTier2(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	return tm.compileMutualRecursiveIntSCCTier2WithGlobals(proto, tm.buildInlineGlobals())
+	return tm.compileMutualRecursiveIntSCCTier2WithGlobals(proto, tm.buildLoopCallGlobals(proto))
 }
 
 func (tm *TieringManager) compileMutualRecursiveIntSCCTier2WithGlobals(proto *vm.FuncProto, globals map[string]*vm.FuncProto) (*CompiledFunction, bool) {
@@ -495,18 +495,25 @@ func (e *mutualRecursiveIntEvaluator) evalBytecode(fn int, args [4]int64) (int64
 			}
 			pc = next
 		case vm.OP_CALL:
-			if !mutualRecursiveIntSlotOK(slots, a) || slots[a].kind != mutualRecursiveIntValueFunc || b == 0 {
+			if !mutualRecursiveIntSlotOK(slots, a) || slots[a].kind != mutualRecursiveIntValueFunc {
 				return 0, false
 			}
 			callee := slots[a].fn
-			if callee < 0 || callee >= len(e.protocol.protos) || b-1 != e.protocol.protos[callee].NumParams {
+			if callee < 0 || callee >= len(e.protocol.protos) {
 				return 0, false
 			}
-			if c != 1 && c != 2 {
+			numArgs := b - 1
+			if b == 0 {
+				numArgs = e.protocol.protos[callee].NumParams
+			}
+			if numArgs != e.protocol.protos[callee].NumParams {
+				return 0, false
+			}
+			if c != 0 && c != 1 && c != 2 {
 				return 0, false
 			}
 			var callArgs [4]int64
-			for i := 0; i < b-1; i++ {
+			for i := 0; i < numArgs; i++ {
 				slot := a + 1 + i
 				if !mutualRecursiveIntSlotOK(slots, slot) || slots[slot].kind != mutualRecursiveIntValueInt {
 					return 0, false
@@ -517,7 +524,7 @@ func (e *mutualRecursiveIntEvaluator) evalBytecode(fn int, args [4]int64) (int64
 			if !ok {
 				return 0, false
 			}
-			if c == 2 {
+			if c == 0 || c == 2 {
 				slots[a] = mutualRecursiveIntValue{kind: mutualRecursiveIntValueInt, i: result}
 			} else {
 				slots[a] = mutualRecursiveIntValue{}

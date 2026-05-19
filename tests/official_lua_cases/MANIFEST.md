@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 381.
+Current translated passing cases: 382.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -199,6 +199,7 @@ Current translated passing cases: 381.
 | `nextvar_power_keys_more` | `nextvar.lua` | Table length behavior with powers-of-two integer keys up to large sparse indexes. |
 | `nextvar_table_insert_general_more` | `nextvar.lua` | General `table.insert`/`remove` behavior over arrays with negative and metadata-like hash keys. |
 | `nextvar_table_insert_remove_edges` | `nextvar.lua` | `table.insert`/`table.remove` boundary positions, non-sequence keys, and zero-key removal behavior. |
+| `nextvar_table_insert_remove_proxy_metamethods` | `nextvar.lua`, `sort.lua` | `table.insert` and `table.remove` over proxy tables using `__len`, `__index`, and `__newindex`, including JIT official-check mode. |
 | `nextvar_table_insert_string_more` | `nextvar.lua` | `table.insert` and `table.remove` over string sequences with explicit insertion positions and append. |
 | `nextvar_table_maxn` | `nextvar.lua` | Deprecated `table.maxn` Lua implementation over numeric, string, and floating numeric keys. |
 | `nextvar_table_length_nils_more` | `nextvar.lua` | Table length over nil-only constructors, trailing nils, incremental array fills, and sparse nil deletion. |

@@ -437,6 +437,15 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 			valVal := regs[valSlot]
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
+				if tbl.HasMetatable() {
+					if cf.CallVM == nil {
+						return fmt.Errorf("no CallVM set for table-set fallback")
+					}
+					if err := cf.CallVM.TableSetForJIT(tblVal, keyVal, valVal); err != nil {
+						return err
+					}
+					break
+				}
 				pc := int(ctx.TableAux2)
 				beforeLen, beforeFieldIdx := -1, -1
 				if keyVal.IsInt() {
@@ -524,7 +533,19 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 			fieldName := cf.Proto.Constants[constIdx].Str()
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
-				result := tbl.RawGetString(fieldName)
+				var result runtime.Value
+				if tbl.HasMetatable() {
+					if cf.CallVM == nil {
+						return fmt.Errorf("no CallVM set for table-field-get fallback")
+					}
+					var err error
+					result, err = cf.CallVM.TableGetForJIT(tblVal, runtime.StringValue(fieldName))
+					if err != nil {
+						return err
+					}
+				} else {
+					result = tbl.RawGetString(fieldName)
+				}
 				if resultSlot < len(regs) {
 					regs[resultSlot] = result
 				}
@@ -544,6 +565,15 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 			valVal := regs[valSlot]
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
+				if tbl.HasMetatable() {
+					if cf.CallVM == nil {
+						return fmt.Errorf("no CallVM set for table-field-set fallback")
+					}
+					if err := cf.CallVM.TableSetForJIT(tblVal, runtime.StringValue(fieldName), valVal); err != nil {
+						return err
+					}
+					break
+				}
 				tbl.RawSetString(fieldName, valVal)
 			}
 		}

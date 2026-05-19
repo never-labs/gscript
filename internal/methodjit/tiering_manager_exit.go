@@ -749,6 +749,12 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 			if tblVal.IsTable() {
 				pc := int(ctx.TableAux2)
 				tbl := tblVal.Table()
+				if tbl.HasMetatable() {
+					if tm.callVM == nil {
+						return fmt.Errorf("no callVM set for table-set exit")
+					}
+					return tm.callVM.TableSetForJIT(tblVal, keyVal, valVal)
+				}
 				beforeLen, beforeFieldIdx := -1, -1
 				if keyVal.IsInt() {
 					beforeLen = tbl.Len()
@@ -897,6 +903,12 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 			valVal := regs[absVal]
 			if tblVal.IsTable() {
 				pc := int(ctx.TableKeySlot)
+				if tblVal.Table().HasMetatable() {
+					if tm.callVM == nil {
+						return fmt.Errorf("no callVM set for table-field-set exit")
+					}
+					return tm.callVM.TableSetForJIT(tblVal, runtime.StringValue(fieldName), valVal)
+				}
 				if pc >= 0 && pc < len(proto.Code) && vm.DecodeOp(proto.Code[pc]) == vm.OP_SETFIELD {
 					ensureFieldCache(proto)
 					tblVal.Table().RawSetStringCached(fieldName, valVal, &proto.FieldCache[pc])

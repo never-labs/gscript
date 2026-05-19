@@ -36,3 +36,10 @@ func (vm *VM) ResumeFromPC(startPC int) ([]runtime.Value, error) {
 func (vm *VM) TableGetForJIT(table, key runtime.Value) (runtime.Value, error) {
 	return vm.tableGet(table, key)
 }
+
+// TableSetForJIT exposes the VM's full table-set semantics to JIT slow paths.
+// It includes __newindex dispatch and recursive table __newindex handling,
+// unlike runtime.Table.RawSet.
+func (vm *VM) TableSetForJIT(table, key, val runtime.Value) error {
+	return vm.tableSet(table, key, val)
+}

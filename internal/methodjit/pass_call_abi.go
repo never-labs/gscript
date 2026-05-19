@@ -94,7 +94,7 @@ func callABIAnnotateRawIntSelfResult(fn *Function, instr *Instr, tails map[int]b
 	if fn == nil || fn.Proto == nil || instr == nil || instr.Op != OpCall {
 		return false
 	}
-	if tails[instr.ID] || !callABIHasExactResultShape(fn, instr, 1) || !callABIIsStaticSelfCall(fn, instr) {
+	if tails[instr.ID] || !callABIHasSyntheticSingleResult(instr) || !callABIIsStaticSelfCall(fn, instr) {
 		return false
 	}
 	abi := AnalyzeRawIntSelfABI(fn.Proto)
@@ -112,6 +112,10 @@ func callABIAnnotateRawIntSelfResult(fn *Function, instr *Instr, tails map[int]b
 	}
 	instr.Type = TypeInt
 	return true
+}
+
+func callABIHasSyntheticSingleResult(instr *Instr) bool {
+	return instr != nil && callResultCountFromAux2(instr.Aux2) == 1
 }
 
 func callABIAnnotateTypedSelfResult(fn *Function, instr *Instr, tails map[int]bool) bool {
@@ -204,7 +208,7 @@ func callABIDescriptorFor(fn *Function, instr *Instr, globals map[string]*vm.Fun
 		}
 		return CallABIDescriptor{}, reason
 	}
-	if !callABIHasExactResultShape(fn, instr, 1) {
+	if !callABIHasSyntheticSingleResult(instr) {
 		return miss("call does not have fixed arity and one exact result")
 	}
 	abi := AnalyzeSpecializedABI(callee)

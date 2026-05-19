@@ -1035,6 +1035,12 @@ func (e *BaselineJITEngine) handleSetTable(ctx *ExecContext, regs []runtime.Valu
 
 	if tblVal.IsTable() {
 		tbl := tblVal.Table()
+		if tbl.HasMetatable() {
+			if e.callVM == nil {
+				return fmt.Errorf("no callVM for table-set exit")
+			}
+			return e.callVM.TableSetForJIT(tblVal, key, val)
+		}
 		// Record array kind feedback for table-access specialization.
 		pc := int(ctx.BaselinePC) - 1
 		beforeLen, beforeFieldIdx := -1, -1
@@ -1121,6 +1127,17 @@ func (e *BaselineJITEngine) handleGetField(ctx *ExecContext, regs []runtime.Valu
 
 	if tblVal.IsTable() {
 		tbl := tblVal.Table()
+		if tbl.HasMetatable() {
+			if e.callVM == nil {
+				return fmt.Errorf("no callVM for table-field-get exit")
+			}
+			v, err := e.callVM.TableGetForJIT(tblVal, runtime.StringValue(fieldName))
+			if err != nil {
+				return err
+			}
+			regs[absA] = v
+			return nil
+		}
 		// Use the cached path to populate the FieldCache for the native inline cache.
 		// BaselinePC is the resume (next) PC, so current instruction PC = BaselinePC - 1.
 		pc := int(ctx.BaselinePC) - 1
@@ -1173,6 +1190,12 @@ func (e *BaselineJITEngine) handleSetField(ctx *ExecContext, regs []runtime.Valu
 
 	if tblVal.IsTable() {
 		tbl := tblVal.Table()
+		if tbl.HasMetatable() {
+			if e.callVM == nil {
+				return fmt.Errorf("no callVM for table-field-set exit")
+			}
+			return e.callVM.TableSetForJIT(tblVal, runtime.StringValue(fieldName), val)
+		}
 		// Use the cached path to populate the FieldCache for the native inline cache.
 		// BaselinePC is the resume (next) PC, so current instruction PC = BaselinePC - 1.
 		pc := int(ctx.BaselinePC) - 1
