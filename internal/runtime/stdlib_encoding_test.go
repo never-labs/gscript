@@ -231,3 +231,20 @@ func TestEncodingXmlUnescapeQuotes(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, v.Str())
 	}
 }
+
+func TestEncodingXmlEscapeUnescapeRoundtripQuotes(t *testing.T) {
+	interp := encodingInterp(t, `
+		original := "<node attr=\"a&b\">Tom & 'Jerry'</node>"
+		escaped := encoding.xmlEscape(original)
+		result, err := encoding.xmlUnescape(escaped)
+	`)
+	v := interp.GetGlobal("result")
+	errV := interp.GetGlobal("err")
+	expected := "<node attr=\"a&b\">Tom & 'Jerry'</node>"
+	if v.Str() != expected {
+		t.Errorf("expected %s, got %s", expected, v.Str())
+	}
+	if !errV.IsNil() {
+		t.Errorf("expected nil error, got %v", errV)
+	}
+}

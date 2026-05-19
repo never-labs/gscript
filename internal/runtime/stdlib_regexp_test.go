@@ -124,6 +124,36 @@ func TestRegexpFindAll_limit(t *testing.T) {
 	}
 }
 
+func TestRegexpFindAllSubmatch_limit(t *testing.T) {
+	interp := runProgram(t, `
+		result := regexp.findAllSubmatch("([a-z]+)([0-9]+)", "a1 bb22 ccc333", 2)
+	`)
+	tbl := interp.GetGlobal("result").Table()
+	if tbl.Length() != 2 {
+		t.Fatalf("expected 2 matches, got %d", tbl.Length())
+	}
+	first := tbl.RawGet(IntValue(1)).Table()
+	if first.RawGet(IntValue(1)).Str() != "a1" {
+		t.Errorf("expected 'a1', got '%s'", first.RawGet(IntValue(1)).Str())
+	}
+	if first.RawGet(IntValue(2)).Str() != "a" {
+		t.Errorf("expected 'a', got '%s'", first.RawGet(IntValue(2)).Str())
+	}
+	if first.RawGet(IntValue(3)).Str() != "1" {
+		t.Errorf("expected '1', got '%s'", first.RawGet(IntValue(3)).Str())
+	}
+	second := tbl.RawGet(IntValue(2)).Table()
+	if second.RawGet(IntValue(1)).Str() != "bb22" {
+		t.Errorf("expected 'bb22', got '%s'", second.RawGet(IntValue(1)).Str())
+	}
+	if second.RawGet(IntValue(2)).Str() != "bb" {
+		t.Errorf("expected 'bb', got '%s'", second.RawGet(IntValue(2)).Str())
+	}
+	if second.RawGet(IntValue(3)).Str() != "22" {
+		t.Errorf("expected '22', got '%s'", second.RawGet(IntValue(3)).Str())
+	}
+}
+
 func TestRegexpReplace(t *testing.T) {
 	interp := runProgram(t, `
 		result := regexp.replace("[0-9]+", "a1b22c333", "X")

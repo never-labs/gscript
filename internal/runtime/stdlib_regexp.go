@@ -227,6 +227,31 @@ func buildRegexpLib() *Table {
 		return []Value{TableValue(tbl)}, nil
 	})
 
+	// regexp.findAllSubmatch(pattern, str [, n]) → table of tables
+	set("findAllSubmatch", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'regexp.findAllSubmatch'")
+		}
+		re, err := regexp.Compile(args[0].Str())
+		if err != nil {
+			return nil, fmt.Errorf("regexp.findAllSubmatch: %v", err)
+		}
+		n := -1
+		if len(args) >= 3 {
+			n = int(toInt(args[2]))
+		}
+		allMatches := re.FindAllStringSubmatch(args[1].Str(), n)
+		tbl := NewTable()
+		for i, matches := range allMatches {
+			sub := NewTable()
+			for j, m := range matches {
+				sub.RawSet(IntValue(int64(j+1)), StringValue(m))
+			}
+			tbl.RawSet(IntValue(int64(i+1)), TableValue(sub))
+		}
+		return []Value{TableValue(tbl)}, nil
+	})
+
 	// regexp.replace(pattern, str, repl) → string (replace first)
 	set("replace", func(args []Value) ([]Value, error) {
 		if len(args) < 3 {

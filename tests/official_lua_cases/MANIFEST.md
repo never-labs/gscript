@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 414.
+Current translated passing cases: 419.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -213,6 +213,7 @@ Current translated passing cases: 414.
 | `nextvar_table_remove_sequences` | `nextvar.lua` | `table.remove` over string sequences, `#t+1` no-op removal, and middle/tail deletion. |
 | `nextvar_table_remove_more` | `nextvar.lua` | Additional `table.remove` edge cases for zero index storage, append/remove order, invalid positions, and middle deletion. |
 | `os_go_host_env_expand_more` | `files.lua`, `main.lua` | Go-host environment get/set/unset and environment expansion helpers with argument diagnostics. |
+| `os_time_date_host_more` | `main.lua`, `api.lua` | Go-host OS time/date/clock/process diagnostics with fixed timestamp formatting and shape checks. |
 | `pm_captures_basic_more` | `pm.lua` | Additional captures, empty captures, anchored captures, trimming captures, and position-capture replacement in `gsub`. |
 | `pm_escape_compat_more` | `pm.lua`, `strings.lua` | Hex/NUL pattern classes, negated class escapes, dot-newline matching, and standalone balanced-pattern matching/replacement. |
 | `pm_find_empty_anchor` | `pm.lua` | Empty pattern finds and anchored pattern finds. |
@@ -234,6 +235,7 @@ Current translated passing cases: 414.
 | `pm_pattern_runtime_more` | `pm.lua` | Pattern runtime callbacks: `gmatch` start positions and function-valued `gsub` replacements with nil/false no-substitution. |
 | `rand_go_host_more` | `api.lua`, `math.lua` | Go-host deterministic seeded random replay, range/shape checks, collection helpers, UUID/bytes shape, and argument validation. |
 | `process_go_host_entry_exit_more` | `main.lua` | Go-host process argument/entrypoint helpers and host-controlled process exit errors. |
+| `process_exec_run_more` | `main.lua`, `api.lua` | Go-host process command helpers for lookup, run/exec/shell, stdin/env, stdout/stderr, exit codes, and process environment shape. |
 | `pm_match_captures_ascii` | `pm.lua` | ASCII `string.match` captures with `%w`, `%d`, empty captures, and anchored failure cases. |
 | `pm_match_classes_repetition_more` | `pm.lua` | Additional pattern repetition, anchors, minimal matches, negated classes, and `%S`/`%C` classes. |
 | `pm_match_classes_more2` | `pm.lua` | Additional pattern class and repetition checks for `%l`, `%a`, `*`, `+`, escaped `$`, and missing matches. |
@@ -338,6 +340,7 @@ Recent audit-added coverage:
 | `files_seek_overwrite_more` | `files.lua` | File-handle `seek` position reporting and overwrite semantics followed by whole-file readback. |
 | `files_tmpfile_flush_type_more` | `files.lua` | `io.tmpfile`, `file:flush`, seek-to-start readback, and closed-file `io.type` reporting. |
 | `fs_path_go_host_more` | `files.lua`, `main.lua` | Go-host `fs` and `path` helpers for temp files, directory creation, path operations, copy/rename/read/write, and error returns. |
+| `fs_path_glob_cwd_more` | `files.lua`, `main.lua` | Go-host current-directory controls, globbing, temp dirs, and absolute/relative path helpers with cwd restoration. |
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
 | `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
@@ -349,7 +352,9 @@ Recent audit-added coverage:
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
 | `net_http_background_roundtrip_more` | `api.lua`, `main.lua` | Go-host `net` client helpers against local background HTTP server, including JSON response parsing and error returns. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
+| `regexp_submatch_limits_more` | `pm.lua`, `strings.lua` | Go RE2 all-submatch helpers, compiled regexp limits, split/find limits, and subexpression counts. |
 | `time_compress_encoding_go_host_more` | `main.lua`, `strings.lua` | Deterministic Go-host `time`, `compress`, and `encoding` helpers over fixed timestamps, round trips, and decode errors. |
+| `encoding_ini_xml_roundtrip_more` | `strings.lua`, `main.lua` | Go-host INI encode/decode round trips, XML escape/unescape numeric entities, and malformed base32 decode errors. |
 | `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |

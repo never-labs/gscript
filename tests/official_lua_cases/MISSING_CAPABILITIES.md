@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 414 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 419 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -47,9 +47,11 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `json_go_host_more`: `json.encode` / `decode` / `pretty` 在脚本层覆盖嵌套结构、round-trip、非法 JSON 和 trailing data 拒绝。
 - `regexp_go_host_more`: Go RE2 风格 `regexp` helper 和 compiled object 覆盖 match/find/submatch/split/replace 与 invalid pattern 错误。
 - `fs_path_go_host_more`: Go-host `fs` / `path` helper 覆盖临时路径、读写追加、stat、copy/rename、readdir、removeAll 和 path match/clean/split。
+- `fs_path_glob_cwd_more`: `fs.cwd` / `fs.chdir` / `fs.glob` / `fs.tempdir` 和 `path.abs` / `isAbs` / `rel` / separator helpers 覆盖 cwd 状态与临时目录恢复。
 - `url_go_host_more`: Go-host URL parse/build/escape/query/join helper 覆盖结构化字段、query table、invalid escape 和 validity checks。
 - `bytes_hash_base64_go_host_more`: `bytes` buffer、hex/XOR/repeat/concat、base64/url-base64、hash/HMAC/CRC32 覆盖 deterministic binary helper。
 - `time_compress_encoding_go_host_more`: 固定时间格式化/解析/diff，gzip/zlib/deflate round-trip，以及 hex/base32/INI/XML 编解码覆盖。
+- `encoding_ini_xml_roundtrip_more`: INI encode/decode round-trip、XML escape/unescape numeric entity round-trip 和 malformed base32/base32hex decode error 路径。
 - `net_http_background_roundtrip_more`: `net.get` / `post` / `request` 通过本地 `http.listen(..., {background:true})` 覆盖 response shape、JSON helper、404 和参数错误路径。
 - `csv_go_host_more`: `csv.parse` / `parseWithHeaders` / `encode` / `encodeWithHeaders` 覆盖 quoted fields、自定义分隔符、header 映射和 malformed input。
 - `bits_go_host_more`: Go-style 64-bit `bits` helper 覆盖按位组合、shift/rotate、bit position 操作、count 和参数错误。
@@ -60,9 +62,12 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `rand_go_host_more`: `rand` helper 覆盖 seeded replay、range/shape invariants、choice/shuffle/sample/weighted helpers、UUID/bytes shape 和参数校验。
 - `log_go_host_more`: `log` helper 覆盖 level constants、format、deterministic log output、history/count/clear 和 level filtering。
 - `os_go_host_env_expand_more`: `os` helper 覆盖环境变量 get/set/unset、ExpandEnv 风格展开和参数错误。
+- `os_time_date_host_more`: `os.time` / `clock` / fixed `date` formatting / hostname / pid / args 的 Go-host 诊断形状覆盖。
 - `process_go_host_entry_exit_more`: `process` helper 覆盖 host-controlled args/entrypoint 与可捕获的 process exit error。
+- `process_exec_run_more`: `process.which` / `pid` / `env` / `run` / `exec` / `shell` 覆盖命令查找、stdin/env、stdout/stderr、exit code 和错误路径。
 - `main_script_file_vm_more`: `script` helper 在 VM 文件模式下覆盖当前 VM globals、相对文件加载、env sync 和 sandbox，不再退回 tree-walker chunk。
 - `main_vm_loader_more`: 全局 `load` / `loadfile` / `dofile` / file-backed `require` 在 VM 文件模式下执行 bytecode chunk，共享当前 globals、相对 script dir 与 `package.loaded` cache。
+- `regexp_submatch_limits_more`: `regexp.findAllSubmatch`、compiled regexp submatch helpers、find/split limit 和 `numSubexp` 覆盖。
 
 当前能力状态与设计取舍：
 

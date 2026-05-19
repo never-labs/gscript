@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // buildEncodingLib creates the "encoding" standard library table.
@@ -217,14 +219,60 @@ func buildEncodingLib() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.xmlUnescape' (string expected)")
 		}
 		s := args[0].Str()
-		// Simple XML unescape for common entities
+		var err error
+		s, err = xmlUnescapeNumericRefs(s)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		// Simple XML unescape for common entities. Keep &amp; last so an escaped
+		// entity name such as &amp;lt; is decoded only once.
 		s = strings.ReplaceAll(s, "&lt;", "<")
 		s = strings.ReplaceAll(s, "&gt;", ">")
-		s = strings.ReplaceAll(s, "&amp;", "&")
 		s = strings.ReplaceAll(s, "&quot;", "\"")
 		s = strings.ReplaceAll(s, "&apos;", "'")
+		s = strings.ReplaceAll(s, "&amp;", "&")
 		return []Value{StringValue(s)}, nil
 	})
 
 	return t
+}
+
+func xmlUnescapeNumericRefs(s string) (string, error) {
+	var sb strings.Builder
+	for i := 0; i < len(s); {
+		if s[i] != '&' || i+2 >= len(s) || s[i+1] != '#' {
+			sb.WriteByte(s[i])
+			i++
+			continue
+		}
+
+		semi := strings.IndexByte(s[i+2:], ';')
+		if semi < 0 {
+			sb.WriteByte(s[i])
+			i++
+			continue
+		}
+		end := i + 2 + semi
+		body := s[i+2 : end]
+		if body == "" {
+			return "", fmt.Errorf("invalid XML numeric character reference")
+		}
+
+		base := 10
+		if body[0] == 'x' || body[0] == 'X' {
+			base = 16
+			body = body[1:]
+			if body == "" {
+				return "", fmt.Errorf("invalid XML numeric character reference")
+			}
+		}
+
+		n, err := strconv.ParseInt(body, base, 32)
+		if err != nil || !utf8.ValidRune(rune(n)) {
+			return "", fmt.Errorf("invalid XML numeric character reference")
+		}
+		sb.WriteRune(rune(n))
+		i = end + 1
+	}
+	return sb.String(), nil
 }
