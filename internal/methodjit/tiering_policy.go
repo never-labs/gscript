@@ -122,13 +122,6 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 			Gate:   blockGate("Tier1Threshold", "below baseline compile threshold"),
 		}
 	}
-	if !state.Tier2Failed && qualifiesForFixedRecursiveTableBuilder(proto) {
-		return PromotionDecision{
-			Action: TieringActionFixedTableBuilder,
-			Reason: PromotionReasonFixedTableBuilder,
-			Gate:   forceGate("FixedRecursiveTableBuilder", "compile fixed recursive table builder"),
-		}
-	}
 	if shouldStayTier0CoroutineRuntime(proto, profile) {
 		return tier0PolicyDecision("Tier0CoroutineRuntime", "stay_tier0_coroutine_runtime", "coroutine_runtime")
 	}

@@ -3,10 +3,10 @@
 package methodjit
 
 import (
-	"testing"
 	"github.com/gscript/gscript/internal/lexer"
 	"github.com/gscript/gscript/internal/parser"
 	"github.com/gscript/gscript/internal/vm"
+	"testing"
 )
 
 func TestDumpBytecodes2(t *testing.T) {
@@ -36,10 +36,10 @@ for i := 1; i <= 100000; i++ {
 			if err != nil {
 				t.Fatalf("compile: %v", err)
 			}
-			
+
 			t.Logf("=== %s main ===", name)
 			t.Log(vm.Disassemble(proto))
-			
+
 			for i, sub := range proto.Protos {
 				t.Logf("=== %s sub[%d] ===", name, i)
 				t.Log(vm.Disassemble(sub))

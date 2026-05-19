@@ -218,6 +218,29 @@ func (ec *emitContext) emitRawIntBinOp(instr *Instr, op intBinOp) {
 		}
 	}
 
+	if op == intBinMul {
+		if c, ok := constIntFromValue(instr.Args[1]); ok {
+			lhs := ec.resolveRawInt(instr.Args[0].ID, jit.X0)
+			if ec.emitSmallConstMul(dst, lhs, c) {
+				if instr.Aux2 == 0 && !ec.int48Safe(instr.ID) {
+					ec.emitInt48OverflowCheck(dst, instr)
+				}
+				ec.storeRawInt(dst, instr.ID)
+				return
+			}
+		}
+		if c, ok := constIntFromValue(instr.Args[0]); ok {
+			rhs := ec.resolveRawInt(instr.Args[1].ID, jit.X1)
+			if ec.emitSmallConstMul(dst, rhs, c) {
+				if instr.Aux2 == 0 && !ec.int48Safe(instr.ID) {
+					ec.emitInt48OverflowCheck(dst, instr)
+				}
+				ec.storeRawInt(dst, instr.ID)
+				return
+			}
+		}
+	}
+
 	lhs := ec.resolveRawInt(instr.Args[0].ID, jit.X0)
 	rhs := ec.resolveRawInt(instr.Args[1].ID, jit.X1)
 	if op == intBinMod {
@@ -261,6 +284,55 @@ func (ec *emitContext) emitRawIntBinOp(instr *Instr, op intBinOp) {
 
 	// Mark as raw int in register (no box needed until block boundary/return).
 	ec.storeRawInt(dst, instr.ID)
+}
+
+func (ec *emitContext) emitSmallConstMul(dst, src jit.Reg, c int64) bool {
+	switch c {
+	case 0:
+		ec.asm.LoadImm64(dst, 0)
+	case 1:
+		if dst != src {
+			ec.asm.MOVreg(dst, src)
+		}
+	case 2:
+		ec.asm.LSLimm(dst, src, 1)
+	case 3:
+		ec.asm.ADDregLSL(dst, src, src, 1)
+	case 4:
+		ec.asm.LSLimm(dst, src, 2)
+	case 5:
+		ec.asm.ADDregLSL(dst, src, src, 2)
+	case 7:
+		tmp := jit.X3
+		if src == tmp {
+			tmp = jit.X2
+		}
+		ec.asm.LSLimm(tmp, src, 3)
+		ec.asm.SUBreg(dst, tmp, src)
+	case 8:
+		ec.asm.LSLimm(dst, src, 3)
+	case 9:
+		ec.asm.ADDregLSL(dst, src, src, 3)
+	case 11:
+		tmp := jit.X3
+		if src == tmp {
+			tmp = jit.X2
+		}
+		ec.asm.ADDregLSL(tmp, src, src, 1)
+		ec.asm.ADDregLSL(dst, tmp, src, 3)
+	case 13:
+		tmp := jit.X3
+		if src == tmp {
+			tmp = jit.X2
+		}
+		ec.asm.ADDregLSL(tmp, src, src, 2)
+		ec.asm.ADDregLSL(dst, tmp, src, 3)
+	case 33:
+		ec.asm.ADDregLSL(dst, src, src, 5)
+	default:
+		return false
+	}
+	return true
 }
 
 func (ec *emitContext) emitConstPositiveModSingleSubtract(instr *Instr, dst jit.Reg) bool {

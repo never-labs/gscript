@@ -53,10 +53,11 @@ func findArgIDs(fn *Function, id int) []int {
 // ---------- Test 1: self-referential phi ----------
 //
 // CFG:
-//   B0 -> B1
-//   B1 (hdr, preds B0,B2): phi v1 = Phi(B0:v0, B2:v1); Branch cond -> B2,B3
-//   B2 -> B1 (back-edge)
-//   B3: use v1; Return
+//
+//	B0 -> B1
+//	B1 (hdr, preds B0,B2): phi v1 = Phi(B0:v0, B2:v1); Branch cond -> B2,B3
+//	B2 -> B1 (back-edge)
+//	B3: use v1; Return
 //
 // After pass: v1 removed; use.Args[0].ID == v0.ID.
 func TestSimplifyPhis_SelfReferential(t *testing.T) {
@@ -128,11 +129,12 @@ func TestSimplifyPhis_SelfReferential(t *testing.T) {
 // ---------- Test 2: 2-phi SCC collapses ----------
 //
 // CFG:
-//   B0 -> B1
-//   B1 (hdr, preds B0,B3): v1 = Phi(B0:v0, B3:v2); Branch cond -> B2,B4
-//   B2 (single pred B1): Jump B3
-//   B3 (single pred B2): v2 = Phi(B2:v1); Jump B1
-//   B4 (single pred B1): use v1 and v2; Return
+//
+//	B0 -> B1
+//	B1 (hdr, preds B0,B3): v1 = Phi(B0:v0, B3:v2); Branch cond -> B2,B4
+//	B2 (single pred B1): Jump B3
+//	B3 (single pred B2): v2 = Phi(B2:v1); Jump B1
+//	B4 (single pred B1): use v1 and v2; Return
 //
 // Note: v2 here is a single-arg phi whose arg is v1, which closes an SCC
 // v1 <-> v2. After pass both should collapse to v0.
@@ -215,10 +217,11 @@ func TestSimplifyPhis_TwoPhiSCC(t *testing.T) {
 // ---------- Test 3: non-redundant phi must NOT collapse ----------
 //
 // CFG:
-//   B0 (entry): Branch const -> B1, B2
-//   B1: v0 = ConstInt 1; Jump B3
-//   B2: v1 = ConstInt 2; Jump B3
-//   B3: v2 = Phi(B1:v0, B2:v1); Return v2
+//
+//	B0 (entry): Branch const -> B1, B2
+//	B1: v0 = ConstInt 1; Jump B3
+//	B2: v1 = ConstInt 2; Jump B3
+//	B3: v2 = Phi(B1:v0, B2:v1); Return v2
 func TestSimplifyPhis_NonRedundantUnchanged(t *testing.T) {
 	fn := &Function{NumRegs: 2}
 	b0 := newBlock(0)
@@ -279,21 +282,22 @@ func TestSimplifyPhis_NonRedundantUnchanged(t *testing.T) {
 // ---------- Test 4: sieve-shaped 3-phi SCC ----------
 //
 // Nested loops:
-//   B0 (entry): v_table = LoadSlot 0, v_n = LoadSlot 1, v_step = ConstInt 2
-//               Jump B1 (outer hdr)
-//   B1 (outer hdr, preds B0, Bback):
-//       v_tbl_outer = Phi(B0:v_table, Bback:v_tbl_outer)
-//       Branch cond -> B2 (inner ph), Bexit
-//   B2 (inner preheader): Jump B3
-//   B3 (inner hdr, preds B2, B4):
-//       v_tbl_inner = Phi(B2:v_tbl_outer, B4:v_tbl_inner)
-//       v_n_inner   = Phi(B2:v_n,         B4:v_n_inner)
-//       v_stp_inner = Phi(B2:v_step,      B4:v_stp_inner)
-//       Branch cond2 -> B4, Bafter
-//   B4 (inner body, preds B3): use(v_tbl_inner, v_n_inner, v_stp_inner); Jump B3
-//   Bafter (preds B3): Jump Bback
-//   Bback (preds Bafter): Jump B1
-//   Bexit (preds B1): Return
+//
+//	B0 (entry): v_table = LoadSlot 0, v_n = LoadSlot 1, v_step = ConstInt 2
+//	            Jump B1 (outer hdr)
+//	B1 (outer hdr, preds B0, Bback):
+//	    v_tbl_outer = Phi(B0:v_table, Bback:v_tbl_outer)
+//	    Branch cond -> B2 (inner ph), Bexit
+//	B2 (inner preheader): Jump B3
+//	B3 (inner hdr, preds B2, B4):
+//	    v_tbl_inner = Phi(B2:v_tbl_outer, B4:v_tbl_inner)
+//	    v_n_inner   = Phi(B2:v_n,         B4:v_n_inner)
+//	    v_stp_inner = Phi(B2:v_step,      B4:v_stp_inner)
+//	    Branch cond2 -> B4, Bafter
+//	B4 (inner body, preds B3): use(v_tbl_inner, v_n_inner, v_stp_inner); Jump B3
+//	Bafter (preds B3): Jump Bback
+//	Bback (preds Bafter): Jump B1
+//	Bexit (preds B1): Return
 func TestSimplifyPhis_SieveShapedNestedLoops(t *testing.T) {
 	fn := &Function{NumRegs: 4}
 	b0 := newBlock(0)

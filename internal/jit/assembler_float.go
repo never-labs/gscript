@@ -65,6 +65,12 @@ func (a *Assembler) FCVTZS(rd Reg, rn FReg) {
 	a.emit(0x9E780000 | uint32(rn)<<5 | uint32(rd))
 }
 
+// FCVTMS: Xd = (int64)Dn (float64 to signed int64, round toward -inf)
+func (a *Assembler) FCVTMS(rd Reg, rn FReg) {
+	// 1|00|11110|01|1|10000|000000|Rn|Rd
+	a.emit(0x9E700000 | uint32(rn)<<5 | uint32(rd))
+}
+
 // FMOVd: Dd = Dn (register to register copy, double precision)
 func (a *Assembler) FMOVd(rd, rn FReg) {
 	// FMOV Dd, Dn: 0|00|11110|01|1|00000|010000|Rn|Rd

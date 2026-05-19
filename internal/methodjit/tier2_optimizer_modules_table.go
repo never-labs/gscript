@@ -74,6 +74,8 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModule("TableArrayLoadTypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TableArrayLoadTypeSpecializePass),
 		tier2PassModule("TableArrayStoreLower (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TableArrayStoreLowerPass),
 		tier2PassModule("TypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TypeSpecializePass),
+		tier2PassModule("FloorPhiSplit", Tier2PhaseTableFieldLower, FloorPhiSplitPass),
+		tier2PassModule("DCE (post-FloorPhiSplit)", Tier2PhaseTableFieldLower, DCEPass),
 		tier2PassModule("ShapeFieldTypeGuard", Tier2PhaseTableFieldLower, ShapeFieldTypeGuardPass),
 		tier2PassModule("LateModuloMultiplyOverflowBoxing", Tier2PhaseTableFieldLower, LateModuloMultiplyOverflowBoxingPass),
 		tier2PassModule("ProfiledStringLenFold", Tier2PhaseTableFieldLower, ProfiledStringLenFoldPass),

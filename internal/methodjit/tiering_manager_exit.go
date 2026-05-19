@@ -945,8 +945,10 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		if handled {
 			return tm.executeWholeCallNoResultBatch(ctx, regs, base, proto)
 		}
-		_, err = tm.callVM.CallValue(fnVal, args)
-		return err
+		if _, err = tm.callVM.CallValue(fnVal, args); err != nil {
+			return err
+		}
+		return tm.executeWholeCallNoResultBatch(ctx, regs, base, proto)
 
 	case OpConstString:
 		if aux >= 0 && aux < len(proto.Constants) {
@@ -1554,7 +1556,14 @@ func (tm *TieringManager) executeWholeCallNoResultBatchCall(proto *vm.FuncProto,
 		}
 		args = append(args, val)
 	}
-	return tm.callVM.TryRunNoResultWholeCallKernelForJIT(fnVal, args)
+	handled, err := tm.callVM.TryRunNoResultWholeCallKernelForJIT(fnVal, args)
+	if handled || err != nil {
+		return handled, err
+	}
+	if _, err := tm.callVM.CallValue(fnVal, args); err != nil {
+		return true, err
+	}
+	return true, nil
 }
 
 func (tm *TieringManager) globalValueByConst(proto *vm.FuncProto, constIdx int) (runtime.Value, bool) {

@@ -555,21 +555,21 @@ func mutualRecursiveIntRK(proto *vm.FuncProto, slots []mutualRecursiveIntValue, 
 func mutualRecursiveIntArith(op vm.Opcode, a, b int64) (int64, bool) {
 	switch op {
 	case vm.OP_ADD:
-		return fixedFoldCheckedAdd(a, b)
+		return mutualRecursiveIntCheckedAdd(a, b)
 	case vm.OP_SUB:
-		if b == fixedFoldMinInt64 {
+		if b == mutualRecursiveIntMinInt64 {
 			return 0, false
 		}
-		return fixedFoldCheckedAdd(a, -b)
+		return mutualRecursiveIntCheckedAdd(a, -b)
 	case vm.OP_MUL:
 		if a == 0 || b == 0 {
 			return 0, true
 		}
-		if (a == fixedFoldMinInt64 && b == -1) || (b == fixedFoldMinInt64 && a == -1) {
+		if (a == mutualRecursiveIntMinInt64 && b == -1) || (b == mutualRecursiveIntMinInt64 && a == -1) {
 			return 0, false
 		}
 		out := a * b
-		if out/b != a || out < fixedFoldMinInt48 || out > fixedFoldMaxInt48 {
+		if out/b != a || out < mutualRecursiveIntMinInt48 || out > mutualRecursiveIntMaxInt48 {
 			return 0, false
 		}
 		return out, true
@@ -581,11 +581,29 @@ func mutualRecursiveIntArith(op vm.Opcode, a, b int64) (int64, bool) {
 		if out != 0 && (out^b) < 0 {
 			out += b
 		}
-		if out < fixedFoldMinInt48 || out > fixedFoldMaxInt48 {
+		if out < mutualRecursiveIntMinInt48 || out > mutualRecursiveIntMaxInt48 {
 			return 0, false
 		}
 		return out, true
 	default:
 		return 0, false
 	}
+}
+
+const (
+	mutualRecursiveIntMaxInt64 = int64(^uint64(0) >> 1)
+	mutualRecursiveIntMinInt64 = -mutualRecursiveIntMaxInt64 - 1
+	mutualRecursiveIntMaxInt48 = (1 << 47) - 1
+	mutualRecursiveIntMinInt48 = -(1 << 47)
+)
+
+func mutualRecursiveIntCheckedAdd(a, b int64) (int64, bool) {
+	if (b > 0 && a > mutualRecursiveIntMaxInt64-b) || (b < 0 && a < mutualRecursiveIntMinInt64-b) {
+		return 0, false
+	}
+	out := a + b
+	if out < mutualRecursiveIntMinInt48 || out > mutualRecursiveIntMaxInt48 {
+		return 0, false
+	}
+	return out, true
 }

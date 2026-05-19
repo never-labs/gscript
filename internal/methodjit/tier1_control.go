@@ -33,7 +33,7 @@ func emitBaselineForPrep(asm *jit.Assembler, inst uint32, pc int) {
 	sbx := vm.DecodesBx(inst)
 
 	// Load init (R(A)) and step (R(A+2))
-	loadSlot(asm, jit.X0, a)                 // init
+	loadSlot(asm, jit.X0, a)                // init
 	asm.LDR(jit.X1, mRegRegs, slotOff(a+2)) // step
 
 	floatLabel := nextLabel("forprep_float")
@@ -79,7 +79,7 @@ func emitBaselineForLoop(asm *jit.Assembler, inst uint32, pc int) {
 	sbx := vm.DecodesBx(inst)
 
 	// Load idx (R(A)), limit (R(A+1)), step (R(A+2))
-	loadSlot(asm, jit.X0, a)                 // idx
+	loadSlot(asm, jit.X0, a)                // idx
 	asm.LDR(jit.X1, mRegRegs, slotOff(a+1)) // limit
 	asm.LDR(jit.X2, mRegRegs, slotOff(a+2)) // step
 
@@ -103,9 +103,9 @@ func emitBaselineForLoop(asm *jit.Assembler, inst uint32, pc int) {
 	asm.BCond(jit.CondNE, floatLabel)
 
 	// All int: idx += step
-	asm.SBFX(jit.X3, jit.X0, 0, 48) // idx
-	asm.SBFX(jit.X4, jit.X2, 0, 48) // step
-	asm.SBFX(jit.X5, jit.X1, 0, 48) // limit
+	asm.SBFX(jit.X3, jit.X0, 0, 48)    // idx
+	asm.SBFX(jit.X4, jit.X2, 0, 48)    // step
+	asm.SBFX(jit.X5, jit.X1, 0, 48)    // limit
 	asm.ADDreg(jit.X3, jit.X3, jit.X4) // idx += step
 
 	// Check direction: if step > 0, check idx <= limit; else idx >= limit

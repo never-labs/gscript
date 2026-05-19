@@ -14,6 +14,7 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	seedShapeFieldTypesFromFixedConstructors(fn)
+	seedShapeFieldTypesFromCatalog(fn)
 	type key struct {
 		shapeID uint32
 		typ     Type
@@ -21,7 +22,7 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 	guardMasks := make(map[key]uint64)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpFieldLoad || instr.Type != TypeFloat || len(instr.Args) == 0 || instr.Args[0] == nil {
+			if instr == nil || instr.Op != OpFieldLoad || !shapeFieldTypeGuardedLoadType(instr.Type) || len(instr.Args) == 0 || instr.Args[0] == nil {
 				continue
 			}
 			svals := instr.Args[0].Def
@@ -81,6 +82,44 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 			fmt.Sprintf("guard shape %d field mask 0x%x stable type %s", k.shapeID, mask, k.typ))
 	}
 	return fn, nil
+}
+
+func shapeFieldTypeGuardedLoadType(t Type) bool {
+	switch t {
+	case TypeFloat, TypeInt:
+		return true
+	default:
+		return false
+	}
+}
+
+func seedShapeFieldTypesFromCatalog(fn *Function) {
+	if fn == nil || len(fn.FieldPolyShapeCatalog) == 0 {
+		return
+	}
+	for shapeID, fact := range fn.FieldPolyShapeCatalog {
+		if shapeID == 0 || fact.ShapeID != shapeID || len(fact.FieldNames) == 0 || len(fact.FieldTypes) == 0 {
+			continue
+		}
+		for fieldIdx, name := range fact.FieldNames {
+			typ := fact.FieldTypes[name]
+			runtimeType, ok := irTypeToRuntimeValueType(typ)
+			if !ok || runtimeType == runtime.TypeNil {
+				continue
+			}
+			before, stableBefore := runtime.ShapeFieldStableType(shapeID, fieldIdx)
+			runtime.ObserveShapeFieldValueType(shapeID, fieldIdx, runtimeType)
+			after, stableAfter := runtime.ShapeFieldStableType(shapeID, fieldIdx)
+			if !stableBefore || before != after {
+				state := "mixed"
+				if stableAfter {
+					state = fmt.Sprintf("%v", after)
+				}
+				functionRemarks(fn).Add("ShapeFieldTypeGuard", "changed", 0, 0, OpNop,
+					fmt.Sprintf("seeded catalog shape %d field %d type as %s", shapeID, fieldIdx, state))
+			}
+		}
+	}
 }
 
 func seedShapeFieldTypesFromFixedConstructors(fn *Function) {

@@ -1961,9 +1961,10 @@ func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes m
 }
 
 func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact) {
+	mutableFields := collectFixedShapeMutableFields(fn)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if annotateFixedShapeFieldLoad(fn, block, instr, facts) {
+			if annotateFixedShapeFieldLoad(fn, block, instr, facts, mutableFields) {
 				continue
 			}
 			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
@@ -1994,7 +1995,7 @@ func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact
 			if typ, ok := fact.FieldTypes[name]; ok && typ != TypeUnknown && typ != TypeAny {
 				instr.Type = typ
 			}
-			if r, ok := fact.FieldRanges[name]; ok && r.known {
+			if r, ok := fact.FieldRanges[name]; ok && r.known && !fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, idx) {
 				if fn.ProfiledIntRanges == nil {
 					fn.ProfiledIntRanges = make(map[int]intRange)
 				}
@@ -2005,7 +2006,7 @@ func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("field %q carries guarded int range [%d,%d]", name, r.min, r.max))
 			}
-			if r, ok := fact.FieldLenRanges[name]; ok && r.known {
+			if r, ok := fact.FieldLenRanges[name]; ok && r.known && !fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, idx) {
 				recordProfiledLenRange(fn, instr.ID, r)
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("field %q carries guarded string-len range [%d,%d]", name, r.min, r.max))
@@ -2078,7 +2079,7 @@ func tableKeyProvenString(fn *Function, instr *Instr, key *Value) bool {
 	return instr.SourcePC < len(proto.Feedback) && proto.Feedback[instr.SourcePC].Right == vm.FBString
 }
 
-func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts map[int]FixedShapeTableFact) bool {
+func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool) bool {
 	if instr == nil || (instr.Op != OpFieldLoad && instr.Op != OpFieldLoadNumToFloat) || len(instr.Args) == 0 || instr.Args[0] == nil {
 		return false
 	}
@@ -2098,7 +2099,14 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 	if typ, ok := fact.FieldTypes[name]; ok && typ != TypeUnknown && typ != TypeAny && instr.Op == OpFieldLoad {
 		instr.Type = typ
 	}
-	if r, ok := fact.FieldRanges[name]; ok && r.known {
+	fieldMayMutate := fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, fieldIdx)
+	if fieldMayMutate && fn.ProfiledIntRanges != nil {
+		delete(fn.ProfiledIntRanges, instr.ID)
+	}
+	if fieldMayMutate && fn.ProfiledLenRanges != nil {
+		delete(fn.ProfiledLenRanges, instr.ID)
+	}
+	if r, ok := fact.FieldRanges[name]; ok && r.known && !fieldMayMutate {
 		if fn.ProfiledIntRanges == nil {
 			fn.ProfiledIntRanges = make(map[int]intRange)
 		}
@@ -2109,7 +2117,7 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 		functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 			fmt.Sprintf("field-load %q carries guarded int range [%d,%d]", name, r.min, r.max))
 	}
-	if r, ok := fact.FieldLenRanges[name]; ok && r.known {
+	if r, ok := fact.FieldLenRanges[name]; ok && r.known && !fieldMayMutate {
 		recordProfiledLenRange(fn, instr.ID, r)
 		functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 			fmt.Sprintf("field-load %q carries guarded string-len range [%d,%d]", name, r.min, r.max))
@@ -2128,6 +2136,44 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 		}
 	}
 	return true
+}
+
+func collectFixedShapeMutableFields(fn *Function) map[uint32]map[int]bool {
+	mutable := make(map[uint32]map[int]bool)
+	if fn == nil {
+		return mutable
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpFieldStore || len(instr.Args) == 0 || instr.Args[0] == nil {
+				continue
+			}
+			svals := instr.Args[0].Def
+			if svals == nil || svals.Op != OpFieldSvals || svals.Aux == 0 {
+				continue
+			}
+			fieldIdx := int(instr.Aux)
+			if fieldIdx < 0 {
+				continue
+			}
+			shapeID := uint32(svals.Aux)
+			if mutable[shapeID] == nil {
+				mutable[shapeID] = make(map[int]bool)
+			}
+			mutable[shapeID][fieldIdx] = true
+		}
+	}
+	return mutable
+}
+
+func fixedShapeFieldMayMutate(mutable map[uint32]map[int]bool, shapeID uint32, fieldIdx int) bool {
+	if len(mutable) == 0 || shapeID == 0 || fieldIdx < 0 {
+		return false
+	}
+	return mutable[shapeID][fieldIdx]
 }
 
 func fixedShapeFactForFieldSvals(fn *Function, facts map[int]FixedShapeTableFact, svals *Instr) (FixedShapeTableFact, bool) {

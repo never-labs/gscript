@@ -27,17 +27,12 @@ func (tm *TieringManager) structuralKernelTieringDecision(proto *vm.FuncProto) (
 			callee: callee,
 		}, true
 	}
-	if vm.IsMatrixMultiplyKernelProto(proto) {
-		return tieringKernelDecision{reason: "whole_call_matrix multiply_kernel"}, true
-	}
-	if vm.IsBoolTableStrikeCountKernelProto(proto) {
-		return tieringKernelDecision{reason: "whole_call_bool_table_strike_count_kernel"}, true
-	}
-	if tm.hasLargeRecordPairwiseAdvanceDriverLoop(proto) {
-		return tieringKernelDecision{reason: "large_whole_call_record_loop"}, true
-	}
-	if tm.hasIntPredicateReductionDriverLoop(proto) {
-		return tieringKernelDecision{reason: "whole_call_int_predicate_reduction_loop"}, true
+	if info, ok := tm.driverLoopKernelForTiering(proto); ok {
+		return tieringKernelDecision{
+			reason: "driver_loop_structural_kernel",
+			kernel: info.Name,
+			route:  string(info.Route),
+		}, true
 	}
 	return tieringKernelDecision{}, false
 }
@@ -78,9 +73,23 @@ func (tm *TieringManager) disableForStructuralKernelTiering(proto *vm.FuncProto,
 }
 
 func recognizedWholeCallKernelForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
+	if vm.IsRawIntNestedKernelProto(proto) {
+		return vm.KernelInfo{
+			Name:    "nested_int_recurrence",
+			Route:   vm.KernelRouteWholeCallValue,
+			Arity:   2,
+			Results: 1,
+		}, true
+	}
 	for _, info := range vm.RecognizedWholeCallKernels(proto) {
 		if info.Route == vm.KernelRouteWholeCallValue &&
-			(info.Name == "record_walk_fold" || info.Name == "int_grid_aggregate") {
+			(info.Name == "record_walk_fold" ||
+				info.Name == "int_grid_aggregate" ||
+				info.Name == "permutation_flip_checksum" ||
+				info.Name == "bool_table_strike_count" ||
+				info.Name == "matrix_multiply" ||
+				info.Name == "lazy_recursive_table_builder" ||
+				info.Name == "lazy_recursive_table_fold") {
 			return info, true
 		}
 		if info.Route == vm.KernelRouteWholeCallNoResult && protoHasFloatConstant(proto) {
@@ -125,52 +134,16 @@ func (tm *TieringManager) wholeCallKernelCalleeForTiering(proto *vm.FuncProto) (
 	return nil, vm.KernelInfo{}, false
 }
 
-func (tm *TieringManager) hasLargeRecordPairwiseAdvanceDriverLoop(proto *vm.FuncProto) bool {
-	if tm == nil || proto == nil {
-		return false
+func (tm *TieringManager) driverLoopKernelForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
+	if tm == nil || tm.envTier2NoFilter || proto == nil {
+		return vm.KernelInfo{}, false
 	}
 	globals := tm.buildLoopCallGlobals(proto)
 	if len(globals) == 0 {
-		return false
+		return vm.KernelInfo{}, false
 	}
-	globalNums := stableNumericGlobals(proto)
-	for pc, inst := range proto.Code {
-		if vm.DecodeOp(inst) != vm.OP_FORPREP {
-			continue
-		}
-		a := vm.DecodeA(inst)
-		steps, ok := staticForTripCount(proto, globalNums, pc, a)
-		if !ok || steps < 1024 {
-			continue
-		}
-		if vm.IsRecordPairwiseAdvanceDriverLoopAt(proto, pc, globals) {
-			return true
-		}
+	for _, info := range vm.RecognizedDriverLoopKernels(proto, globals) {
+		return info, true
 	}
-	return false
-}
-
-func (tm *TieringManager) hasIntPredicateReductionDriverLoop(proto *vm.FuncProto) bool {
-	if tm == nil || proto == nil {
-		return false
-	}
-	globals := tm.buildLoopCallGlobals(proto)
-	if len(globals) == 0 {
-		return false
-	}
-	globalNums := stableNumericGlobals(proto)
-	for pc, inst := range proto.Code {
-		if vm.DecodeOp(inst) != vm.OP_FORPREP {
-			continue
-		}
-		a := vm.DecodeA(inst)
-		steps, ok := staticForTripCount(proto, globalNums, pc, a)
-		if !ok || steps < 1024 {
-			continue
-		}
-		if vm.IsIntPredicateReductionLoopAt(proto, pc, globals) {
-			return true
-		}
-	}
-	return false
+	return vm.KernelInfo{}, false
 }

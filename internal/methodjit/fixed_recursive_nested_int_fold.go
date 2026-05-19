@@ -327,34 +327,34 @@ func (p *fixedRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int64,
 }
 
 func (p *fixedRecursiveNestedIntFoldProtocol) foldSmallRows(m, n int64) (int64, bool) {
-	if p.baseAdd != 1 || p.mStep != 1 || p.nStep != 1 {
+	if p.mStep != 1 || p.nStep != 1 {
 		return 0, false
 	}
+	a := p.baseAdd
 	z := p.zeroArg
 	switch m {
 	case 0:
-		return fixedFoldCheckedAdd(n, 1)
+		return fixedFoldCheckedAdd(n, a)
 	case 1:
-		out, ok := fixedFoldCheckedAdd(n, z)
+		count, ok := fixedFoldCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
-		return fixedFoldCheckedAdd(out, 1)
+		delta, ok := fixedNestedCheckedMul(a, count)
+		if !ok {
+			return 0, false
+		}
+		return fixedFoldCheckedAdd(z, delta)
 	case 2:
 		count, ok := fixedFoldCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
-		step, ok := fixedFoldCheckedAdd(z, 1)
-		if !ok {
-			return 0, false
-		}
-		product, ok := fixedNestedCheckedMul(count, step)
-		if !ok {
-			return 0, false
-		}
-		return fixedFoldCheckedAdd(z, product)
+		return fixedNestedAffineIterate(a, z+a, z, count)
 	case 3:
+		if a != 1 {
+			return 0, false
+		}
 		count, ok := fixedFoldCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
@@ -403,6 +403,31 @@ func fixedNestedCheckedMul(a, b int64) (int64, bool) {
 		return 0, false
 	}
 	return out, true
+}
+
+func fixedNestedAffineIterate(scale, bias, x, count int64) (int64, bool) {
+	if count < 0 {
+		return 0, false
+	}
+	if scale == 1 {
+		delta, ok := fixedNestedCheckedMul(bias, count)
+		if !ok {
+			return 0, false
+		}
+		return fixedFoldCheckedAdd(x, delta)
+	}
+	result := x
+	for i := int64(0); i < count; i++ {
+		next, ok := fixedNestedCheckedMul(scale, result)
+		if !ok {
+			return 0, false
+		}
+		result, ok = fixedFoldCheckedAdd(next, bias)
+		if !ok {
+			return 0, false
+		}
+	}
+	return result, true
 }
 
 func fixedNestedCheckedPow(base, exp int64) (int64, bool) {

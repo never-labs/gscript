@@ -57,6 +57,21 @@ func (ec *emitContext) emitPrepareFieldTablePtr(tblValueID int, shapeID uint32, 
 		ec.shapeVerified[tblValueID] = shapeID
 		return false
 	}
+	if ec.tableValueAlreadyChecked(tblValueID) {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+		ec.tableVerified[tblValueID] = true
+		if prevShape, ok := ec.shapeVerified[tblValueID]; ok && prevShape == shapeID {
+			return true
+		}
+		asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
+		emitCMPWConst(asm, jit.X1, jit.X2, int64(shapeID))
+		asm.BCond(jit.CondNE, deoptLabel)
+		ec.shapeVerified[tblValueID] = shapeID
+		return false
+	}
 	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
 	if tblReg != jit.X0 {
 		asm.MOVreg(jit.X0, tblReg)
@@ -78,6 +93,22 @@ func (ec *emitContext) emitPrepareFieldTablePtr(tblValueID int, shapeID uint32, 
 	return false
 }
 
+func (ec *emitContext) tableValueAlreadyChecked(valueID int) bool {
+	if ec == nil || ec.irTypes == nil || ec.irTypes[valueID] != TypeTable || ec.valueDefs == nil {
+		return false
+	}
+	def := ec.valueDefs[valueID]
+	if def == nil {
+		return false
+	}
+	switch def.Op {
+	case OpTableArrayLoad, OpNewFixedTable:
+		return true
+	default:
+		return false
+	}
+}
+
 func (ec *emitContext) emitTableShapeID(instr *Instr) {
 	if len(instr.Args) < 1 {
 		return
@@ -86,12 +117,20 @@ func (ec *emitContext) emitTableShapeID(instr *Instr) {
 	deoptLabel := ec.uniqueLabel("table_shape_deopt")
 	doneLabel := ec.uniqueLabel("table_shape_done")
 	tblID := instr.Args[0].ID
-	tblReg := ec.resolveValueNB(tblID, jit.X0)
+	rawTablePtr := ec.valueReprOf(tblID) == valueReprRawTablePtr
+	var tblReg jit.Reg
+	if rawTablePtr {
+		tblReg = ec.resolveRawTablePtr(tblID, jit.X0)
+	} else {
+		tblReg = ec.resolveValueNB(tblID, jit.X0)
+	}
 	if tblReg != jit.X0 {
 		asm.MOVreg(jit.X0, tblReg)
 	}
 	if ec.tableVerified[tblID] || ec.irTypes[tblID] == TypeTable {
-		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+		if !rawTablePtr {
+			jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+		}
 	} else {
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, deoptLabel)
 		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
@@ -796,6 +835,16 @@ func (ec *emitContext) emitFieldLoad(instr *Instr) {
 		ec.storeRawFloat(dstF, instr.ID)
 		return
 	}
+	if instr.Type == TypeInt && ec.fieldLoadTypeCheckElided(instr) {
+		dst := jit.X0
+		if pr, ok := ec.alloc.ValueRegs[instr.ID]; ok && !pr.IsFloat {
+			dst = jit.Reg(pr.Reg)
+		}
+		ec.asm.LDR(dst, svals, fieldIdx*jit.ValueSize)
+		ec.asm.SBFX(dst, dst, 0, 48)
+		ec.storeRawInt(dst, instr.ID)
+		return
+	}
 	ec.asm.LDR(jit.X0, svals, fieldIdx*jit.ValueSize)
 	if instr.Type == TypeFloat || instr.Type == TypeInt {
 		typeDeoptLabel := ec.uniqueLabel("field_load_type_deopt")
@@ -922,8 +971,10 @@ func (ec *emitContext) emitStoreTypedFieldLoad(instr *Instr, valReg jit.Reg, typ
 		if valReg != jit.X0 {
 			ec.asm.MOVreg(jit.X0, valReg)
 		}
-		emitCheckIsInt(ec.asm, jit.X0, jit.X2)
-		ec.asm.BCond(jit.CondNE, typeDeoptLabel)
+		if !ec.fieldLoadTypeCheckElided(instr) {
+			emitCheckIsInt(ec.asm, jit.X0, jit.X2)
+			ec.asm.BCond(jit.CondNE, typeDeoptLabel)
+		}
 		jit.EmitUnboxInt(ec.asm, jit.X0, jit.X0)
 		ec.storeRawInt(jit.X0, instr.ID)
 		return

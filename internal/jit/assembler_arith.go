@@ -28,6 +28,12 @@ func (a *Assembler) SUBreg(rd, rn, rm Reg) {
 	a.emit(0xCB000000 | uint32(rm)<<16 | uint32(rn)<<5 | uint32(rd))
 }
 
+// SUBregLSL: Xd = Xn - (Xm << shift) (64-bit, LSL shift 0-63)
+func (a *Assembler) SUBregLSL(rd, rn, rm Reg, shift uint8) {
+	// 1|10|01011|00|0|Rm|imm6|Rn|Rd  (shift_type=00=LSL)
+	a.emit(0xCB000000 | uint32(rm)<<16 | uint32(shift&0x3F)<<10 | uint32(rn)<<5 | uint32(rd))
+}
+
 // SUBimm: Xd = Xn - #imm12 (64-bit, no shift)
 func (a *Assembler) SUBimm(rd, rn Reg, imm12 uint16) {
 	// 1|10|100010|0|imm12|Rn|Rd

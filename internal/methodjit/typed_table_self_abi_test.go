@@ -72,8 +72,8 @@ root := makeTree(5)
 	if cf == nil {
 		t.Fatal("missing Tier 2 compiled checkTree")
 	}
-	if cf.ProtocolKind() != compiledProtocolFixedRecursiveTableFold && !cf.TypedSelfABI.Eligible {
-		t.Fatalf("compiled checkTree used neither fixed table fold nor typed ABI: protocol=%s typed=%+v", cf.ProtocolKind(), cf.TypedSelfABI)
+	if !cf.TypedSelfABI.Eligible {
+		t.Fatalf("compiled checkTree did not use typed ABI: protocol=%s typed=%+v", cf.ProtocolKind(), cf.TypedSelfABI)
 	}
 
 	checkTree.EnteredTier2 = 0

@@ -15,6 +15,7 @@ package methodjit
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/gscript/gscript/internal/jit"
 	"github.com/gscript/gscript/internal/vm"
@@ -191,7 +192,7 @@ func (ec *emitContext) emitGuardCalleeProto(instr *Instr) {
 	asm.LoadImm64(jit.X2, instr.Aux)
 	asm.CMPreg(jit.X1, jit.X2)
 	asm.BCond(jit.CondNE, deoptLabel)
-	ec.storeResultNB(jit.X0, instr.ID)
+	ec.storeResultNBIfUsed(jit.X0, instr.ID)
 	asm.B(doneLabel)
 	asm.Label(deoptLabel)
 	ec.emitDeopt(instr)
@@ -218,6 +219,18 @@ func (ec *emitContext) emitGuardFieldCalleeProto(instr *Instr) {
 	asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
 	ec.rememberFieldSvalsCache(tblValueID, shapeID)
 
+	if exactClosure := ec.guardFieldCalleeExactClosure(instr, shapeID, fieldIdx); exactClosure != 0 {
+		asm.LoadImm64(jit.X2, nbClosureTagBits|int64(exactClosure))
+		asm.CMPreg(jit.X0, jit.X2)
+		asm.BCond(jit.CondNE, deoptLabel)
+		ec.storeResultNBIfUsed(jit.X0, instr.ID)
+		asm.B(doneLabel)
+		asm.Label(deoptLabel)
+		ec.emitDeopt(instr)
+		asm.Label(doneLabel)
+		return
+	}
+
 	asm.LSRimm(jit.X1, jit.X0, 48)
 	asm.MOVimm16(jit.X2, jit.NB_TagPtrShr48)
 	asm.CMPreg(jit.X1, jit.X2)
@@ -232,11 +245,29 @@ func (ec *emitContext) emitGuardFieldCalleeProto(instr *Instr) {
 	asm.LoadImm64(jit.X2, instr.Aux)
 	asm.CMPreg(jit.X1, jit.X2)
 	asm.BCond(jit.CondNE, deoptLabel)
-	ec.storeResultNB(jit.X0, instr.ID)
+	ec.storeResultNBIfUsed(jit.X0, instr.ID)
 	asm.B(doneLabel)
 	asm.Label(deoptLabel)
 	ec.emitDeopt(instr)
 	asm.Label(doneLabel)
+}
+
+func (ec *emitContext) guardFieldCalleeExactClosure(instr *Instr, shapeID uint32, fieldIdx int) uintptr {
+	if ec == nil || ec.fn == nil || instr == nil || shapeID == 0 || fieldIdx < 0 || instr.Aux == 0 {
+		return 0
+	}
+	cases := ec.fn.FieldPolyShapeFacts[instr.ID]
+	if len(cases) != 1 {
+		return 0
+	}
+	c := cases[0]
+	if c.ShapeID != shapeID || c.FieldIdx != fieldIdx || c.VMClosure == 0 || c.VMProto == nil {
+		return 0
+	}
+	if uintptr(instr.Aux) != uintptr(unsafe.Pointer(c.VMProto)) {
+		return 0
+	}
+	return c.VMClosure
 }
 
 func (ec *emitContext) emitGuardConstString(instr *Instr) {
@@ -380,8 +411,7 @@ func (ec *emitContext) emitFloor(instr *Instr) {
 		return
 	}
 	if ec.hasFPReg(argID) {
-		asm.FRINTMd(jit.D0, ec.physFPReg(argID))
-		asm.FCVTZS(jit.X0, jit.D0)
+		asm.FCVTMS(jit.X0, ec.physFPReg(argID))
 		ec.storeRawInt(jit.X0, instr.ID)
 		return
 	}
@@ -407,8 +437,7 @@ func (ec *emitContext) emitFloor(instr *Instr) {
 	asm.CMPreg(jit.X2, jit.X3)
 	asm.BCond(jit.CondGE, deoptLabel)
 	asm.FMOVtoFP(jit.D0, jit.X0)
-	asm.FRINTMd(jit.D0, jit.D0)
-	asm.FCVTZS(jit.X0, jit.D0)
+	asm.FCVTMS(jit.X0, jit.D0)
 	ec.storeRawInt(jit.X0, instr.ID)
 	asm.B(doneLabel)
 

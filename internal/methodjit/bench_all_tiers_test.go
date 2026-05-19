@@ -134,33 +134,35 @@ func allBenchTier2(b *testing.B, src string, args []runtime.Value) {
 // Sum(N) benchmarks -- N = 100, 1000, 10000
 // ---------------------------------------------------------------------------
 
-func BenchmarkAll_VM_Sum100(b *testing.B)    { allBenchVM(b, allSrcSum, intArgs(100)) }
-func BenchmarkAll_T1_Sum100(b *testing.B)    { allBenchTier1(b, allSrcSum, intArgs(100)) }
-func BenchmarkAll_T2_Sum100(b *testing.B)    { allBenchTier2(b, allSrcSum, intArgs(100)) }
+func BenchmarkAll_VM_Sum100(b *testing.B) { allBenchVM(b, allSrcSum, intArgs(100)) }
+func BenchmarkAll_T1_Sum100(b *testing.B) { allBenchTier1(b, allSrcSum, intArgs(100)) }
+func BenchmarkAll_T2_Sum100(b *testing.B) { allBenchTier2(b, allSrcSum, intArgs(100)) }
 
-func BenchmarkAll_VM_Sum1000(b *testing.B)   { allBenchVM(b, allSrcSum, intArgs(1000)) }
-func BenchmarkAll_T1_Sum1000(b *testing.B)   { allBenchTier1(b, allSrcSum, intArgs(1000)) }
-func BenchmarkAll_T2_Sum1000(b *testing.B)   { allBenchTier2(b, allSrcSum, intArgs(1000)) }
+func BenchmarkAll_VM_Sum1000(b *testing.B) { allBenchVM(b, allSrcSum, intArgs(1000)) }
+func BenchmarkAll_T1_Sum1000(b *testing.B) { allBenchTier1(b, allSrcSum, intArgs(1000)) }
+func BenchmarkAll_T2_Sum1000(b *testing.B) { allBenchTier2(b, allSrcSum, intArgs(1000)) }
 
-func BenchmarkAll_VM_Sum10000(b *testing.B)  { allBenchVM(b, allSrcSum, intArgs(10000)) }
-func BenchmarkAll_T1_Sum10000(b *testing.B)  { allBenchTier1(b, allSrcSum, intArgs(10000)) }
-func BenchmarkAll_T2_Sum10000(b *testing.B)  { allBenchTier2(b, allSrcSum, intArgs(10000)) }
+func BenchmarkAll_VM_Sum10000(b *testing.B) { allBenchVM(b, allSrcSum, intArgs(10000)) }
+func BenchmarkAll_T1_Sum10000(b *testing.B) { allBenchTier1(b, allSrcSum, intArgs(10000)) }
+func BenchmarkAll_T2_Sum10000(b *testing.B) { allBenchTier2(b, allSrcSum, intArgs(10000)) }
 
 // ---------------------------------------------------------------------------
 // Add(a, b) -- single integer arithmetic
 // ---------------------------------------------------------------------------
 
-func BenchmarkAll_VM_Add(b *testing.B)  { allBenchVM(b, allSrcAdd, intArgs(3, 4)) }
-func BenchmarkAll_T1_Add(b *testing.B)  { allBenchTier1(b, allSrcAdd, intArgs(3, 4)) }
-func BenchmarkAll_T2_Add(b *testing.B)  { allBenchTier2(b, allSrcAdd, intArgs(3, 4)) }
+func BenchmarkAll_VM_Add(b *testing.B) { allBenchVM(b, allSrcAdd, intArgs(3, 4)) }
+func BenchmarkAll_T1_Add(b *testing.B) { allBenchTier1(b, allSrcAdd, intArgs(3, 4)) }
+func BenchmarkAll_T2_Add(b *testing.B) { allBenchTier2(b, allSrcAdd, intArgs(3, 4)) }
 
 // ---------------------------------------------------------------------------
 // Fib(10) -- recursive calls
 // ---------------------------------------------------------------------------
 
 func BenchmarkAll_VM_Fib10(b *testing.B) { allBenchVM(b, allSrcFib, intArgs(10)) }
+
 // Note: Tier 1 fib(10) has a known deep-recursion bug; included for comparison.
 func BenchmarkAll_T1_Fib10(b *testing.B) { allBenchTier1(b, allSrcFib, intArgs(10)) }
+
 // Note: Tier 2 standalone Execute does not support recursive calls (no call
 // instruction). Fib(10) would require call-exit. Omitted intentionally.
 
@@ -168,9 +170,9 @@ func BenchmarkAll_T1_Fib10(b *testing.B) { allBenchTier1(b, allSrcFib, intArgs(1
 // Branch -- if/else (no loops, no calls)
 // ---------------------------------------------------------------------------
 
-func BenchmarkAll_VM_Branch(b *testing.B)  { allBenchVM(b, allSrcBranch, intArgs(15)) }
-func BenchmarkAll_T1_Branch(b *testing.B)  { allBenchTier1(b, allSrcBranch, intArgs(15)) }
-func BenchmarkAll_T2_Branch(b *testing.B)  { allBenchTier2(b, allSrcBranch, intArgs(15)) }
+func BenchmarkAll_VM_Branch(b *testing.B) { allBenchVM(b, allSrcBranch, intArgs(15)) }
+func BenchmarkAll_T1_Branch(b *testing.B) { allBenchTier1(b, allSrcBranch, intArgs(15)) }
+func BenchmarkAll_T2_Branch(b *testing.B) { allBenchTier2(b, allSrcBranch, intArgs(15)) }
 
 // ---------------------------------------------------------------------------
 // FloatAdd -- float arithmetic
@@ -178,6 +180,6 @@ func BenchmarkAll_T2_Branch(b *testing.B)  { allBenchTier2(b, allSrcBranch, intA
 
 var floatArgs = []runtime.Value{runtime.FloatValue(1.5), runtime.FloatValue(2.5)}
 
-func BenchmarkAll_VM_FloatAdd(b *testing.B)  { allBenchVM(b, allSrcFloatAdd, floatArgs) }
-func BenchmarkAll_T1_FloatAdd(b *testing.B)  { allBenchTier1(b, allSrcFloatAdd, floatArgs) }
-func BenchmarkAll_T2_FloatAdd(b *testing.B)  { allBenchTier2(b, allSrcFloatAdd, floatArgs) }
+func BenchmarkAll_VM_FloatAdd(b *testing.B) { allBenchVM(b, allSrcFloatAdd, floatArgs) }
+func BenchmarkAll_T1_FloatAdd(b *testing.B) { allBenchTier1(b, allSrcFloatAdd, floatArgs) }
+func BenchmarkAll_T2_FloatAdd(b *testing.B) { allBenchTier2(b, allSrcFloatAdd, floatArgs) }

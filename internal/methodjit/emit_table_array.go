@@ -144,6 +144,27 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 		asm.MOVimm16(jit.X5, 1)
 		asm.STRB(jit.X5, cfg.tableReg, jit.TableOffKeysDirty)
 	}
+	emitZeroValidForTypedStore := func() {
+		if cfg.kind != int64(vm.FBKindInt) && cfg.kind != int64(vm.FBKindFloat) {
+			return
+		}
+		scratch := jit.X17
+		if scratch == cfg.tableReg || scratch == cfg.keyReg || scratch == cfg.dataReg {
+			scratch = jit.X16
+		}
+		if scratch == cfg.tableReg || scratch == cfg.keyReg || scratch == cfg.dataReg {
+			scratch = jit.X5
+		}
+		if scratch == cfg.tableReg || scratch == cfg.keyReg || scratch == cfg.dataReg {
+			scratch = jit.X6
+		}
+		nonZeroLabel := ec.uniqueLabel(cfg.labelPrefix + "_nonzero_key")
+		asm.CMPimm(cfg.keyReg, 0)
+		asm.BCond(jit.CondNE, nonZeroLabel)
+		asm.MOVimm16(scratch, 1)
+		asm.STRB(scratch, cfg.tableReg, jit.TableOffArrayZeroValid)
+		asm.Label(nonZeroLabel)
+	}
 	emitSuccess := func() {
 		if !cfg.fallthroughOnSuccess {
 			asm.B(cfg.successLabel)
@@ -224,6 +245,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 		emitBounds(false)
 		asm.Label(storeLabel)
 		emitLoadData()
+		emitZeroValidForTypedStore()
 		asm.STRreg(jit.X4, cfg.dataReg, cfg.keyReg)
 		emitSuccess()
 		emitGrowPaths(true)
@@ -244,6 +266,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 		emitBounds(false)
 		asm.Label(storeLabel)
 		emitLoadData()
+		emitZeroValidForTypedStore()
 		if valueHasRawFPR {
 			valFPR := ec.resolveRawFloat(cfg.valueID, jit.D0)
 			asm.FSTRdReg(valFPR, cfg.dataReg, cfg.keyReg)
@@ -459,8 +482,21 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		asm.BCond(jit.CondGE, deoptLabel)
 	}
 	if tableArrayLoadNeedsZeroValidGuard(instr) && !ec.tableArrayKeyKnownNonZero(keyID) {
+		zeroKeyOKLabel := ec.uniqueLabel("tarr_load_zero_key_ok")
+		zeroKeyDoneLabel := ec.uniqueLabel("tarr_load_zero_key_done")
 		asm.CMPimm(jit.X1, 0)
-		asm.BCond(jit.CondEQ, deoptLabel)
+		asm.BCond(jit.CondNE, zeroKeyDoneLabel)
+		if headerValue, ok := tableArrayLoadHeaderValue(instr); ok {
+			tblReg := ec.resolveRawTablePtr(headerValue.ID, jit.X4)
+			if tblReg != jit.X4 {
+				asm.MOVreg(jit.X4, tblReg)
+			}
+			asm.LDRB(jit.X5, jit.X4, jit.TableOffArrayZeroValid)
+			asm.CBNZ(jit.X5, zeroKeyOKLabel)
+		}
+		asm.B(deoptLabel)
+		asm.Label(zeroKeyOKLabel)
+		asm.Label(zeroKeyDoneLabel)
 	}
 
 	switch instr.Aux {
@@ -792,7 +828,9 @@ func (ec *emitContext) emitTableArraySwapPairs(instr *Instr) {
 func tableArrayStoreNeedsTablePtr(kind, flags int64) bool {
 	return flags&tableArrayStoreFlagAllowGrow != 0 ||
 		kind == int64(vm.FBKindMixed) ||
-		kind == int64(vm.FBKindBool)
+		kind == int64(vm.FBKindBool) ||
+		kind == int64(vm.FBKindInt) ||
+		kind == int64(vm.FBKindFloat)
 }
 
 func (ec *emitContext) emitTableArrayNestedLoad(instr *Instr) {
@@ -941,7 +979,11 @@ func tableArrayLoadNeedsZeroValidGuard(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	return instr.Aux == int64(vm.FBKindInt) || instr.Aux == int64(vm.FBKindFloat)
+	// Typed-array loads are only lowered after table feedback has observed a
+	// present numeric element at the access site. Stores must maintain
+	// arrayZeroValid for key 0 so later generic reads preserve nil-vs-zero
+	// semantics; the load fast path can then use the typed backing directly.
+	return false
 }
 
 func tableArrayLoadHeaderValue(instr *Instr) (*Value, bool) {

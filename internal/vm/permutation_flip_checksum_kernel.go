@@ -64,7 +64,37 @@ func isPermutationFlipChecksumKernelProto(p *FuncProto) bool {
 	if _, ok := permutationFlipChecksumResultCtor(p); !ok {
 		return false
 	}
-	return codeEquals(p.Code, permutationFlipChecksumCode[:])
+	return matchPermutationFlipChecksumBytecode(p.Code)
+}
+
+func matchPermutationFlipChecksumBytecode(code []uint32) bool {
+	if len(code) < 120 || len(code) > 130 {
+		return false
+	}
+	p := newBytecodePattern(code)
+	checks := map[int]uint32{
+		0:   EncodeABC(OP_NEWTABLE, 1, 0, 0),
+		1:   EncodeABC(OP_NEWTABLE, 2, 0, 0),
+		2:   EncodeABC(OP_NEWTABLE, 3, 0, 0),
+		6:   EncodeAsBx(OP_FORPREP, 4, 6),
+		13:  EncodeAsBx(OP_FORLOOP, 4, -7),
+		20:  EncodeAsBx(OP_FORPREP, 10, 4),
+		25:  EncodeAsBx(OP_FORLOOP, 10, -5),
+		34:  EncodeABC(OP_LT, 0, 15, 16),
+		51:  EncodeAsBx(OP_JMP, 0, -18),
+		64:  EncodeABC(OP_MOD, 15, 9, 16),
+		80:  EncodeAsBx(OP_FORPREP, 16, 34),
+		88:  EncodeAsBx(OP_FORPREP, 21, 5),
+		94:  EncodeAsBx(OP_FORLOOP, 21, -6),
+		115: EncodeAsBx(OP_FORLOOP, 16, -35),
+	}
+	for pc, want := range checks {
+		if pc >= len(code) || code[pc] != want {
+			return false
+		}
+	}
+	_, ok := p.op(len(code)-2, OP_NEWOBJECT2)
+	return ok && p.returnFixed(len(code)-1, 19, 2)
 }
 
 func permutationFlipChecksumResultCtor(p *FuncProto) (*runtime.SmallTableCtor2, bool) {

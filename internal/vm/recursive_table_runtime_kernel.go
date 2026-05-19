@@ -66,9 +66,6 @@ func (vm *VM) tryRunRecursiveTableValueKernel(cl *Closure, args []runtime.Value)
 		return false, nil, nil
 	}
 	proto := cl.Proto
-	if vm.methodJIT == nil || !proto.Tier2Promoted {
-		return false, nil, nil
-	}
 	cache := recursiveTableKernelForProto(proto)
 	if !cache.analyzed {
 		return false, nil, nil
@@ -105,9 +102,6 @@ func (vm *VM) tryRecursiveTableBuildFoldRegion(frame *CallFrame, base int, build
 		return false, nil
 	}
 	builderProto := builderCl.Proto
-	if vm.methodJIT == nil || !builderProto.Tier2Promoted {
-		return false, nil
-	}
 	builderCache := recursiveTableKernelForProto(builderProto)
 	if builderCache.builder == nil || !vm.recursiveTableSelfGlobalMatches(builderCl, builderCache.builder.selfName) {
 		return false, nil
@@ -132,9 +126,6 @@ func (vm *VM) tryRecursiveTableBuildFoldRegion(frame *CallFrame, base int, build
 		return false, nil
 	}
 	foldProto := foldCl.Proto
-	if !foldProto.Tier2Promoted {
-		return false, nil
-	}
 	foldCache := recursiveTableKernelForProto(foldProto)
 	if foldCache.fold == nil {
 		return false, nil

@@ -79,12 +79,12 @@ func SimplifyPhisPass(fn *Function) (*Function, error) {
 	// Tarjan SCC on the phi-subgraph. Nodes are phi IDs, edges are
 	// phi -> arg.Def where arg.Def is another phi in phiSet.
 	var (
-		index    = 0
-		indices  = make(map[int]int)
-		lowlink  = make(map[int]int)
-		onStack  = make(map[int]bool)
-		stack    = make([]*Instr, 0, len(phis))
-		sccs     = make([][]*Instr, 0) // reverse-topological
+		index   = 0
+		indices = make(map[int]int)
+		lowlink = make(map[int]int)
+		onStack = make(map[int]bool)
+		stack   = make([]*Instr, 0, len(phis))
+		sccs    = make([][]*Instr, 0) // reverse-topological
 	)
 
 	var strongconnect func(*Instr)

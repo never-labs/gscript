@@ -861,34 +861,6 @@ func ack(m, n) {
 	}
 }
 
-func TestShouldPromoteTier2_FixedRecursiveTableFoldPromotes(t *testing.T) {
-	// The general typed table self ABI stays closed for default admission, but
-	// the exact binary_trees-style fixed walker now has a whole-call protocol
-	// that avoids recursive boxed/Tier2 frame entry.
-	src := `
-func checkTree(node) {
-	if node.left == nil { return 1 }
-	return 1 + checkTree(node.left) + checkTree(node.right)
-}
-`
-	proto := compileProto(t, src)
-	checkProto := proto.Protos[0]
-	checkProto.EnsureFeedback()
-	checkProto.Feedback[8].Result = vm.FBTable
-	checkProto.Feedback[12].Result = vm.FBTable
-	p := analyzeFuncProfile(checkProto)
-
-	if abi := AnalyzeTypedSelfABI(checkProto); !abi.Eligible {
-		t.Fatalf("expected typed table self ABI candidate, got %s", abi.RejectWhy)
-	}
-	if !qualifiesForFixedRecursiveTableFold(checkProto) {
-		t.Fatal("expected fixed recursive table fold protocol candidate")
-	}
-	if !shouldPromoteTier2(checkProto, p, 2) {
-		t.Error("fixed recursive table fold protocol should auto-promote once hot")
-	}
-}
-
 func TestShouldPromoteTier2_TypedTableSelfNonFoldStaysClosed(t *testing.T) {
 	src := `
 func walk(node) {
@@ -905,9 +877,6 @@ func walk(node) {
 
 	if abi := AnalyzeTypedSelfABI(walkProto); !abi.Eligible {
 		t.Fatalf("expected typed table self ABI candidate, got %s", abi.RejectWhy)
-	}
-	if qualifiesForFixedRecursiveTableFold(walkProto) {
-		t.Fatal("subtractive table recursion should not qualify for the fixed fold protocol")
 	}
 	if shouldPromoteTier2(walkProto, p, 2) {
 		t.Error("general typed table self recursion should stay closed without the fixed fold protocol")

@@ -24,8 +24,7 @@ func (vm *VM) tryRunValueWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 		}
 		return handled, results, err
 	}
-	includeRecursiveTable := cl != nil && cl.Proto != nil && vm.methodJIT != nil && cl.Proto.Tier2Promoted
-	return vm.tryRunCachedValueWholeCallKernel(cl, args, includeRecursiveTable)
+	return vm.tryRunCachedValueWholeCallKernel(cl, args, true)
 }
 
 func (vm *VM) tryRunNonRecursiveTableValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
@@ -126,14 +125,16 @@ func mayHaveWholeCallValueKernelCandidate(proto *FuncProto, argc int, includeRec
 			return true
 		}
 		return (proto.MaxStack == 30 && len(proto.Constants) == 2 && len(proto.Protos) == 0) ||
-			(proto.MaxStack >= 13 && len(proto.Constants) == 0 && len(proto.Protos) == 0 && len(proto.Code) == 45)
+			(proto.MaxStack >= 13 && len(proto.Constants) == 0 && len(proto.Protos) == 0 && len(proto.Code) == 45) ||
+			(len(proto.Protos) == 0 && (len(proto.Code) == 15 || len(proto.Code) >= 20))
 	case 2:
 		return proto.NumParams == 2 && len(proto.Constants) == 24 && len(proto.Code) == 169
 	case 3:
-		return proto.NumParams == 3 && (len(proto.Constants) == 5 && len(proto.Code) == 32 ||
-			(len(proto.Constants) == 15 && len(proto.Code) == 83) ||
-			len(proto.Constants) == 1 ||
-			(len(proto.Constants) == 5 && (len(proto.Code) == 51 || len(proto.Code) == 91 || len(proto.Code) == 93)))
+		return proto.NumParams == 3 &&
+			(len(proto.Constants) == 5 && len(proto.Code) == 32 ||
+				(len(proto.Constants) == 15 && len(proto.Code) == 83) ||
+				len(proto.Constants) == 1 ||
+				(len(proto.Constants) == 5 && (len(proto.Code) == 51 || len(proto.Code) == 91 || len(proto.Code) == 93)))
 	default:
 		return false
 	}
@@ -143,19 +144,12 @@ func mayHaveWholeCallNoResultKernelCandidate(proto *FuncProto, argc int) bool {
 	if proto == nil || proto.IsVarArg {
 		return false
 	}
-	switch argc {
-	case 1:
-		return proto.NumParams == 1 && len(proto.Constants) >= 10 &&
-			(len(proto.Code) == 99 || len(proto.Code) == 98 || len(proto.Code) == 241)
-	case 3:
-		return proto.NumParams == 3 && len(proto.Constants) >= 1
-	case 4:
-		return proto.NumParams == 4 &&
-			((len(proto.Constants) == 4 && len(proto.Code) == 45) ||
-				(len(proto.Constants) == 5 && len(proto.Code) == 25))
-	default:
-		return false
-	}
+	return argc == 1 && proto.NumParams == 1 && len(proto.Constants) >= 10 &&
+		(len(proto.Code) == 99 || len(proto.Code) == 98) ||
+		argc == 3 && proto.NumParams == 3 && len(proto.Constants) >= 1 ||
+		argc == 4 && proto.NumParams == 4 &&
+			((len(proto.Constants) == 5 && len(proto.Code) == 25) ||
+				(len(proto.Constants) == 4 && len(proto.Code) == 45))
 }
 
 func (vm *VM) writeNoResults(dst, c int) {

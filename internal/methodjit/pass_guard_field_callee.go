@@ -31,10 +31,17 @@ func GuardFieldCalleePass(fn *Function) (*Function, error) {
 			}
 			if instr.Op == OpGuardCalleeProto && len(instr.Args) == 1 && instr.Args[0] != nil {
 				load := instr.Args[0].Def
-				if aux2, ok := guardFieldCalleeLoadAux2ForGuard(fn, load, instr.Aux); ok {
+				if aux2, c, hasCase, ok := guardFieldCalleeLoadAux2ForGuard(fn, load, instr.Aux); ok {
 					instr.Op = OpGuardFieldCalleeProto
 					instr.Args = []*Value{load.Args[0]}
 					instr.Aux2 = aux2
+					if hasCase {
+						if fn.FieldPolyShapeFacts == nil {
+							fn.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+						}
+						fn.FieldPolyShapeFacts[instr.ID] = []FieldPolyShapeCase{c}
+						recordFieldPolyShapeCatalog(fn, []FieldPolyShapeCase{c})
+					}
 					functionRemarks(fn).Add("GuardFieldCallee", "changed", block.ID, instr.ID, instr.Op,
 						fmt.Sprintf("fused field callee guard for shape/field aux2=%d", instr.Aux2))
 					changed = true
@@ -56,29 +63,36 @@ func GuardFieldCalleePass(fn *Function) (*Function, error) {
 }
 
 func guardFieldCalleeLoadAux2(fn *Function, instr *Instr) (int64, bool) {
-	return guardFieldCalleeLoadAux2ForGuard(fn, instr, 0)
+	aux2, _, _, ok := guardFieldCalleeLoadAux2ForGuard(fn, instr, 0)
+	return aux2, ok
 }
 
-func guardFieldCalleeLoadAux2ForGuard(fn *Function, instr *Instr, protoPtr int64) (int64, bool) {
+func guardFieldCalleeLoadAux2ForGuard(fn *Function, instr *Instr, protoPtr int64) (int64, FieldPolyShapeCase, bool, bool) {
 	if instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 == 0 {
 		if fn == nil || instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
-			return 0, false
+			return 0, FieldPolyShapeCase{}, false, false
 		}
 		cases := fn.FieldPolyShapeFacts[instr.ID]
 		if protoPtr != 0 {
 			cases = guardFieldCalleeCasesForProto(cases, uintptr(protoPtr))
 		}
 		if len(cases) != 1 || cases[0].ShapeID == 0 || cases[0].FieldIdx < 0 {
-			return 0, false
+			return 0, FieldPolyShapeCase{}, false, false
 		}
-		return int64(cases[0].ShapeID)<<32 | int64(uint32(cases[0].FieldIdx)), true
+		return int64(cases[0].ShapeID)<<32 | int64(uint32(cases[0].FieldIdx)), cases[0], true, true
 	}
 	shapeID := uint32(instr.Aux2 >> 32)
 	fieldIdx := int(int32(instr.Aux2 & 0xFFFFFFFF))
 	if shapeID == 0 || fieldIdx < 0 {
-		return 0, false
+		return 0, FieldPolyShapeCase{}, false, false
 	}
-	return instr.Aux2, true
+	if fn != nil {
+		cases := guardFieldCalleeCasesForProto(fn.FieldPolyShapeFacts[instr.ID], uintptr(protoPtr))
+		if len(cases) == 1 && cases[0].ShapeID == shapeID && cases[0].FieldIdx == fieldIdx {
+			return instr.Aux2, cases[0], true, true
+		}
+	}
+	return instr.Aux2, FieldPolyShapeCase{}, false, true
 }
 
 func guardFieldCalleeCasesForProto(cases []FieldPolyShapeCase, protoPtr uintptr) []FieldPolyShapeCase {

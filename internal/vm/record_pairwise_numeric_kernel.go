@@ -7,35 +7,29 @@ import (
 )
 
 const (
-	nbodyFieldX = iota
-	nbodyFieldY
-	nbodyFieldZ
-	nbodyFieldVX
-	nbodyFieldVY
-	nbodyFieldVZ
-	nbodyFieldMass
-	nbodyFieldCount
+	pairwiseFieldX = iota
+	pairwiseFieldY
+	pairwiseFieldZ
+	pairwiseFieldVX
+	pairwiseFieldVY
+	pairwiseFieldVZ
+	pairwiseFieldMass
+	pairwiseFieldCount
 )
 
-type recordPairwiseAdvanceKernelCache struct {
+type recordPairwiseNumericKernelCache struct {
 	eligible  bool
 	shapeID   uint32
-	idxs      [nbodyFieldCount]int
-	spec      *recordPairwiseAdvanceKernelSpec
+	idxs      [pairwiseFieldCount]int
+	spec      *recordPairwiseNumericKernelSpec
 	denseSpec *denseRecordMatrixAdvanceKernelSpec
 }
 
-type nbodyRecord struct {
-	x, y, z    float64
-	vx, vy, vz float64
-	mass       float64
-}
-
-type recordPairwiseAdvanceKernelSpec struct {
+type recordPairwiseNumericKernelSpec struct {
 	tableName     string
 	sqrtTableName string
 	sqrtFieldName string
-	fieldNames    [nbodyFieldCount]string
+	fieldNames    [pairwiseFieldCount]string
 }
 
 type denseRecordMatrixAdvanceKernelSpec struct {
@@ -46,40 +40,40 @@ type denseRecordMatrixAdvanceKernelSpec struct {
 	tableName      string
 	sqrtTableName  string
 	sqrtFieldName  string
-	fieldIndexName [nbodyFieldCount]string
+	fieldIndexName [pairwiseFieldCount]string
 }
 
-type recordPairwiseAdvanceDriverLoopShape struct {
+type recordPairwiseNumericDriverLoopShape struct {
 	loopPC   int
 	fnConst  int
 	argConst int
 }
 
-func (vm *VM) tryRunRecordPairwiseAdvanceKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) tryRunRecordPairwiseNumericKernel(cl *Closure, args []runtime.Value) (bool, error) {
 	if vm.methodJIT != nil {
 		return false, nil
 	}
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelRecordPairwiseAdvance) {
+	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelRecordPairwiseNumeric) {
 		return false, nil
 	}
-	return vm.runRecordPairwiseAdvanceKernel(cl, args)
+	return vm.runRecordPairwiseNumericKernel(cl, args)
 }
 
-func (vm *VM) runRecordPairwiseAdvanceKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) runRecordPairwiseNumericKernel(cl *Closure, args []runtime.Value) (bool, error) {
 	if vm.methodJIT != nil {
 		return false, nil
 	}
-	return vm.runRecordPairwiseAdvanceKernelN(cl, args, 1)
+	return vm.runRecordPairwiseNumericKernelN(cl, args, 1)
 }
 
-func (vm *VM) tryRunRecordPairwiseAdvanceKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelRecordPairwiseAdvance) {
+func (vm *VM) tryRunRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
+	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelRecordPairwiseNumeric) {
 		return false, nil
 	}
-	return vm.runRecordPairwiseAdvanceKernelN(cl, args, steps)
+	return vm.runRecordPairwiseNumericKernelN(cl, args, steps)
 }
 
-func (vm *VM) runRecordPairwiseAdvanceKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
+func (vm *VM) runRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil
 	}
@@ -87,10 +81,10 @@ func (vm *VM) runRecordPairwiseAdvanceKernelN(cl *Closure, args []runtime.Value,
 		return false, nil
 	}
 	proto := cl.Proto
-	cache := proto.RecordPairwiseAdvanceKernel
+	cache := proto.RecordPairwiseNumericKernel
 	if cache == nil {
-		cache = &recordPairwiseAdvanceKernelCache{eligible: true}
-		proto.RecordPairwiseAdvanceKernel = cache
+		cache = &recordPairwiseNumericKernelCache{eligible: true}
+		proto.RecordPairwiseNumericKernel = cache
 	}
 	if isDenseRecordMatrixAdvanceProto(proto) {
 		spec := cache.denseSpec
@@ -108,7 +102,7 @@ func (vm *VM) runRecordPairwiseAdvanceKernelN(cl *Closure, args []runtime.Value,
 	spec := cache.spec
 	if spec == nil {
 		var ok bool
-		spec, ok = recordPairwiseAdvanceKernelSpecForProto(proto)
+		spec, ok = recordPairwiseNumericKernelSpecForProto(proto)
 		if !ok {
 			cache.eligible = false
 			return false, nil
@@ -133,7 +127,9 @@ func (vm *VM) runRecordPairwiseAdvanceKernelN(cl *Closure, args []runtime.Value,
 	}
 
 	var bodyTables [64]*runtime.Table
-	var records [64]nbodyRecord
+	var xs, ys, zs [64]float64
+	var vxs, vys, vzs [64]float64
+	var masses [64]float64
 	if n == 0 {
 		return true, nil
 	}
@@ -165,50 +161,44 @@ func (vm *VM) runRecordPairwiseAdvanceKernelN(cl *Closure, args []runtime.Value,
 				return false, nil
 			}
 		}
-		var fields [nbodyFieldCount]float64
+		var fields [pairwiseFieldCount]float64
 		if !t.LoadFloatRecordForNumericKernel(cache.shapeID, cache.idxs[:], fields[:]) {
 			return false, nil
 		}
 		bodyTables[i] = t
-		records[i] = nbodyRecord{
-			x: fields[nbodyFieldX], y: fields[nbodyFieldY], z: fields[nbodyFieldZ],
-			vx: fields[nbodyFieldVX], vy: fields[nbodyFieldVY], vz: fields[nbodyFieldVZ],
-			mass: fields[nbodyFieldMass],
-		}
+		xs[i], ys[i], zs[i] = fields[pairwiseFieldX], fields[pairwiseFieldY], fields[pairwiseFieldZ]
+		vxs[i], vys[i], vzs[i] = fields[pairwiseFieldVX], fields[pairwiseFieldVY], fields[pairwiseFieldVZ]
+		masses[i] = fields[pairwiseFieldMass]
 	}
 
 	dt := args[0].Number()
 	for step := int64(0); step < steps; step++ {
 		for i := 0; i < n; i++ {
-			bi := &records[i]
 			for j := i + 1; j < n; j++ {
-				bj := &records[j]
-				dx := bi.x - bj.x
-				dy := bi.y - bj.y
-				dz := bi.z - bj.z
+				dx := xs[i] - xs[j]
+				dy := ys[i] - ys[j]
+				dz := zs[i] - zs[j]
 				dsq := dx*dx + dy*dy + dz*dz
 				dist := math.Sqrt(dsq)
 				mag := dt / (dsq * dist)
-				bi.vx -= dx * bj.mass * mag
-				bi.vy -= dy * bj.mass * mag
-				bi.vz -= dz * bj.mass * mag
-				bj.vx += dx * bi.mass * mag
-				bj.vy += dy * bi.mass * mag
-				bj.vz += dz * bi.mass * mag
+				vxs[i] -= dx * masses[j] * mag
+				vys[i] -= dy * masses[j] * mag
+				vzs[i] -= dz * masses[j] * mag
+				vxs[j] += dx * masses[i] * mag
+				vys[j] += dy * masses[i] * mag
+				vzs[j] += dz * masses[i] * mag
 			}
 		}
 		for i := 0; i < n; i++ {
-			b := &records[i]
-			b.x += dt * b.vx
-			b.y += dt * b.vy
-			b.z += dt * b.vz
+			xs[i] += dt * vxs[i]
+			ys[i] += dt * vys[i]
+			zs[i] += dt * vzs[i]
 		}
 	}
 
-	storeIdxs := cache.idxs[:nbodyFieldMass]
+	storeIdxs := cache.idxs[:pairwiseFieldMass]
 	for i := 0; i < n; i++ {
-		b := &records[i]
-		vals := [...]float64{b.x, b.y, b.z, b.vx, b.vy, b.vz}
+		vals := [...]float64{xs[i], ys[i], zs[i], vxs[i], vys[i], vzs[i]}
 		if !bodyTables[i].StoreFloatRecordForNumericKernel(cache.shapeID, storeIdxs, vals[:]) {
 			return false, nil
 		}
@@ -229,13 +219,13 @@ func (vm *VM) runDenseRecordMatrixAdvanceKernelN(args []runtime.Value, steps int
 	if !ok || !bodiesVal.IsTable() {
 		return false, nil
 	}
-	flat, stride, ok := bodiesVal.Table().DenseFloatMatrixForNumericKernel(n, nbodyFieldCount)
-	if !ok || stride < nbodyFieldCount {
+	flat, stride, ok := bodiesVal.Table().DenseFloatMatrixForNumericKernel(n, pairwiseFieldCount)
+	if !ok || stride < pairwiseFieldCount {
 		return false, nil
 	}
-	fx, fy, fz := fields[nbodyFieldX], fields[nbodyFieldY], fields[nbodyFieldZ]
-	fvx, fvy, fvz := fields[nbodyFieldVX], fields[nbodyFieldVY], fields[nbodyFieldVZ]
-	fmass := fields[nbodyFieldMass]
+	fx, fy, fz := fields[pairwiseFieldX], fields[pairwiseFieldY], fields[pairwiseFieldZ]
+	fvx, fvy, fvz := fields[pairwiseFieldVX], fields[pairwiseFieldVY], fields[pairwiseFieldVZ]
+	fmass := fields[pairwiseFieldMass]
 	dt := args[0].Number()
 	for step := int64(0); step < steps; step++ {
 		for i := 0; i < n; i++ {
@@ -284,12 +274,12 @@ func (vm *VM) runDenseRecordMatrixAdvanceKernelN(args []runtime.Value, steps int
 	return true, nil
 }
 
-func (vm *VM) tryRecordPairwiseAdvanceForLoopKernel(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
+func (vm *VM) tryRecordPairwiseNumericForLoopKernel(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
 	if frame == nil || !vm.noGlobalLock {
 		return false, nil
 	}
 	forprepPC := frame.pc - 1
-	shape, ok := matchRecordPairwiseAdvanceDriverLoopShape(code, constants, forprepPC, a, sbx)
+	shape, ok := matchRecordPairwiseNumericDriverLoopShape(code, constants, forprepPC, a, sbx)
 	if !ok {
 		return false, nil
 	}
@@ -313,25 +303,26 @@ func (vm *VM) tryRecordPairwiseAdvanceForLoopKernel(frame *CallFrame, base int, 
 		return false, nil
 	}
 	cl, ok := closureFromValue(fnVal)
-	if !ok || !HasRecordPairwiseAdvanceWholeCallKernel(cl.Proto) {
+	if !ok || !HasRecordPairwiseNumericWholeCallKernel(cl.Proto) {
 		return false, nil
 	}
 	argVal, ok := vm.globalValue(constants[shape.argConst].Str())
 	if !ok || !argVal.IsNumber() {
 		return false, nil
 	}
-	handled, err := vm.tryRunRecordPairwiseAdvanceKernelN(cl, []runtime.Value{argVal}, steps)
+	handled, err := vm.tryRunRecordPairwiseNumericKernelN(cl, []runtime.Value{argVal}, steps)
 	if !handled || err != nil {
 		return handled, err
 	}
+	runtime.RecordRuntimePathStructuralKernelHit(string(KernelRouteDriverLoop), "record_pairwise_numeric_loop")
 	vm.regs[base+a] = limitV
 	vm.regs[base+a+3] = limitV
 	frame.pc = shape.loopPC + 1
 	return true, nil
 }
 
-func matchRecordPairwiseAdvanceDriverLoopShape(code []uint32, constants []runtime.Value, forprepPC int, a int, sbx int) (recordPairwiseAdvanceDriverLoopShape, bool) {
-	var shape recordPairwiseAdvanceDriverLoopShape
+func matchRecordPairwiseNumericDriverLoopShape(code []uint32, constants []runtime.Value, forprepPC int, a int, sbx int) (recordPairwiseNumericDriverLoopShape, bool) {
+	var shape recordPairwiseNumericDriverLoopShape
 	bodyPC := forprepPC + 1
 	loopPC := bodyPC + sbx
 	if forprepPC < 0 || bodyPC < 0 || loopPC < 0 || loopPC >= len(code) || loopPC-bodyPC != 3 {
@@ -357,15 +348,15 @@ func matchRecordPairwiseAdvanceDriverLoopShape(code []uint32, constants []runtim
 	if !stringConst(constants, fnConst) || !stringConst(constants, argConst) {
 		return shape, false
 	}
-	return recordPairwiseAdvanceDriverLoopShape{
+	return recordPairwiseNumericDriverLoopShape{
 		loopPC:   loopPC,
 		fnConst:  fnConst,
 		argConst: argConst,
 	}, true
 }
 
-func recordPairwiseFieldIndexesForShape(proto *FuncProto, spec *recordPairwiseAdvanceKernelSpec, t *runtime.Table) ([nbodyFieldCount]int, bool) {
-	var idxs [nbodyFieldCount]int
+func recordPairwiseFieldIndexesForShape(proto *FuncProto, spec *recordPairwiseNumericKernelSpec, t *runtime.Table) ([pairwiseFieldCount]int, bool) {
+	var idxs [pairwiseFieldCount]int
 	if proto == nil || spec == nil || t == nil {
 		return idxs, false
 	}
@@ -382,7 +373,7 @@ func recordPairwiseFieldIndexesForShape(proto *FuncProto, spec *recordPairwiseAd
 	return idxs, true
 }
 
-func (vm *VM) guardRecordPairwiseSqrt(spec *recordPairwiseAdvanceKernelSpec) bool {
+func (vm *VM) guardRecordPairwiseSqrt(spec *recordPairwiseNumericKernelSpec) bool {
 	if spec == nil || spec.sqrtTableName == "" || spec.sqrtFieldName == "" {
 		return false
 	}
@@ -428,8 +419,8 @@ func (vm *VM) guardDenseRecordMatrixLib(spec *denseRecordMatrixAdvanceKernelSpec
 		setf != nil && setf.Name == "matrix.setf"
 }
 
-func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceKernelSpec) (int, [nbodyFieldCount]int, bool) {
-	var fields [nbodyFieldCount]int
+func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceKernelSpec) (int, [pairwiseFieldCount]int, bool) {
+	var fields [pairwiseFieldCount]int
 	if spec == nil {
 		return 0, fields, false
 	}
@@ -440,7 +431,7 @@ func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceKernel
 	seen := 0
 	for i, name := range spec.fieldIndexName {
 		v, ok := vm.globalValue(name)
-		if !ok || !v.IsInt() || v.Int() < 0 || v.Int() >= nbodyFieldCount {
+		if !ok || !v.IsInt() || v.Int() < 0 || v.Int() >= pairwiseFieldCount {
 			return 0, fields, false
 		}
 		idx := int(v.Int())
@@ -454,7 +445,7 @@ func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceKernel
 	return int(count.Int()), fields, true
 }
 
-func (vm *VM) recordPairwiseTableValue(spec *recordPairwiseAdvanceKernelSpec) (runtime.Value, bool) {
+func (vm *VM) recordPairwiseTableValue(spec *recordPairwiseNumericKernelSpec) (runtime.Value, bool) {
 	if spec == nil || spec.tableName == "" {
 		return runtime.NilValue(), false
 	}
@@ -465,12 +456,12 @@ func (vm *VM) recordPairwiseTableValue(spec *recordPairwiseAdvanceKernelSpec) (r
 	return v, true
 }
 
-func recordPairwiseAdvanceKernelSpecForProto(proto *FuncProto) (*recordPairwiseAdvanceKernelSpec, bool) {
+func recordPairwiseNumericKernelSpecForProto(proto *FuncProto) (*recordPairwiseNumericKernelSpec, bool) {
 	if proto == nil || isDenseRecordMatrixAdvanceProto(proto) {
 		return nil, false
 	}
-	if isRecordPairwiseAdvanceProto(proto) {
-		return analyzeRecordPairwiseAdvanceKernelSpec(proto)
+	if isRecordPairwiseNumericProto(proto) {
+		return analyzeRecordPairwiseNumericKernelSpec(proto)
 	}
 	return nil, false
 }
@@ -513,7 +504,7 @@ func denseRecordMatrixAdvanceKernelSpecForProto(proto *FuncProto) (*denseRecordM
 	return spec, true
 }
 
-func analyzeRecordPairwiseAdvanceKernelSpec(proto *FuncProto) (*recordPairwiseAdvanceKernelSpec, bool) {
+func analyzeRecordPairwiseNumericKernelSpec(proto *FuncProto) (*recordPairwiseNumericKernelSpec, bool) {
 	tableConst, biReg, bjReg, ok := findRecordPairwiseTableAndRecordRegs(proto.Code)
 	if !ok {
 		return nil, false
@@ -534,7 +525,7 @@ func analyzeRecordPairwiseAdvanceKernelSpec(proto *FuncProto) (*recordPairwiseAd
 	if !ok {
 		return nil, false
 	}
-	fieldConsts := [nbodyFieldCount]int{
+	fieldConsts := [pairwiseFieldCount]int{
 		positionConsts[0], positionConsts[1], positionConsts[2],
 		velocityConsts[0], velocityConsts[1], velocityConsts[2],
 		massConst,
@@ -551,7 +542,7 @@ func analyzeRecordPairwiseAdvanceKernelSpec(proto *FuncProto) (*recordPairwiseAd
 	if !ok {
 		return nil, false
 	}
-	spec := &recordPairwiseAdvanceKernelSpec{
+	spec := &recordPairwiseNumericKernelSpec{
 		tableName:     tableName,
 		sqrtTableName: sqrtTableName,
 		sqrtFieldName: sqrtFieldName,
@@ -687,18 +678,11 @@ func containsInt(vals []int, want int) bool {
 	return false
 }
 
-func protoStringConstant(proto *FuncProto, idx int) (string, bool) {
-	if proto == nil || idx < 0 || idx >= len(proto.Constants) || !proto.Constants[idx].IsString() {
-		return "", false
-	}
-	return proto.Constants[idx].Str(), true
-}
-
-func isRecordPairwiseAdvanceProto(p *FuncProto) bool {
+func isRecordPairwiseNumericProto(p *FuncProto) bool {
 	if isDenseRecordMatrixAdvanceProto(p) {
 		return true
 	}
-	if isRecordPairwiseAdvanceProtoWithGlobalCount(p) {
+	if isRecordPairwiseNumericProtoWithGlobalCount(p) {
 		return true
 	}
 	if p == nil || p.NumParams != 1 || p.IsVarArg || len(p.Constants) < 10 || len(p.Code) != 99 {
@@ -842,7 +826,7 @@ func isDenseRecordMatrixAdvanceProto(p *FuncProto) bool {
 	return true
 }
 
-func isRecordPairwiseAdvanceProtoWithGlobalCount(p *FuncProto) bool {
+func isRecordPairwiseNumericProtoWithGlobalCount(p *FuncProto) bool {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || len(p.Constants) < 11 || len(p.Code) != 98 {
 		return false
 	}
@@ -953,17 +937,17 @@ func isRecordPairwiseAdvanceProtoWithGlobalCount(p *FuncProto) bool {
 	})
 }
 
-// HasRecordPairwiseAdvanceWholeCallKernel reports whether p matches the guarded
-// record-field nbody-style advance(dt) kernel shape. MethodJIT uses this to
+// HasRecordPairwiseNumericWholeCallKernel reports whether p matches the guarded
+// record-field pairwise numeric advance(dt) kernel shape. MethodJIT uses this to
 // keep driver loops on the VM route where the whole-call kernel can fire.
-func HasRecordPairwiseAdvanceWholeCallKernel(p *FuncProto) bool {
-	return cachedWholeCallKernelRecognized(p, wholeCallKernelRecordPairwiseAdvance)
+func HasRecordPairwiseNumericWholeCallKernel(p *FuncProto) bool {
+	return cachedWholeCallKernelRecognized(p, wholeCallKernelRecordPairwiseNumeric)
 }
 
-// HasRecordPairwiseAdvanceDriverLoopKernel reports whether p contains a structural
-// driver loop that repeatedly calls an nbody advance(dt)-style whole-call
+// HasRecordPairwiseNumericDriverLoopKernel reports whether p contains a structural
+// driver loop that repeatedly calls an pairwise numeric whole-call
 // kernel candidate.
-func HasRecordPairwiseAdvanceDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
+func HasRecordPairwiseNumericDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
 	if p == nil {
 		return false
 	}
@@ -971,17 +955,17 @@ func HasRecordPairwiseAdvanceDriverLoopKernel(p *FuncProto, globals map[string]*
 		if DecodeOp(inst) != OP_FORPREP {
 			continue
 		}
-		if IsRecordPairwiseAdvanceDriverLoopAt(p, pc, globals) {
+		if IsRecordPairwiseNumericDriverLoopAt(p, pc, globals) {
 			return true
 		}
 	}
 	return false
 }
 
-// IsRecordPairwiseAdvanceDriverLoopAt checks one FORPREP site for the guarded
+// IsRecordPairwiseNumericDriverLoopAt checks one FORPREP site for the guarded
 // advance(dt) call-loop shape. Runtime admission still checks trip count,
 // current globals, and argument/table guards before executing the kernel.
-func IsRecordPairwiseAdvanceDriverLoopAt(p *FuncProto, forprepPC int, globals map[string]*FuncProto) bool {
+func IsRecordPairwiseNumericDriverLoopAt(p *FuncProto, forprepPC int, globals map[string]*FuncProto) bool {
 	if p == nil || len(globals) == 0 || forprepPC < 0 || forprepPC >= len(p.Code) {
 		return false
 	}
@@ -989,12 +973,12 @@ func IsRecordPairwiseAdvanceDriverLoopAt(p *FuncProto, forprepPC int, globals ma
 	if DecodeOp(inst) != OP_FORPREP {
 		return false
 	}
-	shape, ok := matchRecordPairwiseAdvanceDriverLoopShape(p.Code, p.Constants, forprepPC, DecodeA(inst), DecodesBx(inst))
+	shape, ok := matchRecordPairwiseNumericDriverLoopShape(p.Code, p.Constants, forprepPC, DecodeA(inst), DecodesBx(inst))
 	if !ok {
 		return false
 	}
 	if shape.fnConst < 0 || shape.fnConst >= len(p.Constants) || !p.Constants[shape.fnConst].IsString() {
 		return false
 	}
-	return HasRecordPairwiseAdvanceWholeCallKernel(globals[p.Constants[shape.fnConst].Str()])
+	return HasRecordPairwiseNumericWholeCallKernel(globals[p.Constants[shape.fnConst].Str()])
 }

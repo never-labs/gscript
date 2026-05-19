@@ -247,6 +247,13 @@ func (ec *emitContext) storeResultNB(srcReg jit.Reg, valueID int) {
 	ec.storeValue(srcReg, valueID)
 }
 
+func (ec *emitContext) storeResultNBIfUsed(srcReg jit.Reg, valueID int) {
+	if ec != nil && ec.useCounts != nil && ec.useCounts[valueID] == 0 {
+		return
+	}
+	ec.storeResultNB(srcReg, valueID)
+}
+
 // resolveRawInt returns a GPR holding the raw (unboxed) int64 for a value.
 // If the value has a register with raw int content (from a prior emitRawIntBinOp),
 // returns that register directly — zero instructions emitted.

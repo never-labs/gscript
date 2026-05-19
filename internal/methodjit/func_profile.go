@@ -214,9 +214,6 @@ func shouldStayTier0RecursiveTableWalker(proto *vm.FuncProto, profile FuncProfil
 	if ok, _ := qualifyForNumeric(proto); ok {
 		return false
 	}
-	if qualifiesForFixedRecursiveTableFold(proto) {
-		return false
-	}
 	return true
 }
 
@@ -404,9 +401,6 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 	// it for a single static call site.
 	//
 	if profile.CallCount > 0 && !profile.HasLoop {
-		if qualifiesForFixedRecursiveTableBuilder(proto) {
-			return runtimeCallCount >= 1
-		}
 		// proto.HasSelfCalls is only set during compileTier2Pipeline, so
 		// at promotion time it's still false — detect recursion by
 		// bytecode scan instead.
@@ -424,12 +418,6 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 		// 2 call ICs stable even when DirectEntryPtr is cleared for baseline
 		// callers after a runtime deopt, avoiding the old ExitCallExit storm.
 		if qualifiesForNumericCrossRecursiveCandidate(proto) {
-			return runtimeCallCount >= 2
-		}
-		if qualifiesForFixedRecursiveNestedIntFold(proto) {
-			return runtimeCallCount >= 2
-		}
-		if qualifiesForFixedRecursiveTableFold(proto) {
 			return runtimeCallCount >= 2
 		}
 		// Typed table self-recursive protos can be explicitly compiled to Tier 2,
@@ -543,9 +531,7 @@ func mainProtoHasRecursiveChild(proto *vm.FuncProto) bool {
 }
 
 func childHasWholeCallRecursiveProtocol(child *vm.FuncProto) bool {
-	return qualifiesForFixedRecursiveIntFold(child) ||
-		qualifiesForFixedRecursiveNestedIntFold(child) ||
-		qualifiesForFixedRecursiveTableFold(child)
+	return false
 }
 
 func mainMaxConstantForLoopTrip(proto *vm.FuncProto) (int64, bool) {

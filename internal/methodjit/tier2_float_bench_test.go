@@ -4,8 +4,8 @@ package methodjit
 
 import (
 	"fmt"
-	"testing"
 	"github.com/gscript/gscript/internal/runtime"
+	"testing"
 )
 
 const mandelbrotSrc = `func mandelbrot(size) {

@@ -53,6 +53,8 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	crossBlockLive := computeCrossBlockLive(fn)
 	blockLiveIn, blockLiveOut := computeBlockLiveness(fn)
 	instrLiveAfter := computeInstrLiveAfter(fn, blockLiveOut)
+	useCounts := computeUseCounts(fn)
+	valueDefs := computeValueDefs(fn)
 	rawIntBlockCarry := enableSinglePredRawIntCarry(fn)
 	rawIntCarryNoStore := map[int]bool(nil)
 	if rawIntBlockCarry {
@@ -298,9 +300,12 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		blockOutKinds:              make(map[int]map[int]uint16),
 		blockOutKeysDirty:          make(map[int]map[int]bool),
 		blockOutRawIntRegs:         make(map[int]map[int]loopRegEntry),
+		blockOutRawFloatRegs:       make(map[int]map[int]loopFPRegEntry),
 		blockLiveIn:                blockLiveIn,
 		blockLiveOut:               blockLiveOut,
 		instrLiveAfter:             instrLiveAfter,
+		useCounts:                  useCounts,
+		valueDefs:                  valueDefs,
 		rawIntBlockCarry:           rawIntBlockCarry,
 		rawIntCarryNoStore:         rawIntCarryNoStore,
 		crossBlockLive:             crossBlockLive,
@@ -900,6 +905,10 @@ type emitContext struct {
 	// activate these values when liveness says they are live-in.
 	blockOutRawIntRegs map[int]map[int]loopRegEntry
 
+	// blockOutRawFloatRegs saves raw-float FPR state at end of block for
+	// predecessor-edge activation. It does not affect register allocation.
+	blockOutRawFloatRegs map[int]map[int]loopFPRegEntry
+
 	// blockLiveIn is block-level SSA liveness used to bound raw-int carry.
 	blockLiveIn map[int]map[int]bool
 
@@ -907,6 +916,8 @@ type emitContext struct {
 	// lifetime for values carried across block boundaries.
 	blockLiveOut   map[int]map[int]bool
 	instrLiveAfter map[int]map[int]bool
+	useCounts      map[int]int
+	valueDefs      map[int]*Instr
 
 	rawIntBlockCarry bool
 
@@ -2281,6 +2292,9 @@ func (ec *emitContext) emitBlock(block *Block) {
 					if entry.IsRawDataPtr {
 						ec.setValueRepr(entry.ValueID, valueReprRawDataPtr)
 					}
+					if entry.IsRawSvalsPtr {
+						ec.setValueRepr(entry.ValueID, valueReprRawFieldSvalsPtr)
+					}
 				}
 			}
 		}
@@ -2294,6 +2308,11 @@ func (ec *emitContext) emitBlock(block *Block) {
 	}
 	if ec.rawIntBlockCarry && !isHeader && len(block.Preds) == 1 {
 		ec.seedSinglePredRawIntRegs(block)
+		ec.seedSinglePredRawFloatRegs(block)
+	}
+	if ec.rawIntBlockCarry && !isHeader && len(block.Preds) > 1 {
+		ec.seedMultiPredRawIntRegs(block)
+		ec.seedMultiPredRawFloatRegs(block)
 	}
 	if !isHeader && len(block.Preds) == 1 {
 		ec.seedSinglePredTableArrayKeyRegs(block)
@@ -2373,7 +2392,7 @@ func (ec *emitContext) emitBlock(block *Block) {
 	outRaw := make(map[int]loopRegEntry)
 	for valueID := range ec.activeRegs {
 		repr := ec.valueReprOf(valueID)
-		if repr != valueReprRawInt && repr != valueReprRawTablePtr && repr != valueReprRawDataPtr {
+		if repr != valueReprRawInt && repr != valueReprRawTablePtr && repr != valueReprRawDataPtr && repr != valueReprRawFieldSvalsPtr {
 			continue
 		}
 		pr, ok := ec.alloc.ValueRegs[valueID]
@@ -2385,9 +2404,22 @@ func (ec *emitContext) emitBlock(block *Block) {
 			IsRawInt:      repr == valueReprRawInt,
 			IsRawTablePtr: repr == valueReprRawTablePtr,
 			IsRawDataPtr:  repr == valueReprRawDataPtr,
+			IsRawSvalsPtr: repr == valueReprRawFieldSvalsPtr,
 		}
 	}
 	ec.blockOutRawIntRegs[block.ID] = outRaw
+	outRawFloat := make(map[int]loopFPRegEntry)
+	for valueID := range ec.activeFPRegs {
+		if ec.valueReprOf(valueID) != valueReprRawFloat {
+			continue
+		}
+		pr, ok := ec.alloc.ValueRegs[valueID]
+		if !ok || !pr.IsFloat {
+			continue
+		}
+		outRawFloat[pr.Reg] = loopFPRegEntry{ValueID: valueID}
+	}
+	ec.blockOutRawFloatRegs[block.ID] = outRawFloat
 }
 
 func (ec *emitContext) seedSinglePredRawIntRegs(block *Block) {
@@ -2410,7 +2442,7 @@ func (ec *emitContext) seedSinglePredRawIntRegs(block *Block) {
 	sort.Ints(regs)
 	for _, reg := range regs {
 		entry := predOut[reg]
-		if (!entry.IsRawInt && !entry.IsRawTablePtr && !entry.IsRawDataPtr) || !liveIn[entry.ValueID] {
+		if (!entry.IsRawInt && !entry.IsRawTablePtr && !entry.IsRawDataPtr && !entry.IsRawSvalsPtr) || !liveIn[entry.ValueID] {
 			continue
 		}
 		pr, ok := ec.alloc.ValueRegs[entry.ValueID]
@@ -2428,6 +2460,154 @@ func (ec *emitContext) seedSinglePredRawIntRegs(block *Block) {
 		if entry.IsRawDataPtr {
 			ec.setValueRepr(entry.ValueID, valueReprRawDataPtr)
 		}
+		if entry.IsRawSvalsPtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawFieldSvalsPtr)
+		}
+	}
+}
+
+func (ec *emitContext) seedMultiPredRawIntRegs(block *Block) {
+	if ec == nil || block == nil || len(block.Preds) <= 1 {
+		return
+	}
+	liveIn := ec.blockLiveIn[block.ID]
+	if len(liveIn) == 0 {
+		return
+	}
+	firstPred := block.Preds[0]
+	if firstPred == nil {
+		return
+	}
+	firstOut := ec.blockOutRawIntRegs[firstPred.ID]
+	if len(firstOut) == 0 {
+		return
+	}
+	regs := make([]int, 0, len(firstOut))
+	for reg := range firstOut {
+		regs = append(regs, reg)
+	}
+	sort.Ints(regs)
+	for _, reg := range regs {
+		entry := firstOut[reg]
+		if (!entry.IsRawInt && !entry.IsRawTablePtr && !entry.IsRawDataPtr && !entry.IsRawSvalsPtr) || !liveIn[entry.ValueID] {
+			continue
+		}
+		pr, ok := ec.alloc.ValueRegs[entry.ValueID]
+		if !ok || pr.IsFloat || pr.Reg != reg {
+			continue
+		}
+		allPreds := true
+		for _, pred := range block.Preds[1:] {
+			if pred == nil {
+				allPreds = false
+				break
+			}
+			predEntry, ok := ec.blockOutRawIntRegs[pred.ID][reg]
+			if !ok || predEntry.ValueID != entry.ValueID ||
+				predEntry.IsRawInt != entry.IsRawInt ||
+				predEntry.IsRawTablePtr != entry.IsRawTablePtr ||
+				predEntry.IsRawDataPtr != entry.IsRawDataPtr ||
+				predEntry.IsRawSvalsPtr != entry.IsRawSvalsPtr {
+				allPreds = false
+				break
+			}
+		}
+		if !allPreds {
+			continue
+		}
+		ec.invalidateReg(reg, entry.ValueID)
+		ec.activeRegs[entry.ValueID] = true
+		if entry.IsRawInt {
+			ec.setValueRepr(entry.ValueID, valueReprRawInt)
+		}
+		if entry.IsRawTablePtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawTablePtr)
+		}
+		if entry.IsRawDataPtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawDataPtr)
+		}
+		if entry.IsRawSvalsPtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawFieldSvalsPtr)
+		}
+	}
+}
+
+func (ec *emitContext) seedSinglePredRawFloatRegs(block *Block) {
+	if ec == nil || block == nil || len(block.Preds) != 1 {
+		return
+	}
+	liveIn := ec.blockLiveIn[block.ID]
+	if len(liveIn) == 0 {
+		return
+	}
+	pred := block.Preds[0]
+	if pred == nil {
+		return
+	}
+	ec.seedRawFloatRegsFromPredOut(liveIn, ec.blockOutRawFloatRegs[pred.ID])
+}
+
+func (ec *emitContext) seedMultiPredRawFloatRegs(block *Block) {
+	if ec == nil || block == nil || len(block.Preds) <= 1 {
+		return
+	}
+	liveIn := ec.blockLiveIn[block.ID]
+	if len(liveIn) == 0 || block.Preds[0] == nil {
+		return
+	}
+	firstOut := ec.blockOutRawFloatRegs[block.Preds[0].ID]
+	if len(firstOut) == 0 {
+		return
+	}
+	merged := make(map[int]loopFPRegEntry)
+	for reg, entry := range firstOut {
+		if !liveIn[entry.ValueID] {
+			continue
+		}
+		pr, ok := ec.alloc.ValueRegs[entry.ValueID]
+		if !ok || !pr.IsFloat || pr.Reg != reg {
+			continue
+		}
+		allPreds := true
+		for _, pred := range block.Preds[1:] {
+			if pred == nil {
+				allPreds = false
+				break
+			}
+			predEntry, ok := ec.blockOutRawFloatRegs[pred.ID][reg]
+			if !ok || predEntry.ValueID != entry.ValueID {
+				allPreds = false
+				break
+			}
+		}
+		if allPreds {
+			merged[reg] = entry
+		}
+	}
+	ec.seedRawFloatRegsFromPredOut(liveIn, merged)
+}
+
+func (ec *emitContext) seedRawFloatRegsFromPredOut(liveIn map[int]bool, predOut map[int]loopFPRegEntry) {
+	if len(liveIn) == 0 || len(predOut) == 0 {
+		return
+	}
+	regs := make([]int, 0, len(predOut))
+	for reg := range predOut {
+		regs = append(regs, reg)
+	}
+	sort.Ints(regs)
+	for _, reg := range regs {
+		entry := predOut[reg]
+		if !liveIn[entry.ValueID] {
+			continue
+		}
+		pr, ok := ec.alloc.ValueRegs[entry.ValueID]
+		if !ok || !pr.IsFloat || pr.Reg != reg {
+			continue
+		}
+		ec.invalidateFPReg(reg, entry.ValueID)
+		ec.activeFPRegs[entry.ValueID] = true
+		ec.setValueRepr(entry.ValueID, valueReprRawFloat)
 	}
 }
 
@@ -2466,7 +2646,7 @@ func (ec *emitContext) seedSinglePredTableArrayKeyRegs(block *Block) {
 			continue
 		}
 		def := defs[valueID]
-		if def == nil || !isRawIntCarryValue(def) {
+		if def == nil || !isSinglePredRawCarryValue(def) {
 			continue
 		}
 		pr, ok := ec.alloc.ValueRegs[valueID]

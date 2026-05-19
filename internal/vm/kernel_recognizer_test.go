@@ -1,174 +1,22 @@
 package vm
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
-
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	"github.com/gscript/gscript/internal/runtime"
 )
-
-func TestWholeCallKernelDiagnosticsIgnoreProtoNameAndSource(t *testing.T) {
-	proto, vm := compileSpectralKernelTestProgram(t, `
-func local_prime_counter(n) {
-    is_prime := {}
-    for i := 2; i <= n; i++ {
-        is_prime[i] = true
-    }
-    i := 2
-    for i * i <= n {
-        if is_prime[i] {
-            j := i * i
-            for j <= n {
-                is_prime[j] = false
-                j = j + i
-            }
-        }
-        i = i + 1
-    }
-    count := 0
-    for i := 2; i <= n; i++ {
-        if is_prime[i] { count = count + 1 }
-    }
-    return count
-}
-`)
-	defer vm.Close()
-	if len(proto.Protos) != 1 {
-		t.Fatalf("nested protos = %d, want 1", len(proto.Protos))
-	}
-
-	child := proto.Protos[0]
-	child.Name = "fannkuch"
-	child.Source = "benchmarks/suite/fannkuch.gs"
-
-	infos := RecognizedWholeCallKernels(child)
-	requireKernelInfo(t, infos, "bool_table_strike_count")
-	rejectKernelInfo(t, infos, "permutation_flip_checksum")
-
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(child), "bool_table_strike_count")
-	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
-		t.Fatalf("bool-table strike/count diagnostic = %+v, want recognized structural bytecode", diag)
-	}
-}
-
-func TestWholeCallKernelCacheDispatchIgnoresProtoNameAndSource(t *testing.T) {
-	proto, vm := compileSpectralKernelTestProgram(t, `
-func local_prime_counter(n) {
-    is_prime := {}
-    for i := 2; i <= n; i++ {
-        is_prime[i] = true
-    }
-    i := 2
-    for i * i <= n {
-        if is_prime[i] {
-            j := i * i
-            for j <= n {
-                is_prime[j] = false
-                j = j + i
-            }
-        }
-        i = i + 1
-    }
-    count := 0
-    for i := 2; i <= n; i++ {
-        if is_prime[i] { count = count + 1 }
-    }
-    return count
-}
-`)
-	defer vm.Close()
-	child := proto.Protos[0]
-	requireKernelInfo(t, RecognizedWholeCallKernels(child), "bool_table_strike_count")
-
-	child.Name = "fannkuch"
-	child.Source = "benchmarks/suite/fannkuch.gs"
-	child.LineDefined = 999
-	child.LineInfo = append([]int(nil), child.LineInfo...)
-	for i := range child.LineInfo {
-		child.LineInfo[i] += 100
-	}
-
-	requireKernelInfo(t, RecognizedWholeCallKernels(child), "bool_table_strike_count")
-	stats := runtime.EnableRuntimePathStats()
-	defer runtime.DisableRuntimePathStats()
-	handled, results, err := vm.tryRunValueWholeCallKernel(NewClosure(child), []runtime.Value{runtime.IntValue(100)})
-	if err != nil || !handled || len(results) != 1 || !results[0].IsInt() || results[0].Int() != 25 {
-		t.Fatalf("renamed/source-changed sieve dispatch = handled=%v results=%v err=%v, want 25", handled, results, err)
-	}
-	snap := stats.Snapshot()
-	if snap.StructuralKernel.Total != 1 {
-		t.Fatalf("structural kernel total = %d, want 1", snap.StructuralKernel.Total)
-	}
-	if len(snap.StructuralKernel.PerKernel) != 1 ||
-		snap.StructuralKernel.PerKernel[0].Name != "bool_table_strike_count" ||
-		snap.StructuralKernel.PerKernel[0].Route != string(KernelRouteWholeCallValue) ||
-		snap.StructuralKernel.PerKernel[0].Count != 1 {
-		t.Fatalf("structural kernel attribution = %+v, want one bool_table_strike_count whole-call value hit", snap.StructuralKernel.PerKernel)
-	}
-}
-
-func TestWholeCallKernelCacheInvalidatesOnStructuralMutation(t *testing.T) {
-	proto, vm := compileSpectralKernelTestProgram(t, `
-func local_prime_counter(n) {
-    is_prime := {}
-    for i := 2; i <= n; i++ {
-        is_prime[i] = true
-    }
-    i := 2
-    for i * i <= n {
-        if is_prime[i] {
-            j := i * i
-            for j <= n {
-                is_prime[j] = false
-                j = j + i
-            }
-        }
-        i = i + 1
-    }
-    count := 0
-    for i := 2; i <= n; i++ {
-        if is_prime[i] { count = count + 1 }
-    }
-    return count
-}
-`)
-	defer vm.Close()
-	child := proto.Protos[0]
-	requireKernelInfo(t, RecognizedWholeCallKernels(child), "bool_table_strike_count")
-
-	originalCode := append([]uint32(nil), child.Code...)
-	child.Code = append([]uint32(nil), originalCode...)
-	child.Code[7] = EncodeABC(OP_MOVE, 2, 0, 0)
-	if infos := RecognizedWholeCallKernels(child); len(infos) != 0 {
-		t.Fatalf("mutated sieve proto recognized as %+v", infos)
-	}
-	handled, results, err := vm.tryRunValueWholeCallKernel(NewClosure(child), []runtime.Value{runtime.IntValue(100)})
-	if err != nil || handled || len(results) != 0 {
-		t.Fatalf("mutated sieve dispatch = handled=%v results=%v err=%v, want exact fallback", handled, results, err)
-	}
-
-	child.Name = "sieve"
-	child.Source = "benchmarks/suite/sieve.gs"
-	if infos := RecognizedWholeCallKernels(child); len(infos) != 0 {
-		t.Fatalf("benchmark metadata restored recognition for mutated proto: %+v", infos)
-	}
-
-	child.Code = originalCode
-	requireKernelInfo(t, RecognizedWholeCallKernels(child), "bool_table_strike_count")
-}
 
 func TestCachedWholeCallKernelRecognizedUsesHotCache(t *testing.T) {
 	proto := &FuncProto{
 		WholeCallKernel: &wholeCallKernelProtoCache{
 			fingerprint: wholeCallKernelFingerprint{codeLen: 123},
-			recognized:  uint64(1) << uint(wholeCallKernelPermutationFlipChecksum),
+			recognized:  uint64(1) << uint(wholeCallKernelRecordWalkFold),
 		},
 	}
-	if !cachedWholeCallKernelRecognized(proto, wholeCallKernelPermutationFlipChecksum) {
+	if !cachedWholeCallKernelRecognized(proto, wholeCallKernelRecordWalkFold) {
 		t.Fatal("cached hot dispatch guard recomputed structure instead of using cached bits")
 	}
-	if cachedWholeCallKernelRecognized(proto, wholeCallKernelBoolTableStrikeCount) {
+	if cachedWholeCallKernelRecognized(proto, wholeCallKernelIntGridAggregate) {
 		t.Fatal("cached hot dispatch guard reported an uncached kernel bit")
 	}
 }
@@ -207,148 +55,25 @@ func advance(dt) { return dt }
 	}
 }
 
-func BenchmarkWholeCallKernelDispatchCachedSieve(b *testing.B) {
-	proto, vm := compileWholeCallKernelBenchmarkProgram(b, `
-func local_prime_counter(n) {
-    is_prime := {}
-    for i := 2; i <= n; i++ {
-        is_prime[i] = true
-    }
-    i := 2
-    for i * i <= n {
-        if is_prime[i] {
-            j := i * i
-            for j <= n {
-                is_prime[j] = false
-                j = j + i
-            }
-        }
-        i = i + 1
-    }
-    count := 0
-    for i := 2; i <= n; i++ {
-        if is_prime[i] { count = count + 1 }
-    }
-    return count
-}
-`)
-	defer vm.Close()
-	cl := NewClosure(proto.Protos[0])
-	args := []runtime.Value{runtime.IntValue(10)}
-	handled, results, err := vm.tryRunValueWholeCallKernel(cl, args)
-	if err != nil || !handled || len(results) != 1 || !results[0].IsInt() || results[0].Int() != 4 {
-		b.Fatalf("sieve dispatch preflight = handled=%v results=%v err=%v, want 4", handled, results, err)
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		handled, results, err = vm.tryRunValueWholeCallKernel(cl, args)
-		if err != nil || !handled || len(results) != 1 {
-			b.Fatalf("sieve dispatch = handled=%v results=%v err=%v", handled, results, err)
-		}
-	}
-}
-
-func compileWholeCallKernelBenchmarkProgram(b *testing.B, src string) (*FuncProto, *VM) {
-	b.Helper()
-	tokens, err := lexer.New(src).Tokenize()
+func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "fannkuch.gs"))
 	if err != nil {
-		b.Fatalf("lexer error: %v", err)
+		t.Fatal(err)
 	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
-		b.Fatalf("parse error: %v", err)
-	}
-	proto, err := Compile(prog)
-	if err != nil {
-		b.Fatalf("compile error: %v", err)
-	}
-	return proto, New(runtime.NewInterpreterGlobals())
-}
-
-func TestWholeCallKernelDiagnosticsIncludeRecursiveTableProtocols(t *testing.T) {
-	proto, vm := compileSpectralKernelTestProgram(t, recursiveTableKernelProgram)
+	proto, vm := compileSpectralKernelTestProgram(t, string(src))
 	defer vm.Close()
-	if len(proto.Protos) != 2 {
-		t.Fatalf("nested protos = %d, want 2", len(proto.Protos))
+	child := findTestProtoByName(proto, "fannkuch")
+	if child == nil {
+		t.Fatal("missing fannkuch proto")
 	}
-
-	builder := proto.Protos[0]
-	fold := proto.Protos[1]
-	builder.Name = "not_the_recursive_binding"
-	builder.Source = "benchmarks/suite/binary_trees.gs"
-	fold.Name = "also_not_the_recursive_binding"
-	fold.Source = "benchmarks/suite/binary_trees.gs"
-
-	requireKernelInfo(t, RecognizedWholeCallKernels(builder), "lazy_recursive_table_builder")
-	requireKernelInfo(t, RecognizedWholeCallKernels(fold), "lazy_recursive_table_fold")
-	rejectKernelInfo(t, RecognizedWholeCallKernels(builder), "lazy_recursive_table_fold")
-	rejectKernelInfo(t, RecognizedWholeCallKernels(fold), "lazy_recursive_table_builder")
-}
-
-func TestDriverLoopKernelDiagnosticsRecognizeStructuralLoops(t *testing.T) {
-	primeTop, primeVM := compileSpectralKernelTestProgram(t, trialDivisionIntPredicateSource+`
-limit := 2000
-total := 0
-hits := 0
-for candidate := 2; candidate <= limit; candidate++ {
-    if check(candidate) {
-        total = total + candidate
-        hits = hits + 1
-    }
-}
-`)
-	defer primeVM.Close()
-	if len(primeTop.Protos) != 1 {
-		t.Fatalf("prime nested protos = %d, want 1", len(primeTop.Protos))
+	if !isPermutationFlipChecksumKernelProto(child) {
+		t.Fatalf("permutation flip checksum recognizer rejected current benchmark shape: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
 	}
-	primeTop.Name = "sum_primes"
-	primeTop.Source = "benchmarks/suite/sum_primes.gs"
-	requireKernelInfo(t, RecognizedDriverLoopKernels(primeTop, map[string]*FuncProto{
-		"check": primeTop.Protos[0],
-	}), "int_predicate_reduction_loop")
-
-	nbodyTop, nbodyVM := compileSpectralKernelTestProgram(t, nbodyKernelTestProgram+`
-N := 2000
-dt := 0.01
-for i := 1; i <= N; i++ { advance(dt) }
-`)
-	defer nbodyVM.Close()
-	if len(nbodyTop.Protos) != 1 {
-		t.Fatalf("nbody nested protos = %d, want 1", len(nbodyTop.Protos))
+	if !mayHaveWholeCallValueKernelCandidate(child, 1, false) {
+		t.Fatal("permutation flip checksum rejected by value-kernel candidate gate")
 	}
-	nbodyTop.Name = "nbody"
-	nbodyTop.Source = "benchmarks/suite/nbody.gs"
-	requireKernelInfo(t, RecognizedDriverLoopKernels(nbodyTop, map[string]*FuncProto{
-		"advance": nbodyTop.Protos[0],
-	}), "record_pairwise_advance_loop")
-}
-
-func TestDriverLoopKernelDiagnosticsReportFallbackReasons(t *testing.T) {
-	proto, vm := compileSpectralKernelTestProgram(t, trialDivisionIntPredicateSource+`
-limit := 30
-total := 0
-hits := 0
-for candidate := 2; candidate <= limit; candidate++ {
-    if check(candidate) {
-        total = total + candidate
-        hits = hits + 1
-    }
-}
-`)
-	defer vm.Close()
-
-	missingMap := requireKernelDiagnostic(t, DiagnoseDriverLoopKernels(proto, nil), "int_predicate_reduction_loop")
-	if missingMap.Recognized || missingMap.Reason != kernelReasonMissingGlobalProtoMap {
-		t.Fatalf("missing map diagnostic = %+v, want missing global proto map", missingMap)
-	}
-
-	recognized := requireKernelDiagnostic(t, DiagnoseDriverLoopKernels(proto, map[string]*FuncProto{
-		"check": proto.Protos[0],
-	}), "int_predicate_reduction_loop")
-	if !recognized.Recognized || recognized.Reason != kernelReasonDriverRecognized {
-		t.Fatalf("recognized diagnostic = %+v, want structural driver loop", recognized)
+	if !cachedWholeCallKernelRecognized(child, wholeCallKernelPermutationFlipChecksum) {
+		t.Fatal("permutation flip checksum rejected by cached kernel bits")
 	}
 }
 

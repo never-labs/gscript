@@ -407,16 +407,6 @@ func (vm *VM) guardDenseSpectralAtAvCallees(proto *FuncProto) bool {
 	return true
 }
 
-func (vm *VM) globalValue(name string) (runtime.Value, bool) {
-	if vm.globalOverrides != nil {
-		if v, ok := vm.globalOverrides[name]; ok {
-			return v, true
-		}
-	}
-	v, ok := vm.globals[name]
-	return v, ok
-}
-
 func classifyDenseSpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
 	if p == nil || p.NumParams != 3 || p.IsVarArg || len(p.Constants) != 5 ||
 		len(p.Code) != 36 || !numberConst(p.Constants[0], 0.0) ||

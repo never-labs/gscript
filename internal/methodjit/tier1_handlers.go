@@ -437,9 +437,6 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 	if fnVal.IsFunction() {
 		if cl, ok := vmClosureFromValue(fnVal); ok && !cl.Proto.IsVarArg {
 			calleeProto := cl.Proto
-			if vm.IsPermutationFlipChecksumKernelProto(calleeProto) {
-				goto slowPath
-			}
 			if calleeProto.JITDisabled {
 				goto slowPath
 			}

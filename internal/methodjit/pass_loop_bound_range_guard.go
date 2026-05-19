@@ -1,9 +1,9 @@
 package methodjit
 
 const (
-	nestedLoopParamRangeMax          int64 = 1 << 20
-	nestedLoopParamObservedRangeMax  int64 = 1 << 24
-	singleLoopParamRangeMax          int64 = 1 << 30
+	nestedLoopParamRangeMax         int64 = 1 << 20
+	nestedLoopParamObservedRangeMax int64 = 1 << 24
+	singleLoopParamRangeMax         int64 = 1 << 30
 )
 
 // LoopBoundRangeGuardPass adds a narrow entry range guard for integer

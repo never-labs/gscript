@@ -50,20 +50,20 @@ const (
 )
 
 const (
-	wholeCallKernelPermutationFlipChecksum = iota
+	wholeCallKernelRecordWalkFold = iota
+	wholeCallKernelIntGridAggregate
+	wholeCallKernelPermutationFlipChecksum
 	wholeCallKernelBoolTableStrikeCount
+	wholeCallKernelMatrixMultiply
 	wholeCallKernelLazyRecursiveTableBuilder
 	wholeCallKernelLazyRecursiveTableFold
-	wholeCallKernelMatrixMultiply
+	wholeCallKernelRecordPairwiseNumeric
 	wholeCallKernelNumericArrayRegionSort
 	wholeCallKernelCoefficientMatrixVector
 	wholeCallKernelCoefficientMatrixTransposeVector
 	wholeCallKernelCoefficientMatrixAtAVector
-	wholeCallKernelDenseMatrixMultiplyTransposed
 	wholeCallKernelDenseCoefficientMatrixAtAVector
-	wholeCallKernelRecordPairwiseAdvance
-	wholeCallKernelRecordWalkFold
-	wholeCallKernelIntGridAggregate
+	wholeCallKernelDenseMatrixMultiplyTransposed
 	wholeCallKernelCount
 )
 
@@ -97,6 +97,26 @@ type wholeCallKernelRecognizer struct {
 var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	{
 		info: KernelInfo{
+			Name:    "record_walk_fold",
+			Route:   KernelRouteWholeCallValue,
+			Arity:   3,
+			Results: kernelWholeCallSingleResultCount,
+		},
+		recognize: isRecordWalkFoldProto,
+		runValue:  (*VM).runRecordWalkFoldWholeCallKernel,
+	},
+	{
+		info: KernelInfo{
+			Name:    "int_grid_aggregate",
+			Route:   KernelRouteWholeCallValue,
+			Arity:   2,
+			Results: kernelWholeCallSingleResultCount,
+		},
+		recognize: isIntGridAggregateProto,
+		runValue:  (*VM).runIntGridAggregateWholeCallKernel,
+	},
+	{
+		info: KernelInfo{
 			Name:    "permutation_flip_checksum",
 			Route:   KernelRouteWholeCallValue,
 			Arity:   1,
@@ -114,6 +134,16 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 		},
 		recognize: isBoolTableStrikeCountProto,
 		runValue:  (*VM).runBoolTableStrikeCountWholeCallKernel,
+	},
+	{
+		info: KernelInfo{
+			Name:    "matrix_multiply",
+			Route:   KernelRouteWholeCallValue,
+			Arity:   3,
+			Results: kernelWholeCallSingleResultCount,
+		},
+		recognize: isMatrixMultiplyProto,
+		runValue:  (*VM).runMatrixMultiplyWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
@@ -139,13 +169,13 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 	{
 		info: KernelInfo{
-			Name:    "matrix_multiply",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   3,
-			Results: kernelWholeCallSingleResultCount,
+			Name:    "record_pairwise_numeric",
+			Route:   KernelRouteWholeCallNoResult,
+			Arity:   1,
+			Results: kernelWholeCallInPlaceResultCount,
 		},
-		recognize: isMatrixMultiplyProto,
-		runValue:  (*VM).runMatrixMultiplyWholeCallKernel,
+		recognize:   isRecordPairwiseNumericProto,
+		runNoResult: (*VM).runRecordPairwiseNumericKernel,
 	},
 	{
 		info: KernelInfo{
@@ -189,16 +219,6 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 	{
 		info: KernelInfo{
-			Name:    "dense_matrix_multiply_transposed",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   4,
-			Results: kernelWholeCallInPlaceResultCount,
-		},
-		recognize:   isDenseMatrixMultiplyTransposedProto,
-		runNoResult: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
 			Name:    "dense_coefficient_matrix_ata_vector",
 			Route:   KernelRouteWholeCallNoResult,
 			Arity:   4,
@@ -209,33 +229,13 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 	{
 		info: KernelInfo{
-			Name:    "record_pairwise_advance",
+			Name:    "dense_matrix_multiply_transposed",
 			Route:   KernelRouteWholeCallNoResult,
-			Arity:   1,
+			Arity:   4,
 			Results: kernelWholeCallInPlaceResultCount,
 		},
-		recognize:   isRecordPairwiseAdvanceProto,
-		runNoResult: (*VM).runRecordPairwiseAdvanceKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:    "record_walk_fold",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   3,
-			Results: kernelWholeCallSingleResultCount,
-		},
-		recognize: isRecordWalkFoldProto,
-		runValue:  (*VM).runRecordWalkFoldWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:    "int_grid_aggregate",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   2,
-			Results: kernelWholeCallSingleResultCount,
-		},
-		recognize: isIntGridAggregateProto,
-		runValue:  (*VM).runIntGridAggregateWholeCallKernel,
+		recognize:   isDenseMatrixMultiplyTransposedProto,
+		runNoResult: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
 	},
 }
 
@@ -247,30 +247,24 @@ type driverLoopKernelRecognizer struct {
 var driverLoopKernelRegistry = [...]driverLoopKernelRecognizer{
 	{
 		info: KernelInfo{
-			Name:    "record_pairwise_advance_loop",
+			Name:    "record_pairwise_numeric_loop",
 			Route:   KernelRouteDriverLoop,
 			Arity:   kernelUnknownDriverLoopArity,
 			Results: kernelUnknownDriverLoopResultCount,
 		},
-		recognize: HasRecordPairwiseAdvanceDriverLoopKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:    "int_predicate_reduction_loop",
-			Route:   KernelRouteDriverLoop,
-			Arity:   kernelUnknownDriverLoopArity,
-			Results: kernelUnknownDriverLoopResultCount,
-		},
-		recognize: HasIntPredicateReductionLoopKernel,
+		recognize: HasRecordPairwiseNumericDriverLoopKernel,
 	},
 }
 
 // WholeCallKernelCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.
 func WholeCallKernelCatalog() []KernelInfo {
-	out := make([]KernelInfo, len(wholeCallKernelRegistry))
-	for i, entry := range wholeCallKernelRegistry {
-		out[i] = entry.info
+	out := make([]KernelInfo, 0, len(wholeCallKernelRegistry))
+	for _, entry := range wholeCallKernelRegistry {
+		if entry.info.Name == "" {
+			continue
+		}
+		out = append(out, entry.info)
 	}
 	return out
 }
@@ -291,6 +285,9 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 	out := make([]KernelInfo, 0, 1)
 	recognized := recognizedWholeCallKernelBits(p)
 	for i, entry := range wholeCallKernelRegistry {
+		if entry.info.Name == "" {
+			continue
+		}
 		if recognized&(uint64(1)<<uint(i)) != 0 {
 			out = append(out, entry.info)
 		}
@@ -302,15 +299,18 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 // registered whole-call kernel. It is intended for tests and diagnostics, not
 // hot dispatch.
 func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, len(wholeCallKernelRegistry))
+	out := make([]KernelDiagnostic, 0, len(wholeCallKernelRegistry))
 	recognizedBits := recognizedWholeCallKernelBits(p)
 	for i, entry := range wholeCallKernelRegistry {
+		if entry.info.Name == "" {
+			continue
+		}
 		recognized := recognizedBits&(uint64(1)<<uint(i)) != 0
-		out[i] = KernelDiagnostic{
+		out = append(out, KernelDiagnostic{
 			Kernel:     entry.info,
 			Recognized: recognized,
 			Reason:     wholeCallKernelReason(p, recognized),
-		}
+		})
 	}
 	return out
 }
@@ -357,6 +357,9 @@ func wholeCallKernelCacheForProto(proto *FuncProto) *wholeCallKernelProtoCache {
 	}
 	cache = &wholeCallKernelProtoCache{fingerprint: fp}
 	for i, entry := range wholeCallKernelRegistry {
+		if entry.info.Name == "" || entry.recognize == nil {
+			continue
+		}
 		if entry.recognize(proto) {
 			cache.recognized |= uint64(1) << uint(i)
 		}

@@ -38,9 +38,9 @@ func TestObjectCreationDump(t *testing.T) {
 	// create_and_sum +24 total / +8 mem, transform_chain +24/+8, new_vec3
 	// +12/+2. Memory-op delta is the single STRB per entry path.
 	type baseline struct {
-		name          string
-		totalIns      int
-		memIns        int
+		name           string
+		totalIns       int
+		memIns         int
 		totalTolerance float64
 	}
 	const tolerance = 0.02

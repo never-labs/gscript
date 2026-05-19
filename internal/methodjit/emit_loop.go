@@ -278,6 +278,7 @@ type loopRegEntry struct {
 	IsRawInt      bool
 	IsRawTablePtr bool
 	IsRawDataPtr  bool
+	IsRawSvalsPtr bool
 }
 
 // loopFPRegEntry describes an FPR's state at the end of the loop header.
@@ -325,7 +326,7 @@ func (li *loopInfo) computeHeaderExitRegs(fn *Function, alloc *RegAllocation, fu
 			if !ok || pr.IsFloat {
 				continue
 			}
-			isRawTablePtr := isRawTablePtrOp(instr.Op)
+			isRawTablePtr := isRawTablePtrValue(instr)
 			isRawDataPtr := isRawDataPtrOp(instr.Op)
 			isRaw := isRawIntOp(instr.Op) && !isRawTablePtr && !isRawDataPtr
 			regs[pr.Reg] = loopRegEntry{
@@ -600,7 +601,7 @@ func isLoopInvariantRawTablePtr(fn *Function, valueID int) bool {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr.ID == valueID {
-				return isRawTablePtrOp(instr.Op)
+				return isRawTablePtrValue(instr)
 			}
 		}
 	}
@@ -762,6 +763,16 @@ func isRawIntOp(op Op) bool {
 
 func isRawTablePtrOp(op Op) bool {
 	return op == OpTableArrayHeader
+}
+
+func isRawTablePtrValue(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	if isRawTablePtrOp(instr.Op) {
+		return true
+	}
+	return instr.Op == OpTableArrayLoad && instr.Type == TypeTable
 }
 
 func isRawDataPtrOp(op Op) bool {

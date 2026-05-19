@@ -3,8 +3,8 @@
 package methodjit
 
 import (
-	"testing"
 	"github.com/gscript/gscript/internal/runtime"
+	"testing"
 )
 
 // TestFPRCycle_SinglePixelEscape verifies that the FPR phi move cycle fix

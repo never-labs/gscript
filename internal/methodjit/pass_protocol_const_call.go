@@ -98,20 +98,6 @@ func foldProtocolConstCall(callee *vm.FuncProto, globals map[string]*vm.FuncProt
 	if callee == nil || len(args) != callee.NumParams {
 		return 0, nil, nil, false
 	}
-	if cf, ok := newFixedRecursiveIntFoldCompiled(callee); ok {
-		if len(args) != 1 {
-			return 0, nil, nil, false
-		}
-		out, ok := cf.FixedRecursiveIntFold.fold(args[0])
-		return out, nil, nil, ok
-	}
-	if cf, ok := newFixedRecursiveNestedIntFoldCompiled(callee); ok {
-		if len(args) != 2 {
-			return 0, nil, nil, false
-		}
-		out, ok := cf.FixedRecursiveNestedIntFold.fold(args[0], args[1])
-		return out, nil, nil, ok
-	}
 	if cf, ok := newMutualRecursiveIntSCCCompiled(callee, globals); ok {
 		var intArgs [4]int64
 		for i, arg := range args {

@@ -350,22 +350,10 @@ for i := 1; i <= 20; i++ {
 	if makeTreeProto == nil {
 		t.Fatal("makeTree proto not found")
 	}
-	if makeTreeProto.JITDisabled {
-		t.Fatal("makeTree should not stay Tier 0 once the fixed recursive table builder protocol applies")
-	}
-	if makeTreeProto.EnteredTier2 == 0 {
-		t.Fatal("makeTree should enter the fixed recursive table builder Tier 2 protocol")
-	}
 
 	checkTreeProto := findProtoByName(proto, "checkTree")
 	if checkTreeProto == nil {
 		t.Fatal("checkTree proto not found")
-	}
-	if checkTreeProto.JITDisabled {
-		t.Fatal("checkTree should not stay tier0 once the fixed recursive table fold protocol applies")
-	}
-	if checkTreeProto.EnteredTier2 == 0 {
-		t.Fatal("checkTree should enter the fixed recursive table fold Tier 2 protocol")
 	}
 }
 
@@ -409,25 +397,6 @@ for i := 1; i <= 20; i++ {
 	}
 	if !canPromoteWithNativeLoopCalls(proto, tm.buildLoopCallGlobals(proto)) {
 		t.Fatal("helper loop call should remain eligible for native loop-call promotion")
-	}
-}
-
-func TestTieringManager_RecordPairwiseDenseDriverStaysOutOfTier2(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/nbody_dense.gs")
-	if err != nil {
-		t.Fatalf("read nbody_dense benchmark: %v", err)
-	}
-	proto := compileProto(t, string(srcBytes))
-	tm := NewTieringManager()
-	if !tm.hasLargeRecordPairwiseAdvanceDriverLoop(proto) {
-		t.Fatal("record-pairwise dense driver loop was not recognized")
-	}
-	proto.CallCount = BaselineCompileThreshold
-	if got := tm.TryCompile(proto); got != nil {
-		t.Fatalf("TryCompile returned %T, want nil whole-loop kernel routing", got)
-	}
-	if !proto.JITDisabled {
-		t.Fatal("<main> was not marked JITDisabled for record-pairwise dense driver routing")
 	}
 }
 

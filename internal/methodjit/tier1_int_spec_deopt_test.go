@@ -17,8 +17,9 @@ import (
 // resumes at the overflow PC and the side effects run exactly once.
 //
 // Test structure:
-//   counter = counter + 1   ← GETGLOBAL/SETGLOBAL exit-resume (side effect)
-//   return a + b            ← int-spec ADD; overflows for large=10^14
+//
+//	counter = counter + 1   ← GETGLOBAL/SETGLOBAL exit-resume (side effect)
+//	return a + b            ← int-spec ADD; overflows for large=10^14
 //
 // VM produces counter=1. JIT without fix: counter=2 (replay). JIT with fix: counter=1.
 func TestTier1IntSpec_OverflowDeoptNoSideEffectReplay(t *testing.T) {

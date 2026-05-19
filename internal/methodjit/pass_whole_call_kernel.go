@@ -51,10 +51,10 @@ func stableNoResultWholeCallCandidate(fn *Function, instr *Instr, globals map[st
 		return false
 	}
 	if proto, ok := stableFeedbackCalleeProto(fn, instr, nArgs); ok {
-		return protoHasNoResultWholeCallKernel(proto)
+		return protoHasNoResultWholeCallKernel(proto) || protoReturnsNoValuesWithArity(proto, nArgs)
 	}
 	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: globals})
-	return protoHasNoResultWholeCallKernel(callee)
+	return protoHasNoResultWholeCallKernel(callee) || protoReturnsNoValuesWithArity(callee, nArgs)
 }
 
 func stableFeedbackCalleeProto(fn *Function, instr *Instr, nArgs int) (*vm.FuncProto, bool) {
@@ -77,6 +77,23 @@ func protoHasNoResultWholeCallKernel(proto *vm.FuncProto) bool {
 		}
 	}
 	return false
+}
+
+func protoReturnsNoValuesWithArity(proto *vm.FuncProto, nArgs int) bool {
+	if proto == nil || proto.IsVarArg || proto.NumParams != nArgs || len(proto.Code) == 0 {
+		return false
+	}
+	seenReturn := false
+	for _, inst := range proto.Code {
+		if vm.DecodeOp(inst) != vm.OP_RETURN {
+			continue
+		}
+		seenReturn = true
+		if vm.DecodeB(inst) != 1 {
+			return false
+		}
+	}
+	return seenReturn
 }
 
 func buildWholeCallNoResultBatches(fn *Function, globals map[string]*vm.FuncProto, kernels map[int]bool) map[int]WholeCallNoResultBatchFact {
@@ -153,7 +170,8 @@ func wholeCallNoResultGlobalCallRecipe(proto *vm.FuncProto, code []uint32, loopS
 		}
 		if slot == a {
 			name := protoConstString(proto, constIdx)
-			if name == "" || !protoHasNoResultWholeCallKernel(globals[name]) {
+			callee := globals[name]
+			if name == "" || (!protoHasNoResultWholeCallKernel(callee) && !protoReturnsNoValuesWithArity(callee, b-1)) {
 				return WholeCallNoResultBatchCall{}, false
 			}
 			call.FuncConst = constIdx

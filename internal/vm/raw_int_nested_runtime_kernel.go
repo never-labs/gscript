@@ -30,7 +30,7 @@ func IsRawIntNestedKernelProto(proto *FuncProto) bool {
 }
 
 func (vm *VM) tryRunRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if vm == nil || cl == nil || cl.Proto == nil || len(args) != 2 || vm.methodJIT == nil || !cl.Proto.Tier2Promoted {
+	if vm == nil || cl == nil || cl.Proto == nil || len(args) != 2 {
 		return false, nil, nil
 	}
 	cache := rawIntNestedKernelForProto(cl.Proto)
@@ -314,34 +314,34 @@ func (k *rawIntNestedKernel) fold(mv, nv runtime.Value) (int64, bool) {
 }
 
 func (k *rawIntNestedKernel) foldSmallRows(m, n int64) (int64, bool) {
-	if k.baseAdd != 1 || k.mStep != 1 || k.nStep != 1 {
+	if k.mStep != 1 || k.nStep != 1 {
 		return 0, false
 	}
+	a := k.baseAdd
 	z := k.zeroArg
 	switch m {
 	case 0:
-		return rawIntNestedCheckedAdd(n, 1)
+		return rawIntNestedCheckedAdd(n, a)
 	case 1:
-		out, ok := rawIntNestedCheckedAdd(n, z)
+		count, ok := rawIntNestedCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
-		return rawIntNestedCheckedAdd(out, 1)
+		delta, ok := rawIntNestedCheckedMul(a, count)
+		if !ok {
+			return 0, false
+		}
+		return rawIntNestedCheckedAdd(z, delta)
 	case 2:
 		count, ok := rawIntNestedCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
-		step, ok := rawIntNestedCheckedAdd(z, 1)
-		if !ok {
-			return 0, false
-		}
-		product, ok := rawIntNestedCheckedMul(count, step)
-		if !ok {
-			return 0, false
-		}
-		return rawIntNestedCheckedAdd(z, product)
+		return rawIntNestedAffineIterate(a, z+a, z, count)
 	case 3:
+		if a != 1 {
+			return 0, false
+		}
 		count, ok := rawIntNestedCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
@@ -385,6 +385,31 @@ func rawIntNestedCheckedAdd(a, b int64) (int64, bool) {
 		return 0, false
 	}
 	return out, true
+}
+
+func rawIntNestedAffineIterate(scale, bias, x, count int64) (int64, bool) {
+	if count < 0 {
+		return 0, false
+	}
+	if scale == 1 {
+		delta, ok := rawIntNestedCheckedMul(bias, count)
+		if !ok {
+			return 0, false
+		}
+		return rawIntNestedCheckedAdd(x, delta)
+	}
+	result := x
+	for i := int64(0); i < count; i++ {
+		next, ok := rawIntNestedCheckedMul(scale, result)
+		if !ok {
+			return 0, false
+		}
+		result, ok = rawIntNestedCheckedAdd(next, bias)
+		if !ok {
+			return 0, false
+		}
+	}
+	return result, true
 }
 
 func rawIntNestedCheckedMul(a, b int64) (int64, bool) {

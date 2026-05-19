@@ -292,7 +292,7 @@ func frameTrafficDiagnostics(fn *Function, alloc *RegAllocation, body map[int]bo
 				switch {
 				case isRawIntOp(instr.Op):
 					reason = "cross-block raw int is boxed and written through by storeRawInt"
-				case isRawTablePtrOp(instr.Op):
+				case isRawTablePtrValue(instr):
 					reason = "cross-block raw table pointer is boxed and written through by storeRawTablePtr"
 				case isRawDataPtrOp(instr.Op):
 					reason = "cross-block raw data pointer is written through by storeRawDataPtr"

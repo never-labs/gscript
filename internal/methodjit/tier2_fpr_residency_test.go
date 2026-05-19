@@ -140,13 +140,13 @@ func analyzeProtoFPR(t *testing.T, benchFile string, proto *vm.FuncProto, depth 
 
 	// Collect phis.
 	type phiRow struct {
-		id       int
-		blockID  int
-		typ      Type
-		hasReg   bool
-		reg      int
-		isFloat  bool
-		spilled  bool
+		id      int
+		blockID int
+		typ     Type
+		hasReg  bool
+		reg     int
+		isFloat bool
+		spilled bool
 	}
 	var phis []phiRow
 	for _, b := range fn.Blocks {

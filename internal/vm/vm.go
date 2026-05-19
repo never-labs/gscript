@@ -2457,17 +2457,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 		case OP_FORPREP:
 			a := DecodeA(inst)
 			sbx := DecodesBx(inst)
-			if handled, err := vm.tryIntPredicateReductionForLoopKernel(frame, base, code, constants, a, sbx); handled {
-				if err != nil {
-					return nil, wrapLineErr(frame, err)
-				}
-				break
-			}
-			if handled, err := vm.tryRecordPairwiseAdvanceForLoopKernel(frame, base, code, constants, a, sbx); handled {
-				if err != nil {
-					return nil, wrapLineErr(frame, err)
-				}
-				break
+			if handled, err := vm.tryRecordPairwiseNumericForLoopKernel(frame, base, code, constants, a, sbx); err != nil {
+				return nil, err
+			} else if handled {
+				continue
 			}
 			initV := vm.regs[base+a]
 			stepV := vm.regs[base+a+2]
@@ -3068,9 +3061,6 @@ func (vm *VM) callValue(fnVal runtime.Value, args []runtime.Value) ([]runtime.Va
 	if fnVal.IsFunction() {
 		if cl, ok := closureFromValue(fnVal); ok {
 			if wholeCallKernelArity(len(args)) {
-				if handled, results, err := vm.tryRunRawIntNestedValueKernel(cl, args); handled {
-					return results, err
-				}
 				if handled, results, err := vm.tryRunNonRecursiveTableValueWholeCallKernel(cl, args); handled {
 					return results, err
 				}
