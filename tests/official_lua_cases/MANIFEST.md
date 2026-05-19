@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 395.
+Current translated passing cases: 398.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -326,12 +326,15 @@ Recent audit-added coverage:
 | `files_io_read_formats_more` | `files.lua` | File `read` line-with-newline format, byte-count reads, zero-byte EOF probe, partial EOF reads, and ordered multi-format returns. |
 | `files_seek_overwrite_more` | `files.lua` | File-handle `seek` position reporting and overwrite semantics followed by whole-file readback. |
 | `files_tmpfile_flush_type_more` | `files.lua` | `io.tmpfile`, `file:flush`, seek-to-start readback, and closed-file `io.type` reporting. |
+| `fs_path_go_host_more` | `files.lua`, `main.lua` | Go-host `fs` and `path` helpers for temp files, directory creation, path operations, copy/rename/read/write, and error returns. |
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
 | `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
 | `http_background_server_more` | `api.lua`, `main.lua` | Go-host HTTP server/router background mode returns closeable handles with addr/url and supports local client round-trips. |
+| `json_go_host_more` | `api.lua`, `strings.lua` | Go-host `json` encode/decode/pretty round trips, nested values, invalid JSON, and trailing-data rejection. |
 | `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
+| `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `table_go_helpers_more` | `sort.lua` | GScript Go-host table helpers: keys, values, contains, indexOf, copy, merge, count, unique, reverse, slice, and zip. |

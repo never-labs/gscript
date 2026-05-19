@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -45,6 +46,13 @@ func buildJSONLib() *Table {
 		decoder := json.NewDecoder(strings.NewReader(str))
 		decoder.UseNumber()
 		if err := decoder.Decode(&goVal); err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		var extra interface{}
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return []Value{NilValue(), StringValue("invalid JSON: trailing data")}, nil
+			}
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		return []Value{jsonGoToGScript(goVal)}, nil
