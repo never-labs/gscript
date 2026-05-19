@@ -1,9 +1,5 @@
 # Current Official Lua Semantic Gaps
 
-The default translated-case harness has no skipped known failures. These are
-the concrete gaps found while expanding the official-suite translations and
-should be fixed before translating dependent slices.
-
-| Area | Current gap |
-|---|---|
-| JIT official check | `GSCRIPT_OFFICIAL_CHECK_JIT=1` still exposes JIT-only semantic issues in closure and multi-return slices; default official semantic comparison is Lua vs GScript VM. |
+The translated-case harness has no skipped known failures at this point. New
+gaps found while expanding official-suite translations should be added here
+with the blocking slice and intended GScript/Go-host design direction.
