@@ -3884,10 +3884,10 @@ func (vm *VM) ConcatValues(values []runtime.Value) (runtime.Value, error) {
 		return result, nil
 	}
 
-	result := values[0]
-	for i := 1; i < len(values); i++ {
+	result := values[len(values)-1]
+	for i := len(values) - 2; i >= 0; i-- {
 		var err error
-		result, err = vm.concatPair(result, values[i])
+		result, err = vm.concatPair(values[i], result)
 		if err != nil {
 			return runtime.NilValue(), err
 		}

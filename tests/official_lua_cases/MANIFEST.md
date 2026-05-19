@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 379.
+Current translated passing cases: 380.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -97,6 +97,7 @@ Current translated passing cases: 379.
 | `events_compare_compat_more` | `events.lua` | Comparison metamethod compatibility when related metatables share comparison functions. |
 | `events_concat_chain_more` | `events.lua` | Chained `__concat` metamethod results that keep returning wrapped tables. |
 | `events_concat_metamethod` | `events.lua` | `__concat` metamethod with strings, numbers, and tables. |
+| `events_concat_numeric_operand_more` | `events.lua` | VM concat chains preserve right-associative `__concat` dispatch and pass adjacent numeric operands as numbers. |
 | `events_dynamic_call_metatable` | `calls.lua`, `events.lua` | Dynamic metatable construction in loops and `__call` delegation preserving vararg table contents. |
 | `events_eq_invalidate` | `events.lua` | Dynamic `__eq` removal and replacement on an existing metatable. |
 | `events_eq_invalidate_more` | `events.lua` | Additional `__eq` invalidation and replacement checks across two metatable-sharing tables. |
