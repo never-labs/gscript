@@ -13,3 +13,6 @@
 | `load`/`string.dump` 调试信息交互 | `db.lua`, `errors.lua` stripped chunk checks | 若 GScript 后续支持编译/反序列化 chunk，可定义是否保留源码名、行表和局部变量名。 |
 | 精细错误位置与 token 诊断 | `errors.lua`: syntax/runtime line checks and token-message checks | 当前 passing tests 只校验错误发生和值传播；后续可逐步稳定行号、调用层级和 token 文案，文案可保持 GScript 风格。 |
 | `assert` 非字符串失败载荷 | `errors.lua`: `pcall(assert, false, t)` | Lua 会把非字符串消息对象作为失败结果传播；GScript 当前稳定覆盖字符串消息和普通失败，后续可考虑支持任意值载荷。 |
+| Label-directed control flow | `goto.lua`: labels, forward/backward jumps, repeated-label diagnostics, local-scope jumps | GScript 当前不解析 Lua `goto`/label。后续可考虑 Go 风格 label/goto，或显式状态机/结构化跳转能力，并清晰定义块作用域和变量初始化边界。 |
+| Local variable attributes | `constructs.lua`, `locals.lua`: `<const>`, `<close>` | 可用更贴近 Go 的 `const`、`defer`/`using` 或资源作用域语法表达只读局部和离开作用域清理，不必复刻 Lua 局部属性语法。 |
+| Lexical environment injection | `locals.lua`: `_ENV`, `load(..., env)`, environment upvalues | 若需要类似能力，可设计为显式模块环境、sandbox globals 或脚本执行上下文注入，而不必复刻 Lua `_ENV` 机制。 |
