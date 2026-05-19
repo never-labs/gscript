@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	goruntime "runtime"
 	"strconv"
 	"strings"
@@ -23,6 +22,7 @@ type Interpreter struct {
 	modules    map[string]Value // require() cache
 	stringMeta *Table           // metatable for string values (__index → string lib)
 	scriptDir  string           // directory of the main script (for require path resolution)
+	args       []string         // current script entrypoint args: [0]=script, [1:]=user args
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -77,6 +77,35 @@ func (interp *Interpreter) GetGlobal(name string) Value {
 // SetScriptDir sets the directory of the main script, used for require path resolution.
 func (interp *Interpreter) SetScriptDir(dir string) {
 	interp.scriptDir = dir
+}
+
+// ScriptDir returns the directory used for relative script/module loading.
+func (interp *Interpreter) ScriptDir() string {
+	return interp.scriptDir
+}
+
+// SetArgs sets the script entrypoint arguments and updates the global arg table.
+// The resulting table follows GScript's Lua-compatible convention:
+// arg[0] is the script name, and arg[1..n] are user arguments.
+func (interp *Interpreter) SetArgs(script string, args []string) {
+	argv := make([]string, 0, len(args)+1)
+	argv = append(argv, script)
+	argv = append(argv, args...)
+	interp.args = argv
+
+	tbl := NewTable()
+	tbl.RawSet(IntValue(0), StringValue(script))
+	for i, arg := range args {
+		tbl.RawSet(IntValue(int64(i+1)), StringValue(arg))
+	}
+	interp.SetGlobal("arg", TableValue(tbl))
+}
+
+// Args returns a copy of the current script entrypoint arguments.
+func (interp *Interpreter) Args() []string {
+	out := make([]string, len(interp.args))
+	copy(out, interp.args)
+	return out
 }
 
 // Output returns captured print output (for testing).
@@ -403,11 +432,11 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument #1 to 'assert' (value expected)")
 			}
 			if !args[0].Truthy() {
-				msg := "assertion failed"
+				errVal := StringValue("assertion failed")
 				if len(args) > 1 {
-					msg = args[1].String()
+					errVal = args[1]
 				}
-				return nil, &LuaError{Value: StringValue(msg)}
+				return nil, &LuaError{Value: errVal}
 			}
 			return args, nil // return all args on success
 		},
@@ -567,21 +596,11 @@ func (interp *Interpreter) registerBuiltins() {
 				return []Value{loaded}, nil
 			}
 
-			// Convert dots to path separators
-			filename := strings.ReplaceAll(name, ".", "/") + ".gs"
-			// Try resolving relative to script directory first
-			if interp.scriptDir != "" {
-				candidate := filepath.Join(interp.scriptDir, filename)
-				if _, statErr := os.Stat(candidate); statErr == nil {
-					filename = candidate
-				}
-			}
-			src, err := os.ReadFile(filename)
-			if err != nil {
+			filename := interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+			if _, err := os.Stat(filename); err != nil {
 				return nil, fmt.Errorf("module '%s' not found", name)
 			}
-
-			result, err := interp.ExecString(string(src))
+			result, err := interp.RunFile(filename)
 			if err != nil {
 				return nil, err
 			}
@@ -602,11 +621,43 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument #1 to 'dofile' (string expected)")
 			}
 			filename := args[0].Str()
-			src, err := os.ReadFile(filename)
-			if err != nil {
-				return nil, fmt.Errorf("cannot open %s: %s", filename, err)
+			return interp.RunFile(filename)
+		},
+	}))
+
+	interp.globals.Define("load", FunctionValue(&GoFunction{
+		Name: "load",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsString() {
+				return nil, fmt.Errorf("bad argument #1 to 'load' (string expected)")
 			}
-			return interp.ExecString(string(src))
+			var opt Value
+			if len(args) >= 2 {
+				opt = args[1]
+			}
+			fn, err := interp.compileStringWithConfig(args[0].Str(), opt, "<load>")
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{fn}, nil
+		},
+	}))
+
+	interp.globals.Define("loadfile", FunctionValue(&GoFunction{
+		Name: "loadfile",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsString() {
+				return nil, fmt.Errorf("bad argument #1 to 'loadfile' (string expected)")
+			}
+			var opt Value
+			if len(args) >= 2 {
+				opt = args[1]
+			}
+			fn, err := interp.loadFileWithConfig(args[0].Str(), opt)
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{fn}, nil
 		},
 	}))
 

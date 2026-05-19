@@ -354,6 +354,24 @@ func TestAssertFalsyValues(t *testing.T) {
 	}
 }
 
+func TestAssertPreservesFailureValue(t *testing.T) {
+	interp := runProgram(t, `
+		payload := {code: 42, msg: "bad"}
+		ok, err := pcall(assert, false, payload)
+		code := err.code
+		msg := err.msg
+	`)
+	if interp.GetGlobal("ok").Truthy() {
+		t.Fatalf("assert(false, payload) should fail")
+	}
+	if interp.GetGlobal("code").Int() != 42 {
+		t.Fatalf("expected payload code 42, got %v", interp.GetGlobal("code"))
+	}
+	if interp.GetGlobal("msg").Str() != "bad" {
+		t.Fatalf("expected payload msg bad, got %v", interp.GetGlobal("msg"))
+	}
+}
+
 func TestAssertReturnsAllArgs(t *testing.T) {
 	interp := runProgram(t, `
 		a, b, c := assert(1, 2, 3)

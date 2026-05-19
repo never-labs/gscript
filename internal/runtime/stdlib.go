@@ -46,7 +46,8 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("net", TableValue(buildNetLib()))
 
 	// --- System ---
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp.globals.Define("process", TableValue(buildProcessLib(interp)))
+	interp.globals.Define("script", TableValue(buildScriptLib(interp)))
 
 	// --- Data formats ---
 	interp.globals.Define("csv", TableValue(buildCSVLib()))
@@ -55,6 +56,7 @@ func (interp *Interpreter) registerStdlib() {
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
 	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.globals.Define("binary", TableValue(buildBinaryLib()))
 
 	// --- Game math ---
 	interp.globals.Define("vec", TableValue(buildVecLib()))

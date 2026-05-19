@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -127,8 +128,12 @@ func main() {
 	interp := runtime.New()
 
 	if *eval != "" {
+		interp.SetArgs("<eval>", flag.Args())
 		// Execute string
 		if err := runString(interp, *eval); err != nil {
+			if exit, ok := processExit(err); ok {
+				os.Exit(exit.Code)
+			}
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
@@ -138,6 +143,7 @@ func main() {
 	args := flag.Args()
 	if len(args) == 0 {
 		// REPL mode
+		interp.SetArgs("<repl>", nil)
 		runREPL(interp)
 		return
 	}
@@ -145,13 +151,7 @@ func main() {
 	// Execute file
 	filename := args[0]
 
-	// Set os.args global
-	osArgs := runtime.NewTable()
-	osArgs.RawSet(runtime.IntValue(0), runtime.StringValue(filename))
-	for i, arg := range args[1:] {
-		osArgs.RawSet(runtime.IntValue(int64(i+1)), runtime.StringValue(arg))
-	}
-	interp.SetGlobal("arg", runtime.TableValue(osArgs))
+	interp.SetArgs(filename, args[1:])
 
 	// Set script directory for require
 	absPath, _ := filepath.Abs(filename)
@@ -173,15 +173,29 @@ func main() {
 			ShowPathStats:             *pathStats,
 			ShowPathStatsJSON:         *pathStatsJSON,
 		}); err != nil {
+			if exit, ok := processExit(err); ok {
+				os.Exit(exit.Code)
+			}
 			fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
 			os.Exit(1)
 		}
 	} else {
 		if err := runFile(interp, filename); err != nil {
+			if exit, ok := processExit(err); ok {
+				os.Exit(exit.Code)
+			}
 			fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
 			os.Exit(1)
 		}
 	}
+}
+
+func processExit(err error) (*runtime.ProcessExitError, bool) {
+	var exit *runtime.ProcessExitError
+	if errors.As(err, &exit) {
+		return exit, true
+	}
+	return nil, false
 }
 
 func runFile(interp *runtime.Interpreter, filename string) error {

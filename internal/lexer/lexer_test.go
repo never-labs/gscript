@@ -185,6 +185,16 @@ func TestStringEscapeSequences(t *testing.T) {
 	}
 }
 
+func TestRawStringLiterals(t *testing.T) {
+	expectTokens(t, "`hello\\nworld`", []Token{
+		{Type: TOKEN_STRING, Value: `hello\nworld`, Line: 1, Column: 1},
+	})
+	expectTokens(t, "`first\nsecond` \"tail\"", []Token{
+		{Type: TOKEN_STRING, Value: "first\nsecond", Line: 1, Column: 1},
+		{Type: TOKEN_STRING, Value: "tail", Line: 2, Column: 9},
+	})
+}
+
 func TestEmptyString(t *testing.T) {
 	expectTokens(t, `""`, []Token{
 		{Type: TOKEN_STRING, Value: ""},

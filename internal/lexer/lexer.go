@@ -106,6 +106,9 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 	if ch == '"' {
 		return l.readString()
 	}
+	if ch == '`' {
+		return l.readRawString()
+	}
 
 	// Number literal
 	if isDigit(ch) {
@@ -191,6 +194,24 @@ func (l *Lexer) readString() (Token, error) {
 		result = append(result, l.advance())
 	}
 	return Token{}, fmt.Errorf("unterminated string at %d:%d", startLine, startCol)
+}
+
+// readRawString reads a Go-style backtick string literal.
+func (l *Lexer) readRawString() (Token, error) {
+	startLine := l.line
+	startCol := l.col
+	l.advance() // consume opening `
+
+	startPos := l.pos
+	for l.pos < len(l.source) {
+		if l.peek() == '`' {
+			value := l.source[startPos:l.pos]
+			l.advance() // consume closing `
+			return Token{Type: TOKEN_STRING, Value: value, Line: startLine, Column: startCol}, nil
+		}
+		l.advance()
+	}
+	return Token{}, fmt.Errorf("unterminated raw string at %d:%d", startLine, startCol)
 }
 
 // readNumber reads an integer or floating-point number, including scientific notation.

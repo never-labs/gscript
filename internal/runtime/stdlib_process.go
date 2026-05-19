@@ -10,9 +10,23 @@ import (
 	"time"
 )
 
+// ProcessExitError is returned by process.exit so hosts can choose whether
+// to terminate the OS process, report the status, or catch it in tests.
+type ProcessExitError struct {
+	Code int
+}
+
+func (e *ProcessExitError) Error() string {
+	return fmt.Sprintf("process exit %d", e.Code)
+}
+
 // buildProcessLib creates the "process" standard library table.
-func buildProcessLib() *Table {
+func buildProcessLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -191,6 +205,79 @@ func buildProcessLib() *Table {
 			}
 		}
 		return []Value{TableValue(tbl)}, nil
+	})
+
+	// process.args() -- return the current script entrypoint arguments.
+	set("args", func(args []Value) ([]Value, error) {
+		tbl := NewTable()
+		if interp != nil && len(interp.args) > 0 {
+			tbl.RawSet(IntValue(0), StringValue(interp.args[0]))
+			for i, arg := range interp.args[1:] {
+				tbl.RawSet(IntValue(int64(i+1)), StringValue(arg))
+			}
+			return []Value{TableValue(tbl)}, nil
+		}
+		for i, arg := range os.Args {
+			tbl.RawSet(IntValue(int64(i)), StringValue(arg))
+		}
+		return []Value{TableValue(tbl)}, nil
+	})
+
+	// process.entry() -- return {file, dir, args} for the current script.
+	set("entry", func(args []Value) ([]Value, error) {
+		tbl := NewTable()
+		if interp != nil && len(interp.args) > 0 {
+			tbl.RawSetString("file", StringValue(interp.args[0]))
+		} else {
+			tbl.RawSetString("file", NilValue())
+		}
+		if interp != nil {
+			tbl.RawSetString("dir", StringValue(interp.ScriptDir()))
+		} else {
+			tbl.RawSetString("dir", StringValue(""))
+		}
+		argsFn := t.RawGetString("args").GoFunction()
+		argVals, err := argsFn.Fn(nil)
+		if err != nil {
+			return nil, err
+		}
+		if len(argVals) > 0 {
+			tbl.RawSetString("args", argVals[0])
+		}
+		return []Value{TableValue(tbl)}, nil
+	})
+
+	// process.setArgs(script, args...) -- update script arguments for embedders/tests.
+	set("setArgs", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsString() {
+			return nil, fmt.Errorf("bad argument #1 to 'process.setArgs' (string expected)")
+		}
+		if interp == nil {
+			return nil, fmt.Errorf("process.setArgs requires an interpreter-backed process library")
+		}
+		argv := make([]string, 0, len(args)-1)
+		for _, arg := range args[1:] {
+			argv = append(argv, arg.String())
+		}
+		interp.SetArgs(args[0].Str(), argv)
+		return nil, nil
+	})
+
+	// process.exit([code]) -- signal host-controlled process termination.
+	set("exit", func(args []Value) ([]Value, error) {
+		code := 0
+		if len(args) >= 1 && !args[0].IsNil() {
+			if args[0].IsBool() {
+				if !args[0].Bool() {
+					code = 1
+				}
+			} else if args[0].IsNumber() {
+				code = int(toInt(args[0]))
+			} else {
+				return nil, fmt.Errorf("bad argument #1 to 'process.exit' (number or boolean expected)")
+			}
+		}
+		return nil, &ProcessExitError{Code: code}
 	})
 
 	return t
