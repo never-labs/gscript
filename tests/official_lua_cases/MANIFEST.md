@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 407.
+Current translated passing cases: 409.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -86,6 +86,7 @@ Current translated passing cases: 407.
 | `coroutine_wrap_basic` | `coroutine.lua` | `coroutine.wrap`, yield/resume values, simple generator. |
 | `coroutine_wrap_sieve_more` | `coroutine.lua` | Coroutine-wrapped generator/filter pipeline for the prime sieve pattern. |
 | `coroutine_yield_resume_values` | `coroutine.lua` | Resume arguments returned from `yield`, generator state. |
+| `crypto_go_host_more` | `api.lua`, `strings.lua` | Go-host crypto helper equality, AES-GCM round trip, decrypt error returns, random byte/hex shape, and key generation validation. |
 | `csv_go_host_more` | `files.lua`, `strings.lua` | Go-host CSV parse/encode helpers with headers, custom separator, quoting, trimming, and malformed input diagnostics. |
 | `errors_assert_pcall` | `errors.lua` | `assert`, `error`, and `pcall` basics. |
 | `errors_common_runtime_failures` | `errors.lua` | Protected common runtime failures: missing math arguments, failed asserts, nil arithmetic, and missing builtin args. |
@@ -229,6 +230,7 @@ Current translated passing cases: 407.
 | `pm_gmatch_words_more` | `pm.lua` | `gmatch` iteration over word captures and multi-capture numeric assignments. |
 | `pm_gmatch_numeric_pairs_more` | `pm.lua` | `gmatch` two-capture numeric assignments into a table followed by `pairs` verification. |
 | `pm_pattern_runtime_more` | `pm.lua` | Pattern runtime callbacks: `gmatch` start positions and function-valued `gsub` replacements with nil/false no-substitution. |
+| `rand_go_host_more` | `api.lua`, `math.lua` | Go-host deterministic seeded random replay, range/shape checks, collection helpers, UUID/bytes shape, and argument validation. |
 | `pm_match_captures_ascii` | `pm.lua` | ASCII `string.match` captures with `%w`, `%d`, empty captures, and anchored failure cases. |
 | `pm_match_classes_repetition_more` | `pm.lua` | Additional pattern repetition, anchors, minimal matches, negated classes, and `%S`/`%C` classes. |
 | `pm_match_classes_more2` | `pm.lua` | Additional pattern class and repetition checks for `%l`, `%a`, `*`, `+`, escaped `$`, and missing matches. |

@@ -23,11 +23,20 @@ func buildRandLib() *Table {
 			Fn:   fn,
 		}))
 	}
+	requireNumber := func(fn string, idx int, v Value) error {
+		if !v.IsNumber() {
+			return fmt.Errorf("bad argument #%d to '%s' (number expected, got %s)", idx, fn, v.TypeName())
+		}
+		return nil
+	}
 
 	// rand.seed(n) - seed the random source
 	set("seed", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'rand.seed' (number expected)")
+		}
+		if err := requireNumber("rand.seed", 1, args[0]); err != nil {
+			return nil, err
 		}
 		seed := toInt(args[0])
 		rng.Seed(seed)
@@ -44,11 +53,20 @@ func buildRandLib() *Table {
 			return []Value{IntValue(rng.Int63() & 0x7FFFFFFFFFFF)}, nil
 		}
 		if len(args) == 1 {
+			if err := requireNumber("rand.int", 1, args[0]); err != nil {
+				return nil, err
+			}
 			max := toInt(args[0])
 			if max <= 0 {
 				return nil, fmt.Errorf("bad argument #1 to 'rand.int' (positive number expected)")
 			}
 			return []Value{IntValue(rng.Int63n(max))}, nil
+		}
+		if err := requireNumber("rand.int", 1, args[0]); err != nil {
+			return nil, err
+		}
+		if err := requireNumber("rand.int", 2, args[1]); err != nil {
+			return nil, err
 		}
 		min := toInt(args[0])
 		max := toInt(args[1])
@@ -69,9 +87,15 @@ func buildRandLib() *Table {
 		mean := 0.0
 		stddev := 1.0
 		if len(args) >= 1 {
+			if err := requireNumber("rand.normal", 1, args[0]); err != nil {
+				return nil, err
+			}
 			mean = toFloat(args[0])
 		}
 		if len(args) >= 2 {
+			if err := requireNumber("rand.normal", 2, args[1]); err != nil {
+				return nil, err
+			}
 			stddev = toFloat(args[1])
 			if stddev < 0 {
 				return nil, fmt.Errorf("bad argument #2 to 'rand.normal' (non-negative stddev expected)")
@@ -85,6 +109,9 @@ func buildRandLib() *Table {
 	set("exp", func(args []Value) ([]Value, error) {
 		rate := 1.0
 		if len(args) >= 1 {
+			if err := requireNumber("rand.exp", 1, args[0]); err != nil {
+				return nil, err
+			}
 			rate = toFloat(args[0])
 			if rate <= 0 {
 				return nil, fmt.Errorf("bad argument #1 to 'rand.exp' (positive rate expected)")
@@ -144,6 +171,9 @@ func buildRandLib() *Table {
 		if !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'rand.sample' (table expected, got %s)", args[0].TypeName())
 		}
+		if err := requireNumber("rand.sample", 2, args[1]); err != nil {
+			return nil, err
+		}
 		tbl := args[0].Table()
 		n := int(toInt(args[1]))
 		length := tbl.Length()
@@ -190,6 +220,9 @@ func buildRandLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'rand.bytes' (number expected)")
 		}
+		if err := requireNumber("rand.bytes", 1, args[0]); err != nil {
+			return nil, err
+		}
 		n := int(toInt(args[0]))
 		if n < 0 {
 			return nil, fmt.Errorf("bad argument #1 to 'rand.bytes' (non-negative number expected)")
@@ -227,13 +260,16 @@ func buildRandLib() *Table {
 			if w.IsNil() {
 				return nil, fmt.Errorf("rand.weighted: weight at index %d is nil", i)
 			}
+			if !w.IsNumber() {
+				return nil, fmt.Errorf("rand.weighted: weight at index %d is not a number", i)
+			}
 			wf := toFloat(w)
-			if wf < 0 {
+			if math.IsNaN(wf) || wf < 0 {
 				return nil, fmt.Errorf("rand.weighted: negative weight at index %d", i)
 			}
 			total += wf
 		}
-		if total == 0 || math.IsInf(total, 0) {
+		if total == 0 || math.IsInf(total, 0) || math.IsNaN(total) {
 			return nil, fmt.Errorf("rand.weighted: invalid total weight")
 		}
 
