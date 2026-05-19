@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 332.
+Current translated passing cases: 333.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -266,6 +266,7 @@ Current translated passing cases: 332.
 | `utf8_codepoint_bounds` | `utf8.lua` | `utf8.codepoint` multibyte ranges, empty ranges, out-of-bounds errors, and max valid codepoint. |
 | `utf8_codes_empty_iterator` | `utf8.lua` | Direct calls to an empty `utf8.codes` iterator with unusual control values return nil. |
 | `utf8_codes_iterator` | `utf8.lua` | `utf8.codes` iterator, byte positions, and `utf8.offset(..., 0)` current-character behavior. |
+| `utf8_invalid_sequences_more` | `utf8.lua` | Invalid UTF-8 continuation, overlong, surrogate, and out-of-range sequences across len/codepoint/codes/offset. |
 | `utf8_multibyte_offsets` | `utf8.lua` | Multibyte UTF-8 length, offsets, codepoints. |
 | `utf8_offset_len_errors` | `utf8.lua` | `utf8.offset` and indexed `utf8.len` position bounds and continuation-byte errors. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
