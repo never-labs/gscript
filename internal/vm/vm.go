@@ -89,6 +89,10 @@ type VM struct {
 	coroutineResumeFn  *runtime.GoFunction
 	coroutineYieldFn   *runtime.GoFunction
 	ipairsIteratorFn   *runtime.GoFunction
+	debugHook          runtime.Value
+	debugOpts          runtime.DebugHookOptions
+	debugSink          runtime.Value
+	debugBusy          bool
 }
 
 // SetMethodJIT sets the Method JIT engine for this VM.
@@ -826,6 +830,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterIPairsLib()
 	v.RegisterPairsLib()
 	v.RegisterTableSortLib()
+	v.RegisterDebugLib()
 	v.registerChannelBuiltins()
 	runtime.RegisterVM(v)
 	return v
@@ -956,6 +961,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 	child.setGlobalOverride("xpcall", runtime.FunctionValue(child.newXPCallFunction()))
 	child.setGlobalOverride("ipairs", runtime.FunctionValue(child.newIPairsFunction()))
 	child.setGlobalOverride("pairs", runtime.FunctionValue(child.newPairsFunction()))
+	child.setGlobalOverride("debug", runtime.TableValue(child.newDebugLib()))
 	runtime.RegisterVM(child)
 	return child
 }
@@ -999,6 +1005,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterIPairsLib()
 	child.RegisterPairsLib()
 	child.RegisterTableSortLib()
+	child.RegisterDebugLib()
 	runtime.RegisterVM(child)
 	return child
 }
@@ -1123,6 +1130,10 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 	frame.callSitePC = -1
 	frame.defers = nil
 	vm.frameCount++
+	if err := vm.emitDebugHook("call", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+		vm.frameCount--
+		return nil, err
+	}
 
 	// Method JIT: check for compiled function.
 	if vm.methodJIT != nil && !proto.IsVarArg && !proto.JITDisabled {
@@ -1138,6 +1149,10 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 			}
 			if err == nil {
 				vm.closeUpvalues(base)
+				if err := vm.emitDebugHook("return", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+					vm.frameCount--
+					return nil, err
+				}
 				vm.frameCount--
 				return results, nil
 			}
@@ -1151,6 +1166,12 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 	}
 	if vm.coroutineYielded {
 		return result, nil
+	}
+	if err != nil {
+		_ = vm.emitDebugHook("error", "script", debugProtoName(proto), runtime.StringValue(err.Error()))
+	} else if err := vm.emitDebugHook("return", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+		vm.frameCount--
+		return nil, err
 	}
 	vm.frameCount--
 	return result, err
@@ -1227,6 +1248,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			if vm.frameCount > 0 {
 				observeCallResultFixed(vm.frames[vm.frameCount-1].closure.Proto, childCallSitePC, vm.regs, rb, rc)
+			}
+			if err := vm.emitDebugHook("return", "script", debugProtoName(frame.closure.Proto), runtime.NilValue()); err != nil {
+				return nil, err
 			}
 			frame = &vm.frames[vm.frameCount-1]
 			code = frame.closure.Proto.Code
@@ -2284,6 +2308,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						newFrame.callSitePC = callPC
 						newFrame.defers = nil
 						vm.frameCount++
+						if err := vm.emitDebugHook("call", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+							vm.frameCount--
+							return nil, err
+						}
 
 						frame = newFrame
 						code = proto.Code
@@ -2385,6 +2413,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				newFrame.callSitePC = callPC
 				newFrame.defers = nil
 				vm.frameCount++
+				if err := vm.emitDebugHook("call", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+					vm.frameCount--
+					return nil, err
+				}
 
 				// Method JIT: check for compiled function
 				if vm.methodJIT != nil && !proto.IsVarArg && !proto.JITDisabled {
@@ -2403,6 +2435,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						}
 						if err == nil {
 							vm.closeUpvalues(newBase)
+							if err := vm.emitDebugHook("return", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+								vm.frameCount--
+								return nil, err
+							}
 							vm.frameCount--
 							if c == 0 {
 								for i, r := range results {
@@ -2446,11 +2482,14 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					for i := 0; i < nArgs; i++ {
 						args[i] = vm.regs[base+a+1+i]
 					}
+					results, err := vm.callGoFunction(gf, args)
+					if err != nil {
+						return nil, wrapLineErr(frame, err)
+					}
 					if gf.Fast1 != nil {
-						runtime.RecordRuntimePathNativeCallFastFor(gf)
-						result, err := gf.Fast1(args)
-						if err != nil {
-							return nil, wrapLineErr(frame, err)
+						result := runtime.NilValue()
+						if len(results) > 0 {
+							result = results[0]
 						}
 						if c == 0 {
 							vm.regs[base+a] = result
@@ -2466,11 +2505,6 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						}
 						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
 						break
-					}
-					runtime.RecordRuntimePathNativeCallFallbackFor(gf)
-					results, err := gf.Fn(args)
-					if err != nil {
-						return nil, wrapLineErr(frame, err)
 					}
 					if c == 0 {
 						for i, r := range results {
@@ -2613,6 +2647,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			if vm.frameCount > 0 {
 				observeCallResultFixed(vm.frames[vm.frameCount-1].closure.Proto, childCallSitePC, vm.regs, resultBase, resultCount)
+			}
+			if err := vm.emitDebugHook("return", "script", debugProtoName(frame.closure.Proto), runtime.NilValue()); err != nil {
+				return nil, err
 			}
 
 			// Restore parent frame
@@ -3277,16 +3314,7 @@ func (vm *VM) callValue(fnVal runtime.Value, args []runtime.Value) ([]runtime.Va
 			return vm.call(cl, args, newBase, -1)
 		}
 		if gf := fnVal.GoFunction(); gf != nil {
-			if gf.Fast1 != nil {
-				runtime.RecordRuntimePathNativeCallFastFor(gf)
-				v, err := gf.Fast1(args)
-				if err != nil {
-					return nil, err
-				}
-				return []runtime.Value{v}, nil
-			}
-			runtime.RecordRuntimePathNativeCallFallbackFor(gf)
-			return gf.Fn(args)
+			return vm.callGoFunction(gf, args)
 		}
 		if c := fnVal.Closure(); c != nil {
 			return nil, fmt.Errorf("cannot call tree-walker closure from VM")

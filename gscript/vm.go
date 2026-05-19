@@ -85,6 +85,7 @@ func (vm *VM) exec(src, filename string) error {
 		if err != nil {
 			return &Error{Kind: ErrRuntime, Message: err.Error(), File: filename}
 		}
+		setBytecodeSource(proto, filename)
 		globals := vm.interp.ExportGlobals()
 		// Reuse existing bytecode VM if available (preserves JIT state)
 		bvm := vm.bvm
@@ -111,6 +112,18 @@ func (vm *VM) exec(src, filename string) error {
 		return &Error{Kind: ErrRuntime, Message: err.Error(), File: filename}
 	}
 	return nil
+}
+
+func setBytecodeSource(proto *bytecodevm.FuncProto, filename string) {
+	if proto == nil {
+		return
+	}
+	if proto.Source == "" {
+		proto.Source = filename
+	}
+	for _, child := range proto.Protos {
+		setBytecodeSource(child, filename)
+	}
 }
 
 // Call calls a named GScript function with Go arguments and returns Go values.

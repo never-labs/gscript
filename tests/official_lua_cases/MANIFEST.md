@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 343.
+Current translated passing cases: 344.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -287,11 +287,11 @@ Audit-added coverage not yet folded into the main table above:
 |---|---|---|
 | `code_explicit_spread_more` | `code.lua`, `db.lua` | GScript explicit `spread(expr)` and `table.spread` expansion in call arguments and table constructors. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
+| `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 
 Next recommended conversion order:
 
 1. Continue broad `api.lua` translations using `testkit`, raw operations, protected calls, and existing debug/runtime diagnostics.
 2. Close VM compiler parity gaps for GScript-only language features currently covered by interpreter/runtime tests, especially `const` declarations and `defer`.
-3. Tighten VM file-mode diagnostics coverage for `debug.stack`, numeric `debug.info(level)`, source-name metadata, and hook/sink events.
-4. Continue compatibility slices in `strings.lua`, `events.lua`, and `math.lua` where existing Go-style APIs provide feature-equivalent coverage.
+3. Continue compatibility slices in `strings.lua`, `events.lua`, and `math.lua` where existing Go-style APIs provide feature-equivalent coverage.
