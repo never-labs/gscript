@@ -68,3 +68,17 @@ binary.size("u16 u32 bytes:3")  -- 9
 size, err := binary.size("string")
 -- size == nil
 ```
+
+### string.pack / string.unpack / string.packsize
+
+The `string` namespace also exposes compatibility entry points with the same
+Go-style binary format strings:
+
+```
+data := string.pack("be:u16 bytes:2", 258, "go")
+a, raw, next := string.unpack("be:u16 bytes:2", data)
+size := string.packsize("be:u16 bytes:2")
+```
+
+These functions intentionally share `binary` formats; they are not Lua
+`string.pack` format-string clones.

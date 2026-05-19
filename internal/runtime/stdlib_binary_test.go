@@ -70,3 +70,37 @@ func TestBinaryLittleEndianOffsetAndErrors(t *testing.T) {
 		t.Fatalf("badErr = %v, want string", interp.GetGlobal("badErr"))
 	}
 }
+
+func TestStringPackAliasesUseGoStyleBinaryFormats(t *testing.T) {
+	interp := New()
+
+	execBinaryIOTest(t, interp, `
+		packed := string.pack("be:u16 bytes:2", 258, "go")
+		hex := bytes.toHex(packed)
+		a, raw, next := string.unpack("be:u16 bytes:2", packed)
+		fixedSize := string.packsize("be:u16 bytes:2")
+		varSize, varErr := string.packsize("string")
+	`)
+
+	if got := interp.GetGlobal("hex").Str(); got != "0102676f" {
+		t.Fatalf("hex = %q, want 0102676f", got)
+	}
+	if got := interp.GetGlobal("a").Int(); got != 258 {
+		t.Fatalf("a = %d, want 258", got)
+	}
+	if got := interp.GetGlobal("raw").Str(); got != "go" {
+		t.Fatalf("raw = %q, want go", got)
+	}
+	if got := interp.GetGlobal("next").Int(); got != 5 {
+		t.Fatalf("next = %d, want 5", got)
+	}
+	if got := interp.GetGlobal("fixedSize").Int(); got != 4 {
+		t.Fatalf("fixedSize = %d, want 4", got)
+	}
+	if !interp.GetGlobal("varSize").IsNil() {
+		t.Fatalf("varSize = %v, want nil", interp.GetGlobal("varSize"))
+	}
+	if !interp.GetGlobal("varErr").IsString() {
+		t.Fatalf("varErr = %v, want string", interp.GetGlobal("varErr"))
+	}
+}

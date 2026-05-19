@@ -1540,6 +1540,17 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				return nil, fmt.Errorf("SETLIST on non-table")
 			}
 			offset := (c - 1) * 50
+			if b == 0 {
+				valueStart := base + a + 1
+				count := vm.top - valueStart
+				if count < 0 {
+					count = 0
+				}
+				for i := 1; i <= count; i++ {
+					t.RawSetInt(int64(offset+i), vm.regs[valueStart+i-1])
+				}
+				break
+			}
 			for i := 1; i <= b; i++ {
 				t.RawSetInt(int64(offset+i), vm.regs[base+a+i])
 			}

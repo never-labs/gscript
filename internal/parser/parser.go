@@ -1175,7 +1175,7 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 		return &ast.IdentExpr{P: p.tokenPos(tok), Name: tok.Value}, nil
 
 	case lexer.TOKEN_LPAREN:
-		p.advance() // consume '('
+		tok := p.advance() // consume '('
 		expr, err := p.parseExpr()
 		if err != nil {
 			return nil, err
@@ -1183,7 +1183,7 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 		if _, err := p.expect(lexer.TOKEN_RPAREN); err != nil {
 			return nil, err
 		}
-		return expr, nil
+		return &ast.ParenExpr{P: p.tokenPos(tok), Inner: expr}, nil
 
 	case lexer.TOKEN_FUNC:
 		return p.parseFuncLitExpr()

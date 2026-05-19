@@ -1154,6 +1154,80 @@ func TestExplicitSpreadTableConstructor(t *testing.T) {
 	}
 }
 
+func TestParenthesizedCallAdjustsToSingleResult(t *testing.T) {
+	g := compileAndRun(t, `
+		func triple() { return 10, 20, 30 }
+		func count(...) { return select("#", ...), ... }
+
+		a, b, c := (triple())
+		n1, x1, y1 := count((triple()))
+		t1 := {(triple())}
+		t2 := {triple()}
+
+		rA := a
+		rB := b
+		rC := c
+		rN1 := n1
+		rX1 := x1
+		rY1 := y1
+		rT1Len := #t1
+		rT1A := t1[1]
+		rT2Len := #t2
+		rT2C := t2[3]
+	`)
+	expectGlobalInt(t, g, "rA", 10)
+	expectGlobalNil(t, g, "rB")
+	expectGlobalNil(t, g, "rC")
+	expectGlobalInt(t, g, "rN1", 1)
+	expectGlobalInt(t, g, "rX1", 10)
+	expectGlobalNil(t, g, "rY1")
+	expectGlobalInt(t, g, "rT1Len", 1)
+	expectGlobalInt(t, g, "rT1A", 10)
+	expectGlobalInt(t, g, "rT2Len", 3)
+	expectGlobalInt(t, g, "rT2C", 30)
+}
+
+func TestRecursiveMultiReturnTableConstructorsAndTailVarargs(t *testing.T) {
+	g := compileAndRun(t, `
+		func down(n) {
+			if n <= 0 { return }
+			return n, down(n - 1)
+		}
+		func sink(a, b, c, d, e, f) {
+			return table.pack(a, b, c, d, e, f)
+		}
+		func forward(prefix, ...) {
+			return sink(prefix, ...)
+		}
+
+		t := {down(3), down(5), down(4)}
+		p := forward(99, 1, nil, 3)
+
+		tLen := #t
+		t1 := t[1]
+		t2 := t[2]
+		t3 := t[3]
+		t6 := t[6]
+		pN := p.n
+		p1 := p[1]
+		p2 := p[2]
+		p3 := p[3]
+		p4 := p[4]
+		p5 := p[5]
+	`)
+	expectGlobalInt(t, g, "tLen", 6)
+	expectGlobalInt(t, g, "t1", 3)
+	expectGlobalInt(t, g, "t2", 5)
+	expectGlobalInt(t, g, "t3", 4)
+	expectGlobalInt(t, g, "t6", 1)
+	expectGlobalInt(t, g, "pN", 6)
+	expectGlobalInt(t, g, "p1", 99)
+	expectGlobalInt(t, g, "p2", 1)
+	expectGlobalNil(t, g, "p3")
+	expectGlobalInt(t, g, "p4", 3)
+	expectGlobalNil(t, g, "p5")
+}
+
 func TestStringNumberCoercion(t *testing.T) {
 	// String-to-number coercion in arithmetic (Lua semantics)
 	g := compileAndRun(t, `

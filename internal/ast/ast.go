@@ -330,6 +330,18 @@ func (e *UnaryExpr) nodeType() string { return "UnaryExpr" }
 func (e *UnaryExpr) GetPos() Pos      { return e.P }
 func (e *UnaryExpr) exprNode()        {}
 
+// ParenExpr preserves explicit parentheses around an expression.
+// Calls and varargs inside parentheses are adjusted to a single value in list
+// contexts, matching the usual expression-list boundary.
+type ParenExpr struct {
+	P     Pos
+	Inner Expr
+}
+
+func (e *ParenExpr) nodeType() string { return "ParenExpr" }
+func (e *ParenExpr) GetPos() Pos      { return e.P }
+func (e *ParenExpr) exprNode()        {}
+
 // IndexExpr represents an index access: t[k]
 type IndexExpr struct {
 	P     Pos

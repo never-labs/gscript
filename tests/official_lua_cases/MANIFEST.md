@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 328.
+Current translated passing cases: 332.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -36,11 +36,13 @@ Current translated passing cases: 328.
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |
+| `calls_inline_function_args` | `calls.lua`, `sort.lua` | Inline function literals passed directly to `pcall`, `table.sort`, and higher-order call sites. |
 | `calls_inline_table_args` | `calls.lua`, `sort.lua` | Inline table literals used directly as function arguments. |
 | `calls_incorrect_args_more` | `calls.lua` | Extra arguments ignored by fixed-arity builtins/calls and nil parameter adjustment behavior. |
 | `calls_long_method_name_more` | `calls.lua` | Long method-name definition and repeated self-style invocation. |
 | `calls_method_recursion` | `calls.lua` | Local recursion, method calls, chained method calls. |
 | `calls_multireturn` | `calls.lua` | Missing argument nils, fixed multi-return assignment, tail recursion. |
+| `calls_multireturn_adjust_more` | `calls.lua`, `constructs.lua`, `vararg.lua` | Parenthesized call adjustment, nested multi-return argument adjustment, recursive multi-return table constructors, and value-bearing vararg tail forwarding. |
 | `calls_nested_method_more` | `calls.lua` | Nested table function assignment and explicit self-style method mutation. |
 | `calls_recursion_error_more` | `calls.lua` | Recursive protected error propagation and moderate tail-recursive descent. |
 | `calls_return_values` | `calls.lua`, `constructs.lua` | Multiple return assignment and nil-return basics. |
@@ -81,6 +83,7 @@ Current translated passing cases: 328.
 | `events_compare_compat_more` | `events.lua` | Comparison metamethod compatibility when related metatables share comparison functions. |
 | `events_concat_chain_more` | `events.lua` | Chained `__concat` metamethod results that keep returning wrapped tables. |
 | `events_concat_metamethod` | `events.lua` | `__concat` metamethod with strings, numbers, and tables. |
+| `events_dynamic_call_metatable` | `calls.lua`, `events.lua` | Dynamic metatable construction in loops and `__call` delegation preserving vararg table contents. |
 | `events_eq_invalidate` | `events.lua` | Dynamic `__eq` removal and replacement on an existing metatable. |
 | `events_eq_invalidate_more` | `events.lua` | Additional `__eq` invalidation and replacement checks across two metatable-sharing tables. |
 | `events_index_chain` | `events.lua` | Chained `__index` fallback tables/functions. |
@@ -243,6 +246,7 @@ Current translated passing cases: 328.
 | `strings_rep_reverse_tostring` | `strings.lua` | `string.rep` separators, binary-safe `reverse`, repeated length checks, and `tostring` basics. |
 | `strings_rep_tostring_ascii_more` | `strings.lua` | Additional ASCII `upper`/`lower`, `rep` separator, empty reverse, repeated lengths, and primitive `tostring` checks. |
 | `strings_sub_find_len_ascii_more` | `strings.lua` | Additional ASCII `string.sub`, `string.find`, empty-find, and length boundary checks. |
+| `strings_string_pack_go_style` | `tpack.lua` | GScript string namespace binary pack/unpack/packsize compatibility using Go-style formats. |
 | `strings_sub_boundary_more` | `strings.lua` | `string.sub` omitted end, empty ranges, negative indices, and `math.mininteger`/`maxinteger` boundaries. |
 | `strings_table_concat_binary` | `strings.lua` | `table.concat` with NUL-containing strings and long repeated ranges. |
 | `strings_table_concat_empty_errors_more` | `strings.lua` | Additional `table.concat` empty ranges and bad argument/value errors. |
@@ -271,7 +275,7 @@ Current translated passing cases: 328.
 
 Next recommended conversion order:
 
-1. Fix known semantic gaps that block larger official slices (nested multi-return, file-mode inline function literals, metatable/coroutine edge cases).
+1. Fix known semantic gaps that block larger official slices (pattern escape mapping and coroutine/metatable edge cases).
 2. Continue `strings.lua` pattern/gsub/format/concat slices after those gaps shrink.
 3. Continue `events.lua` comparison/rawlen/protected metatable slices after metamethod and `rawlen` support improve.
 4. Continue `math.lua` integer and bitwise stress slices using the existing Go-style bitwise operators and `math.floorDiv` helper.

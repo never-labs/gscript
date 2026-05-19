@@ -1764,6 +1764,16 @@ func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value
 		}
 		return []Value{v}, nil
 
+	case *ast.ParenExpr:
+		vals, err := interp.evalExpr(e.Inner, env)
+		if err != nil {
+			return nil, err
+		}
+		if len(vals) == 0 {
+			return []Value{NilValue()}, nil
+		}
+		return []Value{vals[0]}, nil
+
 	case *ast.IndexExpr:
 		tbl, err := interp.evalExprSingle(e.Table, env)
 		if err != nil {

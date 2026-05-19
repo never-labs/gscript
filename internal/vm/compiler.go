@@ -1583,6 +1583,8 @@ func (c *compiler) compileExprTo(expr ast.Expr, dest int) error {
 		return c.compileBinaryExpr(e, dest)
 	case *ast.UnaryExpr:
 		return c.compileUnaryExpr(e, dest)
+	case *ast.ParenExpr:
+		return c.compileExprTo(e.Inner, dest)
 	case *ast.CallExpr:
 		return c.compileCallExprMulti(e, dest, 1)
 	case *ast.MethodCallExpr:
@@ -2703,6 +2705,8 @@ func (c *compiler) smallFixedCtorValueSafe(e ast.Expr) bool {
 		return c.smallFixedCtorValueSafe(v.Left) && c.smallFixedCtorValueSafe(v.Right)
 	case *ast.UnaryExpr:
 		return c.smallFixedCtorValueSafe(v.Operand)
+	case *ast.ParenExpr:
+		return c.smallFixedCtorValueSafe(v.Inner)
 	default:
 		return false
 	}

@@ -38,79 +38,85 @@ func buildBinaryLib() *Table {
 	// i8/u8/i16/u16/i32/u32/i64/u64/f32/f64/string/str/bytes.
 	// string and bytes are length-prefixed with a u32 unless written as
 	// string:N or bytes:N, which encodes exactly N raw bytes.
-	set("pack", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'binary.pack' (format string expected)")
-		}
-		format, err := parseBinaryFormat(args[0].Str())
-		if err != nil {
-			return nil, err
-		}
-		if len(args)-1 != len(format.fields) {
-			return nil, fmt.Errorf("binary.pack: got %d values for %d fields", len(args)-1, len(format.fields))
-		}
-		var buf bytes.Buffer
-		for i, field := range format.fields {
-			if err := packBinaryField(&buf, format.order, field, args[i+1]); err != nil {
-				return nil, err
-			}
-		}
-		return []Value{StringValue(buf.String())}, nil
-	})
+	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("binary.pack", args) })
 
 	// binary.unpack(format, data [, offset]) -> values..., nextOffset
 	// Offset is 1-based, matching GScript string positions.
-	set("unpack", func(args []Value) ([]Value, error) {
-		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
-			return nil, fmt.Errorf("bad argument to 'binary.unpack' (format and data strings expected)")
-		}
-		format, err := parseBinaryFormat(args[0].Str())
-		if err != nil {
-			return nil, err
-		}
-		offset := 1
-		if len(args) >= 3 {
-			offset = int(toInt(args[2]))
-		}
-		if offset < 1 {
-			return []Value{NilValue(), StringValue("binary.unpack: offset out of range")}, nil
-		}
-		data := []byte(args[1].Str())
-		pos := offset - 1
-		results := make([]Value, 0, len(format.fields)+1)
-		for _, field := range format.fields {
-			v, next, err := unpackBinaryField(data, pos, format.order, field)
-			if err != nil {
-				return []Value{NilValue(), StringValue(err.Error())}, nil
-			}
-			results = append(results, v)
-			pos = next
-		}
-		results = append(results, IntValue(int64(pos+1)))
-		return results, nil
-	})
+	set("unpack", func(args []Value) ([]Value, error) { return binaryUnpackValues("binary.unpack", args) })
 
 	// binary.size(format) -> byte count, or nil,err for variable-size formats.
-	set("size", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'binary.size' (format string expected)")
-		}
-		format, err := parseBinaryFormat(args[0].Str())
-		if err != nil {
-			return nil, err
-		}
-		total := 0
-		for _, field := range format.fields {
-			n, fixed := binaryFieldSize(field)
-			if !fixed {
-				return []Value{NilValue(), StringValue("binary.size: variable-size field in format")}, nil
-			}
-			total += n
-		}
-		return []Value{IntValue(int64(total))}, nil
-	})
+	set("size", func(args []Value) ([]Value, error) { return binarySizeValues("binary.size", args) })
 
 	return t
+}
+
+func binaryPackValues(apiName string, args []Value) ([]Value, error) {
+	if len(args) < 1 || !args[0].IsString() {
+		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
+	}
+	format, err := parseBinaryFormat(args[0].Str())
+	if err != nil {
+		return nil, err
+	}
+	if len(args)-1 != len(format.fields) {
+		return nil, fmt.Errorf("%s: got %d values for %d fields", apiName, len(args)-1, len(format.fields))
+	}
+	var buf bytes.Buffer
+	for i, field := range format.fields {
+		if err := packBinaryField(&buf, format.order, field, args[i+1]); err != nil {
+			return nil, fmt.Errorf("%s", strings.Replace(err.Error(), "binary.pack", apiName, 1))
+		}
+	}
+	return []Value{StringValue(buf.String())}, nil
+}
+
+func binaryUnpackValues(apiName string, args []Value) ([]Value, error) {
+	if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
+		return nil, fmt.Errorf("bad argument to '%s' (format and data strings expected)", apiName)
+	}
+	format, err := parseBinaryFormat(args[0].Str())
+	if err != nil {
+		return nil, err
+	}
+	offset := 1
+	if len(args) >= 3 {
+		offset = int(toInt(args[2]))
+	}
+	if offset < 1 {
+		return []Value{NilValue(), StringValue(apiName + ": offset out of range")}, nil
+	}
+	data := []byte(args[1].Str())
+	pos := offset - 1
+	results := make([]Value, 0, len(format.fields)+1)
+	for _, field := range format.fields {
+		v, next, err := unpackBinaryField(data, pos, format.order, field)
+		if err != nil {
+			return []Value{NilValue(), StringValue(strings.Replace(err.Error(), "binary.unpack", apiName, 1))}, nil
+		}
+		results = append(results, v)
+		pos = next
+	}
+	results = append(results, IntValue(int64(pos+1)))
+	return results, nil
+}
+
+func binarySizeValues(apiName string, args []Value) ([]Value, error) {
+	if len(args) < 1 || !args[0].IsString() {
+		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
+	}
+	format, err := parseBinaryFormat(args[0].Str())
+	if err != nil {
+		return nil, err
+	}
+	total := 0
+	for _, field := range format.fields {
+		n, fixed := binaryFieldSize(field)
+		if !fixed {
+			return []Value{NilValue(), StringValue(apiName + ": variable-size field in format")}, nil
+		}
+		total += n
+	}
+	return []Value{IntValue(int64(total))}, nil
 }
 
 func parseBinaryFormat(format string) (binaryFormat, error) {

@@ -616,7 +616,11 @@ func TestPrecedenceParens(t *testing.T) {
 	if mul.Op != "*" {
 		t.Fatalf("expected top-level '*', got %q", mul.Op)
 	}
-	add, ok := mul.Left.(*ast.BinaryExpr)
+	paren, ok := mul.Left.(*ast.ParenExpr)
+	if !ok {
+		t.Fatalf("expected left operand to preserve parentheses, got %T", mul.Left)
+	}
+	add, ok := paren.Inner.(*ast.BinaryExpr)
 	if !ok || add.Op != "+" {
 		t.Error("expected left operand to be '+'")
 	}
@@ -777,9 +781,13 @@ func TestNestedUnary(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected UnaryExpr, got %T", decl.Values[0])
 	}
-	inner, ok := outer.Operand.(*ast.UnaryExpr)
+	paren, ok := outer.Operand.(*ast.ParenExpr)
 	if !ok {
-		t.Fatalf("expected nested UnaryExpr, got %T", outer.Operand)
+		t.Fatalf("expected parenthesized operand, got %T", outer.Operand)
+	}
+	inner, ok := paren.Inner.(*ast.UnaryExpr)
+	if !ok {
+		t.Fatalf("expected nested UnaryExpr, got %T", paren.Inner)
 	}
 	if inner.Op != "-" {
 		t.Errorf("expected inner '-', got %q", inner.Op)

@@ -111,6 +111,14 @@ func buildStringLib() *Table {
 		gf.NativeData = StdStringSubIdentityPtr()
 	}
 
+	// string.pack/unpack/packsize expose the project's Go-style binary format
+	// strings from the conventional string namespace. The canonical API is the
+	// binary library; these are compatibility entry points, not Lua format
+	// string clones.
+	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("string.pack", args) })
+	set("unpack", func(args []Value) ([]Value, error) { return binaryUnpackValues("string.unpack", args) })
+	set("packsize", func(args []Value) ([]Value, error) { return binarySizeValues("string.packsize", args) })
+
 	// string.upper(s) -> string
 	set("upper", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {

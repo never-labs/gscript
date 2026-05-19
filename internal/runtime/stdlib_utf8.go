@@ -64,7 +64,7 @@ func buildUTF8Lib() *Table {
 		var buf strings.Builder
 		for _, arg := range args {
 			n := toInt(arg)
-			if n < 0 || n > 0x7fffffff {
+			if n < 0 || n > utf8.MaxRune || !utf8.ValidRune(rune(n)) {
 				return nil, fmt.Errorf("bad argument to 'utf8.char' (value out of range)")
 			}
 			cp := rune(n)

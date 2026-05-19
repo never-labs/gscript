@@ -160,6 +160,8 @@ func (c *freeVarCollector) walkExpr(expr ast.Expr) {
 		c.walkExpr(e.Right)
 	case *ast.UnaryExpr:
 		c.walkExpr(e.Operand)
+	case *ast.ParenExpr:
+		c.walkExpr(e.Inner)
 	case *ast.IndexExpr:
 		c.walkExpr(e.Table)
 		c.walkExpr(e.Index)

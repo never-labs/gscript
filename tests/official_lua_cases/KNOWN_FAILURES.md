@@ -7,16 +7,7 @@ should be fixed before translating dependent slices.
 | Area | Current gap |
 |---|---|
 | Pattern escape compatibility | GScript string literals now support Go-style control, hex, Unicode, and decimal byte escapes; translated Lua pattern slices still need case-by-case mapping to GScript string/regexp semantics. |
-| Nested multireturn in file mode | `table.unpack(a)` or `string.byte(...)` nested under another call/table constructor can collapse differently when loaded from a `.gs` file. |
-| Table constructors with recursive multireturns | Official `constructs.lua` cases like `{f(3), f(5), f(10)}` do not yet match Lua in `.gs` file mode. |
-| Parenthesized call adjustment | Lua adjusts `(f())` to one result; GScript probes returned multiple values. |
-| Tail-call vararg forwarding with values | Empty vararg tail forwarding passes; forwarding real arguments through a tail-call wrapper failed in `.gs` file mode. |
-| Inline function literals in file mode | Some inline function literals passed to `pcall`, `table.sort`, or higher-order functions resolve differently from named functions. |
-| `table.sort` comparator in file mode | Passing a comparator function to `table.sort` from a translated file can hit a nil-function path. |
-| Dynamic metatable construction in loops | A direct `setmetatable({i}, {__call = u})`-style translation required explicit local tables in `.gs` file mode. |
-| `__call` delegation returning varargs | Chained `__call` invocation count works, but returned vararg table contents differed in `.gs` file mode. |
 | Yield inside `__pairs` | A VM `__pairs` closure that calls `coroutine.yield` completes only on the next resume after `pairs(t)` has already produced nil results. |
 | Lua GC internals | `collectgarbage` protocol basics are supported, but finalizers, weak tables, and exact Lua GC aging/barrier behavior are not modeled. |
 | UTF-8 strict/nonstrict validation edge cases | `utf8.codes`/`codepoint` now use byte positions for valid UTF-8, but the full official invalid/nonstrict edge matrix is not translated yet. |
-| `string.pack` family | `string.pack`, `string.unpack`, and `string.packsize` are nil/unsupported. |
 | JIT official check | `GSCRIPT_OFFICIAL_CHECK_JIT=1` still exposes JIT-only semantic issues in closure and multi-return slices; default official semantic comparison is Lua vs GScript VM. |

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -50,6 +51,15 @@ func TestUTF8Char(t *testing.T) {
 	}
 	if b.Str() != "中文" {
 		t.Errorf("expected '中文', got '%s'", b.Str())
+	}
+}
+
+func TestUTF8CharRejectsInvalidUnicodeScalars(t *testing.T) {
+	if err := runProgramExpectError(t, `utf8.char(0x110000)`); err == nil || !strings.Contains(err.Error(), "value out of range") {
+		t.Fatalf("utf8.char(0x110000) error = %v, want value out of range", err)
+	}
+	if err := runProgramExpectError(t, `utf8.char(0xD800)`); err == nil || !strings.Contains(err.Error(), "value out of range") {
+		t.Fatalf("utf8.char(0xD800) error = %v, want value out of range", err)
 	}
 }
 

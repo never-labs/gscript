@@ -607,6 +607,11 @@ a, b, c, s, raw, next := binary.unpack("be:u16 i32 f32 string bytes:3", packed)
 
 binary.size("u16 u32 bytes:3")  // 9
 n, err := binary.size("string") // nil, "variable-size field..."
+
+// Compatibility namespace, same Go-style formats:
+packed = string.pack("be:u16 bytes:2", 258, "go")
+a, raw, next = string.unpack("be:u16 bytes:2", packed)
+n = string.packsize("be:u16 bytes:2")
 ```
 
 ---
