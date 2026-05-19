@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 427 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 430 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -76,6 +76,9 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `main_script_file_vm_more`: `script` helper 在 VM 文件模式下覆盖当前 VM globals、相对文件加载、env sync 和 sandbox，不再退回 tree-walker chunk。
 - `main_vm_loader_more`: 全局 `load` / `loadfile` / `dofile` / file-backed `require` 在 VM 文件模式下执行 bytecode chunk，共享当前 globals、相对 script dir 与 `package.loaded` cache。
 - `regexp_submatch_limits_more`: `regexp.findAllSubmatch`、compiled regexp submatch helpers、find/split limit 和 `numSubexp` 覆盖。
+- `io_current_stream_more`: `io.input` / `io.output` 的当前流切换覆盖 path 与 file handle 两种入口，并验证全局 `io.read` / `io.write` / `io.lines` 和 closed-file diagnostics。
+- `http_router_json_edges_more`: `http.newRouter` method gating、response helper、handler error response，以及 `json.encode` 对 array/sparse/mixed table 与 NaN/Inf 的 Go-host 语义覆盖。
+- `time_color_hash_edges_more`: 固定 UTC time boundary、color operator metamethod、SHA-512 和 hash 参数错误路径覆盖。
 
 当前能力状态与设计取舍：
 

@@ -1,0 +1,118 @@
+print("case:http_router_json_edges_more")
+
+router := http.newRouter()
+
+router.get("/onlyget", func(req, res) {
+	res.header("X-Route", "onlyget")
+	res.writeln("get:" .. req.method)
+	res.write("tail")
+})
+
+router.post("/submit", func(req, res) {
+	data, err := req.json()
+	assert(err == nil)
+	res.header("X-Seen-Header", req.headers["X-Case"])
+	res.status(202).json({
+		method: req.method,
+		path: req.path,
+		query: req.query.mode,
+		param: req.param("mode"),
+		body: req.body,
+		json_name: data.name,
+		header: req.headers["X-Case"],
+	})
+})
+
+router.any("/any", func(req, res) {
+	res.write(req.method .. ":" .. req.path .. ":" .. req.param("via"))
+})
+
+router.get("/boom", func(req, res) {
+	error("router boom")
+})
+
+server := router.listen("127.0.0.1:0", {background: true})
+
+resp, err := net.get(server.url .. "/onlyget")
+assert(err == nil)
+assert(resp.status == 200)
+assert(resp.body == "get:GET\ntail")
+assert(resp.headers["X-Route"] == "onlyget")
+
+headers := {}
+headers["Content-Type"] = "application/json"
+headers["X-Case"] = "edge-header"
+resp, err = net.post(server.url .. "/submit?mode=query-one", "{\"name\":\"posted\"}", {headers: headers})
+assert(err == nil)
+assert(resp.status == 202)
+assert(resp.headers["X-Seen-Header"] == "edge-header")
+posted, jsonErr := resp.json()
+assert(jsonErr == nil)
+assert(posted.method == "POST")
+assert(posted.path == "/submit")
+assert(posted.query == "query-one")
+assert(posted.param == "query-one")
+assert(posted.body == "{\"name\":\"posted\"}")
+assert(posted.json_name == "posted")
+assert(posted.header == "edge-header")
+
+resp, err = net.post(server.url .. "/onlyget", "wrong-method")
+assert(err == nil)
+assert(resp.status == 405)
+assert(string.find(resp.body, "Method Not Allowed", 1, true) != nil)
+
+resp, err = net.request({method: "delete", url: server.url .. "/any?via=delete"})
+assert(err == nil)
+assert(resp.status == 200)
+assert(resp.body == "DELETE:/any:delete")
+
+resp, err = net.get(server.url .. "/boom")
+assert(err == nil)
+assert(resp.status == 500)
+assert(string.find(resp.body, "router boom", 1, true) != nil)
+
+arrayJSON := json.encode({"a", "b", "c"})
+assert(arrayJSON == "[\"a\",\"b\",\"c\"]")
+arrayRound := json.decode(arrayJSON)
+assert(arrayRound[1] == "a")
+assert(arrayRound[3] == "c")
+
+sparse := {}
+sparse[2] = "two"
+sparseJSON := json.encode(sparse)
+assert(string.find(sparseJSON, "\"2\"", 1, true) != nil)
+sparseRound := json.decode(sparseJSON)
+assert(sparseRound["2"] == "two")
+
+mixed := {10, 20}
+mixed.name = "mixed"
+mixedJSON := json.encode(mixed)
+mixedRound := json.decode(mixedJSON)
+assert(mixedRound["1"] == 10)
+assert(mixedRound["2"] == 20)
+assert(mixedRound.name == "mixed")
+
+numericJSON := json.encode({0 / 0, 1 / 0, -1 / 0, 1.5})
+assert(numericJSON == "[null,null,null,1.5]")
+numericRound := json.decode(numericJSON)
+assert(numericRound[1] == nil)
+assert(numericRound[2] == nil)
+assert(numericRound[3] == nil)
+assert(numericRound[4] == 1.5)
+
+pretty := json.pretty({outer: {items: {"x", "y"}, flag: true}}, "    ")
+assert(string.find(pretty, "\n", 1, true) != nil)
+assert(string.find(pretty, "    \"outer\"", 1, true) != nil)
+assert(string.find(pretty, "\"items\"", 1, true) != nil)
+prettyRound := json.decode(pretty)
+assert(prettyRound.outer.items[2] == "y")
+assert(prettyRound.outer.flag == true)
+
+closed, closeErr := server.close()
+assert(closed == true)
+assert(closeErr == nil)
+waited, waitErr := server.wait()
+assert(waited == true)
+assert(waitErr == nil)
+
+print("ok")

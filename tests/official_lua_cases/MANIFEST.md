@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 427.
+Current translated passing cases: 430.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -348,6 +348,8 @@ Recent audit-added coverage:
 | `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
 | `http_background_server_more` | `api.lua`, `main.lua` | Go-host HTTP server/router background mode returns closeable handles with addr/url and supports local client round-trips. |
+| `http_router_json_edges_more` | `api.lua`, `main.lua`, `strings.lua` | Go-host router method gating, response helpers, handler error responses, and JSON table/numeric edge encoding. |
+| `io_current_stream_more` | `files.lua`, `main.lua` | Current `io.input`/`io.output` stream redirection through paths and file handles, global read/write/lines, and closed-file diagnostics. |
 | `json_go_host_more` | `api.lua`, `strings.lua` | Go-host `json` encode/decode/pretty round trips, nested values, invalid JSON, and trailing-data rejection. |
 | `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
 | `main_script_file_vm_more` | `main.lua`, `code.lua` | VM-aware `script.eval`/`compile`/`loadFile`/`runFile` with current globals, relative file loading, env sync, and sandbox options. |
@@ -358,6 +360,7 @@ Recent audit-added coverage:
 | `net_http_methods_more` | `api.lua`, `main.lua` | Go-host loopback HTTP methods for PUT/PATCH/DELETE and configurable `net.request` headers, body, timeout, and redirect behavior. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
 | `regexp_submatch_limits_more` | `pm.lua`, `strings.lua` | Go RE2 all-submatch helpers, compiled regexp limits, split/find limits, and subexpression counts. |
+| `time_color_hash_edges_more` | `main.lua`, `math.lua`, `strings.lua` | Deterministic time UTC boundaries, color operator metamethods, and SHA-512/hash error diagnostics. |
 | `time_compress_encoding_go_host_more` | `main.lua`, `strings.lua` | Deterministic Go-host `time`, `compress`, and `encoding` helpers over fixed timestamps, round trips, and decode errors. |
 | `compress_error_levels_more` | `main.lua`, `strings.lua` | Go-host gzip/zlib/deflate explicit compression levels, fallback levels, bad-input errors, and missing-argument diagnostics. |
 | `encoding_ini_xml_roundtrip_more` | `strings.lua`, `main.lua` | Go-host INI encode/decode round trips, XML escape/unescape numeric entities, and malformed base32 decode errors. |
