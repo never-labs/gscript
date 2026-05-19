@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 412.
+Current translated passing cases: 413.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -344,6 +344,7 @@ Recent audit-added coverage:
 | `http_background_server_more` | `api.lua`, `main.lua` | Go-host HTTP server/router background mode returns closeable handles with addr/url and supports local client round-trips. |
 | `json_go_host_more` | `api.lua`, `strings.lua` | Go-host `json` encode/decode/pretty round trips, nested values, invalid JSON, and trailing-data rejection. |
 | `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
+| `main_script_file_vm_more` | `main.lua`, `code.lua` | VM-aware `script.eval`/`compile`/`loadFile`/`runFile` with current globals, relative file loading, env sync, and sandbox options. |
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
 | `net_http_background_roundtrip_more` | `api.lua`, `main.lua` | Go-host `net` client helpers against local background HTTP server, including JSON response parsing and error returns. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |

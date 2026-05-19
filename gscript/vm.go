@@ -94,6 +94,7 @@ func (vm *VM) exec(src, filename string) error {
 		if bvm == nil {
 			bvm = bytecodevm.New(globals)
 			bvm.SetStringMeta(vm.interp.StringMeta())
+			bvm.SetScriptDir(vm.interp.ScriptDir())
 			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
 			if vm.opts.useJIT {
 				enableJIT(bvm)

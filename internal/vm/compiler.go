@@ -2804,6 +2804,11 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 	flushArrayBatch := func() {
 		if pendingArrayCount > 0 {
 			batchNum := (arrayIdx-pendingArrayCount)/50 + 1
+			if pendingArrayBase >= 0 && pendingArrayBase != dest+1 {
+				for i := 0; i < pendingArrayCount; i++ {
+					c.emitABC(OP_MOVE, dest+1+i, pendingArrayBase+i, 0, line)
+				}
+			}
 			c.emitABC(OP_SETLIST, dest, pendingArrayCount, batchNum, line)
 			pendingArrayCount = 0
 			pendingArrayBase = -1
@@ -2866,9 +2871,11 @@ func (c *compiler) compileTableLitExpr(e *ast.TableLitExpr, dest int) error {
 			pendingArrayCount++
 
 			if pendingArrayCount >= 50 {
+				batchBase := pendingArrayBase
 				flushArrayBatch()
-				c.nextReg = pendingArrayBase
-				pendingArrayBase = -1
+				if batchBase >= 0 {
+					c.nextReg = batchBase
+				}
 			}
 		} else {
 			// Flush pending array elements first
