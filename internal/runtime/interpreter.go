@@ -30,13 +30,17 @@ type Interpreter struct {
 	debugOpts         DebugHookOptions // filters for debugHook
 	debugSink         Value            // optional explicit diagnostic sink
 	debugBusy         bool             // prevents debug hooks from recursively firing
+	gcMode            string           // host-facing collectgarbage mode label
+	gcRunning         bool             // host-facing collectgarbage running flag
 }
 
 // New creates a new Interpreter with built-in globals.
 func New() *Interpreter {
 	interp := &Interpreter{
-		globals: NewEnvironment(nil),
-		modules: make(map[string]Value),
+		globals:   NewEnvironment(nil),
+		modules:   make(map[string]Value),
+		gcMode:    "incremental",
+		gcRunning: true,
 	}
 	interp.registerBuiltins()
 	interp.registerStdlib()
@@ -122,9 +126,6 @@ func (interp *Interpreter) Output() []string {
 
 // registerBuiltins installs standard global functions.
 func (interp *Interpreter) registerBuiltins() {
-	gcMode := "incremental"
-	gcRunning := true
-
 	interp.globals.Define("print", FunctionValue(&GoFunction{
 		Name: "print",
 		Fn: func(args []Value) ([]Value, error) {
@@ -226,13 +227,13 @@ func (interp *Interpreter) registerBuiltins() {
 				goruntime.GC()
 				return []Value{IntValue(0)}, nil
 			case "stop":
-				gcRunning = false
+				interp.gcRunning = false
 				return []Value{IntValue(0)}, nil
 			case "restart":
-				gcRunning = true
+				interp.gcRunning = true
 				return []Value{IntValue(0)}, nil
 			case "isrunning":
-				return []Value{BoolValue(gcRunning)}, nil
+				return []Value{BoolValue(interp.gcRunning)}, nil
 			case "count":
 				var stats goruntime.MemStats
 				goruntime.ReadMemStats(&stats)
@@ -247,15 +248,15 @@ func (interp *Interpreter) registerBuiltins() {
 				tbl.RawSetString("heapObjects", IntValue(int64(stats.HeapObjects)))
 				tbl.RawSetString("numGC", IntValue(int64(stats.NumGC)))
 				tbl.RawSetString("rootLog", IntValue(GCRootLogSize()))
-				tbl.RawSetString("running", BoolValue(gcRunning))
-				tbl.RawSetString("mode", StringValue(gcMode))
+				tbl.RawSetString("running", BoolValue(interp.gcRunning))
+				tbl.RawSetString("mode", StringValue(interp.gcMode))
 				return []Value{TableValue(tbl)}, nil
 			case "step":
 				goruntime.GC()
 				return []Value{BoolValue(false)}, nil
 			case "incremental", "generational":
-				old := gcMode
-				gcMode = option
+				old := interp.gcMode
+				interp.gcMode = option
 				return []Value{StringValue(old)}, nil
 			default:
 				return nil, fmt.Errorf("bad argument #1 to 'collectgarbage' (invalid option '%s')", option)

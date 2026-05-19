@@ -332,6 +332,82 @@ func (vm *VM) RegisterProtectedCallLib() {
 	vm.SetGlobal("xpcall", runtime.FunctionValue(vm.newXPCallFunction()))
 }
 
+// RegisterTestkitLib installs VM-aware testkit helpers for APIs that need to
+// call or introspect ordinary VM closures. Pure runtime diagnostics stay in
+// the runtime-provided testkit table.
+func (vm *VM) RegisterTestkitLib() {
+	val, ok := vm.globals["testkit"]
+	if !ok || !val.IsTable() {
+		return
+	}
+	lib := val.Table()
+	lib.RawSetString("protect", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "testkit.protect",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
+			}
+			if !args[0].IsFunction() {
+				return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
+			}
+			results, err := vm.callValue(args[0], args[1:])
+			out := runtime.NewTable()
+			if err != nil {
+				out.RawSetString("ok", runtime.BoolValue(false))
+				out.RawSetString("error", protectedErrorValue(err))
+				return []runtime.Value{runtime.TableValue(out)}, nil
+			}
+			values := runtime.NewTable()
+			for i, result := range results {
+				values.RawSet(runtime.IntValue(int64(i+1)), result)
+			}
+			out.RawSetString("ok", runtime.BoolValue(true))
+			out.RawSetString("values", runtime.TableValue(values))
+			out.RawSetString("n", runtime.IntValue(int64(len(results))))
+			return []runtime.Value{runtime.TableValue(out)}, nil
+		},
+	}))
+	lib.RawSetString("functionInfo", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "testkit.functionInfo",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsFunction() {
+				return nil, fmt.Errorf("bad argument #1 to 'testkit.functionInfo' (function expected)")
+			}
+			out := runtime.NewTable()
+			out.RawSetString("type", runtime.StringValue("function"))
+			out.RawSetString("raw", runtime.StringValue(fmt.Sprintf("0x%x", args[0].Raw())))
+			out.RawSetString("identity", runtime.StringValue(fmt.Sprintf("function:%x", args[0].Raw())))
+			if gf := args[0].GoFunction(); gf != nil {
+				out.RawSetString("name", runtime.StringValue(gf.Name))
+				out.RawSetString("kind", runtime.StringValue("native"))
+				return []runtime.Value{runtime.TableValue(out)}, nil
+			}
+			if cl, ok := closureFromValue(args[0]); ok && cl != nil && cl.Proto != nil {
+				name := cl.Proto.Name
+				if name == "" {
+					name = "<anonymous>"
+				}
+				out.RawSetString("name", runtime.StringValue(name))
+				out.RawSetString("kind", runtime.StringValue("script"))
+				if cl.Proto.Source != "" {
+					out.RawSetString("sourceName", runtime.StringValue(cl.Proto.Source))
+				}
+				if cl.Proto.LineDefined > 0 {
+					out.RawSetString("line", runtime.IntValue(int64(cl.Proto.LineDefined)))
+					out.RawSetString("column", runtime.IntValue(1))
+				}
+				out.RawSetString("params", runtime.IntValue(int64(cl.Proto.NumParams)))
+				out.RawSetString("vararg", runtime.BoolValue(cl.Proto.IsVarArg))
+				out.RawSetString("upvalues", runtime.IntValue(int64(len(cl.Upvalues))))
+				return []runtime.Value{runtime.TableValue(out)}, nil
+			}
+			out.RawSetString("name", runtime.StringValue("<unknown>"))
+			out.RawSetString("kind", runtime.StringValue("unknown"))
+			return []runtime.Value{runtime.TableValue(out)}, nil
+		},
+	}))
+}
+
 // RegisterToStringLib installs a VM-aware tostring builtin so __tostring
 // metamethods implemented as VM closures can be invoked correctly.
 func (vm *VM) RegisterToStringLib() {
@@ -743,6 +819,7 @@ func New(globals map[string]runtime.Value) *VM {
 	}
 	v.RegisterCoroutineLib()
 	v.RegisterProtectedCallLib()
+	v.RegisterTestkitLib()
 	v.RegisterToStringLib()
 	v.RegisterIPairsLib()
 	v.RegisterPairsLib()
@@ -915,6 +992,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	}
 	child.RegisterCoroutineLib()
 	child.RegisterProtectedCallLib()
+	child.RegisterTestkitLib()
 	child.RegisterToStringLib()
 	child.RegisterIPairsLib()
 	child.RegisterPairsLib()

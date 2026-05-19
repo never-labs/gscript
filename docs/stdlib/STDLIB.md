@@ -28,6 +28,7 @@ GScript ships with a comprehensive standard library covering application develop
 | [process](#process) | `process` | Process args, exit, and command execution |
 | [script](#script) | `script` | Compile/evaluate/load script chunks |
 | [debug](#debug) | `debug` | Runtime diagnostics and source info |
+| [testkit](#testkit) | `testkit` | Script-level runtime test diagnostics |
 | [http](#http) | `http` | HTTP server |
 | [gl](#gl) | `gl` | OpenGL 2D drawing |
 | [coroutine](#coroutine) | `coroutine` | Coroutine control (built-in) |
@@ -708,6 +709,47 @@ debug.setHook(func(event) {
 debug.emit("progress", {done: 10})
 debug.setHook(nil)
 ```
+
+---
+
+## testkit
+
+Small runtime test helpers for translated official cases and GScript self-tests.
+This is a Go-host replacement for Lua's private C test library, not a
+`T.testC` instruction emulator.
+
+```go
+before := testkit.snapshot()
+collectgarbage("collect")
+ok, report := testkit.checkMemory(before, {
+    collect: true,
+    maxAllocBytesGrowth: 1 << 62,
+})
+
+stats := testkit.memory()
+diff := testkit.diff(before, stats)
+
+value := testkit.value({1, 2, 3})   // {type, text, truthy, raw, len}
+kind := testkit.typeOf(value)       // "table"
+
+result := testkit.protect(func(a, b) {
+    return a + b, "ok"
+}, 2, 5)
+
+info := testkit.functionInfo(print) // {type, kind, name, identity, raw}
+same := testkit.sameFunction(print, print)
+```
+
+Core APIs:
+
+| Function | Description |
+|---|---|
+| `testkit.memory()` / `testkit.snapshot()` | Return Go runtime memory counters: `allocBytes`, `allocKB`, `sysBytes`, `heapObjects`, `numGC`, `rootLog`, `running`, `mode`. |
+| `testkit.diff(before [, after])` | Return numeric deltas between two snapshots, or between `before` and the current snapshot. |
+| `testkit.checkMemory(before [, opts])` | Optionally collect, compare growth limits, and return `ok, report`. Supported limits: `maxAllocBytesGrowth`, `maxHeapObjectsGrowth`, `maxRootLogGrowth`. |
+| `testkit.value(v)` / `testkit.typeOf(v)` | Inspect value type, truthiness, raw representation, and common shape fields. |
+| `testkit.protect(fn, ...)` | Run a function through a structured protected-call result table: `{ok, values, n}` or `{ok=false, error}`. |
+| `testkit.functionInfo(fn)` / `testkit.sameFunction(a, b)` | Inspect native/script function identity and compare raw function identity. |
 
 ---
 

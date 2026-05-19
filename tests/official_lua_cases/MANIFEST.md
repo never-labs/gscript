@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 340.
+Current translated passing cases: 341.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -33,6 +33,7 @@ Current translated passing cases: 340.
 | `bitwise_bit32_shifts` | `bitwise.lua` | `bit32.lshift`, `rshift`, and unsigned-result `arshift` edge cases. |
 | `bitwise_bit32_varargs` | `bitwise.lua` | `bit32` empty and multi-argument `band`/`bor`/`bxor`/`btest` defaults. |
 | `bitwise_bit32_wrap_more` | `bitwise.lua` | Additional `bit32.band` wrapping for positive and negative values around 2^33 and 2^40. |
+| `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |
@@ -288,7 +289,7 @@ Audit-added coverage not yet folded into the main table above:
 
 Next recommended conversion order:
 
-1. Close VM compiler parity gaps for GScript-only language features currently covered by interpreter/runtime tests, especially `const` declarations and `defer`.
-2. Tighten VM file-mode diagnostics coverage for `debug.stack`, numeric `debug.info(level)`, source-name metadata, and hook/sink events.
-3. Decide whether label-directed control flow should be added as Go-style labels/goto or remain documented as a non-goal in favor of structured loops.
-4. If runtime-embedding tests need Lua `ltests`-style coverage, design a GScript-native host test helper instead of cloning the Lua C API test library.
+1. Continue broad `api.lua` translations using `testkit`, raw operations, protected calls, and existing debug/runtime diagnostics.
+2. Close VM compiler parity gaps for GScript-only language features currently covered by interpreter/runtime tests, especially `const` declarations and `defer`.
+3. Tighten VM file-mode diagnostics coverage for `debug.stack`, numeric `debug.info(level)`, source-name metadata, and hook/sink events.
+4. Continue compatibility slices in `strings.lua`, `events.lua`, and `math.lua` where existing Go-style APIs provide feature-equivalent coverage.
