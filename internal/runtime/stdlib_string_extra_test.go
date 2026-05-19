@@ -284,3 +284,58 @@ func TestLuaBalancedPatternStandalone(t *testing.T) {
 		t.Fatalf("paren count = %d, want 1", got)
 	}
 }
+
+func TestLuaPatternFrontierCompatibility(t *testing.T) {
+	interp := runProgram(t, `
+		first := string.match("abc def", "%f[%w]%w+")
+		second := string.match("abc,def", "%w+%f[%W]")
+		i, e := string.find("abc123 def", "%f[%d]%d+")
+		atEndStart, atEndEnd := string.find("abc", "%f[%z]")
+		replaced, count := string.gsub("one two", "%f[%w](%w+)", "[%1]")
+		replacedWhole, wholeCount := string.gsub("a b", "%f[%w]%w", "%1%0")
+		words := {}
+		for w := range string.gmatch("a-b c", "%f[%w]%w+%f[%W]") {
+			table.insert(words, w)
+		}
+	`)
+	if got := interp.GetGlobal("first").Str(); got != "abc" {
+		t.Fatalf("frontier first = %q, want abc", got)
+	}
+	if got := interp.GetGlobal("second").Str(); got != "abc" {
+		t.Fatalf("frontier second = %q, want abc", got)
+	}
+	if got := interp.GetGlobal("i").Int(); got != 4 {
+		t.Fatalf("digit frontier start = %d, want 4", got)
+	}
+	if got := interp.GetGlobal("e").Int(); got != 6 {
+		t.Fatalf("digit frontier end = %d, want 6", got)
+	}
+	if got := interp.GetGlobal("atEndStart").Int(); got != 4 {
+		t.Fatalf("end frontier start = %d, want 4", got)
+	}
+	if got := interp.GetGlobal("atEndEnd").Int(); got != 3 {
+		t.Fatalf("end frontier end = %d, want 3", got)
+	}
+	if got := interp.GetGlobal("replaced").Str(); got != "[one] [two]" {
+		t.Fatalf("frontier gsub = %q, want [one] [two]", got)
+	}
+	if got := interp.GetGlobal("count").Int(); got != 2 {
+		t.Fatalf("frontier gsub count = %d, want 2", got)
+	}
+	if got := interp.GetGlobal("replacedWhole").Str(); got != "aa bb" {
+		t.Fatalf("frontier whole replacement = %q, want aa bb", got)
+	}
+	if got := interp.GetGlobal("wholeCount").Int(); got != 2 {
+		t.Fatalf("frontier whole replacement count = %d, want 2", got)
+	}
+	words := interp.GetGlobal("words").Table()
+	if got := words.RawGet(IntValue(1)).Str(); got != "a" {
+		t.Fatalf("word 1 = %q, want a", got)
+	}
+	if got := words.RawGet(IntValue(2)).Str(); got != "b" {
+		t.Fatalf("word 2 = %q, want b", got)
+	}
+	if got := words.RawGet(IntValue(3)).Str(); got != "c" {
+		t.Fatalf("word 3 = %q, want c", got)
+	}
+}

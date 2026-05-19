@@ -275,12 +275,12 @@ func buildStringLib() *Table {
 			end := loc[1] + init - 1
 			return []Value{IntValue(int64(start)), IntValue(int64(end))}, nil
 		}
-		goPattern := luaPatternToRegex(pattern)
-		re, err := regexp.Compile(goPattern)
+		prog := compileLuaPattern(pattern)
+		re, err := regexp.Compile(prog.regex)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
-		loc := re.FindStringSubmatchIndex(searchStr)
+		loc := prog.findSubmatchIndex(re, searchStr)
 		if loc == nil {
 			return []Value{NilValue()}, nil
 		}
@@ -288,9 +288,10 @@ func buildStringLib() *Table {
 		end := loc[1] + init - 1
 		result := []Value{IntValue(int64(start)), IntValue(int64(end))}
 		// Add captures if any
-		for i := 2; i < len(loc); i += 2 {
-			if loc[i] >= 0 {
-				result = append(result, StringValue(searchStr[loc[i]:loc[i+1]]))
+		for _, slot := range prog.captureSlots {
+			pos := slot * 2
+			if pos+1 < len(loc) && loc[pos] >= 0 {
+				result = append(result, StringValue(searchStr[loc[pos]:loc[pos+1]]))
 			} else {
 				result = append(result, NilValue())
 			}
@@ -330,23 +331,28 @@ func buildStringLib() *Table {
 			}
 			return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 		}
-		goPattern := luaPatternToRegex(pattern)
-		re, err := regexp.Compile(goPattern)
+		prog := compileLuaPattern(pattern)
+		re, err := regexp.Compile(prog.regex)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
-		matches := re.FindStringSubmatch(searchStr)
-		if matches == nil {
+		loc := prog.findSubmatchIndex(re, searchStr)
+		if loc == nil {
 			return []Value{NilValue()}, nil
 		}
-		if len(matches) == 1 {
+		if len(prog.captureSlots) == 0 {
 			// No captures: return whole match
-			return []Value{StringValue(matches[0])}, nil
+			return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 		}
 		// Return captures
-		result := make([]Value, 0, len(matches)-1)
-		for _, m := range matches[1:] {
-			result = append(result, StringValue(m))
+		result := make([]Value, 0, len(prog.captureSlots))
+		for _, slot := range prog.captureSlots {
+			pos := slot * 2
+			if pos+1 < len(loc) && loc[pos] >= 0 {
+				result = append(result, StringValue(searchStr[loc[pos]:loc[pos+1]]))
+			} else {
+				result = append(result, NilValue())
+			}
 		}
 		return result, nil
 	})
@@ -378,12 +384,12 @@ func buildStringLib() *Table {
 			}
 			return []Value{FunctionValue(iter)}, nil
 		}
-		goPattern := luaPatternToRegex(pattern)
-		re, err := regexp.Compile(goPattern)
+		prog := compileLuaPattern(pattern)
+		re, err := regexp.Compile(prog.regex)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
-		allMatches := re.FindAllStringSubmatch(s, -1)
+		allMatches := prog.findAllSubmatchIndex(re, s)
 		idx := 0
 		iter := &GoFunction{
 			Name: "gmatch_iterator",
@@ -391,14 +397,19 @@ func buildStringLib() *Table {
 				if idx >= len(allMatches) {
 					return []Value{NilValue()}, nil
 				}
-				m := allMatches[idx]
+				loc := allMatches[idx]
 				idx++
-				if len(m) == 1 {
-					return []Value{StringValue(m[0])}, nil
+				if len(prog.captureSlots) == 0 {
+					return []Value{StringValue(s[loc[0]:loc[1]])}, nil
 				}
-				result := make([]Value, 0, len(m)-1)
-				for _, sub := range m[1:] {
-					result = append(result, StringValue(sub))
+				result := make([]Value, 0, len(prog.captureSlots))
+				for _, slot := range prog.captureSlots {
+					pos := slot * 2
+					if pos+1 < len(loc) && loc[pos] >= 0 {
+						result = append(result, StringValue(s[loc[pos]:loc[pos+1]]))
+					} else {
+						result = append(result, NilValue())
+					}
 				}
 				return result, nil
 			},
@@ -443,8 +454,8 @@ func buildStringLib() *Table {
 			return []Value{StringValue(result), IntValue(int64(count))}, nil
 		}
 
-		goPattern, captureKinds := luaPatternToRegexWithCaptures(pattern)
-		re, err := regexp.Compile(goPattern)
+		prog := compileLuaPattern(pattern)
+		re, err := regexp.Compile(prog.regex)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
@@ -453,13 +464,13 @@ func buildStringLib() *Table {
 		var result string
 		if repl.IsString() {
 			replStr := repl.Str()
-			if err := validateLuaReplacementString(replStr, len(captureKinds)); err != nil {
+			if err := validateLuaReplacementString(replStr, len(prog.captureKinds)); err != nil {
 				return nil, err
 			}
-			result = replaceLuaPatternString(s, re, captureKinds, replStr, maxRepl, &count)
+			result = replaceLuaPatternString(s, re, prog, replStr, maxRepl, &count)
 		} else if repl.IsTable() {
 			var err error
-			result, err = replaceLuaPatternTable(s, re, captureKinds, repl.Table(), maxRepl, &count)
+			result, err = replaceLuaPatternTable(s, re, prog, repl.Table(), maxRepl, &count)
 			if err != nil {
 				return nil, err
 			}
@@ -2094,15 +2105,34 @@ const (
 	luaPatternCapturePosition
 )
 
+type luaPatternFrontier struct {
+	slot  int
+	class string
+}
+
+type luaPatternProgram struct {
+	regex        string
+	captureKinds []luaPatternCaptureKind
+	captureSlots []int
+	frontiers    []luaPatternFrontier
+}
+
 // luaPatternToRegex converts a Lua-style pattern string to a Go regex string.
 func luaPatternToRegex(pattern string) string {
-	re, _ := luaPatternToRegexWithCaptures(pattern)
-	return re
+	return compileLuaPattern(pattern).regex
 }
 
 func luaPatternToRegexWithCaptures(pattern string) (string, []luaPatternCaptureKind) {
+	prog := compileLuaPattern(pattern)
+	return prog.regex, prog.captureKinds
+}
+
+func compileLuaPattern(pattern string) luaPatternProgram {
 	var buf strings.Builder
 	var captureKinds []luaPatternCaptureKind
+	var captureSlots []int
+	var frontiers []luaPatternFrontier
+	captureSlot := 1
 	i := 0
 	n := len(pattern)
 
@@ -2167,7 +2197,30 @@ func luaPatternToRegexWithCaptures(pattern string) (string, []luaPatternCaptureK
 				buf.WriteString("\\x00")
 			case 'Z':
 				buf.WriteString("[^\\x00]")
-			case 'f', 'b':
+			case 'f':
+				if i+1 < n && pattern[i+1] == '[' {
+					start := i + 1
+					j := start + 1
+					if j < n && pattern[j] == '^' {
+						j++
+					}
+					if j < n && pattern[j] == ']' && j+1 < n {
+						j++
+					}
+					for j < n && pattern[j] != ']' {
+						j++
+					}
+					if j < n {
+						buf.WriteString("()")
+						frontiers = append(frontiers, luaPatternFrontier{slot: captureSlot, class: pattern[start : j+1]})
+						captureSlot++
+						i = j + 1
+						prevMatchable = false
+						continue
+					}
+				}
+				buf.WriteString("[")
+			case 'b':
 				buf.WriteString("[")
 			default:
 				// Escape the literal character
@@ -2196,10 +2249,14 @@ func luaPatternToRegexWithCaptures(pattern string) (string, []luaPatternCaptureK
 			if i+1 < n && pattern[i+1] == ')' {
 				buf.WriteString("()")
 				captureKinds = append(captureKinds, luaPatternCapturePosition)
+				captureSlots = append(captureSlots, captureSlot)
+				captureSlot++
 				i += 2
 			} else {
 				buf.WriteByte('(')
 				captureKinds = append(captureKinds, luaPatternCaptureText)
+				captureSlots = append(captureSlots, captureSlot)
+				captureSlot++
 				i++
 			}
 			prevMatchable = false
@@ -2247,7 +2304,12 @@ func luaPatternToRegexWithCaptures(pattern string) (string, []luaPatternCaptureK
 		}
 	}
 
-	return buf.String(), captureKinds
+	return luaPatternProgram{
+		regex:        buf.String(),
+		captureKinds: captureKinds,
+		captureSlots: captureSlots,
+		frontiers:    frontiers,
+	}
 }
 
 func luaBracketClassToRegex(class string) string {
@@ -2314,6 +2376,146 @@ func luaPatternClassRegex(kind byte, outerNegated bool) string {
 		return "[^" + quoted + "]"
 	}
 	return "[" + quoted + "]"
+}
+
+func (p luaPatternProgram) findSubmatchIndex(re *regexp.Regexp, s string) []int {
+	if len(p.frontiers) == 0 {
+		return re.FindStringSubmatchIndex(s)
+	}
+	for _, loc := range re.FindAllStringSubmatchIndex(s, -1) {
+		if p.frontiersMatch(s, loc) {
+			return loc
+		}
+	}
+	return nil
+}
+
+func (p luaPatternProgram) findAllSubmatchIndex(re *regexp.Regexp, s string) [][]int {
+	matches := re.FindAllStringSubmatchIndex(s, -1)
+	if len(p.frontiers) == 0 || len(matches) == 0 {
+		return matches
+	}
+	out := matches[:0]
+	for _, loc := range matches {
+		if p.frontiersMatch(s, loc) {
+			out = append(out, loc)
+		}
+	}
+	return out
+}
+
+func (p luaPatternProgram) frontiersMatch(s string, loc []int) bool {
+	for _, frontier := range p.frontiers {
+		posSlot := frontier.slot * 2
+		if posSlot >= len(loc) || loc[posSlot] < 0 {
+			return false
+		}
+		if !luaFrontierMatches(s, loc[posSlot], frontier.class) {
+			return false
+		}
+	}
+	return true
+}
+
+func luaFrontierMatches(s string, pos int, class string) bool {
+	prev := byte(0)
+	if pos > 0 {
+		prev = s[pos-1]
+	}
+	next := byte(0)
+	if pos < len(s) {
+		next = s[pos]
+	}
+	return !luaBracketClassByteContains(class, prev) && luaBracketClassByteContains(class, next)
+}
+
+func luaBracketClassByteContains(class string, b byte) bool {
+	if len(class) < 2 || class[0] != '[' || class[len(class)-1] != ']' {
+		return false
+	}
+	negated := len(class) > 2 && class[1] == '^'
+	bodyStart := 1
+	if negated {
+		bodyStart = 2
+	}
+	body := class[bodyStart : len(class)-1]
+	matched := luaClassBodyByteContains(body, b)
+	if negated {
+		return !matched
+	}
+	return matched
+}
+
+func luaClassBodyByteContains(body string, b byte) bool {
+	for i := 0; i < len(body); i++ {
+		ch := body[i]
+		if ch == '%' && i+1 < len(body) {
+			i++
+			if luaClassEscapeByteContains(body[i], b) {
+				return true
+			}
+			continue
+		}
+		if i+2 < len(body) && body[i+1] == '-' && body[i+2] != ']' {
+			end := body[i+2]
+			if ch <= b && b <= end {
+				return true
+			}
+			i += 2
+			continue
+		}
+		if ch == b {
+			return true
+		}
+	}
+	return false
+}
+
+func luaClassEscapeByteContains(kind byte, b byte) bool {
+	switch kind {
+	case 'd':
+		return b >= '0' && b <= '9'
+	case 'D':
+		return !(b >= '0' && b <= '9')
+	case 'x':
+		return (b >= '0' && b <= '9') || (b >= 'A' && b <= 'F') || (b >= 'a' && b <= 'f')
+	case 'X':
+		return !luaClassEscapeByteContains('x', b)
+	case 'a':
+		return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
+	case 'A':
+		return !luaClassEscapeByteContains('a', b)
+	case 'l':
+		return b >= 'a' && b <= 'z'
+	case 'L':
+		return !luaClassEscapeByteContains('l', b)
+	case 'u':
+		return b >= 'A' && b <= 'Z'
+	case 'U':
+		return !luaClassEscapeByteContains('u', b)
+	case 's':
+		return b == '\t' || b == '\n' || b == '\r' || b == '\f' || b == '\v' || b == ' '
+	case 'S':
+		return !luaClassEscapeByteContains('s', b)
+	case 'w':
+		return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
+	case 'W':
+		return !luaClassEscapeByteContains('w', b)
+	case 'p':
+		return (b >= '!' && b <= '/') || (b >= ':' && b <= '@') || (b >= '[' && b <= '`') || (b >= '{' && b <= '~')
+	case 'P':
+		return !luaClassEscapeByteContains('p', b)
+	case 'c':
+		return b <= 0x1f || b == 0x7f
+	case 'C':
+		return !luaClassEscapeByteContains('c', b)
+	case 'z':
+		return b == 0
+	case 'Z':
+		return b != 0
+	default:
+		return b == kind
+	}
 }
 
 func luaPositiveClassContent(kind byte) (string, bool) {
@@ -2427,7 +2629,7 @@ func findAllBalancedRanges(s string, open, close byte) [][]int {
 
 func replaceBalancedPatternString(s string, open, close byte, repl string, maxRepl int, count *int) string {
 	result, _ := replaceBalancedPattern(s, open, close, maxRepl, count, func(loc []int) (string, error) {
-		return expandLuaReplacement(s, loc, nil, repl), nil
+		return expandLuaReplacement(s, loc, luaPatternProgram{}, repl), nil
 	})
 	return result
 }
@@ -2482,8 +2684,8 @@ func replaceBalancedPattern(s string, open, close byte, maxRepl int, count *int,
 	return b.String(), nil
 }
 
-func replaceLuaPatternString(s string, re *regexp.Regexp, captureKinds []luaPatternCaptureKind, repl string, maxRepl int, count *int) string {
-	matches := re.FindAllStringSubmatchIndex(s, -1)
+func replaceLuaPatternString(s string, re *regexp.Regexp, prog luaPatternProgram, repl string, maxRepl int, count *int) string {
+	matches := prog.findAllSubmatchIndex(re, s)
 	if len(matches) == 0 {
 		return s
 	}
@@ -2498,7 +2700,7 @@ func replaceLuaPatternString(s string, re *regexp.Regexp, captureKinds []luaPatt
 			continue
 		}
 		b.WriteString(s[last:start])
-		b.WriteString(expandLuaReplacement(s, loc, captureKinds, repl))
+		b.WriteString(expandLuaReplacement(s, loc, prog, repl))
 		last = end
 		(*count)++
 	}
@@ -2506,8 +2708,8 @@ func replaceLuaPatternString(s string, re *regexp.Regexp, captureKinds []luaPatt
 	return b.String()
 }
 
-func replaceLuaPatternTable(s string, re *regexp.Regexp, captureKinds []luaPatternCaptureKind, repl *Table, maxRepl int, count *int) (string, error) {
-	matches := re.FindAllStringSubmatchIndex(s, -1)
+func replaceLuaPatternTable(s string, re *regexp.Regexp, prog luaPatternProgram, repl *Table, maxRepl int, count *int) (string, error) {
+	matches := prog.findAllSubmatchIndex(re, s)
 	if len(matches) == 0 {
 		return s, nil
 	}
@@ -2521,7 +2723,7 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, captureKinds []luaPatte
 		if start < last {
 			continue
 		}
-		key := luaReplacementTableKey(s, loc, captureKinds)
+		key := luaReplacementTableKey(s, loc, prog)
 		val := repl.RawGet(key)
 		replacement := s[start:end]
 		if !val.IsNil() && !(val.IsBool() && !val.Bool()) {
@@ -2540,14 +2742,19 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, captureKinds []luaPatte
 	return b.String(), nil
 }
 
-func luaReplacementTableKey(s string, loc []int, captureKinds []luaPatternCaptureKind) Value {
-	if len(captureKinds) == 0 || len(loc) < 4 || loc[2] < 0 {
+func luaReplacementTableKey(s string, loc []int, prog luaPatternProgram) Value {
+	if len(prog.captureKinds) == 0 || len(prog.captureSlots) == 0 {
 		return StringValue(s[loc[0]:loc[1]])
 	}
-	if captureKinds[0] == luaPatternCapturePosition {
-		return IntValue(int64(loc[2] + 1))
+	slot := prog.captureSlots[0]
+	pos := slot * 2
+	if pos+1 >= len(loc) || loc[pos] < 0 {
+		return StringValue("")
 	}
-	return StringValue(s[loc[2]:loc[3]])
+	if prog.captureKinds[0] == luaPatternCapturePosition {
+		return IntValue(int64(loc[pos] + 1))
+	}
+	return StringValue(s[loc[pos]:loc[pos+1]])
 }
 
 func validateLuaReplacementString(repl string, captureCount int) error {
@@ -2582,7 +2789,7 @@ func validateLuaReplacementString(repl string, captureCount int) error {
 	return nil
 }
 
-func expandLuaReplacement(s string, loc []int, captureKinds []luaPatternCaptureKind, repl string) string {
+func expandLuaReplacement(s string, loc []int, prog luaPatternProgram, repl string) string {
 	var b strings.Builder
 	for i := 0; i < len(repl); i++ {
 		if repl[i] != '%' || i+1 >= len(repl) {
@@ -2597,13 +2804,18 @@ func expandLuaReplacement(s string, loc []int, captureKinds []luaPatternCaptureK
 		}
 		if ch >= '0' && ch <= '9' {
 			idx := int(ch - '0')
-			pos := idx * 2
-			if idx == 1 && len(loc) == 2 {
+			if idx == 0 {
 				b.WriteString(s[loc[0]:loc[1]])
-			} else if idx > 0 && idx <= len(captureKinds) && captureKinds[idx-1] == luaPatternCapturePosition && pos+1 < len(loc) && loc[pos] >= 0 {
-				b.WriteString(strconv.Itoa(loc[pos] + 1))
-			} else if pos+1 < len(loc) && loc[pos] >= 0 {
-				b.WriteString(s[loc[pos]:loc[pos+1]])
+			} else if idx == 1 && len(prog.captureSlots) == 0 {
+				b.WriteString(s[loc[0]:loc[1]])
+			} else if idx > 0 && idx <= len(prog.captureSlots) {
+				slot := prog.captureSlots[idx-1]
+				pos := slot * 2
+				if prog.captureKinds[idx-1] == luaPatternCapturePosition && pos+1 < len(loc) && loc[pos] >= 0 {
+					b.WriteString(strconv.Itoa(loc[pos] + 1))
+				} else if pos+1 < len(loc) && loc[pos] >= 0 {
+					b.WriteString(s[loc[pos]:loc[pos+1]])
+				}
 			}
 			continue
 		}

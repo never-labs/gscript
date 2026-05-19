@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 334.
+Current translated passing cases: 335.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -188,6 +188,7 @@ Current translated passing cases: 334.
 | `pm_captures_basic_more` | `pm.lua` | Additional captures, empty captures, anchored captures, trimming captures, and position-capture replacement in `gsub`. |
 | `pm_escape_compat_more` | `pm.lua`, `strings.lua` | Hex/NUL pattern classes, negated class escapes, dot-newline matching, and standalone balanced-pattern matching/replacement. |
 | `pm_find_empty_anchor` | `pm.lua` | Empty pattern finds and anchored pattern finds. |
+| `pm_frontier_compat_more` | `pm.lua`, `strings.lua` | Byte-oriented `%f[...]` frontier assertions across find, match, gmatch, and gsub. |
 | `pm_find_nul_more2` | `pm.lua` | Empty-pattern find, literal find in NUL-containing strings, and missing NUL pattern checks. |
 | `pm_find_match_more_ascii` | `pm.lua` | Additional ASCII pattern find/match repetition, anchors, frontier-like punctuation, and negated classes. |
 | `pm_find_nul_strings` | `pm.lua` | `string.find` over NUL-containing strings, start offsets, final-byte matches, and missing NUL suffixes. |
