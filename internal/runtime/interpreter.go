@@ -23,6 +23,7 @@ type Interpreter struct {
 	stringMeta *Table           // metatable for string values (__index → string lib)
 	scriptDir  string           // directory of the main script (for require path resolution)
 	args       []string         // current script entrypoint args: [0]=script, [1:]=user args
+	callStack  []DebugFrame     // active runtime calls, oldest to newest
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -2217,6 +2218,8 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	}
 
 	if gf := fn.GoFunction(); gf != nil {
+		interp.pushDebugFrame(gf.Name, "native")
+		defer interp.popDebugFrame()
 		return gf.Fn(args)
 	}
 
@@ -2237,6 +2240,13 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	}
 
 	proto := cl.Proto
+	name := proto.Name
+	if name == "" {
+		name = "<anonymous>"
+	}
+	interp.pushDebugFrame(name, "script")
+	defer interp.popDebugFrame()
+
 	// Bind parameters (as new local variables -- these shadow any captured upvalues)
 	nParams := len(proto.Params)
 	if proto.HasVarArg {

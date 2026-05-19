@@ -48,6 +48,7 @@ func (interp *Interpreter) registerStdlib() {
 	// --- System ---
 	interp.globals.Define("process", TableValue(buildProcessLib(interp)))
 	interp.globals.Define("script", TableValue(buildScriptLib(interp)))
+	interp.globals.Define("debug", TableValue(buildDebugLib(interp)))
 
 	// --- Data formats ---
 	interp.globals.Define("csv", TableValue(buildCSVLib()))
