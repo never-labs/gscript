@@ -1,0 +1,31 @@
+print("case:bwcoercion_bit32_string_edges_more2")
+
+func toint(x) {
+  x = tonumber(x)
+  if x == nil || x == false {
+    return false
+  }
+  y := math.tointeger(x)
+  if y == nil {
+    return false
+  }
+  return y
+}
+
+inputs := {" 15 ", "0xf0", "-1", "4294967296", "3.0"}
+assert(toint(inputs[1]) == 15)
+assert(toint(inputs[2]) == 240)
+assert(toint(inputs[3]) == -1)
+assert(toint(inputs[4]) == 4294967296)
+assert(toint(inputs[5]) == 3)
+
+a := toint(inputs[1])
+b := toint(inputs[2])
+assert(bit32.bor(a, b) == 255)
+assert(bit32.bxor(b, a) == 255)
+assert(bit32.band(toint(inputs[3]), b) == 240)
+assert(bit32.lshift(toint(inputs[5]), 8) == 768)
+assert(bit32.bor(toint(inputs[4]), 7) == 7)
+assert(toint("3.25") == false)
+
+print("ok")
