@@ -1,0 +1,18 @@
+print("case:constructs_multireturn_tables")
+
+func f(i) {
+  if type(i) != "number" {
+    return i, "jojo"
+  }
+  if i > 0 {
+    return i, f(i - 1)
+  }
+}
+
+x := {f("alo"), f("xixi"), nil}
+assert(x[1] == "alo" && x[2] == "xixi" && x[3] == nil)
+
+x = {f("alo") .. "xixi"}
+assert(x[1] == "aloxixi")
+
+print("ok")

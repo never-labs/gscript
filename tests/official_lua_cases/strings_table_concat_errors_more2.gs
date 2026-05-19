@@ -1,0 +1,10 @@
+print("case:strings_table_concat_errors_more2")
+
+func checkerror(msg, f, ...) {
+  s, err := pcall(f, ...)
+  assert(!s && string.find(err, msg))
+}
+checkerror("table expected", table.concat, 3)
+assert(!pcall(table.concat, {"a", "b", {}}))
+
+print("ok")

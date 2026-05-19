@@ -1,0 +1,24 @@
+print("case:events_eq_invalidate")
+
+mt := {}
+mt.__eq = true
+
+ta := {10}
+tb := {10}
+a := setmetatable(ta, mt)
+b := setmetatable(tb, mt)
+
+mt.__eq = nil
+assert(a != b)
+
+mt.__eq = func(x, y) {
+  return x[1] == y[1]
+}
+assert(a == b)
+
+mt.__eq = func(x, y) {
+  return x[1] != y[1]
+}
+assert(a != b)
+
+print("ok")

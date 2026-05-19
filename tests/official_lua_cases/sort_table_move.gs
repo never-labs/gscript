@@ -1,0 +1,33 @@
+print("case:sort_table_move")
+
+src := {10, 20, 30}
+a := table.move(src, 1, 3, 2)
+assert(a[1] == 10 && a[2] == 10 && a[3] == 20 && a[4] == 30)
+
+src = {10, 20, 30}
+a = table.move(src, 1, 3, 3)
+assert(a[1] == 10 && a[2] == 20 && a[3] == 10 && a[4] == 20 && a[5] == 30)
+
+a = {10, 20, 30, 40}
+table.move(a, 1, 4, 2, a)
+assert(a[1] == 10 && a[2] == 10 && a[3] == 20 && a[4] == 30 && a[5] == 40)
+
+src = {10, 20, 30}
+a = table.move(src, 2, 3, 1)
+assert(a[1] == 20 && a[2] == 30 && a[3] == 30)
+
+a = {}
+src = {10, 20, 30}
+assert(table.move(src, 1, 3, 1, a) == a)
+assert(a[1] == 10 && a[2] == 20 && a[3] == 30)
+
+a = {}
+src = {10, 20, 30}
+assert(table.move(src, 1, 0, 3, a) == a)
+assert(next(a) == nil)
+
+src = {10, 20, 30}
+a = table.move(src, 1, 10, 1)
+assert(a[1] == 10 && a[2] == 20 && a[3] == 30)
+
+print("ok")

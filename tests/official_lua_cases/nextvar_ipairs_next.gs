@@ -1,0 +1,38 @@
+print("case:nextvar_ipairs_next")
+
+a := {}
+for i := 1; i <= 100; i++ {
+    a[i] = true
+    assert(#a == i)
+}
+
+x := 0
+tmp := {10, 20, 30, x: 12}
+for k, v := range ipairs(tmp) {
+    x = x + 1
+    assert(k == x && v == x * 10)
+}
+
+tmp = {x: 12, y: 24}
+for _ := range ipairs(tmp) {
+    assert(nil)
+}
+
+x = false
+i := 0
+tmp = {true, false, true, false}
+for k, v := range ipairs(tmp) {
+    _ = k
+    i = i + 1
+    x = !x
+    assert(x == v)
+}
+assert(i == 4)
+
+assert(type(ipairs({})) == "function")
+
+k, v := next({10})
+assert(k == 1 && v == 10)
+assert(next({}) == nil)
+
+print("ok")

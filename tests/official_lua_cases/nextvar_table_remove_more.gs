@@ -1,0 +1,18 @@
+print("case:nextvar_table_remove_more")
+
+a := {[0]: "ban"}
+assert(#a == 0 && table.remove(a) == "ban" && a[0] == nil)
+table.insert(a, 1, 10); table.insert(a, 1, 20); table.insert(a, 1, -1)
+assert(table.remove(a) == 10)
+assert(table.remove(a) == 20)
+assert(table.remove(a) == -1)
+assert(table.remove(a) == nil)
+
+a = {10, 20, 30, 40}
+assert(table.remove(a, #a + 1) == nil)
+assert(!pcall(table.remove, a, 0))
+assert(table.remove(a, #a) == 40)
+assert(table.remove(a, 2) == 20)
+assert(#a == 2 && a[1] == 10 && a[2] == 30)
+
+print("ok")

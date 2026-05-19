@@ -1,0 +1,37 @@
+print("case:nextvar_length_nil")
+
+assert(#{} == 0)
+assert(#{nil} == 0)
+assert(#{nil, nil} == 0)
+assert(#{1, 2, 3, nil, nil} == 3)
+
+a := {}
+for i := 1; i <= 100; i++ {
+  a[i] = true
+  assert(#a == i)
+}
+
+for i := 5; i <= 95; i++ {
+  a[i] = nil
+}
+
+for i := 1; i <= 4; i++ {
+  assert(a[i] == true)
+}
+for i := 5; i <= 95; i++ {
+  assert(a[i] == nil)
+}
+for i := 96; i <= 100; i++ {
+  assert(a[i] == true)
+}
+
+x := false
+n := 0
+for k, v := range ipairs({true, false, true, false}) {
+  n = n + 1
+  x = !x
+  assert(k == n && x == v)
+}
+assert(n == 4)
+
+print("ok")

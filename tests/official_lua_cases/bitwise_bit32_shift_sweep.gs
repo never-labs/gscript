@@ -1,0 +1,14 @@
+print("case:bitwise_bit32_shift_sweep")
+
+c := {0, 1, 2, 3, 10, 8388608, 11184810, 5592405, 16777215, 8388607}
+shifts := {-40, -32, -8, -1, 0, 1, 7, 16, 31, 32, 40}
+
+for _, b := range pairs(c) {
+    for _, i := range pairs(shifts) {
+        x := bit32.lshift(b, i)
+        y := math.floor(math.fmod(b * 2.0 ** i, 2.0 ** 32))
+        assert(math.fmod(x - y, 2.0 ** 32) == 0)
+    }
+}
+
+print("ok")

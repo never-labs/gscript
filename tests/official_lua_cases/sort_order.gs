@@ -1,0 +1,37 @@
+print("case:sort_order")
+
+func check(a, f) {
+    f = f || func(x, y) { return x < y }
+    for n := #a; n >= 2; n-- {
+        assert(!f(a[n], a[n - 1]))
+    }
+}
+
+a := {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+      "Oct", "Nov", "Dec"}
+table.sort(a)
+check(a)
+
+perm := nil
+perm = func(s, n) {
+    n = n || #s
+    if n == 1 {
+        t := {table.unpack(s)}
+        table.sort(t)
+        check(t)
+    } else {
+        for i := 1; i <= n; i++ {
+            s[i], s[n] = s[n], s[i]
+            perm(s, n - 1)
+            s[i], s[n] = s[n], s[i]
+        }
+    }
+}
+
+perm({})
+perm({1})
+perm({1, 2})
+perm({1, 2, 3})
+perm({2, 2, 3, 4})
+
+print("ok")

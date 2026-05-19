@@ -1,0 +1,33 @@
+print("case:sort_permutation_more")
+
+func check(a) {
+  for n := #a; n >= 2; n-- {
+    assert(!(a[n] < a[n - 1]))
+  }
+}
+
+seen := 0
+perm := nil
+perm = func(s, n) {
+  n = n || #s
+  if n == 1 {
+    t := {table.unpack(s)}
+    table.sort(t)
+    check(t)
+    seen = seen + 1
+  } else {
+    for i := 1; i <= n; i++ {
+      s[i], s[n] = s[n], s[i]
+      perm(s, n - 1)
+      s[i], s[n] = s[n], s[i]
+    }
+  }
+}
+
+perm({1, 2, 3, 4})
+assert(seen == 24)
+seen = 0
+perm({1, 2, 3, 3, 5})
+assert(seen == 120)
+
+print("ok")

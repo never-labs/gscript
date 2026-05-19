@@ -1,0 +1,17 @@
+print("case:vararg_forwarding")
+
+func vararg(...) {
+  return {n: select("#", ...), ...}
+}
+
+func first_and_more(a, ...) {
+  return a, ...
+}
+
+x := vararg(nil, nil)
+assert(x.n == 2 && x[1] == nil && x[2] == nil)
+
+a, b, c := first_and_more(1, 2, 3)
+assert(a == 1 && b == 2 && c == 3)
+
+print("ok")

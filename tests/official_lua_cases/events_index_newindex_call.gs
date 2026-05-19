@@ -1,0 +1,57 @@
+print("case:events_index_newindex_call")
+
+a, t := {10, 20, 30, x: "10", y: "20"}, {}
+assert(setmetatable(a, t) == a)
+assert(getmetatable(a) == t)
+assert(setmetatable(a, nil) == a)
+assert(getmetatable(a) == nil)
+assert(setmetatable(a, t) == a)
+
+func fIndex(tbl, i, e) {
+    assert(!e)
+    p := rawget(tbl, "parent")
+    return (p && p[i] + 3), "dummy return"
+}
+
+t.__index = fIndex
+a.parent = {z: 25, x: 12, [4]: 24}
+assert(a[1] == 10 && a.z == 28 && a[4] == 27 && a.x == "10")
+
+a = setmetatable({}, t)
+func fNewIndex(tbl, i, v) {
+    rawset(tbl, i, v - 3)
+}
+t.__newindex = fNewIndex
+a[1] = 30
+a.x = 101
+a[5] = 200
+assert(a[1] == 27 && a.x == 98 && a[5] == 197)
+
+c := {}
+a = setmetatable({}, t)
+t.__newindex = c
+t.__index = c
+a[1] = 10
+a[2] = 20
+a[3] = 90
+for i := 4; i <= 20; i++ {
+    a[i] = i * 10
+}
+assert(a[1] == 10 && a[2] == 20 && a[3] == 90)
+for i := 4; i <= 20; i++ {
+    assert(a[i] == i * 10)
+}
+assert(next(a) == nil)
+
+setmetatable(t, nil)
+func fCall(tbl, ...) {
+    return tbl, table.pack(...)
+}
+t.__call = fCall
+
+x, y := a("a", 1)
+assert(x == a && y[1] == "a" && y[2] == 1 && y[3] == nil)
+x, y = a()
+assert(x == a && y[1] == nil)
+
+print("ok")

@@ -1,0 +1,15 @@
+print("case:utf8_complex_string_more")
+
+x := "日本語a-4éó"
+assert(utf8.len(x) == 8)
+t := {26085, 26412, 35486, 97, 45, 52, 233, 243}
+p := 1
+for i := 1; i <= #t; i++ {
+  assert(utf8.codepoint(x, p, p) == t[i])
+  assert(utf8.offset(x, i) == p)
+  np := utf8.offset(x, 2, p)
+  if i < #t { assert(np == utf8.offset(x, i + 1)) }
+  p = np || (#x + 1)
+}
+
+print("ok")

@@ -1,0 +1,17 @@
+print("case:math_tonumber_base")
+
+assert(tonumber("  001010  ", 2) == 10)
+assert(tonumber("  001010  ", 10) == 1010)
+assert(tonumber("  -1010  ", 2) == -10)
+assert(tonumber("10", 36) == 36)
+assert(tonumber("  -10  ", 36) == -36)
+assert(tonumber("  +1Z  ", 36) == 71)
+assert(tonumber("  -1z  ", 36) == -71)
+assert(tonumber("-fFfa", 16) == -65530)
+assert(!tonumber("fFfa", 15))
+assert(!tonumber("099", 8))
+assert(!tonumber("", 8))
+assert(!tonumber("  ", 9))
+assert(!tonumber("0xf", 10))
+
+print("ok")

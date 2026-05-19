@@ -1,0 +1,9 @@
+print("case:pm_gsub_table_fallback_more")
+
+assert(string.gsub("alo alo", ".", {}) == "alo alo")
+assert(string.gsub("alo alo", "(.)", {a="AA", l=""}) == "AAo AAo")
+assert(string.gsub("alo alo", "(.).", {a="AA", l="K"}) == "AAo AAo")
+assert(string.gsub("alo alo", "((.)(.?))", {al="AA", o=false}) == "AAo AAo")
+assert(string.gsub("alo alo", "().", {'x','yy','zzz'}) == "xyyzzz alo")
+
+print("ok")

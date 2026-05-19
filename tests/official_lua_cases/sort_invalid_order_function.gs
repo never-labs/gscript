@@ -1,0 +1,27 @@
+print("case:sort_invalid_order_function")
+
+func checkerror(msg, f, t, cmp) {
+  ok, err := pcall(f, t, cmp)
+  pos := string.find(err, msg)
+  assert(!ok && type(err) == "string" && pos != nil)
+}
+
+mt := {__len: func() { return -1 }}
+a := setmetatable({}, mt)
+assert(#a == -1)
+table.sort(a, error)
+
+func bad(a, b) {
+  assert(a && b)
+  return true
+}
+
+func check(t) {
+  checkerror("invalid order function", table.sort, t, bad)
+}
+
+check({1, 2, 3, 4})
+check({1, 2, 3, 4, 5})
+check({1, 2, 3, 4, 5, 6})
+
+print("ok")

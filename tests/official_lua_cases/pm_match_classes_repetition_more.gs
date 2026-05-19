@@ -1,0 +1,39 @@
+print("case:pm_match_classes_repetition_more")
+
+func f(s, p) {
+  i, e := string.find(s, p)
+  if i {
+    return string.sub(s, i, e)
+  }
+  return nil
+}
+
+assert(f("aaa", "ab*a") == "aa")
+assert(f("aba", "ab*a") == "aba")
+assert(f("aaab", "a+") == "aaa")
+assert(f("aaa", "^.+$") == "aaa")
+assert(!f("aaa", "b+"))
+assert(!f("aaa", "ab+a"))
+assert(f("aba", "ab+a") == "aba")
+assert(f("a$a", ".%$") == "a$")
+assert(f("a$a", ".$.") == "a$a")
+assert(!f("a$a", "$$"))
+assert(!f("a$b", "a$"))
+assert(f("a$a", "$") == "")
+assert(f("", "b*") == "")
+assert(!f("aaa", "bb*"))
+assert(f("aaab", "a-") == "")
+assert(f("aaa", "^.-$") == "aaa")
+assert(f("aabaaabaaabaaaba", "b.*b") == "baaabaaabaaab")
+assert(f("aabaaabaaabaaaba", "b.-b") == "baaab")
+assert(f("alo xo", ".o$") == "xo")
+assert(f(" \n isto e assim", "%S%S*") == "isto")
+assert(f(" \n isto e assim", "%S*$") == "assim")
+assert(f(" \n isto e assim", "[a-z]*$") == "assim")
+assert(f("um caracter ? extra", "[^%sa-z]") == "?")
+assert(f("", "a?") == "")
+assert(f("aa", "^aa?a?a") == "aa")
+assert(f("]]]ab", "[^]]+") == "ab")
+assert(f("alo alo", "%C+") == "alo alo")
+
+print("ok")

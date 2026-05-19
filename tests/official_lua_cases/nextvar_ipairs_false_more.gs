@@ -1,0 +1,37 @@
+print("case:nextvar_ipairs_false_more")
+
+x := 0
+t := {10, 20, 30, x: 12}
+f, s, c := ipairs(t)
+for guard := 1; guard <= 10; guard++ {
+  k, v := f(s, c)
+  if k == nil { break }
+  c = k
+  x = x + 1
+  assert(k == x && v == x * 10)
+}
+assert(x == 3)
+
+seen := false
+t = {x: 12, y: 24}
+f, s, c = ipairs(t)
+k, v := f(s, c)
+if k != nil { seen = true }
+assert(!seen)
+
+x = false
+i := 0
+t = {true, false, true, false}
+f, s, c = ipairs(t)
+for guard := 1; guard <= 10; guard++ {
+  k, v = f(s, c)
+  if k == nil { break }
+  c = k
+  i = i + 1
+  x = !x
+  assert(k == i && x == v)
+}
+assert(i == 4)
+assert(type(ipairs({})) == "function" && ipairs({}) == ipairs({}))
+
+print("ok")

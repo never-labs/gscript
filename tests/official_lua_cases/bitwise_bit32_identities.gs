@@ -1,0 +1,34 @@
+print("case:bitwise_bit32_identities")
+
+c := {0, 1, 2, 3, 10, 2147483648, 2863311530, 1431655765,
+      4294967295, 2147483647}
+
+for _, b := range pairs(c) {
+    assert(bit32.band(b) == b)
+    assert(bit32.band(b, b) == b)
+    assert(bit32.band(b, b, b, b) == b)
+    assert(bit32.btest(b, b) == (b != 0))
+    assert(bit32.band(b, b, b) == b)
+    assert(bit32.band(b, b, b, bit32.bnot(b)) == 0)
+    assert(bit32.btest(b, b, b) == (b != 0))
+    assert(bit32.band(b, bit32.bnot(b)) == 0)
+    assert(bit32.bor(b, bit32.bnot(b)) == bit32.bnot(0))
+    assert(bit32.bor(b) == b)
+    assert(bit32.bor(b, b) == b)
+    assert(bit32.bor(b, b, b) == b)
+    assert(bit32.bor(b, b, 0, bit32.bnot(b)) == 4294967295)
+    assert(bit32.bxor(b) == b)
+    assert(bit32.bxor(b, b) == 0)
+    assert(bit32.bxor(b, b, b) == b)
+    assert(bit32.bxor(b, b, b, b) == 0)
+    assert(bit32.bxor(b, 0) == b)
+    assert(bit32.bnot(b) != b)
+    assert(bit32.bnot(bit32.bnot(b)) == b)
+    assert(bit32.bnot(b) == 4294967295 - b)
+    assert(bit32.lrotate(b, 32) == b)
+    assert(bit32.rrotate(b, 32) == b)
+    assert(bit32.lshift(bit32.lshift(b, -4), 4) == bit32.band(b, bit32.bnot(15)))
+    assert(bit32.rshift(bit32.rshift(b, 4), -4) == bit32.band(b, bit32.bnot(15)))
+}
+
+print("ok")

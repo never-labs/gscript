@@ -1,0 +1,17 @@
+print("case:math_tonumber_decimal_more2")
+
+assert(tonumber(3.4) == 3.4)
+assert(math.type(tonumber(3)) == "integer" && tonumber(3) == 3)
+assert(tonumber(1/0) == 1/0)
+assert(tonumber("0") == 0)
+assert(!tonumber(""))
+assert(!tonumber("  "))
+assert(!tonumber("-"))
+assert(!tonumber("  -0x "))
+assert(!tonumber({}))
+assert(tonumber("+0.01") == 1/100 && tonumber("+.01") == 0.01 && tonumber(".01") == 0.01)
+assert(tonumber("-1.") == -1 && tonumber("+1.") == 1)
+assert(!tonumber("+ 0.01") && !tonumber("+.e1") && !tonumber("1e"))
+assert(!tonumber("1.0e+") && !tonumber("."))
+
+print("ok")

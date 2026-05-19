@@ -1,0 +1,17 @@
+print("case:math_random_unit_edges_more")
+
+minint := math.mininteger
+maxint := math.maxinteger
+for i := 1; i <= 20; i++ {
+  assert(math.random(-10, -10) == -10)
+  assert(math.random(minint, minint) == minint)
+  assert(math.random(maxint, maxint) == maxint)
+}
+for i := 1; i <= 50; i++ {
+  t := math.random(minint, minint + 9)
+  assert(minint <= t && t <= minint + 9)
+  t = math.random(maxint - 3, maxint)
+  assert(maxint - 3 <= t && t <= maxint)
+}
+
+print("ok")

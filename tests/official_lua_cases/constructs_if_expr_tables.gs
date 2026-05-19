@@ -1,0 +1,23 @@
+print("case:constructs_if_expr_tables")
+
+f := func(i) {
+  if i < 10 { return "a" } elseif i < 20 { return "b" } elseif i < 30 { return "c" }
+}
+
+assert(f(3) == "a" && f(12) == "b" && f(26) == "c" && f(100) == nil)
+
+g := func(i) {
+  if i < 10 { return "a" } elseif i < 20 { return "b" } elseif i < 30 { return "c" } else { return 8 }
+}
+
+assert(g(3) == "a" && g(12) == "b" && g(26) == "c" && g(100) == 8)
+
+a := nil
+b := 23
+x := {g(100) * 2 + 3 || a, a || b + 2}
+assert(x[1] == 19 && x[2] == 25)
+
+x = {f: 2 + 3 || a, a: b + 2}
+assert(x.f == 5 && x.a == 25)
+
+print("ok")

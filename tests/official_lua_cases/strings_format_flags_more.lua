@@ -1,0 +1,15 @@
+print("case:strings_format_flags_more")
+
+assert(string.format("%x", 0.0) == "0")
+assert(string.format("%02x", 0.0) == "00")
+assert(string.format("%08X", 0xFFFFFFFF) == "FFFFFFFF")
+assert(string.format("%+08d", 31501) == "+0031501")
+assert(string.format("%+08d", -30927) == "-0030927")
+assert(string.format("% d", 12) == " 12")
+assert(string.format("% d", -12) == "-12")
+assert(string.format("%#x", 15) == "0xf")
+assert(string.format("%#X", 15) == "0XF")
+assert(string.format("%.0s", "abc") == "")
+assert(string.format("%5.2s", "abc") == "   ab")
+
+print("ok")

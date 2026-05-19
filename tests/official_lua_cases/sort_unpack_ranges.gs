@@ -1,0 +1,31 @@
+print("case:sort_unpack_ranges")
+
+a := {}
+for i := 1; i <= 20; i = i + 1 {
+  a[i] = i
+}
+
+x := table.unpack(a)
+assert(x == 1)
+
+x, y := table.unpack(a, 10, 10)
+assert(x == 10 && y == nil)
+
+x, y, z := table.unpack(a, 10, 11)
+assert(x == 10 && y == 11 && z == nil)
+
+x, y, z = table.unpack(a, 10, 6)
+assert(x == nil && y == nil && z == nil)
+
+x, y, z = table.unpack(a, 11, 10)
+assert(x == nil && y == nil && z == nil)
+
+one := {1}
+x, y = table.unpack(one, 1, 1)
+assert(x == 1 && y == nil)
+
+two := {1, 2}
+x, y = table.unpack(two, 1, 1)
+assert(x == 1 && y == nil)
+
+print("ok")
