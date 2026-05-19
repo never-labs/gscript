@@ -331,6 +331,41 @@ func (vm *VM) SetGlobal(name string, val runtime.Value) {
 	vm.globalsMu.Unlock()
 }
 
+func (vm *VM) DeleteGlobal(name string) {
+	if vm.noGlobalLock {
+		if idx, ok := vm.globalIndex[name]; ok {
+			vm.globalArray[idx] = runtime.NilValue()
+			delete(vm.globalIndex, name)
+			delete(vm.globals, name)
+			vm.globalVer++
+			vm.globalValueVer++
+		}
+		return
+	}
+	vm.globalsMu.Lock()
+	if idx, ok := vm.globalIndex[name]; ok {
+		vm.globalArray[idx] = runtime.NilValue()
+		delete(vm.globalIndex, name)
+		delete(vm.globals, name)
+		vm.globalVer++
+		vm.globalValueVer++
+	}
+	vm.globalsMu.Unlock()
+}
+
+func (vm *VM) RestrictStdlib(allowed map[string]bool) {
+	for _, name := range runtime.StdlibModuleNames() {
+		if allowed[name] {
+			continue
+		}
+		vm.DeleteGlobal(name)
+		vm.setPackageLoaded(name, runtime.NilValue())
+		if name == "string" {
+			vm.stringMeta = nil
+		}
+	}
+}
+
 func (vm *VM) setPackageLoaded(name string, val runtime.Value) {
 	pkgVal, ok := vm.globals["package"]
 	if !ok || !pkgVal.IsTable() {

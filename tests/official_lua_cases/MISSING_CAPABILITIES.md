@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 402 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 405 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -51,6 +51,9 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `bytes_hash_base64_go_host_more`: `bytes` buffer、hex/XOR/repeat/concat、base64/url-base64、hash/HMAC/CRC32 覆盖 deterministic binary helper。
 - `time_compress_encoding_go_host_more`: 固定时间格式化/解析/diff，gzip/zlib/deflate round-trip，以及 hex/base32/INI/XML 编解码覆盖。
 - `net_http_background_roundtrip_more`: `net.get` / `post` / `request` 通过本地 `http.listen(..., {background:true})` 覆盖 response shape、JSON helper、404 和参数错误路径。
+- `csv_go_host_more`: `csv.parse` / `parseWithHeaders` / `encode` / `encodeWithHeaders` 覆盖 quoted fields、自定义分隔符、header 映射和 malformed input。
+- `bits_go_host_more`: Go-style 64-bit `bits` helper 覆盖按位组合、shift/rotate、bit position 操作、count 和参数错误。
+- `uuid_go_host_more`: `uuid` helper 覆盖 nil UUID、validation、parse metadata 和 generated UUID shape。
 
 当前能力状态与设计取舍：
 

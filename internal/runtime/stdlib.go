@@ -40,6 +40,12 @@ var stdlibModuleNames = []string{
 	"vec",
 }
 
+func StdlibModuleNames() []string {
+	out := make([]string, len(stdlibModuleNames))
+	copy(out, stdlibModuleNames)
+	return out
+}
+
 // registerStdlib registers all standard library tables as globals.
 // This is called from New() after registerBuiltins().
 func (interp *Interpreter) registerStdlib() {

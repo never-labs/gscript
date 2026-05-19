@@ -52,6 +52,11 @@ func (e *Environment) Define(name string, val Value) {
 	e.vars[name] = NewUpvalue(&v)
 }
 
+// Delete removes a binding from this exact scope.
+func (e *Environment) Delete(name string) {
+	delete(e.vars, name)
+}
+
 // DefineReadOnly creates a new read-only variable in the current scope.
 func (e *Environment) DefineReadOnly(name string, val Value) {
 	v := val // make a local copy so the Upvalue points at stable storage

@@ -329,10 +329,10 @@ type Vec2 struct {
 	X, Y float64
 }
 
-func (v Vec2) Length() float64          { return math.Sqrt(v.X*v.X + v.Y*v.Y) }
-func (v Vec2) Add(other Vec2) Vec2      { return Vec2{v.X + other.X, v.Y + other.Y} }
-func (v *Vec2) Scale(f float64)         { v.X *= f; v.Y *= f }
-func (v Vec2) String() string           { return fmt.Sprintf("Vec2(%g, %g)", v.X, v.Y) }
+func (v Vec2) Length() float64     { return math.Sqrt(v.X*v.X + v.Y*v.Y) }
+func (v Vec2) Add(other Vec2) Vec2 { return Vec2{v.X + other.X, v.Y + other.Y} }
+func (v *Vec2) Scale(f float64)    { v.X *= f; v.Y *= f }
+func (v Vec2) String() string      { return fmt.Sprintf("Vec2(%g, %g)", v.X, v.Y) }
 
 func TestBindStruct_new(t *testing.T) {
 	vm := gs.New()
@@ -661,6 +661,99 @@ func TestWithLibs(t *testing.T) {
 	err := vm.Exec(`x := 1 + 2`)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestWithLibsRestrictsUnsafeGlobals(t *testing.T) {
+	vm := gs.New(gs.WithLibs(gs.LibSafe))
+	err := vm.Exec(`
+		hasMath := type(math)
+		hasJSON := type(json)
+		hasBytes := type(bytes)
+		hasURL := type(url)
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"hasMath", "hasJSON", "hasBytes", "hasURL"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "table" {
+			t.Fatalf("%s = %v, want table", name, got)
+		}
+	}
+	for _, name := range []string{"io", "os", "fs", "net", "http", "process", "script", "debug", "testkit"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+}
+
+func TestWithLibsRestrictsBytecodeVM(t *testing.T) {
+	vm := gs.New(gs.WithLibs(gs.LibSafe), gs.WithVM())
+	err := vm.Exec(`
+		hasString := type(string)
+		hasBytes := type(bytes)
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"hasString", "hasBytes"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "table" {
+			t.Fatalf("%s = %v, want table", name, got)
+		}
+	}
+	for _, name := range []string{"http", "debug", "testkit"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+}
+
+func TestEachPublicLibFlagExposesNamedGlobal(t *testing.T) {
+	tests := []struct {
+		name   string
+		flag   gs.LibFlags
+		global string
+	}{
+		{"bytes", gs.LibBytes, "bytes"},
+		{"url", gs.LibURL, "url"},
+		{"bits", gs.LibBits, "bits"},
+		{"csv", gs.LibCSV, "csv"},
+		{"uuid", gs.LibUUID, "uuid"},
+		{"matrix", gs.LibMatrix, "matrix"},
+		{"compress", gs.LibCompress, "compress"},
+		{"container", gs.LibContainer, "container"},
+		{"rl", gs.LibRL, "rl"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(gs.WithLibs(tc.flag))
+			if err := vm.Exec(`result := type(` + tc.global + `)`); err != nil {
+				t.Fatal(err)
+			}
+			got, err := vm.Get("result")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "table" {
+				t.Fatalf("type(%s) = %v, want table", tc.global, got)
+			}
+		})
 	}
 }
 

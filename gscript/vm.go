@@ -30,6 +30,8 @@ func New(opts ...Option) *VM {
 	}
 
 	interp := runtime.New()
+	allowedStdlib := stdlibAllowedNames(o.libs)
+	interp.RestrictStdlib(allowedStdlib)
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -92,6 +94,7 @@ func (vm *VM) exec(src, filename string) error {
 		if bvm == nil {
 			bvm = bytecodevm.New(globals)
 			bvm.SetStringMeta(vm.interp.StringMeta())
+			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -112,6 +115,49 @@ func (vm *VM) exec(src, filename string) error {
 		return &Error{Kind: ErrRuntime, Message: err.Error(), File: filename}
 	}
 	return nil
+}
+
+func stdlibAllowedNames(libs LibFlags) map[string]bool {
+	allowed := map[string]bool{
+		"base64":    libs&LibBase64 != 0,
+		"binary":    libs&LibBinary != 0,
+		"bit32":     libs&LibBit32 != 0,
+		"bits":      libs&LibBits != 0,
+		"bytes":     libs&LibBytes != 0,
+		"color":     libs&LibColor != 0,
+		"compress":  libs&LibCompress != 0,
+		"container": libs&LibContainer != 0,
+		"crypto":    libs&LibCrypto != 0,
+		"csv":       libs&LibCSV != 0,
+		"debug":     libs&LibDebug != 0,
+		"encoding":  libs&LibEncoding != 0,
+		"fs":        libs&LibFS != 0,
+		"hash":      libs&LibHash != 0,
+		"http":      libs&LibHTTP != 0,
+		"io":        libs&LibIO != 0,
+		"json":      libs&LibJSON != 0,
+		"log":       libs&LibLog != 0,
+		"math":      libs&LibMath != 0,
+		"matrix":    libs&LibMatrix != 0,
+		"net":       libs&LibNet != 0,
+		"os":        libs&LibOS != 0,
+		"path":      libs&LibPath != 0,
+		"process":   libs&LibProcess != 0,
+		"rand":      libs&LibRand != 0,
+		"regexp":    libs&LibRegexp != 0,
+		"rl":        libs&LibGL != 0,
+		"script":    libs&LibScript != 0,
+		"sort":      libs&LibSort != 0,
+		"string":    libs&LibString != 0,
+		"table":     libs&LibTable != 0,
+		"testkit":   libs&LibTestkit != 0,
+		"time":      libs&LibTime != 0,
+		"url":       libs&LibURL != 0,
+		"utf8":      libs&LibUTF8 != 0,
+		"uuid":      libs&LibUUID != 0,
+		"vec":       libs&LibVec != 0,
+	}
+	return allowed
 }
 
 func setBytecodeSource(proto *bytecodevm.FuncProto, filename string) {

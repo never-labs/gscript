@@ -67,6 +67,21 @@ func (interp *Interpreter) ExportGlobals() map[string]Value {
 	return m
 }
 
+// RestrictStdlib removes standard-library globals not present in allowed.
+func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
+	for _, name := range stdlibModuleNames {
+		if allowed[name] {
+			continue
+		}
+		interp.globals.Delete(name)
+		delete(interp.modules, name)
+		interp.markPackageLoaded(name, NilValue())
+		if name == "string" {
+			interp.stringMeta = nil
+		}
+	}
+}
+
 // NewInterpreterGlobals creates a fresh globals map with all builtins and stdlib registered.
 // This is used by the bytecode VM to get the same standard library as the tree-walker.
 func NewInterpreterGlobals() map[string]Value {

@@ -1,0 +1,29 @@
+print("case:bits_go_host_more")
+
+assert(bits.and(7, 3) == 3)
+assert(bits.or(4, 2, 1) == 7)
+assert(bits.xor(7, 3) == 4)
+assert(bits.not(0) == -1)
+assert(bits.shl(1, 63) == math.mininteger)
+assert(bits.shr(-1, 63) == 1)
+assert(bits.sar(-1, 64) == -1)
+assert(bits.rotl(1, 1) == 2)
+assert(bits.rotr(2, 1) == 1)
+
+assert(bits.test(8, 3) == true)
+assert(bits.set(0, 4) == 16)
+assert(bits.clear(31, 4) == 15)
+assert(bits.toggle(8, 3) == 0)
+
+assert(bits.ones(-1) == 64)
+assert(bits.leadingZeros(1) == 63)
+assert(bits.trailingZeros(8) == 3)
+
+ok, err := pcall(bits.shl, 1, -1)
+assert(ok == false)
+assert(type(err) == "string")
+ok, err = pcall(bits.test, 1, 64)
+assert(ok == false)
+assert(type(err) == "string")
+
+print("ok")

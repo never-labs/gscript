@@ -4,46 +4,77 @@ package gscript
 type LibFlags uint64
 
 const (
-	LibString  LibFlags = 1 << iota // string.*
-	LibTable                        // table.*
-	LibMath                         // math.*
-	LibIO                           // io.*
-	LibOS                           // os.*
-	LibCoroutine                    // coroutine (built-in, always available)
-	LibHTTP                         // http.* (server)
-	LibGL                           // gl.* (OpenGL)
-	LibJSON                         // json.*
-	LibBase64                       // base64.*
-	LibHash                         // hash.*
-	LibFS                           // fs.*
-	LibPath                         // path.*
-	LibTime                         // time.*
-	LibNet                          // net.* (HTTP client)
-	LibVec                          // vec.* (2D/3D vectors)
-	LibColor                        // color.*
-	LibRegexp                       // regexp.*
-	LibUTF8                         // utf8.*
-	LibBit32                        // bit32.*
+	LibString    LibFlags = 1 << iota // string.*
+	LibTable                          // table.*
+	LibMath                           // math.*
+	LibIO                             // io.*
+	LibOS                             // os.*
+	LibCoroutine                      // coroutine (built-in, always available)
+	LibHTTP                           // http.* (server)
+	LibGL                             // gl.* (OpenGL)
+	LibJSON                           // json.*
+	LibBase64                         // base64.*
+	LibHash                           // hash.*
+	LibFS                             // fs.*
+	LibPath                           // path.*
+	LibTime                           // time.*
+	LibNet                            // net.* (HTTP client)
+	LibVec                            // vec.* (2D/3D vectors)
+	LibColor                          // color.*
+	LibRegexp                         // regexp.*
+	LibUTF8                           // utf8.*
+	LibBit32                          // bit32.*
+	LibBinary                         // binary.*
+	LibBits                           // bits.*
+	LibBytes                          // bytes.*
+	LibCSV                            // csv.*
+	LibURL                            // url.*
+	LibUUID                           // uuid.*
+	LibProcess                        // process.*
+	LibScript                         // script.*
+	LibDebug                          // debug.*
+	LibTestkit                        // testkit.*
+	LibMatrix                         // matrix.*
+	LibRand                           // rand.*
+	LibSort                           // sort.*
+	LibEncoding                       // encoding.*
+	LibCompress                       // compress.*
+	LibCrypto                         // crypto.*
+	LibContainer                      // container.*
+	LibLog                            // log.*
+
+	LibRL = LibGL // compatibility alias for the registered rl.* module
 
 	// LibAll includes every library (default).
 	LibAll = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
 		LibHTTP | LibGL | LibJSON | LibBase64 | LibHash |
 		LibFS | LibPath | LibTime | LibNet |
-		LibVec | LibColor | LibRegexp | LibUTF8 | LibBit32
+		LibVec | LibColor | LibRegexp | LibUTF8 | LibBit32 |
+		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
+		LibProcess | LibScript | LibDebug | LibTestkit | LibMatrix |
+		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
+		LibContainer | LibLog
 
 	// LibSafe is a sandboxed subset with no I/O, network, or system access.
 	LibSafe = LibString | LibTable | LibMath | LibCoroutine |
 		LibJSON | LibBase64 | LibHash | LibVec | LibColor |
-		LibRegexp | LibUTF8 | LibBit32
+		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
+		LibBytes | LibCSV | LibURL | LibUUID | LibMatrix |
+		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
+		LibContainer
 
 	// LibApp is a convenient preset for application development (no GL).
 	LibApp = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
 		LibJSON | LibBase64 | LibHash | LibFS | LibPath | LibTime | LibNet |
-		LibRegexp | LibUTF8 | LibBit32
+		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
+		LibBytes | LibCSV | LibURL | LibUUID | LibProcess | LibScript |
+		LibDebug | LibMatrix | LibRand | LibSort | LibEncoding |
+		LibCompress | LibCrypto | LibContainer | LibLog
 
 	// LibGame is a preset for game development (no I/O, includes GL/vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |
-		LibGL | LibVec | LibColor | LibJSON | LibBit32 | LibTime
+		LibGL | LibVec | LibColor | LibJSON | LibBit32 | LibBits |
+		LibTime | LibRand
 )
 
 type vmOptions struct {

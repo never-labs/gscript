@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 402.
+Current translated passing cases: 405.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -34,6 +34,7 @@ Current translated passing cases: 402.
 | `bitwise_bit32_varargs` | `bitwise.lua` | `bit32` empty and multi-argument `band`/`bor`/`bxor`/`btest` defaults. |
 | `bitwise_bit32_wrap_more` | `bitwise.lua` | Additional `bit32.band` wrapping for positive and negative values around 2^33 and 2^40. |
 | `bitwise_direct_ops_more` | `bitwise.lua`, `bwcoercion.lua` | First-class bitwise expression operators, complement, bit-clear translation, shifts, and small accumulation loop. |
+| `bits_go_host_more` | `bitwise.lua`, `bwcoercion.lua` | Go-host 64-bit `bits` helper operations, rotations, bit tests/mutations, counts, and invalid shift diagnostics. |
 | `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
 | `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `attrib_require_builtin_modules_more` | `attrib.lua` | `require` returns cached builtin standard-library modules and exposes them through `package.loaded`. |
@@ -84,6 +85,7 @@ Current translated passing cases: 402.
 | `coroutine_wrap_basic` | `coroutine.lua` | `coroutine.wrap`, yield/resume values, simple generator. |
 | `coroutine_wrap_sieve_more` | `coroutine.lua` | Coroutine-wrapped generator/filter pipeline for the prime sieve pattern. |
 | `coroutine_yield_resume_values` | `coroutine.lua` | Resume arguments returned from `yield`, generator state. |
+| `csv_go_host_more` | `files.lua`, `strings.lua` | Go-host CSV parse/encode helpers with headers, custom separator, quoting, trimming, and malformed input diagnostics. |
 | `errors_assert_pcall` | `errors.lua` | `assert`, `error`, and `pcall` basics. |
 | `errors_common_runtime_failures` | `errors.lua` | Protected common runtime failures: missing math arguments, failed asserts, nil arithmetic, and missing builtin args. |
 | `errors_error_edge_values` | `errors.lua` | No-argument `error`, raw error level argument, protected runtime errors, and bad-argument propagation. |
@@ -304,6 +306,7 @@ Current translated passing cases: 402.
 | `utf8_len_range_more` | `utf8.lua` | UTF-8 length, offsets, negative offsets, and codepoint ranges over a mixed multibyte/NUL string. |
 | `utf8_offset_len_errors` | `utf8.lua` | `utf8.offset` and indexed `utf8.len` position bounds and continuation-byte errors. |
 | `utf8_validation_helpers_more` | `utf8.lua` | Go-style structured UTF-8 validation diagnostics and non-strict sanitization helpers over invalid edge sequences. |
+| `uuid_go_host_more` | `api.lua`, `strings.lua` | Go-host UUID nil value, validation, parsing, version/variant metadata, and generated UUID shape checks. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
 | `vararg_call_unpack_more` | `vararg.lua` | `table.unpack`-driven call forwarding, explicit nil-count handling, fixed-parameter adjustment, and vararg builtin dispatch. |
 | `vararg_method_recursive_more` | `vararg.lua` | Method-call vararg indexing plus recursive vararg forwarding through nested one-less helpers. |
