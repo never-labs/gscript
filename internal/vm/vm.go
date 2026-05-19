@@ -1177,6 +1177,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterTableSortLib()
 	v.RegisterTableHigherOrderLib()
 	v.RegisterStringLib()
+	v.RegisterHTTPLib()
 	v.RegisterDebugLib()
 	v.registerChannelBuiltins()
 	runtime.RegisterVM(v)
@@ -1355,6 +1356,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterTableSortLib()
 	child.RegisterTableHigherOrderLib()
 	child.RegisterStringLib()
+	child.RegisterHTTPLib()
 	child.RegisterDebugLib()
 	runtime.RegisterVM(child)
 	return child
@@ -1396,6 +1398,12 @@ func (vm *VM) RegisterStringLib() {
 	meta.RawSet(runtime.StringValue("__index"), runtime.TableValue(strLib))
 	vm.stringMeta = meta
 	vm.setPackageLoaded("string", runtime.TableValue(strLib))
+}
+
+func (vm *VM) RegisterHTTPLib() {
+	httpLib := runtime.TableValue(runtime.BuildHTTPLibWithCaller(vm.callValue))
+	vm.SetGlobal("http", httpLib)
+	vm.setPackageLoaded("http", httpLib)
 }
 
 // Execute runs a top-level function prototype.

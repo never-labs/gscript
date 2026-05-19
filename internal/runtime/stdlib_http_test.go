@@ -2,7 +2,9 @@ package runtime
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -218,5 +220,111 @@ func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "Path: /mypath" {
 		t.Errorf("expected 'Path: /mypath', got '%s'", string(body))
+	}
+}
+
+func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
+	interp := New()
+	src := `
+		server := http.listen("127.0.0.1:0", func(req, res) {
+			res.write("ok:" .. req.path)
+		}, {background: true})
+		serverType := type(server)
+		addrType := type(server.addr)
+		urlType := type(server.url)
+		closeType := type(server.close)
+		resp := http.get(server.url .. "/health")
+		status := resp.status
+		body := resp.body
+		closed, closeErr := server.close()
+		waited, waitErr := server.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	for name, want := range map[string]string{
+		"serverType": "table",
+		"addrType":   "string",
+		"urlType":    "string",
+		"closeType":  "function",
+		"body":       "ok:/health",
+	} {
+		if got := interp.GetGlobal(name); got.Str() != want {
+			t.Fatalf("%s = %v, want %q", name, got, want)
+		}
+	}
+	if got := interp.GetGlobal("status"); !got.IsInt() || got.Int() != 200 {
+		t.Fatalf("status = %v, want 200", got)
+	}
+	if got := interp.GetGlobal("closed"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("closed = %v, want true", got)
+	}
+	if got := interp.GetGlobal("waited"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("waited = %v, want true", got)
+	}
+	if got := interp.GetGlobal("closeErr"); !got.IsNil() {
+		t.Fatalf("closeErr = %v, want nil", got)
+	}
+	if got := interp.GetGlobal("waitErr"); !got.IsNil() {
+		t.Fatalf("waitErr = %v, want nil", got)
+	}
+}
+
+func TestHTTPRouterBackgroundShutdown(t *testing.T) {
+	interp := New()
+	src := `
+		router := http.newRouter()
+		router.get("/route", func(req, res) {
+			res.status(201).write("route:" .. req.path)
+		})
+		server := router.listen("127.0.0.1:0", {background: true})
+		resp := http.get(server.url .. "/route")
+		status := resp.status
+		body := resp.body
+		shut, shutErr := server.shutdown()
+		waited, waitErr := server.wait()
+	`
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("status"); !got.IsInt() || got.Int() != 201 {
+		t.Fatalf("status = %v, want 201", got)
+	}
+	if got := interp.GetGlobal("body"); got.Str() != "route:/route" {
+		t.Fatalf("body = %v, want route:/route", got)
+	}
+	if got := interp.GetGlobal("shut"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("shut = %v, want true", got)
+	}
+	if got := interp.GetGlobal("waited"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("waited = %v, want true", got)
+	}
+	if got := interp.GetGlobal("shutErr"); !got.IsNil() {
+		t.Fatalf("shutErr = %v, want nil", got)
+	}
+	if got := interp.GetGlobal("waitErr"); !got.IsNil() {
+		t.Fatalf("waitErr = %v, want nil", got)
+	}
+}
+
+func TestHTTPListenBackgroundPortConflictFailsSynchronously(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen fixture: %v", err)
+	}
+	defer ln.Close()
+
+	interp := New()
+	src := fmt.Sprintf(`
+		ok, err := pcall(http.listen, "%s", func(req, res) {}, {background: true})
+	`, ln.Addr().String())
+	if _, err := interp.ExecString(src); err != nil {
+		t.Fatalf("ExecString: %v", err)
+	}
+	if got := interp.GetGlobal("ok"); !got.IsBool() || got.Bool() {
+		t.Fatalf("ok = %v, want false", got)
+	}
+	if got := interp.GetGlobal("err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("err = %v, want non-empty string", got)
 	}
 }

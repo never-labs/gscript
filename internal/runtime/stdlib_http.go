@@ -1,15 +1,25 @@
 package runtime
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 )
 
+type httpScriptCaller func(Value, []Value) ([]Value, error)
+
 func httpLib(interp *Interpreter) *Table {
+	return BuildHTTPLibWithCaller(interp.callFunction)
+}
+
+func BuildHTTPLibWithCaller(call httpScriptCaller) *Table {
 	t := NewTable()
+	var handlerMu sync.Mutex
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -18,15 +28,16 @@ func httpLib(interp *Interpreter) *Table {
 		}))
 	}
 
-	// http.listen(addr, handler)
+	// http.listen(addr, handler [, options])
 	// handler is called with (req, res) for each request
-	// This BLOCKS until the server stops
+	// This BLOCKS until the server stops unless options.background is true.
 	set("listen", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("http.listen requires address and handler")
 		}
 		addr := args[0].Str()
 		handler := args[1]
+		background := httpListenBackground(args, 2)
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -35,15 +46,13 @@ func httpLib(interp *Interpreter) *Table {
 			// Build res table
 			res := buildResponseTable(w, r)
 
-			// Call handler
-			_, err := interp.callFunction(handler, []Value{req, res})
+			_, err := callHTTPHandler(call, &handlerMu, handler, req, res)
 			if err != nil {
 				http.Error(w, err.Error(), 500)
 			}
 		})
 
-		fmt.Printf("GScript HTTP server listening on %s\n", addr)
-		return nil, http.ListenAndServe(addr, mux)
+		return startHTTPServer(addr, mux, background)
 	})
 
 	// http.get(url) - simple HTTP GET client
@@ -73,7 +82,7 @@ func httpLib(interp *Interpreter) *Table {
 
 	// http.newRouter() - creates a router with route registration
 	set("newRouter", func(args []Value) ([]Value, error) {
-		return []Value{TableValue(buildRouterTable(interp))}, nil
+		return []Value{TableValue(buildRouterTable(call))}, nil
 	})
 
 	return t
@@ -240,9 +249,10 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 }
 
 // buildRouterTable creates a router with route registration.
-func buildRouterTable(interp *Interpreter) *Table {
+func buildRouterTable(call httpScriptCaller) *Table {
 	t := NewTable()
 	mux := http.NewServeMux()
+	var handlerMu sync.Mutex
 
 	registerRoute := func(method, pattern string, handler Value) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -252,7 +262,9 @@ func buildRouterTable(interp *Interpreter) *Table {
 			}
 			req := buildRequestTable(r)
 			res := buildResponseTable(w, r)
-			interp.callFunction(handler, []Value{req, res})
+			if _, err := callHTTPHandler(call, &handlerMu, handler, req, res); err != nil {
+				http.Error(w, err.Error(), 500)
+			}
 		})
 	}
 
@@ -289,7 +301,7 @@ func buildRouterTable(interp *Interpreter) *Table {
 		},
 	}))
 
-	// router.listen(addr)
+	// router.listen(addr [, options])
 	t.RawSet(StringValue("listen"), FunctionValue(&GoFunction{
 		Name: "router.listen",
 		Fn: func(args []Value) ([]Value, error) {
@@ -297,12 +309,140 @@ func buildRouterTable(interp *Interpreter) *Table {
 			if len(args) >= 1 {
 				addr = args[0].Str()
 			}
-			fmt.Printf("GScript HTTP server listening on %s\n", addr)
-			return nil, http.ListenAndServe(addr, mux)
+			background := httpListenBackground(args, 1)
+			return startHTTPServer(addr, mux, background)
 		},
 	}))
 
 	return t
+}
+
+type httpServerHandle struct {
+	server *http.Server
+	ln     net.Listener
+	done   chan error
+
+	mu     sync.Mutex
+	closed bool
+}
+
+func httpListenBackground(args []Value, optIndex int) bool {
+	if len(args) <= optIndex || !args[optIndex].IsTable() {
+		return false
+	}
+	return args[optIndex].Table().RawGetString("background").Truthy()
+}
+
+func startHTTPServer(addr string, handler http.Handler, background bool) ([]Value, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{Handler: handler}
+	handle := &httpServerHandle{
+		server: server,
+		ln:     ln,
+		done:   make(chan error, 1),
+	}
+
+	if !background {
+		fmt.Printf("GScript HTTP server listening on %s\n", ln.Addr().String())
+		err := server.Serve(ln)
+		if err == http.ErrServerClosed {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	go func() {
+		err := server.Serve(ln)
+		if err == http.ErrServerClosed {
+			err = nil
+		}
+		handle.done <- err
+	}()
+
+	return []Value{TableValue(buildHTTPServerHandleTable(handle))}, nil
+}
+
+func buildHTTPServerHandleTable(handle *httpServerHandle) *Table {
+	t := NewTable()
+	addr := handle.ln.Addr().String()
+	urlAddr := httpConnectAddr(addr)
+	t.RawSetString("addr", StringValue(addr))
+	t.RawSetString("url", StringValue("http://"+urlAddr))
+
+	t.RawSetString("close", FunctionValue(&GoFunction{
+		Name: "http.server.close",
+		Fn: func(args []Value) ([]Value, error) {
+			err := handle.close()
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{BoolValue(true)}, nil
+		},
+	}))
+	t.RawSetString("shutdown", FunctionValue(&GoFunction{
+		Name: "http.server.shutdown",
+		Fn: func(args []Value) ([]Value, error) {
+			err := handle.shutdown()
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{BoolValue(true)}, nil
+		},
+	}))
+	t.RawSetString("wait", FunctionValue(&GoFunction{
+		Name: "http.server.wait",
+		Fn: func(args []Value) ([]Value, error) {
+			err := <-handle.done
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{BoolValue(true)}, nil
+		},
+	}))
+	return t
+}
+
+func callHTTPHandler(call httpScriptCaller, mu *sync.Mutex, handler Value, req, res Value) ([]Value, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	return call(handler, []Value{req, res})
+}
+
+func httpConnectAddr(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	switch host {
+	case "", "::", "[::]", "0.0.0.0":
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func (h *httpServerHandle) close() error {
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return nil
+	}
+	h.closed = true
+	h.mu.Unlock()
+	return h.server.Close()
+}
+
+func (h *httpServerHandle) shutdown() error {
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return nil
+	}
+	h.closed = true
+	h.mu.Unlock()
+	return h.server.Shutdown(context.Background())
 }
 
 // goToGScript converts Go values (from JSON unmarshal) to GScript Values.

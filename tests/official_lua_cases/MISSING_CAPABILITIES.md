@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 394 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 395 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -43,6 +43,7 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `go_channel_host_more`: Go-style channel/goroutine 在 VM 文件模式下覆盖 buffered producer、range over closed channel、closed receive 和容量/关闭错误路径。
 - `matrix_host_dense_more`: `matrix.dense` / `matrix.getf` / `matrix.setf` 在脚本层覆盖 flat backing 读写、普通索引一致性和稳定参数错误。
 - `attrib_require_go_host_modules_more`: Go-host 标准库模块通过 `require` 和 `package.loaded` 保持全局表身份一致。
+- `http_background_server_more`: `http.listen` / `router.listen` 支持 `{background: true}`，返回可 `close` / `shutdown` / `wait` 的 server handle，脚本层可稳定做本地请求回环测试。
 
 当前能力状态与设计取舍：
 
@@ -67,6 +68,22 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
   `table.unpack` / `table.spread` 最多展开 1,000,000 个返回值，超过时立即报
   “too many results” 错误，不逐项扫描 sparse range。
 当前没有 skipped known failures；此前明确记录的 VM `const`/`defer` parity、VM 文件模式 debug parity、VM table higher-order callback 和 table concat proxy 语义均已按 GScript/Go-host 语义补齐。后续继续翻译更大的官方切片时，如发现新能力缺口，再按本文件记录。
+
+## JIT capability matrix
+
+这些条目不是语言能力缺口。它们描述的是 native JIT 在 semantic-check 模式下主动退回 VM 的边界，或 methodjit 内部保留的 skipped 优化/正确性 repro。官方 translated correctness 仍由 VM 负责，`GSCRIPT_OFFICIAL_CHECK_JIT=1` 只要求 `gscript -jit` 输出一致，不要求每个 case 都 native 编译。
+
+| 范围 | 语言/VM 状态 | JIT 当前策略 | 后续方向 |
+|---|---|---|---|
+| 多返回 ABI | VM 已覆盖普通赋值、调用、构造、vararg 和显式 `spread` | semantic gate 避免单 boxed return ABI 无法表达的 native 路径 | 设计 native 多返回 ABI 或统一 op-exit result buffer |
+| top-level `<main>` | 文件模式副作用、错误和 source diagnostics 已由 VM 覆盖 | semantic gate 避免 native restart/fallback replay 可观察副作用 | 只有在 fallback 可证明不重放副作用后再放开 |
+| `const` / `defer` / readonly control | 解释器和 VM compiler 已覆盖 | VM-only control，native 不负责 cleanup/control-state 合约 | 先保持 VM 执行，必要时设计 defer unwinding protocol |
+| upvalue arithmetic | 闭包/upvalue 语言语义已覆盖 | upvalue + arithmetic 被 gate，避免 guard/boxing 不完整 | 补 upvalue numeric guard 与 deopt 恢复 |
+| dynamic arithmetic/len/concat | metamethod、类型错误和 table proxy 语义已覆盖 | 动态 operators 被 gate，避免 native fallback 语义不完整 | 按 opcode 补完整 metamethod/error slow path |
+| comparison branches | `__eq`/`__lt`/`__le` 与 raw equality 已覆盖 | comparison branches 被 gate | 补比较分支的 metamethod、error 和 deopt 合约 |
+| call/coroutine boundaries | call、xpcall、yield/resume 等语言语义已覆盖 | call/self/generic-for/resume/yield 被 gate | 先补 native call boundary 的 error/yield/fallback 协议 |
+| skipped Tier 2 quicksort / driver-loop tests | 不影响官方 translated VM/JIT output parity | methodjit 内部保留 skipped known bug/design-record tests | 作为 JIT correctness backlog，不写进 official `KNOWN_FAILURES.md` |
+| whole-call no-result kernel | 语言侧无缺口 | disabled optimization，fallback contract 尚未证明 | 定义无返回 call op-exit 的恢复与副作用合约后再启用 |
 
 ## Covered GScript equivalents
 

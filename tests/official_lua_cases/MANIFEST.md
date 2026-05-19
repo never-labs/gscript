@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 394.
+Current translated passing cases: 395.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -329,6 +329,7 @@ Recent audit-added coverage:
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
 | `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
+| `http_background_server_more` | `api.lua`, `main.lua` | Go-host HTTP server/router background mode returns closeable handles with addr/url and supports local client round-trips. |
 | `main_generated_chunk_eval_more` | `main.lua`, `code.lua` | Generated chunk compilation with explicit lexical environment and protected syntax-error handling. |
 | `matrix_host_dense_more` | `api.lua`, `attrib.lua` | Go-host `matrix.dense` plus `matrix.getf`/`setf` flat access and stable argument/index error paths. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
