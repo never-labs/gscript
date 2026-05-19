@@ -20,6 +20,23 @@
 
 真正仍需补齐或明确设计取舍的缺口：
 
+本轮继续补 passing case 时，另观察到这些 Lua 兼容细节尚未纳入 passing
+set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lua：
+
+- `require("string") == string` / `require("math") == math` 这类 builtin
+  module alias 与 `package.*` metadata。
+- 普通多表达式赋值/调用参数中，Lua 会对非最后表达式的多返回调用自动
+  调整为单值；GScript 当前更适合用显式括号或 `spread(...)` 表达意图。
+- `coroutine.resume` 对 `coroutine.yield(a, b, ...)` 的多个 yield 值透传
+  还没有放进官方 passing set；当前覆盖的是单值 yield/status 行为。
+- table library 对 proxy/metatable table 的读写，包括 `table.insert` /
+  `table.sort` / `table.remove` / `table.unpack` 与 `table.move` 的
+  `__index` / `__newindex` 交互。
+- 极值 sparse `table.unpack` 范围目前会在 VM harness 下超时，需要 bounded
+  runtime support 或明确的兼容边界。
+- `__concat` 数字操作数保留：官方 Lua 期望数字操作数以 number 传入
+  metamethod；GScript 当前部分路径会先做字符串化。
+
 当前没有 skipped known failures；此前明确记录的 VM `const`/`defer` parity 和 VM 文件模式 debug parity 已按 GScript/Go-host 语义补齐。后续继续翻译更大的官方切片时，如发现新能力缺口，再按本文件记录。
 
 | 能力候选 | 来源片段 | 说明 |

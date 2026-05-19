@@ -1,0 +1,29 @@
+print("case:vararg_method_recursive_more")
+
+t := {1, 10}
+t.f = func(self, ...) {
+  arg := table.pack(...)
+  return self[(...)] + arg.n
+}
+
+assert(t:f(1, 4) == 3 && t:f(2) == 11)
+
+func oneless(a, ...) { return ... }
+
+func f(n, a, ...) {
+  if n == 0 {
+    packed := table.pack(...)
+    return a, packed[1], packed[2], packed[3], packed[4]
+  }
+  b := (...)
+  assert(b == (...))
+  return f(n - 1, a, ...)
+}
+
+a, b, c, d, e := f(10, 5, 4, 3, 2, 1)
+assert(a == 5 && b == 4 && c == 3 && d == 2 && e == 1)
+
+a, b, c, d, e = f(4)
+assert(a == nil && b == nil && c == nil && d == nil && e == nil)
+
+print("ok")

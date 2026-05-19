@@ -3,10 +3,10 @@
 The `debug` library exposes runtime diagnostics, source-aware stack frames, and
 coarse event hooks.
 
-VM note: file-mode VM execution currently has passing coverage for
-`debug.info(function)` and `debug.value`. Stack-frame/source metadata and
-call/return hook events have runtime/interpreter coverage, with fuller VM
-parity tracked in `tests/official_lua_cases/MISSING_CAPABILITIES.md`.
+VM note: file-mode VM execution has official translated coverage for
+`debug.info(function)`, `debug.value`, stack/source metadata, numeric frame
+queries, and hook/sink events. The API is intentionally GScript/Go-host shaped
+instead of a byte-for-byte Lua `debug` clone.
 
 ## Source Information
 

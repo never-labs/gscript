@@ -1,0 +1,15 @@
+print("case:sort_reverse_closure_more")
+
+a := {7, 1, 5, 2, 9, 4, 8, 3, 6}
+comparisons := 0
+table.sort(a, func(x, y) {
+  comparisons = comparisons + 1
+  return y < x
+})
+
+for i := 2; i <= #a; i += 1 {
+  assert(a[i - 1] >= a[i])
+}
+assert(a[1] == 9 && a[#a] == 1 && comparisons > 0)
+
+print("ok")

@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 344.
+Current translated passing cases: 360.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -47,7 +47,9 @@ Current translated passing cases: 344.
 | `calls_multireturn_adjust_more` | `calls.lua`, `constructs.lua`, `vararg.lua` | Parenthesized call adjustment, nested multi-return argument adjustment, recursive multi-return table constructors, and value-bearing vararg tail forwarding. |
 | `calls_nested_method_more` | `calls.lua` | Nested table function assignment and explicit self-style method mutation. |
 | `calls_recursion_error_more` | `calls.lua` | Recursive protected error propagation and moderate tail-recursive descent. |
+| `calls_ret2_pack_adjust_more` | `calls.lua` | Recursive multi-return unpack feeding assignment, table constructors, and vararg packing in currently supported positions. |
 | `calls_return_values` | `calls.lua`, `constructs.lua` | Multiple return assignment and nil-return basics. |
+| `calls_tail_call_metamethod_more` | `calls.lua` | Tail-style calls through `__call` metamethod tables and chained callable tables ending in a recursive function. |
 | `calls_tail_varargs` | `calls.lua` | Empty vararg forwarding through a tail call. |
 | `calls_tail_varargs_more2` | `calls.lua` | Tail vararg forwarding into a sink function for empty, one-argument, and two-argument calls. |
 | `calls_type_basic` | `calls.lua` | `type` over core values and builtins. |
@@ -58,19 +60,24 @@ Current translated passing cases: 344.
 | `closure_identity_more` | `closure.lua` | Distinct closures created in loops and stable identity when returning the same captured closure. |
 | `closure_if_branch_upvalues_more` | `closure.lua` | Closures created in different conditional branches maintain independent per-branch upvalues. |
 | `closure_break_upvalues` | `closure.lua` | Upvalues closed through break paths remain distinct from later locals. |
+| `closure_multilevel_state_more` | `closure.lua` | Multi-level closures capture outer state and independent mutable locals across returned functions. |
 | `closure_repeat_until_upvalues` | `closure.lua` | Closures created inside repeat-until style loops close per-iteration locals correctly. |
 | `closure_tailcall_upvalue` | `closure.lua` | Upvalues captured by closures returned through a tail-call style vararg helper remain valid. |
 | `constructs_loops_tables` | `constructs.lua` | Conditional chains, translated loops, table constructors. |
 | `constructs_label_goto_control` | `goto.lua`, `constructs.lua` | Go-style `label:`/`goto label` forward, backward, loop-exit, and function-local control flow translated against equivalent Lua loops. |
 | `constructs_loop_break_count` | `constructs.lua` | Nested loops, `break`, and table writes. |
 | `constructs_loop_break_repeat_more` | `constructs.lua` | Nested counting loops plus repeat-until/break control-flow cases. |
+| `constructs_recursive_multireturn_more` | `constructs.lua` | Recursive multi-return calls in table constructors, first-result adjustment before concatenation, and non-number fallthrough returns. |
 | `constructs_function_branches_more` | `constructs.lua` | Function branch returns, nil fallthrough, and table constructor expression fields. |
 | `constructs_if_expr_tables` | `constructs.lua` | If/elseif return chains and table constructors containing logical expression fields. |
 | `constructs_multireturn_tables` | `constructs.lua` | Multi-return table constructor behavior for stable cases. |
 | `constructs_precedence` | `constructs.lua` | Arithmetic, concat, logical precedence, unary/power precedence. |
 | `constructs_short_circuit` | `constructs.lua` | `and`/`or` short-circuit value semantics and comparisons. |
 | `coroutine_create_gofunction` | `coroutine.lua` | `coroutine.create`/`resume` over native functions, including errors and dead status. |
+| `coroutine_self_resume_status_more` | `coroutine.lua` | Coroutine resume/status progression across suspended yields, return, and repeated dead-coroutine resumes. |
+| `coroutine_status_yieldable_more` | `coroutine.lua` | Coroutine status transitions around yield/resume plus `coroutine.isyieldable` inside and outside a coroutine. |
 | `coroutine_wrap_basic` | `coroutine.lua` | `coroutine.wrap`, yield/resume values, simple generator. |
+| `coroutine_wrap_sieve_more` | `coroutine.lua` | Coroutine-wrapped generator/filter pipeline for the prime sieve pattern. |
 | `coroutine_yield_resume_values` | `coroutine.lua` | Resume arguments returned from `yield`, generator state. |
 | `errors_assert_pcall` | `errors.lua` | `assert`, `error`, and `pcall` basics. |
 | `errors_common_runtime_failures` | `errors.lua` | Protected common runtime failures: missing math arguments, failed asserts, nil arithmetic, and missing builtin args. |
@@ -78,6 +85,7 @@ Current translated passing cases: 344.
 | `errors_pcall_basic` | `errors.lua` | Protected calls around errors and successful builtins. |
 | `errors_pcall_xpcall_values` | `errors.lua` | `pcall` multi-return/error-object propagation and `xpcall` handlers. |
 | `errors_xpcall_args_more` | `errors.lua` | `xpcall` forwarding arguments to the protected function and handler return-value propagation. |
+| `errors_xpcall_nested_error_more` | `errors.lua` | Nested `xpcall` recovery flow and table-valued message handler transformation. |
 | `events_arith_compare` | `events.lua` | Arithmetic metamethod basics. |
 | `events_call_levels` | `events.lua` | Several levels of `__call` delegation. |
 | `events_compare_metamethods` | `events.lua` | VM comparison metamethod dispatch for `__lt`, `__le`, and `__eq`, including reversed `>`/`>=` forms. |
@@ -111,8 +119,10 @@ Current translated passing cases: 344.
 | `literals_strings_basic` | `literals.lua`, `strings.lua` | Basic string literal behavior that maps to GScript escapes. |
 | `literals_long_brackets_more` | `literals.lua` | Long-bracket string delimiter edge cases translated to equivalent literal values. |
 | `literals_long_string_more` | `literals.lua` | Long string literal length and substring checks over a 960-byte literal. |
+| `literals_control_escapes_more` | `literals.lua` | Control-character, decimal, NUL, and hexadecimal string escape semantics translated to equivalent byte values. |
 | `locals_scope` | `locals.lua` | Nil locals, local shadowing, scope checks. |
 | `locals_basic_more` | `locals.lua` | Local nil assignment/returns, multiple nil returns, and nested local shadowing checks. |
+| `locals_repeat_shadow_more2` | `locals.lua` | Parameter nil assignment, nested local shadowing, branch-local bindings, and repeat-loop shadowed locals. |
 | `math_floor_power` | `math.lua` | Numeric literals, floor-equivalent checks, negative powers. |
 | `math_floor_ceil_minmax` | `math.lua` | `floor`, `ceil`, `max`, and `min` stable cases. |
 | `math_float_notation_coercion` | `math.lua` | Basic float notation and arithmetic coercion from numeric strings. |
@@ -213,9 +223,12 @@ Current translated passing cases: 344.
 | `pm_malformed_pattern_errors_more` | `pm.lua` | Malformed pattern inputs for unfinished captures and malformed character classes raise errors. |
 | `sort_custom_comparator` | `sort.lua` | VM-closure comparators for descending sort, empty arrays, equal elements, and string ordering checks. |
 | `sort_invalid_order_function` | `sort.lua` | `table.sort` does not call comparators for empty ranges and rejects inconsistent order functions. |
+| `sort_binary_string_order_more` | `sort.lua` | Default `table.sort` byte ordering over strings including an embedded-NUL prefix. |
 | `sort_metatable_lt_more` | `sort.lua` | Default `table.sort` ordering through element `__lt` metamethods. |
+| `sort_len_noninteger_more` | `sort.lua` | `__len` metamethods returning non-integer and negative values, including empty negative-length sort. |
 | `sort_order` | `sort.lua` | Default `table.sort` over permutations. |
 | `sort_permutation_more` | `sort.lua` | Additional recursive permutation sorting over 4- and 5-element arrays, including duplicate values. |
+| `sort_reverse_closure_more` | `sort.lua` | Reverse `table.sort` comparator closure with mutable comparison counter. |
 | `sort_table_insert_errors` | `sort.lua` | `table.insert` wrong-arity and bad-table argument errors. |
 | `sort_pack_unpack` | `sort.lua` | `table.pack` nil/count behavior. |
 | `sort_pack_nil_counts_more` | `sort.lua` | Additional `table.pack` count preservation across interior and trailing nil arguments. |
@@ -277,6 +290,8 @@ Current translated passing cases: 344.
 | `utf8_offset_len_errors` | `utf8.lua` | `utf8.offset` and indexed `utf8.len` position bounds and continuation-byte errors. |
 | `utf8_validation_helpers_more` | `utf8.lua` | Go-style structured UTF-8 validation diagnostics and non-strict sanitization helpers over invalid edge sequences. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
+| `vararg_call_unpack_more` | `vararg.lua` | `table.unpack`-driven call forwarding, explicit nil-count handling, fixed-parameter adjustment, and vararg builtin dispatch. |
+| `vararg_method_recursive_more` | `vararg.lua` | Method-call vararg indexing plus recursive vararg forwarding through nested one-less helpers. |
 | `vararg_pack` | `calls.lua`, `vararg.lua` | Vararg count, `table.pack`, forwarding. |
 | `vararg_select` | `vararg.lua` | Positive-index `select` and protected out-of-range calls. |
 | `vararg_tail_missing_args` | `vararg.lua` | Tail-call forwarding with missing arguments preserves nil and later returned values. |
@@ -288,6 +303,7 @@ Audit-added coverage not yet folded into the main table above:
 | `code_explicit_spread_more` | `code.lua`, `db.lua` | GScript explicit `spread(expr)` and `table.spread` expansion in call arguments and table constructors. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
+| `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 
 Next recommended conversion order:

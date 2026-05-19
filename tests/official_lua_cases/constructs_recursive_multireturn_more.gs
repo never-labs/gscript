@@ -1,0 +1,21 @@
+print("case:constructs_recursive_multireturn_more")
+
+func f(i) {
+  if type(i) != "number" { return i, "jojo" }
+  if i > 0 { return i, f(i - 1) }
+}
+
+x := {f(3), f(5), f(10)}
+assert(x[1] == 3 && x[2] == 5 && x[3] == 10 && x[4] == 9 && x[12] == 1)
+assert(x[nil] == nil)
+
+x = {f("alo"), f("xixi"), nil}
+assert(x[1] == "alo" && x[2] == "xixi" && x[3] == nil)
+
+x = {f("alo") .. "xixi"}
+assert(x[1] == "aloxixi")
+
+x = {f({})}
+assert(x[2] == "jojo" && type(x[1]) == "table")
+
+print("ok")
