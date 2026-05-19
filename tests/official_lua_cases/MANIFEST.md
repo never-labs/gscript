@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 289.
+Current translated passing cases: 294.
 
 | Case | Official source area | Notes |
 |---|---|---|
