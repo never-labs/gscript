@@ -349,7 +349,7 @@ func matchCopyPrefixBody(body *Block, bodySet map[int]bool, idx *Value) (copyPre
 		}
 		switch instr.Op {
 		case OpTableArrayLoad:
-			if len(instr.Args) != 3 || instr.Aux != int64(vm.FBKindInt) || !sameSSAValue(instr.Args[2], idx) {
+			if len(instr.Args) < 3 || instr.Aux != int64(vm.FBKindInt) || !sameSSAValue(instr.Args[2], idx) {
 				return match, false
 			}
 			if load != nil {
@@ -492,7 +492,7 @@ func matchReversePrefixBody(body *Block, loPhi, hiPhi *Value) (reversePrefixBody
 			}
 			fusedSwap = instr
 		case OpTableArrayLoad:
-			if len(instr.Args) != 3 || instr.Aux != int64(vm.FBKindInt) {
+			if len(instr.Args) < 3 || instr.Aux != int64(vm.FBKindInt) {
 				return match, false
 			}
 			switch {

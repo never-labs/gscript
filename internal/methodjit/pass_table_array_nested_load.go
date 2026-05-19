@@ -50,7 +50,7 @@ func TableArrayNestedLoadPass(fn *Function) (*Function, error) {
 			if !tableArrayNestedLoadSafeSpan(block, rowLoad, instr) {
 				continue
 			}
-			if uses[rowLoad.ID] != 1 || uses[header.ID] != 2 ||
+			if uses[rowLoad.ID] != 1 || uses[header.ID] < 2 ||
 				uses[data.ID] != 1 || uses[length.ID] != 1 {
 				continue
 			}

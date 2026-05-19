@@ -105,6 +105,7 @@ math.pi          // 3.14159...
 math.huge        // +Inf
 math.abs(-5)     // 5
 math.floor(3.7)  // 3
+math.floorDiv(-7, 3) // -3
 math.ceil(3.2)   // 4
 math.sqrt(16)    // 4.0
 math.pow(2, 10)  // 1024

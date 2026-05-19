@@ -726,7 +726,7 @@ func TestTableArrayLower_TableArrayLoadKeepsNonNegativeKeyFact(t *testing.T) {
 	fn := &Function{Proto: &vm.FuncProto{Name: "table_array_nonneg_key"}, NumRegs: 2}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
-	key := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 0, Block: b}
+	key := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 1, Block: b}
 	get := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeInt, Aux2: int64(vm.FBKindInt),
 		Args: []*Value{tbl.Value(), key.Value()}, Block: b}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{get.Value()}, Block: b}
@@ -762,6 +762,27 @@ func TestTableArrayLower_TableArrayLoadKeepsNonNegativeKeyFact(t *testing.T) {
 	}
 	if !fn.IntNonNegative[load.Args[2].ID] {
 		t.Fatalf("lowered TableArrayLoad key should retain non-negative fact")
+	}
+}
+
+func TestTableArrayLower_SkipsPossibleUnsetTypedNumericZeroAnyLoad(t *testing.T) {
+	fn := &Function{Proto: &vm.FuncProto{Name: "table_array_zero_any"}, NumRegs: 1}
+	b := &Block{ID: 0, defs: make(map[int]*Value)}
+	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
+	key := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 0, Block: b}
+	get := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeAny, Aux2: int64(vm.FBKindInt),
+		Args: []*Value{tbl.Value(), key.Value()}, Block: b}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{get.Value()}, Block: b}
+	b.Instrs = []*Instr{tbl, key, get, ret}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+
+	out, err := TableArrayLowerPass(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if get.Op != OpGetTable {
+		t.Fatalf("possible unset typed numeric key 0 should stay generic:\n%s", Print(out))
 	}
 }
 

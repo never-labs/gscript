@@ -1966,6 +1966,7 @@ func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults i
 	lastArgIsMulti := false
 	for i, arg := range call.Args {
 		argReg := c.allocReg()
+		savedArgTop := c.nextReg
 		if _, ok := arg.(*ast.VarArgExpr); ok && i == nArgs-1 {
 			lastArgIsMulti = true
 			c.emitABC(OP_VARARG, argReg, 0, 0, line)
@@ -1984,6 +1985,7 @@ func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults i
 			if err := c.compileExprTo(arg, argReg); err != nil {
 				return err
 			}
+			c.nextReg = savedArgTop
 		}
 	}
 
@@ -2113,6 +2115,7 @@ func (c *compiler) compileCoroutineBuiltinCall(call *ast.CallExpr, dest int, nRe
 	lastArgIsMulti := false
 	for i, arg := range call.Args {
 		argReg := c.allocReg()
+		savedArgTop := c.nextReg
 		if i == nArgs-1 {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
@@ -2136,6 +2139,7 @@ func (c *compiler) compileCoroutineBuiltinCall(call *ast.CallExpr, dest int, nRe
 		if err := c.compileExprTo(arg, argReg); err != nil {
 			return err
 		}
+		c.nextReg = savedArgTop
 	}
 
 	b := nArgs + 1
@@ -2174,6 +2178,7 @@ func (c *compiler) compileMethodCallExprMulti(call *ast.MethodCallExpr, dest int
 	lastArgIsMulti := false
 	for i, arg := range call.Args {
 		argReg := c.allocReg()
+		savedArgTop := c.nextReg
 		if i == nArgs-1 {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
@@ -2197,6 +2202,7 @@ func (c *compiler) compileMethodCallExprMulti(call *ast.MethodCallExpr, dest int
 		if err := c.compileExprTo(arg, argReg); err != nil {
 			return err
 		}
+		c.nextReg = savedArgTop
 	}
 
 	b := nArgs + 2

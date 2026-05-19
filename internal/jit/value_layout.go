@@ -66,18 +66,19 @@ const (
 	FieldPolyCacheEntryOffShapeID  = 8  // uint32
 
 	// Type-specialized array fields (added at end of Table struct)
-	TableOffArrayKind     = 137 // ArrayKind (uint8)
-	TableOffShapeID       = 140 // uint32 — shape identifier for field cache validation
-	TableOffShape         = 216 // *Shape (pointer, 8 bytes)
-	TableOffIntArray      = 144 // []int64 slice header (ptr+len+cap = 24 bytes)
-	TableOffIntArrayLen   = 152 // intArray slice len field (8 bytes after data ptr)
-	TableOffIntArrayCap   = 160 // intArray slice cap field
-	TableOffFloatArray    = 168 // []float64 slice header (ptr+len+cap = 24 bytes)
-	TableOffFloatArrayLen = 176 // floatArray slice len field (168 + 8)
-	TableOffFloatArrayCap = 184 // floatArray slice cap field
-	TableOffBoolArray     = 192 // []byte slice header (ptr+len+cap = 24 bytes)
-	TableOffBoolArrayLen  = 200 // boolArray slice len field (192 + 8)
-	TableOffBoolArrayCap  = 208 // boolArray slice cap field
+	TableOffArrayKind      = 137 // ArrayKind (uint8)
+	TableOffArrayZeroValid = 138 // bool — key 0 was explicitly written for int/float typed arrays
+	TableOffShapeID        = 140 // uint32 — shape identifier for field cache validation
+	TableOffShape          = 216 // *Shape (pointer, 8 bytes)
+	TableOffIntArray       = 144 // []int64 slice header (ptr+len+cap = 24 bytes)
+	TableOffIntArrayLen    = 152 // intArray slice len field (8 bytes after data ptr)
+	TableOffIntArrayCap    = 160 // intArray slice cap field
+	TableOffFloatArray     = 168 // []float64 slice header (ptr+len+cap = 24 bytes)
+	TableOffFloatArrayLen  = 176 // floatArray slice len field (168 + 8)
+	TableOffFloatArrayCap  = 184 // floatArray slice cap field
+	TableOffBoolArray      = 192 // []byte slice header (ptr+len+cap = 24 bytes)
+	TableOffBoolArrayLen   = 200 // boolArray slice len field (192 + 8)
+	TableOffBoolArrayCap   = 208 // boolArray slice cap field
 	// R43 Phase 2 DenseMatrix descriptor fields.
 	TableOffDMFlat            = 224 // unsafe.Pointer — flat backing head
 	TableOffDMStride          = 232 // int32 — row stride (columns)
@@ -215,6 +216,9 @@ func init() {
 	}
 	if baOff != TableOffBoolArray {
 		panic("jit: Table.boolArray offset mismatch: expected " + itoa(TableOffBoolArray) + ", got " + itoa(int(baOff)))
+	}
+	if zeroOff := runtime.TableArrayZeroValidOffset(); zeroOff != TableOffArrayZeroValid {
+		panic("jit: Table.arrayZeroValid offset mismatch: expected " + itoa(TableOffArrayZeroValid) + ", got " + itoa(int(zeroOff)))
 	}
 	imapOff, hashOff := runtime.TableMapOffsets()
 	if imapOff != TableOffImap {

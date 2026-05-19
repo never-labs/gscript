@@ -74,6 +74,18 @@ func buildMathLib() *Table {
 		}
 	}
 
+	// math.floorDiv(a, b) -> int|float
+	set("floorDiv", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'math.floorDiv'")
+		}
+		v, err := mathFloorDivValue(args[0], args[1])
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	})
+
 	// math.sqrt(x)
 	set("sqrt", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -444,6 +456,26 @@ func mathFloorValue(arg Value) Value {
 		return FloatValue(f)
 	}
 	return IntValue(int64(f))
+}
+
+func mathFloorDivValue(a, b Value) (Value, error) {
+	if (b.IsInt() && b.Int() == 0) || (!b.IsInt() && toFloat(b) == 0) {
+		return NilValue(), fmt.Errorf("bad argument #2 to 'math.floorDiv' (zero)")
+	}
+	if a.IsInt() && b.IsInt() {
+		ai := a.Int()
+		bi := b.Int()
+		if ai == math.MinInt64 && bi == -1 {
+			return FloatValue(math.Floor(float64(ai) / float64(bi))), nil
+		}
+		q := ai / bi
+		r := ai % bi
+		if r != 0 && ((r < 0) != (bi < 0)) {
+			q--
+		}
+		return IntValue(q), nil
+	}
+	return mathFloorValue(FloatValue(toFloat(a) / toFloat(b))), nil
 }
 
 func mathCeilValue(arg Value) Value {

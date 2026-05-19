@@ -101,6 +101,35 @@ func TestMathTrunc(t *testing.T) {
 	}
 }
 
+func TestMathFloorDiv(t *testing.T) {
+	interp := runProgram(t, `
+		a := math.floorDiv(7, 3)
+		b := math.floorDiv(-7, 3)
+		c := math.floorDiv(7, -3)
+		d := math.floorDiv(-7, -3)
+		e := math.floorDiv(7.5, 2)
+	`)
+	tests := map[string]int64{
+		"a": 2,
+		"b": -3,
+		"c": -3,
+		"d": 2,
+		"e": 3,
+	}
+	for name, want := range tests {
+		got := interp.GetGlobal(name)
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("%s = %v, want %d", name, got, want)
+		}
+	}
+}
+
+func TestMathFloorDivByZero(t *testing.T) {
+	if err := runProgramExpectError(t, `result := math.floorDiv(1, 0)`); err == nil {
+		t.Fatal("expected floorDiv by zero error")
+	}
+}
+
 func TestMathHypot(t *testing.T) {
 	interp := runProgram(t, `
 		a := math.hypot(3, 4)

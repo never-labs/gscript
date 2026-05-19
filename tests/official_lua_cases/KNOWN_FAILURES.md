@@ -6,16 +6,12 @@ should be fixed before translating dependent slices.
 
 | Area | Current gap |
 |---|---|
-| Floor division | GScript lexes `//` as a line comment, so Lua floor-division slices need syntax support or a faithful translated helper. |
-| Numeric table key `0` | Fixed for newly allocated mixed array tables; still needs broader regression coverage across typed/dense table paths. |
-| Typed numeric table key `0` | Dense typed int arrays can still return numeric zero for an unset `t[0]`; seen while translating `constructs.lua` loop-table checks. |
 | Pattern escape compatibility | GScript string literals now support Go-style control, hex, Unicode, and decimal byte escapes; translated Lua pattern slices still need case-by-case mapping to GScript string/regexp semantics. |
 | Nested multireturn in file mode | `table.unpack(a)` or `string.byte(...)` nested under another call/table constructor can collapse differently when loaded from a `.gs` file. |
 | Table constructors with recursive multireturns | Official `constructs.lua` cases like `{f(3), f(5), f(10)}` do not yet match Lua in `.gs` file mode. |
 | Parenthesized call adjustment | Lua adjusts `(f())` to one result; GScript probes returned multiple values. |
 | Tail-call vararg forwarding with values | Empty vararg tail forwarding passes; forwarding real arguments through a tail-call wrapper failed in `.gs` file mode. |
 | Inline function literals in file mode | Some inline function literals passed to `pcall`, `table.sort`, or higher-order functions resolve differently from named functions. |
-| Inline table literals as function args in file mode | `table.move({ ... }, ...)` and some `table.unpack({ ... })` call sites differ from assigning the table to a local first. |
 | `table.sort` comparator in file mode | Passing a comparator function to `table.sort` from a translated file can hit a nil-function path. |
 | Dynamic metatable construction in loops | A direct `setmetatable({i}, {__call = u})`-style translation required explicit local tables in `.gs` file mode. |
 | `__call` delegation returning varargs | Chained `__call` invocation count works, but returned vararg table contents differed in `.gs` file mode. |

@@ -458,6 +458,10 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		asm.CMPreg(jit.X1, lenReg)
 		asm.BCond(jit.CondGE, deoptLabel)
 	}
+	if tableArrayLoadNeedsZeroValidGuard(instr) && !ec.tableArrayKeyKnownNonZero(keyID) {
+		asm.CMPimm(jit.X1, 0)
+		asm.BCond(jit.CondEQ, deoptLabel)
+	}
 
 	switch instr.Aux {
 	case int64(vm.FBKindMixed):
@@ -933,6 +937,27 @@ func tableArrayLoadScratchClobbers(reg jit.Reg) bool {
 	}
 }
 
+func tableArrayLoadNeedsZeroValidGuard(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	return instr.Aux == int64(vm.FBKindInt) || instr.Aux == int64(vm.FBKindFloat)
+}
+
+func tableArrayLoadHeaderValue(instr *Instr) (*Value, bool) {
+	if instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil {
+		return nil, false
+	}
+	if len(instr.Args) >= 4 && instr.Args[3] != nil {
+		return instr.Args[3], true
+	}
+	data := instr.Args[0].Def
+	if data == nil || data.Op != OpTableArrayData || len(data.Args) < 1 || data.Args[0] == nil {
+		return nil, false
+	}
+	return data.Args[0], true
+}
+
 func (ec *emitContext) emitTableArrayKeyToReg(key *Value, deoptLabel string) bool {
 	if key == nil {
 		return false
@@ -974,11 +999,11 @@ func tableArrayLoadTableValue(instr *Instr) (*Value, bool) {
 	if instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil {
 		return nil, false
 	}
-	data := instr.Args[0].Def
-	if data == nil || data.Op != OpTableArrayData || len(data.Args) < 1 || data.Args[0] == nil {
+	headerValue, ok := tableArrayLoadHeaderValue(instr)
+	if !ok {
 		return nil, false
 	}
-	header := data.Args[0].Def
+	header := headerValue.Def
 	if header == nil || header.Op != OpTableArrayHeader || len(header.Args) < 1 || header.Args[0] == nil {
 		return nil, false
 	}
@@ -1040,6 +1065,17 @@ func (ec *emitContext) tableArrayLowerBoundSafe(id int) bool {
 		return false
 	}
 	return ec.fn.TableArrayLowerBoundSafe[id]
+}
+
+func (ec *emitContext) tableArrayKeyKnownNonZero(id int) bool {
+	if kv, ok := ec.constInts[id]; ok {
+		return kv != 0
+	}
+	if ec.fn == nil || ec.fn.IntRanges == nil {
+		return false
+	}
+	r, ok := ec.fn.IntRanges[id]
+	return ok && r.known && (r.min > 0 || r.max < 0)
 }
 
 func (ec *emitContext) recordTableArrayBoundedKey(instr *Instr) {
@@ -1348,6 +1384,12 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 	asm.LDR(jit.X2, jit.X0, jit.TableOffIntArrayLen) // intArray.len
 	asm.CMPreg(jit.X1, jit.X2)
 	asm.BCond(jit.CondGE, deoptLabel)
+	asm.CMPimm(jit.X1, 0)
+	nonZeroIntKeyLabel := ec.uniqueLabel("gettable_int_nonzero")
+	asm.BCond(jit.CondNE, nonZeroIntKeyLabel)
+	asm.LDRB(jit.X3, jit.X0, jit.TableOffArrayZeroValid)
+	asm.CBZ(jit.X3, deoptLabel)
+	asm.Label(nonZeroIntKeyLabel)
 	asm.LDR(jit.X2, jit.X0, jit.TableOffIntArray) // intArray data pointer
 	asm.LDRreg(jit.X0, jit.X2, jit.X1)            // raw int64 = intArray[key]
 	if instr.Type == TypeInt {
@@ -1364,6 +1406,12 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 	asm.LDR(jit.X2, jit.X0, jit.TableOffFloatArrayLen) // floatArray.len
 	asm.CMPreg(jit.X1, jit.X2)
 	asm.BCond(jit.CondGE, deoptLabel)
+	asm.CMPimm(jit.X1, 0)
+	nonZeroFloatKeyLabel := ec.uniqueLabel("gettable_float_nonzero")
+	asm.BCond(jit.CondNE, nonZeroFloatKeyLabel)
+	asm.LDRB(jit.X3, jit.X0, jit.TableOffArrayZeroValid)
+	asm.CBZ(jit.X3, deoptLabel)
+	asm.Label(nonZeroFloatKeyLabel)
 	asm.LDR(jit.X2, jit.X0, jit.TableOffFloatArray) // floatArray data pointer
 	if instr.Type == TypeFloat {
 		asm.FLDRdReg(jit.D0, jit.X2, jit.X1) // raw float64 = floatArray[key]

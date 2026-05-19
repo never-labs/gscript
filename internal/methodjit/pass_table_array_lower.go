@@ -11,7 +11,7 @@ import (
 //	hdr  = TableArrayHeader(t)  // table/metatable/kind guard
 //	len  = TableArrayLen(hdr)
 //	data = TableArrayData(hdr)
-//	val  = TableArrayLoad(data, len, key)
+//	val  = TableArrayLoad(data, len, key[, hdr])
 //
 // Header/len/data are pure SSA values after the guard, so the existing
 // LoadElimination and LICM passes can reuse or hoist them in read-only loops.
@@ -51,7 +51,7 @@ func TableArrayLowerPass(fn *Function) (*Function, error) {
 
 			newInstrs = append(newInstrs, header, length, data)
 			instr.Op = OpTableArrayLoad
-			instr.Args = []*Value{data.Value(), length.Value(), key}
+			instr.Args = []*Value{data.Value(), length.Value(), key, header.Value()}
 			instr.Aux = kind
 			instr.Aux2 = 0
 			if typ, ok := tableArrayKindElementType(kind); ok {
@@ -122,7 +122,35 @@ func tableArrayLowerableGetTable(fn *Function, instr *Instr) bool {
 		}
 		instr.Aux2 = kind
 	}
+	if tableArrayNumericZeroLoadNeedsGenericPath(instr) {
+		blockID := -1
+		if instr.Block != nil {
+			blockID = instr.Block.ID
+		}
+		functionRemarks(fn).Add("TableArrayLower", "missed", blockID, instr.ID, instr.Op,
+			"possible typed numeric key-0 nil requires generic table load")
+		return false
+	}
 	return true
+}
+
+func tableArrayNumericZeroLoadNeedsGenericPath(instr *Instr) bool {
+	if instr == nil || len(instr.Args) < 2 {
+		return false
+	}
+	if instr.Type != TypeAny || !tableArrayKeyKnownZero(instr.Args[1]) {
+		return false
+	}
+	switch instr.Aux2 {
+	case int64(vm.FBKindMixed), int64(vm.FBKindInt), int64(vm.FBKindFloat):
+		return true
+	default:
+		return false
+	}
+}
+
+func tableArrayKeyKnownZero(key *Value) bool {
+	return key != nil && key.Def != nil && key.Def.Op == OpConstInt && key.Def.Aux == 0
 }
 
 func tableAccessKeyReadyForArrayLowering(fn *Function, instr *Instr) bool {

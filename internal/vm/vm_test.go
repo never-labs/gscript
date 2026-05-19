@@ -1127,6 +1127,19 @@ func TestExplicitTableSpreadNestedCall(t *testing.T) {
 	}
 }
 
+func TestInlineTableLiteralCallArgsStayContiguous(t *testing.T) {
+	g := compileAndRun(t, `
+		a := table.move({10, 20, 30}, 1, 3, 2)
+	`)
+	tbl := g["a"].Table()
+	for i, want := range []int64{10, 10, 20, 30} {
+		got := tbl.RawGet(runtime.IntValue(int64(i + 1)))
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("a[%d] = %v, want %d", i+1, got, want)
+		}
+	}
+}
+
 func TestExplicitSpreadTableConstructor(t *testing.T) {
 	g := compileAndRun(t, `
 		func pair() { return 2, 3 }

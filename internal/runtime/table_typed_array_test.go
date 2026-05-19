@@ -329,6 +329,32 @@ func TestNewTableSizedKindPreallocatesTypedArray(t *testing.T) {
 	}
 }
 
+func TestArrayKindTypedNumericUnsetZeroReturnsNil(t *testing.T) {
+	cases := []struct {
+		name string
+		kind ArrayKind
+		set  Value
+	}{
+		{name: "int", kind: ArrayInt, set: IntValue(7)},
+		{name: "float", kind: ArrayFloat, set: FloatValue(7.5)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tbl := NewTableSizedKind(8, 0, tc.kind)
+			tbl.RawSetInt(1, tc.set)
+			if got := tbl.RawGetInt(0); !got.IsNil() {
+				t.Fatalf("RawGetInt(0) = %v, want nil", got)
+			}
+			if got := tbl.RawGet(IntValue(0)); !got.IsNil() {
+				t.Fatalf("RawGet(IntValue(0)) = %v, want nil", got)
+			}
+			if k, _, ok := tbl.Next(NilValue()); !ok || !k.IsInt() || k.Int() != 1 {
+				t.Fatalf("first Next key = %v ok=%v, want integer key 1", k, ok)
+			}
+		})
+	}
+}
+
 func TestArrayKindOverwrite(t *testing.T) {
 	// Overwriting same-type value should stay specialized
 	tbl := NewTable()
