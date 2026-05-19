@@ -25,6 +25,7 @@ type FuncProto struct {
 	TableCtors2                  []TableCtor2                       // static two-field table constructors
 	TableCtorsN                  []TableCtorN                       // static small string-field table constructors
 	Upvalues                     []UpvalDesc                        // upvalue descriptors
+	ReadOnlyLocals               map[int]string                     // local register -> binding name for const checks
 	Protos                       []*FuncProto                       // nested function prototypes
 	LineInfo                     []int                              // source line for each instruction (debug)
 	GlobalCache                  []globalCacheEntry                 // lazily-initialized cache indexed by constant pool index
@@ -153,7 +154,8 @@ type UpvalDesc struct {
 	Name    string // variable name (for debugging)
 	InStack bool   // true: capture from enclosing function's register at Index
 	// false: capture from enclosing function's upvalue at Index
-	Index int // register index (if InStack) or upvalue index in parent
+	Index    int  // register index (if InStack) or upvalue index in parent
+	ReadOnly bool // true when the captured binding rejects reassignment
 }
 
 // Closure is a bytecode closure: a FuncProto paired with captured upvalues.
@@ -254,4 +256,10 @@ type CallFrame struct {
 	resultBase  int             // register in parent frame where results should be placed (for inline return)
 	resultCount int             // C parameter from caller's OP_CALL (0 = return all; for inline return)
 	callSitePC  int             // caller OP_CALL pc for result feedback (-1 when not a bytecode call)
+	defers      []deferredVMCall
+}
+
+type deferredVMCall struct {
+	fn   runtime.Value
+	args []runtime.Value
 }

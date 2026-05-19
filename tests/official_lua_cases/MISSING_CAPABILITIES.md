@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 342 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 343 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures，但这里保留“能力候选/设计缺口”作为后续
 实现队列。
 
@@ -15,12 +15,12 @@
 - `code_explicit_spread_more`: 显式 `spread(expr)` / `table.spread` 在调用参数和表构造中的展开。
 - `db_gscript_diagnostics_more`: `debug.info(function)` 和 `debug.value` 的文件模式 VM 可用性。
 - `main_script_process_more`: `script.eval`/`script.compile` 环境注入，以及 `process.setArgs`/`process.args`/`process.entry`。
+- `attrib_const_defer_gscript`: VM compiler 对 Go-style `const` 只读 binding 与 `defer` LIFO cleanup 的支持，覆盖错误路径 drain。
 
 真正仍需补齐或明确设计取舍的缺口：
 
 | 缺口 | 当前状态 | 建议设计 |
 |---|---|---|
-| VM compiler 对 `const` / `defer` 的支持 | parser 和 runtime/interpreter 已有能力，runtime tests 通过；但 `internal/vm/compiler.go` 还没有 `ConstDeclStmt` / `DeferStmt` 编译分支，因此不能加入官方 VM passing case。 | 按 Go 直觉补 VM lowering：`const` 编译为只读局部/全局绑定检查；`defer` 编译为函数/顶层 frame 的 LIFO cleanup 栈，并在 return/error path 统一 drain。 |
 | VM 文件模式 debug 栈诊断完整性 | runtime/interpreter 已覆盖 `debug.stack`、`debug.traceback`、`debug.info(level)`、hook/sink；本轮发现 VM 文件模式下函数名/source/frame/hook 信息仍只能做较弱断言。 | 让 VM frame 带稳定 sourceName、line/column、function name，并把 call/return/error/emit hook 统一接入 VM 执行路径。 |
 
 | 能力候选 | 来源片段 | 说明 |
@@ -34,7 +34,7 @@
 | 精细错误位置与 token 诊断 | `errors.lua`: syntax/runtime line checks and token-message checks | 已补 `SourceError` 包装 lexer/parser/runtime 错误，稳定输出 `source:line:column: error` 形态并支持 Go `errors.As` 解包；lexer/parser 保留字符或 token 类型/文本，错误文案保持 GScript 风格。 |
 | `assert` 非字符串失败载荷 | `errors.lua`: `pcall(assert, false, t)` | 已支持：`assert(false, value)` 会把任意 GScript 值作为失败载荷交给 `pcall`/`xpcall`，不是字符串化后再传播。 |
 | Label-directed control flow | `goto.lua`: labels, forward/backward jumps, repeated-label diagnostics, local-scope jumps | 已补 Go-style `label:` + `goto label`。标签为函数内唯一名称；允许向前/向后跳转和跳出嵌套 block/loop；禁止跳入更深 block 或跳过同一 block 内 local/function 声明。解释器和 VM 使用同一套静态校验。 |
-| Local variable attributes | `constructs.lua`, `locals.lua`: `<const>`, `<close>` | 已补 Go-style `const name := expr` / `const name = expr` 只读绑定，以及 `defer call(...)` / `defer obj:method(...)` 资源清理能力；const 禁止重绑定但不冻结表内部状态，不复刻 Lua `<const>`/`<close>` 语法。当前覆盖主要在 runtime/interpreter，VM compiler parity 仍在上方缺口表跟踪。 |
+| Local variable attributes | `constructs.lua`, `locals.lua`: `<const>`, `<close>` | 已补 Go-style `const name := expr` / `const name = expr` 只读绑定，以及 `defer call(...)` / `defer obj:method(...)` 资源清理能力；const 禁止重绑定但不冻结表内部状态，不复刻 Lua `<const>`/`<close>` 语法。runtime/interpreter 与 VM compiler 均有 focused tests，官方翻译集以 GScript 风格 case 覆盖 VM 文件模式。 |
 | Lexical environment injection | `locals.lua`: `_ENV`, `load(..., env)`, environment upvalues | 已补 GScript 风格 `script.env(table)` / `script.sandbox(table)`，用于 `script.compile`/`script.eval`/`script.loadFile`/`script.runFile` 的显式环境注入；不复刻 Lua `_ENV` 隐式 upvalue 机制。 |
 | GC finalizer tracing and runner-integrated progress output | `tracegc.lua`: table `__gc`, repeated remarking for finalization, `io.stderr` progress writes; `all.lua`: `require"tracegc".start()` | 已补 Go runtime 风格 `collectgarbage("stats")`，返回 alloc/sys/heapObjects/numGC/rootLog/running/mode 诊断表，供 runner 和测试观测 GC 状态；对象 finalizer 调度不按 Lua `__gc` 复刻，资源清理由 GScript `defer` 承担。 |
 | UTF-8 strict/nonstrict validation helpers | `utf8.lua`: invalid byte sequences, non-strict decoding edge cases | 已补 `utf8.validate(s)` 结构化诊断和 `utf8.sanitize(s [, replacement])` 非严格清洗 API。严格路径继续由 `utf8.valid`/`utf8.len`/`utf8.codepoint`/`utf8.codes` 使用 Go `unicode/utf8` 规则；非严格路径显式 opt-in，不复刻 Lua 内部 nonstrict 参数形态。 |

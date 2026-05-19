@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 342.
+Current translated passing cases: 343.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -34,6 +34,7 @@ Current translated passing cases: 342.
 | `bitwise_bit32_varargs` | `bitwise.lua` | `bit32` empty and multi-argument `band`/`bor`/`bxor`/`btest` defaults. |
 | `bitwise_bit32_wrap_more` | `bitwise.lua` | Additional `bit32.band` wrapping for positive and negative values around 2^33 and 2^40. |
 | `api_testkit_runtime_diagnostics` | `api.lua` | GScript `testkit` replacement for Lua's private C API test library: memory snapshots/checks, value inspection, protected calls, and function identity. |
+| `attrib_const_defer_gscript` | `locals.lua`, `constructs.lua` | GScript Go-style `const` readonly binding checks and `defer` LIFO cleanup on error; intentionally not Lua `<const>/<close>` syntax. |
 | `calls_anonymous_invocation` | `calls.lua` | Immediately invoked anonymous functions and simple multi-return anonymous closures. |
 | `calls_builtin_missing_args` | `calls.lua` | Missing-argument errors for core builtins through protected calls. |
 | `calls_fixedpoint_returns` | `calls.lua` | Fixed-point function calls, closure-returning calls, recursive multi-return unpack. |

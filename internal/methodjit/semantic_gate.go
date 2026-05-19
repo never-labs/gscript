@@ -40,11 +40,16 @@ func jitShouldStayInInterpreter(proto *vm.FuncProto) bool {
 		return false
 	}
 	return proto.Name == "<main>" ||
+		jitUnsupportedVMOnlyControl(proto) ||
 		jitUnsupportedMultiReturn(proto) ||
 		jitUnsupportedClosureArithmetic(proto) ||
 		jitUnsupportedDynamicOperators(proto) ||
 		jitUnsupportedComparisonBranch(proto) ||
 		jitUnsupportedCallBoundary(proto)
+}
+
+func jitRequiresInterpreter(proto *vm.FuncProto) bool {
+	return jitUnsupportedVMOnlyControl(proto)
 }
 
 func jitSemanticGateEnabled() bool {
@@ -85,6 +90,27 @@ func jitUnsupportedCallBoundary(proto *vm.FuncProto) bool {
 	for _, inst := range proto.Code {
 		switch vm.DecodeOp(inst) {
 		case vm.OP_CALL, vm.OP_CALLTABLE, vm.OP_SELF, vm.OP_TFORCALL, vm.OP_TFORLOOP, vm.OP_RESUME, vm.OP_YIELD:
+			return true
+		}
+	}
+	return false
+}
+
+func jitUnsupportedVMOnlyControl(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	if len(proto.ReadOnlyLocals) > 0 {
+		return true
+	}
+	for _, uv := range proto.Upvalues {
+		if uv.ReadOnly {
+			return true
+		}
+	}
+	for _, inst := range proto.Code {
+		switch vm.DecodeOp(inst) {
+		case vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return true
 		}
 	}

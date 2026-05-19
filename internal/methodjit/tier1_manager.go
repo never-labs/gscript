@@ -217,6 +217,9 @@ func (e *BaselineJITEngine) SetOSRHandler(fn func([]runtime.Value, int, *vm.Func
 // TryCompile checks if a function should be baseline-compiled.
 // Returns the compiled function (as interface{}) if available, nil if not ready.
 func (e *BaselineJITEngine) TryCompile(proto *vm.FuncProto) interface{} {
+	if jitRequiresInterpreter(proto) {
+		return nil
+	}
 	if jitSemanticGateEnabled() && jitShouldStayInInterpreter(proto) {
 		return nil
 	}

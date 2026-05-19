@@ -376,6 +376,9 @@ func (tm *TieringManager) getProfile(proto *vm.FuncProto) FuncProfile {
 // density, call patterns) to decide promotion thresholds instead of a simple
 // call count.
 func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
+	if jitRequiresInterpreter(proto) {
+		return nil
+	}
 	if jitSemanticGateEnabled() && jitShouldStayInInterpreter(proto) {
 		return nil
 	}

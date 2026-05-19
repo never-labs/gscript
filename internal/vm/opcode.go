@@ -81,12 +81,15 @@ const (
 	OP_SEND     // A B : R(A) <- R(B)
 	OP_RECV     // A B : R(A) = <-R(B)
 
-	OP_NEWOBJECTN // A B C : R(A) = small string table, ctor=B, values starting at R(C)
-	OP_YIELD      // A B C : coroutine.yield(R(A+1)..R(A+B-1)); result convention matches CALL
-	OP_RESUME     // A B C : coroutine.resume(R(A+1)..R(A+B-1)); result convention matches CALL
-	OP_SETLISTDYN // A B C : R(A)[R(B)..] = R(C)..top-1; R(B) += count
-	OP_CALLTABLE  // A B C : R(A).. = R(A)(R(B)[1..R(B).n]); C matches CALL result convention
-	OP_SETTOP     // A     : top = R(A)
+	OP_NEWOBJECTN  // A B C : R(A) = small string table, ctor=B, values starting at R(C)
+	OP_YIELD       // A B C : coroutine.yield(R(A+1)..R(A+B-1)); result convention matches CALL
+	OP_RESUME      // A B C : coroutine.resume(R(A+1)..R(A+B-1)); result convention matches CALL
+	OP_SETLISTDYN  // A B C : R(A)[R(B)..] = R(C)..top-1; R(B) += count
+	OP_CALLTABLE   // A B C : R(A).. = R(A)(R(B)[1..R(B).n]); C matches CALL result convention
+	OP_SETTOP      // A     : top = R(A)
+	OP_DEFER       // A B   : defer R(A)(R(A+1)..R(A+B-1)); B=0 use top
+	OP_SETGLOBALRO // A Bx : Globals[Constants[Bx]] = R(A), then mark binding read-only
+	OP_CHECKCONST  // A Bx  : fail if local R(A) binding named Constants[Bx] is read-only
 
 	OP_MAX // sentinel
 )
@@ -171,59 +174,62 @@ func ConstToRK(idx int) int {
 
 // Opcode names for debugging.
 var opNames = [...]string{
-	OP_LOADNIL:    "LOADNIL",
-	OP_LOADBOOL:   "LOADBOOL",
-	OP_LOADINT:    "LOADINT",
-	OP_LOADK:      "LOADK",
-	OP_MOVE:       "MOVE",
-	OP_GETGLOBAL:  "GETGLOBAL",
-	OP_SETGLOBAL:  "SETGLOBAL",
-	OP_GETUPVAL:   "GETUPVAL",
-	OP_SETUPVAL:   "SETUPVAL",
-	OP_NEWTABLE:   "NEWTABLE",
-	OP_NEWOBJECT2: "NEWOBJECT2",
-	OP_NEWOBJECTN: "NEWOBJECTN",
-	OP_GETTABLE:   "GETTABLE",
-	OP_SETTABLE:   "SETTABLE",
-	OP_GETFIELD:   "GETFIELD",
-	OP_SETFIELD:   "SETFIELD",
-	OP_SETLIST:    "SETLIST",
-	OP_APPEND:     "APPEND",
-	OP_ADD:        "ADD",
-	OP_SUB:        "SUB",
-	OP_MUL:        "MUL",
-	OP_DIV:        "DIV",
-	OP_MOD:        "MOD",
-	OP_POW:        "POW",
-	OP_UNM:        "UNM",
-	OP_NOT:        "NOT",
-	OP_LEN:        "LEN",
-	OP_CONCAT:     "CONCAT",
-	OP_EQ:         "EQ",
-	OP_LT:         "LT",
-	OP_LE:         "LE",
-	OP_TEST:       "TEST",
-	OP_TESTSET:    "TESTSET",
-	OP_JMP:        "JMP",
-	OP_CALL:       "CALL",
-	OP_YIELD:      "YIELD",
-	OP_RESUME:     "RESUME",
-	OP_RETURN:     "RETURN",
-	OP_CLOSURE:    "CLOSURE",
-	OP_CLOSE:      "CLOSE",
-	OP_FORPREP:    "FORPREP",
-	OP_FORLOOP:    "FORLOOP",
-	OP_TFORCALL:   "TFORCALL",
-	OP_TFORLOOP:   "TFORLOOP",
-	OP_VARARG:     "VARARG",
-	OP_SELF:       "SELF",
-	OP_GO:         "GO",
-	OP_MAKECHAN:   "MAKECHAN",
-	OP_SEND:       "SEND",
-	OP_RECV:       "RECV",
-	OP_SETLISTDYN: "SETLISTDYN",
-	OP_CALLTABLE:  "CALLTABLE",
-	OP_SETTOP:     "SETTOP",
+	OP_LOADNIL:     "LOADNIL",
+	OP_LOADBOOL:    "LOADBOOL",
+	OP_LOADINT:     "LOADINT",
+	OP_LOADK:       "LOADK",
+	OP_MOVE:        "MOVE",
+	OP_GETGLOBAL:   "GETGLOBAL",
+	OP_SETGLOBAL:   "SETGLOBAL",
+	OP_GETUPVAL:    "GETUPVAL",
+	OP_SETUPVAL:    "SETUPVAL",
+	OP_NEWTABLE:    "NEWTABLE",
+	OP_NEWOBJECT2:  "NEWOBJECT2",
+	OP_NEWOBJECTN:  "NEWOBJECTN",
+	OP_GETTABLE:    "GETTABLE",
+	OP_SETTABLE:    "SETTABLE",
+	OP_GETFIELD:    "GETFIELD",
+	OP_SETFIELD:    "SETFIELD",
+	OP_SETLIST:     "SETLIST",
+	OP_APPEND:      "APPEND",
+	OP_ADD:         "ADD",
+	OP_SUB:         "SUB",
+	OP_MUL:         "MUL",
+	OP_DIV:         "DIV",
+	OP_MOD:         "MOD",
+	OP_POW:         "POW",
+	OP_UNM:         "UNM",
+	OP_NOT:         "NOT",
+	OP_LEN:         "LEN",
+	OP_CONCAT:      "CONCAT",
+	OP_EQ:          "EQ",
+	OP_LT:          "LT",
+	OP_LE:          "LE",
+	OP_TEST:        "TEST",
+	OP_TESTSET:     "TESTSET",
+	OP_JMP:         "JMP",
+	OP_CALL:        "CALL",
+	OP_YIELD:       "YIELD",
+	OP_RESUME:      "RESUME",
+	OP_RETURN:      "RETURN",
+	OP_CLOSURE:     "CLOSURE",
+	OP_CLOSE:       "CLOSE",
+	OP_FORPREP:     "FORPREP",
+	OP_FORLOOP:     "FORLOOP",
+	OP_TFORCALL:    "TFORCALL",
+	OP_TFORLOOP:    "TFORLOOP",
+	OP_VARARG:      "VARARG",
+	OP_SELF:        "SELF",
+	OP_GO:          "GO",
+	OP_MAKECHAN:    "MAKECHAN",
+	OP_SEND:        "SEND",
+	OP_RECV:        "RECV",
+	OP_SETLISTDYN:  "SETLISTDYN",
+	OP_CALLTABLE:   "CALLTABLE",
+	OP_SETTOP:      "SETTOP",
+	OP_DEFER:       "DEFER",
+	OP_SETGLOBALRO: "SETGLOBALRO",
+	OP_CHECKCONST:  "CHECKCONST",
 }
 
 // OpName returns the name of an opcode.

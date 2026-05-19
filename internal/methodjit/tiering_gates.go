@@ -25,8 +25,9 @@ import (
 //   - CLOSURE, GETUPVAL, SETUPVAL: emitOpExit with closure state from VM
 //   - VARARG: emitOpExit with vararg state from VM frame
 //
-// Only goroutine/channel ops are blocked (fundamentally require Go runtime):
+// Only bytecodes that require VM-only control state are blocked:
 //   - GO, MAKECHAN, SEND, RECV
+//   - DEFER, SETGLOBALRO, CHECKCONST
 //
 // CALL is no longer blocked here. Instead, compileTier2 runs the inline pass to
 // eliminate calls, then checks the optimized IR with irHasCall. If calls remain
@@ -37,7 +38,8 @@ func canPromoteToTier2(proto *vm.FuncProto) bool {
 		op := vm.DecodeOp(inst)
 		switch op {
 		// Goroutine/channel ops (not in Tier 2):
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV:
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV,
+			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return false
 		}
 	}
@@ -56,7 +58,8 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 	for _, inst := range proto.Code {
 		op := vm.DecodeOp(inst)
 		switch op {
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV:
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV,
+			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return blockGate("Tier2Bytecode", vm.OpName(op))
 		}
 	}
@@ -86,7 +89,8 @@ func canPromoteToTier2NoCalls(proto *vm.FuncProto) bool {
 		switch op {
 		case vm.OP_CALL:
 			return false
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV:
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV,
+			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return false
 		}
 	}

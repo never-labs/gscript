@@ -68,6 +68,7 @@ type VM struct {
 	globalOverrideIdx  map[int]runtime.Value    // indexed mirror of globalOverrides for GETGLOBAL cache hits
 	globalOverrideFast int                      // single indexed override fast path (-1 = disabled)
 	globalOverrideVal  runtime.Value
+	readOnlyGlobals    map[string]bool
 	globalsMu          *sync.RWMutex  // protects globals for goroutine safety (shared across VMs)
 	noGlobalLock       bool           // skip globals mutex (single-threaded mode)
 	openUpvals         []*Upvalue     // list of open upvalues (sorted by regIdx descending)
@@ -156,6 +157,7 @@ func (vm *VM) PushFrame(cl *Closure, base int) bool {
 	frame.numResults = -1
 	frame.varargs = nil
 	frame.callSitePC = -1
+	frame.defers = nil
 	vm.frameCount++
 	return true
 }
@@ -1043,6 +1045,42 @@ func (vm *VM) executeMethodJIT(compiled interface{}, regs []runtime.Value, base 
 	return vm.methodJIT.Execute(compiled, regs, base, proto)
 }
 
+func (vm *VM) markGlobalReadOnly(name string) {
+	if vm.readOnlyGlobals == nil {
+		vm.readOnlyGlobals = make(map[string]bool)
+	}
+	vm.readOnlyGlobals[name] = true
+}
+
+func (vm *VM) isGlobalReadOnly(name string) bool {
+	return vm.readOnlyGlobals != nil && vm.readOnlyGlobals[name]
+}
+
+func (vm *VM) drainFrameDefers(frame *CallFrame) error {
+	if frame == nil || len(frame.defers) == 0 {
+		return nil
+	}
+	calls := frame.defers
+	frame.defers = nil
+	var firstErr error
+	for i := len(calls) - 1; i >= 0; i-- {
+		if _, err := vm.callValue(calls[i].fn, calls[i].args); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+func (vm *VM) drainActiveDefers(fromFrame int) error {
+	var firstErr error
+	for i := vm.frameCount - 1; i >= fromFrame && i >= 0; i-- {
+		if err := vm.drainFrameDefers(&vm.frames[i]); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
 // call pushes a new call frame and executes.
 func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) ([]runtime.Value, error) {
 	// GC safe point at function entry: all caller's register writes are complete.
@@ -1083,6 +1121,7 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 	frame.numResults = numResults
 	frame.varargs = varargs
 	frame.callSitePC = -1
+	frame.defers = nil
 	vm.frameCount++
 
 	// Method JIT: check for compiled function.
@@ -1150,6 +1189,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 	if !coroutineChild {
 		defer func() {
 			if retErr != nil && retErr != errCoroutineYield {
+				if deferErr := vm.drainActiveDefers(initialFC - 1); deferErr != nil && retErr == nil {
+					retErr = deferErr
+				}
 				vm.frameCount = initialFC
 			}
 		}()
@@ -1163,6 +1205,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 	for {
 		if frame.pc >= len(code) {
 			// End of function - implicit return nil
+			if err := vm.drainFrameDefers(frame); err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
 			vm.closeUpvalues(base)
 			if vm.frameCount <= initialFC {
 				return nil, nil
@@ -1300,6 +1345,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			a := DecodeA(inst)
 			bx := DecodeBx(inst)
 			val := vm.regs[base+a]
+			name := constants[bx].Str()
+			if vm.isGlobalReadOnly(name) {
+				return nil, wrapLineErr(frame, fmt.Errorf("cannot assign to readonly variable %q", name))
+			}
 			if vm.noGlobalLock {
 				// Single-threaded fast path
 				proto := frame.closure.Proto
@@ -1310,7 +1359,6 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 				}
 				cache := &proto.GlobalCache[bx]
-				name := constants[bx].Str()
 				if cache.index >= 0 && cache.version == vm.globalVer {
 					vm.globalArray[cache.index] = val
 				} else {
@@ -1323,7 +1371,6 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				vm.globalValueVer++
 			} else {
 				// Multi-threaded: locked access, update both map and array
-				name := constants[bx].Str()
 				vm.globalsMu.Lock()
 				vm.globals[name] = val
 				if idx, ok := vm.globalIndex[name]; ok {
@@ -1333,6 +1380,45 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				vm.globalsMu.Unlock()
 			}
 
+		case OP_SETGLOBALRO:
+			a := DecodeA(inst)
+			bx := DecodeBx(inst)
+			val := vm.regs[base+a]
+			name := constants[bx].Str()
+			if vm.isGlobalReadOnly(name) {
+				return nil, wrapLineErr(frame, fmt.Errorf("cannot redeclare readonly variable %q", name))
+			}
+			if vm.noGlobalLock {
+				proto := frame.closure.Proto
+				if proto.GlobalCache == nil {
+					proto.GlobalCache = make([]globalCacheEntry, len(proto.Constants))
+					for i := range proto.GlobalCache {
+						proto.GlobalCache[i].index = -1
+					}
+				}
+				cache := &proto.GlobalCache[bx]
+				idx := vm.resolveGlobalIndex(name)
+				cache.index = int32(idx)
+				cache.version = vm.globalVer
+				vm.globalArray[idx] = val
+				vm.globals[name] = val
+				vm.globalValueVer++
+			} else {
+				vm.globalsMu.Lock()
+				vm.globals[name] = val
+				if idx, ok := vm.globalIndex[name]; ok {
+					vm.globalArray[idx] = val
+				} else {
+					idx = len(vm.globalArray)
+					vm.globalIndex[name] = idx
+					vm.globalArray = append(vm.globalArray, val)
+					vm.globalVer++
+				}
+				vm.globalValueVer++
+				vm.globalsMu.Unlock()
+			}
+			vm.markGlobalReadOnly(name)
+
 		case OP_GETUPVAL:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -1341,7 +1427,20 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 		case OP_SETUPVAL:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
+			if b >= 0 && b < len(frame.closure.Proto.Upvalues) && frame.closure.Proto.Upvalues[b].ReadOnly {
+				return nil, wrapLineErr(frame, fmt.Errorf("cannot assign to readonly variable %q", frame.closure.Proto.Upvalues[b].Name))
+			}
 			frame.closure.Upvalues[b].Set(vm.regs[base+a])
+
+		case OP_CHECKCONST:
+			a := DecodeA(inst)
+			bx := DecodeBx(inst)
+			if name, ok := frame.closure.Proto.ReadOnlyLocals[a]; ok {
+				if bx >= 0 && bx < len(constants) && constants[bx].IsString() {
+					name = constants[bx].Str()
+				}
+				return nil, wrapLineErr(frame, fmt.Errorf("cannot assign to readonly variable %q", name))
+			}
 
 		case OP_NEWTABLE:
 			a := DecodeA(inst)
@@ -2183,6 +2282,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						newFrame.resultBase = base + a
 						newFrame.resultCount = c
 						newFrame.callSitePC = callPC
+						newFrame.defers = nil
 						vm.frameCount++
 
 						frame = newFrame
@@ -2283,6 +2383,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				newFrame.resultBase = base + a
 				newFrame.resultCount = c
 				newFrame.callSitePC = callPC
+				newFrame.defers = nil
 				vm.frameCount++
 
 				// Method JIT: check for compiled function
@@ -2422,10 +2523,29 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			observeCallResultSlice(callerProto, callPC, results, c)
 
+		case OP_DEFER:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			nArgs := b - 1
+			if b == 0 {
+				nArgs = vm.top - (base + a + 1)
+			}
+			if nArgs < 0 {
+				nArgs = 0
+			}
+			args := make([]runtime.Value, nArgs)
+			for i := 0; i < nArgs; i++ {
+				args[i] = vm.regs[base+a+1+i]
+			}
+			frame.defers = append(frame.defers, deferredVMCall{fn: vm.regs[base+a], args: args})
+
 		case OP_RETURN:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
 
+			if err := vm.drainFrameDefers(frame); err != nil {
+				return nil, wrapLineErr(frame, err)
+			}
 			vm.closeUpvalues(base)
 
 			// Initial frame return → back to Go caller (call() will pop)
@@ -3042,7 +3162,7 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if payloadReg == a || payloadReg == a+1 {
 				return false
 			}
-		case OP_SETGLOBAL, OP_SETUPVAL, OP_CLOSE, OP_APPEND, OP_SEND:
+		case OP_SETGLOBAL, OP_SETGLOBALRO, OP_SETUPVAL, OP_CLOSE, OP_APPEND, OP_SEND, OP_DEFER, OP_CHECKCONST:
 			if a == payloadReg || b == payloadReg {
 				return false
 			}

@@ -41,6 +41,7 @@ type localVar struct {
 	reg      int
 	depth    int
 	captured bool
+	readOnly bool
 }
 
 type loopInfo struct {
@@ -50,24 +51,26 @@ type loopInfo struct {
 }
 
 type upvalInfo struct {
-	name    string
-	inStack bool
-	index   int
+	name     string
+	inStack  bool
+	index    int
+	readOnly bool
 }
 
 type compiler struct {
-	parent      *compiler
-	proto       *FuncProto
-	locals      []localVar
-	upvals      []upvalInfo
-	nextReg     int
-	maxReg      int
-	depth       int
-	loops       []loopInfo
-	isVarArg    bool
-	labels      map[string]compiledLabel
-	labelDepths map[string]int
-	gotos       []compiledGoto
+	parent         *compiler
+	proto          *FuncProto
+	locals         []localVar
+	upvals         []upvalInfo
+	readOnlyLocals map[int]string
+	nextReg        int
+	maxReg         int
+	depth          int
+	loops          []loopInfo
+	isVarArg       bool
+	labels         map[string]compiledLabel
+	labelDepths    map[string]int
+	gotos          []compiledGoto
 }
 
 type compiledLabel struct {
@@ -164,45 +167,66 @@ func (c *compiler) leaveScope() {
 // --------------------------------------------------------------------
 
 func (c *compiler) addLocal(name string) int {
+	return c.addLocalWithReadOnly(name, false)
+}
+
+func (c *compiler) addLocalWithReadOnly(name string, readOnly bool) int {
 	reg := c.allocReg()
-	c.locals = append(c.locals, localVar{name: name, reg: reg, depth: c.depth})
+	c.locals = append(c.locals, localVar{name: name, reg: reg, depth: c.depth, readOnly: readOnly})
+	if readOnly {
+		if c.readOnlyLocals == nil {
+			c.readOnlyLocals = make(map[int]string)
+		}
+		c.readOnlyLocals[reg] = name
+	}
 	return reg
 }
 
-func (c *compiler) resolveLocal(name string) int {
+func (c *compiler) resolveLocalInfo(name string) (int, bool) {
 	for i := len(c.locals) - 1; i >= 0; i-- {
 		if c.locals[i].name == name {
-			return c.locals[i].reg
+			return c.locals[i].reg, c.locals[i].readOnly
 		}
 	}
-	return -1
+	return -1, false
 }
 
-func (c *compiler) resolveUpvalue(name string) int {
+func (c *compiler) resolveLocal(name string) int {
+	reg, _ := c.resolveLocalInfo(name)
+	return reg
+}
+
+func (c *compiler) resolveUpvalueInfo(name string) (int, bool) {
 	if c.parent == nil {
-		return -1
+		return -1, false
 	}
 	for i := len(c.parent.locals) - 1; i >= 0; i-- {
 		if c.parent.locals[i].name == name {
 			c.parent.locals[i].captured = true
-			return c.addUpvalue(name, true, c.parent.locals[i].reg)
+			readOnly := c.parent.locals[i].readOnly
+			return c.addUpvalue(name, true, c.parent.locals[i].reg, readOnly), readOnly
 		}
 	}
-	parentUpIdx := c.parent.resolveUpvalue(name)
+	parentUpIdx, readOnly := c.parent.resolveUpvalueInfo(name)
 	if parentUpIdx >= 0 {
-		return c.addUpvalue(name, false, parentUpIdx)
+		return c.addUpvalue(name, false, parentUpIdx, readOnly), readOnly
 	}
-	return -1
+	return -1, false
 }
 
-func (c *compiler) addUpvalue(name string, inStack bool, index int) int {
+func (c *compiler) resolveUpvalue(name string) int {
+	idx, _ := c.resolveUpvalueInfo(name)
+	return idx
+}
+
+func (c *compiler) addUpvalue(name string, inStack bool, index int, readOnly bool) int {
 	for i, uv := range c.upvals {
 		if uv.inStack == inStack && uv.index == index {
 			return i
 		}
 	}
 	idx := len(c.upvals)
-	c.upvals = append(c.upvals, upvalInfo{name: name, inStack: inStack, index: index})
+	c.upvals = append(c.upvals, upvalInfo{name: name, inStack: inStack, index: index, readOnly: readOnly})
 	return idx
 }
 
@@ -381,8 +405,9 @@ func (c *compiler) finish() *FuncProto {
 	c.proto.IsVarArg = c.isVarArg
 	c.proto.Upvalues = make([]UpvalDesc, len(c.upvals))
 	for i, uv := range c.upvals {
-		c.proto.Upvalues[i] = UpvalDesc{Name: uv.name, InStack: uv.inStack, Index: uv.index}
+		c.proto.Upvalues[i] = UpvalDesc{Name: uv.name, InStack: uv.inStack, Index: uv.index, ReadOnly: uv.readOnly}
 	}
+	c.proto.ReadOnlyLocals = c.readOnlyLocals
 	c.proto.LeafNoCall = protoHasNoCalls(c.proto)
 	c.proto.NoGlobalOps = protoHasNoGlobalOps(c.proto)
 	return c.proto
@@ -429,7 +454,7 @@ func (c *compiler) collectLabelDepths(stmts []ast.Stmt, depth int) {
 func protoHasNoGlobalOps(proto *FuncProto) bool {
 	for _, inst := range proto.Code {
 		switch DecodeOp(inst) {
-		case OP_GETGLOBAL, OP_SETGLOBAL:
+		case OP_GETGLOBAL, OP_SETGLOBAL, OP_SETGLOBALRO:
 			return false
 		}
 	}
@@ -496,6 +521,8 @@ func (c *compiler) compileStmt(stmt ast.Stmt) error {
 		return c.compileBlockStmt(s)
 	case *ast.GoStmt:
 		return c.compileGoStmt(s)
+	case *ast.DeferStmt:
+		return c.compileDeferStmt(s)
 	case *ast.SendStmt:
 		return c.compileSendStmt(s)
 	default:
@@ -536,7 +563,7 @@ func (c *compiler) compileDeclareStmt(s *ast.DeclareStmt) error {
 	c.freeRegs(nNames)
 
 	for i, name := range s.Names {
-		reg := c.addLocal(name)
+		reg := c.addLocalWithReadOnly(name, s.ReadOnly)
 		if reg != tempBase+i {
 			c.emitABC(OP_MOVE, reg, tempBase+i, 0, s.P.Line)
 		}
@@ -560,7 +587,11 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 			}
 			for i, name := range s.Names {
 				nameK := c.stringConst(name)
-				c.emitABx(OP_SETGLOBAL, tempBase+i, nameK, s.P.Line)
+				if s.ReadOnly {
+					c.emitABx(OP_SETGLOBALRO, tempBase+i, nameK, s.P.Line)
+				} else {
+					c.emitABx(OP_SETGLOBAL, tempBase+i, nameK, s.P.Line)
+				}
 			}
 			c.nextReg = tempBase
 			return nil
@@ -576,7 +607,11 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 			}
 			for i, name := range s.Names {
 				nameK := c.stringConst(name)
-				c.emitABx(OP_SETGLOBAL, tempBase+i, nameK, s.P.Line)
+				if s.ReadOnly {
+					c.emitABx(OP_SETGLOBALRO, tempBase+i, nameK, s.P.Line)
+				} else {
+					c.emitABx(OP_SETGLOBAL, tempBase+i, nameK, s.P.Line)
+				}
 			}
 			c.nextReg = tempBase
 			return nil
@@ -593,7 +628,11 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 			c.emitABC(OP_LOADNIL, reg, 0, 0, s.P.Line)
 		}
 		nameK := c.stringConst(s.Names[i])
-		c.emitABx(OP_SETGLOBAL, reg, nameK, s.P.Line)
+		if s.ReadOnly {
+			c.emitABx(OP_SETGLOBALRO, reg, nameK, s.P.Line)
+		} else {
+			c.emitABx(OP_SETGLOBAL, reg, nameK, s.P.Line)
+		}
 		c.freeReg()
 	}
 	return nil
@@ -609,7 +648,7 @@ func (c *compiler) compileDeclareMultiCall(s *ast.DeclareStmt, call *ast.CallExp
 	// Reset nextReg so addLocal allocates those exact registers.
 	c.nextReg = base
 	for _, name := range s.Names {
-		c.addLocal(name)
+		c.addLocalWithReadOnly(name, s.ReadOnly)
 	}
 	return nil
 }
@@ -623,7 +662,7 @@ func (c *compiler) compileDeclareMultiMethodCall(s *ast.DeclareStmt, call *ast.M
 	// Results are in registers base..base+nNames-1.
 	c.nextReg = base
 	for _, name := range s.Names {
-		c.addLocal(name)
+		c.addLocalWithReadOnly(name, s.ReadOnly)
 	}
 	return nil
 }
@@ -710,14 +749,17 @@ func (c *compiler) compileAssignMultiMethodCall(s *ast.AssignStmt, call *ast.Met
 func (c *compiler) compileAssignTarget(target ast.Expr, valueReg int, line int) error {
 	switch t := target.(type) {
 	case *ast.IdentExpr:
-		reg := c.resolveLocal(t.Name)
+		reg, readOnly := c.resolveLocalInfo(t.Name)
 		if reg >= 0 {
+			if readOnly {
+				c.emitABx(OP_CHECKCONST, reg, c.stringConst(t.Name), line)
+			}
 			if reg != valueReg {
 				c.emitABC(OP_MOVE, reg, valueReg, 0, line)
 			}
 			return nil
 		}
-		upIdx := c.resolveUpvalue(t.Name)
+		upIdx, _ := c.resolveUpvalueInfo(t.Name)
 		if upIdx >= 0 {
 			c.emitABC(OP_SETUPVAL, valueReg, upIdx, 0, line)
 			return nil
@@ -786,12 +828,15 @@ func (c *compiler) compileCompoundAssignStmt(s *ast.CompoundAssignStmt) error {
 
 	switch t := s.Target.(type) {
 	case *ast.IdentExpr:
-		reg := c.resolveLocal(t.Name)
+		reg, readOnly := c.resolveLocalInfo(t.Name)
 		if reg >= 0 {
+			if readOnly {
+				c.emitABx(OP_CHECKCONST, reg, c.stringConst(t.Name), line)
+			}
 			return c.emitCompoundOp(opcode, reg, s.Value, line,
 				func(resultReg int) { /* result already in reg */ })
 		}
-		upIdx := c.resolveUpvalue(t.Name)
+		upIdx, _ := c.resolveUpvalueInfo(t.Name)
 		if upIdx >= 0 {
 			tmp := c.allocReg()
 			c.emitABC(OP_GETUPVAL, tmp, upIdx, 0, line)
@@ -899,13 +944,16 @@ func (c *compiler) compileIncDecStmt(s *ast.IncDecStmt) error {
 
 	switch t := s.Target.(type) {
 	case *ast.IdentExpr:
-		reg := c.resolveLocal(t.Name)
+		reg, readOnly := c.resolveLocalInfo(t.Name)
 		if reg >= 0 {
+			if readOnly {
+				c.emitABx(OP_CHECKCONST, reg, c.stringConst(t.Name), line)
+			}
 			c.emitABC(opcode, reg, reg, oneReg, line)
 			c.freeReg() // oneReg
 			return nil
 		}
-		upIdx := c.resolveUpvalue(t.Name)
+		upIdx, _ := c.resolveUpvalueInfo(t.Name)
 		if upIdx >= 0 {
 			tmp := c.allocReg()
 			c.emitABC(OP_GETUPVAL, tmp, upIdx, 0, line)
@@ -1093,6 +1141,86 @@ func (c *compiler) compileGoMethodCallExpr(call *ast.MethodCallExpr, line int) e
 	}
 	b := nArgs + 2 // +1 for self, +1 for encoding
 	c.emitABC(OP_GO, selfReg, b, 0, line)
+	c.nextReg = base
+	return nil
+}
+
+// ---- DeferStmt ----
+
+func (c *compiler) compileDeferStmt(s *ast.DeferStmt) error {
+	line := s.P.Line
+	c.proto.JITDisabled = true
+	switch call := s.Call.(type) {
+	case *ast.CallExpr:
+		return c.compileDeferCallExpr(call, line)
+	case *ast.MethodCallExpr:
+		return c.compileDeferMethodCallExpr(call, line)
+	default:
+		return fmt.Errorf("line %d: defer statement requires a function call", line)
+	}
+}
+
+func (c *compiler) compileDeferCallExpr(call *ast.CallExpr, line int) error {
+	base := c.nextReg
+	funcReg := c.allocReg()
+	if err := c.compileExprTo(call.Func, funcReg); err != nil {
+		return err
+	}
+	nArgs := len(call.Args)
+	lastArgIsMulti := false
+	for i, arg := range call.Args {
+		argReg := c.allocReg()
+		if i == nArgs-1 {
+			switch a := arg.(type) {
+			case *ast.CallExpr:
+				lastArgIsMulti = true
+				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
+					return err
+				}
+				continue
+			case *ast.MethodCallExpr:
+				lastArgIsMulti = true
+				if err := c.compileMethodCallExprMulti(a, argReg, -1); err != nil {
+					return err
+				}
+				continue
+			case *ast.VarArgExpr:
+				lastArgIsMulti = true
+				c.emitABC(OP_VARARG, argReg, 0, 0, line)
+				continue
+			}
+		}
+		if err := c.compileExprTo(arg, argReg); err != nil {
+			return err
+		}
+	}
+	b := nArgs + 1
+	if lastArgIsMulti {
+		b = 0
+	}
+	c.emitABC(OP_DEFER, funcReg, b, 0, line)
+	c.nextReg = base
+	return nil
+}
+
+func (c *compiler) compileDeferMethodCallExpr(call *ast.MethodCallExpr, line int) error {
+	base := c.nextReg
+	selfReg := c.allocReg()
+	c.allocReg()
+	objReg := c.allocReg()
+	if err := c.compileExprTo(call.Object, objReg); err != nil {
+		return err
+	}
+	c.emitMethodLookup(selfReg, objReg, c.stringConst(call.Method), line)
+	c.freeReg()
+
+	for _, arg := range call.Args {
+		argReg := c.allocReg()
+		if err := c.compileExprTo(arg, argReg); err != nil {
+			return err
+		}
+	}
+	c.emitABC(OP_DEFER, selfReg, len(call.Args)+2, 0, line)
 	c.nextReg = base
 	return nil
 }
@@ -3043,6 +3171,10 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("GETGLOBAL  R%d K%d  ; %s", a, bx, proto.Constants[bx].String())
 		case OP_SETGLOBAL:
 			desc = fmt.Sprintf("SETGLOBAL  R%d K%d  ; %s", a, bx, proto.Constants[bx].String())
+		case OP_SETGLOBALRO:
+			desc = fmt.Sprintf("SETGLOBALRO R%d K%d  ; %s", a, bx, proto.Constants[bx].String())
+		case OP_CHECKCONST:
+			desc = fmt.Sprintf("CHECKCONST R%d K%d  ; %s", a, bx, proto.Constants[bx].String())
 		case OP_GETUPVAL:
 			desc = fmt.Sprintf("GETUPVAL   R%d U%d", a, b)
 		case OP_SETUPVAL:
@@ -3132,6 +3264,8 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("SELF       R%d R%d K%d", a, b, cc)
 		case OP_GO:
 			desc = fmt.Sprintf("GO         R%d B=%d", a, b)
+		case OP_DEFER:
+			desc = fmt.Sprintf("DEFER      R%d B=%d", a, b)
 		case OP_MAKECHAN:
 			desc = fmt.Sprintf("MAKECHAN   R%d B=%d C=%d", a, b, cc)
 		case OP_SEND:
