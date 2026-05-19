@@ -335,6 +335,89 @@ Audit-added coverage not yet folded into the main table above:
 | `tracegc_stats_progress_more` | `tracegc.lua`, `gc.lua` | Go-host GC stats shape and explicit collection progress compared with Lua `collectgarbage` count/running observability. |
 | `utf8_go_helpers_more` | `utf8.lua` | GScript Go-host UTF-8 helpers: reverse, codepoint substring, Unicode case conversion, char classes, validate, and sanitize. |
 | `verybig_method_constants_more` | `verybig.lua` | Large constant table access with method calls, self chaining, and closure reads beyond the RK-style boundary. |
+| `all_harness_flags_format` | `all.lua` | Harness option defaults, message suppression, and compact count formatting. |
+| `api_metamethod_compare_len_concat_more` | `api.lua` | Comparison, length, and concat metamethod dispatch. |
+| `api_raw_ops_more` | `api.lua` | Raw table and metatable operations around `rawget`, `rawset`, `getmetatable`, and `setmetatable`. |
+| `api_table_self_keys_more` | `api.lua` | Tables used as self-referential keys and values. |
+| `attrib_scope_shadow_more` | `attrib.lua` | Lexical shadowing and closure capture of mutable locals. |
+| `attrib_unpack_assignment_more` | `attrib.lua` | Multi-result unpack adjustment in assignment targets. |
+| `big_table_growth_more` | `big.lua` | Array growth, concatenation, length, and high-index table access. |
+| `big_table_sparse_pressure_more2` | `big.lua` | Sparse table deletion pressure and remaining indexed values. |
+| `bwcoercion_bit32_numeric_strings` | `bwcoercion.lua` | Integer string coercion for bitwise operations and invalid numeric strings. |
+| `bwcoercion_bit32_string_edges_more2` | `bwcoercion.lua` | Whitespace, hex, negative, float-like, and 32-bit wrap string inputs for bitwise coercion. |
+| `calls_closure_parameter_capture_more` | `calls.lua` | Closure capture of function parameters and arity mismatch handling. |
+| `calls_multiline_adjust_more` | `calls.lua` | Multiline function calls and return-value adjustment. |
+| `calls_tail_missing_matrix_more` | `calls.lua` | Tail-return propagation with missing trailing values. |
+| `closure_loop_mutation_more2` | `closure.lua` | Per-iteration closure state and nested mutable upvalues. |
+| `closure_shared_sibling_upvalues_more` | `closure.lua` | Sibling closures sharing and shadowing captured locals. |
+| `code_arithmetic_constants_more` | `code.lua` | Constant arithmetic boundaries and unary/operator precedence. |
+| `code_comparison_immediates_more` | `code.lua` | Comparisons against numeric and string immediates in branches. |
+| `code_constant_branch_matrix_more2` | `code.lua` | Branch selection across constant comparison combinations. |
+| `code_string_constant_closure_more` | `code.lua` | Long string constants captured through nested closures. |
+| `constructs_boolean_paths_more` | `constructs.lua` | Boolean short-circuit paths in expressions, `if`, and `while`. |
+| `constructs_silly_loop_scope_more` | `constructs.lua` | Constant-condition loops and local shadowing inside table constructors. |
+| `coroutine_recursive_yield_more` | `coroutine.lua` | Yielding through recursive coroutine calls. |
+| `coroutine_tail_yield_more` | `coroutine.lua` | Yielded values and resumed arguments through wrapped coroutine loops. |
+| `cstack_pattern_complexity_more` | `cstack.lua` | Pattern matching stack use with repeated optional captures. |
+| `cstack_pattern_recursion_small` | `cstack.lua` | Small recursion-pressure variant for pattern matching stack behavior. |
+| `db_nested_call_flow_more` | `db.lua` | Nested call evaluation, field assignment results, and closure state flow. |
+| `db_pcall_nested_errors` | `db.lua` | Nested `pcall` behavior and propagated arithmetic error messages. |
+| `db_upvalue_closure_flow` | `db.lua` | Closure/upvalue mutation flow across sibling functions and independent returned counters. |
+| `db_vararg_transfer_values` | `db.lua`, `vararg.lua` | Vararg transfer, `table.unpack`, `table.pack`, and nil-preserving vararg counts. |
+| `errors_assert_messages_more` | `errors.lua` | `assert` message selection, missing-argument failure, and successful multi-return passthrough. |
+| `errors_call_index_failures_more` | `errors.lua` | Protected runtime failures for nil calls, missing method calls, bad method indexing, and nil arithmetic. |
+| `errors_non_string_messages_deeper` | `errors.lua` | Non-string error objects through `pcall` and `xpcall` handler transformation. |
+| `errors_non_string_messages_more` | `errors.lua` | Table and nil error messages plus `assert` failures with string, table, and nil messages. |
+| `errors_runtime_failures_more` | `errors.lua` | Protected concat, invalid `collectgarbage`, illegal yield, and bad method-self failures. |
+| `errors_runtime_messages_more` | `errors.lua` | Protected runtime errors for arithmetic, calls, length, and invalid comparisons. |
+| `errors_xpcall_handler_more` | `errors.lua` | `xpcall` handler results for string, nested error, and table-valued error objects. |
+| `events_newindex_self_metatable_more` | `events.lua` | `__newindex` function dispatch through a self-metatable parent and raw assignment side effects. |
+| `files_append_read_all_more` | `files.lua` | File append, read-all, `io.lines`, close, and remove behavior over a temporary file. |
+| `files_io_read_numbers` | `files.lua` | Numeric `file:read` formats parse integers/floats and stop cleanly at non-numeric input. |
+| `files_io_write_read_lines` | `files.lua` | File write/read line formats and `io.lines` count behavior including a final unterminated line. |
+| `files_tmpname_remove_rename` | `files.lua` | `os.tmpname`, `os.rename`, and `os.remove` success/failure return protocol. |
+| `gc_collectgarbage_stop_step_more` | `gc.lua` | `collectgarbage` stop, step, restart, and `isrunning` state preservation. |
+| `gc_generational_table_barrier_slice` | `gc.lua`, `gengc.lua` | Generational mode table barrier behavior across collection steps and mode restoration. |
+| `gengc_running_mode_restore_more` | `gengc.lua` | Generational GC mode switching keeps the collector running across explicit steps and restore. |
+| `goto_flow_equivalent_more` | `goto.lua` | Forward/backward label flow through blocks and functions with repeated label paths. |
+| `goto_if_branch_equivalent_more` | `goto.lua` | Conditional branches jumping to shared labels, unreachable code, and branch-specific returns. |
+| `heavy_concat_pressure_more2` | `heavy.lua`, `strings.lua` | Moderate string/table concatenation pressure with length and substring invariants. |
+| `heavy_string_growth_small` | `heavy.lua`, `strings.lua` | Repeated string growth and table concatenation over small expanding strings. |
+| `literals_line_comment_strings_more` | `literals.lua` | Line comments and escaped newline/carriage-return string literal values. |
+| `literals_string_table_more2` | `literals.lua` | String literals inside table constructors, including empty strings, newlines, brackets, and equals signs. |
+| `locals_block_assignment_scope_more` | `locals.lua` | Block-local shadowing and assignment scope behavior inside nested blocks and loops. |
+| `locals_many_shadow_slots_more2` | `locals.lua` | Multiple local shadow slots across loop blocks and parameter shadowing with nil defaults. |
+| `locals_shadowing_repeat_more` | `locals.lua` | Local shadowing across branches, function names, and repeat-until assignments. |
+| `main_multiline_chunk_values` | `main.lua`, `literals.lua` | Multiline chunk parsing with long strings, escaped newlines, and multi-return values. |
+| `main_print_write_more` | `main.lua`, `files.lua` | Top-level `io.write` and `print` output plus function availability checks. |
+| `math_negative_powers_more` | `math.lua` | Negative exponent and reciprocal power identities over small signed integer bases. |
+| `math_tonumber_long_decimal_more` | `math.lua` | Long decimal `tonumber` parsing, malformed decimal rejection, and decimal difference consistency. |
+| `nextvar_checknext_more` | `nextvar.lua` | `next` traversal copies mixed array/hash tables and cross-checks against `pairs`. |
+| `nextvar_numeric_for_fractional_more` | `nextvar.lua` | Fractional numeric `for` loops count iterations and final values for positive and negative steps. |
+| `nextvar_pairs_delete_strings_more` | `nextvar.lua` | Deleting string keys during `pairs` traversal visits all entries and leaves the table empty. |
+| `pm_class_sets_ascii_more` | `pm.lua` | ASCII pattern class sets and negated `%d`, `%s`, and `%w` classes. |
+| `pm_gsub_limit_count_more` | `pm.lua` | `string.gsub` replacement limits, zero-limit behavior, no-match counts, and repeated-pattern counts. |
+| `pm_match_capture_suffix_more` | `pm.lua` | Captures before suffixes, empty captures, anchored failures, and alpha/digit capture pairs. |
+| `pm_match_minimal_more` | `pm.lua` | Minimal and greedy pattern matching across anchors, classes, optional matches, and negated classes. |
+| `sort_equal_false_more` | `sort.lua` | `table.sort` with comparator returning nil preserves false elements and handles empty arrays. |
+| `sort_invalid_order_more2` | `sort.lua` | Inconsistent `table.sort` order functions raise invalid-order errors across small array sizes. |
+| `sort_month_names_more` | `sort.lua` | Default lexical `table.sort` ordering for month-name strings. |
+| `sort_unpack_assignment_more` | `sort.lua` | `table.unpack` assignment over bounded, empty, and sparse singleton ranges. |
+| `strings_byte_range_multi_more` | `strings.lua` | `string.byte` multi-return ranges with positive, negative, and empty index windows. |
+| `strings_char_errors_more` | `strings.lua` | `string.char` empty call and out-of-byte-range argument errors. |
+| `strings_find_offsets_more` | `strings.lua` | `string.find` start offsets, empty-pattern edge cases, pattern matching, and plain-find mode. |
+| `strings_format_percent_char_more` | `strings.lua` | `string.format` literal percent, `%c`, width flags, and combined percent/integer formatting. |
+| `strings_rep_separator_more` | `strings.lua` | `string.rep` separator behavior for zero, one, empty-string, and repeated-string counts. |
+| `strings_reverse_ascii_more` | `strings.lua` | ASCII `string.reverse` over empty, ordinary, numeric, and repeated strings. |
+| `strings_sub_method_more` | `strings.lua` | String method-call syntax for `sub`, `upper`, `lower`, and separator `rep`. |
+| `tpack_pack_count_more` | `tpack.lua` | `table.pack` preserves `n` and nil positions through direct and vararg calls. |
+| `tpack_select_more` | `tpack.lua` | `select` count, positive indexes, negative indexes, and multi-value tail selection. |
+| `tpack_vararg_edges_more` | `tpack.lua` | Vararg packing, selecting, and unpacking preserve nil, false, and tail values. |
+| `utf8_supplementary_more` | `utf8.lua` | Supplementary-plane UTF-8 codepoints checked through `len`, `offset`, `codepoint`, and `codes`. |
+| `vararg_argument_adjust_more` | `vararg.lua` | Vararg argument adjustment preserves nils and validates fixed-result comparison behavior. |
+| `vararg_long_parameter_list_more` | `vararg.lua` | Long fixed parameter lists receive nil defaults and collect overflow arguments in varargs. |
+| `verybig_many_constants_more2` | `verybig.lua` | Large constant tables exercise indexed constants beyond common bytecode constant thresholds. |
+| `verybig_rk_constants_more` | `verybig.lua` | Large constant access combines RK-style numeric constants, method calls, and closure reads. |
 
 Next recommended conversion order:
 
