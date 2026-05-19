@@ -1,0 +1,17 @@
+print("case:sort_invalid_order_more2")
+
+func checkerror(msg, f, ...) {
+  s, err := pcall(f, ...)
+  assert(!s && string.find(err, msg))
+}
+
+func check(t) {
+  f := func(a, b) { assert(a && b); return true }
+  checkerror("invalid order function", table.sort, t, f)
+}
+
+check({1, 2, 3, 4})
+check({1, 2, 3, 4, 5})
+check({1, 2, 3, 4, 5, 6})
+
+print("ok")

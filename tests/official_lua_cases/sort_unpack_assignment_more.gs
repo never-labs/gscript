@@ -1,0 +1,12 @@
+print("case:sort_unpack_assignment_more")
+
+unpack := table.unpack
+a := {1,2,3,4,5,6,7,8,9,10}
+x, y, z := unpack(a, 4, 6)
+assert(x == 4 && y == 5 && z == 6)
+x, y, z = unpack(a, 8, 7)
+assert(x == nil && y == nil && z == nil)
+x, y = unpack({[20]: "x"}, 20, 20)
+assert(x == "x" && y == nil)
+
+print("ok")

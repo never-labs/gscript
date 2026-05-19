@@ -1,0 +1,15 @@
+print("case:sort_month_names_more")
+
+func check(a, f) {
+  f = f || func(x, y) { return x < y }
+  for n := #a; n >= 2; n-- {
+    assert(!f(a[n], a[n - 1]))
+  }
+}
+
+a := {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+table.sort(a)
+check(a)
+assert(table.concat(a, ",") == "Apr,Aug,Dec,Feb,Jan,Jul,Jun,Mar,May,Nov,Oct,Sep")
+
+print("ok")

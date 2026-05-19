@@ -1,0 +1,24 @@
+print("case:vararg_argument_adjust_more")
+
+func f(a, ...) {
+  x := table.pack(...)
+  for i := 1; i <= x.n; i++ { assert(a[i] == x[i]) }
+  return x.n, x[1], x[2], x[3], x[4]
+}
+
+n, a, b, c, d := f({1, 2, 3}, 1, 2, 3)
+assert(n == 3 && a == 1 && b == 2 && c == 3 && d == nil)
+n, a, b, c, d = f({"alo", nil, 45, f, nil}, "alo", nil, 45, f, nil)
+assert(n == 5 && a == "alo" && b == nil && c == 45 && d == f)
+
+func c12(...) {
+  x := table.pack(...)
+  res := (x.n == 2 && x[1] == 1 && x[2] == 2)
+  if res { res = 55 }
+  return res, 2
+}
+
+assert(c12(1, 2) == 55)
+assert(c12(1, 2, 3) == false)
+
+print("ok")
