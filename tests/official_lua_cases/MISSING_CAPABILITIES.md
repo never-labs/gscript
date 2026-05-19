@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 409 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 412 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -58,6 +58,9 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `container_sort_go_host_more`: `container` / `sort` helper 覆盖 set/queue/stack/heap、ascending/descending/reverse、binary search、unique、partition 和 key sort。
 - `crypto_go_host_more`: `crypto` helper 覆盖 constant-time equality、AES-GCM round-trip、decrypt error returns、random byte/hex shape 和 key-size validation。
 - `rand_go_host_more`: `rand` helper 覆盖 seeded replay、range/shape invariants、choice/shuffle/sample/weighted helpers、UUID/bytes shape 和参数校验。
+- `log_go_host_more`: `log` helper 覆盖 level constants、format、deterministic log output、history/count/clear 和 level filtering。
+- `os_go_host_env_expand_more`: `os` helper 覆盖环境变量 get/set/unset、ExpandEnv 风格展开和参数错误。
+- `process_go_host_entry_exit_more`: `process` helper 覆盖 host-controlled args/entrypoint 与可捕获的 process exit error。
 
 当前能力状态与设计取舍：
 

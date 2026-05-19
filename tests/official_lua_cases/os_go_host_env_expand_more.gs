@@ -1,0 +1,16 @@
+print("case:os_go_host_env_expand_more")
+
+name := "GSCRIPT_OFFICIAL_OS_CASE"
+os.unsetenv(name)
+assert(os.getenv(name) == nil)
+assert(os.setenv(name, "ok-value") == true)
+assert(os.getenv(name) == "ok-value")
+assert(os.expand("x=$GSCRIPT_OFFICIAL_OS_CASE/${GSCRIPT_OFFICIAL_OS_CASE}") == "x=ok-value/ok-value")
+assert(os.unsetenv(name) == true)
+assert(os.getenv(name) == nil)
+
+assert(!pcall(os.getenv))
+assert(!pcall(os.setenv, name, 1))
+assert(!pcall(os.expand, 1))
+
+print("ok")

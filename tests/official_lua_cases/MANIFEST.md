@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 409.
+Current translated passing cases: 412.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -133,6 +133,7 @@ Current translated passing cases: 409.
 | `locals_scope` | `locals.lua` | Nil locals, local shadowing, scope checks. |
 | `locals_basic_more` | `locals.lua` | Local nil assignment/returns, multiple nil returns, and nested local shadowing checks. |
 | `locals_repeat_shadow_more2` | `locals.lua` | Parameter nil assignment, nested local shadowing, branch-local bindings, and repeat-loop shadowed locals. |
+| `log_go_host_more` | `api.lua` | Go-host log levels, formatting, deterministic output, history, count, clear, and level filtering. |
 | `math_floor_power` | `math.lua` | Numeric literals, floor-equivalent checks, negative powers. |
 | `math_floor_ceil_minmax` | `math.lua` | `floor`, `ceil`, `max`, and `min` stable cases. |
 | `math_float_notation_coercion` | `math.lua` | Basic float notation and arithmetic coercion from numeric strings. |
@@ -211,6 +212,7 @@ Current translated passing cases: 409.
 | `nextvar_table_length_nils_more` | `nextvar.lua` | Table length over nil-only constructors, trailing nils, incremental array fills, and sparse nil deletion. |
 | `nextvar_table_remove_sequences` | `nextvar.lua` | `table.remove` over string sequences, `#t+1` no-op removal, and middle/tail deletion. |
 | `nextvar_table_remove_more` | `nextvar.lua` | Additional `table.remove` edge cases for zero index storage, append/remove order, invalid positions, and middle deletion. |
+| `os_go_host_env_expand_more` | `files.lua`, `main.lua` | Go-host environment get/set/unset and environment expansion helpers with argument diagnostics. |
 | `pm_captures_basic_more` | `pm.lua` | Additional captures, empty captures, anchored captures, trimming captures, and position-capture replacement in `gsub`. |
 | `pm_escape_compat_more` | `pm.lua`, `strings.lua` | Hex/NUL pattern classes, negated class escapes, dot-newline matching, and standalone balanced-pattern matching/replacement. |
 | `pm_find_empty_anchor` | `pm.lua` | Empty pattern finds and anchored pattern finds. |
@@ -231,6 +233,7 @@ Current translated passing cases: 409.
 | `pm_gmatch_numeric_pairs_more` | `pm.lua` | `gmatch` two-capture numeric assignments into a table followed by `pairs` verification. |
 | `pm_pattern_runtime_more` | `pm.lua` | Pattern runtime callbacks: `gmatch` start positions and function-valued `gsub` replacements with nil/false no-substitution. |
 | `rand_go_host_more` | `api.lua`, `math.lua` | Go-host deterministic seeded random replay, range/shape checks, collection helpers, UUID/bytes shape, and argument validation. |
+| `process_go_host_entry_exit_more` | `main.lua` | Go-host process argument/entrypoint helpers and host-controlled process exit errors. |
 | `pm_match_captures_ascii` | `pm.lua` | ASCII `string.match` captures with `%w`, `%d`, empty captures, and anchored failure cases. |
 | `pm_match_classes_repetition_more` | `pm.lua` | Additional pattern repetition, anchors, minimal matches, negated classes, and `%S`/`%C` classes. |
 | `pm_match_classes_more2` | `pm.lua` | Additional pattern class and repetition checks for `%l`, `%a`, `*`, `+`, escaped `$`, and missing matches. |
