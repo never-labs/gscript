@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 335.
+Current translated passing cases: 337.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -104,6 +104,7 @@ Current translated passing cases: 335.
 | `gc_collectgarbage_more2` | `gc.lua` | Additional `collectgarbage` running-state, explicit collection, and mode transition return values. |
 | `gc_collectgarbage_protocol` | `gc.lua`, `gengc.lua` | `collectgarbage` collect/count/step/stop/restart/isrunning protocol basics. |
 | `gc_basic_more` | `gc.lua` | Basic `collectgarbage` running state, count, stop/restart, step result type, and explicit collection. |
+| `gc_stats_defer_cleanup` | `gc.lua`, `tracegc.lua` | GScript Go-host GC diagnostics via `collectgarbage("stats")`; deterministic cleanup is covered by runtime `defer` tests and docs. |
 | `literals_strings_basic` | `literals.lua`, `strings.lua` | Basic string literal behavior that maps to GScript escapes. |
 | `literals_long_brackets_more` | `literals.lua` | Long-bracket string delimiter edge cases translated to equivalent literal values. |
 | `literals_long_string_more` | `literals.lua` | Long string literal length and substring checks over a 960-byte literal. |
@@ -271,6 +272,7 @@ Current translated passing cases: 335.
 | `utf8_invalid_sequences_more` | `utf8.lua` | Invalid UTF-8 continuation, overlong, surrogate, and out-of-range sequences across len/codepoint/codes/offset. |
 | `utf8_multibyte_offsets` | `utf8.lua` | Multibyte UTF-8 length, offsets, codepoints. |
 | `utf8_offset_len_errors` | `utf8.lua` | `utf8.offset` and indexed `utf8.len` position bounds and continuation-byte errors. |
+| `utf8_validation_helpers_more` | `utf8.lua` | Go-style structured UTF-8 validation diagnostics and non-strict sanitization helpers over invalid edge sequences. |
 | `vararg_forwarding` | `vararg.lua` | Vararg capture and simple forwarding. |
 | `vararg_pack` | `calls.lua`, `vararg.lua` | Vararg count, `table.pack`, forwarding. |
 | `vararg_select` | `vararg.lua` | Positive-index `select` and protected out-of-range calls. |

@@ -165,6 +165,35 @@ func TestUTF8Valid(t *testing.T) {
 	}
 }
 
+func TestUTF8ValidateAndSanitizeInvalidEdges(t *testing.T) {
+	interp := runProgram(t, `
+		valid := utf8.validate("A" .. utf8.char(0x1F600))
+		truncated := utf8.validate("ok" .. string.char(0xE2))
+		overlong := utf8.validate(string.char(0xC0, 0x80))
+		surrogate := utf8.validate(string.char(0xED, 0xA0, 0x80))
+		limit := utf8.validate(string.char(0xF4, 0x90, 0x80, 0x80))
+		clean := utf8.sanitize("a" .. string.char(0x80) .. "b")
+		custom := utf8.sanitize(string.char(0xC0, 0x80), "?")
+	`)
+	if got := interp.GetGlobal("valid").Table(); !got.RawGetString("valid").Bool() || got.RawGetString("runeCount").Int() != 2 {
+		t.Fatalf("valid report = %v, want valid with runeCount=2", got)
+	}
+	if got := interp.GetGlobal("truncated").Table(); got.RawGetString("valid").Bool() || got.RawGetString("pos").Int() != 3 {
+		t.Fatalf("truncated report pos = %v, want invalid at byte 3", got.RawGetString("pos"))
+	}
+	for _, name := range []string{"overlong", "surrogate", "limit"} {
+		if got := interp.GetGlobal(name).Table(); got.RawGetString("valid").Bool() || got.RawGetString("pos").Int() != 1 {
+			t.Fatalf("%s report = %v, want invalid at byte 1", name, got)
+		}
+	}
+	if got := interp.GetGlobal("clean").Str(); got != "a\uFFFDb" {
+		t.Fatalf("clean = %q, want replacement char", got)
+	}
+	if got := interp.GetGlobal("custom").Str(); got != "??" {
+		t.Fatalf("custom = %q, want two custom replacements", got)
+	}
+}
+
 func TestUTF8Reverse(t *testing.T) {
 	interp := runProgram(t, `
 		a := utf8.reverse("abc")

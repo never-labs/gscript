@@ -54,6 +54,29 @@ gscript.New(gscript.WithLibs(gscript.LibAll))   // everything (default)
 
 ---
 
+## Core Diagnostics
+
+`collectgarbage` is a Go-host diagnostic interface, not a Lua GC control
+surface. Use `collectgarbage("stats")` for runtime memory counters and use
+`defer` for deterministic resource cleanup instead of finalizers.
+
+```go
+stats := collectgarbage("stats")
+stats.allocBytes
+stats.heapObjects
+stats.numGC
+stats.rootLog
+stats.running
+stats.mode
+
+defer handle.close()
+```
+
+Supported options: `collect`, `count`, `stats`, `step`, `stop`, `restart`,
+`isrunning`, `incremental`, and `generational`.
+
+---
+
 ## string
 
 String manipulation with Lua-compatible pattern matching.
@@ -519,6 +542,8 @@ Unicode-aware string operations. See [utf8.md](utf8.md).
 utf8.len("hello")        // 5
 utf8.len("中文")          // 2 (codepoints, not bytes)
 utf8.valid("hello")      // true
+utf8.validate("hello")   // {valid: true, byteCount: 5, runeCount: 5}
+utf8.sanitize(string.char(0x80), "?")  // "?"
 
 utf8.char(0x4E2D, 0x6587)  // "中文" — from codepoints
 utf8.codepoint("A")         // 65

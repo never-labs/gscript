@@ -202,6 +202,27 @@ func buildUTF8Lib() *Table {
 		return []Value{BoolValue(utf8.ValidString(args[0].Str()))}, nil
 	})
 
+	// utf8.validate(s) -> {valid, byteCount, runeCount, error?, pos?}
+	set("validate", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'utf8.validate'")
+		}
+		report := utf8ValidationReport(args[0].Str())
+		return []Value{TableValue(report)}, nil
+	})
+
+	// utf8.sanitize(s [, replacement]) -> string
+	set("sanitize", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'utf8.sanitize'")
+		}
+		replacement := "\uFFFD"
+		if len(args) >= 2 {
+			replacement = args[1].Str()
+		}
+		return []Value{StringValue(utf8Sanitize(args[0].Str(), replacement))}, nil
+	})
+
 	// utf8.reverse(s) → string (reverse by codepoint)
 	set("reverse", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -312,4 +333,42 @@ func utf8CodepointStarts(s string) []int {
 
 func isUTF8ContinuationByte(b byte) bool {
 	return b >= 0x80 && b <= 0xBF
+}
+
+func utf8ValidationReport(s string) *Table {
+	tbl := NewTable()
+	tbl.RawSetString("byteCount", IntValue(int64(len(s))))
+	runeCount := int64(0)
+	for pos := 0; pos < len(s); {
+		r, size := utf8.DecodeRuneInString(s[pos:])
+		if r == utf8.RuneError && size == 1 {
+			tbl.RawSetString("valid", BoolValue(false))
+			tbl.RawSetString("pos", IntValue(int64(pos+1)))
+			tbl.RawSetString("runeCount", IntValue(runeCount))
+			tbl.RawSetString("error", StringValue("invalid UTF-8 encoding"))
+			return tbl
+		}
+		pos += size
+		runeCount++
+	}
+	tbl.RawSetString("valid", BoolValue(true))
+	tbl.RawSetString("pos", NilValue())
+	tbl.RawSetString("runeCount", IntValue(runeCount))
+	tbl.RawSetString("error", NilValue())
+	return tbl
+}
+
+func utf8Sanitize(s, replacement string) string {
+	var out strings.Builder
+	for pos := 0; pos < len(s); {
+		r, size := utf8.DecodeRuneInString(s[pos:])
+		if r == utf8.RuneError && size == 1 {
+			out.WriteString(replacement)
+			pos++
+			continue
+		}
+		out.WriteString(s[pos : pos+size])
+		pos += size
+	}
+	return out.String()
 }

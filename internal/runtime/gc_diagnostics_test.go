@@ -32,3 +32,26 @@ func TestCollectGarbageStats(t *testing.T) {
 		t.Fatalf("numGC should not decrease")
 	}
 }
+
+func TestCollectGarbageStatsWithDeferCleanup(t *testing.T) {
+	interp := New()
+
+	execBinaryIOTest(t, interp, `
+		closed := false
+		func useResource() {
+			defer func() {
+				closed = true
+			}()
+			stats := collectgarbage("stats")
+			return stats.running
+		}
+		running := useResource()
+	`)
+
+	if got := interp.GetGlobal("running"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("running = %v, want true", got)
+	}
+	if got := interp.GetGlobal("closed"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("closed = %v, want defer cleanup to run", got)
+	}
+}

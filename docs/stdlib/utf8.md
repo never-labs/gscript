@@ -64,6 +64,33 @@ utf8.valid("hello")  -- true
 utf8.valid("中文")    -- true
 ```
 
+### utf8.validate(s) -> table
+
+Returns structured UTF-8 diagnostics using Go's strict `unicode/utf8` decoder.
+The returned table has `valid`, `byteCount`, `runeCount`, and, for invalid
+input, `pos` plus `error`.
+
+```gscript
+report := utf8.validate("hello")
+report.valid      -- true
+report.runeCount  -- 5
+
+bad := utf8.validate(string.char(0x80))
+bad.valid  -- false
+bad.pos    -- 1
+```
+
+### utf8.sanitize(s [, replacement]) -> string
+
+Returns a non-strict UTF-8 string by replacing invalid byte sequences. The
+default replacement is Unicode U+FFFD; pass `replacement` to use a different
+string.
+
+```gscript
+utf8.sanitize("a" .. string.char(0x80) .. "b")       -- "a�b"
+utf8.sanitize(string.char(0xc0, 0x80), "?")          -- "??"
+```
+
 ### utf8.reverse(s) -> string
 
 Reverses the string by codepoint (not by byte).
