@@ -1,0 +1,31 @@
+print("case:big_table_growth_more")
+
+lim := 4096 + 17
+prog := {"local y = {0"}
+for i := 1; i <= lim; i++ {
+  prog[#prog + 1] = i
+}
+prog[#prog + 1] = "}"
+
+assert(#prog == lim + 2)
+assert(prog[1] == "local y = {0")
+assert(prog[2] == 1 && prog[lim + 1] == lim && prog[lim + 2] == "}")
+
+joined := table.concat(prog, ";")
+assert(string.sub(joined, 1, 12) == "local y = {0")
+assert(string.find(joined, ";1;2;3;4;", 1, true))
+assert(string.find(joined, ";" .. lim .. ";}", 1, true))
+
+y := {0}
+for i := 1; i <= lim; i++ {
+  y[#y + 1] = i
+}
+assert(y[lim] == lim - 1 && y[lim + 1] == lim && #y == lim + 1)
+
+sum := 0
+for i := lim - 9; i <= lim + 1; i++ {
+  sum = sum + y[i]
+}
+assert(sum == 11 * lim - 55)
+
+print("ok")
