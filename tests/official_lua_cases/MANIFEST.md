@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 333.
+Current translated passing cases: 334.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -186,6 +186,7 @@ Current translated passing cases: 333.
 | `nextvar_table_remove_sequences` | `nextvar.lua` | `table.remove` over string sequences, `#t+1` no-op removal, and middle/tail deletion. |
 | `nextvar_table_remove_more` | `nextvar.lua` | Additional `table.remove` edge cases for zero index storage, append/remove order, invalid positions, and middle deletion. |
 | `pm_captures_basic_more` | `pm.lua` | Additional captures, empty captures, anchored captures, trimming captures, and position-capture replacement in `gsub`. |
+| `pm_escape_compat_more` | `pm.lua`, `strings.lua` | Hex/NUL pattern classes, negated class escapes, dot-newline matching, and standalone balanced-pattern matching/replacement. |
 | `pm_find_empty_anchor` | `pm.lua` | Empty pattern finds and anchored pattern finds. |
 | `pm_find_nul_more2` | `pm.lua` | Empty-pattern find, literal find in NUL-containing strings, and missing NUL pattern checks. |
 | `pm_find_match_more_ascii` | `pm.lua` | Additional ASCII pattern find/match repetition, anchors, frontier-like punctuation, and negated classes. |

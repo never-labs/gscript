@@ -75,6 +75,11 @@ string.format("%.2f", 3.14159)      // "3.14"
 for w := range string.gmatch("one two three", "%a+") { print(w) }
 ```
 
+Pattern matching uses a Lua-compatible shim over Go's RE2 engine for common
+ASCII classes (`%a`, `%d`, `%w`, `%s`, `%p`, `%c`, `%x`, `%z` and uppercase
+negations), captures, repetition, anchors, and standalone balanced atoms such
+as `%b()`. Use the `regexp` package directly for native Go regular expressions.
+
 See individual function reference at: [GScript README Language Features](../../README.md)
 
 ---

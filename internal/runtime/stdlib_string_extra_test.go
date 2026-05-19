@@ -228,3 +228,59 @@ func TestStringIsNumeric(t *testing.T) {
 		t.Errorf("expected true for '1e10'")
 	}
 }
+
+func TestLuaPatternEscapeCompatibility(t *testing.T) {
+	interp := runProgram(t, `
+		hex := string.match("0alo alo", "%x*")
+		nothex := string.match("0alo alo", "%X+")
+		nul := string.match("a" .. string.char(0) .. "b", "%z")
+		notnul := string.match("a" .. string.char(0) .. "b", "%Z+")
+		word := string.match("-", "[%W]")
+		notword := string.match("abc-123", "[^%W]+")
+		line := string.match("a\nb", "a.b")
+	`)
+	if got := interp.GetGlobal("hex").Str(); got != "0a" {
+		t.Fatalf("hex = %q, want 0a", got)
+	}
+	if got := interp.GetGlobal("nothex").Str(); got != "lo " {
+		t.Fatalf("nothex = %q, want lo ", got)
+	}
+	if got := interp.GetGlobal("nul").Str(); got != "\x00" {
+		t.Fatalf("nul = %q, want NUL", got)
+	}
+	if got := interp.GetGlobal("notnul").Str(); got != "a" {
+		t.Fatalf("notnul = %q, want a", got)
+	}
+	if got := interp.GetGlobal("word").Str(); got != "-" {
+		t.Fatalf("word = %q, want -", got)
+	}
+	if got := interp.GetGlobal("notword").Str(); got != "abc" {
+		t.Fatalf("notword = %q, want abc", got)
+	}
+	if got := interp.GetGlobal("line").Str(); got != "a\nb" {
+		t.Fatalf("line = %q, want a\\nb", got)
+	}
+}
+
+func TestLuaBalancedPatternStandalone(t *testing.T) {
+	interp := runProgram(t, `
+		a := string.match("a (b (c) d) z", "%b()")
+		b, n := string.gsub("alo 'oi' alo", "%b''", "\"")
+		c, m := string.gsub("a (b (c) d) z", "%b()", "")
+	`)
+	if got := interp.GetGlobal("a").Str(); got != "(b (c) d)" {
+		t.Fatalf("balanced match = %q, want nested parens", got)
+	}
+	if got := interp.GetGlobal("b").Str(); got != `alo " alo` {
+		t.Fatalf("quote gsub = %q", got)
+	}
+	if got := interp.GetGlobal("n").Int(); got != 1 {
+		t.Fatalf("quote count = %d, want 1", got)
+	}
+	if got := interp.GetGlobal("c").Str(); got != "a  z" {
+		t.Fatalf("paren gsub = %q", got)
+	}
+	if got := interp.GetGlobal("m").Int(); got != 1 {
+		t.Fatalf("paren count = %d, want 1", got)
+	}
+}
