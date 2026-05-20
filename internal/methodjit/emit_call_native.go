@@ -2971,7 +2971,7 @@ func (ec *emitContext) emitTypedPeerArgsFromValuesInRegsWithOptionalSave(args []
 				if src != dst {
 					asm.MOVreg(dst, src)
 				}
-				jit.EmitIsTagged(asm, dst, jit.X6)
+				jit.EmitIsTaggedPinned(asm, dst, jit.X6, mRegTagInt)
 				asm.BCond(jit.CondEQ, fallbackLabel)
 			}
 			if saveArgs {

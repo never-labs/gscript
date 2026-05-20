@@ -995,7 +995,7 @@ func (ec *emitContext) emitGenericMod(instr *Instr) {
 	asm.B(done)
 
 	asm.Label(rhsNotInt)
-	jit.EmitIsTagged(asm, jit.X1, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X1, jit.X2, mRegTagInt)
 	asm.BCond(jit.CondEQ, fallback)
 	jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	asm.SCVTF(jit.D0, jit.X0)
@@ -1003,7 +1003,7 @@ func (ec *emitContext) emitGenericMod(instr *Instr) {
 	asm.B(doFloat)
 
 	asm.Label(lhsNotInt)
-	jit.EmitIsTagged(asm, jit.X0, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 	asm.BCond(jit.CondEQ, fallback)
 	asm.FMOVtoFP(jit.D0, jit.X0)
 	emitCheckIsIntWithTag(asm, jit.X1, jit.X2, jit.X3)
@@ -1013,7 +1013,7 @@ func (ec *emitContext) emitGenericMod(instr *Instr) {
 	asm.B(doFloat)
 
 	asm.Label(bothFloat)
-	jit.EmitIsTagged(asm, jit.X1, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X1, jit.X2, mRegTagInt)
 	asm.BCond(jit.CondEQ, fallback)
 	asm.FMOVtoFP(jit.D1, jit.X1)
 
@@ -1063,7 +1063,7 @@ func (ec *emitContext) emitGenericModConstRHS(instr *Instr, divisor int64) {
 	asm.B(done)
 
 	asm.Label(floatPath)
-	jit.EmitIsTagged(asm, jit.X0, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 	asm.BCond(jit.CondEQ, fallback)
 	asm.FMOVtoFP(jit.D0, jit.X0)
 	asm.LoadImm64(jit.X1, divisor)
@@ -1348,7 +1348,7 @@ func (ec *emitContext) emitGenericNumericCmp(instr *Instr, cond jit.Cond) {
 	}
 
 	asm.Label(lhsIntRhsNotInt)
-	jit.EmitIsTagged(asm, jit.X1, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X1, jit.X2, mRegTagInt)
 	asm.BCond(jit.CondEQ, fallbackLabel)
 	jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	asm.SCVTF(jit.D0, jit.X0)
@@ -1358,7 +1358,7 @@ func (ec *emitContext) emitGenericNumericCmp(instr *Instr, cond jit.Cond) {
 	asm.B(falseLabel)
 
 	asm.Label(lhsNotInt)
-	jit.EmitIsTagged(asm, jit.X0, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 	lhsTaggedLabel := ec.uniqueLabel("cmp_lhs_tagged")
 	asm.BCond(jit.CondEQ, lhsTaggedLabel)
 	asm.FMOVtoFP(jit.D0, jit.X0)
@@ -1373,7 +1373,7 @@ func (ec *emitContext) emitGenericNumericCmp(instr *Instr, cond jit.Cond) {
 	asm.B(falseLabel)
 
 	asm.Label(bothNotInt)
-	jit.EmitIsTagged(asm, jit.X1, jit.X2)
+	jit.EmitIsTaggedPinned(asm, jit.X1, jit.X2, mRegTagInt)
 	asm.BCond(jit.CondEQ, fallbackLabel)
 	asm.FMOVtoFP(jit.D1, jit.X1)
 	asm.FCMPd(jit.D0, jit.D1)

@@ -28,7 +28,7 @@ func (ec *emitContext) emitInlinedGetUpval(instr *Instr) {
 		ec.storeRawInt(jit.X0, instr.ID)
 		asm.B(doneLabel)
 	case TypeFloat:
-		jit.EmitIsTagged(asm, jit.X0, jit.X1)
+		jit.EmitIsTaggedPinned(asm, jit.X0, jit.X1, mRegTagInt)
 		asm.BCond(jit.CondEQ, missLabel)
 		asm.FMOVtoFP(jit.D0, jit.X0)
 		ec.storeRawFloat(jit.D0, instr.ID)

@@ -520,6 +520,14 @@ func EmitIsTagged(asm *Assembler, valReg, scratch Reg) {
 	asm.CMPreg(scratch, X16)
 }
 
+// EmitIsTaggedPinned checks if a NaN-boxed value is tagged (non-float) using
+// the pinned tag register. 0xFFFE000000000000 >> 50 = 0x3FFF.
+// After this, CondEQ = tagged, CondNE = float. Uses scratch as temporary.
+func EmitIsTaggedPinned(asm *Assembler, valReg, scratch, tagReg Reg) {
+	asm.LSRimm(scratch, valReg, 50)
+	asm.CMPregLSR(scratch, tagReg, 50) // scratch vs (tagReg >> 50) = 0x3FFF
+}
+
 // EmitCheckIsTableFull is a full table check: tag=ptr AND sub=table.
 // Branches to 'notTableLabel' if not a table. Uses scratch1 and scratch2.
 func EmitCheckIsTableFull(asm *Assembler, valReg, scratch1, scratch2 Reg, notTableLabel string) {

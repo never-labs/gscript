@@ -128,7 +128,7 @@ func (ec *emitContext) emitStoreDynamicStringTableLoad(instr *Instr, valReg jit.
 		asm.SBFX(jit.X0, jit.X0, 0, 48)
 		ec.storeRawInt(jit.X0, instr.ID)
 	case TypeFloat:
-		jit.EmitIsTagged(asm, valReg, jit.X2)
+		jit.EmitIsTaggedPinned(asm, valReg, jit.X2, mRegTagInt)
 		asm.BCond(jit.CondEQ, deoptLabel)
 		asm.FMOVtoFP(jit.D0, valReg)
 		ec.storeRawFloat(jit.D0, instr.ID)

@@ -782,7 +782,7 @@ func emitStoreAccumulatorIntResult(asm *jit.Assembler, dstSlot int, doneLabel st
 }
 
 func emitFloatValueOrMiss(asm *jit.Assembler, fpReg jit.FReg, gpReg, scratch jit.Reg, missLabel string) {
-	jit.EmitIsTagged(asm, gpReg, scratch)
+	jit.EmitIsTaggedPinned(asm, gpReg, scratch, mRegTagInt)
 	asm.BCond(jit.CondEQ, missLabel)
 	asm.FMOVtoFP(fpReg, gpReg)
 }
@@ -793,7 +793,7 @@ func emitToFloatNumberOrMiss(asm *jit.Assembler, fpReg jit.FReg, gpReg, scratch 
 
 	emitCheckIsIntPinned(asm, gpReg, scratch)
 	asm.BCond(jit.CondEQ, isIntLabel)
-	jit.EmitIsTagged(asm, gpReg, scratch)
+	jit.EmitIsTaggedPinned(asm, gpReg, scratch, mRegTagInt)
 	asm.BCond(jit.CondEQ, missLabel)
 	asm.FMOVtoFP(fpReg, gpReg)
 	asm.B(doneLabel)

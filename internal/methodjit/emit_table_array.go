@@ -259,7 +259,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 				asm.MOVreg(jit.X4, valReg)
 			}
 			if !valueIsTypedFloat {
-				jit.EmitIsTagged(asm, jit.X4, jit.X5)
+				jit.EmitIsTaggedPinned(asm, jit.X4, jit.X5, mRegTagInt)
 				asm.BCond(jit.CondEQ, cfg.missLabel)
 			}
 		}
@@ -511,7 +511,7 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 			asm.SBFX(jit.X0, jit.X0, 0, 48)
 			ec.storeRawInt(jit.X0, instr.ID)
 		case TypeFloat:
-			jit.EmitIsTagged(asm, jit.X0, jit.X2)
+			jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 			asm.BCond(jit.CondEQ, deoptLabel)
 			asm.FMOVtoFP(jit.D0, jit.X0)
 			ec.storeRawFloat(jit.D0, instr.ID)
@@ -1066,7 +1066,7 @@ func (ec *emitContext) emitCheckTableArrayLoadExitResult(instr *Instr, deoptLabe
 			asm.CMPreg(jit.X2, jit.X3)
 			asm.BCond(jit.CondNE, deoptLabel)
 		case TypeFloat:
-			jit.EmitIsTagged(asm, jit.X0, jit.X2)
+			jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 			asm.BCond(jit.CondEQ, deoptLabel)
 		case TypeTable:
 			jit.EmitCheckIsTableFull(asm, jit.X0, jit.X2, jit.X3, deoptLabel)
@@ -1082,7 +1082,7 @@ func (ec *emitContext) emitCheckTableArrayLoadExitResult(instr *Instr, deoptLabe
 		}
 	case int64(vm.FBKindFloat):
 		if instr.Type == TypeFloat {
-			jit.EmitIsTagged(asm, jit.X0, jit.X2)
+			jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 			asm.BCond(jit.CondEQ, deoptLabel)
 		}
 	}
@@ -1409,7 +1409,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 		asm.SBFX(jit.X0, jit.X0, 0, 48)
 		ec.storeRawInt(jit.X0, instr.ID)
 	case TypeFloat:
-		jit.EmitIsTagged(asm, jit.X0, jit.X2)
+		jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 		asm.BCond(jit.CondEQ, deoptLabel)
 		asm.FMOVtoFP(jit.D0, jit.X0)
 		ec.storeRawFloat(jit.D0, instr.ID)
