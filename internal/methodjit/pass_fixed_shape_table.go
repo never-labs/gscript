@@ -168,6 +168,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		propagateFixedShapePhiFacts(fn, facts)
 		annotateFixedShapeGetFields(fn, facts)
 		annotateFixedShapeSetFields(fn, facts)
+		propagateShapeCacheFromSetFieldToGetField(fn, facts)
 		annotateFixedShapeArrayElementAccesses(fn, facts)
 		forwardFixedShapeGetFields(fn, facts)
 		return fn, nil
@@ -2235,6 +2236,183 @@ func annotateFixedShapeSetFields(fn *Function, facts map[int]FixedShapeTableFact
 			instr.Aux2 = int64(fact.ShapeID)<<32 | int64(uint32(idx))
 			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("prefilled fixed-shape setfield cache for %q", name))
+		}
+	}
+}
+
+// propagateShapeCacheFromSetFieldToGetField propagates fixed-shape cache and
+// field-type information from SetField instructions to GetField instructions
+// on Phi-merged table values. This handles the common pattern where a table is
+// created with a known fixed shape in one branch, stored via SetTable, and
+// later loaded via GetTable + Phi in a subsequent iteration. The Phi-merged
+// value has no direct shape fact (because one Phi input is a dynamic GetTable
+// result), but the SetField instructions on the original constructor carry
+// shape cache metadata.
+//
+// The pass works in two phases:
+//  1. Collect per-shape field info (field indices and types) from SetField
+//     instructions with known shape caches.
+//  2. For each GetField whose table argument is a Phi where at least one input
+//     has a known fixed-shape fact with the same shape, propagate the shape
+//     cache and field type.
+func propagateShapeCacheFromSetFieldToGetField(fn *Function, facts map[int]FixedShapeTableFact) {
+	if fn == nil || len(facts) == 0 {
+		return
+	}
+
+	// shapeFieldInfo holds field index and type info for one shape.
+	type shapeFieldInfo struct {
+		fieldIdx map[string]int
+	}
+	// Collect field info per shape ID from SetField instructions.
+	shapeFields := make(map[uint32]*shapeFieldInfo)
+
+	// Build a shape-ID -> field-types lookup from existing facts.
+	shapeFieldTypes := make(map[uint32]map[string]Type)
+	for _, fact := range facts {
+		if fact.ShapeID != 0 && len(fact.FieldTypes) > 0 {
+			if existing, ok := shapeFieldTypes[fact.ShapeID]; !ok || len(existing) < len(fact.FieldTypes) {
+				shapeFieldTypes[fact.ShapeID] = fact.FieldTypes
+			}
+		}
+	}
+
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Aux2 == 0 {
+				continue
+			}
+			shapeID := uint32(instr.Aux2 >> 32)
+			fieldIdx := int(int32(instr.Aux2 & 0xFFFFFFFF))
+			name := fixedShapeFieldNameFromAux(fn, instr)
+			if name == "" || shapeID == 0 {
+				continue
+			}
+			info := shapeFields[shapeID]
+			if info == nil {
+				info = &shapeFieldInfo{
+					fieldIdx: make(map[string]int),
+				}
+				shapeFields[shapeID] = info
+			}
+			info.fieldIdx[name] = fieldIdx
+		}
+	}
+
+	if len(shapeFields) == 0 {
+		return
+	}
+
+	// Build a map from table SSA value ID to the best known shape ID.
+	// For values that already have a fact, use that. For Phi values where
+	// at least one input has a fixed-shape fact, propagate the shape ID,
+	// provided all known-shape inputs agree.
+	tableShapeID := make(map[int]uint32)
+	for id, fact := range facts {
+		if fact.ShapeID != 0 {
+			tableShapeID[id] = fact.ShapeID
+		}
+	}
+	// Propagate through Phis: if a Phi has at least one input with a known
+	// shape AND all known-shape inputs agree on the same shape ID, propagate.
+	changed := true
+	for changed {
+		changed = false
+		for _, block := range fn.Blocks {
+			for _, instr := range block.Instrs {
+				if instr.Op != OpPhi || len(instr.Args) == 0 {
+					continue
+				}
+				if _, exists := tableShapeID[instr.ID]; exists {
+					continue
+				}
+				var candidate uint32
+				conflict := false
+				for _, arg := range instr.Args {
+					if arg == nil {
+						continue
+					}
+					if sid, ok := tableShapeID[arg.ID]; ok {
+						if candidate == 0 {
+							candidate = sid
+						} else if candidate != sid {
+							conflict = true
+							break
+						}
+					}
+				}
+				if candidate != 0 && !conflict {
+					tableShapeID[instr.ID] = candidate
+					changed = true
+				}
+			}
+		}
+	}
+
+	// First annotate SetField instructions on Phi-merged table values
+	// that don't yet have a shape cache. This is needed so that
+	// FieldSvalsLower can see them as lowerable.
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil || instr.Aux2 != 0 {
+				continue
+			}
+			shapeID, ok := tableShapeID[instr.Args[0].ID]
+			if !ok {
+				continue
+			}
+			info, ok := shapeFields[shapeID]
+			if !ok {
+				continue
+			}
+			name := fixedShapeFieldNameFromAux(fn, instr)
+			if name == "" {
+				continue
+			}
+			fieldIdx, ok := info.fieldIdx[name]
+			if !ok {
+				continue
+			}
+			if !valueProvenNonNil(instr.Args[1]) {
+				continue
+			}
+			instr.Aux2 = int64(shapeID)<<32 | int64(uint32(fieldIdx))
+			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+				fmt.Sprintf("prefilled fixed-shape setfield cache for %q from shape propagation", name))
+		}
+	}
+
+	// Now annotate GetField instructions that don't yet have a shape cache.
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 != 0 {
+				continue
+			}
+			shapeID, ok := tableShapeID[instr.Args[0].ID]
+			if !ok {
+				continue
+			}
+			info, ok := shapeFields[shapeID]
+			if !ok {
+				continue
+			}
+			name := fixedShapeFieldNameFromAux(fn, instr)
+			if name == "" {
+				continue
+			}
+			fieldIdx, ok := info.fieldIdx[name]
+			if !ok {
+				continue
+			}
+			instr.Aux2 = int64(shapeID)<<32 | int64(uint32(fieldIdx))
+			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+				fmt.Sprintf("prefilled fixed-shape field cache for %q from matching SetField", name))
+			// Propagate field type from the shape-level type info.
+			if sft, ok := shapeFieldTypes[shapeID]; ok {
+				if typ, ok := sft[name]; ok && typ != TypeUnknown && typ != TypeAny {
+					instr.Type = typ
+				}
+			}
 		}
 	}
 }
