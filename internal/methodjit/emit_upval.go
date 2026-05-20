@@ -22,7 +22,7 @@ func (ec *emitContext) emitInlinedGetUpval(instr *Instr) {
 	asm.LDR(jit.X0, jit.X3, 0)
 	switch instr.Type {
 	case TypeInt:
-		emitCheckIsInt(asm, jit.X0, jit.X1)
+		emitCheckIsIntPinned(asm, jit.X0, jit.X1)
 		asm.BCond(jit.CondNE, missLabel)
 		jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 		ec.storeRawInt(jit.X0, instr.ID)

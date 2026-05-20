@@ -601,7 +601,7 @@ func (ec *emitContext) emitGetTableStringFormatIntNative(instr *Instr) {
 	if intVal != jit.X1 {
 		asm.MOVreg(jit.X1, intVal)
 	}
-	emitCheckIsInt(asm, jit.X1, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 	asm.BCond(jit.CondNE, nativeMissLabel)
 	jit.EmitUnboxInt(asm, jit.X1, jit.X1)
 
@@ -647,7 +647,7 @@ func (ec *emitContext) emitGetTableStringFormatIntNative(instr *Instr) {
 		asm.LDR(jit.X2, jit.X0, jit.TableOffMetatable)
 		asm.CBNZ(jit.X2, nativeMissLabel)
 		asm.LDR(jit.X1, mRegRegs, slotOffset(tempBase+3))
-		emitCheckIsInt(asm, jit.X1, jit.X2)
+		emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 		asm.BCond(jit.CondNE, nativeMissLabel)
 		jit.EmitUnboxInt(asm, jit.X1, jit.X1)
 		asm.LoadImm64(jit.X2, math.MinInt64)

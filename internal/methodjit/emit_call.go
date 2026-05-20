@@ -30,6 +30,15 @@ func emitCheckIsInt(asm *jit.Assembler, valReg, scratch jit.Reg) {
 	asm.CMPreg(scratch, jit.X3)              // EQ = int, NE = not int
 }
 
+// emitCheckIsIntPinned checks if a NaN-boxed value is an integer using the
+// pinned tag register mRegTagInt (X24 = 0xFFFE000000000000). This avoids the
+// MOVimm16 constant load by using a shifted-register comparison instead.
+// After this: CondEQ = int, CondNE = not int. Uses scratch as temporary.
+func emitCheckIsIntPinned(asm *jit.Assembler, valReg, scratch jit.Reg) {
+	asm.LSRimm(scratch, valReg, 48)        // scratch = top 16 bits
+	asm.CMPregLSR(scratch, mRegTagInt, 48) // scratch vs (mRegTagInt >> 48) = 0xFFFE
+}
+
 func emitCheckIsIntWithTag(asm *jit.Assembler, valReg, scratch, tagReg jit.Reg) {
 	asm.LSRimm(scratch, valReg, 48)
 	asm.CMPreg(scratch, tagReg)
@@ -122,7 +131,7 @@ func (ec *emitContext) emitGuardType(instr *Instr) {
 	switch guardType {
 	case TypeInt:
 		// Check NaN-box int tag: top 16 bits must be 0xFFFE.
-		emitCheckIsInt(asm, jit.X0, jit.X2)
+		emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 		deoptLabel := ec.uniqueLabel("guard_deopt")
 		asm.BCond(jit.CondNE, deoptLabel)
 		// Success: store the value as the guard's result.
@@ -316,7 +325,7 @@ func (ec *emitContext) emitGuardIntRange(instr *Instr) {
 		if src != jit.X0 {
 			asm.MOVreg(jit.X0, src)
 		}
-		emitCheckIsInt(asm, jit.X0, jit.X2)
+		emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 		asm.BCond(jit.CondNE, deoptLabel)
 		jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	}
@@ -371,7 +380,7 @@ func (ec *emitContext) emitNumToFloat(instr *Instr) {
 	deoptLabel := ec.uniqueLabel("num_to_float_deopt")
 	doneLabel := ec.uniqueLabel("num_to_float_done")
 
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	asm.BCond(jit.CondNE, floatLabel)
 	jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	asm.SCVTF(jit.D0, jit.X0)
@@ -425,7 +434,7 @@ func (ec *emitContext) emitFloor(instr *Instr) {
 	deoptLabel := ec.uniqueLabel("floor_deopt")
 	doneLabel := ec.uniqueLabel("floor_done")
 
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	asm.BCond(jit.CondNE, floatLabel)
 	jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	ec.storeRawInt(jit.X0, instr.ID)
@@ -479,7 +488,7 @@ func (ec *emitContext) emitDiv(instr *Instr) {
 	}
 
 	// Check if lhs is int.
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	lhsNotInt := ec.uniqueLabel("div_lhs_not_int")
 	lhsBoth := ec.uniqueLabel("div_both_ready")
 	asm.BCond(jit.CondNE, lhsNotInt)
@@ -496,7 +505,7 @@ func (ec *emitContext) emitDiv(instr *Instr) {
 	asm.Label(lhsBoth)
 
 	// Check if rhs is int.
-	emitCheckIsInt(asm, jit.X1, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 	rhsNotInt := ec.uniqueLabel("div_rhs_not_int")
 	rhsBoth := ec.uniqueLabel("div_do_div")
 	asm.BCond(jit.CondNE, rhsNotInt)
@@ -536,7 +545,7 @@ func (ec *emitContext) emitUnm(instr *Instr) {
 	}
 
 	// Check if int.
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	notInt := ec.uniqueLabel("unm_not_int")
 	done := ec.uniqueLabel("unm_done")
 	asm.BCond(jit.CondNE, notInt)
@@ -1320,11 +1329,11 @@ func (ec *emitContext) emitGenericNumericCmp(instr *Instr, cond jit.Cond) {
 		asm.BCond(jit.CondEQ, falseLabel)
 	}
 
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	lhsNotInt := ec.uniqueLabel("cmp_lhs_not_int")
 	asm.BCond(jit.CondNE, lhsNotInt)
 
-	emitCheckIsInt(asm, jit.X1, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 	lhsIntRhsNotInt := ec.uniqueLabel("cmp_lhs_int_rhs_not_int")
 	asm.BCond(jit.CondNE, lhsIntRhsNotInt)
 
@@ -1353,7 +1362,7 @@ func (ec *emitContext) emitGenericNumericCmp(instr *Instr, cond jit.Cond) {
 	lhsTaggedLabel := ec.uniqueLabel("cmp_lhs_tagged")
 	asm.BCond(jit.CondEQ, lhsTaggedLabel)
 	asm.FMOVtoFP(jit.D0, jit.X0)
-	emitCheckIsInt(asm, jit.X1, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 	bothNotInt := ec.uniqueLabel("cmp_both_not_int")
 	asm.BCond(jit.CondNE, bothNotInt)
 

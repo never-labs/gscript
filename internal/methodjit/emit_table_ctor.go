@@ -315,7 +315,7 @@ func (ec *emitContext) emitNewFixedTableValueTypeGuard(shapeID uint32, fieldIdx 
 		if valReg != jit.X6 {
 			ec.asm.MOVreg(jit.X6, valReg)
 		}
-		emitCheckIsInt(ec.asm, jit.X6, jit.X7)
+		emitCheckIsIntPinned(ec.asm, jit.X6, jit.X7)
 		ec.asm.BCond(jit.CondNE, missLabel)
 	default:
 		return true

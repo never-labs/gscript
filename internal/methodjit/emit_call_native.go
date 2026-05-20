@@ -2297,7 +2297,7 @@ func (ec *emitContext) emitFloorProjectionFromCallResult(instr *Instr) {
 	deoptLabel := ec.uniqueLabel("call_floor_deopt")
 	doneLabel := ec.uniqueLabel("call_floor_done")
 
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	asm.BCond(jit.CondNE, floatLabel)
 	jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	ec.storeRawInt(jit.X0, valueID)
@@ -2955,7 +2955,7 @@ func (ec *emitContext) emitTypedPeerArgsFromValuesInRegsWithOptionalSave(args []
 				if src != dst {
 					asm.MOVreg(dst, src)
 				}
-				emitCheckIsInt(asm, dst, jit.X6)
+				emitCheckIsIntPinned(asm, dst, jit.X6)
 				asm.BCond(jit.CondNE, fallbackLabel)
 				jit.EmitUnboxInt(asm, dst, dst)
 			}

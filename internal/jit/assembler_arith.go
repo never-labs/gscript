@@ -144,6 +144,14 @@ func (a *Assembler) CMPreg(rn, rm Reg) {
 	a.emit(0xEB00001F | uint32(rm)<<16 | uint32(rn)<<5)
 }
 
+// CMPregLSR: CMP Xn, Xm, LSR #shift (SUBS XZR, Xn, Xm, LSR #shift)
+// Compares Xn against (Xm >> shift). shift must be 1-63.
+func (a *Assembler) CMPregLSR(rn, rm Reg, shift uint8) {
+	// SUBS XZR, Xn, Xm, LSR #shift: 1|11|01011|01|0|Rm|imm6|Rn|Rd=11111
+	// shift_type=01 (LSR), imm6=shift amount (1-63)
+	a.emit(0xEB40001F | uint32(rm)<<16 | uint32(shift&0x3F)<<10 | uint32(rn)<<5)
+}
+
 // CMPimm: CMP Xn, #imm12 (SUBS XZR, Xn, #imm12)
 func (a *Assembler) CMPimm(rn Reg, imm12 uint16) {
 	// SUBS XZR, Xn, #imm12: 1|11|100010|0|imm12|Rn|Rd=11111

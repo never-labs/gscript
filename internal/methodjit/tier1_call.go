@@ -701,7 +701,7 @@ func emitBaselineAccumulatorClosureFastPathBody(asm *jit.Assembler, fast accumul
 		emitLoadClosureUpvalueRef(asm, jit.X0, fast.valueUpval, len(fast.proto.Upvalues), jit.X6, jit.X2, jit.X3, missLabel)
 		asm.LDR(jit.X4, jit.X6, 0) // boxed current value
 		floatLabel := nextLabel("accum_closure_float")
-		emitCheckIsInt(asm, jit.X4, jit.X5)
+		emitCheckIsIntPinned(asm, jit.X4, jit.X5)
 		asm.BCond(jit.CondNE, floatLabel)
 		jit.EmitUnboxInt(asm, jit.X4, jit.X4)
 		if fast.delta >= 0 && fast.delta <= 4095 {
@@ -791,7 +791,7 @@ func emitToFloatNumberOrMiss(asm *jit.Assembler, fpReg jit.FReg, gpReg, scratch 
 	isIntLabel := nextLabel("number_to_float_int")
 	doneLabel := nextLabel("number_to_float_done")
 
-	emitCheckIsInt(asm, gpReg, scratch)
+	emitCheckIsIntPinned(asm, gpReg, scratch)
 	asm.BCond(jit.CondEQ, isIntLabel)
 	jit.EmitIsTagged(asm, gpReg, scratch)
 	asm.BCond(jit.CondEQ, missLabel)
@@ -869,7 +869,7 @@ func emitSimpleClosureExprValue(asm *jit.Assembler, expr simpleClosureExpr, argS
 	switch expr.kind {
 	case simpleClosureExprParam:
 		loadSlot(asm, dst, argSlot)
-		emitCheckIsInt(asm, dst, tagScratch)
+		emitCheckIsIntPinned(asm, dst, tagScratch)
 		asm.BCond(jit.CondNE, missLabel)
 		jit.EmitUnboxInt(asm, dst, dst)
 	case simpleClosureExprIntConst:
@@ -877,7 +877,7 @@ func emitSimpleClosureExprValue(asm *jit.Assembler, expr simpleClosureExpr, argS
 	case simpleClosureExprUpval:
 		emitLoadClosureUpvalueRef(asm, jit.X0, expr.upval, upvalCount, refScratch, rhs, tagScratch, missLabel)
 		asm.LDR(dst, refScratch, 0)
-		emitCheckIsInt(asm, dst, tagScratch)
+		emitCheckIsIntPinned(asm, dst, tagScratch)
 		asm.BCond(jit.CondNE, missLabel)
 		jit.EmitUnboxInt(asm, dst, dst)
 	case simpleClosureExprAdd, simpleClosureExprMul:
@@ -905,7 +905,7 @@ func emitImmediateClosureFactoryExprValue(asm *jit.Assembler, expr simpleClosure
 	switch expr.kind {
 	case simpleClosureExprParam:
 		loadSlot(asm, dst, argSlot)
-		emitCheckIsInt(asm, dst, tagScratch)
+		emitCheckIsIntPinned(asm, dst, tagScratch)
 		asm.BCond(jit.CondNE, missLabel)
 		jit.EmitUnboxInt(asm, dst, dst)
 	case simpleClosureExprIntConst:
@@ -916,7 +916,7 @@ func emitImmediateClosureFactoryExprValue(asm *jit.Assembler, expr simpleClosure
 			return
 		}
 		loadSlot(asm, dst, factoryArgBase+upvalSlots[expr.upval])
-		emitCheckIsInt(asm, dst, tagScratch)
+		emitCheckIsIntPinned(asm, dst, tagScratch)
 		asm.BCond(jit.CondNE, missLabel)
 		jit.EmitUnboxInt(asm, dst, dst)
 	case simpleClosureExprAdd, simpleClosureExprMul:

@@ -1726,7 +1726,7 @@ func (ec *emitContext) emitTypedSelfReturnEpilogue() {
 		// Zero-result typed self calls return only status; X0 is ignored by
 		// the caller and CALL C=1 must not fabricate a result slot.
 	case SpecializedABIReturnRawInt:
-		emitCheckIsInt(asm, jit.X0, jit.X1)
+		emitCheckIsIntPinned(asm, jit.X0, jit.X1)
 		asm.BCond(jit.CondNE, failLabel)
 		jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	case SpecializedABIReturnRawFloat:
@@ -1761,7 +1761,7 @@ func (ec *emitContext) emitTypedPeerClobberReturnEpilogue() {
 	switch ec.typedSelfABI.Return {
 	case SpecializedABIReturnNone:
 	case SpecializedABIReturnRawInt:
-		emitCheckIsInt(asm, jit.X0, jit.X1)
+		emitCheckIsIntPinned(asm, jit.X0, jit.X1)
 		asm.BCond(jit.CondNE, failLabel)
 		jit.EmitUnboxInt(asm, jit.X0, jit.X0)
 	case SpecializedABIReturnRawFloat:

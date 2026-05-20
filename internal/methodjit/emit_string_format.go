@@ -354,7 +354,7 @@ func (ec *emitContext) emitStringFormatIntNative(instr *Instr) {
 	if intVal != jit.X1 {
 		asm.MOVreg(jit.X1, intVal)
 	}
-	emitCheckIsInt(asm, jit.X1, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 	asm.BCond(jit.CondNE, slowLabel)
 	jit.EmitUnboxInt(asm, jit.X1, jit.X1)
 	asm.LoadImm64(jit.X3, math.MinInt64)
@@ -606,7 +606,7 @@ func (ec *emitContext) emitStringFormatConstNative(instr *Instr) {
 			asm.ADDreg(jit.X15, jit.X15, jit.X13)
 			continue
 		}
-		emitCheckIsInt(asm, jit.X1, jit.X2)
+		emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 		asm.BCond(jit.CondNE, slowAfterStackLabel)
 		jit.EmitUnboxInt(asm, jit.X1, jit.X1)
 		asm.LoadImm64(jit.X3, math.MinInt64)
@@ -747,7 +747,7 @@ func (ec *emitContext) emitStringFormatConstLenNative(instr *Instr) {
 		if arg != jit.X1 {
 			asm.MOVreg(jit.X1, arg)
 		}
-		emitCheckIsInt(asm, jit.X1, jit.X2)
+		emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 		asm.BCond(jit.CondNE, slowLabel)
 		jit.EmitUnboxInt(asm, jit.X1, jit.X1)
 		asm.LoadImm64(jit.X3, math.MinInt64)

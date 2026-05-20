@@ -840,7 +840,7 @@ func (ec *emitContext) resolveModZeroIntLHS(instr *Instr) jit.Reg {
 	if src != jit.X0 {
 		ec.asm.MOVreg(jit.X0, src)
 	}
-	emitCheckIsInt(ec.asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(ec.asm, jit.X0, jit.X2)
 	okLabel := ec.uniqueLabel("modzero_int_ok")
 	ec.asm.BCond(jit.CondEQ, okLabel)
 	ec.emitDeopt(instr)

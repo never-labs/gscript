@@ -21,7 +21,7 @@ func (ec *emitContext) emitShiftAddOverflowVersion(spec *shiftAddOverflowVersion
 
 	guardOK := ec.uniqueLabel("ov_shiftadd_guard_ok")
 	asm.LDR(jit.X0, mRegRegs, slotOffset(spec.boundParamSlot))
-	emitCheckIsInt(asm, jit.X0, jit.X2)
+	emitCheckIsIntPinned(asm, jit.X0, jit.X2)
 	asm.BCond(jit.CondEQ, guardOK)
 	ec.emitDeopt(spec.cond)
 

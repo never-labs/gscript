@@ -940,7 +940,7 @@ func (ec *emitContext) emitStableShapeFieldStoreTypeGuard(instr *Instr, fieldIdx
 		ec.asm.CMPreg(jit.X2, jit.X3)
 		ec.asm.BCond(jit.CondGE, deoptLabel)
 	case runtime.TypeInt:
-		emitCheckIsInt(ec.asm, jit.X0, jit.X2)
+		emitCheckIsIntPinned(ec.asm, jit.X0, jit.X2)
 		ec.asm.BCond(jit.CondNE, deoptLabel)
 	default:
 		return true
@@ -972,7 +972,7 @@ func (ec *emitContext) emitStoreTypedFieldLoad(instr *Instr, valReg jit.Reg, typ
 			ec.asm.MOVreg(jit.X0, valReg)
 		}
 		if !ec.fieldLoadTypeCheckElided(instr) {
-			emitCheckIsInt(ec.asm, jit.X0, jit.X2)
+			emitCheckIsIntPinned(ec.asm, jit.X0, jit.X2)
 			ec.asm.BCond(jit.CondNE, typeDeoptLabel)
 		}
 		jit.EmitUnboxInt(ec.asm, jit.X0, jit.X0)
