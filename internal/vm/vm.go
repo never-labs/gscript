@@ -1902,18 +1902,25 @@ func (vm *VM) loadScriptFile(filename string, opt runtime.Value) ([]runtime.Valu
 func compileScriptSource(src string, sourceName string) (*FuncProto, error) {
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
-		return nil, err
+		return nil, wrapScriptCompileSourceError(err, sourceName)
 	}
 	prog, err := parser.New(tokens).Parse()
 	if err != nil {
-		return nil, err
+		return nil, wrapScriptCompileSourceError(err, sourceName)
 	}
 	proto, err := Compile(prog)
 	if err != nil {
-		return nil, err
+		return nil, wrapScriptCompileSourceError(err, sourceName)
 	}
 	setProtoSource(proto, sourceName)
 	return proto, nil
+}
+
+func wrapScriptCompileSourceError(err error, sourceName string) error {
+	if err == nil || sourceName == "" || strings.Contains(err.Error(), sourceName) {
+		return err
+	}
+	return fmt.Errorf("%s: %w", sourceName, err)
 }
 
 func setProtoSource(proto *FuncProto, sourceName string) {

@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 437.
+Current translated passing cases: 439.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -339,6 +339,7 @@ Recent audit-added coverage:
 | `bytes_numeric_buffer_more` | `api.lua`, `strings.lua` | Go-host bytes buffer numeric little-endian writes, byte/string reads, hex round trips, concat, and reset behavior. |
 | `control_coroutine_defer_more` | `attrib.lua`, `coroutine.lua` | Cached coroutine functions, Go-style defer LIFO under return/protected errors, and const capture/shadowing semantics. |
 | `csv_options_quotes_more` | `api.lua`, `strings.lua` | CSV comment/lazy-quote options and Go encoding/csv quoting for comma, quote, newline, and leading-space fields. |
+| `defer_loader_require_edges_more` | `attrib.lua`, `main.lua` | Defer argument evaluation timing, remaining stdlib require identities, and load source-name syntax diagnostics. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
 | `debug_host_helpers_more` | `db.lua` | Go-host `debug.traceback`, `debug.stack`, `debug.globals`, `debug.info`, `debug.value`, and `debug.goStack` diagnostics. |
 | `db_vm_debug_parity_more` | `db.lua` | VM file-mode `debug.stack`, numeric `debug.info(level)`, source metadata, and hook/sink event observability. |
@@ -350,6 +351,7 @@ Recent audit-added coverage:
 | `fs_path_glob_cwd_more` | `files.lua`, `main.lua` | Go-host current-directory controls, globbing, temp dirs, and absolute/relative path helpers with cwd restoration. |
 | `goto_simple_paths_more` | `goto.lua` | Direct label/goto forward and backward paths plus function-local label chains translated to GScript label syntax. |
 | `go_channel_host_more` | `attrib.lua`, `api.lua` | Go-style channels and goroutines: buffered production, range over close, nil receive after close, and capacity/close error paths. |
+| `go_channel_edges_more` | `attrib.lua`, `api.lua` | Go-style unbuffered channel rendezvous, goroutine arguments, and send-on-closed diagnostics. |
 | `heavy_generated_concat_more` | `heavy.lua` | Bounded generated string-concatenation chunk mirroring the official heavy generated-program pressure pattern. |
 | `http_background_server_more` | `api.lua`, `main.lua` | Go-host HTTP server/router background mode returns closeable handles with addr/url and supports local client round-trips. |
 | `http_router_json_edges_more` | `api.lua`, `main.lua`, `strings.lua` | Go-host router method gating, response helpers, handler error responses, and JSON table/numeric edge encoding. |

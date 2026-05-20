@@ -6,7 +6,7 @@
 
 ## 2026-05-20 覆盖审计结论
 
-当前默认官方翻译集已扩展到 437 个 passing case。`KNOWN_FAILURES.md`
+当前默认官方翻译集已扩展到 439 个 passing case。`KNOWN_FAILURES.md`
 仍没有 skipped known failures。本文现在记录三类内容：已经覆盖的
 GScript 等价能力、明确不追求 Lua 逐字兼容的设计取舍，以及后续翻译官方
 case 时如果再次发现问题才需要新增的能力候选。
@@ -86,6 +86,8 @@ case 时如果再次发现问题才需要新增的能力候选。
 - `url_canonical_edges_more`: Go `net/url` canonical behavior 覆盖 IPv6 host/port、userinfo、percent encoding、duplicate query、invalid query 和 absolute join。
 - `utf8_testkit_edges_more`: UTF-8 helper 边界与 `testkit` deterministic diagnostic/protect/functionInfo 形状覆盖。
 - `time_process_debug_edges_more`: Go layout time parse/format、`process.run` string/dir option，以及 debug hook filtering/getHook/clear 行为覆盖。
+- `go_channel_edges_more`: unbuffered channel rendezvous、goroutine argument passing 和 send-on-closed error 的 official 层覆盖。
+- `defer_loader_require_edges_more`: `defer` 参数注册时求值、剩余 stdlib module require 身份，以及 `load` sourceName syntax diagnostic 覆盖。
 
 当前能力状态与设计取舍：
 
