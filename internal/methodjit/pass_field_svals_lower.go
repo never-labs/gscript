@@ -19,6 +19,7 @@ func FieldSvalsLowerPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
 	for i := 0; i < 3; i++ {
 		if !crossBlockFieldSvalsLower(fn) {
 			break
@@ -536,10 +537,10 @@ func fieldSvalsLowerable(fn *Function, instr *Instr) bool {
 	if instr == nil || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 == 0 {
 		return false
 	}
-	if fn != nil && len(fn.FieldPolyShapeFacts[instr.ID]) > 0 {
+	if fn != nil && len(fn.Analysis.FieldPolyShapeFacts[instr.ID]) > 0 {
 		return false
 	}
-	if fn != nil && fn.FieldPolyShapeReceivers[instr.Args[0].ID] {
+	if fn != nil && fn.Analysis.FieldPolyShapeReceivers[instr.Args[0].ID] {
 		return false
 	}
 	switch instr.Op {

@@ -3,7 +3,11 @@ package methodjit
 // IntAlgebraSimplifyPass removes checked integer add/sub pairs that cancel
 // each other after RangeAnalysis has proven both checked operations int48-safe.
 func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
-	if fn == nil || len(fn.Blocks) == 0 || len(fn.Int48Safe) == 0 {
+	if fn == nil || len(fn.Blocks) == 0 {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	if len(fn.Analysis.Int48Safe) == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -11,10 +15,10 @@ func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Type != TypeInt || len(instr.Args) < 2 || !fn.Int48Safe[instr.ID] {
+			if instr == nil || instr.Type != TypeInt || len(instr.Args) < 2 || !fn.Analysis.Int48Safe[instr.ID] {
 				continue
 			}
-			base, ok := cancellingIntAddSubBase(instr, fn.Int48Safe)
+			base, ok := cancellingIntAddSubBase(instr, fn.Analysis.Int48Safe)
 			if !ok {
 				continue
 			}

@@ -45,7 +45,7 @@ func gcd_bench(n) {
 	}
 
 	call := singleCallTo(t, fn, "gcd", map[string]*vm.FuncProto{"gcd": gcd})
-	desc, ok := fn.CallABIs[call.ID]
+	desc, ok := fn.Analysis.CallABIs[call.ID]
 	if !ok {
 		t.Fatalf("call %d missing CallABI descriptor\nIR:\n%s", call.ID, Print(fn))
 	}
@@ -77,7 +77,7 @@ result := inc(41)`
 	}
 
 	call := singleCallTo(t, fn, "inc", map[string]*vm.FuncProto{"inc": inc})
-	if _, ok := fn.CallABIs[call.ID]; !ok {
+	if _, ok := fn.Analysis.CallABIs[call.ID]; !ok {
 		t.Fatalf("stable global call %d missing CallABI descriptor\nIR:\n%s", call.ID, Print(fn))
 	}
 	if call.Type != TypeInt {
@@ -116,7 +116,7 @@ func TestCallABIRefinesRawIntParamToRawFloatFromIRType(t *testing.T) {
 }
 
 func TestCallReturnProjection_FoldsRawIntCallFloor(t *testing.T) {
-	fn := &Function{NumRegs: 4, nextID: 5}
+	fn := &Function{NumRegs: 4, nextID: 5, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
@@ -126,7 +126,7 @@ func TestCallReturnProjection_FoldsRawIntCallFloor(t *testing.T) {
 	floor := &Instr{ID: 3, Op: OpFloor, Type: TypeInt, Args: []*Value{call.Value()}, Block: b}
 	ret := &Instr{ID: 4, Op: OpReturn, Args: []*Value{floor.Value()}, Block: b}
 	b.Instrs = []*Instr{callee, arg, call, floor, ret}
-	fn.CallABIs = map[int]CallABIDescriptor{call.ID: {
+	fn.Analysis.CallABIs = map[int]CallABIDescriptor{call.ID: {
 		NumArgs:      1,
 		NumRets:      1,
 		RawIntParams: []bool{true},
@@ -179,7 +179,7 @@ func apply(f) {
 	}
 
 	call = firstCall(t, fn)
-	desc, ok := fn.CallABIs[call.ID]
+	desc, ok := fn.Analysis.CallABIs[call.ID]
 	if !ok {
 		t.Fatalf("feedback-resolved call %d missing CallABI descriptor\nIR:\n%s", call.ID, Print(fn))
 	}
@@ -204,7 +204,7 @@ func TestStaticNoDepthCalleeUsesStableFeedbackCallee(t *testing.T) {
 	proto.CallSiteFeedback[1].CalleeVMProtos[0] = callee
 	proto.CallSiteFeedback[1].CalleeVMProtoCount = 1
 
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	call := &Instr{
 		ID:        10,
 		Op:        OpCall,
@@ -232,7 +232,7 @@ func TestCallCalleeFlagSpecUsesPolymorphicFeedback(t *testing.T) {
 	proto.CallSiteFeedback[1].CalleeVMProtos[1] = calleeB
 	proto.CallSiteFeedback[1].CalleeVMProtoCount = 2
 
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	call := &Instr{
 		ID:        10,
 		Op:        OpCall,
@@ -291,12 +291,14 @@ func TestFieldShapeCalleeProtosDeduplicatesShapeCases(t *testing.T) {
 		Aux2: 2,
 	}
 	fn := &Function{
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			calleeLoad.ID: {
-				{ShapeID: 11, FieldIdx: 0, VMProto: calleeA},
-				{ShapeID: 12, FieldIdx: 0, VMProto: calleeA},
-				{ShapeID: 13, FieldIdx: 0, VMProto: calleeB},
-			},
+		Analysis: &AnalysisResult{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{ShapeID: 11, FieldIdx: 0, VMProto: calleeA},
+						{ShapeID: 12, FieldIdx: 0, VMProto: calleeA},
+						{ShapeID: 13, FieldIdx: 0, VMProto: calleeB},
+					},
+				},
 		},
 	}
 
@@ -331,25 +333,27 @@ func TestFieldShapeCalleeABISummaryUsesReceiverFacts(t *testing.T) {
 		Aux2: 2,
 	}
 	fn := &Function{
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			calleeLoad.ID: {
-				{
-					ShapeID:  316,
-					FieldIdx: 5,
-					VMProto:  stepIO,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    316,
-						FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
-						FieldTypes: map[string]Type{
-							"id":    TypeInt,
-							"queue": TypeInt,
-							"bytes": TypeInt,
-							"state": TypeString,
-							"step":  TypeFunction,
+		Analysis: &AnalysisResult{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{
+							ShapeID:  316,
+							FieldIdx: 5,
+							VMProto:  stepIO,
+							ReceiverFact: FixedShapeTableFact{
+								ShapeID:    316,
+								FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
+								FieldTypes: map[string]Type{
+									"id":    TypeInt,
+									"queue": TypeInt,
+									"bytes": TypeInt,
+									"state": TypeString,
+									"step":  TypeFunction,
+								},
+							},
 						},
 					},
 				},
-			},
 		},
 	}
 	summary := fieldShapeCalleeABISummary(fn, call)
@@ -384,6 +388,7 @@ func TestCallABIAnnotate_FieldShapeTypedPeerDescriptor(t *testing.T) {
 	fn := &Function{
 		Proto:  &vm.FuncProto{Name: "caller", Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 3, 2)}},
 		Blocks: []*Block{block},
+	Analysis: &AnalysisResult{
 		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 			calleeLoad.ID: {
 				{
@@ -404,10 +409,11 @@ func TestCallABIAnnotate_FieldShapeTypedPeerDescriptor(t *testing.T) {
 				},
 			},
 		},
+	},
 	}
 
 	fn = AnnotateCallABIs(fn, CallABIAnnotationConfig{})
-	desc, ok := fn.CallABIs[call.ID]
+	desc, ok := fn.Analysis.CallABIs[call.ID]
 	if !ok {
 		t.Fatalf("missing typed-peer descriptor")
 	}
@@ -449,6 +455,7 @@ func TestCallABIAnnotate_TypedPeerNoResultLeavesCallUntyped(t *testing.T) {
 	fn := &Function{
 		Proto:  &vm.FuncProto{Name: "caller", Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 3, 1)}},
 		Blocks: []*Block{block},
+	Analysis: &AnalysisResult{
 		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 			calleeLoad.ID: {
 				{
@@ -467,10 +474,11 @@ func TestCallABIAnnotate_TypedPeerNoResultLeavesCallUntyped(t *testing.T) {
 				},
 			},
 		},
+	},
 	}
 
 	fn = AnnotateCallABIs(fn, CallABIAnnotationConfig{})
-	desc, ok := fn.CallABIs[call.ID]
+	desc, ok := fn.Analysis.CallABIs[call.ID]
 	if !ok {
 		t.Fatalf("missing typed-peer descriptor")
 	}
@@ -511,6 +519,7 @@ func step_float(a, tick) {
 	}
 	fn := &Function{
 		Proto: &vm.FuncProto{Name: "caller"},
+	Analysis: &AnalysisResult{
 		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 			calleeLoad.ID: {
 				{
@@ -537,6 +546,7 @@ func step_float(a, tick) {
 				},
 			},
 		},
+	},
 	}
 	cases := (&emitContext{fn: fn}).fieldShapeTypedPeerCallCases(call)
 	if len(cases) != 2 {
@@ -575,7 +585,7 @@ func step_float(a, tick) {
 		t.Fatalf("missing protos: step_int=%v step_float=%v", stepInt != nil, stepFloat != nil)
 	}
 
-	fn := &Function{Proto: &vm.FuncProto{Name: "field_floor_projection_test"}, NumRegs: 4, nextID: 6}
+	fn := &Function{Proto: &vm.FuncProto{Name: "field_floor_projection_test"}, NumRegs: 4, nextID: 6, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
@@ -586,7 +596,7 @@ func step_float(a, tick) {
 	floor := &Instr{ID: 4, Op: OpFloor, Type: TypeInt, Args: []*Value{call.Value()}, Block: b}
 	ret := &Instr{ID: 5, Op: OpReturn, Args: []*Value{floor.Value()}, Block: b}
 	b.Instrs = []*Instr{receiver, calleeLoad, tick, call, floor, ret}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		calleeLoad.ID: {
 			{
 				ShapeID:   101,
@@ -627,10 +637,10 @@ func step_float(a, tick) {
 	if len(call.Args) != 2 || call.Args[0].ID != receiver.ID || call.Args[1].ID != tick.ID {
 		t.Fatalf("fused args=%v want receiver,tick\nIR:\n%s", call.Args, Print(fn))
 	}
-	if got := len(fn.FieldPolyShapeFacts[call.ID]); got != 2 {
+	if got := len(fn.Analysis.FieldPolyShapeFacts[call.ID]); got != 2 {
 		t.Fatalf("fused FieldPolyShapeFacts=%d want 2", got)
 	}
-	fused := fn.FieldPolyShapeFacts[call.ID]
+	fused := fn.Analysis.FieldPolyShapeFacts[call.ID]
 	if fused[0].VMClosure != 0x3030 || fused[1].VMClosure != 0x4040 {
 		t.Fatalf("fused closures=%#x,%#x want 0x3030,0x4040", fused[0].VMClosure, fused[1].VMClosure)
 	}
@@ -745,7 +755,7 @@ func bench(n, reps) {
 	}
 
 	call := singleCallTo(t, fn, "fib_iter", globals)
-	if _, ok := fn.CallABIs[call.ID]; ok {
+	if _, ok := fn.Analysis.CallABIs[call.ID]; ok {
 		t.Fatalf("overflow-versioned fib call must not use raw-int CallABI\nIR:\n%s", Print(fn))
 	}
 	if call.Type == TypeInt {
@@ -889,7 +899,7 @@ func M(n) {
 		t.Fatalf("self call Type=%s, want int\nIR:\n%s", selfCall.Type, Print(fn))
 	}
 	peerCall := singleCallTo(t, fn, "M", globals)
-	desc, ok := fn.CallABIs[peerCall.ID]
+	desc, ok := fn.Analysis.CallABIs[peerCall.ID]
 	if !ok {
 		t.Fatalf("peer call %d missing raw-int CallABI descriptor\nIR:\n%s", peerCall.ID, Print(fn))
 	}
@@ -987,8 +997,8 @@ func caller(x) {
 				tt.mutate(fn, call)
 			}
 			fn = AnnotateCallABIs(fn, CallABIAnnotationConfig{Globals: globals})
-			if len(fn.CallABIs) != 0 {
-				t.Fatalf("unexpected descriptors: %+v\nIR:\n%s", fn.CallABIs, Print(fn))
+			if len(fn.Analysis.CallABIs) != 0 {
+				t.Fatalf("unexpected descriptors: %+v\nIR:\n%s", fn.Analysis.CallABIs, Print(fn))
 			}
 			if call.Type == TypeInt {
 				t.Fatalf("negative call Type=%s, want non-int", call.Type)

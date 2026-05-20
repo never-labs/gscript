@@ -609,6 +609,7 @@ func EscapeAnalysisPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
 
 	remarks := functionRemarks(fn)
 	if partialMaterializeTablesForReadonlyCalls(fn, remarks) {
@@ -885,7 +886,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 							ok = false
 							break
 						}
-						_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Globals})
+						_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.Globals})
 						if !calleeArgFieldsReadonly(callee, argIdx-1) {
 							ok = false
 							break
@@ -995,7 +996,7 @@ func partialMaterializeCtorForAlloc(fn *Function, alloc *Instr) (partialMaterial
 	if alloc.Op != OpNewTable {
 		return partialMaterializeCtor{}, false
 	}
-	fact, hasFact := fn.FixedTableConstructors[alloc.ID]
+	fact, hasFact := fn.Analysis.FixedTableConstructors[alloc.ID]
 	expectedFields := 0
 	if hasFact {
 		expectedFields = len(fact.FieldNames)

@@ -30,7 +30,7 @@
 //   - OpGuardTruthy/OpGuardNonNil are NOT hoisted (control-flow guards).
 //   - OpLoadSlot is only hoisted if no in-loop OpStoreSlot writes the
 //     same slot number (slots are independent VM registers).
-//   - Int arithmetic is only hoisted when fn.Int48Safe marks it safe
+//   - Int arithmetic is only hoisted when fn.Analysis.Int48Safe marks it safe
 //     (otherwise hoisting past an overflow check would relocate a deopt).
 
 package methodjit
@@ -48,6 +48,7 @@ func LICMPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
 
 	li := computeLoopInfo(fn)
 	if !li.hasLoops() {
@@ -443,7 +444,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			}
 			// Int arithmetic: require Int48Safe marking.
 			if isIntArithOp(instr.Op) {
-				if fn.Int48Safe == nil || !fn.Int48Safe[instr.ID] {
+				if fn.Analysis.Int48Safe == nil || !fn.Analysis.Int48Safe[instr.ID] {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"integer arithmetic is not proven int48-safe")
 					continue
@@ -652,11 +653,11 @@ func isPureNumericLoopCall(fn *Function, call *Instr) bool {
 	if fn == nil || call == nil || call.Op != OpCall {
 		return false
 	}
-	desc, hasDesc := fn.CallABIs[call.ID]
+	desc, hasDesc := fn.Analysis.CallABIs[call.ID]
 	if !hasDesc || desc.Callee == nil || desc.NumRets != 1 || !desc.RawIntReturn {
 		return false
 	}
-	globals := callABIMergeGlobals(fn.Globals, callABIStableGlobals(fn.Proto))
+	globals := callABIMergeGlobals(fn.Analysis.Globals, callABIStableGlobals(fn.Proto))
 	if len(globals) == 0 {
 		return false
 	}
@@ -681,7 +682,7 @@ func isPureLoopInvariantCall(fn *Function, call *Instr) bool {
 	if fn == nil || call == nil || call.Op != OpCall || !callABIHasExactResultShape(fn, call, 1) {
 		return false
 	}
-	globals := callABIMergeGlobals(fn.Globals, callABIStableGlobals(fn.Proto))
+	globals := callABIMergeGlobals(fn.Analysis.Globals, callABIStableGlobals(fn.Proto))
 	if len(globals) == 0 {
 		return false
 	}
@@ -812,7 +813,7 @@ func licmCallCalleeProtos(fn *Function, instr *Instr) []*vm.FuncProto {
 	if protos := fieldShapeCalleeProtos(fn, instr); len(protos) > 0 {
 		return protos
 	}
-	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Globals})
+	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.Globals})
 	if callee != nil {
 		return []*vm.FuncProto{callee}
 	}
@@ -872,7 +873,7 @@ func canHoistOp(op Op) bool {
 	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpFMA, OpFMSUB:
 		return true
 	case OpAddInt, OpSubInt, OpMulInt, OpDivIntExact, OpNegInt:
-		// Caller must also check fn.Int48Safe.
+		// Caller must also check fn.Analysis.Int48Safe.
 		return true
 	case OpLtInt, OpLeInt, OpEqInt, OpModZeroInt, OpLtFloat, OpLeFloat, OpEqString, OpNot:
 		return true

@@ -42,7 +42,7 @@ func TestCallResultRangeGuardPass_SkipsModuloReducedFloorCall(t *testing.T) {
 		Name:             "modular_floor_guard_skip",
 		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	recv := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
 	tick := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 1, Block: b}
@@ -53,7 +53,7 @@ func TestCallResultRangeGuardPass_SkipsModuloReducedFloorCall(t *testing.T) {
 	b.Instrs = []*Instr{recv, tick, call, div, reduced, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
 	}
 

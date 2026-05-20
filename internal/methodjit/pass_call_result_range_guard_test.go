@@ -16,7 +16,7 @@ func TestCallResultRangeGuardPass_GuardsProfiledFieldCallResult(t *testing.T) {
 		proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
 		proto.CallSiteFeedback[0].ObserveResult(runtime.IntValue(int64(i + 3)))
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	recv := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
 	arg := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 1, Block: b}
@@ -62,7 +62,7 @@ func TestCallResultRangeGuardPass_RangeAnalysisConsumesGuard(t *testing.T) {
 		proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
 		proto.CallSiteFeedback[0].ObserveResult(runtime.IntValue(40))
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	recv := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
 	arg := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 1, Block: b}
@@ -83,7 +83,7 @@ func TestCallResultRangeGuardPass_RangeAnalysisConsumesGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !fn.Int48Safe[add.ID] {
+	if !fn.Analysis.Int48Safe[add.ID] {
 		t.Fatalf("AddInt fed by guarded call result should be Int48Safe:\n%s", Print(fn))
 	}
 }
@@ -97,7 +97,7 @@ func TestCallResultRangeGuardPass_GuardsProfiledBoxedCallResult(t *testing.T) {
 		proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 1)
 		proto.CallSiteFeedback[0].ObserveResult(runtime.IntValue(int64(40 + i)))
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	callee := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeFunction, Aux: 0, Block: b}
 	call := &Instr{ID: fn.newValueID(), Op: OpCall, Type: TypeAny, Args: []*Value{callee.Value()}, Block: b, HasSource: true, SourcePC: 0, Aux: 0, Aux2: 1}
@@ -143,7 +143,7 @@ func TestCallResultRangeGuardPass_SpeculatesStableBoxedCallWithIntegerUse(t *tes
 	proto.CallSiteFeedback[0].CalleeVMProtos[0] = calleeProto
 	proto.CallSiteFeedback[0].CalleeVMProtoCount = 1
 
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	callee := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeFunction, Aux: 0, Block: b}
 	call := &Instr{ID: fn.newValueID(), Op: OpCall, Type: TypeAny, Args: []*Value{callee.Value()}, Block: b, HasSource: true, SourcePC: 0, Aux: 0, Aux2: 1}
@@ -182,7 +182,7 @@ func TestCallResultRangeGuardPass_SpeculatesStableFieldCallFloor(t *testing.T) {
 		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
 	}
 	proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	recv := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
 	arg := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 1, Block: b}
@@ -191,7 +191,7 @@ func TestCallResultRangeGuardPass_SpeculatesStableFieldCallFloor(t *testing.T) {
 	b.Instrs = []*Instr{recv, arg, call, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
 	}
 
@@ -219,8 +219,10 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
 	fn := &Function{
 		Proto: proto,
-		SuppressedSpecGuardKinds: map[int]map[string]bool{
-			0: {"GuardIntRange": true},
+		Analysis: &AnalysisResult{
+			SuppressedSpecGuardKinds: map[int]map[string]bool{
+					0: {"GuardIntRange": true},
+				},
 		},
 	}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
@@ -231,7 +233,7 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	b.Instrs = []*Instr{recv, arg, call, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
 	}
 

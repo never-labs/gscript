@@ -16,6 +16,7 @@ func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
+fn.ensureAnalysis()
 	for _, block := range fn.Blocks {
 		if block == nil {
 			continue
@@ -42,7 +43,7 @@ func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 }
 
 func sourceFeedbackRefreshGetField(fn *Function, block *Block, instr *Instr) {
-	if len(fn.FieldPolyShapeFacts[instr.ID]) > 0 {
+	if len(fn.Analysis.FieldPolyShapeFacts[instr.ID]) > 0 {
 		if typ, ok := sourceFeedbackFieldValueType(instr.SourceProto, instr.SourcePC); ok &&
 			(instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = typ

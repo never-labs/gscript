@@ -127,8 +127,8 @@ for i := 0; i < 3; i++ {
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
-	if len(fn.WholeCallNoResultKernels) != 0 {
-		t.Fatalf("stable non-kernel runtime call should not be annotated: %#v", fn.WholeCallNoResultKernels)
+	if len(fn.Analysis.WholeCallNoResultKernels) != 0 {
+		t.Fatalf("stable non-kernel runtime call should not be annotated: %#v", fn.Analysis.WholeCallNoResultKernels)
 	}
 }
 
@@ -167,8 +167,8 @@ caller(sinkB, 1)
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
-	if len(fn.WholeCallNoResultKernels) != 0 {
-		t.Fatalf("polymorphic runtime call should not be annotated: %#v", fn.WholeCallNoResultKernels)
+	if len(fn.Analysis.WholeCallNoResultKernels) != 0 {
+		t.Fatalf("polymorphic runtime call should not be annotated: %#v", fn.Analysis.WholeCallNoResultKernels)
 	}
 }
 

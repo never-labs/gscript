@@ -116,6 +116,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		if fn == nil || len(fn.Blocks) == 0 {
 			return fn, nil
 		}
+		fn.ensureAnalysis()
 		facts := inferLocalFixedShapeTables(fn)
 		if len(facts) == 0 {
 			facts = make(map[int]FixedShapeTableFact)
@@ -126,7 +127,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		seedGuardedPolyShapeArrayElementArgFacts(fn, facts, config.ArrayElementPolyFacts)
 		seedProfiledDynamicTableValueFacts(fn, facts)
 		if config.EntryGuardedArgs {
-			markEntryGuardedFixedShapeArgFacts(fn, facts, fn.FixedShapeArgFacts)
+			markEntryGuardedFixedShapeArgFacts(fn, facts, fn.Analysis.FixedShapeArgFacts)
 		}
 		propagateFixedShapePhiFacts(fn, facts)
 
@@ -156,10 +157,10 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		arrayElementFacts := inferLocalArrayElementTableFacts(fn, facts)
 		seedLocalArrayElementTableFacts(fn, facts, arrayElementFacts)
 
-		if len(facts) == 0 && len(fn.FieldPolyShapeFacts) == 0 {
+		if len(facts) == 0 && len(fn.Analysis.FieldPolyShapeFacts) == 0 {
 			return fn, nil
 		}
-		fn.FixedShapeTables = facts
+		fn.Analysis.FixedShapeTables = facts
 		annotateFixedShapeStringValueAccesses(fn, facts)
 		propagateFixedShapePhiFacts(fn, facts)
 		annotateFixedShapeGetFields(fn, facts)
@@ -187,10 +188,10 @@ func seedGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTableFa
 				continue
 			}
 			facts[instr.ID] = fact
-			if fn.FixedShapeArgFacts == nil {
-				fn.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
+			if fn.Analysis.FixedShapeArgFacts == nil {
+				fn.Analysis.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
 			}
-			fn.FixedShapeArgFacts[int(instr.Aux)] = fact
+			fn.Analysis.FixedShapeArgFacts[int(instr.Aux)] = fact
 			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("parameter %d carries guarded fixed table shape %v", instr.Aux, fact.FieldNames))
 		}
@@ -244,10 +245,10 @@ func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTab
 					continue
 				}
 				valueFacts[instr.ID] = poly
-				if fn.FieldPolyShapeReceivers == nil {
-					fn.FieldPolyShapeReceivers = make(map[int]bool)
+				if fn.Analysis.FieldPolyShapeReceivers == nil {
+					fn.Analysis.FieldPolyShapeReceivers = make(map[int]bool)
 				}
-				fn.FieldPolyShapeReceivers[instr.ID] = true
+				fn.Analysis.FieldPolyShapeReceivers[instr.ID] = true
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeTable
 				}
@@ -269,10 +270,10 @@ func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTab
 				if len(cases) < 2 {
 					continue
 				}
-				if fn.FieldPolyShapeFacts == nil {
-					fn.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+				if fn.Analysis.FieldPolyShapeFacts == nil {
+					fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
 				}
-				fn.FieldPolyShapeFacts[instr.ID] = cases
+				fn.Analysis.FieldPolyShapeFacts[instr.ID] = cases
 				recordFieldPolyShapeCatalog(fn, cases)
 				instr.Aux2 = 0
 				if typ != TypeUnknown && typ != TypeAny {
@@ -306,10 +307,10 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedS
 					continue
 				}
 				valueFacts[instr.ID] = poly
-				if fn.FieldPolyShapeReceivers == nil {
-					fn.FieldPolyShapeReceivers = make(map[int]bool)
+				if fn.Analysis.FieldPolyShapeReceivers == nil {
+					fn.Analysis.FieldPolyShapeReceivers = make(map[int]bool)
 				}
-				fn.FieldPolyShapeReceivers[instr.ID] = true
+				fn.Analysis.FieldPolyShapeReceivers[instr.ID] = true
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeTable
 				}
@@ -334,10 +335,10 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedS
 				if len(cases) < 2 {
 					continue
 				}
-				if fn.FieldPolyShapeFacts == nil {
-					fn.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+				if fn.Analysis.FieldPolyShapeFacts == nil {
+					fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
 				}
-				fn.FieldPolyShapeFacts[instr.ID] = cases
+				fn.Analysis.FieldPolyShapeFacts[instr.ID] = cases
 				recordFieldPolyShapeCatalog(fn, cases)
 				instr.Aux2 = 0
 				if typ != TypeUnknown && typ != TypeAny {
@@ -354,14 +355,14 @@ func recordFieldPolyShapeCatalog(fn *Function, cases []FieldPolyShapeCase) {
 	if fn == nil || len(cases) == 0 {
 		return
 	}
-	if fn.FieldPolyShapeCatalog == nil {
-		fn.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, len(cases))
+	if fn.Analysis.FieldPolyShapeCatalog == nil {
+		fn.Analysis.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, len(cases))
 	}
 	for _, c := range cases {
 		if c.ShapeID == 0 || c.ReceiverFact.ShapeID != c.ShapeID {
 			continue
 		}
-		fn.FieldPolyShapeCatalog[c.ShapeID] = cloneFixedShapeTableFact(c.ReceiverFact)
+		fn.Analysis.FieldPolyShapeCatalog[c.ShapeID] = cloneFixedShapeTableFact(c.ReceiverFact)
 	}
 }
 
@@ -369,10 +370,10 @@ func recordFixedShapeCatalogFact(fn *Function, fact FixedShapeTableFact) {
 	if fn == nil || fact.ShapeID == 0 || len(fact.FieldNames) == 0 {
 		return
 	}
-	if fn.FieldPolyShapeCatalog == nil {
-		fn.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, 1)
+	if fn.Analysis.FieldPolyShapeCatalog == nil {
+		fn.Analysis.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, 1)
 	}
-	fn.FieldPolyShapeCatalog[fact.ShapeID] = cloneFixedShapeTableFact(fact)
+	fn.Analysis.FieldPolyShapeCatalog[fact.ShapeID] = cloneFixedShapeTableFact(fact)
 }
 
 func guardedFixedShapePolyFacts(facts []FixedShapeTableFact) []FixedShapeTableFact {
@@ -960,14 +961,14 @@ func markEntryGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTa
 			continue
 		}
 		fact.EntryGuarded = true
-		if fn.FixedShapeEntryGuards == nil {
-			fn.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
+		if fn.Analysis.FixedShapeEntryGuards == nil {
+			fn.Analysis.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
 		}
-		fn.FixedShapeEntryGuards[paramIdx] = fact
-		if fn.FixedShapeArgFacts == nil {
-			fn.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
+		fn.Analysis.FixedShapeEntryGuards[paramIdx] = fact
+		if fn.Analysis.FixedShapeArgFacts == nil {
+			fn.Analysis.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
 		}
-		fn.FixedShapeArgFacts[paramIdx] = fact
+		fn.Analysis.FixedShapeArgFacts[paramIdx] = fact
 		for _, block := range fn.Blocks {
 			for _, instr := range block.Instrs {
 				if instr.Op == OpLoadSlot && int(instr.Aux) == paramIdx {
@@ -1996,10 +1997,10 @@ func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact
 				instr.Type = typ
 			}
 			if r, ok := fact.FieldRanges[name]; ok && r.known && !fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, idx) {
-				if fn.ProfiledIntRanges == nil {
-					fn.ProfiledIntRanges = make(map[int]intRange)
+				if fn.Analysis.ProfiledIntRanges == nil {
+					fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
 				}
-				fn.ProfiledIntRanges[instr.ID] = r
+				fn.Analysis.ProfiledIntRanges[instr.ID] = r
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeInt
 				}
@@ -2100,17 +2101,17 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 		instr.Type = typ
 	}
 	fieldMayMutate := fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, fieldIdx)
-	if fieldMayMutate && fn.ProfiledIntRanges != nil {
-		delete(fn.ProfiledIntRanges, instr.ID)
+	if fieldMayMutate && fn.Analysis.ProfiledIntRanges != nil {
+		delete(fn.Analysis.ProfiledIntRanges, instr.ID)
 	}
-	if fieldMayMutate && fn.ProfiledLenRanges != nil {
-		delete(fn.ProfiledLenRanges, instr.ID)
+	if fieldMayMutate && fn.Analysis.ProfiledLenRanges != nil {
+		delete(fn.Analysis.ProfiledLenRanges, instr.ID)
 	}
 	if r, ok := fact.FieldRanges[name]; ok && r.known && !fieldMayMutate {
-		if fn.ProfiledIntRanges == nil {
-			fn.ProfiledIntRanges = make(map[int]intRange)
+		if fn.Analysis.ProfiledIntRanges == nil {
+			fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
 		}
-		fn.ProfiledIntRanges[instr.ID] = r
+		fn.Analysis.ProfiledIntRanges[instr.ID] = r
 		if instr.Op == OpFieldLoad && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = TypeInt
 		}
@@ -2184,16 +2185,16 @@ func fixedShapeFactForFieldSvals(fn *Function, facts map[int]FixedShapeTableFact
 	if fact, ok := facts[svals.Args[0].ID]; ok && fact.ShapeID == shapeID {
 		return fact, true
 	}
-	if fn != nil && fn.FieldPolyShapeCatalog != nil {
-		if fact, ok := fn.FieldPolyShapeCatalog[shapeID]; ok && fact.ShapeID == shapeID {
+	if fn != nil && fn.Analysis.FieldPolyShapeCatalog != nil {
+		if fact, ok := fn.Analysis.FieldPolyShapeCatalog[shapeID]; ok && fact.ShapeID == shapeID {
 			return fact, true
 		}
 	}
-	if fn == nil || len(fn.FieldPolyShapeFacts) == 0 {
+	if fn == nil || len(fn.Analysis.FieldPolyShapeFacts) == 0 {
 		return FixedShapeTableFact{}, false
 	}
 	var found FixedShapeTableFact
-	for _, cases := range fn.FieldPolyShapeFacts {
+	for _, cases := range fn.Analysis.FieldPolyShapeFacts {
 		for _, c := range cases {
 			if c.ShapeID != shapeID || c.ReceiverFact.ShapeID != shapeID {
 				continue
@@ -2296,10 +2297,10 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedSha
 					instr.Type = typ
 				}
 				if r := fact.ArrayElementRange; r.known {
-					if fn.ProfiledIntRanges == nil {
-						fn.ProfiledIntRanges = make(map[int]intRange)
+					if fn.Analysis.ProfiledIntRanges == nil {
+						fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
 					}
-					fn.ProfiledIntRanges[instr.ID] = r
+					fn.Analysis.ProfiledIntRanges[instr.ID] = r
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("table value carries guarded array element kind %d", kind))
@@ -2312,10 +2313,10 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedSha
 					instr.Type = typ
 				}
 				if r := fact.ArrayElementRange; r.known {
-					if fn.ProfiledIntRanges == nil {
-						fn.ProfiledIntRanges = make(map[int]intRange)
+					if fn.Analysis.ProfiledIntRanges == nil {
+						fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
 					}
-					fn.ProfiledIntRanges[instr.ID] = r
+					fn.Analysis.ProfiledIntRanges[instr.ID] = r
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("lowered table value carries guarded array element kind %d", kind))
@@ -2569,10 +2570,10 @@ func recordProfiledLenRange(fn *Function, valueID int, r intRange) {
 	if fn == nil || valueID == 0 || !r.known {
 		return
 	}
-	if fn.ProfiledLenRanges == nil {
-		fn.ProfiledLenRanges = make(map[int]intRange)
+	if fn.Analysis.ProfiledLenRanges == nil {
+		fn.Analysis.ProfiledLenRanges = make(map[int]intRange)
 	}
-	fn.ProfiledLenRanges[valueID] = r
+	fn.Analysis.ProfiledLenRanges[valueID] = r
 }
 
 func cloneStringRangeMap(in map[string]intRange) map[string]intRange {

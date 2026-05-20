@@ -34,27 +34,29 @@ func step_b(actor, tick) {
 		Proto:   &vm.FuncProto{Name: "caller", NumParams: 2, MaxStack: 6},
 		NumRegs: 2,
 		nextID:  4,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			2: {
-				{
-					ShapeID:   shapeID,
-					FieldIdx:  0,
-					VMProto:   stepA,
-					VMClosure: uintptr(unsafe.Pointer(clA)),
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    shapeID,
-						FieldNames: []string{"count", "step"},
-						FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				2: {
+					{
+						ShapeID:   shapeID,
+						FieldIdx:  0,
+						VMProto:   stepA,
+						VMClosure: uintptr(unsafe.Pointer(clA)),
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    shapeID,
+							FieldNames: []string{"count", "step"},
+							FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:  shapeID + 1,
-					FieldIdx: 0,
-					VMProto:  stepB,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    shapeID + 1,
-						FieldNames: []string{"count", "step"},
-						FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+					{
+						ShapeID:  shapeID + 1,
+						FieldIdx: 0,
+						VMProto:  stepB,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    shapeID + 1,
+							FieldNames: []string{"count", "step"},
+							FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+						},
 					},
 				},
 			},
@@ -88,7 +90,7 @@ func step_b(actor, tick) {
 	if strings.Contains(text, "GuardCalleeProto") {
 		t.Fatalf("split IR still contains inline-only guard:\n%s", text)
 	}
-	if got := len(fn.FieldPolyShapeFacts[call.ID]); got != 1 {
+	if got := len(fn.Analysis.FieldPolyShapeFacts[call.ID]); got != 1 {
 		t.Fatalf("fallback cases=%d want 1", got)
 	}
 
@@ -126,27 +128,29 @@ func step_b(actor, tick) {
 		Proto:   &vm.FuncProto{Name: "caller", NumParams: 2, MaxStack: 6},
 		NumRegs: 2,
 		nextID:  4,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			2: {
-				{
-					ShapeID:   shapeID,
-					FieldIdx:  0,
-					VMProto:   stepA,
-					VMClosure: uintptr(unsafe.Pointer(clA)),
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    shapeID,
-						FieldNames: []string{"count", "step"},
-						FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				2: {
+					{
+						ShapeID:   shapeID,
+						FieldIdx:  0,
+						VMProto:   stepA,
+						VMClosure: uintptr(unsafe.Pointer(clA)),
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    shapeID,
+							FieldNames: []string{"count", "step"},
+							FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:  shapeID + 1,
-					FieldIdx: 0,
-					VMProto:  stepB,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    shapeID + 1,
-						FieldNames: []string{"count", "step"},
-						FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+					{
+						ShapeID:  shapeID + 1,
+						FieldIdx: 0,
+						VMProto:  stepB,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    shapeID + 1,
+							FieldNames: []string{"count", "step"},
+							FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+						},
 					},
 				},
 			},
@@ -168,7 +172,7 @@ func step_b(actor, tick) {
 	var caseCall *Instr
 	for _, block := range out.Blocks {
 		for _, instr := range block.Instrs {
-			if instr != nil && instr.Op == OpFieldCallFloor && len(out.FieldPolyShapeFacts[instr.ID]) == 1 {
+			if instr != nil && instr.Op == OpFieldCallFloor && len(out.Analysis.FieldPolyShapeFacts[instr.ID]) == 1 {
 				caseCall = instr
 				break
 			}
@@ -180,7 +184,7 @@ func step_b(actor, tick) {
 	ec := &emitContext{fn: out}
 	cases := ec.fieldShapeTypedPeerMethodCallCases(caseCall)
 	if len(cases) != 1 {
-		t.Fatalf("single-case field call cases=%d want 1\nIR:\n%s\nfacts=%#v", len(cases), Print(out), out.FieldPolyShapeFacts[caseCall.ID])
+		t.Fatalf("single-case field call cases=%d want 1\nIR:\n%s\nfacts=%#v", len(cases), Print(out), out.Analysis.FieldPolyShapeFacts[caseCall.ID])
 	}
 }
 
@@ -203,26 +207,28 @@ func step_b(actor, tick) {
 		Proto:   &vm.FuncProto{Name: "caller", NumParams: 2, MaxStack: 6},
 		NumRegs: 2,
 		nextID:  4,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			2: {
-				{
-					ShapeID:  101,
-					FieldIdx: 1,
-					VMProto:  stepCache,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    101,
-						FieldNames: []string{"hits", "step"},
-						FieldTypes: map[string]Type{"hits": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				2: {
+					{
+						ShapeID:  101,
+						FieldIdx: 1,
+						VMProto:  stepCache,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    101,
+							FieldNames: []string{"hits", "step"},
+							FieldTypes: map[string]Type{"hits": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:  202,
-					FieldIdx: 0,
-					VMProto:  stepB,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    202,
-						FieldNames: []string{"step"},
-						FieldTypes: map[string]Type{"step": TypeFunction},
+					{
+						ShapeID:  202,
+						FieldIdx: 0,
+						VMProto:  stepB,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    202,
+							FieldNames: []string{"step"},
+							FieldTypes: map[string]Type{"step": TypeFunction},
+						},
 					},
 				},
 			},
@@ -248,7 +254,7 @@ func step_b(actor, tick) {
 	if strings.Contains(text, "TableShapeID") || len(fn.Blocks) != 1 {
 		t.Fatalf("unsafe callee was split unexpectedly:\n%s", text)
 	}
-	if got := len(fn.FieldPolyShapeFacts[call.ID]); got != 2 {
+	if got := len(fn.Analysis.FieldPolyShapeFacts[call.ID]); got != 2 {
 		t.Fatalf("fallback cases=%d want unchanged 2", got)
 	}
 }
@@ -304,26 +310,28 @@ func step_b(actor, tick) { return tick + 2 }`)
 		Proto:   callerProto,
 		NumRegs: 2,
 		nextID:  5,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			2: {
-				{
-					ShapeID:  101,
-					FieldIdx: 1,
-					VMProto:  stepA,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    101,
-						FieldNames: []string{"id", "step"},
-						FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				2: {
+					{
+						ShapeID:  101,
+						FieldIdx: 1,
+						VMProto:  stepA,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    101,
+							FieldNames: []string{"id", "step"},
+							FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:  202,
-					FieldIdx: 1,
-					VMProto:  stepB,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    202,
-						FieldNames: []string{"id", "step"},
-						FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+					{
+						ShapeID:  202,
+						FieldIdx: 1,
+						VMProto:  stepB,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    202,
+							FieldNames: []string{"id", "step"},
+							FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+						},
 					},
 				},
 			},
@@ -358,25 +366,25 @@ func step_b(actor, tick) { return tick + 2 }`)
 		}
 	}
 	sawMono := false
-	for id, cases := range fn.FieldPolyShapeFacts {
+	for id, cases := range fn.Analysis.FieldPolyShapeFacts {
 		if id != method.ID && len(cases) == 1 && cases[0].VMProto == stepA {
 			sawMono = true
 		}
 	}
 	if !sawMono {
-		t.Fatalf("missing monomorphic case call fact: %#v", fn.FieldPolyShapeFacts)
+		t.Fatalf("missing monomorphic case call fact: %#v", fn.Analysis.FieldPolyShapeFacts)
 	}
 	sawFallback := false
-	for id, cases := range fn.FieldPolyShapeFacts {
+	for id, cases := range fn.Analysis.FieldPolyShapeFacts {
 		if id != method.ID && len(cases) == 1 && cases[0].VMProto == stepB {
 			sawFallback = true
 		}
 	}
 	if !sawFallback {
-		t.Fatalf("missing localized fallback case call fact: %#v", fn.FieldPolyShapeFacts)
+		t.Fatalf("missing localized fallback case call fact: %#v", fn.Analysis.FieldPolyShapeFacts)
 	}
-	if _, ok := fn.FieldPolyShapeFacts[method.ID]; ok {
-		t.Fatalf("stale pre-branch method facts were not removed: %#v", fn.FieldPolyShapeFacts[method.ID])
+	if _, ok := fn.Analysis.FieldPolyShapeFacts[method.ID]; ok {
+		t.Fatalf("stale pre-branch method facts were not removed: %#v", fn.Analysis.FieldPolyShapeFacts[method.ID])
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -416,26 +424,28 @@ func step_b(actor, tick) { return tick + 2 }`)
 		},
 		NumRegs: 2,
 		nextID:  5,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			2: {
-				{
-					ShapeID:  101,
-					FieldIdx: 1,
-					VMProto:  stepA,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    101,
-						FieldNames: []string{"id", "step"},
-						FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				2: {
+					{
+						ShapeID:  101,
+						FieldIdx: 1,
+						VMProto:  stepA,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    101,
+							FieldNames: []string{"id", "step"},
+							FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:  202,
-					FieldIdx: 1,
-					VMProto:  stepB,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    202,
-						FieldNames: []string{"id", "step"},
-						FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+					{
+						ShapeID:  202,
+						FieldIdx: 1,
+						VMProto:  stepB,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    202,
+							FieldNames: []string{"id", "step"},
+							FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+						},
 					},
 				},
 			},
@@ -498,26 +508,28 @@ func step_b(actor, tick) { return tick + 2 }`)
 		},
 		NumRegs: 2,
 		nextID:  5,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			2: {
-				{
-					ShapeID:  shapeID,
-					FieldIdx: 1,
-					VMProto:  stepA,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    shapeID,
-						FieldNames: []string{"id", "step"},
-						FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				2: {
+					{
+						ShapeID:  shapeID,
+						FieldIdx: 1,
+						VMProto:  stepA,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    shapeID,
+							FieldNames: []string{"id", "step"},
+							FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:  shapeID + 1,
-					FieldIdx: 1,
-					VMProto:  stepB,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    shapeID + 1,
-						FieldNames: []string{"id", "step"},
-						FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+					{
+						ShapeID:  shapeID + 1,
+						FieldIdx: 1,
+						VMProto:  stepB,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    shapeID + 1,
+							FieldNames: []string{"id", "step"},
+							FieldTypes: map[string]Type{"id": TypeInt, "step": TypeFunction},
+						},
 					},
 				},
 			},

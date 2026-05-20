@@ -6,7 +6,11 @@ package methodjit
 // shape arm produce the later length value and lets OpFieldPolyLen skip its own
 // shape dispatch when that value is already live.
 func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
-	if fn == nil || len(fn.Blocks) == 0 || len(fn.FieldPolyShapeFacts) == 0 {
+	if fn == nil || len(fn.Blocks) == 0 {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -17,7 +21,7 @@ func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
 			if call == nil || call.Op != OpFieldCallFloor || len(call.Args) == 0 || call.Args[0] == nil {
 				continue
 			}
-			callCases := fn.FieldPolyShapeFacts[call.ID]
+			callCases := fn.Analysis.FieldPolyShapeFacts[call.ID]
 			if len(callCases) < 2 {
 				continue
 			}
@@ -33,10 +37,10 @@ func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
 				if len(fusions) == 0 {
 					continue
 				}
-				if fn.FieldCallPolyLenFusions == nil {
-					fn.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
+				if fn.Analysis.FieldCallPolyLenFusions == nil {
+					fn.Analysis.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
 				}
-				fn.FieldCallPolyLenFusions[call.ID] = append(fn.FieldCallPolyLenFusions[call.ID], fusions...)
+				fn.Analysis.FieldCallPolyLenFusions[call.ID] = append(fn.Analysis.FieldCallPolyLenFusions[call.ID], fusions...)
 				if remarks := functionRemarks(fn); remarks != nil {
 					remarks.Add("FieldCallPolyLenFusion", "changed", block.ID, call.ID, call.Op,
 						"reused field-call shape dispatch for later field length")
@@ -71,7 +75,7 @@ func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []Fiel
 	if name == "" {
 		return nil
 	}
-	lenCases := fn.FieldPolyShapeFacts[ln.ID]
+	lenCases := fn.Analysis.FieldPolyShapeFacts[ln.ID]
 	if len(lenCases) == 0 {
 		return nil
 	}

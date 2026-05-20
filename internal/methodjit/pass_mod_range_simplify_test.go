@@ -7,7 +7,7 @@ import (
 )
 
 func TestModRangeSimplify_ReplacesKnownBelowDivisor(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "mod_identity"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "mod_identity"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	x := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 0, Block: b}
 	d := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 10, Block: b}
@@ -16,7 +16,7 @@ func TestModRangeSimplify_ReplacesKnownBelowDivisor(t *testing.T) {
 	b.Instrs = []*Instr{x, d, mod, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.IntRanges = map[int]intRange{x.ID: {min: 0, max: 9, known: true}}
+	fn.Analysis.IntRanges = map[int]intRange{x.ID: {min: 0, max: 9, known: true}}
 
 	out, err := ModRangeSimplifyPass(fn)
 	if err != nil {
@@ -31,7 +31,7 @@ func TestModRangeSimplify_ReplacesKnownBelowDivisor(t *testing.T) {
 }
 
 func TestModRangeSimplify_KeepsPossibleWrap(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "mod_wrap"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "mod_wrap"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	x := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 0, Block: b}
 	d := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 10, Block: b}
@@ -40,7 +40,7 @@ func TestModRangeSimplify_KeepsPossibleWrap(t *testing.T) {
 	b.Instrs = []*Instr{x, d, mod, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.IntRanges = map[int]intRange{x.ID: {min: 0, max: 10, known: true}}
+	fn.Analysis.IntRanges = map[int]intRange{x.ID: {min: 0, max: 10, known: true}}
 
 	out, err := ModRangeSimplifyPass(fn)
 	if err != nil {
@@ -52,7 +52,7 @@ func TestModRangeSimplify_KeepsPossibleWrap(t *testing.T) {
 }
 
 func TestModRangeSimplify_FoldsModuloOne(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "mod_one"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "mod_one"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	x := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 0, Block: b}
 	d := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 1, Block: b}
@@ -61,7 +61,7 @@ func TestModRangeSimplify_FoldsModuloOne(t *testing.T) {
 	b.Instrs = []*Instr{x, d, mod, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.IntRanges = map[int]intRange{x.ID: {min: -100, max: 100, known: true}}
+	fn.Analysis.IntRanges = map[int]intRange{x.ID: {min: -100, max: 100, known: true}}
 
 	out, err := ModRangeSimplifyPass(fn)
 	if err != nil {

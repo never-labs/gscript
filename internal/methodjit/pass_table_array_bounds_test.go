@@ -14,13 +14,13 @@ func TestTableArrayBoundsCheckHoist_MarksHeaderBoundedLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected loop-header guard to prove TableArrayLoad upper bound:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
 		t.Fatalf("expected non-negative induction to prove TableArrayLoad lower bound:\n%s", Print(out))
 	}
-	fact, ok := out.LoopTableArrayFacts[load.ID]
+	fact, ok := out.Analysis.LoopTableArrayFacts[load.ID]
 	if !ok || fact.AccessOp != OpTableArrayLoad || fact.KeyID != load.Args[2].ID || fact.LenID != load.Args[1].ID {
 		t.Fatalf("expected loop-region metadata for bounded load, fact=%+v\n%s", fact, Print(out))
 	}
@@ -33,7 +33,7 @@ func TestTableArrayBoundsCheckHoist_RejectsLoopTableMutation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe != nil && out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe != nil && out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("table mutation in loop must keep TableArrayLoad bounds check:\n%s", Print(out))
 	}
 }
@@ -45,7 +45,7 @@ func TestTableArrayBoundsCheckHoist_RejectsDifferentLoopBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe != nil && out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe != nil && out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("different loop bound must not prove TableArrayLoad upper bound:\n%s", Print(out))
 	}
 }
@@ -57,7 +57,7 @@ func TestLoopRegionVersioning_GuardsParamLimitAgainstArrayLen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected preheader n < len guard to prove TableArrayLoad upper bound:\n%s", Print(out))
 	}
 	foundGuard := false
@@ -79,13 +79,13 @@ func TestLoopRegionVersioning_MarksCheckedStoreUpperBound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] || !out.TableArrayUpperBoundSafe[store.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] || !out.Analysis.TableArrayUpperBoundSafe[store.ID] {
 		t.Fatalf("expected loop-region facts to prove load and store upper bounds:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] || !out.TableArrayLowerBoundSafe[store.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] || !out.Analysis.TableArrayLowerBoundSafe[store.ID] {
 		t.Fatalf("expected non-negative induction to prove load and store lower bounds:\n%s", Print(out))
 	}
-	storeFact, ok := out.LoopTableArrayFacts[store.ID]
+	storeFact, ok := out.Analysis.LoopTableArrayFacts[store.ID]
 	if !ok || storeFact.AccessOp != OpTableArrayStore || storeFact.TableID != store.Args[0].ID ||
 		storeFact.DataID != store.Args[1].ID || storeFact.LenID != store.Args[2].ID || storeFact.KeyID != store.Args[3].ID {
 		t.Fatalf("expected loop-region metadata for checked store, fact=%+v\n%s", storeFact, Print(out))
@@ -99,7 +99,7 @@ func TestLoopRegionVersioning_RejectsDifferentStoreLen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe != nil && out.TableArrayUpperBoundSafe[store.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe != nil && out.Analysis.TableArrayUpperBoundSafe[store.ID] {
 		t.Fatalf("store using a different len must keep its dynamic bounds check:\n%s", Print(out))
 	}
 }
@@ -111,13 +111,13 @@ func TestLoopRegionVersioning_AllowsNoAliasNoGlobalCall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected no-alias no-global call to preserve TableArrayLoad upper-bound proof:\n%s", Print(out))
 	}
 }
 
 func TestTableArrayStaticBounds_MarksSetListLoadWithRangedKey(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "static_bounds"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "static_bounds"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}
 	fn.Entry = entry
 	fn.Blocks = []*Block{entry}
@@ -132,22 +132,22 @@ func TestTableArrayStaticBounds_MarksSetListLoadWithRangedKey(t *testing.T) {
 	key := &Instr{ID: fn.newValueID(), Op: OpAddInt, Type: TypeInt, Block: entry}
 	load := &Instr{ID: fn.newValueID(), Op: OpTableArrayLoad, Type: TypeString, Aux: int64(vm.FBKindMixed), Args: []*Value{data.Value(), length.Value(), key.Value()}, Block: entry}
 	entry.Instrs = []*Instr{tbl, a, b, c, setList, header, length, data, key, load}
-	fn.IntRanges = map[int]intRange{key.ID: {min: 1, max: 3, known: true}}
+	fn.Analysis.IntRanges = map[int]intRange{key.ID: {min: 1, max: 3, known: true}}
 
 	out, err := TableArrayStaticBoundsPass(fn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected static SetList length to prove upper bound:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
 		t.Fatalf("expected key range to prove lower bound:\n%s", Print(out))
 	}
 }
 
 func TestTableArrayStaticBounds_MarksDominatingLenGuardWithRangedKey(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "guarded_len_bounds"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "guarded_len_bounds"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}
 	fn.Entry = entry
 	fn.Blocks = []*Block{entry}
@@ -161,22 +161,22 @@ func TestTableArrayStaticBounds_MarksDominatingLenGuardWithRangedKey(t *testing.
 	key := &Instr{ID: fn.newValueID(), Op: OpAddInt, Type: TypeInt, Block: entry}
 	load := &Instr{ID: fn.newValueID(), Op: OpTableArrayLoad, Type: TypeTable, Aux: int64(vm.FBKindMixed), Args: []*Value{data.Value(), length.Value(), key.Value()}, Block: entry}
 	entry.Instrs = []*Instr{tbl, header, length, five, lt, guard, data, key, load}
-	fn.IntRanges = map[int]intRange{key.ID: {min: 1, max: 5, known: true}}
+	fn.Analysis.IntRanges = map[int]intRange{key.ID: {min: 1, max: 5, known: true}}
 
 	out, err := TableArrayStaticBoundsPass(fn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected dominating len guard to prove upper bound:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
 		t.Fatalf("expected key range to prove lower bound:\n%s", Print(out))
 	}
 }
 
 func TestTableArrayStaticBounds_UsesDominatingTrueBranchKeyUpper(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "guarded_branch_key_bounds"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "guarded_branch_key_bounds"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}
 	body := &Block{ID: 1}
 	exit := &Block{ID: 2}
@@ -200,17 +200,17 @@ func TestTableArrayStaticBounds_UsesDominatingTrueBranchKeyUpper(t *testing.T) {
 	load := &Instr{ID: fn.newValueID(), Op: OpTableArrayLoad, Type: TypeTable, Aux: int64(vm.FBKindMixed), Args: []*Value{data.Value(), length.Value(), key.Value()}, Block: body}
 	body.Instrs = []*Instr{data, load, {ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Block: body}}
 	exit.Instrs = []*Instr{{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Block: exit}}
-	fn.IntRanges = map[int]intRange{}
-	fn.IntNonNegative = map[int]bool{key.ID: true}
+	fn.Analysis.IntRanges = map[int]intRange{}
+	fn.Analysis.IntNonNegative = map[int]bool{key.ID: true}
 
 	out, err := TableArrayStaticBoundsPass(fn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected true-branch key guard plus len guard to prove upper bound:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
 		t.Fatalf("expected key range to prove lower bound:\n%s", Print(out))
 	}
 }
@@ -245,10 +245,10 @@ func TestTableArrayStaticBounds_MarksInductionKeyWithDominatingLenGuard(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected induction key plus len guard to prove upper bound:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
 		t.Fatalf("expected induction key to prove lower bound:\n%s", Print(out))
 	}
 }
@@ -298,10 +298,10 @@ func TestTableArrayStaticBounds_MarksInductionKeyWithSplitPreheaderLenGuard(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("expected split preheader len guard to prove upper bound:\n%s", Print(out))
 	}
-	if out.TableArrayLowerBoundSafe == nil || !out.TableArrayLowerBoundSafe[load.ID] {
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
 		t.Fatalf("expected induction key to prove lower bound:\n%s", Print(out))
 	}
 }
@@ -313,7 +313,7 @@ func TestLoopRegionVersioning_RejectsAliasingNoGlobalCall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe != nil && out.TableArrayUpperBoundSafe[load.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe != nil && out.Analysis.TableArrayUpperBoundSafe[load.ID] {
 		t.Fatalf("call receiving the target table must keep TableArrayLoad bounds check:\n%s", Print(out))
 	}
 }
@@ -327,8 +327,10 @@ func tableArrayBoundsCallLoopFixture(t *testing.T, passTargetTable bool) (*Funct
 			Constants: []runtime.Value{runtime.StringValue("helper")},
 		},
 		NumRegs: 4,
-		Globals: map[string]*vm.FuncProto{
-			"helper": {Name: "helper", NoGlobalOps: true},
+		Analysis: &AnalysisResult{
+			Globals: map[string]*vm.FuncProto{
+				"helper": {Name: "helper", NoGlobalOps: true},
+			},
 		},
 	}
 	entry, header, body, exit := buildSimpleLoop(fn)

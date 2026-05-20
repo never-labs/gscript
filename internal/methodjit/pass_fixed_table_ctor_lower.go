@@ -10,16 +10,14 @@ import (
 // constructors into one value-producing op after escape analysis has had a
 // chance to scalar-replace the expanded NewTable+SetField form.
 func FixedTableConstructorLoweringPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Proto == nil {
-		return fn, nil
-	}
-	if len(fn.FixedTableConstructors) > 0 {
+	fn.ensureAnalysis()
+	if len(fn.Analysis.FixedTableConstructors) > 0 {
 		for _, block := range fn.Blocks {
 			for i, instr := range block.Instrs {
 				if instr == nil || instr.Op != OpNewTable {
 					continue
 				}
-				fact, ok := fn.FixedTableConstructors[instr.ID]
+				fact, ok := fn.Analysis.FixedTableConstructors[instr.ID]
 				if !ok {
 					continue
 				}
@@ -149,9 +147,6 @@ type materializedCtorCandidate struct {
 }
 
 func lowerMaterializedTableConstructors(fn *Function) {
-	if fn == nil || fn.Proto == nil {
-		return
-	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpNewTable {

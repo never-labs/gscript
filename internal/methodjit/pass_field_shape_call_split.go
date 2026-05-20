@@ -13,7 +13,11 @@ import (
 // is a staging component for guarded runtime specialization; tests exercise the
 // CFG rewrite before the pipeline starts using it broadly.
 func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
-	if fn == nil || len(fn.FieldPolyShapeFacts) == 0 {
+	if fn == nil {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
 		return fn, nil
 	}
 	for splits := 0; splits < 16; splits++ {
@@ -50,7 +54,11 @@ func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
 // call path while eligible shape arms become visible to the regular inline and
 // table-native lowering pipeline.
 func FieldShapeCallSplitPreInlinePass(fn *Function) (*Function, error) {
-	if fn == nil || len(fn.FieldPolyShapeFacts) == 0 {
+	if fn == nil {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
 		return fn, nil
 	}
 	for splits := 0; splits < 16; splits++ {
@@ -81,7 +89,7 @@ func fieldShapeSplitPreInlineCallCase(fn *Function, block *Block, idx int, call 
 	if calleeLoad == nil {
 		return false
 	}
-	cases := fn.FieldPolyShapeFacts[calleeLoad.ID]
+	cases := fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
 	if len(cases) < 2 || len(call.Args) < 2 {
 		return false
 	}
@@ -183,7 +191,7 @@ func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, cal
 	caseJump.copySourceFrom(call)
 	caseBlock.Instrs = []*Instr{caseLoad, caseCall, caseJump}
 	caseBlock.Succs = []*Block{mergeBlock}
-	fn.FieldPolyShapeFacts[caseLoad.ID] = []FieldPolyShapeCase{c}
+	fn.Analysis.FieldPolyShapeFacts[caseLoad.ID] = []FieldPolyShapeCase{c}
 	recordFieldPolyShapeCatalog(fn, []FieldPolyShapeCase{c})
 
 	fallbackInstrs := make([]*Instr, 0, 3)
@@ -206,14 +214,14 @@ func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, cal
 		fallbackArgs[0] = fallbackLoad.Value()
 		call.Args = fallbackArgs
 		fallbackInstrs = append(fallbackInstrs, fallbackLoad)
-		fn.FieldPolyShapeFacts[fallbackLoad.ID] = remaining
+		fn.Analysis.FieldPolyShapeFacts[fallbackLoad.ID] = remaining
 		recordFieldPolyShapeCatalog(fn, remaining)
-		delete(fn.FieldPolyShapeFacts, calleeLoad.ID)
+		delete(fn.Analysis.FieldPolyShapeFacts, calleeLoad.ID)
 	} else {
 		if aux2 := fieldPolyShapeCasesAux2(remaining); aux2 != 0 {
 			calleeLoad.Aux2 = aux2
 		}
-		fn.FieldPolyShapeFacts[calleeLoad.ID] = remaining
+		fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID] = remaining
 		recordFieldPolyShapeCatalog(fn, remaining)
 	}
 	call.Block = fallbackBlock
@@ -269,7 +277,7 @@ func removeInstrByID(instrs []*Instr, id int) []*Instr {
 }
 
 func fieldShapeSplitSingleBlockCase(fn *Function, block *Block, idx int, call *Instr) bool {
-	cases := fn.FieldPolyShapeFacts[call.ID]
+	cases := fn.Analysis.FieldPolyShapeFacts[call.ID]
 	if len(cases) < 2 || len(call.Args) == 0 {
 		functionRemarks(fn).Add("FieldShapeCallSplit", "missed", block.ID, call.ID, call.Op,
 			fmt.Sprintf("missing field-shape cases for call: cases=%d args=%d", len(cases), len(call.Args)))
@@ -540,7 +548,7 @@ func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c Fie
 	}
 	caseCall.copySourceFrom(call)
 	caseBlock.Instrs = append(caseBlock.Instrs, caseCall)
-	fn.FieldPolyShapeFacts[caseCall.ID] = []FieldPolyShapeCase{c}
+	fn.Analysis.FieldPolyShapeFacts[caseCall.ID] = []FieldPolyShapeCase{c}
 	recordFieldPolyShapeCatalog(fn, []FieldPolyShapeCase{c})
 	caseResult := caseCall.Value()
 	caseJump := &Instr{ID: fn.newValueID(), Op: OpJump, Block: caseBlock}
@@ -554,7 +562,7 @@ func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c Fie
 	fallbackBlock.Instrs = []*Instr{call, fallbackJump}
 	fallbackBlock.Succs = []*Block{mergeBlock}
 	remaining := fieldShapeCasesWithout(cases, caseIdx)
-	fn.FieldPolyShapeFacts[call.ID] = remaining
+	fn.Analysis.FieldPolyShapeFacts[call.ID] = remaining
 	recordFieldPolyShapeCatalog(fn, remaining)
 
 	mergeBlock.Preds = []*Block{caseBlock, fallbackBlock}

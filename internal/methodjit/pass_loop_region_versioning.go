@@ -26,7 +26,8 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
-	fn.LoopTableArrayFacts = nil
+	fn.ensureAnalysis()
+	fn.Analysis.LoopTableArrayFacts = nil
 
 	li := computeLoopInfo(fn)
 	if !li.hasLoops() {
@@ -35,8 +36,8 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 
 	dom := computeDominators(fn)
 	preheaders := computeLoopPreheaders(fn, li)
-	safe := cloneTableArrayBoolMap(fn.TableArrayUpperBoundSafe)
-	lowerSafe := cloneTableArrayBoolMap(fn.TableArrayLowerBoundSafe)
+	safe := cloneTableArrayBoolMap(fn.Analysis.TableArrayUpperBoundSafe)
+	lowerSafe := cloneTableArrayBoolMap(fn.Analysis.TableArrayLowerBoundSafe)
 	accessFacts := make(map[int]LoopTableArrayFact)
 
 	for _, header := range fn.Blocks {
@@ -115,15 +116,15 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 	}
 
 	if len(safe) == 0 {
-		fn.TableArrayUpperBoundSafe = nil
-		fn.TableArrayLowerBoundSafe = nil
+		fn.Analysis.TableArrayUpperBoundSafe = nil
+		fn.Analysis.TableArrayLowerBoundSafe = nil
 		return fn, nil
 	}
-	fn.TableArrayUpperBoundSafe = safe
+	fn.Analysis.TableArrayUpperBoundSafe = safe
 	if len(lowerSafe) > 0 {
-		fn.TableArrayLowerBoundSafe = lowerSafe
+		fn.Analysis.TableArrayLowerBoundSafe = lowerSafe
 	}
-	fn.LoopTableArrayFacts = accessFacts
+	fn.Analysis.LoopTableArrayFacts = accessFacts
 	return fn, nil
 }
 
@@ -137,7 +138,7 @@ func loopRegionKeyNonNegative(fn *Function, li *loopInfo, header *Block, key *Va
 	if fn == nil || li == nil || header == nil || key == nil {
 		return false
 	}
-	if fn.IntNonNegative != nil && fn.IntNonNegative[key.ID] {
+	if fn.Analysis.IntNonNegative != nil && fn.Analysis.IntNonNegative[key.ID] {
 		return true
 	}
 	if c, ok := constIntFromValue(key); ok {
@@ -146,7 +147,7 @@ func loopRegionKeyNonNegative(fn *Function, li *loopInfo, header *Block, key *Va
 	if key.Def == nil {
 		return false
 	}
-	if r, ok := fn.IntRanges[key.ID]; ok && r.nonNegative() {
+	if r, ok := fn.Analysis.IntRanges[key.ID]; ok && r.nonNegative() {
 		return true
 	}
 	for _, instr := range header.Instrs {

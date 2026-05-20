@@ -6,7 +6,11 @@ import "fmt"
 // constants/phis when existing shape-split control flow already proves the
 // receiver shape on every incoming edge.
 func FieldPolyLenPhiPass(fn *Function) (*Function, error) {
-	if fn == nil || len(fn.Blocks) == 0 || len(fn.FieldPolyShapeFacts) == 0 {
+	if fn == nil || len(fn.Blocks) == 0 {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
 		return fn, nil
 	}
 	changed := false
@@ -66,7 +70,7 @@ func fieldPolyLenExactLens(fn *Function, instr *Instr) map[uint32]int64 {
 	if name == "" {
 		return nil
 	}
-	for _, c := range fn.FieldPolyShapeFacts[instr.ID] {
+	for _, c := range fn.Analysis.FieldPolyShapeFacts[instr.ID] {
 		r, ok := c.ReceiverFact.FieldLenRanges[name]
 		if c.ShapeID == 0 || !ok || !r.known || r.min != r.max {
 			return nil

@@ -17,6 +17,7 @@ func CallResultRangeGuardPass(fn *Function) (*Function, error) {
 	if fn == nil || fn.Proto == nil || fn.Proto.CallSiteFeedback == nil {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {
 		if block == nil {
@@ -122,8 +123,8 @@ func callFloorSpeculativeNarrowRangeCandidate(fn *Function, instr *Instr, fb vm.
 	}
 	switch instr.Op {
 	case OpCallFloor:
-		if fn != nil && fn.CallABIs != nil {
-			if desc, ok := fn.CallABIs[instr.ID]; ok && desc.ReturnRep != SpecializedABIReturnNone {
+		if fn != nil && fn.Analysis.CallABIs != nil {
+			if desc, ok := fn.Analysis.CallABIs[instr.ID]; ok && desc.ReturnRep != SpecializedABIReturnNone {
 				return true
 			}
 		}
@@ -131,7 +132,7 @@ func callFloorSpeculativeNarrowRangeCandidate(fn *Function, instr *Instr, fb vm.
 		_, vmOK := fb.StableCalleeVMProto()
 		return nativeOK || vmOK
 	case OpFieldCallFloor:
-		return fn != nil && len(fn.FieldPolyShapeFacts[instr.ID]) > 0
+		return fn != nil && len(fn.Analysis.FieldPolyShapeFacts[instr.ID]) > 0
 	default:
 		return false
 	}
@@ -155,7 +156,7 @@ func callResultHasStableCallee(fn *Function, instr *Instr, fb vm.CallSiteFeedbac
 	if _, ok := fb.StableCalleeVMProto(); ok {
 		return true
 	}
-	if _, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Globals}); callee != nil {
+	if _, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.Globals}); callee != nil {
 		return true
 	}
 	return false

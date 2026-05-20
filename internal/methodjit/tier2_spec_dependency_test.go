@@ -55,13 +55,15 @@ func TestSortedSpecDependencyProtosDropsSelfAndOrdersByName(t *testing.T) {
 	c := &vm.FuncProto{Name: "c"}
 	fn := &Function{
 		Proto: self,
-		SpecDependencyProtos: map[*vm.FuncProto]bool{
-			b:    true,
-			self: true,
-			a:    true,
-		},
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			10: {{VMProto: c}},
+		Analysis: &AnalysisResult{
+			SpecDependencyProtos: map[*vm.FuncProto]bool{
+				b:    true,
+				self: true,
+				a:    true,
+			},
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				10: {{VMProto: c}},
+			},
 		},
 	}
 

@@ -5,7 +5,11 @@ package methodjit
 // rewrites positive constant divisors and non-negative dividends whose maximum
 // is strictly below the divisor, preserving Lua modulo semantics for negatives.
 func ModRangeSimplifyPass(fn *Function) (*Function, error) {
-	if fn == nil || len(fn.Blocks) == 0 || len(fn.IntRanges) == 0 {
+	if fn == nil || len(fn.Blocks) == 0 {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	if len(fn.Analysis.IntRanges) == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -28,7 +32,7 @@ func ModRangeSimplifyPass(fn *Function) (*Function, error) {
 				continue
 			}
 			lhs := instr.Args[0]
-			r, ok := fn.IntRanges[lhs.ID]
+			r, ok := fn.Analysis.IntRanges[lhs.ID]
 			if !ok || !r.known || r.min < 0 || r.max >= divisor {
 				continue
 			}

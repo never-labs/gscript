@@ -14,7 +14,7 @@ func TestFieldLenFold_FoldsJoinConstStringStores(t *testing.T) {
 			runtime.StringValue("idle"),
 		},
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b0 := &Block{ID: 0}
 	b1 := &Block{ID: 1}
 	b2 := &Block{ID: 2}
@@ -55,7 +55,7 @@ func TestFieldLenFold_LowersProfiledPolyFieldLen(t *testing.T) {
 			runtime.StringValue("kind"),
 		},
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b0 := &Block{ID: 0}
 	fn.Entry = b0
 	fn.Blocks = []*Block{b0}
@@ -64,7 +64,7 @@ func TestFieldLenFold_LowersProfiledPolyFieldLen(t *testing.T) {
 	get := &Instr{ID: 2, Op: OpGetField, Type: TypeString, Args: []*Value{tbl.Value()}, Aux: 0, Block: b0}
 	ln := &Instr{ID: 3, Op: OpLen, Type: TypeInt, Args: []*Value{get.Value()}, Block: b0}
 	b0.Instrs = []*Instr{tbl, get, ln, {Op: OpReturn, Args: []*Value{ln.Value()}, Block: b0}}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		get.ID: {
 			{ShapeID: 101, FieldIdx: 0, Type: TypeString, ReceiverFact: FixedShapeTableFact{
 				ShapeID: 101, FieldLenRanges: map[string]intRange{"kind": pointRange(2)},
@@ -82,11 +82,11 @@ func TestFieldLenFold_LowersProfiledPolyFieldLen(t *testing.T) {
 	if out == nil || ln.Op != OpFieldPolyLen || ln.Type != TypeInt || len(ln.Args) != 1 || ln.Args[0].ID != tbl.ID {
 		t.Fatalf("len op not lowered to FieldPolyLen:\n%s", Print(fn))
 	}
-	cases := fn.FieldPolyShapeFacts[ln.ID]
+	cases := fn.Analysis.FieldPolyShapeFacts[ln.ID]
 	if len(cases) != 2 {
 		t.Fatalf("FieldPolyLen facts not copied, got %d cases", len(cases))
 	}
-	if r, ok := fn.ProfiledIntRanges[ln.ID]; !ok || !r.known || r.min != 2 || r.max != 5 {
+	if r, ok := fn.Analysis.ProfiledIntRanges[ln.ID]; !ok || !r.known || r.min != 2 || r.max != 5 {
 		t.Fatalf("FieldPolyLen profiled int range=%+v ok=%v, want [2,5]", r, ok)
 	}
 }
@@ -98,7 +98,7 @@ func TestFieldLenFold_DoesNotLowerProfiledPolyLenForMutatedField(t *testing.T) {
 			runtime.StringValue("longer"),
 		},
 	}
-	fn := &Function{Proto: proto}
+	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b0 := &Block{ID: 0}
 	fn.Entry = b0
 	fn.Blocks = []*Block{b0}
@@ -109,7 +109,7 @@ func TestFieldLenFold_DoesNotLowerProfiledPolyLenForMutatedField(t *testing.T) {
 	get := &Instr{ID: 4, Op: OpGetField, Type: TypeString, Args: []*Value{tbl.Value()}, Aux: 0, Block: b0}
 	ln := &Instr{ID: 5, Op: OpLen, Type: TypeInt, Args: []*Value{get.Value()}, Block: b0}
 	b0.Instrs = []*Instr{tbl, next, set, get, ln, {Op: OpReturn, Args: []*Value{ln.Value()}, Block: b0}}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		get.ID: {
 			{ShapeID: 101, FieldIdx: 0, Type: TypeString, ReceiverFact: FixedShapeTableFact{
 				ShapeID: 101, FieldLenRanges: map[string]intRange{"kind": pointRange(4)},
@@ -133,7 +133,9 @@ func TestFieldLenFold_FoldsProfiledExactLen(t *testing.T) {
 	fn := &Function{
 		Proto:             &vm.FuncProto{Name: "profiled_len"},
 		NumRegs:           1,
-		ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
+		Analysis: &AnalysisResult{
+			ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
+		},
 	}
 	b0 := &Block{ID: 0, defs: make(map[int]*Value)}
 	s := &Instr{ID: 2, Op: OpGetField, Type: TypeString, Aux: 0, Block: b0}
@@ -156,7 +158,9 @@ func TestProfiledStringLenFold_FoldsAfterFieldLowering(t *testing.T) {
 	fn := &Function{
 		Proto:             &vm.FuncProto{Name: "profiled_len_after_lower"},
 		NumRegs:           1,
-		ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
+		Analysis: &AnalysisResult{
+			ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
+		},
 	}
 	b0 := &Block{ID: 0, defs: make(map[int]*Value)}
 	svals := &Instr{ID: 1, Op: OpFieldSvals, Type: TypeInt, Block: b0}
@@ -180,11 +184,13 @@ func TestProfiledStringLenFold_FoldsLoweredFixedShapeFieldLen(t *testing.T) {
 	fn := &Function{
 		Proto:   &vm.FuncProto{Name: "lowered_fixed_shape_len"},
 		NumRegs: 1,
-		FixedShapeTables: map[int]FixedShapeTableFact{
-			1: {
-				ShapeID:        42,
-				FieldNames:     []string{"kind"},
-				FieldLenRanges: map[string]intRange{"kind": pointRange(7)},
+		Analysis: &AnalysisResult{
+			FixedShapeTables: map[int]FixedShapeTableFact{
+				1: {
+					ShapeID:        42,
+					FieldNames:     []string{"kind"},
+					FieldLenRanges: map[string]intRange{"kind": pointRange(7)},
+				},
 			},
 		},
 	}
@@ -211,9 +217,11 @@ func TestProfiledStringLenFold_ReplacesLenOfPhi(t *testing.T) {
 	fn := &Function{
 		Proto:   &vm.FuncProto{Name: "profiled_len_phi"},
 		NumRegs: 1,
-		ProfiledLenRanges: map[int]intRange{
-			10: pointRange(4),
-			11: pointRange(5),
+		Analysis: &AnalysisResult{
+			ProfiledLenRanges: map[int]intRange{
+				10: pointRange(4),
+				11: pointRange(5),
+			},
 		},
 	}
 	entry := &Block{ID: 0, defs: make(map[int]*Value)}

@@ -40,6 +40,11 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		return nil, err
 	}
 
+	// Ensure Analysis is initialized for functions constructed outside BuildGraph.
+	if fn.Analysis == nil {
+		fn.Analysis = NewAnalysisResult()
+	}
+
 	// Check if any FPR allocations exist (to skip FPR save/restore).
 	hasFPR := false
 	for _, pr := range alloc.ValueRegs {
@@ -264,7 +269,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	nativeCallCalleeResumeSafe := tier2NativeCallCalleeResumeSafe(fn)
 	rawIntSelfABI := AnalyzeRawIntSelfABI(fn.Proto)
 	typedSelfABI := AnalyzeTypedSelfABI(fn.Proto)
-	typedPeerABI := AnalyzeTypedPeerABIWithFactsAndGlobals(fn.Proto, nil, nil, fn.NumericGlobalValues, fn.GlobalArrayElementFacts)
+	typedPeerABI := AnalyzeTypedPeerABIWithFactsAndGlobals(fn.Proto, nil, nil, fn.Analysis.NumericGlobalValues, fn.Analysis.GlobalArrayElementFacts)
 	typedEntryABI := typedSelfABI
 	if !typedEntryABI.Eligible && typedPeerABI.Eligible {
 		typedEntryABI = typedPeerABI
@@ -338,7 +343,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		nativeCallCalleeResumeSafe: nativeCallCalleeResumeSafe,
 		rawIntSelfABI:              rawIntSelfABI,
 		typedSelfABI:               typedEntryABI,
-		entryShapeGuards:           fn.FixedShapeEntryGuards,
+		entryShapeGuards:           fn.Analysis.FixedShapeEntryGuards,
 		traceNativeCalls:           opts.TraceNativeCalls,
 		printNativeCallTrace:       opts.PrintNativeCallTrace,
 	}
@@ -496,11 +501,11 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		CallCachePCs:             ec.callCachePCs,
 		NewTableCaches:           ec.newTableCaches,
 		FixedTableArgSlots:       ec.fixedTableArgSlots,
-		FixedRecordNewTableSites: fn.FixedRecordNewTableSites,
+		FixedRecordNewTableSites: fn.Analysis.FixedRecordNewTableSites,
 		StringConstTables:        fn.StringConstTables,
 		StringFormatPatterns:     fn.StringFormatPatterns,
 		StringSplitSubSpecs:      fn.StringSplitSubSpecs,
-		WholeCallNoResultBatches: fn.WholeCallNoResultBatches,
+		WholeCallNoResultBatches: fn.Analysis.WholeCallNoResultBatches,
 		RecordArrayLoopCaches:    fn.RecordArrayLoopCaches,
 		InstrCodeRanges:          ec.instrCodeRanges,
 		ExitSites:                exitSites,

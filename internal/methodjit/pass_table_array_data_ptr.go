@@ -15,12 +15,13 @@ func TableArrayDataPtrFactPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
+fn.ensureAnalysis()
 	facts := collectTableArrayDataPtrFacts(fn)
 	if len(facts) == 0 {
-		fn.TableArrayDataPtrs = nil
+		fn.Analysis.TableArrayDataPtrs = nil
 		return fn, nil
 	}
-	fn.TableArrayDataPtrs = facts
+	fn.Analysis.TableArrayDataPtrs = facts
 	return fn, nil
 }
 
@@ -65,9 +66,9 @@ func collectTableArrayDataPtrFacts(fn *Function) map[int]TableArrayDataPtrFact {
 }
 
 func (f *Function) tableArrayDataPtrFact(valueID int) (TableArrayDataPtrFact, bool) {
-	if f == nil || f.TableArrayDataPtrs == nil {
+	if f == nil || f.Analysis.TableArrayDataPtrs == nil {
 		return TableArrayDataPtrFact{}, false
 	}
-	fact, ok := f.TableArrayDataPtrs[valueID]
+	fact, ok := f.Analysis.TableArrayDataPtrs[valueID]
 	return fact, ok
 }

@@ -13,6 +13,7 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
+fn.ensureAnalysis()
 	seedShapeFieldTypesFromFixedConstructors(fn)
 	seedShapeFieldTypesFromCatalog(fn)
 	type key struct {
@@ -53,10 +54,10 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 			}
 			k := key{shapeID: shapeID, typ: instr.Type}
 			guardMasks[k] |= uint64(1) << uint(fieldIdx)
-			if fn.ShapeFieldTypeElidedLoads == nil {
-				fn.ShapeFieldTypeElidedLoads = make(map[int]bool)
+			if fn.Analysis.ShapeFieldTypeElidedLoads == nil {
+				fn.Analysis.ShapeFieldTypeElidedLoads = make(map[int]bool)
 			}
-			fn.ShapeFieldTypeElidedLoads[instr.ID] = true
+			fn.Analysis.ShapeFieldTypeElidedLoads[instr.ID] = true
 			functionRemarks(fn).Add("ShapeFieldTypeGuard", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("elide per-load type check for shape %d field %d as %s", shapeID, fieldIdx, instr.Type))
 		}
@@ -94,10 +95,10 @@ func shapeFieldTypeGuardedLoadType(t Type) bool {
 }
 
 func seedShapeFieldTypesFromCatalog(fn *Function) {
-	if fn == nil || len(fn.FieldPolyShapeCatalog) == 0 {
+	if fn == nil || len(fn.Analysis.FieldPolyShapeCatalog) == 0 {
 		return
 	}
-	for shapeID, fact := range fn.FieldPolyShapeCatalog {
+	for shapeID, fact := range fn.Analysis.FieldPolyShapeCatalog {
 		if shapeID == 0 || fact.ShapeID != shapeID || len(fact.FieldNames) == 0 || len(fact.FieldTypes) == 0 {
 			continue
 		}

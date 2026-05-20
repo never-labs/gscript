@@ -13,7 +13,7 @@ func TestFieldCallPolyLenFusionPass_RecordsSameBlockFusion(t *testing.T) {
 	fn := &Function{Proto: &vm.FuncProto{
 		Name:      "caller",
 		Constants: []runtime.Value{runtime.StringValue("kind")},
-	}}
+	}, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
@@ -25,7 +25,7 @@ func TestFieldCallPolyLenFusionPass_RecordsSameBlockFusion(t *testing.T) {
 	ln := &Instr{ID: fn.newValueID(), Op: OpFieldPolyLen, Type: TypeInt, Args: []*Value{recv.Value()}, Aux: 0, Block: b}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{ln.Value()}, Block: b}
 	b.Instrs = []*Instr{recv, tick, call, mod, ln, ret}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {
 			{ShapeID: 101, FieldIdx: 0, VMProto: calleeA},
 			{ShapeID: 102, FieldIdx: 0, VMProto: calleeB},
@@ -40,7 +40,7 @@ func TestFieldCallPolyLenFusionPass_RecordsSameBlockFusion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FieldCallPolyLenFusionPass: %v", err)
 	}
-	fusions := out.FieldCallPolyLenFusions[call.ID]
+	fusions := out.Analysis.FieldCallPolyLenFusions[call.ID]
 	if len(fusions) != 2 {
 		t.Fatalf("fusion count=%d want 2", len(fusions))
 	}
@@ -57,7 +57,7 @@ func TestFieldCallPolyLenFusionPass_StopsAtMutationBarrier(t *testing.T) {
 	fn := &Function{Proto: &vm.FuncProto{
 		Name:      "caller",
 		Constants: []runtime.Value{runtime.StringValue("kind")},
-	}}
+	}, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
@@ -69,7 +69,7 @@ func TestFieldCallPolyLenFusionPass_StopsAtMutationBarrier(t *testing.T) {
 	ln := &Instr{ID: fn.newValueID(), Op: OpFieldPolyLen, Type: TypeInt, Args: []*Value{recv.Value()}, Aux: 0, Block: b}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{ln.Value()}, Block: b}
 	b.Instrs = []*Instr{recv, tick, call, set, ln, ret}
-	fn.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {
 			{ShapeID: 101, FieldIdx: 0, VMProto: callee},
 			{ShapeID: 102, FieldIdx: 0, VMProto: callee},
@@ -84,7 +84,7 @@ func TestFieldCallPolyLenFusionPass_StopsAtMutationBarrier(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FieldCallPolyLenFusionPass: %v", err)
 	}
-	if got := len(out.FieldCallPolyLenFusions[call.ID]); got != 0 {
+	if got := len(out.Analysis.FieldCallPolyLenFusions[call.ID]); got != 0 {
 		t.Fatalf("fusion count=%d want 0", got)
 	}
 }

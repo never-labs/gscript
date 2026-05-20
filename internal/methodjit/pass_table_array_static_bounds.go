@@ -7,6 +7,7 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
+fn.ensureAnalysis()
 	facts := collectStaticTableLenFacts(fn)
 	dom := computeDominators(fn)
 	li := computeLoopInfo(fn)
@@ -89,7 +90,7 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 	nonNegative := false
 	var max int64
 	maxKnown := false
-	if r, ok := fn.IntRanges[key.ID]; ok && r.known {
+	if r, ok := fn.Analysis.IntRanges[key.ID]; ok && r.known {
 		nonNegative = r.min >= 0
 		max = r.max
 		maxKnown = true
@@ -101,7 +102,7 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 			maxKnown = true
 		}
 	}
-	if fn.IntNonNegative != nil && fn.IntNonNegative[key.ID] {
+	if fn.Analysis.IntNonNegative != nil && fn.Analysis.IntNonNegative[key.ID] {
 		nonNegative = true
 	}
 	if tableArrayKeyNonNegativeFromInduction(li, key) {
@@ -313,15 +314,15 @@ func tableArrayLenGuardDominates(fact tableArrayLenGuardFact, dom *domInfo, orde
 }
 
 func markTableArrayLowerBoundSafe(fn *Function, instr *Instr) {
-	if fn.TableArrayLowerBoundSafe == nil {
-		fn.TableArrayLowerBoundSafe = make(map[int]bool)
+	if fn.Analysis.TableArrayLowerBoundSafe == nil {
+		fn.Analysis.TableArrayLowerBoundSafe = make(map[int]bool)
 	}
-	fn.TableArrayLowerBoundSafe[instr.ID] = true
+	fn.Analysis.TableArrayLowerBoundSafe[instr.ID] = true
 }
 
 func markTableArrayUpperBoundSafe(fn *Function, instr *Instr) {
-	if fn.TableArrayUpperBoundSafe == nil {
-		fn.TableArrayUpperBoundSafe = make(map[int]bool)
+	if fn.Analysis.TableArrayUpperBoundSafe == nil {
+		fn.Analysis.TableArrayUpperBoundSafe = make(map[int]bool)
 	}
-	fn.TableArrayUpperBoundSafe[instr.ID] = true
+	fn.Analysis.TableArrayUpperBoundSafe[instr.ID] = true
 }

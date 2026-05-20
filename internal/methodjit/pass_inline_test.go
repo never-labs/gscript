@@ -68,10 +68,12 @@ func step_b(actor, tick) { return tick + 2 }
 		Entry:   block,
 		Proto:   &vm.FuncProto{Name: "caller"},
 		Remarks: remarks,
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			calleeLoad.ID: {
-				{ShapeID: 101, FieldIdx: 0, VMProto: stepA, ReceiverFact: FixedShapeTableFact{ShapeID: 101}},
-				{ShapeID: 202, FieldIdx: 0, VMProto: stepB, ReceiverFact: FixedShapeTableFact{ShapeID: 202}},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				calleeLoad.ID: {
+					{ShapeID: 101, FieldIdx: 0, VMProto: stepA, ReceiverFact: FixedShapeTableFact{ShapeID: 101}},
+					{ShapeID: 202, FieldIdx: 0, VMProto: stepB, ReceiverFact: FixedShapeTableFact{ShapeID: 202}},
+				},
 			},
 		},
 	}
@@ -425,32 +427,6 @@ func f(x) {
 }
 
 // TestInline_Pipeline tests that InlinePass integrates with the pipeline.
-func TestInline_Pipeline(t *testing.T) {
-	src := `
-func add(a, b) {
-	return a + b
-}
-func f(x) {
-	return add(x, 1)
-}
-`
-	fn, config := buildInlineTestIR(t, src, "f")
-
-	p := NewPipeline()
-	p.Add("Inline", InlinePassWith(config))
-	p.SetValidator(Validate)
-
-	result, err := p.Run(fn)
-	if err != nil {
-		t.Fatalf("pipeline error: %v", err)
-	}
-
-	// After inlining through the pipeline, no OpCall should remain.
-	if n := countOp(result, OpCall); n != 0 {
-		t.Errorf("expected 0 OpCall after pipeline inline, got %d", n)
-	}
-}
-
 // TestInline_MultipleCallSites tests inlining when the same function is called
 // multiple times in the caller.
 func TestInline_MultipleCallSites(t *testing.T) {

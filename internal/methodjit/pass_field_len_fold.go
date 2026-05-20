@@ -8,6 +8,7 @@ func FieldLenFoldPass(fn *Function) (*Function, error) {
 	if fn == nil || fn.Proto == nil {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
 	mutations := collectFieldLenMutations(fn)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -62,6 +63,7 @@ func ProfiledStringLenFoldPass(fn *Function) (*Function, error) {
 	if fn == nil || fn.Proto == nil {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
 	mutations := collectFieldLenMutations(fn)
 	fieldLoadLens := fieldLoadExactLenFacts(fn, mutations)
 	for _, block := range fn.Blocks {
@@ -134,10 +136,10 @@ func fixedShapeFactForValue(fn *Function, id int) (FixedShapeTableFact, bool) {
 	if fn == nil {
 		return FixedShapeTableFact{}, false
 	}
-	if fact, ok := fn.FixedShapeTables[id]; ok {
+	if fact, ok := fn.Analysis.FixedShapeTables[id]; ok {
 		return fact, true
 	}
-	if fact, ok := fn.FixedShapeArgFacts[id]; ok {
+	if fact, ok := fn.Analysis.FixedShapeArgFacts[id]; ok {
 		return fact, true
 	}
 	return FixedShapeTableFact{}, false
@@ -168,7 +170,7 @@ func foldProfiledExactLen(fn *Function, block *Block, lenInstr *Instr, mutations
 	if profiledLenFoldReadsMutatedField(fn, lenInstr.Args[0], mutations) {
 		return false
 	}
-	r, ok := fn.ProfiledLenRanges[lenInstr.Args[0].ID]
+	r, ok := fn.Analysis.ProfiledLenRanges[lenInstr.Args[0].ID]
 	if !ok || !r.known || r.min != r.max || r.min < 0 {
 		return false
 	}
@@ -195,7 +197,7 @@ func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr) bool {
 		if arg == nil {
 			return false
 		}
-		r, ok := fn.ProfiledLenRanges[arg.ID]
+		r, ok := fn.Analysis.ProfiledLenRanges[arg.ID]
 		if !ok || !r.known || r.min != r.max || r.min < 0 {
 			return false
 		}
@@ -234,16 +236,16 @@ func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMut
 	if len(cases) < 2 {
 		return false
 	}
-	if fn.FieldPolyShapeFacts == nil {
-		fn.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+	if fn.Analysis.FieldPolyShapeFacts == nil {
+		fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
 	}
-	fn.FieldPolyShapeFacts[lenInstr.ID] = cases
+	fn.Analysis.FieldPolyShapeFacts[lenInstr.ID] = cases
 	name := fieldNameFromAux(fn, get.Aux)
 	if r, ok := fieldPolyLenRange(fn, name, cases); ok {
-		if fn.ProfiledIntRanges == nil {
-			fn.ProfiledIntRanges = make(map[int]intRange)
+		if fn.Analysis.ProfiledIntRanges == nil {
+			fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
 		}
-		fn.ProfiledIntRanges[lenInstr.ID] = r
+		fn.Analysis.ProfiledIntRanges[lenInstr.ID] = r
 	}
 	lenInstr.Op = OpFieldPolyLen
 	lenInstr.Type = TypeInt
@@ -261,7 +263,7 @@ func fieldPolyExactLenCases(fn *Function, get *Instr, mutations fieldLenMutation
 	if name == "" {
 		return nil
 	}
-	src := fn.FieldPolyShapeFacts[get.ID]
+	src := fn.Analysis.FieldPolyShapeFacts[get.ID]
 	if len(src) < 2 {
 		return nil
 	}

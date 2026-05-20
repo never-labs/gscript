@@ -29,7 +29,7 @@ result := makePair(1, 2)
 			if instr.Op != OpNewTable {
 				continue
 			}
-			fact, ok := fn.FixedTableConstructors[instr.ID]
+			fact, ok := fn.Analysis.FixedTableConstructors[instr.ID]
 			if !ok {
 				continue
 			}
@@ -66,7 +66,7 @@ result := makeTriple(1, 2, 3)
 			if instr.Op != OpNewTable {
 				continue
 			}
-			fact, ok := fn.FixedTableConstructors[instr.ID]
+			fact, ok := fn.Analysis.FixedTableConstructors[instr.ID]
 			if !ok {
 				continue
 			}

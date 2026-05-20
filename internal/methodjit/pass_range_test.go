@@ -181,9 +181,9 @@ func TestRangePass_ConstIntsFit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !result.Int48Safe[add.ID] {
+	if !result.Analysis.Int48Safe[add.ID] {
 		t.Errorf("AddInt of (1, 2) should be Int48Safe, got safe=%v",
-			result.Int48Safe[add.ID])
+			result.Analysis.Int48Safe[add.ID])
 	}
 }
 
@@ -208,7 +208,7 @@ func TestRangePass_UnknownLoadNotSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if result.Int48Safe[add.ID] {
+	if result.Analysis.Int48Safe[add.ID] {
 		t.Errorf("AddInt(load, 1) should NOT be Int48Safe (load is top)")
 	}
 }
@@ -237,10 +237,10 @@ func TestRangePass_Propagation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !result.Int48Safe[mul.ID] {
+	if !result.Analysis.Int48Safe[mul.ID] {
 		t.Errorf("MulInt(5, 7) should be Int48Safe")
 	}
-	if !result.Int48Safe[add.ID] {
+	if !result.Analysis.Int48Safe[add.ID] {
 		t.Errorf("AddInt(35, 35) should be Int48Safe")
 	}
 }
@@ -285,13 +285,13 @@ func TestRangePass_DuplicateBackedgeInductionUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if got := result.IntRanges[phi.ID]; !got.known || got.min != 0 || got.max != 1000 {
+	if got := result.Analysis.IntRanges[phi.ID]; !got.known || got.min != 0 || got.max != 1000 {
 		t.Fatalf("phi range=%+v, want [0,1000]", got)
 	}
-	if got := result.IntRanges[add.ID]; !got.known || got.min != 1 || got.max != 1001 {
+	if got := result.Analysis.IntRanges[add.ID]; !got.known || got.min != 1 || got.max != 1001 {
 		t.Fatalf("add range=%+v, want [1,1001]", got)
 	}
-	if !result.Int48Safe[add.ID] {
+	if !result.Analysis.Int48Safe[add.ID] {
 		t.Fatalf("duplicate-backedge induction update should be int48 safe")
 	}
 }
@@ -320,8 +320,8 @@ func TestRangePass_MarksConstBoundPreIncrementInductionSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !out.Int48Safe[add.ID] {
-		t.Fatalf("pre-increment const-bound induction update should be Int48Safe:\n%s\nranges=%v", Print(out), out.IntRanges)
+	if !out.Analysis.Int48Safe[add.ID] {
+		t.Fatalf("pre-increment const-bound induction update should be Int48Safe:\n%s\nranges=%v", Print(out), out.Analysis.IntRanges)
 	}
 }
 
@@ -344,7 +344,7 @@ func TestRangePass_SeedsModuloRecurrencePhi(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !out.Int48Safe[add.ID] {
+	if !out.Analysis.Int48Safe[add.ID] {
 		t.Fatalf("AddInt fed by modulo recurrence phi should be Int48Safe:\n%s", Print(out))
 	}
 }
@@ -385,13 +385,13 @@ func TestRangePass_SeedsNestedModuloRecurrencePhis(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if got := out.IntRanges[outer.ID]; !got.known || got.min != 0 || got.max != 1000000006 {
+	if got := out.Analysis.IntRanges[outer.ID]; !got.known || got.min != 0 || got.max != 1000000006 {
 		t.Fatalf("outer phi range=%+v, want modulo range", got)
 	}
-	if got := out.IntRanges[inner.ID]; !got.known || got.min != 0 || got.max != 1000000006 {
+	if got := out.Analysis.IntRanges[inner.ID]; !got.known || got.min != 0 || got.max != 1000000006 {
 		t.Fatalf("inner phi range=%+v, want modulo range", got)
 	}
-	if !out.Int48Safe[add.ID] {
+	if !out.Analysis.Int48Safe[add.ID] {
 		t.Fatalf("AddInt fed by nested modulo recurrence phis should be Int48Safe:\n%s", Print(out))
 	}
 }
@@ -420,13 +420,13 @@ func TestRangePass_IntNonNegativeMarksConstantsAndRanges(t *testing.T) {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
 	for _, instr := range []*Instr{zero, two, three, add} {
-		if !result.IntNonNegative[instr.ID] {
-			t.Fatalf("v%d %s should be marked non-negative\nfacts=%v", instr.ID, instr.Op, result.IntNonNegative)
+		if !result.Analysis.IntNonNegative[instr.ID] {
+			t.Fatalf("v%d %s should be marked non-negative\nfacts=%v", instr.ID, instr.Op, result.Analysis.IntNonNegative)
 		}
 	}
 	for _, instr := range []*Instr{negConst, neg} {
-		if result.IntNonNegative[instr.ID] {
-			t.Fatalf("v%d %s should not be marked non-negative\nfacts=%v", instr.ID, instr.Op, result.IntNonNegative)
+		if result.Analysis.IntNonNegative[instr.ID] {
+			t.Fatalf("v%d %s should not be marked non-negative\nfacts=%v", instr.ID, instr.Op, result.Analysis.IntNonNegative)
 		}
 	}
 }
@@ -457,13 +457,13 @@ func f(n) {
 			if !ok || ind.step <= 0 {
 				continue
 			}
-			if fn.IntNonNegative[phi.ID] && fn.IntNonNegative[ind.update.ID] {
+			if fn.Analysis.IntNonNegative[phi.ID] && fn.Analysis.IntNonNegative[ind.update.ID] {
 				return
 			}
 		}
 	}
 	t.Fatalf("expected dynamic-bound positive induction phi/update to be non-negative\nIR:\n%s\nfacts=%v",
-		Print(fn), fn.IntNonNegative)
+		Print(fn), fn.Analysis.IntNonNegative)
 }
 
 func TestRangePass_IntNonNegativeRejectsNegativeStartAndDecrement(t *testing.T) {
@@ -501,9 +501,9 @@ func f(n) {
 				if !ok {
 					continue
 				}
-				if fn.IntNonNegative[phi.ID] && fn.IntNonNegative[update.ID] {
+				if fn.Analysis.IntNonNegative[phi.ID] && fn.Analysis.IntNonNegative[update.ID] {
 					t.Fatalf("unexpected non-negative loop phi/update for negative/decrementing case\nIR:\n%s\nfacts=%v",
-						Print(fn), fn.IntNonNegative)
+						Print(fn), fn.Analysis.IntNonNegative)
 				}
 			}
 		}
@@ -530,12 +530,12 @@ func f(n) {
 			switch instr.Op {
 			case OpModInt:
 				foundMod = true
-				if !fn.IntNonNegative[instr.ID] {
+				if !fn.Analysis.IntNonNegative[instr.ID] {
 					t.Fatalf("modulo recurrence result should be non-negative\nIR:\n%s\nfacts=%v",
-						Print(fn), fn.IntNonNegative)
+						Print(fn), fn.Analysis.IntNonNegative)
 				}
 			case OpPhi:
-				if instr.Type.isIntegerLike() && fn.IntNonNegative[instr.ID] {
+				if instr.Type.isIntegerLike() && fn.Analysis.IntNonNegative[instr.ID] {
 					foundPhi = true
 				}
 			}
@@ -543,7 +543,7 @@ func f(n) {
 	}
 	if !foundMod || !foundPhi {
 		t.Fatalf("expected non-negative modulo recurrence facts (mod=%v phi=%v)\nIR:\n%s\nfacts=%v",
-			foundMod, foundPhi, Print(fn), fn.IntNonNegative)
+			foundMod, foundPhi, Print(fn), fn.Analysis.IntNonNegative)
 	}
 }
 
@@ -606,7 +606,7 @@ func f() {
 
 	// Expect at least one Int48Safe entry for an i+j / i+j+1 / (i+j)*(i+j+1)
 	// op. All of these use loop counters with known bounds.
-	if len(fn.Int48Safe) == 0 {
+	if len(fn.Analysis.Int48Safe) == 0 {
 		t.Errorf("expected at least one Int48Safe entry, got empty map\nIR:\n%s", Print(fn))
 	}
 	// Non-loop-counter arithmetic that was marked safe.
@@ -618,7 +618,7 @@ func f() {
 			}
 			switch instr.Op {
 			case OpAddInt, OpMulInt, OpSubInt, OpNegInt:
-				if fn.Int48Safe[instr.ID] {
+				if fn.Analysis.Int48Safe[instr.ID] {
 					safeNonCounter++
 				}
 			}
@@ -667,7 +667,7 @@ func f() {
 			switch instr.Op {
 			case OpAddInt, OpMulInt, OpSubInt, OpNegInt:
 				totalNonCounter++
-				if fn.Int48Safe[instr.ID] {
+				if fn.Analysis.Int48Safe[instr.ID] {
 					safeNonCounter++
 				}
 			}
@@ -735,9 +735,9 @@ func multiplyAtAv(n, v, u, atav) {
 				continue
 			}
 			hot++
-			if optimized.Int48Safe[instr.ID] {
+			if optimized.Analysis.Int48Safe[instr.ID] {
 				safe++
-			} else if r, ok := optimized.IntRanges[instr.ID]; ok && r.known {
+			} else if r, ok := optimized.Analysis.IntRanges[instr.ID]; ok && r.known {
 				t.Logf("unsafe v%d %s range=[%d,%d]", instr.ID, instr.Op, r.min, r.max)
 			} else {
 				t.Logf("unsafe v%d %s range=top", instr.ID, instr.Op)
@@ -828,7 +828,7 @@ func TestRangePass_LoopCounter(t *testing.T) {
 	// Phi's seeded range should cover at least [min(-1,100)-1, max(-1,100)+1]
 	// = [-2, 101]. That's well within int48.
 	// The post-loop AddInt consumes the phi, so its range should also fit.
-	if !result.Int48Safe[x.ID] {
+	if !result.Analysis.Int48Safe[x.ID] {
 		t.Errorf("post-loop AddInt(phi, 1) should be Int48Safe (phi bounded by loop)")
 	}
 }
@@ -888,7 +888,7 @@ func f(n) {
 			if instr.Op != OpAddInt || len(instr.Args) < 2 {
 				continue
 			}
-			if !fn.Int48Safe[instr.ID] {
+			if !fn.Analysis.Int48Safe[instr.ID] {
 				continue
 			}
 			if c, ok := constIntFromValue(instr.Args[1]); ok {
@@ -986,10 +986,10 @@ func f(n) {
 				continue
 			}
 			modCount++
-			if !fn.IntModNonZeroDivisor[instr.ID] {
+			if !fn.Analysis.IntModNonZeroDivisor[instr.ID] {
 				t.Fatalf("ModInt v%d should have non-zero divisor fact\nIR:\n%s", instr.ID, Print(fn))
 			}
-			if !fn.IntModNoSignAdjust[instr.ID] {
+			if !fn.Analysis.IntModNoSignAdjust[instr.ID] {
 				t.Fatalf("ModInt v%d should have no-sign-adjust fact\nIR:\n%s", instr.ID, Print(fn))
 			}
 		}
@@ -1022,19 +1022,19 @@ func TestRangePass_ModIntFactsStayConservative(t *testing.T) {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
 
-	if !got.IntModNonZeroDivisor[mixedSign.ID] {
+	if !got.Analysis.IntModNonZeroDivisor[mixedSign.ID] {
 		t.Fatalf("constant positive divisor should be non-zero")
 	}
-	if got.IntModNoSignAdjust[mixedSign.ID] {
+	if got.Analysis.IntModNoSignAdjust[mixedSign.ID] {
 		t.Fatalf("mixed-sign modulo must keep Lua sign-adjust path")
 	}
-	if r := got.IntRanges[mixedSign.ID]; !r.known || r.min != 0 || r.max != 2 {
+	if r := got.Analysis.IntRanges[mixedSign.ID]; !r.known || r.min != 0 || r.max != 2 {
 		t.Fatalf("positive-divisor Lua modulo range=%+v, want [0,2]", r)
 	}
-	if got.IntModNonZeroDivisor[unknownDivisor.ID] {
+	if got.Analysis.IntModNonZeroDivisor[unknownDivisor.ID] {
 		t.Fatalf("unknown divisor must keep zero-divisor guard")
 	}
-	if got.IntModNoSignAdjust[unknownDivisor.ID] {
+	if got.Analysis.IntModNoSignAdjust[unknownDivisor.ID] {
 		t.Fatalf("unknown divisor sign must keep Lua sign-adjust path")
 	}
 }
@@ -1065,13 +1065,13 @@ func TestRangePass_StaticSetListLenFeedsModuloRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if r := got.IntRanges[length.ID]; !r.known || r.min != 2 || r.max != 2 {
+	if r := got.Analysis.IntRanges[length.ID]; !r.known || r.min != 2 || r.max != 2 {
 		t.Fatalf("Len range=%+v, want [2,2]\nIR:\n%s", r, Print(got))
 	}
-	if r := got.IntRanges[add.ID]; !r.known || r.min != 1 || r.max != 2 {
+	if r := got.Analysis.IntRanges[add.ID]; !r.known || r.min != 1 || r.max != 2 {
 		t.Fatalf("mod+1 range=%+v, want [1,2]\nIR:\n%s", r, Print(got))
 	}
-	if !got.Int48Safe[add.ID] {
+	if !got.Analysis.Int48Safe[add.ID] {
 		t.Fatalf("bounded add should be int48-safe\nIR:\n%s", Print(got))
 	}
 }

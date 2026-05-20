@@ -7,7 +7,7 @@ import (
 )
 
 func TestIntAlgebraSimplify_RemovesSafeAddSubPair(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "safe_add_sub"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "safe_add_sub"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}
 	fn.Entry = entry
 	fn.Blocks = []*Block{entry}
@@ -18,7 +18,7 @@ func TestIntAlgebraSimplify_RemovesSafeAddSubPair(t *testing.T) {
 	sub := &Instr{ID: fn.newValueID(), Op: OpSubInt, Type: TypeInt, Args: []*Value{add.Value(), one.Value()}, Block: entry}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Args: []*Value{sub.Value()}, Block: entry}
 	entry.Instrs = []*Instr{x, one, add, sub, ret}
-	fn.Int48Safe = map[int]bool{add.ID: true, sub.ID: true}
+	fn.Analysis.Int48Safe = map[int]bool{add.ID: true, sub.ID: true}
 
 	out, err := IntAlgebraSimplifyPass(fn)
 	if err != nil {
@@ -33,7 +33,7 @@ func TestIntAlgebraSimplify_RemovesSafeAddSubPair(t *testing.T) {
 }
 
 func TestIntAlgebraSimplify_KeepsUnsafeAddSubPair(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "unsafe_add_sub"}, NumRegs: 1}
+	fn := &Function{Proto: &vm.FuncProto{Name: "unsafe_add_sub"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}
 	fn.Entry = entry
 	fn.Blocks = []*Block{entry}
@@ -44,7 +44,7 @@ func TestIntAlgebraSimplify_KeepsUnsafeAddSubPair(t *testing.T) {
 	sub := &Instr{ID: fn.newValueID(), Op: OpSubInt, Type: TypeInt, Args: []*Value{add.Value(), one.Value()}, Block: entry}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Args: []*Value{sub.Value()}, Block: entry}
 	entry.Instrs = []*Instr{x, one, add, sub, ret}
-	fn.Int48Safe = map[int]bool{sub.ID: true}
+	fn.Analysis.Int48Safe = map[int]bool{sub.ID: true}
 
 	out, err := IntAlgebraSimplifyPass(fn)
 	if err != nil {

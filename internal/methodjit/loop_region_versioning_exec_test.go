@@ -16,7 +16,7 @@ func TestTier2_LoopRegionVersionedTableArrayStoreExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.TableArrayUpperBoundSafe == nil || !out.TableArrayUpperBoundSafe[store.ID] {
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[store.ID] {
 		t.Fatalf("expected checked store to reuse loop-region upper-bound fact:\n%s", Print(out))
 	}
 
@@ -48,8 +48,9 @@ func loopRegionVersioningExecFixture(t *testing.T) (*Function, *Instr) {
 	t.Helper()
 
 	fn := &Function{
-		Proto:   &vm.FuncProto{Name: "loop_region_exec", NumParams: 1},
-		NumRegs: 4,
+		Proto:    &vm.FuncProto{Name: "loop_region_exec", NumParams: 1},
+		NumRegs:  4,
+		Analysis: NewAnalysisResult(),
 	}
 	entry, header, body, exit := buildSimpleLoop(fn)
 

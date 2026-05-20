@@ -8,6 +8,7 @@ func FieldNumToFloatFusionPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
+fn.ensureAnalysis()
 
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {

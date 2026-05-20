@@ -15,6 +15,7 @@ func RecordArrayLoopKernelPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
+fn.ensureAnalysis()
 	changed := false
 	for _, header := range append([]*Block(nil), fn.Blocks...) {
 		if lowerRecordArrayLoopKernel(fn, header) {
@@ -62,12 +63,12 @@ func lowerRecordArrayLoopKernel(fn *Function, header *Block) bool {
 		Args:  []*Value{spec.header, spec.data, spec.len, limit, spec.scale, spec.damp},
 		Block: header,
 	}
-	if fn.RecordArrayLoopKernels == nil {
-		fn.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
+	if fn.Analysis.RecordArrayLoopKernels == nil {
+		fn.Analysis.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
 	}
 	spec.kernel.Cache = &RecordArrayLoopKernelCache{}
 	fn.RecordArrayLoopCaches = append(fn.RecordArrayLoopCaches, spec.kernel.Cache)
-	fn.RecordArrayLoopKernels[op.ID] = spec.kernel
+	fn.Analysis.RecordArrayLoopKernels[op.ID] = spec.kernel
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Block: header}
 	header.Instrs = []*Instr{op, ret}
 	header.Preds = []*Block{pre}
