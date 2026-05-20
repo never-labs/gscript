@@ -3789,6 +3789,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			} else if handled {
 				continue
 			}
+			if handled, err := vm.tryGenericRecordArrayForLoopKernel(frame, base, code, constants, a, sbx); err != nil {
+				return nil, err
+			} else if handled {
+				continue
+			}
 			initV := vm.regs[base+a]
 			stepV := vm.regs[base+a+2]
 			if initV.IsInt() && stepV.IsInt() {

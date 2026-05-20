@@ -2,34 +2,51 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/jit"
+import (
+	"unsafe"
+
+	"github.com/gscript/gscript/internal/jit"
+	gruntime "github.com/gscript/gscript/internal/runtime"
+)
+
+const (
+	recordArrayLoopCacheOffTable            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Table))
+	recordArrayLoopCacheOffArrayVersion     = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.ArrayVersion))
+	recordArrayLoopCacheOffShapeLayoutEpoch = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.ShapeLayoutEpoch))
+	recordArrayLoopCacheOffLimit            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Limit))
+	recordArrayLoopCacheOffSvals            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Svals))
+)
 
 func (ec *emitContext) emitRecordArrayLoopKernel(instr *Instr) {
-	if instr == nil || len(instr.Args) < 3 || ec == nil || ec.fn == nil {
+	if instr == nil || len(instr.Args) < 4 || ec == nil || ec.fn == nil {
 		return
 	}
 	spec, ok := ec.fn.RecordArrayLoopKernels[instr.ID]
-	if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-3) {
+	if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
 		ec.emitPreciseDeopt(instr)
 		return
 	}
 
 	asm := ec.asm
-	dataReg := ec.resolveRawDataPtr(instr.Args[0].ID, jit.X9)
+	tableReg := ec.resolveRawTablePtr(instr.Args[0].ID, jit.X13)
+	if tableReg != jit.X13 {
+		asm.MOVreg(jit.X13, tableReg)
+	}
+	dataReg := ec.resolveRawDataPtr(instr.Args[1].ID, jit.X9)
 	if dataReg != jit.X9 {
 		asm.MOVreg(jit.X9, dataReg)
 	}
-	lenReg := ec.resolveRawInt(instr.Args[1].ID, jit.X10)
+	lenReg := ec.resolveRawInt(instr.Args[2].ID, jit.X10)
 	if lenReg != jit.X10 {
 		asm.MOVreg(jit.X10, lenReg)
 	}
-	limitReg := ec.resolveRawInt(instr.Args[2].ID, jit.X11)
+	limitReg := ec.resolveRawInt(instr.Args[3].ID, jit.X11)
 	if limitReg != jit.X11 {
 		asm.MOVreg(jit.X11, limitReg)
 	}
 	scalarRegs := []jit.FReg{jit.D6, jit.D7}
 	for i := 0; i < spec.ScalarCount; i++ {
-		src := ec.resolveRawFloat(instr.Args[3+i].ID, scalarRegs[i])
+		src := ec.resolveRawFloat(instr.Args[4+i].ID, scalarRegs[i])
 		if src != scalarRegs[i] {
 			asm.FMOVd(scalarRegs[i], src)
 		}
@@ -40,11 +57,41 @@ func (ec *emitContext) emitRecordArrayLoopKernel(instr *Instr) {
 	validateLoop := ec.uniqueLabel("record_array_kernel_validate")
 	validateDone := ec.uniqueLabel("record_array_kernel_validate_done")
 	updateLoop := ec.uniqueLabel("record_array_kernel_loop")
+	updateCachedLoop := ec.uniqueLabel("record_array_kernel_cached_loop")
+	updateCachedTail := ec.uniqueLabel("record_array_kernel_cached_tail")
+	updateCachedTailLoop := ec.uniqueLabel("record_array_kernel_cached_tail_loop")
+	cacheMiss := ec.uniqueLabel("record_array_kernel_cache_miss")
+	cacheStore := ec.uniqueLabel("record_array_kernel_cache_store")
+	cacheBaseReady := ec.uniqueLabel("record_array_kernel_cache_base_ready")
 
 	asm.CMPimm(jit.X11, 0)
 	asm.BCond(jit.CondLE, doneLabel)
 	asm.CMPreg(jit.X11, jit.X10)
 	asm.BCond(jit.CondGE, deoptLabel)
+	shapeEpochPtr := gruntime.ShapeLayoutMutationCountPtr(spec.ShapeID)
+	useSvalsCache := spec.Cache != nil && shapeEpochPtr != nil
+	if useSvalsCache {
+		asm.LoadImm64(jit.X14, RecordArrayLoopKernelMaxCachedSvals)
+		asm.CMPreg(jit.X11, jit.X14)
+		asm.BCond(jit.CondGT, deoptLabel)
+		asm.LoadImm64(jit.X14, int64(uintptr(unsafe.Pointer(spec.Cache))))
+		asm.LDR(jit.X15, jit.X14, recordArrayLoopCacheOffTable)
+		asm.CMPreg(jit.X15, jit.X13)
+		asm.BCond(jit.CondNE, cacheMiss)
+		asm.LDR(jit.X15, jit.X13, jit.TableOffArrayVersion)
+		asm.LDR(jit.X16, jit.X14, recordArrayLoopCacheOffArrayVersion)
+		asm.CMPreg(jit.X16, jit.X15)
+		asm.BCond(jit.CondNE, cacheMiss)
+		asm.LoadImm64(jit.X17, int64(uintptr(shapeEpochPtr)))
+		asm.LDR(jit.X16, jit.X17, 0)
+		asm.LDR(jit.X17, jit.X14, recordArrayLoopCacheOffShapeLayoutEpoch)
+		asm.CMPreg(jit.X17, jit.X16)
+		asm.BCond(jit.CondNE, cacheMiss)
+		asm.LDR(jit.X17, jit.X14, recordArrayLoopCacheOffLimit)
+		asm.CMPreg(jit.X17, jit.X11)
+		asm.BCond(jit.CondGE, cacheBaseReady)
+		asm.Label(cacheMiss)
+	}
 
 	asm.MOVimm16(jit.X8, 1)
 	asm.Label(validateLoop)
@@ -54,10 +101,32 @@ func (ec *emitContext) emitRecordArrayLoopKernel(instr *Instr) {
 	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
 	emitCMPWConst(asm, jit.X1, jit.X2, int64(spec.ShapeID))
 	asm.BCond(jit.CondNE, deoptLabel)
+	if useSvalsCache {
+		asm.LDR(jit.X12, jit.X0, jit.TableOffSvals)
+		asm.ADDimm(jit.X17, jit.X14, uint16(recordArrayLoopCacheOffSvals))
+		asm.STRreg(jit.X12, jit.X17, jit.X8)
+	}
 	asm.CMPreg(jit.X8, jit.X11)
-	asm.BCond(jit.CondEQ, validateDone)
+	if useSvalsCache {
+		asm.BCond(jit.CondEQ, cacheStore)
+	} else {
+		asm.BCond(jit.CondEQ, validateDone)
+	}
 	asm.ADDimm(jit.X8, jit.X8, 1)
 	asm.B(validateLoop)
+	if useSvalsCache {
+		asm.Label(cacheStore)
+		asm.LoadImm64(jit.X14, int64(uintptr(unsafe.Pointer(spec.Cache))))
+		asm.STR(jit.X13, jit.X14, recordArrayLoopCacheOffTable)
+		asm.LDR(jit.X15, jit.X13, jit.TableOffArrayVersion)
+		asm.STR(jit.X15, jit.X14, recordArrayLoopCacheOffArrayVersion)
+		asm.LoadImm64(jit.X15, int64(uintptr(shapeEpochPtr)))
+		asm.LDR(jit.X16, jit.X15, 0)
+		asm.STR(jit.X16, jit.X14, recordArrayLoopCacheOffShapeLayoutEpoch)
+		asm.STR(jit.X11, jit.X14, recordArrayLoopCacheOffLimit)
+		asm.Label(cacheBaseReady)
+		asm.ADDimm(jit.X17, jit.X14, uint16(recordArrayLoopCacheOffSvals))
+	}
 
 	fieldRegs := []jit.FReg{jit.D0, jit.D1, jit.D2, jit.D3, jit.D4, jit.D5}
 	opRegs := []jit.FReg{jit.D8, jit.D9, jit.D10, jit.D11, jit.D12, jit.D13, jit.D14, jit.D15, jit.D16, jit.D17}
@@ -74,30 +143,67 @@ func (ec *emitContext) emitRecordArrayLoopKernel(instr *Instr) {
 		}
 	}
 
-	asm.Label(validateDone)
+	emitUpdateBody := func() {
+		for i, field := range spec.FieldLoads {
+			asm.FLDRd(fieldRegs[i], jit.X12, field*jit.ValueSize)
+		}
+		for i, op := range spec.Ops {
+			dst := opRegs[i]
+			switch op.Kind {
+			case RecordArrayKernelFloatOpMul:
+				asm.FMULd(dst, sourceReg(op.A), sourceReg(op.B))
+			case RecordArrayKernelFloatOpFMA:
+				asm.FMADDd(dst, sourceReg(op.A), sourceReg(op.B), sourceReg(op.C))
+			default:
+				ec.emitPreciseDeopt(instr)
+				return
+			}
+		}
+		for _, store := range spec.Stores {
+			asm.FSTRd(sourceReg(store.Value), jit.X12, store.Field*jit.ValueSize)
+		}
+	}
+
+	if useSvalsCache {
+		asm.MOVimm16(jit.X8, 1)
+		asm.ADDimm(jit.X15, jit.X8, 3)
+		asm.CMPreg(jit.X15, jit.X11)
+		asm.BCond(jit.CondGT, updateCachedTail)
+		asm.Label(updateCachedLoop)
+		asm.LDRreg(jit.X12, jit.X17, jit.X8)
+		emitUpdateBody()
+		asm.ADDimm(jit.X15, jit.X8, 1)
+		asm.LDRreg(jit.X12, jit.X17, jit.X15)
+		emitUpdateBody()
+		asm.ADDimm(jit.X15, jit.X8, 2)
+		asm.LDRreg(jit.X12, jit.X17, jit.X15)
+		emitUpdateBody()
+		asm.ADDimm(jit.X15, jit.X8, 3)
+		asm.LDRreg(jit.X12, jit.X17, jit.X15)
+		emitUpdateBody()
+		asm.ADDimm(jit.X8, jit.X8, 4)
+		asm.ADDimm(jit.X15, jit.X8, 3)
+		asm.CMPreg(jit.X15, jit.X11)
+		asm.BCond(jit.CondLE, updateCachedLoop)
+		asm.Label(updateCachedTail)
+		asm.CMPreg(jit.X8, jit.X11)
+		asm.BCond(jit.CondGT, doneLabel)
+		asm.Label(updateCachedTailLoop)
+		asm.LDRreg(jit.X12, jit.X17, jit.X8)
+		emitUpdateBody()
+		asm.CMPreg(jit.X8, jit.X11)
+		asm.BCond(jit.CondEQ, doneLabel)
+		asm.ADDimm(jit.X8, jit.X8, 1)
+		asm.B(updateCachedTailLoop)
+	}
+
 	asm.MOVimm16(jit.X8, 1)
+	asm.Label(validateDone)
 	asm.Label(updateLoop)
 	asm.LDRreg(jit.X0, jit.X9, jit.X8)
 	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.LDR(jit.X12, jit.X0, jit.TableOffSvals)
-	for i, field := range spec.FieldLoads {
-		asm.FLDRd(fieldRegs[i], jit.X12, field*jit.ValueSize)
-	}
-	for i, op := range spec.Ops {
-		dst := opRegs[i]
-		switch op.Kind {
-		case RecordArrayKernelFloatOpMul:
-			asm.FMULd(dst, sourceReg(op.A), sourceReg(op.B))
-		case RecordArrayKernelFloatOpFMA:
-			asm.FMADDd(dst, sourceReg(op.A), sourceReg(op.B), sourceReg(op.C))
-		default:
-			ec.emitPreciseDeopt(instr)
-			return
-		}
-	}
-	for _, store := range spec.Stores {
-		asm.FSTRd(sourceReg(store.Value), jit.X12, store.Field*jit.ValueSize)
-	}
+	emitUpdateBody()
 	asm.CMPreg(jit.X8, jit.X11)
 	asm.BCond(jit.CondEQ, doneLabel)
 	asm.ADDimm(jit.X8, jit.X8, 1)

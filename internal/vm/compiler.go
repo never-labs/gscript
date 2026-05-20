@@ -1120,6 +1120,12 @@ func (c *compiler) compileCallExprDiscard(call *ast.CallExpr, line int) error {
 		if i == nArgs-1 {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
+				if c.callExprKnownSingleResult(a) {
+					if err := c.compileExprTo(a, argReg); err != nil {
+						return err
+					}
+					continue
+				}
 				lastArgIsMulti = true
 				c.proto.JITDisabled = true
 				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
@@ -2303,6 +2309,13 @@ func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults i
 		if expandFinalArg {
 			switch a := arg.(type) {
 			case *ast.CallExpr:
+				if c.callExprKnownSingleResult(a) {
+					if err := c.compileExprTo(a, argReg); err != nil {
+						return err
+					}
+					c.nextReg = savedArgTop
+					continue
+				}
 				lastArgIsMulti = true
 				c.proto.JITDisabled = true
 				if err := c.compileCallExprMulti(a, argReg, -1); err != nil {
@@ -2407,15 +2420,88 @@ func (c *compiler) callTargetsFixedArityFunction(call *ast.CallExpr) bool {
 	if call == nil || c == nil {
 		return false
 	}
-	fn, ok := call.Func.(*ast.IdentExpr)
-	if !ok {
+	if fn, ok := call.Func.(*ast.IdentExpr); ok {
+		if c.proto != nil && c.proto.Name != "" && !c.proto.IsVarArg && fn.Name == c.proto.Name {
+			return len(call.Args) == c.proto.NumParams
+		}
+		if arity, ok := c.funcArities[fn.Name]; ok {
+			return !arity.vararg && len(call.Args) == arity.numParams
+		}
+		return builtinFixedArityCall(fn.Name, "", len(call.Args))
+	}
+	if field, ok := call.Func.(*ast.FieldExpr); ok {
+		if recv, ok := field.Table.(*ast.IdentExpr); ok {
+			return builtinFixedArityCall(recv.Name, field.Field, len(call.Args))
+		}
+	}
+	return false
+}
+
+func (c *compiler) callExprKnownSingleResult(call *ast.CallExpr) bool {
+	if call == nil {
 		return false
 	}
-	if c.proto != nil && c.proto.Name != "" && !c.proto.IsVarArg && fn.Name == c.proto.Name {
-		return len(call.Args) == c.proto.NumParams
+	if c != nil && c.proto != nil && c.proto.Name == "<main>" {
+		return false
 	}
-	arity, ok := c.funcArities[fn.Name]
-	return ok && !arity.vararg && len(call.Args) == arity.numParams
+	if fn, ok := call.Func.(*ast.IdentExpr); ok {
+		switch fn.Name {
+		case "tonumber", "type", "len", "tostring", "error", "assert":
+			return true
+		}
+		return false
+	}
+	if field, ok := call.Func.(*ast.FieldExpr); ok {
+		recv, ok := field.Table.(*ast.IdentExpr)
+		if !ok {
+			return false
+		}
+		switch recv.Name {
+		case "math":
+			return true
+		case "string":
+			switch field.Field {
+			case "format", "sub", "len", "upper", "lower", "reverse", "rep", "split", "trim", "trimLeft", "trimRight", "hasPrefix", "hasSuffix", "contains", "count", "replaceAll":
+				return true
+			}
+		case "time":
+			switch field.Field {
+			case "now", "since":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func builtinFixedArityCall(name, field string, argc int) bool {
+	switch name {
+	case "tonumber":
+		return field == "" && (argc == 1 || argc == 2)
+	case "type", "len", "pairs", "ipairs":
+		return field == "" && argc == 1
+	case "math":
+		switch field {
+		case "abs", "ceil", "floor", "sqrt", "sin", "cos", "tan", "asin", "acos", "log", "exp", "deg", "rad":
+			return argc == 1
+		case "atan":
+			return argc == 1 || argc == 2
+		case "floorDiv", "min", "max", "random":
+			return argc == 2
+		}
+	case "string":
+		switch field {
+		case "len", "upper", "lower", "reverse":
+			return argc == 1
+		case "sub", "byte":
+			return argc == 2 || argc == 3
+		case "split", "find", "match", "trim", "trimLeft", "trimRight", "hasPrefix", "hasSuffix", "contains", "count":
+			return argc == 2 || argc == 3
+		case "replaceAll":
+			return argc == 3
+		}
+	}
+	return false
 }
 
 func (c *compiler) compileCallExprWithExplicitSpread(call *ast.CallExpr, dest int, nResults int) error {

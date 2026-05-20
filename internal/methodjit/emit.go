@@ -637,6 +637,10 @@ type CompiledFunction struct {
 	// guarded Go-side batch before resuming Tier 2.
 	WholeCallNoResultBatches map[int]WholeCallNoResultBatchFact
 
+	// RecordArrayLoopCaches keeps native validation-cache backing storage alive
+	// for RecordArrayLoopKernel code that embeds raw pointers to these cells.
+	RecordArrayLoopCaches []*RecordArrayLoopKernelCache
+
 	// InstrCodeRanges maps IR instruction IDs to emitted machine-code byte
 	// ranges. Diagnostic metadata only; execution never consults it.
 	InstrCodeRanges []InstrCodeRange

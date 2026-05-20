@@ -501,6 +501,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		StringFormatPatterns:     fn.StringFormatPatterns,
 		StringSplitSubSpecs:      fn.StringSplitSubSpecs,
 		WholeCallNoResultBatches: fn.WholeCallNoResultBatches,
+		RecordArrayLoopCaches:    fn.RecordArrayLoopCaches,
 		InstrCodeRanges:          ec.instrCodeRanges,
 		ExitSites:                exitSites,
 		Continuations:            continuations,

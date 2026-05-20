@@ -113,6 +113,23 @@ type RecordArrayLoopKernelSpec struct {
 	Ops         []RecordArrayKernelFloatOp
 	Stores      []RecordArrayKernelStore
 	MaxField    int
+	Cache       *RecordArrayLoopKernelCache
+}
+
+const RecordArrayLoopKernelMaxCachedSvals = 8192
+
+// RecordArrayLoopKernelCache memoizes a successful full-shape validation for a
+// native record-array loop. It is guarded by the outer table's array version
+// and the record shape's layout epoch, so value-only field writes do not force
+// the next call to re-scan every element. Svals caches the record payload
+// pointers discovered during validation so the hot update loop can avoid
+// re-decoding every boxed table element on subsequent calls.
+type RecordArrayLoopKernelCache struct {
+	Table            uintptr
+	ArrayVersion     uint64
+	ShapeLayoutEpoch uint64
+	Limit            int64
+	Svals            [RecordArrayLoopKernelMaxCachedSvals + 1]uintptr
 }
 
 // Function is the complete IR for one compiled function.
@@ -193,6 +210,7 @@ type Function struct {
 	// RecordArrayLoopKernels records generated loop-body dataflow graphs keyed
 	// by OpRecordArrayLoopKernel instruction ID.
 	RecordArrayLoopKernels map[int]RecordArrayLoopKernelSpec
+	RecordArrayLoopCaches  []*RecordArrayLoopKernelCache
 
 	// Globals, if non-nil, maps global function names to their protos.
 	// Used by the IR interpreter to resolve residual cross-function calls

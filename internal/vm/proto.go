@@ -34,6 +34,7 @@ type FuncProto struct {
 	ResumePayloadCache           []int8                             // per-PC cache for ResumePayloadIsFieldOnly: 0 unknown, 1 false, 2 true
 	WholeCallKernel              *wholeCallKernelProtoCache         // structural whole-call kernel recognizer cache, nil until first probe
 	RecordPairwiseNumericKernel  *recordPairwiseNumericKernelCache  // guarded runtime-generated pairwise record numeric kernel cache
+	GenericRecordArrayLoopKernel *genericRecordArrayLoopKernelCache // guarded runtime-generated scalar record-array loop cache
 	RecursiveTableKernel         *recursiveTableKernelCache         // guarded runtime recursive table builder/fold kernel cache
 	RawIntNestedKernel           *rawIntNestedKernelCache           // guarded runtime nested raw-int recurrence kernel cache
 	HasSelfCalls                 bool                               // true if function has recursive calls to itself (set during JIT compilation)

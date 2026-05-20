@@ -44,6 +44,7 @@ func tier2TableArrayNativeLoweringModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModule("TableArrayLower", Tier2PhaseTableArrayLower, TableArrayLowerPass),
 		tier2PassModule("TableArrayLoadTypeSpecialize", Tier2PhaseTableArrayLower, TableArrayLoadTypeSpecializePass),
+		tier2PassModule("StringEnumCompare", Tier2PhaseTableArrayLower, StringEnumComparePass),
 		tier2PassModule("TableArrayNestedLoad", Tier2PhaseTableArrayLower, TableArrayNestedLoadPass),
 	}
 }
@@ -72,6 +73,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModule("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, GuardFieldCalleePass),
 		tier2PassModule("TableArrayLower (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TableArrayLowerPass),
 		tier2PassModule("TableArrayLoadTypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TableArrayLoadTypeSpecializePass),
+		tier2PassModule("StringEnumCompare (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, StringEnumComparePass),
 		tier2PassModule("TableArrayStoreLower (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TableArrayStoreLowerPass),
 		tier2PassModule("TypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, TypeSpecializePass),
 		tier2PassModule("FloorPhiSplit", Tier2PhaseTableFieldLower, FloorPhiSplitPass),

@@ -86,6 +86,7 @@ const (
 	TableOffLazyTree          = 256 // *LazyRecursiveTable — deferred recursive table side pointer
 	TableOffStringLookupCache = 264 // *StringLookupCache — large string map value cache
 	TableOffStringLookupVer   = 272 // uint64 — string-map mutation version
+	TableOffArrayVersion      = 280 // uint64 — array-structure mutation version
 
 	FixedRecordOffCtor         = 0
 	FixedRecordOffMaterialized = 8
@@ -290,6 +291,9 @@ func init() {
 	}
 	if verOff := runtime.TableStringLookupVersionOffset(); verOff != TableOffStringLookupVer {
 		panic("jit: Table string lookup version offset mismatch")
+	}
+	if verOff := runtime.TableArrayVersionOffset(); verOff != TableOffArrayVersion {
+		panic("jit: Table array version offset mismatch")
 	}
 	if dataOff, lenOff, capOff, maskOff := runtime.StringLookupCacheOffsets(); dataOff != StringLookupCacheOffEntries ||
 		lenOff != StringLookupCacheOffEntriesLen || capOff != StringLookupCacheOffEntriesCap || maskOff != StringLookupCacheOffMask {

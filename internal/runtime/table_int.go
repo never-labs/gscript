@@ -206,6 +206,7 @@ func (t *Table) RawSetInt(key int64, val Value) {
 	}
 	t.maybeClearDenseParentForWrite(key, val)
 	t.keysDirty = true
+	t.bumpArrayVersionLocked()
 
 	arrLen := int64(t.typedArrayLen())
 	tableArraySetPath(key, val, arrLen)

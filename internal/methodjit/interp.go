@@ -544,9 +544,9 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 
 	case OpRecordArrayLoopKernel:
 		tbl := s.val(instr.Args[0])
-		limit := s.val(instr.Args[2]).Int()
+		limit := s.val(instr.Args[3]).Int()
 		spec, ok := s.fn.RecordArrayLoopKernels[instr.ID]
-		if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-3) {
+		if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
 			return nil, false, fmt.Errorf("OpRecordArrayLoopKernel: missing or invalid kernel spec")
 		}
 		if !tbl.IsTable() {
@@ -560,7 +560,7 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		}
 		scalars := make([]float64, spec.ScalarCount)
 		for i := range scalars {
-			scalars[i] = s.val(instr.Args[3+i]).Number()
+			scalars[i] = s.val(instr.Args[4+i]).Number()
 		}
 		for i := int64(1); i <= limit; i++ {
 			row := tbl.Table().RawGetInt(i).Table()

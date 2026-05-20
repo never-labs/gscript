@@ -25,14 +25,15 @@ var (
 // All tables that have the same fields in the same insertion order share a
 // single Shape instance.
 type Shape struct {
-	ID             uint32
-	FieldKeys      []string       // ordered field names (immutable)
-	FieldMap       map[string]int // key → index for O(1) GetFieldIndex
-	transitions    sync.Map       // string → *Shape (cached addField transitions)
-	mutations      uint64         // observed overwrites/deletes of this shape
-	fieldMutations []uint64       // observed overwrites/deletes by field index
-	fieldTypes     []uint32       // stable observed field value types, encoded as ValueType+1
-	fieldTypeEpoch []uint64       // increments when a field's observed type changes or becomes mixed
+	ID              uint32
+	FieldKeys       []string       // ordered field names (immutable)
+	FieldMap        map[string]int // key → index for O(1) GetFieldIndex
+	transitions     sync.Map       // string → *Shape (cached addField transitions)
+	layoutMutations uint64         // observed transitions away from this exact layout
+	mutations       uint64         // observed overwrites/deletes of this shape
+	fieldMutations  []uint64       // observed overwrites/deletes by field index
+	fieldTypes      []uint32       // stable observed field value types, encoded as ValueType+1
+	fieldTypeEpoch  []uint64       // increments when a field's observed type changes or becomes mixed
 }
 
 // GetFieldIndex returns the slot index of key in FieldKeys, or -1 if absent.
@@ -151,6 +152,19 @@ func RecordShapeMutation(id uint32) {
 	}
 }
 
+// RecordShapeLayoutMutation marks that a table has transitioned away from this
+// exact shape layout. Unlike RecordShapeFieldMutation, ordinary value
+// overwrites do not affect this epoch; it is for guards that only need to know
+// whether field positions remain valid.
+func RecordShapeLayoutMutation(id uint32) {
+	if id == 0 {
+		return
+	}
+	if s := LookupShapeByID(id); s != nil {
+		atomic.AddUint64(&s.layoutMutations, 1)
+	}
+}
+
 // RecordShapeFieldMutation marks that a specific field in a shaped table has
 // been overwritten or deleted. It also bumps the coarse shape mutation epoch so
 // existing shape-level guards keep their original semantics.
@@ -187,6 +201,30 @@ func ShapeMutationCountPtr(id uint32) unsafe.Pointer {
 	}
 	if s := LookupShapeByID(id); s != nil {
 		return unsafe.Pointer(&s.mutations)
+	}
+	return nil
+}
+
+// ShapeLayoutMutationCount returns the observed structural-layout mutation
+// epoch for a shape.
+func ShapeLayoutMutationCount(id uint32) uint64 {
+	if id == 0 {
+		return 0
+	}
+	if s := LookupShapeByID(id); s != nil {
+		return atomic.LoadUint64(&s.layoutMutations)
+	}
+	return 0
+}
+
+// ShapeLayoutMutationCountPtr returns the address of the layout mutation epoch
+// for native guards.
+func ShapeLayoutMutationCountPtr(id uint32) unsafe.Pointer {
+	if id == 0 {
+		return nil
+	}
+	if s := LookupShapeByID(id); s != nil {
+		return unsafe.Pointer(&s.layoutMutations)
 	}
 	return nil
 }

@@ -59,12 +59,14 @@ func lowerRecordArrayLoopKernel(fn *Function, header *Block) bool {
 		ID:    fn.newValueID(),
 		Op:    OpRecordArrayLoopKernel,
 		Type:  TypeUnknown,
-		Args:  []*Value{spec.data, spec.len, limit, spec.scale, spec.damp},
+		Args:  []*Value{spec.header, spec.data, spec.len, limit, spec.scale, spec.damp},
 		Block: header,
 	}
 	if fn.RecordArrayLoopKernels == nil {
 		fn.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
 	}
+	spec.kernel.Cache = &RecordArrayLoopKernelCache{}
+	fn.RecordArrayLoopCaches = append(fn.RecordArrayLoopCaches, spec.kernel.Cache)
 	fn.RecordArrayLoopKernels[op.ID] = spec.kernel
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Block: header}
 	header.Instrs = []*Instr{op, ret}
@@ -77,6 +79,7 @@ func lowerRecordArrayLoopKernel(fn *Function, header *Block) bool {
 }
 
 type recordFieldUpdateSpec struct {
+	header *Value
 	data   *Value
 	len    *Value
 	scale  *Value
@@ -104,6 +107,12 @@ func parseRecordFieldUpdateBody(body *Block, index *Value) (recordFieldUpdateSpe
 		}
 	}
 	if load == nil || svals == nil || len(load.Args) < 3 {
+		return spec, false
+	}
+	if len(load.Args) >= 4 {
+		spec.header = load.Args[3]
+	}
+	if spec.header == nil {
 		return spec, false
 	}
 	spec.data = load.Args[0]

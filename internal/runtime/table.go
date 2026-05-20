@@ -84,6 +84,7 @@ type Table struct {
 	// tables that are never dynamically probed pay only this pointer.
 	stringLookupCache   *StringLookupCache
 	stringLookupVersion uint64
+	arrayVersion        uint64
 }
 
 // SetConcurrent enables or disables mutex protection for concurrent access.
@@ -1364,6 +1365,7 @@ func (t *Table) RawSetStringDynamicCached(key string, val Value, cache []TableSt
 			RecordRuntimePathTableStringSetAppend()
 		} else {
 			RecordShapeMutation(t.shapeID)
+			RecordShapeLayoutMutation(t.shapeID)
 			t.promoteStringFieldsToMapLocked(key, val)
 			RecordRuntimePathTableStringSetPromote()
 		}
@@ -1408,6 +1410,13 @@ func (t *Table) RawSet(key, val Value) {
 		delete(t.hash, ck)
 	} else {
 		t.hash[ck] = val
+	}
+}
+
+func (t *Table) bumpArrayVersionLocked() {
+	t.arrayVersion++
+	if t.arrayVersion == 0 {
+		t.arrayVersion = 1
 	}
 }
 
@@ -1478,6 +1487,9 @@ func (t *Table) applyShape(s *Shape) {
 // new string field is appended. It avoids rebuilding the full joined shape key
 // for every object with the same field insertion order.
 func (t *Table) appendShape(key string) {
+	if t.shapeID != 0 {
+		RecordShapeLayoutMutation(t.shapeID)
+	}
 	var s *Shape
 	if t.shape != nil {
 		s = t.shape.Transition(key)
@@ -1522,6 +1534,7 @@ func (t *Table) deleteSmallStringField(idx int) {
 	if idx != last {
 		t.svals[idx] = t.svals[last]
 	}
+	RecordShapeLayoutMutation(t.shapeID)
 	t.svals = t.svals[:last]
 	if last == 0 {
 		t.setShape(nil)
@@ -1586,6 +1599,7 @@ func (t *Table) RawSetString(key string, val Value) {
 			t.bumpStringLookupVersionLocked()
 		} else {
 			RecordShapeMutation(t.shapeID)
+			RecordShapeLayoutMutation(t.shapeID)
 			t.promoteStringFieldsToMapLocked(key, val)
 		}
 	}
@@ -1865,6 +1879,13 @@ func TableStringLookupVersionOffset() uintptr {
 	return unsafe.Offsetof(t.stringLookupVersion)
 }
 
+// TableArrayVersionOffset returns the byte offset for the array-structure
+// mutation version used by native record-array validation caches.
+func TableArrayVersionOffset() uintptr {
+	var t Table
+	return unsafe.Offsetof(t.arrayVersion)
+}
+
 // StringLookupCacheOffsets returns byte offsets for StringLookupCache.
 func StringLookupCacheOffsets() (entriesData, entriesLen, entriesCap, mask uintptr) {
 	var c StringLookupCache
@@ -1987,6 +2008,15 @@ func (t *Table) StoreFloatRecordForNumericKernel(shapeID uint32, idxs []int, val
 	}
 	t.keysDirty = true
 	return true
+}
+
+// NumericSvalsForRecordKernel exposes the string-field value slice for guarded
+// runtime-generated numeric record kernels after validating the table shape.
+func (t *Table) NumericSvalsForRecordKernel(shapeID uint32) ([]Value, bool) {
+	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.shapeID == 0 || t.shapeID != shapeID {
+		return nil, false
+	}
+	return t.svals, true
 }
 
 // MarkArrayMutationForNumericKernel mirrors RawSetInt's observable iteration

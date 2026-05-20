@@ -162,7 +162,7 @@ func TestTier2NumericModuleOrder(t *testing.T) {
 
 func TestTier2TableNativeLoweringModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2TableArrayNativeLoweringModules(), Tier2PhaseTableArrayLower,
-		[]string{"TableArrayLower", "TableArrayLoadTypeSpecialize", "TableArrayNestedLoad"})
+		[]string{"TableArrayLower", "TableArrayLoadTypeSpecialize", "StringEnumCompare", "TableArrayNestedLoad"})
 	assertTier2ModuleOrder(t, tier2TableFieldNativeLoweringModules(nil), Tier2PhaseTableFieldLower,
 		[]string{
 			"TableArrayStoreLower",
@@ -174,6 +174,7 @@ func TestTier2TableNativeLoweringModuleOrder(t *testing.T) {
 			"GuardFieldCallee (post-FieldSvalsLower)",
 			"TableArrayLower (post-FieldSvalsLower)",
 			"TableArrayLoadTypeSpecialize (post-FieldSvalsLower)",
+			"StringEnumCompare (post-FieldSvalsLower)",
 			"TableArrayStoreLower (post-FieldSvalsLower)",
 			"TypeSpecialize (post-FieldSvalsLower)",
 			"FloorPhiSplit",
