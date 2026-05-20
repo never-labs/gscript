@@ -79,6 +79,7 @@ type TieringManager struct {
 	globalArrayFacts   map[string]FixedShapeTableFact
 	perfStats          *tier2PerfStatsCollector
 	perfStatsEnabled   bool
+	tier1Only          map[*vm.FuncProto]bool
 	callVM             *vm.VM
 	retBuf             [8]runtime.Value
 	tier2Ctx           ExecContext
@@ -121,6 +122,7 @@ func NewTieringManager() *TieringManager {
 		tier2GuardFailures: make(map[*vm.FuncProto]map[int]map[string]uint64),
 		globalNumericFacts: make(map[string]runtime.Value),
 		globalArrayFacts:   make(map[string]FixedShapeTableFact),
+		tier1Only:          make(map[*vm.FuncProto]bool),
 		tier2Threshold:     tmDefaultTier2Threshold,
 		profileCache:       make(map[*vm.FuncProto]FuncProfile),
 		// R162: cache env vars once to keep hot paths free of syscalls.
@@ -403,6 +405,9 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 	if compiled != nil {
 		return compiled
 	}
+	if !recompileRequested && tm.tier1Only[proto] {
+		return tm.tier1.TryCompile(proto)
+	}
 	profile := tm.getProfile(proto)
 	decision := tm.policy.Decide(proto, profile, PromotionPolicyState{
 		Manager:            tm,
@@ -410,7 +415,21 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 		Tier2Failed:        tm.tier2HasFailed(proto),
 		RecompileRequested: recompileRequested,
 	})
+	if decision.Action == TieringActionUseTier1 &&
+		proto.CallCount >= 128 &&
+		!profile.HasLoop &&
+		!decision.PromoteTier2 &&
+		!decision.SuppressedRecursivePartition &&
+		!staticallyCallsOnlySelf(proto) &&
+		!qualifiesForNumericCrossRecursiveCandidate(proto) &&
+		!stateCanRecompile(recompileRequested, tm.tier2HasFailed(proto)) {
+		tm.tier1Only[proto] = true
+	}
 	return tm.applyPromotionDecision(proto, profile, decision)
+}
+
+func stateCanRecompile(recompileRequested bool, tier2Failed bool) bool {
+	return recompileRequested || tier2Failed
 }
 
 func (tm *TieringManager) retireStaleTier2AfterFeedback(proto *vm.FuncProto, cf *CompiledFunction) {

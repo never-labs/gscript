@@ -4485,7 +4485,8 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 		return vm.tableGetDepth(runtime.TableValue(idx.Table()), key, depth+1)
 	}
 	if idx.IsFunction() {
-		results, err := vm.callValue(idx, []runtime.Value{t, key})
+		args := [2]runtime.Value{t, key}
+		results, err := vm.callValue(idx, args[:])
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -4511,7 +4512,8 @@ func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) er
 			ni := mt.RawGet(runtime.StringValue("__newindex"))
 			if !ni.IsNil() {
 				if ni.IsFunction() {
-					_, err := vm.callValue(ni, []runtime.Value{t, key, val})
+					args := [3]runtime.Value{t, key, val}
+					_, err := vm.callValue(ni, args[:])
 					return err
 				}
 				if ni.IsTable() {
@@ -4584,7 +4586,8 @@ func (vm *VM) arith(a, b runtime.Value, metamethod string, op func(float64, floa
 	}
 	mm, err := vm.getMetamethod(a, b, metamethod)
 	if err == nil && !mm.IsNil() {
-		results, err := vm.callValue(mm, []runtime.Value{a, b})
+		args := [2]runtime.Value{a, b}
+		results, err := vm.callValue(mm, args[:])
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -4697,7 +4700,8 @@ func (vm *VM) unaryMinus(v runtime.Value) (runtime.Value, error) {
 	}
 	mm, err := vm.getMetamethod(v, v, "__unm")
 	if err == nil && !mm.IsNil() {
-		results, err := vm.callValue(mm, []runtime.Value{v})
+		args := [1]runtime.Value{v}
+		results, err := vm.callValue(mm, args[:])
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -4717,7 +4721,8 @@ func (vm *VM) length(v runtime.Value) (runtime.Value, error) {
 		if mt != nil {
 			mm := mt.RawGet(runtime.StringValue("__len"))
 			if !mm.IsNil() {
-				results, err := vm.callValue(mm, []runtime.Value{v})
+				args := [1]runtime.Value{v}
+				results, err := vm.callValue(mm, args[:])
 				if err != nil {
 					return runtime.NilValue(), err
 				}
@@ -4772,7 +4777,8 @@ func (vm *VM) concatPair(a, b runtime.Value) (runtime.Value, error) {
 	}
 	mm, err := vm.getMetamethod(a, b, "__concat")
 	if err == nil && !mm.IsNil() {
-		results, err := vm.callValue(mm, []runtime.Value{a, b})
+		args := [2]runtime.Value{a, b}
+		results, err := vm.callValue(mm, args[:])
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -4794,7 +4800,8 @@ func (vm *VM) valueEqual(a, b runtime.Value) (bool, error) {
 		}
 		mm, err := vm.getMetamethod(a, b, "__eq")
 		if err == nil && !mm.IsNil() {
-			results, err := vm.callValue(mm, []runtime.Value{a, b})
+			args := [2]runtime.Value{a, b}
+			results, err := vm.callValue(mm, args[:])
 			if err != nil {
 				return false, err
 			}
@@ -4814,7 +4821,8 @@ func (vm *VM) valueLessThan(a, b runtime.Value) (bool, error) {
 	}
 	mm, err := vm.getMetamethod(a, b, "__lt")
 	if err == nil && !mm.IsNil() {
-		results, err := vm.callValue(mm, []runtime.Value{a, b})
+		args := [2]runtime.Value{a, b}
+		results, err := vm.callValue(mm, args[:])
 		if err != nil {
 			return false, err
 		}
@@ -4832,7 +4840,8 @@ func (vm *VM) valueLessEqual(a, b runtime.Value) (bool, error) {
 	}
 	mm, err := vm.getMetamethod(a, b, "__le")
 	if err == nil && !mm.IsNil() {
-		results, err := vm.callValue(mm, []runtime.Value{a, b})
+		args := [2]runtime.Value{a, b}
+		results, err := vm.callValue(mm, args[:])
 		if err != nil {
 			return false, err
 		}

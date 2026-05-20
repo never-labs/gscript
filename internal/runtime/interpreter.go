@@ -198,6 +198,9 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return []Value{StringValue(args[0].TypeName())}, nil
 		},
+		FastArg1: func(arg Value) (Value, error) {
+			return StringValue(arg.TypeName()), nil
+		},
 	}))
 
 	interp.globals.Define("tostring", FunctionValue(&GoFunction{
@@ -369,6 +372,12 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return []Value{args[0].Table().RawGet(args[1])}, nil
 		},
+		FastArg2: func(table, key Value) (Value, error) {
+			if !table.IsTable() {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'rawget' (table expected, got %s)", table.TypeName())
+			}
+			return table.Table().RawGet(key), nil
+		},
 	}))
 
 	interp.globals.Define("rawset", FunctionValue(&GoFunction{
@@ -388,6 +397,19 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			args[0].Table().RawSet(args[1], args[2])
 			return []Value{args[0]}, nil
+		},
+		FastArg3: func(table, key, value Value) (Value, error) {
+			if !table.IsTable() {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'rawset' (table expected, got %s)", table.TypeName())
+			}
+			if key.IsNil() {
+				return NilValue(), fmt.Errorf("table index is nil")
+			}
+			if key.IsFloat() && math.IsNaN(key.Float()) {
+				return NilValue(), fmt.Errorf("table index is NaN")
+			}
+			table.Table().RawSet(key, value)
+			return table, nil
 		},
 	}))
 
