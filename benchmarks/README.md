@@ -213,6 +213,24 @@ default.
 method-JIT performance work. It builds `cmd/gscript` once, runs every core suite
 benchmark in:
 
+`official_perf_coverage.py` audits the translated official Lua correctness
+cases against the hot-loop benchmark suite:
+
+```bash
+python3 benchmarks/official_perf_coverage.py \
+  --markdown /tmp/official_perf_coverage.md \
+  --json /tmp/official_perf_coverage.json
+```
+
+It does not time the official semantic cases directly. Most of those programs
+are short assertions, so process wall time would mostly measure startup and
+compiler overhead. Instead, the report classifies each official-case family as
+`covered`, `partial`, or `semantic_only`, links covered families to existing hot
+benchmarks, and lists official cases that look like candidates for extracting a
+future hot benchmark. Use it together with `strict_guard.py`: the former tells
+whether performance coverage is broad enough, while the latter proves that the
+covered hot regions are not slower than LuaJIT.
+
 | Mode | Meaning |
 |------|---------|
 | `VM` | bytecode VM, no JIT |
