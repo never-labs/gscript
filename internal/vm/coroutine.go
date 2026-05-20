@@ -769,12 +769,16 @@ func (vm *VM) finishCoroutineRun(co *VMCoroutine, results []rt.Value, err error)
 	if results == nil {
 		results = []rt.Value{}
 	}
-	co.releaseVM()
 	if err != nil {
+		if co.vm != nil {
+			_ = co.vm.drainActiveDefers(0)
+		}
+		co.releaseVM()
 		co.status = VMCoroutineDead
 		vm.recordCoroutineCompleted()
 		return false, []rt.Value{rt.StringValue(err.Error())}, nil
 	}
+	co.releaseVM()
 	co.status = VMCoroutineDead
 	vm.recordCoroutineCompleted()
 	return true, results, nil

@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 439.
+Current translated passing cases: 441.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -338,6 +338,7 @@ Recent audit-added coverage:
 | `bytes_hash_base64_go_host_more` | `api.lua`, `strings.lua` | Go-host `bytes`, `hash`, and `base64` helpers for buffers, encodings, checksums, HMAC, and error returns. |
 | `bytes_numeric_buffer_more` | `api.lua`, `strings.lua` | Go-host bytes buffer numeric little-endian writes, byte/string reads, hex round trips, concat, and reset behavior. |
 | `control_coroutine_defer_more` | `attrib.lua`, `coroutine.lua` | Cached coroutine functions, Go-style defer LIFO under return/protected errors, and const capture/shadowing semantics. |
+| `coroutine_defer_xpcall_edges_more` | `coroutine.lua`, `errors.lua`, `attrib.lua` | Coroutine defer cleanup across yield/return/error plus xpcall handler ordering after protected defer drain. |
 | `csv_options_quotes_more` | `api.lua`, `strings.lua` | CSV comment/lazy-quote options and Go encoding/csv quoting for comma, quote, newline, and leading-space fields. |
 | `defer_loader_require_edges_more` | `attrib.lua`, `main.lua` | Defer argument evaluation timing, remaining stdlib require identities, and load source-name syntax diagnostics. |
 | `db_gscript_diagnostics_more` | `db.lua` | GScript diagnostic helpers for function metadata and value inspection in VM-translated file mode. |
@@ -374,6 +375,7 @@ Recent audit-added coverage:
 | `url_canonical_edges_more` | `main.lua`, `strings.lua` | Go net/url canonical edge behavior for IPv6, user info, percent encoding, duplicate query keys, and absolute joins. |
 | `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
 | `utf8_testkit_edges_more` | `utf8.lua`, `api.lua` | UTF-8 boundary helpers plus deterministic testkit diagnostic shapes and protected-call value capture. |
+| `xpcall_iterator_edges_more` | `errors.lua`, `nextvar.lua` | xpcall handler multi-return adjustment and generic-for nil-first termination with extra iterator values. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `sort_callback_helpers_more` | `sort.lua`, `api.lua` | Go-host sort helpers invoking VM comparator/key callbacks, including callback error propagation through `pcall`. |
