@@ -19,7 +19,7 @@ The harness compares stdout from:
 
 Set `GSCRIPT_OFFICIAL_CHECK_JIT=1` to also compare `gscript -jit *.gs`.
 
-Current translated passing cases: 434.
+Current translated passing cases: 437.
 
 | Case | Official source area | Notes |
 |---|---|---|
@@ -364,11 +364,14 @@ Recent audit-added coverage:
 | `net_http_methods_more` | `api.lua`, `main.lua` | Go-host loopback HTTP methods for PUT/PATCH/DELETE and configurable `net.request` headers, body, timeout, and redirect behavior. |
 | `regexp_go_host_more` | `pm.lua`, `strings.lua` | Go RE2 regexp helpers, compiled objects, submatches, split/replace, and invalid-pattern errors. |
 | `regexp_submatch_limits_more` | `pm.lua`, `strings.lua` | Go RE2 all-submatch helpers, compiled regexp limits, split/find limits, and subexpression counts. |
+| `time_process_debug_edges_more` | `main.lua`, `db.lua` | Go-layout time formatting/parsing, process run string/dir options, and debug hook filtering/getHook behavior. |
 | `time_color_hash_edges_more` | `main.lua`, `math.lua`, `strings.lua` | Deterministic time UTC boundaries, color operator metamethods, and SHA-512/hash error diagnostics. |
 | `time_compress_encoding_go_host_more` | `main.lua`, `strings.lua` | Deterministic Go-host `time`, `compress`, and `encoding` helpers over fixed timestamps, round trips, and decode errors. |
 | `compress_error_levels_more` | `main.lua`, `strings.lua` | Go-host gzip/zlib/deflate explicit compression levels, fallback levels, bad-input errors, and missing-argument diagnostics. |
 | `encoding_ini_xml_roundtrip_more` | `strings.lua`, `main.lua` | Go-host INI encode/decode round trips, XML escape/unescape numeric entities, and malformed base32 decode errors. |
+| `url_canonical_edges_more` | `main.lua`, `strings.lua` | Go net/url canonical edge behavior for IPv6, user info, percent encoding, duplicate query keys, and absolute joins. |
 | `url_go_host_more` | `main.lua`, `strings.lua` | Go-host URL parse/build/query/escape/join helpers and invalid escape handling. |
+| `utf8_testkit_edges_more` | `utf8.lua`, `api.lua` | UTF-8 boundary helpers plus deterministic testkit diagnostic shapes and protected-call value capture. |
 | `main_script_process_more` | `main.lua`, `code.lua` | GScript `script.eval`/`script.compile` environment options and host-controlled `process.args`/`process.entry`. |
 | `strings_go_helpers_more` | `strings.lua` | GScript Go-host string helpers: split, trim variants, replaceAll, join, title, padding, and numeric detection. |
 | `sort_callback_helpers_more` | `sort.lua`, `api.lua` | Go-host sort helpers invoking VM comparator/key callbacks, including callback error propagation through `pcall`. |
