@@ -546,9 +546,7 @@ func EmitCheckIsString(asm *Assembler, valReg, scratch1, scratch2 Reg, notString
 	asm.MOVimm16(scratch2, NB_TagPtrShr48) // 0xFFFF
 	asm.CMPreg(scratch1, scratch2)
 	asm.BCond(CondNE, notStringLabel)
-	asm.LSRimm(scratch1, valReg, uint8(NB_PtrSubShift))
-	asm.LoadImm64(scratch2, 0xF)
-	asm.ANDreg(scratch1, scratch1, scratch2)
-	asm.CMPimm(scratch1, 1) // ptrSubString = 1 (fits in 12 bits)
+	asm.UBFX(scratch1, valReg, uint8(NB_PtrSubShift), 4) // extract 4-bit sub-type
+	asm.CMPimm(scratch1, 1)                                // ptrSubString = 1
 	asm.BCond(CondNE, notStringLabel)
 }
