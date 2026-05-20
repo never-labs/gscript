@@ -28,8 +28,8 @@ func (ec *emitContext) traceNativeCallEmit(instr *Instr, pathKind string, callee
 	abi := "none"
 	if desc != nil {
 		abi = callABIDescSummary(*desc)
-	} else if ec.fn != nil && ec.fn.CallABIs != nil {
-		if d, ok := ec.fn.CallABIs[instr.ID]; ok {
+	} else if ec.fn != nil && ec.fn.Analysis.CallABIs != nil {
+		if d, ok := ec.fn.Analysis.CallABIs[instr.ID]; ok {
 			abi = callABIDescSummary(d)
 		}
 	}

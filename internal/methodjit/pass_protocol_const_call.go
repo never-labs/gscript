@@ -55,10 +55,10 @@ func AnnotateProtocolConstCallFolds(fn *Function, globals map[string]*vm.FuncPro
 		}
 	}
 	if len(folds) == 0 {
-		fn.ProtocolConstCallFolds = nil
+		fn.Analysis.ProtocolConstCallFolds = nil
 		return fn
 	}
-	fn.ProtocolConstCallFolds = folds
+	fn.Analysis.ProtocolConstCallFolds = folds
 	return fn
 }
 

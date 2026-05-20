@@ -208,7 +208,10 @@ func NewAnalysisResult() *AnalysisResult {
 		CallABIs:                   make(map[int]CallABIDescriptor),
 		SpecDependencyProtos:       make(map[*vm.FuncProto]bool),
 		SuppressedSpecGuardPCs:     make(map[int]bool),
-		SuppressedSpecGuardKinds:   make(map[int]map[string]bool),
+		// SuppressedSpecGuardKinds is intentionally left nil: production code
+		// uses nil as a sentinel to fall through to SuppressedSpecGuardPCs in
+		// specGuardKindSuppressed. Initializing it would break that logic.
+
 		ProtocolConstCallFolds:     make(map[int]ProtocolConstCallFoldFact),
 		WholeCallNoResultKernels:   make(map[int]bool),
 		WholeCallNoResultBatches:   make(map[int]WholeCallNoResultBatchFact),
@@ -221,7 +224,8 @@ func NewAnalysisResult() *AnalysisResult {
 		FixedTableConstructors:     make(map[int]FixedTableConstructorFact),
 		FixedRecordNewTableSites:   make(map[int]bool),
 		FixedShapeEntryGuards:      make(map[int]FixedShapeTableFact),
-		Globals:                    make(map[string]*vm.FuncProto),
+		// Globals is intentionally left nil: the inline pass uses nil as a
+		// sentinel to decide whether to copy config.Globals into the function.
 		NumericGlobalValues:        make(map[string]runtime.Value),
 		GlobalArrayElementFacts:    make(map[string]FixedShapeTableFact),
 	}

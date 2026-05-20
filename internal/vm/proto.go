@@ -19,6 +19,7 @@ type FuncProto struct {
 	LineDefined                  int                                // line where the function is defined
 	NumParams                    int                                // number of fixed parameters
 	IsVarArg                     bool                               // whether the function accepts varargs
+	UsesVarargBytecode           bool                               // true when bytecode actually reads varargs via OP_VARARG
 	MaxStack                     int                                // maximum number of registers used
 	Code                         []uint32                           // bytecode instructions
 	Constants                    []runtime.Value                    // constant pool
@@ -69,6 +70,14 @@ type FuncProto struct {
 	NeedsTier2                   bool                               // set true when Tier 2 applied ops (e.g., intrinsics) that Tier 1 would execute differently
 	EnteredTier2                 byte                               // R146: set to 1 by Tier 2 native prologue on first entry — observable signal that native code actually ran (not just compiled)
 	TableStringKeyCache          []runtime.TableStringKeyCacheEntry
+}
+
+// MethodJITCallable reports whether the method JIT can enter this function
+// through the fixed-register calling convention. A function may declare varargs
+// for API compatibility while never reading them; in that case extra arguments
+// are ignored exactly as compiled fixed-arity code would do.
+func (p *FuncProto) MethodJITCallable() bool {
+	return p != nil && (!p.IsVarArg || !p.UsesVarargBytecode)
 }
 
 // TableCtor2 describes a static two-string-field table constructor.

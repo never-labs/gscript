@@ -41,11 +41,11 @@ func sortedSpecDependencyProtos(fn *Function) []*vm.FuncProto {
 	if fn == nil {
 		return nil
 	}
-	deps := make(map[*vm.FuncProto]bool, len(fn.SpecDependencyProtos))
-	for proto := range fn.SpecDependencyProtos {
+	deps := make(map[*vm.FuncProto]bool, len(fn.Analysis.SpecDependencyProtos))
+	for proto := range fn.Analysis.SpecDependencyProtos {
 		recordSpecDependencyProto(fn, deps, proto)
 	}
-	for _, cases := range fn.FieldPolyShapeFacts {
+	for _, cases := range fn.Analysis.FieldPolyShapeFacts {
 		for _, c := range cases {
 			recordSpecDependencyProto(fn, deps, c.VMProto)
 		}

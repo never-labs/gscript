@@ -89,8 +89,8 @@ func InlinePassWith(config InlineConfig) PassFunc {
 		// oracle (Interpret) can resolve residual cross-function calls left
 		// behind by bounded recursive inlining. Production code paths don't
 		// read this field.
-		if fn.Globals == nil && config.Globals != nil {
-			fn.Globals = config.Globals
+		if fn.Analysis.Globals == nil && config.Globals != nil {
+			fn.Analysis.Globals = config.Globals
 		}
 		// recursionCounts tracks, per callee proto, how many times that proto
 		// has been inlined into this caller across the whole fixpoint. It is
@@ -386,10 +386,10 @@ func recordTier2SpecDependency(fn *Function, callee *vm.FuncProto) {
 	if fn == nil || callee == nil || callee == fn.Proto {
 		return
 	}
-	if fn.SpecDependencyProtos == nil {
-		fn.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
+	if fn.Analysis.SpecDependencyProtos == nil {
+		fn.Analysis.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
 	}
-	fn.SpecDependencyProtos[callee] = true
+	fn.Analysis.SpecDependencyProtos[callee] = true
 }
 
 func inlineFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool) {
@@ -1584,10 +1584,10 @@ func remapValue(v *Value, idMap map[int]int, paramValues map[int]*Value) *Value 
 }
 
 func copyInlinedFixedTableConstructors(callerFn, calleeFn *Function, idMap map[int]int) {
-	if callerFn == nil || callerFn.Proto == nil || calleeFn == nil || calleeFn.Proto == nil || len(calleeFn.FixedTableConstructors) == 0 {
+	if callerFn == nil || callerFn.Proto == nil || calleeFn == nil || calleeFn.Proto == nil || len(calleeFn.Analysis.FixedTableConstructors) == 0 {
 		return
 	}
-	for oldID, fact := range calleeFn.FixedTableConstructors {
+	for oldID, fact := range calleeFn.Analysis.FixedTableConstructors {
 		newID, ok := idMap[oldID]
 		if !ok {
 			continue
@@ -1596,10 +1596,10 @@ func copyInlinedFixedTableConstructors(callerFn, calleeFn *Function, idMap map[i
 		if !ok {
 			continue
 		}
-		if callerFn.FixedTableConstructors == nil {
-			callerFn.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
+		if callerFn.Analysis.FixedTableConstructors == nil {
+			callerFn.Analysis.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
 		}
-		callerFn.FixedTableConstructors[newID] = mapped
+		callerFn.Analysis.FixedTableConstructors[newID] = mapped
 	}
 }
 

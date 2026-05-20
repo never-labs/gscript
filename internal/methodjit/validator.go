@@ -303,7 +303,7 @@ func (v *validator) checkOpContracts() {
 				}
 			case OpRecordArrayLoopKernel:
 				v.checkArgCount(blk, instr, 3, 16)
-				if _, ok := v.fn.RecordArrayLoopKernels[instr.ID]; !ok {
+				if _, ok := v.fn.Analysis.RecordArrayLoopKernels[instr.ID]; !ok {
 					v.errorf("B%d: RecordArrayLoopKernel (v%d) must have a kernel spec", blk.ID, instr.ID)
 				}
 			}

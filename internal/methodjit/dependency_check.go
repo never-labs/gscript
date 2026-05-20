@@ -16,13 +16,13 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 	provided := make(map[string]string) // fact -> module that provided it
 	providers := make(map[string][]string)
 
-	// First pass: collect all facts that are provided and by which modules
+	// First pass: collect all facts that are provided and by which modules.
+	// The same fact may be provided by multiple modules (e.g., RangeAnalysis
+	// runs multiple times at different phases, each providing Int48Safe).
+	// We track all providers but do not treat this as an error.
 	for _, module := range plan.Modules {
 		for _, fact := range module.Provides {
-			if existingProvider, ok := provided[fact]; ok {
-				return fmt.Errorf("fact %s is provided by multiple modules: %s and %s", fact, existingProvider, module.Name)
-			}
-			provided[fact] = module.Name
+			provided[fact] = module.Name // last provider wins for the map
 			providers[module.Name] = append(providers[module.Name], fact)
 		}
 	}

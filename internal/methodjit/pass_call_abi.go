@@ -27,7 +27,7 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 		return fn
 	}
 	globals := callABIMergeGlobals(config.Globals, callABIStableGlobals(fn.Proto))
-	fn.CallABIs = nil
+	fn.Analysis.CallABIs = nil
 
 	tails := callABITailCalls(fn)
 	shiftAddOverflowVersions := make(map[*vm.FuncProto]*shiftAddOverflowVersion)
@@ -78,7 +78,7 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 		}
 	}
 	if len(descs) > 0 {
-		fn.CallABIs = descs
+		fn.Analysis.CallABIs = descs
 	}
 	return fn
 }
@@ -477,8 +477,8 @@ func currentFixedShapeTableFacts(fn *Function) map[int]FixedShapeTableFact {
 	if fn == nil {
 		return nil
 	}
-	facts := make(map[int]FixedShapeTableFact, len(fn.FixedShapeTables))
-	for id, fact := range fn.FixedShapeTables {
+	facts := make(map[int]FixedShapeTableFact, len(fn.Analysis.FixedShapeTables))
+	for id, fact := range fn.Analysis.FixedShapeTables {
 		facts[id] = cloneFixedShapeTableFact(fact)
 	}
 	for id, fact := range inferLocalFixedShapeTables(fn) {
@@ -631,7 +631,7 @@ func fieldShapeCalleeCases(fn *Function, instr *Instr) []FieldPolyShapeCase {
 	if calleeLoad.Op != OpGetField {
 		return nil
 	}
-	cases := fn.FieldPolyShapeFacts[calleeLoad.ID]
+	cases := fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
 	if len(cases) == 0 {
 		return nil
 	}
@@ -687,20 +687,20 @@ func specGuardKindSuppressed(fn *Function, pc int, kind string) bool {
 	if fn == nil {
 		return false
 	}
-	if fn.SuppressedSpecGuardKinds != nil {
-		if global := fn.SuppressedSpecGuardKinds[tier2GlobalGuardSuppressPC]; len(global) > 0 && (global[kind] || global["*"]) {
+	if fn.Analysis != nil && fn.Analysis.SuppressedSpecGuardKinds != nil {
+		if global := fn.Analysis.SuppressedSpecGuardKinds[tier2GlobalGuardSuppressPC]; len(global) > 0 && (global[kind] || global["*"]) {
 			return true
 		}
 		if pc < 0 {
 			return false
 		}
-		kinds := fn.SuppressedSpecGuardKinds[pc]
+		kinds := fn.Analysis.SuppressedSpecGuardKinds[pc]
 		return kinds[kind] || kinds["*"]
 	}
 	if pc < 0 {
 		return false
 	}
-	return fn.SuppressedSpecGuardPCs != nil && fn.SuppressedSpecGuardPCs[pc]
+	return fn.Analysis != nil && fn.Analysis.SuppressedSpecGuardPCs != nil && fn.Analysis.SuppressedSpecGuardPCs[pc]
 }
 
 func callABIHasExactResultShape(fn *Function, instr *Instr, wantRets int) bool {
@@ -851,8 +851,8 @@ func callABIValueIntRange(fn *Function, v *Value) (intRange, bool) {
 			return intRange{min: v.Def.Aux, max: v.Def.Aux2, known: true}, true
 		}
 	}
-	if fn.IntRanges != nil {
-		if r, ok := fn.IntRanges[v.ID]; ok && r.known {
+	if fn.Analysis.IntRanges != nil {
+		if r, ok := fn.Analysis.IntRanges[v.ID]; ok && r.known {
 			return r, true
 		}
 	}

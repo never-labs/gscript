@@ -21,14 +21,20 @@ func BuildGraphWithSpeculation(proto *vm.FuncProto, speculation Tier2Speculation
 		fn: &Function{
 			Proto:                    proto,
 			NumRegs:                  proto.MaxStack,
-			SuppressedSpecGuardPCs:   speculation.SuppressedGuardPCs(),
-			SuppressedSpecGuardKinds: speculation.SuppressedGuardKinds(),
+			Analysis:                 NewAnalysisResult(),
 		},
 		proto:           proto,
 		speculation:     speculation,
 		pcToBlock:       make(map[int]*Block),
 		currentPC:       -1,
 		lastMultiRetReg: -1,
+	}
+	// Initialize suppressed spec guard PCs and kinds from speculation
+	if speculation.SuppressedGuardPCs() != nil {
+		b.fn.Analysis.SuppressedSpecGuardPCs = speculation.SuppressedGuardPCs()
+	}
+	if speculation.SuppressedGuardKinds() != nil {
+		b.fn.Analysis.SuppressedSpecGuardKinds = speculation.SuppressedGuardKinds()
 	}
 	b.build()
 	return b.fn
@@ -780,10 +786,10 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, tbl)
 				if ctorIdx >= 0 && ctorIdx < len(b.proto.TableCtors2) {
 					ctor := b.proto.TableCtors2[ctorIdx]
-					if b.fn.FixedTableConstructors == nil {
-						b.fn.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
+					if b.fn.Analysis.FixedTableConstructors == nil {
+						b.fn.Analysis.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
 					}
-					b.fn.FixedTableConstructors[newTable.ID] = FixedTableConstructorFact{
+					b.fn.Analysis.FixedTableConstructors[newTable.ID] = FixedTableConstructorFact{
 						Ctor2Index: ctorIdx,
 						CtorNIndex: -1,
 						FieldNames: []string{ctor.Runtime.Key1, ctor.Runtime.Key2},
@@ -807,10 +813,10 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, tbl)
 				if ctorIdx >= 0 && ctorIdx < len(b.proto.TableCtorsN) {
 					ctor := b.proto.TableCtorsN[ctorIdx]
-					if b.fn.FixedTableConstructors == nil {
-						b.fn.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
+					if b.fn.Analysis.FixedTableConstructors == nil {
+						b.fn.Analysis.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
 					}
-					b.fn.FixedTableConstructors[newTable.ID] = FixedTableConstructorFact{
+					b.fn.Analysis.FixedTableConstructors[newTable.ID] = FixedTableConstructorFact{
 						Ctor2Index: -1,
 						CtorNIndex: ctorIdx,
 						FieldNames: append([]string(nil), ctor.Runtime.Keys...),

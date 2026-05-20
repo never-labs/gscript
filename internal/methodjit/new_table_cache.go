@@ -330,10 +330,10 @@ func fixedRecordCtorNCacheableForFunction(fn *Function, instr *Instr, ctor *runt
 	if fn == nil || instr == nil || !fixedRecordCtorNCacheableForProto(fn.Proto, ctor) {
 		return false
 	}
-	if fn.FixedRecordNewTableSites == nil {
-		fn.FixedRecordNewTableSites = computeFixedRecordNewTableSites(fn)
+	if fn.Analysis.FixedRecordNewTableSites == nil {
+		fn.Analysis.FixedRecordNewTableSites = computeFixedRecordNewTableSites(fn)
 	}
-	return fn.FixedRecordNewTableSites[instr.ID]
+	return fn.Analysis.FixedRecordNewTableSites[instr.ID]
 }
 
 func computeFixedRecordNewTableSites(fn *Function) map[int]bool {

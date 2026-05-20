@@ -33,12 +33,12 @@ func AnnotateWholeCallKernelExits(fn *Function, globals map[string]*vm.FuncProto
 		}
 	}
 	if len(kernels) == 0 {
-		fn.WholeCallNoResultKernels = nil
-		fn.WholeCallNoResultBatches = nil
+		fn.Analysis.WholeCallNoResultKernels = nil
+		fn.Analysis.WholeCallNoResultBatches = nil
 		return fn
 	}
-	fn.WholeCallNoResultKernels = kernels
-	fn.WholeCallNoResultBatches = buildWholeCallNoResultBatches(fn, globals, kernels)
+	fn.Analysis.WholeCallNoResultKernels = kernels
+	fn.Analysis.WholeCallNoResultBatches = buildWholeCallNoResultBatches(fn, globals, kernels)
 	return fn
 }
 

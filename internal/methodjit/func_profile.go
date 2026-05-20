@@ -322,6 +322,9 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 	if shouldStayTier1ForBoxedRawIntKernel(proto, profile) {
 		return false
 	}
+	if proto != nil && proto.IsVarArg {
+		return false
+	}
 	// Top-level drivers are only invoked once and often contain bytecode ops
 	// that resume through generic exits. Until those continuations are proven
 	// restart-safe, keep <main> on Tier 1 and let hot child functions promote.

@@ -346,10 +346,10 @@ func (ec *emitContext) emitConstPositiveModSingleSubtract(instr *Instr, dst jit.
 	if divisor > MaxInt48 {
 		return false
 	}
-	if ec.fn == nil || ec.fn.IntRanges == nil {
+	if ec.fn == nil || ec.fn.Analysis == nil || ec.fn.Analysis.IntRanges == nil {
 		return false
 	}
-	lhsRange, ok := ec.fn.IntRanges[instr.Args[0].ID]
+	lhsRange, ok := ec.fn.Analysis.IntRanges[instr.Args[0].ID]
 	if !ok || !lhsRange.known || lhsRange.min < 0 || lhsRange.max >= divisor*2 {
 		return false
 	}
@@ -626,14 +626,14 @@ func (ec *emitContext) emitIntModZeroDeopt() {
 // fits in the int48 signed range. When true, the emitter may skip the
 // SBFX+CMP+B.NE overflow check (saves 3 ARM64 instructions per op).
 func (ec *emitContext) int48Safe(id int) bool {
-	if ec.fn == nil {
+	if ec.fn == nil || ec.fn.Analysis == nil {
 		return false
 	}
-	if ec.fn.Int48Safe != nil && ec.fn.Int48Safe[id] {
+	if ec.fn.Analysis.Int48Safe != nil && ec.fn.Analysis.Int48Safe[id] {
 		return true
 	}
-	if ec.fn.IntRanges != nil {
-		if r, ok := ec.fn.IntRanges[id]; ok {
+	if ec.fn.Analysis.IntRanges != nil {
+		if r, ok := ec.fn.Analysis.IntRanges[id]; ok {
 			return r.fitsInt48()
 		}
 	}
@@ -641,17 +641,17 @@ func (ec *emitContext) int48Safe(id int) bool {
 }
 
 func (ec *emitContext) intModNonZeroDivisor(id int) bool {
-	if ec.fn == nil || ec.fn.IntModNonZeroDivisor == nil {
+	if ec.fn == nil || ec.fn.Analysis == nil || ec.fn.Analysis.IntModNonZeroDivisor == nil {
 		return false
 	}
-	return ec.fn.IntModNonZeroDivisor[id]
+	return ec.fn.Analysis.IntModNonZeroDivisor[id]
 }
 
 func (ec *emitContext) intModNoSignAdjust(id int) bool {
-	if ec.fn == nil || ec.fn.IntModNoSignAdjust == nil {
+	if ec.fn == nil || ec.fn.Analysis == nil || ec.fn.Analysis.IntModNoSignAdjust == nil {
 		return false
 	}
-	return ec.fn.IntModNoSignAdjust[id]
+	return ec.fn.Analysis.IntModNoSignAdjust[id]
 }
 
 // --- Raw int unary negate (type-specialized, no unbox/box) ---

@@ -468,25 +468,23 @@ func TestTypeSpec_UnaryNeg(t *testing.T) {
 // TestPipeline_FullOptimization runs all three passes in sequence through the
 // pipeline and verifies the combined result on a for-loop sum function.
 func TestPipeline_FullOptimization(t *testing.T) {
-	p := NewPipeline()
-	p.Add("TypeSpecialize", TypeSpecializePass)
-	p.Add("ConstProp", ConstPropPass)
-	p.Add("DCE", DCEPass)
-	p.SetValidator(func(fn *Function) []error { return Validate(fn) })
-	p.EnableDump(true)
-
 	proto := compile(t, `func f(n) { s := 0; for i := 1; i <= n; i++ { s = s + i }; return s }`)
 	fn := BuildGraph(proto)
-	result, err := p.Run(fn)
+
+	// Run passes in sequence directly
+	result, err := TypeSpecializePass(fn)
 	if err != nil {
-		t.Fatalf("Pipeline error: %v", err)
+		t.Fatalf("TypeSpecialize error: %v", err)
+	}
+	result, err = ConstPropPass(result)
+	if err != nil {
+		t.Fatalf("ConstProp error: %v", err)
+	}
+	result, err = DCEPass(result)
+	if err != nil {
+		t.Fatalf("DCE error: %v", err)
 	}
 
-	t.Logf("Pipeline dump:\n%s", p.Dump())
-
-	// After TypeSpecialize: some Adds may become AddInt, Sub may become SubInt.
-	// After ConstProp: constant operations may be folded.
-	// After DCE: dead code removed.
 	// Verify the result is valid IR.
 	errs := Validate(result)
 	if len(errs) > 0 {
@@ -507,12 +505,6 @@ func TestPipeline_FullOptimization(t *testing.T) {
 	}
 	if !hasSpecialized {
 		t.Log("Note: no specialized instructions found (phis may prevent full specialization)")
-	}
-
-	// Verify the diff shows changes from the pipeline.
-	diff := p.Diff("input", "TypeSpecialize")
-	if diff == "" {
-		t.Log("Note: no diff between input and TypeSpecialize")
 	}
 }
 
@@ -536,15 +528,18 @@ func TestPipeline_ConstFolding(t *testing.T) {
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
 
-	p := NewPipeline()
-	p.Add("TypeSpecialize", TypeSpecializePass)
-	p.Add("ConstProp", ConstPropPass)
-	p.Add("DCE", DCEPass)
-	p.SetValidator(func(fn *Function) []error { return Validate(fn) })
-
-	result, err := p.Run(fn)
+	// Run passes in sequence directly
+	result, err := TypeSpecializePass(fn)
 	if err != nil {
-		t.Fatalf("Pipeline error: %v", err)
+		t.Fatalf("TypeSpecialize error: %v", err)
+	}
+	result, err = ConstPropPass(result)
+	if err != nil {
+		t.Fatalf("ConstProp error: %v", err)
+	}
+	result, err = DCEPass(result)
+	if err != nil {
+		t.Fatalf("DCE error: %v", err)
 	}
 
 	// After TypeSpec: Add -> AddInt (both args are int).

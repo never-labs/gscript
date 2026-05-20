@@ -330,6 +330,9 @@ func (c *compiler) emit(inst uint32, line int) int {
 	pos := len(c.proto.Code)
 	c.proto.Code = append(c.proto.Code, inst)
 	c.proto.LineInfo = append(c.proto.LineInfo, line)
+	if DecodeOp(inst) == OP_VARARG {
+		c.proto.UsesVarargBytecode = true
+	}
 	return pos
 }
 

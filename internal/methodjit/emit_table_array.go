@@ -1089,34 +1089,34 @@ func (ec *emitContext) emitCheckTableArrayLoadExitResult(instr *Instr, deoptLabe
 }
 
 func (ec *emitContext) intNonNegative(id int) bool {
-	if ec.fn == nil || ec.fn.IntNonNegative == nil {
+	if ec.fn == nil || ec.fn.Analysis.IntNonNegative == nil {
 		return false
 	}
-	return ec.fn.IntNonNegative[id]
+	return ec.fn.Analysis.IntNonNegative[id]
 }
 
 func (ec *emitContext) tableArrayUpperBoundSafe(id int) bool {
-	if ec.fn == nil || ec.fn.TableArrayUpperBoundSafe == nil {
+	if ec.fn == nil || ec.fn.Analysis.TableArrayUpperBoundSafe == nil {
 		return false
 	}
-	return ec.fn.TableArrayUpperBoundSafe[id]
+	return ec.fn.Analysis.TableArrayUpperBoundSafe[id]
 }
 
 func (ec *emitContext) tableArrayLowerBoundSafe(id int) bool {
-	if ec.fn == nil || ec.fn.TableArrayLowerBoundSafe == nil {
+	if ec.fn == nil || ec.fn.Analysis.TableArrayLowerBoundSafe == nil {
 		return false
 	}
-	return ec.fn.TableArrayLowerBoundSafe[id]
+	return ec.fn.Analysis.TableArrayLowerBoundSafe[id]
 }
 
 func (ec *emitContext) tableArrayKeyKnownNonZero(id int) bool {
 	if kv, ok := ec.constInts[id]; ok {
 		return kv != 0
 	}
-	if ec.fn == nil || ec.fn.IntRanges == nil {
+	if ec.fn == nil || ec.fn.Analysis.IntRanges == nil {
 		return false
 	}
-	r, ok := ec.fn.IntRanges[id]
+	r, ok := ec.fn.Analysis.IntRanges[id]
 	return ok && r.known && (r.min > 0 || r.max < 0)
 }
 

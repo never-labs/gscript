@@ -164,7 +164,7 @@ func countLoopOps(fn *Function, blocks map[int]bool) LoopOpCounts {
 				}
 			case OpAddInt, OpSubInt, OpMulInt, OpNegInt:
 				counts.IntArith++
-				if fn.Int48Safe == nil || !fn.Int48Safe[instr.ID] {
+				if fn.Analysis.Int48Safe == nil || !fn.Analysis.Int48Safe[instr.ID] {
 					counts.IntArithChecked++
 				}
 			case OpAddFloat, OpSubFloat:

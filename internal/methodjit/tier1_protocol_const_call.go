@@ -16,16 +16,16 @@ func baselineProtocolConstCallFolds(proto *vm.FuncProto) map[int]ProtocolConstCa
 		return nil
 	}
 	fn := AnnotateProtocolConstCallFolds(BuildGraph(proto), globals)
-	if fn == nil || len(fn.ProtocolConstCallFolds) == 0 {
+	if fn == nil || len(fn.Analysis.ProtocolConstCallFolds) == 0 {
 		return nil
 	}
-	byPC := make(map[int]ProtocolConstCallFoldFact, len(fn.ProtocolConstCallFolds))
+	byPC := make(map[int]ProtocolConstCallFoldFact, len(fn.Analysis.ProtocolConstCallFolds))
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpCall || !instr.HasSource || instr.SourcePC < 0 {
 				continue
 			}
-			if fact, ok := fn.ProtocolConstCallFolds[instr.ID]; ok {
+			if fact, ok := fn.Analysis.ProtocolConstCallFolds[instr.ID]; ok {
 				byPC[instr.SourcePC] = fact
 			}
 		}

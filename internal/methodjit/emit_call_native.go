@@ -1051,8 +1051,8 @@ func (ec *emitContext) emitCallNativeRawIntPeerIfEligible(instr *Instr) bool {
 	if nRets != 1 || nArgs != callee.NumParams || nArgs < 1 || nArgs > 4 {
 		return false
 	}
-	if ec.fn != nil && ec.fn.CallABIs != nil {
-		if desc, ok := ec.fn.CallABIs[instr.ID]; ok {
+	if ec.fn != nil && ec.fn.Analysis.CallABIs != nil {
+		if desc, ok := ec.fn.Analysis.CallABIs[instr.ID]; ok {
 			ec.traceNativeCallEmit(instr, "raw-int peer", callee, &desc)
 		} else {
 			ec.traceNativeCallEmit(instr, "raw-int peer", callee, nil)
@@ -1195,10 +1195,10 @@ func (ec *emitContext) emitCallNativeRawIntPeerIfEligible(instr *Instr) bool {
 }
 
 func (ec *emitContext) emitCallNativeTypedPeerIfEligible(instr *Instr) bool {
-	if ec == nil || ec.fn == nil || instr == nil || ec.fn.CallABIs == nil {
+	if ec == nil || ec.fn == nil || instr == nil || ec.fn.Analysis.CallABIs == nil {
 		return false
 	}
-	desc, ok := ec.fn.CallABIs[instr.ID]
+	desc, ok := ec.fn.Analysis.CallABIs[instr.ID]
 	if !ok || !desc.TypedPeer || desc.Callee == nil {
 		return false
 	}
@@ -1385,7 +1385,7 @@ func (ec *emitContext) fieldShapeTypedPeerCallCases(instr *Instr) []fieldShapeTy
 	if callResultCountFromAux2(instr.Aux2) != 1 || nArgs < 1 || nArgs > 4 {
 		return nil
 	}
-	cases := ec.fn.FieldPolyShapeFacts[calleeLoad.ID]
+	cases := ec.fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
 	if len(cases) < 2 {
 		return nil
 	}
@@ -1458,7 +1458,7 @@ func (ec *emitContext) fieldShapeTypedPeerMethodCallCases(instr *Instr) []fieldS
 	if callResultCountFromAux2(instr.Aux2) != 1 || nArgs < 1 || nArgs > 4 {
 		return nil
 	}
-	cases := ec.fn.FieldPolyShapeFacts[instr.ID]
+	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
 	if len(cases) == 0 {
 		return nil
 	}
@@ -1998,7 +1998,7 @@ func (ec *emitContext) emitFieldCallPolyLenFusionStores(callID int, shapeID uint
 	if ec == nil || ec.fn == nil {
 		return
 	}
-	fusions := ec.fn.FieldCallPolyLenFusions[callID]
+	fusions := ec.fn.Analysis.FieldCallPolyLenFusions[callID]
 	if len(fusions) == 0 {
 		return
 	}
@@ -2587,7 +2587,7 @@ func (ec *emitContext) staticNoDepthCallee(instr *Instr) *vm.FuncProto {
 	if ec.tailCallInstrs[instr.ID] || ec.isStaticSelfCall(instr) {
 		return nil
 	}
-	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Globals})
+	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Analysis.Globals})
 	if callee == nil {
 		if feedbackCallee, ok := callABIFeedbackCalleeProto(ec.fn, instr); ok {
 			callee = feedbackCallee
@@ -2606,7 +2606,7 @@ func (ec *emitContext) staticNativeCallUnsafeCallee(instr *Instr) *vm.FuncProto 
 	if ec.tailCallInstrs[instr.ID] || ec.isStaticSelfCall(instr) {
 		return nil
 	}
-	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Globals})
+	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Analysis.Globals})
 	if callee == nil {
 		if feedbackCallee, ok := callABIFeedbackCalleeProto(ec.fn, instr); ok {
 			callee = feedbackCallee
@@ -2718,10 +2718,10 @@ func (ec *emitContext) rawIntPeerCallee(instr *Instr) *vm.FuncProto {
 	if ec.tailCallInstrs[instr.ID] || ec.isStaticSelfCall(instr) {
 		return nil
 	}
-	if len(instr.Args) < 2 || ec.fn.CallABIs == nil {
+	if len(instr.Args) < 2 || ec.fn.Analysis.CallABIs == nil {
 		return nil
 	}
-	desc, ok := ec.fn.CallABIs[instr.ID]
+	desc, ok := ec.fn.Analysis.CallABIs[instr.ID]
 	if !ok || desc.Callee == nil || !desc.RawIntReturn || desc.NumRets != 1 {
 		return nil
 	}

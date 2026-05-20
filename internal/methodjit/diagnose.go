@@ -16,10 +16,120 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gscript/gscript/internal/runtime"
 	"github.com/gscript/gscript/internal/vm"
 )
+
+// Snapshot records the IR state at one point in the pipeline.
+type Snapshot struct {
+	Name string // pass name (or "input" for initial state)
+	IR   string // Print(fn) output
+}
+
+// lineDiff produces a simple line-level diff between two slices of lines.
+// Uses a basic LCS (longest common subsequence) approach for small inputs,
+// appropriate for IR dumps which are typically short.
+func lineDiff(a, b []string) string {
+	// Build LCS table.
+	m, n := len(a), len(b)
+	dp := make([][]int, m+1)
+	for i := range dp {
+		dp[i] = make([]int, n+1)
+	}
+	for i := 1; i <= m; i++ {
+		for j := 1; j <= n; j++ {
+			if a[i-1] == b[j-1] {
+				dp[i][j] = dp[i-1][j-1] + 1
+			} else if dp[i-1][j] >= dp[i][j-1] {
+				dp[i][j] = dp[i-1][j]
+			} else {
+				dp[i][j] = dp[i][j-1]
+			}
+		}
+	}
+
+	// Backtrack to produce diff.
+	var result []string
+	i, j := m, n
+	for i > 0 || j > 0 {
+		if i > 0 && j > 0 && a[i-1] == b[j-1] {
+			result = append(result, "  "+a[i-1])
+			i--
+			j--
+		} else if j > 0 && (i == 0 || dp[i][j-1] >= dp[i-1][j]) {
+			result = append(result, "+ "+b[j-1])
+			j--
+		} else {
+			result = append(result, "- "+a[i-1])
+			i--
+		}
+	}
+
+	// Reverse since we built it backwards.
+	for l, r := 0, len(result)-1; l < r; l, r = l+1, r-1 {
+		result[l], result[r] = result[r], result[l]
+	}
+
+	return strings.Join(result, "\n")
+}
+
+// snapshotCollector collects IR snapshots during pipeline execution.
+type snapshotCollector struct {
+	snapshots []Snapshot
+	timings   []PipelineStageTiming
+}
+
+func newSnapshotCollector() *snapshotCollector {
+	return &snapshotCollector{
+		snapshots: make([]Snapshot, 0, 64),
+		timings:   make([]PipelineStageTiming, 0, 64),
+	}
+}
+
+func (sc *snapshotCollector) addSnapshot(name string, fn *Function) {
+	sc.snapshots = append(sc.snapshots, Snapshot{
+		Name: name,
+		IR:   Print(fn),
+	})
+}
+
+func (sc *snapshotCollector) addSnapshotAndTiming(name string, fn *Function, duration time.Duration) {
+	sc.snapshots = append(sc.snapshots, Snapshot{
+		Name: name,
+		IR:   Print(fn),
+	})
+	sc.timings = append(sc.timings, newPipelineStageTiming(name, duration, nil))
+}
+
+func (sc *snapshotCollector) diff(a, b string) string {
+	irA := sc.findSnapshot(a)
+	irB := sc.findSnapshot(b)
+	if irA == "" && irB == "" {
+		return fmt.Sprintf("(snapshots %q and %q not found)", a, b)
+	}
+	if irA == "" {
+		return fmt.Sprintf("(snapshot %q not found)", a)
+	}
+	if irB == "" {
+		return fmt.Sprintf("(snapshot %q not found)", b)
+	}
+
+	linesA := strings.Split(irA, "\n")
+	linesB := strings.Split(irB, "\n")
+
+	return lineDiff(linesA, linesB)
+}
+
+func (sc *snapshotCollector) findSnapshot(name string) string {
+	for _, snap := range sc.snapshots {
+		if snap.Name == name {
+			return snap.IR
+		}
+	}
+	return ""
+}
 
 // DiagReport is the complete diagnostic output for one function invocation.
 type DiagReport struct {
@@ -66,16 +176,21 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.InterpResult = interpResult
 	r.InterpError = interpErr
 
-	// 4. Pipeline with dump — uses NewTier2Pipeline() to ensure pass list
-	//    matches the production compileTier2() order exactly.
-	pipe := NewTier2Pipeline()
-	pipe.EnableDump(true)
+	// 4. Run optimizer with snapshot callback.
+	collector := newSnapshotCollector()
+	collector.addSnapshot("input", fn)
+	ctx := &Tier2OptimizerContext{
+		InlineMaxSize: 40,
+		SnapshotCallback: func(moduleName string, fn *Function, duration time.Duration) {
+			collector.addSnapshotAndTiming(moduleName, fn, duration)
+		},
+	}
 
-	optimized, pipeErr := pipe.Run(fn)
+	optimized, pipeErr := runTier2OptimizerPlan(fn, nil, ctx, newTier2OptimizerPlan(ctx))
 	if pipeErr != nil {
 		// Pipeline failed; record what we can.
 		r.IRAfter = r.IRBefore
-		r.PipelineStages = pipe.StageTimings()
+		r.PipelineStages = collector.timings
 		r.OptimizationRemarks = remarks.List()
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
@@ -84,10 +199,10 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 
 	r.IRAfter = Print(optimized)
 	r.OptimizationRemarks = remarks.List()
-	r.PipelineStages = pipe.StageTimings()
+	r.PipelineStages = collector.timings
 
 	// Collect diffs for passes that changed the IR.
-	r.PassDiffs = collectPassDiffs(pipe)
+	r.PassDiffs = collectPassDiffs(collector)
 
 	// 5. Register allocation (display only).
 	optimized.CarryPreheaderInvariants = true
@@ -164,20 +279,20 @@ func valuesMatch(a, b runtime.Value) bool {
 	return false
 }
 
-// collectPassDiffs extracts diffs from the pipeline for passes that changed the IR.
-func collectPassDiffs(pipe *Pipeline) []string {
-	if len(pipe.snapshots) < 2 {
+// collectPassDiffs extracts diffs from the snapshot collector for passes that changed the IR.
+func collectPassDiffs(sc *snapshotCollector) []string {
+	if len(sc.snapshots) < 2 {
 		return nil
 	}
 
 	var diffs []string
-	for i := 1; i < len(pipe.snapshots); i++ {
-		prev := pipe.snapshots[i-1]
-		curr := pipe.snapshots[i]
+	for i := 1; i < len(sc.snapshots); i++ {
+		prev := sc.snapshots[i-1]
+		curr := sc.snapshots[i]
 		if prev.IR == curr.IR {
 			continue // no change
 		}
-		diff := pipe.Diff(prev.Name, curr.Name)
+		diff := sc.diff(prev.Name, curr.Name)
 		header := fmt.Sprintf("--- Pass: %s ---\n%s", curr.Name, summarizeDiff(diff))
 		diffs = append(diffs, header)
 	}

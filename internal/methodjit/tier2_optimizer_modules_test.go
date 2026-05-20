@@ -1,6 +1,9 @@
 package methodjit
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func assertTier2ModuleOrder(t *testing.T, mods []Tier2OptimizerModule, phase Tier2OptimizerPhase, want []string) {
 	t.Helper()
@@ -283,4 +286,118 @@ func TestTier2FinalCallModuleOrderIgnoresOtherFieldShapeSplitValues(t *testing.T
 		"FieldCallPolyLenFusion",
 		"RangeAnalysis (post-final-call)",
 	})
+}
+
+func TestDependencyOrder(t *testing.T) {
+	plan := newTier2OptimizerPlan(&Tier2OptimizerContext{InlineMaxSize: 40})
+	if err := ValidateDependencyOrder(plan); err != nil {
+		t.Fatalf("dependency validation failed: %v", err)
+	}
+}
+
+func TestDependencyOrderRejectsMissingRequirement(t *testing.T) {
+	// Build a plan where a module requires a fact that is never provided.
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical, Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "FakeProvider",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Requires: nil,
+				Provides: []string{"FactA"},
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "FakeConsumer",
+				Phase:    Tier2PhaseNumeric,
+				Requires: []string{"FactA", "FactB"}, // FactB is never provided
+				Provides: nil,
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected error for missing FactB dependency, got nil")
+	}
+	if !strings.Contains(err.Error(), "FactB") {
+		t.Fatalf("error should mention FactB, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "never provided") {
+		t.Fatalf("error should say 'never provided', got: %v", err)
+	}
+}
+
+func TestDependencyOrderRejectsOutOfOrderDependency(t *testing.T) {
+	// Build a plan where a module requires a fact that is provided later.
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical, Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "Consumer",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Requires: []string{"LateFact"},
+				Provides: nil,
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "LateProvider",
+				Phase:    Tier2PhaseNumeric,
+				Requires: nil,
+				Provides: []string{"LateFact"},
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected error for out-of-order dependency, got nil")
+	}
+	if !strings.Contains(err.Error(), "LateFact") {
+		t.Fatalf("error should mention LateFact, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "not yet available") {
+		t.Fatalf("error should say 'not yet available', got: %v", err)
+	}
+}
+
+func TestDependencyOrderAllowsMultipleProviders(t *testing.T) {
+	// The same fact can be provided by multiple modules (e.g., RangeAnalysis
+	// runs multiple times, each providing Int48Safe).
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical, Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "Provider1",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Requires: nil,
+				Provides: []string{"SharedFact"},
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "Consumer1",
+				Phase:    Tier2PhaseNumeric,
+				Requires: []string{"SharedFact"},
+				Provides: nil,
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "Provider2",
+				Phase:    Tier2PhaseNumeric,
+				Requires: nil,
+				Provides: []string{"SharedFact"},
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "Consumer2",
+				Phase:    Tier2PhaseNumeric,
+				Requires: []string{"SharedFact"},
+				Provides: nil,
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+	if err := ValidateDependencyOrder(plan); err != nil {
+		t.Fatalf("expected no error for multiple providers, got: %v", err)
+	}
 }

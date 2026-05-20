@@ -7,50 +7,105 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
+// Tier2SnapshotCallback is called after each optimizer module runs, for IR dump/snapshot.
+// The duration is the time the module took to execute (non-nil only if module succeeded).
+type Tier2SnapshotCallback func(moduleName string, fn *Function, duration time.Duration)
+
 // Tier2OptimizerPhase names a coarse-grained extension point in the Tier 2
 // optimizer. New native optimizations should enter through a phase module
 // instead of being inserted ad hoc into RunTier2Pipeline.
 type Tier2OptimizerPhase string
 
 const (
-	Tier2PhaseEarlyCanonical  Tier2OptimizerPhase = "early_canonical"
-	Tier2PhaseInlineCall      Tier2OptimizerPhase = "inline_call"
-	Tier2PhaseCallLower       Tier2OptimizerPhase = "call_lower"
-	Tier2PhaseStringNative    Tier2OptimizerPhase = "string_native"
+	// Tier2PhaseEarlyCanonical runs initial simplification, type specialization,
+	// intrinsic rewriting, and pre-inline fixed-shape table analysis.
+	Tier2PhaseEarlyCanonical Tier2OptimizerPhase = "early_canonical"
+
+	// Tier2PhaseInlineCall performs call inlining and post-inline cleanup passes.
+	Tier2PhaseInlineCall Tier2OptimizerPhase = "inline_call"
+
+	// Tier2PhaseCallLower annotates callsites with ABI facts and folds
+	// protocol-level constant calls.
+	Tier2PhaseCallLower Tier2OptimizerPhase = "call_lower"
+
+	// Tier2PhaseStringNative rewrites string intrinsics into native IR ops.
+	Tier2PhaseStringNative Tier2OptimizerPhase = "string_native"
+
+	// Tier2PhaseTableObjectPrep runs table allocation hints, fixed-shape analysis,
+	// load elimination, escape analysis, and scalar replacement.
 	Tier2PhaseTableObjectPrep Tier2OptimizerPhase = "table_object_prep"
-	Tier2PhasePostRewrite     Tier2OptimizerPhase = "post_rewrite"
-	Tier2PhaseNumeric         Tier2OptimizerPhase = "numeric"
+
+	// Tier2PhasePostRewrite runs cleanup after escape analysis rewrites.
+	Tier2PhasePostRewrite Tier2OptimizerPhase = "post_rewrite"
+
+	// Tier2PhaseNumeric runs integer range analysis, overflow boxing, division
+	// simplification, and branch threading.
+	Tier2PhaseNumeric Tier2OptimizerPhase = "numeric"
+
+	// Tier2PhaseTableArrayLower lowers table array accesses to native ops.
 	Tier2PhaseTableArrayLower Tier2OptimizerPhase = "table_array_lower"
+
+	// Tier2PhaseMatrixNative lowers dense matrix ops to native stride/load ops.
+	Tier2PhaseMatrixNative Tier2OptimizerPhase = "matrix_native"
+
+	// Tier2PhaseTableFieldLower lowers field accesses to native SVALS ops and
+	// runs post-lowering range analysis.
 	Tier2PhaseTableFieldLower Tier2OptimizerPhase = "table_field_lower"
-	Tier2PhaseMatrixNative    Tier2OptimizerPhase = "matrix_native"
-	Tier2PhaseFloatNumeric    Tier2OptimizerPhase = "float_numeric"
-	Tier2PhaseLoopKernel      Tier2OptimizerPhase = "loop_kernel"
-	Tier2PhaseLoopPost        Tier2OptimizerPhase = "loop_post"
-	Tier2PhaseFinalCall       Tier2OptimizerPhase = "final_call"
+
+	// Tier2PhaseFloatNumeric runs FMA fusion and float strength reduction.
+	Tier2PhaseFloatNumeric Tier2OptimizerPhase = "float_numeric"
+
+	// Tier2PhaseLoopKernel runs LICM, loop-global store sinking, table loop
+	// kernels, and post-LICM load elimination.
+	Tier2PhaseLoopKernel Tier2OptimizerPhase = "loop_kernel"
+
+	// Tier2PhaseLoopPost runs loop unrolling, quadratic strength reduction,
+	// and scalar promotion.
+	Tier2PhaseLoopPost Tier2OptimizerPhase = "loop_post"
+
+	// Tier2PhaseFinalCall re-runs call ABI annotation and final-range analysis
+	// after all other lowering is complete.
+	Tier2PhaseFinalCall Tier2OptimizerPhase = "final_call"
 )
 
+// Tier2OptimizerContext carries per-compilation context shared across modules
+// within a single Tier 2 optimization run. It is created by RunTier2Pipeline
+// and passed to modules that declare RunWithContext instead of Run.
 type Tier2OptimizerContext struct {
-	Globals         map[string]*vm.FuncProto
+	// Globals maps global function names to their protos, used for inlining
+	// and call ABI annotation.
+	Globals map[string]*vm.FuncProto
+	// ProtocolGlobals maps stable protocol globals available for guarded folds.
 	ProtocolGlobals map[string]*vm.FuncProto
-	IntrinsicNotes  []string
-	InlineApplied   bool
-	InlineMaxSize   int
+	// IntrinsicNotes collects human-readable notes from intrinsic rewrites.
+	IntrinsicNotes []string
+	// InlineApplied reports whether the inline pass made changes.
+	InlineApplied bool
+	// InlineMaxSize is the maximum callee bytecode count for inlining (default 40).
+	InlineMaxSize int
+	// SnapshotCallback is an optional callback invoked after each module for
+	// IR dump/snapshot. The duration is the time the module took to execute.
+	SnapshotCallback Tier2SnapshotCallback
 }
 
 // Tier2OptimizerModule is the smallest pluggable optimization unit. Modules
 // are intentionally plain functions with metadata: this keeps hot code out of
 // interfaces while giving diagnostics, ordering, and future feature switches a
 // single place to hook into.
+//
+// Modules within a phase execute in registration order (the Order field is
+// reserved for future stable intra-phase sorting).
 type Tier2OptimizerModule struct {
 	Name           string
 	Phase          Tier2OptimizerPhase
+	Order          int    // reserved for stable intra-phase ordering (future use)
+	Requires       []string // Facts this module needs to be already computed
+	Provides       []string // Facts this module computes
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
 	RunWithContext func(*Function, *Tier2PipelineOpts, *Tier2OptimizerContext) (*Function, error)
 }
 
-type Tier2PassFunc func(*Function) (*Function, error)
-
-func tier2PassModule(name string, phase Tier2OptimizerPhase, pass Tier2PassFunc) Tier2OptimizerModule {
+func tier2PassModule(name string, phase Tier2OptimizerPhase, pass PassFunc) Tier2OptimizerModule {
 	return Tier2OptimizerModule{
 		Name:  name,
 		Phase: phase,
@@ -60,53 +115,33 @@ func tier2PassModule(name string, phase Tier2OptimizerPhase, pass Tier2PassFunc)
 	}
 }
 
+func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provides []string, pass PassFunc) Tier2OptimizerModule {
+	return Tier2OptimizerModule{
+		Name:     name,
+		Phase:    phase,
+		Requires: requires,
+		Provides: provides,
+		Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+			return pass(fn)
+		},
+	}
+}
+
+// Tier2OptimizerPlan is the fully constructed optimization plan: an ordered
+// list of phases and the modules that belong to each phase.
 type Tier2OptimizerPlan struct {
 	Phases  []Tier2OptimizerPhase
 	Modules []Tier2OptimizerModule
 }
 
 func newTier2OptimizerPlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
-	return Tier2OptimizerPlan{
-		Phases: []Tier2OptimizerPhase{
-			Tier2PhaseEarlyCanonical,
-			Tier2PhaseInlineCall,
-			Tier2PhaseCallLower,
-			Tier2PhaseStringNative,
-			Tier2PhaseTableObjectPrep,
-			Tier2PhasePostRewrite,
-			Tier2PhaseNumeric,
-			Tier2PhaseTableArrayLower,
-			Tier2PhaseMatrixNative,
-			Tier2PhaseTableFieldLower,
-			Tier2PhaseFloatNumeric,
-			Tier2PhaseLoopKernel,
-			Tier2PhaseLoopPost,
-			Tier2PhaseFinalCall,
-		},
-		Modules: tier2OptimizerModules(ctx),
-	}
-}
-
-func tier2OptimizerModules(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
-	modules := make([]Tier2OptimizerModule, 0, 64)
-	modules = append(modules, tier2EarlyCanonicalModules(ctxGlobals(ctx))...)
-	modules = append(modules, tier2InlineCallModules(ctxGlobals(ctx), ctxInlineMaxSize(ctx))...)
-	modules = append(modules, tier2CallLoweringModules(ctxProtocolGlobals(ctx))...)
-	modules = append(modules, tier2StringNativeModules()...)
-	modules = append(modules, tier2TableObjectPreparationModules(ctxGlobals(ctx))...)
-	modules = append(modules, tier2PostRewriteModules()...)
-	modules = append(modules, tier2NumericModules()...)
-	modules = append(modules, tier2TableArrayNativeLoweringModules()...)
-	modules = append(modules, tier2MatrixNativeLoweringModules()...)
-	modules = append(modules, tier2TableFieldNativeLoweringModules(ctxGlobals(ctx))...)
-	modules = append(modules, tier2FloatNumericModules()...)
-	modules = append(modules, tier2LoopKernelModules()...)
-	modules = append(modules, tier2LoopPostModules()...)
-	modules = append(modules, tier2FinalCallModules(ctxProtocolGlobals(ctx))...)
-	return modules
+	return BuildModulePlan(ctx)
 }
 
 func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext, plan Tier2OptimizerPlan) (*Function, error) {
+	if err := ValidateDependencyOrder(plan); err != nil {
+		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
+	}
 	var err error
 	for _, phase := range plan.Phases {
 		fn, err = runTier2OptimizerModulesWithContext(fn, opts, ctx, phase, plan.Modules)
@@ -132,14 +167,20 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		} else {
 			fn, err = module.Run(fn, opts)
 		}
+		duration := time.Since(start)
 		if opts != nil && opts.OptimizerTimings != nil {
 			name := fmt.Sprintf("RunTier2Pipeline/%s/%s", phase, module.Name)
-			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(name, time.Since(start), err))
+			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(name, duration, err))
 		}
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", module.Name, err)
 		}
 		attachRemarks(fn, opts)
+
+		// Invoke snapshot callback if set.
+		if ctx != nil && ctx.SnapshotCallback != nil {
+			ctx.SnapshotCallback(module.Name, fn, duration)
+		}
 	}
 	return fn, nil
 }

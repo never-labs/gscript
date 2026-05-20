@@ -289,8 +289,8 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 		if trace != nil && len(optimizerTimings) > 0 {
 			trace.PipelineStages = append(trace.PipelineStages, optimizerTimings...)
 		}
-		tm.learnGlobalNumericFacts(fn.NumericGlobalValues)
-		tm.learnGlobalArrayElementFacts(fn.GlobalArrayElementFacts)
+		tm.learnGlobalNumericFacts(fn.Analysis.NumericGlobalValues)
+		tm.learnGlobalArrayElementFacts(fn.Analysis.GlobalArrayElementFacts)
 		return nil
 	})
 
@@ -446,11 +446,11 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 }
 
 func typedPeerCallRegisterReserve(fn *Function, baseSlots int) int {
-	if fn == nil || len(fn.CallABIs) == 0 {
+	if fn == nil || len(fn.Analysis.CallABIs) == 0 {
 		return 0
 	}
 	reserve := baseSlots
-	for _, desc := range fn.CallABIs {
+	for _, desc := range fn.Analysis.CallABIs {
 		if !desc.TypedPeer || desc.Callee == nil {
 			continue
 		}

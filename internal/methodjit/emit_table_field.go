@@ -291,7 +291,7 @@ func (ec *emitContext) emitGetFieldDirectPolyShapeFacts(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || len(instr.Args) == 0 {
 		return false
 	}
-	cases := ec.fn.FieldPolyShapeFacts[instr.ID]
+	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
 	if len(cases) < 2 {
 		return false
 	}
@@ -362,7 +362,7 @@ func (ec *emitContext) emitFieldPolyLen(instr *Instr) {
 	if ec.hasReg(instr.ID) && ec.valueReprOf(instr.ID) == valueReprRawInt {
 		return
 	}
-	cases := ec.fn.FieldPolyShapeFacts[instr.ID]
+	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
 	if len(cases) < 2 {
 		ec.emitDeopt(instr)
 		return
@@ -1009,10 +1009,10 @@ func (ec *emitContext) emitStoreNumericFieldLoad(instr *Instr, valReg jit.Reg, d
 }
 
 func (ec *emitContext) fieldLoadTypeCheckElided(instr *Instr) bool {
-	if ec == nil || ec.fn == nil || instr == nil || ec.fn.ShapeFieldTypeElidedLoads == nil {
+	if ec == nil || ec.fn == nil || instr == nil || ec.fn.Analysis.ShapeFieldTypeElidedLoads == nil {
 		return false
 	}
-	return ec.fn.ShapeFieldTypeElidedLoads[instr.ID]
+	return ec.fn.Analysis.ShapeFieldTypeElidedLoads[instr.ID]
 }
 
 func (ec *emitContext) emitGuardShapeFieldType(instr *Instr) {
