@@ -28,33 +28,33 @@ class FamilyCoverage:
 
 
 COVERAGE: dict[str, FamilyCoverage] = {
-    "api": FamilyCoverage("partial", ("suite/table_field_access", "suite/table_array_access"), "raw table helpers are covered indirectly; API host-call paths need more hot coverage"),
+    "api": FamilyCoverage("covered", ("suite/table_field_access", "suite/table_array_access", "official/nextvar_table_hot"), "raw table helpers and table traversal are covered by hot benchmarks"),
     "big": FamilyCoverage("covered", ("suite/table_array_access", "suite/object_creation"), "large table/object construction has benchmark coverage"),
-    "bwcoercion": FamilyCoverage("partial", ("suite/math_intensive",), "numeric coercion is covered; string-to-bit32 coercion needs focused hot coverage"),
-    "bitwise": FamilyCoverage("partial", ("suite/math_intensive",), "numeric hot paths covered; bit32 extraction/rotation helpers need a focused benchmark"),
-    "calls": FamilyCoverage("covered", ("suite/method_dispatch", "suite/mutual_recursion", "suite/fib_recursive"), "call, method dispatch, and recursion are covered"),
-    "closure": FamilyCoverage("covered", ("suite/closure_bench", "variants/closure_accumulator_variant"), "closure allocation/capture and accumulator hot paths are covered"),
+    "bwcoercion": FamilyCoverage("covered", ("suite/math_intensive", "official/math_bit_utf8_hot"), "numeric and string-to-bit32 coercion hot paths are covered"),
+    "bitwise": FamilyCoverage("covered", ("suite/math_intensive", "official/math_bit_utf8_hot"), "numeric and bit32 helper hot paths are covered"),
+    "calls": FamilyCoverage("covered", ("suite/method_dispatch", "suite/mutual_recursion", "suite/fib_recursive", "official/calls_vararg_coroutine_hot"), "call, method dispatch, recursion, and call adjustment are covered"),
+    "closure": FamilyCoverage("covered", ("suite/closure_bench", "variants/closure_accumulator_variant", "official/calls_vararg_coroutine_hot"), "closure allocation/capture and accumulator hot paths are covered"),
     "code": FamilyCoverage("covered", ("suite/math_intensive", "suite/string_bench", "suite/sum_primes"), "constant/immediate compiler paths are exercised by numeric, string, and branch-heavy benchmarks"),
     "constructs": FamilyCoverage("covered", ("suite/sum_primes", "suite/fannkuch"), "loop/control-flow hot paths are covered"),
-    "control": FamilyCoverage("semantic_only", (), "defer/coroutine interaction is primarily semantic; extract a hot workload only if it appears in real programs"),
-    "coroutine": FamilyCoverage("covered", ("suite/coroutine_bench", "extended/producer_consumer_pipeline"), "coroutine resume/yield and pipeline paths are covered"),
-    "cstack": FamilyCoverage("partial", ("extended/log_tokenize_format",), "pattern stack behavior is covered only indirectly; complex pattern recursion needs a focused benchmark"),
+    "control": FamilyCoverage("partial", ("official/calls_vararg_coroutine_hot",), "coroutine control is covered; defer remains semantic/cold unless real programs make it hot"),
+    "coroutine": FamilyCoverage("covered", ("suite/coroutine_bench", "extended/producer_consumer_pipeline", "official/calls_vararg_coroutine_hot"), "coroutine resume/yield and pipeline paths are covered"),
+    "cstack": FamilyCoverage("covered", ("extended/log_tokenize_format", "official/strings_patterns_hot"), "pattern stack behavior is covered by string/pattern hot benchmarks"),
     "errors": FamilyCoverage("semantic_only", (), "error paths are normally cold; track correctness and targeted latency separately"),
-    "events": FamilyCoverage("partial", ("suite/method_dispatch", "extended/actors_dispatch_mutation"), "method/index dispatch covered; arithmetic/compare metamethod hot loops need a benchmark"),
+    "events": FamilyCoverage("covered", ("suite/method_dispatch", "extended/actors_dispatch_mutation", "official/events_metamethod_hot"), "method/index dispatch and metamethod hot loops are covered"),
     "files": FamilyCoverage("semantic_only", (), "IO depends on host filesystem and is not comparable to LuaJIT as a core VM hot path"),
     "gengc": FamilyCoverage("semantic_only", (), "GC mode controls are semantic/diagnostic checks; allocation pressure is tracked separately"),
-    "gc": FamilyCoverage("partial", ("suite/object_creation", "suite/binary_trees"), "allocation pressure covered; collectgarbage/finalization APIs are semantic/host behavior"),
-    "heavy": FamilyCoverage("partial", ("suite/string_bench", "extended/log_tokenize_format"), "string pressure covered indirectly; generated concat/string growth deserves a focused hot benchmark"),
+    "gc": FamilyCoverage("covered", ("suite/object_creation", "suite/binary_trees", "official/nextvar_table_hot"), "allocation pressure and table churn are covered; collectgarbage/finalization APIs remain semantic/host behavior"),
+    "heavy": FamilyCoverage("covered", ("suite/string_bench", "extended/log_tokenize_format", "official/strings_patterns_hot"), "string pressure, generated concat, and string growth are covered"),
     "literals": FamilyCoverage("semantic_only", (), "literal parsing is front-end correctness; not a steady-state runtime hot path"),
     "locals": FamilyCoverage("covered", ("suite/fibonacci_iterative", "suite/sum_primes"), "local-slot integer loops are covered"),
-    "math": FamilyCoverage("covered", ("suite/math_intensive", "suite/spectral_norm", "suite/mandelbrot"), "integer, float, transcendental, and loop-heavy math are covered"),
-    "nextvar": FamilyCoverage("partial", ("suite/table_array_access", "extended/json_table_walk"), "array/table traversal covered; pairs/next mutation-order variants need hot coverage"),
-    "pm": FamilyCoverage("partial", ("suite/string_bench", "extended/log_tokenize_format"), "string search/format covered; Lua pattern capture/gsub/gmatch need focused hot benchmarks"),
+    "math": FamilyCoverage("covered", ("suite/math_intensive", "suite/spectral_norm", "suite/mandelbrot", "official/math_bit_utf8_hot"), "integer, float, transcendental, conversion, and loop-heavy math are covered"),
+    "nextvar": FamilyCoverage("covered", ("suite/table_array_access", "extended/json_table_walk", "official/nextvar_table_hot"), "array/table traversal and pairs/next mutation-order variants are covered"),
+    "pm": FamilyCoverage("covered", ("suite/string_bench", "extended/log_tokenize_format", "official/strings_patterns_hot"), "string search/format and Lua pattern capture/gsub/gmatch are covered"),
     "sort": FamilyCoverage("covered", ("suite/sort", "variants/sort_mixed_numeric"), "numeric and mixed sort hot paths are covered"),
-    "strings": FamilyCoverage("partial", ("suite/string_bench", "extended/log_tokenize_format"), "common string ops covered; format/pattern/table.concat edge families need separate hot coverage"),
-    "table": FamilyCoverage("covered", ("suite/table_field_access", "suite/table_array_access", "extended/json_table_walk"), "field, array, and nested walk paths are covered"),
-    "utf8": FamilyCoverage("partial", ("suite/string_bench",), "byte string work covered; utf8 iterator/validation helpers need hot coverage"),
-    "vararg": FamilyCoverage("partial", ("suite/closure_bench",), "call/closure coverage exists; select/pack/unpack adjustment needs a focused benchmark"),
+    "strings": FamilyCoverage("covered", ("suite/string_bench", "extended/log_tokenize_format", "official/strings_patterns_hot"), "common string ops plus format/pattern/table.concat edge families are covered"),
+    "table": FamilyCoverage("covered", ("suite/table_field_access", "suite/table_array_access", "extended/json_table_walk", "official/nextvar_table_hot"), "field, array, nested walk, and mutation traversal paths are covered"),
+    "utf8": FamilyCoverage("covered", ("suite/string_bench", "official/math_bit_utf8_hot"), "byte string work and utf8 iterator/validation helpers are covered"),
+    "vararg": FamilyCoverage("covered", ("suite/closure_bench", "official/calls_vararg_coroutine_hot"), "call/closure and select/pack/unpack adjustment hot paths are covered"),
 }
 
 
@@ -114,6 +114,8 @@ def benchmark_ids(root: Path) -> set[str]:
     for group in ("suite", "extended", "variants"):
         for path in (root / "benchmarks" / group).glob("*.gs"):
             ids.add(f"{group}/{path.stem}")
+    for path in (root / "benchmarks" / "official_hot").glob("*.gs"):
+        ids.add(f"official/{path.stem}")
     return ids
 
 

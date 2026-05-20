@@ -1,0 +1,74 @@
+print("official_hot/math_bit_utf8_hot")
+
+N := 180000
+MOD := 1000000007
+MASK32 := 4294967295
+
+inputs := {"101010", "755", "1f", "Z", "12345", "-1011", "+1Z", "777777"}
+bases := {2, 8, 16, 36, 10, 2, 36, 8}
+text := "Az" .. utf8.char(0x4e2d) .. utf8.char(0x03bb) .. utf8.char(0x1f600)
+textLen := utf8.len(text)
+textOffsets := {1, 2, 3, 6, 8}
+
+func toint(x) {
+  n := tonumber(x)
+  if n == nil || n == false {
+    return false
+  }
+  i := math.tointeger(n)
+  if i == nil {
+    return false
+  }
+  return i
+}
+
+func bench(n) {
+  checksum := 0
+  rolling := 305419896
+  inputCount := #inputs
+
+  for i := 1; i <= n; i = i + 1 {
+    idx := (i % inputCount) + 1
+    parsed := tonumber(inputs[idx], bases[idx])
+    if parsed == nil || parsed == false {
+      parsed = 0
+    }
+
+    folded := math.floor(math.fmod(parsed * 13 + i * 17, 1048573))
+    floored := math.floor((i * 97.0) / 11.0)
+    fmodded := math.floor(math.fmod(floored + folded, 251))
+    modulo := (i * 31 + fmodded) % 65521
+
+    shift := (i % 63) - 31
+    left := bit32.lshift(folded, shift)
+    right := bit32.rshift(rolling, -shift)
+    arith := bit32.arshift(rolling, shift)
+    rot := bit32.bxor(bit32.lrotate(rolling, shift), bit32.rrotate(folded, shift))
+    field := i % 24
+    width := (i % 8) + 1
+    extracted := bit32.extract(rot, field, width)
+    replaced := bit32.replace(rolling, extracted, i % 16, 4)
+
+    xi := toint(tostring(i % 256))
+    yi := toint(tostring((i * 3) % 1024))
+    coerced := bit32.bxor(bit32.bor(xi, yi), bit32.band(replaced, 65535))
+
+    cpSum := 0
+    for pos, cp := range utf8.codes(text) {
+      cpSum = cpSum + cp + pos
+    }
+    cpAt := utf8.codepoint(text, textOffsets[((i + cpSum) % textLen) + 1])
+
+    rolling = bit32.band(bit32.bxor(replaced, coerced, cpSum, cpAt, left, right, arith, modulo), MASK32)
+    checksum = (checksum + (rolling % MOD) + extracted + textLen + fmodded + modulo) % MOD
+  }
+
+  return checksum
+}
+
+t0 := time.now()
+checksum := bench(N)
+elapsed := time.since(t0)
+
+print(string.format("checksum: %d", checksum))
+print(string.format("Time: %.3fs", elapsed))

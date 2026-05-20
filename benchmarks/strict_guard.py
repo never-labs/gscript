@@ -54,6 +54,7 @@ DEFAULT_BENCHMARKS = [
 
 DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_GROUPS = ["suite", "extended", "variants"]
+ALL_GROUPS = ["suite", "extended", "variants", "official"]
 
 VARIANT_BASES = {
     "ack_nested_shifted": "ackermann",
@@ -632,11 +633,24 @@ def variant_specs(root: Path) -> list[BenchmarkSpec]:
     ]
 
 
+def official_specs(root: Path) -> list[BenchmarkSpec]:
+    return [
+        BenchmarkSpec(
+            "official",
+            path.stem,
+            path,
+            root / "benchmarks" / "lua_official_hot" / f"{path.stem}.lua",
+        )
+        for path in sorted((root / "benchmarks" / "official_hot").glob("*.gs"))
+    ]
+
+
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
     by_group = {
         "suite": suite_specs,
         "extended": extended_specs,
         "variants": variant_specs,
+        "official": official_specs,
     }
     specs: list[BenchmarkSpec] = []
     for group in groups:
@@ -875,7 +889,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--group",
         action="append",
-        choices=DEFAULT_GROUPS,
+        choices=ALL_GROUPS,
         help="benchmark group to run; repeatable; default is suite+extended+variants",
     )
     parser.add_argument("--mode", action="append", choices=DEFAULT_MODES, help="mode to run; repeatable")

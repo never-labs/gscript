@@ -171,6 +171,14 @@ class StrictGuardReportTest(unittest.TestCase):
         self.assertIn("extended/json_table_walk", ids)
         self.assertIn("variants/matmul_row_variant", ids)
 
+    def test_discovery_supports_official_group(self):
+        root = Path(__file__).resolve().parents[1]
+        specs = sg.discover_specs(root, ["official"])
+        for spec in specs:
+            self.assertEqual(spec.group, "official")
+            self.assertIn("benchmarks/official_hot", str(spec.gscript))
+            self.assertIn("benchmarks/lua_official_hot", str(spec.luajit))
+
 
 if __name__ == "__main__":
     unittest.main()

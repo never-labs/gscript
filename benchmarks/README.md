@@ -187,6 +187,11 @@ signal, not a performance patch gate.
 Use `--group=suite`, `--group=extended`, or `--group=variants` to narrow the
 run; repeat `--bench=group/name` for a representative subset. `--dry-run`
 prints the exact discovered matrix without building or running anything.
+Use `--group=official` to run the extracted official-case hot benchmarks under
+`benchmarks/official_hot` against their LuaJIT references in
+`benchmarks/lua_official_hot`; this group is intentionally excluded from the
+default strict run because it is a broader coverage/profiling surface and may
+contain known gaps while they are being optimized.
 
 `timing_compare.py` is the preferred harness for local before/after timing when
 the current worktree may differ from clean `HEAD`. It exports a clean `HEAD`
