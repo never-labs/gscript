@@ -61,6 +61,7 @@ b := sum(20)
 		"sum.ir.after.txt",
 		"sum.regalloc.txt",
 		"sum.pipeline.txt",
+		"sum.contracts.txt",
 		"sum.loops.txt",
 		"sum.bin",
 		"sum.asm.txt",
@@ -101,12 +102,22 @@ b := sum(20)
 	if len(got.PipelineStages) == 0 || got.Files["pipeline"] == "" {
 		t.Fatalf("pipeline summary missing: %+v", got.PipelineStages)
 	}
+	if len(got.ModuleContracts) == 0 || got.Files["module_contracts"] == "" {
+		t.Fatalf("module contracts missing: %+v files=%+v", got.ModuleContracts, got.Files)
+	}
 	pipelineText, err := os.ReadFile(filepath.Join(outDir, got.Files["pipeline"]))
 	if err != nil {
 		t.Fatalf("read pipeline summary: %v", err)
 	}
 	if !strings.Contains(string(pipelineText), "RunTier2Pipeline") || !strings.Contains(string(pipelineText), "RegAlloc") {
 		t.Fatalf("pipeline summary missing expected stages:\n%s", string(pipelineText))
+	}
+	contractsText, err := os.ReadFile(filepath.Join(outDir, got.Files["module_contracts"]))
+	if err != nil {
+		t.Fatalf("read module contracts: %v", err)
+	}
+	if !strings.Contains(string(contractsText), "requires:") || !strings.Contains(string(contractsText), "provides:") {
+		t.Fatalf("module contracts missing expected fields:\n%s", string(contractsText))
 	}
 	if got.CodeStart == "" || got.CodeEnd == "" || got.Files["sourcemap"] == "" || got.Files["pcmap"] == "" {
 		t.Fatalf("PC/source map metadata missing: %+v", got)
@@ -166,6 +177,15 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 		PipelineStages: []PipelineStageTiming{
 			newNestedPipelineStageTiming("RunTier2Pipeline/numeric/FailingModule", 12, compileErr),
 		},
+		ModuleRuns: []Tier2ModuleRun{
+			{
+				Phase:      Tier2PhaseNumeric,
+				ModuleName: "FailingModule",
+				StageName:  "RunTier2Pipeline/numeric/FailingModule",
+				Requires:   analysisFacts(AnalysisFactIntRanges),
+				Provides:   analysisFacts(AnalysisFactInt48Safe),
+			},
+		},
 	}
 	tm.recordWarmDumpCompile(proto, trace, nil, compileErr)
 	if err := tm.WriteWarmDump(proto); err != nil {
@@ -192,6 +212,10 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 	}
 	if len(got.PipelineStages) != 1 || got.PipelineStages[0].Name != "RunTier2Pipeline/numeric/FailingModule" || got.PipelineStages[0].Error != compileErr.Error() {
 		t.Fatalf("pipeline stages missing failed module: %+v", got.PipelineStages)
+	}
+	if len(got.ModuleContracts) != 1 || got.ModuleContracts[0].ModuleName != "FailingModule" ||
+		len(got.ModuleContracts[0].Requires) != 1 || got.ModuleContracts[0].Requires[0] != AnalysisFactIntRanges {
+		t.Fatalf("module contracts missing failed module: %+v", got.ModuleContracts)
 	}
 	pipelineText, err := os.ReadFile(filepath.Join(outDir, got.Files["pipeline"]))
 	if err != nil {

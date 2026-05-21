@@ -265,8 +265,18 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
 		Modules: []Tier2OptimizerModule{
 			{
-				Name:  "FailingModule",
-				Phase: Tier2PhaseNumeric,
+				Name:     "ProviderModule",
+				Phase:    Tier2PhaseNumeric,
+				Provides: analysisFacts(AnalysisFactIntRanges),
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					return fn, nil
+				},
+			},
+			{
+				Name:     "FailingModule",
+				Phase:    Tier2PhaseNumeric,
+				Requires: analysisFacts(AnalysisFactIntRanges),
+				Updates:  analysisFacts(AnalysisFactInt48Safe),
 				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 					return fn, wantErr
 				},
@@ -285,10 +295,10 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	if !strings.Contains(err.Error(), "FailingModule") || !strings.Contains(err.Error(), wantErr.Error()) {
 		t.Fatalf("error = %v, want module and cause", err)
 	}
-	if len(runs) != 1 {
-		t.Fatalf("module runs = %d, want 1", len(runs))
+	if len(runs) != 2 {
+		t.Fatalf("module runs = %d, want 2", len(runs))
 	}
-	run := runs[0]
+	run := runs[1]
 	if run.Phase != Tier2PhaseNumeric || run.ModuleName != "FailingModule" {
 		t.Fatalf("unexpected run scope: %+v", run)
 	}
@@ -299,14 +309,20 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	if run.Err == nil || !strings.Contains(run.Err.Error(), wantErr.Error()) {
 		t.Fatalf("run err = %v, want %v", run.Err, wantErr)
 	}
+	if len(run.Requires) != 1 || run.Requires[0] != AnalysisFactIntRanges {
+		t.Fatalf("run requires = %v, want IntRanges", run.Requires)
+	}
+	if len(run.Updates) != 1 || run.Updates[0] != AnalysisFactInt48Safe {
+		t.Fatalf("run updates = %v, want Int48Safe", run.Updates)
+	}
 	if run.Duration < 0 {
 		t.Fatalf("duration = %s, want non-negative", run.Duration)
 	}
-	if len(timings) != 1 {
-		t.Fatalf("timings = %d, want 1", len(timings))
+	if len(timings) != 2 {
+		t.Fatalf("timings = %d, want 2", len(timings))
 	}
-	if timings[0].Name != wantStage || timings[0].Error != wantErr.Error() || !timings[0].Nested {
-		t.Fatalf("unexpected timing: %+v", timings[0])
+	if timings[1].Name != wantStage || timings[1].Error != wantErr.Error() || !timings[1].Nested {
+		t.Fatalf("unexpected timing: %+v", timings[1])
 	}
 }
 

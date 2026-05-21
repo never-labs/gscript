@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gscript/gscript/internal/vm"
@@ -20,6 +21,9 @@ type Tier2ModuleRun struct {
 	Function   *Function
 	Duration   time.Duration
 	Err        error
+	Requires   []AnalysisFact
+	Provides   []AnalysisFact
+	Updates    []AnalysisFact
 }
 
 // Tier2ModuleRunCallback is called after each optimizer module run, including
@@ -32,6 +36,18 @@ type Tier2ModuleRunCallback func(Tier2ModuleRun)
 type Tier2PipelineDiagnostics struct {
 	SnapshotCallback  Tier2SnapshotCallback
 	ModuleRunCallback Tier2ModuleRunCallback
+}
+
+// Tier2ModuleContract is the declared analysis-fact contract for one optimizer
+// module. It intentionally reports declarations only; it does not diff or copy
+// the full AnalysisResult.
+type Tier2ModuleContract struct {
+	Phase      Tier2OptimizerPhase `json:"phase"`
+	ModuleName string              `json:"module"`
+	StageName  string              `json:"stage"`
+	Requires   []AnalysisFact      `json:"requires,omitempty"`
+	Provides   []AnalysisFact      `json:"provides,omitempty"`
+	Updates    []AnalysisFact      `json:"updates,omitempty"`
 }
 
 // Tier2PipelineData is the per-compilation data object shared across Tier 2
@@ -309,6 +325,9 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 				Function:   fn,
 				Duration:   duration,
 				Err:        err,
+				Requires:   cloneAnalysisFacts(module.Requires),
+				Provides:   cloneAnalysisFacts(module.Provides),
+				Updates:    cloneAnalysisFacts(module.Updates),
 			})
 		}
 		if err != nil {
@@ -326,6 +345,66 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 
 func tier2VerifyIROptEnabled(opts *Tier2PipelineOpts) bool {
 	return opts != nil && opts.VerifyIR
+}
+
+func (run Tier2ModuleRun) Contract() Tier2ModuleContract {
+	return Tier2ModuleContract{
+		Phase:      run.Phase,
+		ModuleName: run.ModuleName,
+		StageName:  run.StageName,
+		Requires:   cloneAnalysisFacts(run.Requires),
+		Provides:   cloneAnalysisFacts(run.Provides),
+		Updates:    cloneAnalysisFacts(run.Updates),
+	}
+}
+
+func moduleContractsFromRuns(runs []Tier2ModuleRun) []Tier2ModuleContract {
+	if len(runs) == 0 {
+		return nil
+	}
+	contracts := make([]Tier2ModuleContract, 0, len(runs))
+	for _, run := range runs {
+		contract := run.Contract()
+		if len(contract.Requires) == 0 && len(contract.Provides) == 0 && len(contract.Updates) == 0 {
+			continue
+		}
+		contracts = append(contracts, contract)
+	}
+	return contracts
+}
+
+func cloneAnalysisFacts(facts []AnalysisFact) []AnalysisFact {
+	if len(facts) == 0 {
+		return nil
+	}
+	return append([]AnalysisFact(nil), facts...)
+}
+
+// FormatTier2ModuleContracts renders declared module analysis-fact contracts
+// for human diagnostics.
+func FormatTier2ModuleContracts(contracts []Tier2ModuleContract) string {
+	if len(contracts) == 0 {
+		return "(not recorded)\n"
+	}
+	var b strings.Builder
+	for _, contract := range contracts {
+		fmt.Fprintf(&b, "  %s/%s\n", contract.Phase, contract.ModuleName)
+		fmt.Fprintf(&b, "    requires: %s\n", formatAnalysisFacts(contract.Requires))
+		fmt.Fprintf(&b, "    provides: %s\n", formatAnalysisFacts(contract.Provides))
+		fmt.Fprintf(&b, "    updates:  %s\n", formatAnalysisFacts(contract.Updates))
+	}
+	return b.String()
+}
+
+func formatAnalysisFacts(facts []AnalysisFact) string {
+	if len(facts) == 0 {
+		return "(none)"
+	}
+	parts := make([]string, 0, len(facts))
+	for _, fact := range facts {
+		parts = append(parts, string(fact))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func tier2OptimizerModuleStageName(phase Tier2OptimizerPhase, moduleName string) string {

@@ -210,6 +210,7 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 	var opts *Tier2PipelineOpts
 	dependencyRegistry := NewCompilationDependencyRegistry()
 	var optimizerTimings []PipelineStageTiming
+	var moduleRuns []Tier2ModuleRun
 	optimizerTimingsFlushed := false
 	flushOptimizerTimings := func() {
 		if trace == nil || optimizerTimingsFlushed || len(optimizerTimings) == 0 {
@@ -284,6 +285,7 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 		}
 		if trace != nil {
 			opts.OptimizerTimings = &optimizerTimings
+			opts.ModuleRuns = &moduleRuns
 		}
 		return nil
 	})
@@ -293,6 +295,9 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 		var err error
 		fn, intrinsicNotes, err = RunTier2Pipeline(fn, opts)
 		flushOptimizerTimings()
+		if trace != nil {
+			trace.ModuleRuns = append([]Tier2ModuleRun(nil), moduleRuns...)
+		}
 		if err != nil {
 			remarks.Add("Tier2Gate", "blocked", 0, 0, OpNop,
 				"optimization pipeline failed: "+err.Error())

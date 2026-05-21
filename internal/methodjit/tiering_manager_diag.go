@@ -45,6 +45,7 @@ type Tier2Trace struct {
 	SourceMap           []IRASMMapEntry
 	LoopDiagnostics     []LoopDiagnostic
 	PipelineStages      []PipelineStageTiming
+	ModuleRuns          []Tier2ModuleRun
 }
 
 // DiagArtifact is the full diagnostic payload for one Tier 2 compile.
@@ -63,6 +64,7 @@ type DiagArtifact struct {
 	SourceMap           []IRASMMapEntry
 	LoopDiagnostics     []LoopDiagnostic
 	PipelineStages      []PipelineStageTiming
+	ModuleContracts     []Tier2ModuleContract
 	CompiledCode        []byte         // copy of cf.Code bytes
 	InsnCount           int            // total ARM64 instructions
 	InsnHistogram       map[string]int // class -> count
@@ -99,6 +101,7 @@ func (tm *TieringManager) CompileForDiagnostics(proto *vm.FuncProto) (*DiagArtif
 		SourceMap:           trace.SourceMap,
 		LoopDiagnostics:     trace.LoopDiagnostics,
 		PipelineStages:      append([]PipelineStageTiming(nil), trace.PipelineStages...),
+		ModuleContracts:     moduleContractsFromRuns(trace.ModuleRuns),
 		CompileErr:          err,
 	}
 

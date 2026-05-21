@@ -198,6 +198,15 @@ func TestDiagnose_ReportString(t *testing.T) {
 	if len(report.PipelineStages) == 0 {
 		t.Error("expected pipeline stages in diagnostic report")
 	}
+	if len(report.ModuleContracts) == 0 {
+		t.Fatal("expected module contracts in diagnostic report")
+	}
+	contractText := FormatTier2ModuleContracts(report.ModuleContracts)
+	if !strings.Contains(s, "Module contracts") ||
+		!strings.Contains(contractText, "requires:") ||
+		!strings.Contains(contractText, "provides:") {
+		t.Fatalf("diagnostic report missing module contracts:\n%s", s)
+	}
 }
 
 // TestDiagnose_RegAllocMap: Verify register allocation map is populated.
