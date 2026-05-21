@@ -194,6 +194,14 @@ func arm64Class(insn uint32) string {
 // included with CompileErr set and other fields zero — the caller can
 // report the reason without losing the proto from the list.
 func (tm *TieringManager) ProtoTreeDiag(top *vm.FuncProto) []*DiagArtifact {
+	// Populate diagGlobals from the top-level proto so that child protos
+	// can resolve sibling closures (e.g., sum_primes calling is_prime).
+	// At runtime, buildInlineGlobals uses the VM's global table; the diag
+	// path has no VM, so this bridges the gap.
+	if globals := buildProtoStableGlobals(top); len(globals) > 0 {
+		tm.diagGlobals = globals
+	}
+
 	var out []*DiagArtifact
 	var walk func(p *vm.FuncProto)
 	walk = func(p *vm.FuncProto) {

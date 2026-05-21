@@ -81,6 +81,7 @@ type TieringManager struct {
 	perfStatsEnabled   bool
 	tier1Only          map[*vm.FuncProto]bool
 	callVM             *vm.VM
+	diagGlobals        map[string]*vm.FuncProto // fallback inline globals for diag path (no VM)
 	retBuf             [8]runtime.Value
 	tier2Ctx           ExecContext
 	tier2CtxBusy       bool

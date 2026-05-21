@@ -11,6 +11,9 @@ import (
 func (tm *TieringManager) buildInlineGlobals() map[string]*vm.FuncProto {
 	globals := make(map[string]*vm.FuncProto)
 	if tm.callVM == nil {
+		for name, p := range tm.diagGlobals {
+			globals[name] = p
+		}
 		return globals
 	}
 	for name, val := range tm.callVM.Globals() {
