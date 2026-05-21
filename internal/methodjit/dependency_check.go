@@ -3,6 +3,7 @@ package methodjit
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // ValidateDependencyOrder checks that all module dependencies are satisfied in
@@ -14,17 +15,65 @@ import (
 // This is intended to be called at initialization or test time, not in the
 // production hot path.
 func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
-	provided := make(map[AnalysisFact]string) // fact -> module that provided it
-	providers := make(map[string][]AnalysisFact)
+	var issues []string
+	modules := dependencyPlanModules(plan)
+	provided := make(map[AnalysisFact]string) // fact -> module that first provided it
+	providersByFact := make(map[AnalysisFact][]string)
+	consumed := make(map[AnalysisFact]bool)
+	moduleDeps := make(map[string][]string)
+	moduleRefs := make(map[string]bool)
 
 	// First pass: collect all facts that are provided and by which modules.
-	// The same fact may be provided by multiple modules (e.g., RangeAnalysis
-	// runs multiple times at different phases, each providing Int48Safe).
-	// We track all providers but do not treat this as an error.
-	for _, module := range plan.Modules {
+	for _, module := range modules {
+		ref := dependencyModuleRef(module)
+		moduleRefs[ref] = true
 		for _, fact := range module.Provides {
-			provided[fact] = module.Name // last provider wins for the map
-			providers[module.Name] = append(providers[module.Name], fact)
+			if _, ok := provided[fact]; !ok {
+				provided[fact] = ref
+			}
+			providersByFact[fact] = append(providersByFact[fact], ref)
+			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
+				issues = append(issues, fmt.Sprintf("%s provides unregistered fact %s", ref, fact))
+			}
+		}
+	}
+
+	for _, module := range modules {
+		ref := dependencyModuleRef(module)
+		for _, fact := range module.Requires {
+			consumed[fact] = true
+			if provider, ok := provided[fact]; ok && provider != ref {
+				moduleDeps[ref] = append(moduleDeps[ref], provider)
+			}
+		}
+		for _, fact := range module.Updates {
+			consumed[fact] = true
+			if provider, ok := provided[fact]; ok && provider != ref {
+				moduleDeps[ref] = append(moduleDeps[ref], provider)
+			}
+		}
+	}
+
+	for fact, providers := range providersByFact {
+		if len(providers) <= 1 {
+			continue
+		}
+		sort.Strings(providers)
+		issues = append(issues, fmt.Sprintf("fact %s has multiple providers: %s", fact, strings.Join(providers, ", ")))
+	}
+
+	for _, module := range modules {
+		ref := dependencyModuleRef(module)
+		provides := factSet(module.Provides)
+		for _, fact := range module.Requires {
+			if provides[fact] {
+				issues = append(issues, fmt.Sprintf("%s has self-dependency on fact %s", ref, fact))
+			}
+		}
+		for _, fact := range module.Updates {
+			if provides[fact] {
+				issues = append(issues, fmt.Sprintf("%s both provides and updates fact %s", ref, fact))
+			}
 		}
 	}
 
@@ -32,23 +81,26 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 	available := make(map[AnalysisFact]bool)
 	for _, group := range plan.phaseGroups() {
 		for _, module := range group.Modules {
+			ref := dependencyModuleRef(module)
 			// Check that all required facts are available
 			for _, required := range module.Requires {
 				if !available[required] {
 					provider, ok := provided[required]
 					if !ok {
-						return fmt.Errorf("%s/%s requires fact %s which is never provided", group.Phase, module.Name, required)
+						issues = append(issues, fmt.Sprintf("%s requires fact %s which is never provided", ref, required))
+						continue
 					}
-					return fmt.Errorf("%s/%s requires fact %s which is provided by %s (but not yet available)", group.Phase, module.Name, required, provider)
+					issues = append(issues, fmt.Sprintf("%s requires fact %s which is provided by %s (but not yet available)", ref, required, provider))
 				}
 			}
 			for _, updated := range module.Updates {
 				if !available[updated] {
 					provider, ok := provided[updated]
 					if !ok {
-						return fmt.Errorf("%s/%s updates fact %s which is never provided", group.Phase, module.Name, updated)
+						issues = append(issues, fmt.Sprintf("%s updates fact %s which is never provided", ref, updated))
+						continue
 					}
-					return fmt.Errorf("%s/%s updates fact %s which is provided by %s (but not yet available)", group.Phase, module.Name, updated, provider)
+					issues = append(issues, fmt.Sprintf("%s updates fact %s which is provided by %s (but not yet available)", ref, updated, provider))
 				}
 			}
 
@@ -59,33 +111,101 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 		}
 	}
 
-	// Optional: warn about facts that are provided but never required
-	// (these might still be used by codegen or other infrastructure)
-	neverRequired := []AnalysisFact{}
 	for fact := range provided {
-		required := false
-		for _, module := range plan.Modules {
-			for _, req := range module.Requires {
-				if req == fact {
-					required = true
+		if consumed[fact] {
+			continue
+		}
+		metadata, ok := lookupAnalysisFactMetadata(fact)
+		if ok && len(metadata.Consumers) > 0 {
+			continue
+		}
+		issues = append(issues, fmt.Sprintf("fact %s is provided by %s but has no declared consumers", fact, provided[fact]))
+	}
+
+	for _, cycle := range findModuleDependencyCycles(moduleDeps, moduleRefs) {
+		issues = append(issues, fmt.Sprintf("module dependency cycle: %s", strings.Join(cycle, " -> ")))
+	}
+
+	if len(issues) == 0 {
+		return nil
+	}
+	sort.Strings(issues)
+	return fmt.Errorf("analysis fact contract violations:\n  %s", strings.Join(issues, "\n  "))
+}
+
+func dependencyPlanModules(plan Tier2OptimizerPlan) []Tier2OptimizerModule {
+	if len(plan.Modules) > 0 {
+		return plan.Modules
+	}
+	var modules []Tier2OptimizerModule
+	for _, group := range plan.phaseGroups() {
+		modules = append(modules, group.Modules...)
+	}
+	return modules
+}
+
+func dependencyModuleRef(module Tier2OptimizerModule) string {
+	return fmt.Sprintf("%s/%s", module.Phase, module.Name)
+}
+
+func factSet(facts []AnalysisFact) map[AnalysisFact]bool {
+	out := make(map[AnalysisFact]bool, len(facts))
+	for _, fact := range facts {
+		out[fact] = true
+	}
+	return out
+}
+
+func findModuleDependencyCycles(deps map[string][]string, moduleRefs map[string]bool) [][]string {
+	var cycles [][]string
+	visited := make(map[string]bool, len(moduleRefs))
+	inStack := make(map[string]bool, len(moduleRefs))
+	var stack []string
+
+	var visit func(string)
+	visit = func(module string) {
+		if inStack[module] {
+			cycle := []string{module}
+			for i := len(stack) - 1; i >= 0; i-- {
+				cycle = append(cycle, stack[i])
+				if stack[i] == module {
 					break
 				}
 			}
-			if required {
-				break
-			}
+			reverseStrings(cycle)
+			cycles = append(cycles, cycle)
+			return
 		}
-		if !required {
-			neverRequired = append(neverRequired, fact)
+		if visited[module] {
+			return
 		}
-	}
-	if len(neverRequired) > 0 {
-		sort.Slice(neverRequired, func(i, j int) bool {
-			return neverRequired[i] < neverRequired[j]
-		})
-		// This is informational, not an error
-		return nil
+		visited[module] = true
+		inStack[module] = true
+		stack = append(stack, module)
+
+		next := append([]string(nil), deps[module]...)
+		sort.Strings(next)
+		for _, dep := range next {
+			visit(dep)
+		}
+
+		stack = stack[:len(stack)-1]
+		inStack[module] = false
 	}
 
-	return nil
+	refs := make([]string, 0, len(moduleRefs))
+	for ref := range moduleRefs {
+		refs = append(refs, ref)
+	}
+	sort.Strings(refs)
+	for _, ref := range refs {
+		visit(ref)
+	}
+	return cycles
+}
+
+func reverseStrings(values []string) {
+	for i, j := 0, len(values)-1; i < j; i, j = i+1, j-1 {
+		values[i], values[j] = values[j], values[i]
+	}
 }

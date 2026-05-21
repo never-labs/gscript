@@ -871,9 +871,7 @@ func TestDependencyOrderRejectsOutOfOrderUpdate(t *testing.T) {
 	}
 }
 
-func TestDependencyOrderAllowsMultipleProviders(t *testing.T) {
-	// The same fact can be provided by multiple modules (e.g., RangeAnalysis
-	// runs multiple times, each providing Int48Safe).
+func TestDependencyOrderRejectsMultipleProviders(t *testing.T) {
 	plan := Tier2OptimizerPlan{
 		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical, Tier2PhaseNumeric},
 		Modules: []Tier2OptimizerModule{
@@ -907,7 +905,11 @@ func TestDependencyOrderAllowsMultipleProviders(t *testing.T) {
 			},
 		},
 	}
-	if err := ValidateDependencyOrder(plan); err != nil {
-		t.Fatalf("expected no error for multiple providers, got: %v", err)
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected error for multiple providers, got nil")
+	}
+	if !strings.Contains(err.Error(), "multiple providers") {
+		t.Fatalf("error should say 'multiple providers', got: %v", err)
 	}
 }
