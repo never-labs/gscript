@@ -147,6 +147,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("UnrollAndJam", Tier2PhaseLoopPost, nil, nil, UnrollAndJamPass),
 		tier2PassModuleWith("MatrixRowPtrFactoring (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, MatrixRowPtrFactoringPass),
+		tier2PassModuleWith("FMAFusion (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, FMAFusionPass),
 		{
 			Name:     "LICM (post-MatrixRowPtrFactoring)",
 			Phase:    Tier2PhaseLoopPost,
