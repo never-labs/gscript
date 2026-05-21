@@ -267,7 +267,7 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 			{
 				Name:     "ProviderModule",
 				Phase:    Tier2PhaseNumeric,
-				Provides: analysisFacts(AnalysisFactIntRanges),
+				Provides: analysisFacts(AnalysisFactIntRanges, AnalysisFactInt48Safe),
 				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 					return fn, nil
 				},
