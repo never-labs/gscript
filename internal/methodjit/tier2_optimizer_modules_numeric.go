@@ -22,6 +22,7 @@ func tier2NumericModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("LoopBoundRangeGuard", Tier2PhaseNumeric, nil, nil, LoopBoundRangeGuardPass),
 		tier2PassModuleWith("ObservedParamRangeGuard", Tier2PhaseNumeric, nil, nil, ObservedParamRangeGuardPass),
+		tier2PassModuleWith("ObservedParamTypeGuard", Tier2PhaseNumeric, nil, nil, ObservedParamTypeGuardPass),
 		tier2PassModuleWith("ExactGuardConst", Tier2PhaseNumeric, nil, nil, ExactGuardConstPass),
 		tier2PassModuleWith("ConstProp (post-ExactGuardConst)", Tier2PhaseNumeric, nil, nil, ConstPropPass),
 		tier2PassModuleWith("RangeAnalysis", Tier2PhaseNumeric, nil, []string{"Int48Safe", "IntRanges", "IntNonNegative", "IntModNonZeroDivisor", "IntModNoSignAdjust"}, RangeAnalysisPass),

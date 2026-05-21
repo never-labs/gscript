@@ -147,6 +147,7 @@ func TestTier2NumericModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2NumericModules(), Tier2PhaseNumeric, []string{
 		"LoopBoundRangeGuard",
 		"ObservedParamRangeGuard",
+			"ObservedParamTypeGuard",
 		"ExactGuardConst",
 		"ConstProp (post-ExactGuardConst)",
 		"RangeAnalysis",
