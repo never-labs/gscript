@@ -68,7 +68,8 @@ func (r *ModuleRegistry) RegisterModuleBuilder(phase Tier2OptimizerPhase, order 
 
 // BuildModulePlan constructs the ordered module plan from all registered
 // builders. It returns a Tier2OptimizerPlan with phases sorted by their
-// declared order and the concatenated module lists from each builder.
+// declared order and modules within each phase stably sorted by non-zero
+// Tier2OptimizerModule.Order.
 func BuildModulePlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
 	return DefaultModuleRegistry.BuildModulePlan(ctx)
 }
@@ -86,7 +87,6 @@ func (r *ModuleRegistry) BuildModulePlan(ctx *Tier2OptimizerContext) Tier2Optimi
 	})
 
 	phases := make([]Tier2OptimizerPhase, 0, len(sorted))
-	var modules []Tier2OptimizerModule
 	groupIndex := make(map[Tier2OptimizerPhase]int, len(sorted))
 	var groups []Tier2OptimizerPhaseGroup
 	for _, entry := range sorted {
@@ -101,11 +101,32 @@ func (r *ModuleRegistry) BuildModulePlan(ctx *Tier2OptimizerContext) Tier2Optimi
 				Modules: built,
 			})
 		}
-		modules = append(modules, built...)
+	}
+
+	var modules []Tier2OptimizerModule
+	for idx := range groups {
+		sortTier2ModulesByOrder(groups[idx].Modules)
+		modules = append(modules, groups[idx].Modules...)
 	}
 	return Tier2OptimizerPlan{
 		Phases:      phases,
 		Modules:     modules,
 		PhaseGroups: groups,
 	}
+}
+
+func sortTier2ModulesByOrder(modules []Tier2OptimizerModule) {
+	sort.SliceStable(modules, func(i, j int) bool {
+		left, right := modules[i].Order, modules[j].Order
+		switch {
+		case left == 0 && right == 0:
+			return false
+		case left == 0:
+			return false
+		case right == 0:
+			return true
+		default:
+			return left < right
+		}
+	})
 }

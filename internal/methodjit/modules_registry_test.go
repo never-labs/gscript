@@ -21,6 +21,22 @@ func registryTestBuilder(phase Tier2OptimizerPhase, names ...string) ModuleBuild
 	}
 }
 
+func registryTestBuilderWithOrders(phase Tier2OptimizerPhase, modules ...Tier2OptimizerModule) ModuleBuilder {
+	return func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
+		built := make([]Tier2OptimizerModule, 0, len(modules))
+		for _, module := range modules {
+			module.Phase = phase
+			if module.Run == nil && module.RunWithContext == nil {
+				module.Run = func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					return fn, nil
+				}
+			}
+			built = append(built, module)
+		}
+		return built
+	}
+}
+
 func TestModuleRegistryBuildsIsolatedPlan(t *testing.T) {
 	registry := NewModuleRegistry()
 	if err := registry.RegisterModuleBuilder(Tier2PhaseNumeric, 20, registryTestBuilder(Tier2PhaseNumeric, "numeric")); err != nil {
@@ -36,6 +52,37 @@ func TestModuleRegistryBuildsIsolatedPlan(t *testing.T) {
 	}
 	if got, want := tier2ModuleNames(plan.Modules), []string{"early", "numeric"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("modules=%v want %v", got, want)
+	}
+}
+
+func TestModuleRegistrySortsNonZeroModuleOrderWithinPhase(t *testing.T) {
+	registry := NewModuleRegistry()
+	if err := registry.RegisterModuleBuilder(Tier2PhaseNumeric, 20, registryTestBuilderWithOrders(
+		Tier2PhaseNumeric,
+		Tier2OptimizerModule{Name: "zero-a"},
+		Tier2OptimizerModule{Name: "ordered-20-a", Order: 20},
+		Tier2OptimizerModule{Name: "ordered-10", Order: 10},
+	)); err != nil {
+		t.Fatalf("register numeric-a: %v", err)
+	}
+	if err := registry.RegisterModuleBuilder(Tier2PhaseNumeric, 20, registryTestBuilderWithOrders(
+		Tier2PhaseNumeric,
+		Tier2OptimizerModule{Name: "ordered-20-b", Order: 20},
+		Tier2OptimizerModule{Name: "zero-b"},
+	)); err != nil {
+		t.Fatalf("register numeric-b: %v", err)
+	}
+
+	plan := registry.BuildModulePlan(&Tier2OptimizerContext{})
+	want := []string{"ordered-10", "ordered-20-a", "ordered-20-b", "zero-a", "zero-b"}
+	if got := tier2ModuleNames(plan.Modules); !sameStrings(got, want) {
+		t.Fatalf("flat modules=%v want %v", got, want)
+	}
+	if len(plan.PhaseGroups) != 1 {
+		t.Fatalf("phase group count=%d want 1: %#v", len(plan.PhaseGroups), plan.PhaseGroups)
+	}
+	if got := tier2ModuleNames(plan.PhaseGroups[0].Modules); !sameStrings(got, want) {
+		t.Fatalf("group modules=%v want %v", got, want)
 	}
 }
 
@@ -103,4 +150,16 @@ func TestModuleRegistryRejectsPhaseOrderChange(t *testing.T) {
 	if !strings.Contains(err.Error(), "already registered with order") {
 		t.Fatalf("error=%v want phase order conflict", err)
 	}
+}
+
+func sameStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }

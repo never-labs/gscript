@@ -111,12 +111,14 @@ type Tier2OptimizerContext struct {
 // interfaces while giving diagnostics, ordering, and future feature switches a
 // single place to hook into.
 //
-// Modules within a phase execute in registration order (the Order field is
-// reserved for future stable intra-phase sorting).
+// Modules within a phase execute in registration order by default. Non-zero
+// Order values opt modules into stable intra-phase sorting ahead of unordered
+// modules; duplicate Order values and zero-Order modules keep registration
+// order.
 type Tier2OptimizerModule struct {
 	Name           string
 	Phase          Tier2OptimizerPhase
-	Order          int            // reserved for stable intra-phase ordering (future use)
+	Order          int            // optional stable intra-phase order; zero leaves the module unordered
 	Requires       []AnalysisFact // Facts this module needs to be already computed
 	Provides       []AnalysisFact // Facts this module computes
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
