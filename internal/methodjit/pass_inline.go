@@ -279,12 +279,12 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 			}
 		}
 		if fn.Proto != nil && fn.Proto.Name == "<main>" && calleeHasAllocationIR(calleeFn) {
-			// Allow small fixed-shape constructors: they are cheap to inline
+			// Allow small constructors: they are cheap to inline
 			// and LoadElim can forward their field values, potentially
 			// eliminating the allocation via DCE if the table doesn't escape.
-			if len(calleeProto.Code) <= 10 && calleeOnlyFixedTableAlloc(calleeFn) {
+			if len(calleeProto.Code) <= 10 && (calleeOnlyFixedTableAlloc(calleeFn) || calleeIsSimpleConstructor(calleeFn)) {
 				functionRemarks(fn).Add("Inline", "changed", block.ID, instr.ID, instr.Op,
-					fmt.Sprintf("admitted small fixed-shape constructor %s into <main>", calleeName))
+					fmt.Sprintf("admitted small constructor %s into <main>", calleeName))
 			} else {
 				functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("callee %s allocates; keep <main> call boundary", calleeName))
@@ -1118,6 +1118,43 @@ func calleeOnlyFixedTableAlloc(calleeFn *Function) bool {
 		}
 	}
 	return true
+}
+
+// calleeIsSimpleConstructor checks that the callee allocates at most one table
+// and only sets fields on it (no other side effects). This matches functions
+// like `func new_point(x, y) { return {x: x, y: y} }` where BuildGraph
+// emits OpNewTable+SetField before FixedTableConstructorLowering runs.
+func calleeIsSimpleConstructor(calleeFn *Function) bool {
+	if calleeFn == nil {
+		return false
+	}
+	var allocID int
+	allocCount := 0
+	for _, block := range calleeFn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			switch instr.Op {
+			case OpNewTable:
+				allocCount++
+				if allocCount > 1 {
+					return false
+				}
+				allocID = instr.ID
+			case OpSetField:
+				if len(instr.Args) == 0 || instr.Args[0] == nil || instr.Args[0].ID != allocID {
+					return false
+				}
+			case OpSetList:
+				return false
+			case OpNewFixedTable:
+				// handled by calleeOnlyFixedTableAlloc; not our pattern
+				return false
+			}
+		}
+	}
+	return allocCount == 1
 }
 
 func nativeEffectLoopInlineOp(op Op) bool {

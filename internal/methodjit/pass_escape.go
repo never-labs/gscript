@@ -24,6 +24,19 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
+
+// blockForID returns the block with the given ID, or nil.
+// Block IDs may not match fn.Blocks slice indices after inlining.
+func blockForID(fn *Function, id int) *Block {
+	for _, b := range fn.Blocks {
+		if b.ID == id {
+			return b
+		}
+	}
+	return nil
+}
+
+
 // virtualAllocInfo describes a table allocation that passed
 // R158's MVP escape predicate. Populated by the analysis phase of
 // EscapeAnalysisPass (R159); consumed by the rewrite phase.
@@ -199,7 +212,7 @@ func identifyVirtualPhis(fn *Function, candidates map[int]*virtualAllocInfo) map
 				fm[name] = id
 			}
 		}
-		block := fn.Blocks[info.blockID]
+		block := blockForID(fn, info.blockID)
 		for _, ins := range block.Instrs {
 			if ins.Op != OpSetField || len(ins.Args) < 2 {
 				continue
@@ -321,9 +334,12 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 	candidates map[int]*virtualAllocInfo,
 	instrByID map[int]*Instr,
 ) {
-	phiBlock := fn.Blocks[vphi.blockID]
 	phiInstr := instrByID[vphi.phiID]
-	if phiInstr == nil {
+	if phiInstr == nil || phiInstr.Block == nil {
+		return
+	}
+	phiBlock := phiInstr.Block
+if phiInstr == nil {
 		return
 	}
 
@@ -345,13 +361,13 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 				fm[name] = id
 			}
 		}
-		block := fn.Blocks[cand.blockID]
+		block := blockForID(fn, cand.blockID)
 		for _, ins := range block.Instrs {
 			if ins.Op == OpSetField && len(ins.Args) >= 2 &&
 				ins.Args[0].ID == allocID {
 				name := fieldNameFromAux(fn, ins.Aux)
 				if name == "" {
-					return
+						return
 				}
 				fm[name] = ins.Args[1].ID
 			}
@@ -394,9 +410,6 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 				args[i] = defInstr.Value()
 				phiType = joinVirtualFieldType(phiType, defInstr.Type)
 			} else {
-				// Value IDs < numRegs come from LoadSlot / parameters;
-				// represent them as an undefined arg. To stay safe,
-				// bail.
 				return
 			}
 		}
@@ -469,7 +482,7 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 			allocInstr.Aux = 0
 			allocInstr.Aux2 = 0
 		}
-		block := fn.Blocks[cand.blockID]
+		block := blockForID(fn, cand.blockID)
 		for _, ins := range block.Instrs {
 			if ins.Op == OpSetField && len(ins.Args) >= 2 &&
 				ins.Args[0].ID == allocID {
@@ -648,7 +661,7 @@ func EscapeAnalysisPass(fn *Function) (*Function, error) {
 		if info.phiReachable {
 			continue
 		}
-		block := fn.Blocks[info.blockID]
+		block := blockForID(fn, info.blockID)
 		allocInstr := instrByID[allocID]
 		initialFieldSSA := fixedTableInitialFieldSSA(fn, allocInstr)
 		fieldSSA := make(map[string]int) // fieldName → value ID to forward
