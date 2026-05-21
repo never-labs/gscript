@@ -1044,6 +1044,9 @@ func (vm *VM) RegisterTableProxyLib() {
 	tbl.RawSet(runtime.StringValue("insert"), runtime.FunctionValue(&runtime.GoFunction{
 		Name: "table.insert",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+			}
 			if len(args) != 2 && len(args) != 3 {
 				return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
 			}
