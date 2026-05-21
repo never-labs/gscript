@@ -203,6 +203,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 	setUpvals := make(map[upvalueKey]bool)
 	var loopCalls []*Instr
 	hasEffectfulLoopCall := false
+	callOnlyCreates := true // tracks whether all loop calls only create objects
 	for _, b := range bodyList {
 		for _, instr := range b.Instrs {
 			switch instr.Op {
@@ -249,15 +250,20 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 				if !isPureLoopInvariantCall(fn, instr) {
 					loopCalls = append(loopCalls, instr)
 					hasEffectfulLoopCall = true
+					if !licmCallOnlyCreates(fn, instr) {
+						callOnlyCreates = false
+					}
 				}
 			case OpResume:
 				if !isPureNumericLoopCall(fn, instr) {
 					loopCalls = append(loopCalls, instr)
 					hasEffectfulLoopCall = true
+					callOnlyCreates = false
 				}
 			case OpSelf:
 				loopCalls = append(loopCalls, instr)
 				hasEffectfulLoopCall = true
+				callOnlyCreates = false
 			}
 		}
 	}
@@ -416,7 +422,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// GetGlobal and guarded global constants require no in-loop
 			// SetGlobal on same name and no calls.
 			if instr.Op == OpGetGlobal || instr.Op == OpGuardGlobalConst {
-				if hasEffectfulLoopCall {
+				if hasEffectfulLoopCall && !callOnlyCreates {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate globals")
 					continue
@@ -695,6 +701,45 @@ func isPureLoopInvariantCall(fn *Function, call *Instr) bool {
 		return false
 	}
 	return pureNumericInlineRejectReason(calleeFn) == ""
+}
+
+// licmCallOnlyCreates returns true if the call only creates objects (tables,
+// closures) without modifying globals, upvalues, or existing table fields.
+// This allows LICM to hoist GetGlobal past such calls since they don't mutate
+// observable global state.
+func licmCallOnlyCreates(fn *Function, call *Instr) bool {
+	if fn == nil || call == nil || call.Op != OpCall {
+		return false
+	}
+	if !callABIHasExactResultShape(fn, call, 1) {
+		return false
+	}
+	globals := callABIMergeGlobals(fn.Analysis.Globals, callABIStableGlobals(fn.Proto))
+	if len(globals) == 0 {
+		return false
+	}
+	_, callee := resolveCallee(call, fn, InlineConfig{Globals: globals})
+	if callee == nil {
+		return false
+	}
+	calleeFn := BuildGraph(callee)
+	if calleeFn == nil {
+		return false
+	}
+	for _, block := range calleeFn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			switch instr.Op {
+			case OpSetGlobal, OpSetField, OpFieldStore, OpSetTable,
+				OpTableArrayStore, OpTableArraySwap, OpAppend, OpSetList,
+				OpSetUpval:
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // sameValue returns true when every non-nil Value in args refers to the
