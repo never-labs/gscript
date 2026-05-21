@@ -404,6 +404,9 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	if run.Err == nil || !strings.Contains(run.Err.Error(), wantErr.Error()) {
 		t.Fatalf("run err = %v, want %v", run.Err, wantErr)
 	}
+	if run.InputFunction == nil || run.OutputFunction == nil || run.Function == nil {
+		t.Fatalf("run missing diagnostic function state: %+v", run)
+	}
 	if len(run.Requires) != 1 || run.Requires[0] != AnalysisFactIntRanges {
 		t.Fatalf("run requires = %v, want IntRanges", run.Requires)
 	}
@@ -418,6 +421,46 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	}
 	if timings[1].Name != wantStage || timings[1].Error != wantErr.Error() || !timings[1].Nested {
 		t.Fatalf("unexpected timing: %+v", timings[1])
+	}
+}
+
+func TestTier2OptimizerModuleFailureRecordsInputWhenOutputNil(t *testing.T) {
+	wantErr := errors.New("synthetic nil-output failure")
+	var runs []Tier2ModuleRun
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:  "NilFail",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					return nil, wantErr
+				},
+			},
+		},
+	}
+	input := &Function{Analysis: NewAnalysisResult()}
+	ctx := &Tier2OptimizerContext{
+		ModuleRunCallback: func(run Tier2ModuleRun) {
+			runs = append(runs, run)
+		},
+	}
+
+	_, err := runTier2OptimizerPlan(input, nil, ctx, plan)
+	if err == nil {
+		t.Fatal("expected optimizer failure")
+	}
+	if len(runs) != 1 {
+		t.Fatalf("module runs = %d, want 1", len(runs))
+	}
+	if runs[0].InputFunction != input {
+		t.Fatalf("input function not preserved: got %p want %p", runs[0].InputFunction, input)
+	}
+	if runs[0].OutputFunction != nil {
+		t.Fatalf("output function = %p, want nil", runs[0].OutputFunction)
+	}
+	if runs[0].Function != input {
+		t.Fatalf("diagnostic function = %p, want input %p", runs[0].Function, input)
 	}
 }
 

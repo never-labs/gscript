@@ -112,8 +112,12 @@ func (sc *snapshotCollector) addModuleRun(run Tier2ModuleRun) {
 	if run.Function == nil {
 		return
 	}
+	name := run.ModuleName
+	if run.Err != nil {
+		name += " (error)"
+	}
 	sc.snapshots = append(sc.snapshots, Snapshot{
-		Name: run.ModuleName,
+		Name: name,
 		IR:   Print(run.Function),
 	})
 }
@@ -144,6 +148,13 @@ func (sc *snapshotCollector) findSnapshot(name string) string {
 		}
 	}
 	return ""
+}
+
+func (sc *snapshotCollector) latestSnapshotIR() string {
+	if sc == nil || len(sc.snapshots) == 0 {
+		return ""
+	}
+	return sc.snapshots[len(sc.snapshots)-1].IR
 }
 
 // DiagReport is the complete diagnostic output for one function invocation.
@@ -205,7 +216,11 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	optimized, pipeErr := runTier2OptimizerPlan(fn, nil, ctx, newTier2OptimizerPlan(ctx))
 	if pipeErr != nil {
 		// Pipeline failed; record what we can.
-		r.IRAfter = r.IRBefore
+		r.IRAfter = collector.latestSnapshotIR()
+		if r.IRAfter == "" {
+			r.IRAfter = r.IRBefore
+		}
+		r.PassDiffs = collectPassDiffs(collector)
 		r.PipelineStages = collector.timings
 		r.ModuleContracts = append([]Tier2ModuleContract(nil), collector.moduleContracts...)
 		r.OptimizationRemarks = remarks.List()

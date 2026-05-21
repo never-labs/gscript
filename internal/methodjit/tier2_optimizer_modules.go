@@ -15,15 +15,17 @@ type Tier2SnapshotCallback func(moduleName string, fn *Function, duration time.D
 
 // Tier2ModuleRun records one optimizer module execution scope.
 type Tier2ModuleRun struct {
-	Phase      Tier2OptimizerPhase
-	ModuleName string
-	StageName  string
-	Function   *Function
-	Duration   time.Duration
-	Err        error
-	Requires   []AnalysisFact
-	Provides   []AnalysisFact
-	Updates    []AnalysisFact
+	Phase          Tier2OptimizerPhase
+	ModuleName     string
+	StageName      string
+	Function       *Function
+	InputFunction  *Function
+	OutputFunction *Function
+	Duration       time.Duration
+	Err            error
+	Requires       []AnalysisFact
+	Provides       []AnalysisFact
+	Updates        []AnalysisFact
 }
 
 // Tier2ModuleRunCallback is called after each optimizer module run, including
@@ -219,6 +221,98 @@ func (flags Tier2OptimizerFeatureFlags) moduleEnabled(module Tier2OptimizerModul
 	return true
 }
 
+// PhaseScope records the common diagnostics around one pipeline phase/module:
+// elapsed time, structured trace, snapshots, and errors. Callers fill the
+// run body, then finish the scope with the best available function state.
+type PhaseScope struct {
+	name             string
+	start            time.Time
+	timingSink       *[]PipelineStageTiming
+	nestedTiming     bool
+	snapshotName     string
+	snapshotCallback Tier2SnapshotCallback
+	moduleRun        Tier2ModuleRun
+	moduleCallback   Tier2ModuleRunCallback
+	hasModuleRun     bool
+}
+
+type PhaseScopeOption func(*PhaseScope)
+
+func beginPhaseScope(name string, opts ...PhaseScopeOption) *PhaseScope {
+	scope := &PhaseScope{
+		name:  name,
+		start: time.Now(),
+	}
+	for _, opt := range opts {
+		opt(scope)
+	}
+	return scope
+}
+
+func phaseScopeTimingSink(sink *[]PipelineStageTiming, nested bool) PhaseScopeOption {
+	return func(scope *PhaseScope) {
+		scope.timingSink = sink
+		scope.nestedTiming = nested
+	}
+}
+
+func phaseScopeSnapshot(name string, callback Tier2SnapshotCallback) PhaseScopeOption {
+	return func(scope *PhaseScope) {
+		scope.snapshotName = name
+		scope.snapshotCallback = callback
+	}
+}
+
+func phaseScopeModuleRun(run Tier2ModuleRun, callback Tier2ModuleRunCallback) PhaseScopeOption {
+	return func(scope *PhaseScope) {
+		scope.moduleRun = run
+		scope.moduleCallback = callback
+		scope.hasModuleRun = true
+	}
+}
+
+func (scope *PhaseScope) finish(fn *Function, err error) time.Duration {
+	duration := scope.duration()
+	if scope.timingSink != nil {
+		*scope.timingSink = append(*scope.timingSink, scope.timing(err))
+	}
+	if scope.hasModuleRun && scope.moduleCallback != nil {
+		run := scope.moduleRun
+		run.Duration = duration
+		run.Err = err
+		run.OutputFunction = fn
+		run.Function = bestTier2ModuleRunFunction(run.InputFunction, fn)
+		scope.moduleCallback(run)
+	}
+	if err == nil && scope.snapshotCallback != nil {
+		scope.snapshotCallback(scope.snapshotName, fn, duration)
+	}
+	return duration
+}
+
+func (scope *PhaseScope) duration() time.Duration {
+	if scope == nil {
+		return 0
+	}
+	return time.Since(scope.start)
+}
+
+func (scope *PhaseScope) timing(err error) PipelineStageTiming {
+	duration := scope.duration()
+	timing := newPipelineStageTiming(scope.name, duration, err)
+	if scope != nil {
+		timing.Nested = scope.nestedTiming
+	}
+	return timing
+}
+
+func bestTier2ModuleRunFunction(input, output *Function) *Function {
+	if output != nil {
+		return output
+	}
+	return input
+}
+
 func tier2PassModule(name string, phase Tier2OptimizerPhase, pass PassFunc) Tier2OptimizerModule {
 	return Tier2OptimizerModule{
 		Name:  name,
@@ -408,7 +502,24 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 			return nil, fmt.Errorf("%s: missing optimizer module runner", module.Name)
 		}
 		stageName := tier2OptimizerModuleStageName(phase, module.Name)
-		start := time.Now()
+		inputFn := fn
+		var timingSink *[]PipelineStageTiming
+		if opts != nil {
+			timingSink = opts.OptimizerTimings
+		}
+		scope := beginPhaseScope(stageName,
+			phaseScopeTimingSink(timingSink, true),
+			phaseScopeSnapshot(module.Name, ctxSnapshotCallback(ctx)),
+			phaseScopeModuleRun(Tier2ModuleRun{
+				Phase:         phase,
+				ModuleName:    module.Name,
+				StageName:     stageName,
+				InputFunction: inputFn,
+				Requires:      cloneAnalysisFacts(module.Requires),
+				Provides:      cloneAnalysisFacts(module.Provides),
+				Updates:       cloneAnalysisFacts(module.Updates),
+			}, ctxModuleRunCallback(ctx)),
+		)
 		if module.RunWithContext != nil {
 			fn, err = module.RunWithContext(fn, opts, ctx)
 		} else {
@@ -419,32 +530,11 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 				err = fmt.Errorf("%s: lightweight IR verifier failed: %w", stageName, verifyErr)
 			}
 		}
-		duration := time.Since(start)
-		if opts != nil && opts.OptimizerTimings != nil {
-			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(stageName, duration, err))
-		}
-		if callback := ctxModuleRunCallback(ctx); callback != nil {
-			callback(Tier2ModuleRun{
-				Phase:      phase,
-				ModuleName: module.Name,
-				StageName:  stageName,
-				Function:   fn,
-				Duration:   duration,
-				Err:        err,
-				Requires:   cloneAnalysisFacts(module.Requires),
-				Provides:   cloneAnalysisFacts(module.Provides),
-				Updates:    cloneAnalysisFacts(module.Updates),
-			})
-		}
+		scope.finish(fn, err)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", module.Name, err)
 		}
 		attachRemarks(fn, opts)
-
-		// Invoke snapshot callback if set.
-		if callback := ctxSnapshotCallback(ctx); callback != nil {
-			callback(module.Name, fn, duration)
-		}
 	}
 	return fn, nil
 }

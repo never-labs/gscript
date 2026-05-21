@@ -299,6 +299,11 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 			trace.ModuleRuns = append([]Tier2ModuleRun(nil), moduleRuns...)
 		}
 		if err != nil {
+			if trace != nil && trace.IRAfter == "" {
+				if lastFn := lastTier2ModuleRunFunction(moduleRuns); lastFn != nil {
+					trace.IRAfter = Print(lastFn)
+				}
+			}
 			remarks.Add("Tier2Gate", "blocked", 0, 0, OpNop,
 				"optimization pipeline failed: "+err.Error())
 			return fmt.Errorf("tier2: pipeline: %w", err)
@@ -458,6 +463,15 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 	// an extra label at the end of the same code block when the proto
 	// qualifies, so caller BL is compile-time PC-relative.
 	return cf, nil
+}
+
+func lastTier2ModuleRunFunction(runs []Tier2ModuleRun) *Function {
+	for i := len(runs) - 1; i >= 0; i-- {
+		if runs[i].Function != nil {
+			return runs[i].Function
+		}
+	}
+	return nil
 }
 
 func typedPeerCallRegisterReserve(fn *Function, baseSlots int) int {

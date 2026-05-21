@@ -2,8 +2,6 @@
 
 package methodjit
 
-import "time"
-
 type tier2CompileStage struct {
 	name string
 	run  func() error
@@ -17,9 +15,9 @@ func runTier2CompileStages(trace *Tier2Trace, stages []tier2CompileStage) error 
 			}
 			continue
 		}
-		start := time.Now()
+		scope := beginPhaseScope(stage.name)
 		err := stage.run()
-		trace.PipelineStages = append(trace.PipelineStages, newPipelineStageTiming(stage.name, time.Since(start), err))
+		trace.PipelineStages = append(trace.PipelineStages, scope.timing(err))
 		if err != nil {
 			return err
 		}
