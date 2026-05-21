@@ -26,6 +26,24 @@ func tier2ModuleNames(mods []Tier2OptimizerModule) []string {
 	return names
 }
 
+type testCompilationDependency struct{}
+
+func (testCompilationDependency) Kind() CompilationDependencyKind {
+	return CompilationDependencyGlobal
+}
+
+func (testCompilationDependency) Key() string {
+	return "test-dependency"
+}
+
+func (testCompilationDependency) Validate(CompilationDependencyContext) error {
+	return nil
+}
+
+func (testCompilationDependency) String() string {
+	return "test-dependency"
+}
+
 func TestTier2TableObjectPreparationModuleOrder(t *testing.T) {
 	mods := tier2TableObjectPreparationModules(nil)
 	want := []string{
@@ -90,6 +108,87 @@ func TestTier2OptimizerPlanCoversModulePhases(t *testing.T) {
 			t.Fatalf("duplicate module name: %s", module.Name)
 		}
 		names[module.Name] = true
+	}
+}
+
+func TestRunTier2PipelineCreatesPipelineDataWithDependencyRegistry(t *testing.T) {
+	oldRegistry := DefaultModuleRegistry
+	registry := NewModuleRegistry()
+	DefaultModuleRegistry = registry
+	t.Cleanup(func() {
+		DefaultModuleRegistry = oldRegistry
+	})
+
+	var seenCtx *Tier2OptimizerContext
+	if err := registry.RegisterModuleBuilder(Tier2PhaseNumeric, 10, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
+		return []Tier2OptimizerModule{
+			{
+				Name:  "DependencyProbe",
+				Phase: Tier2PhaseNumeric,
+				RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+					seenCtx = ctx
+					if ctx == nil || ctx.PipelineData == nil {
+						t.Fatal("pipeline data missing from optimizer context")
+					}
+					if ctx.PipelineData.CompilationDependencies == nil {
+						t.Fatal("compilation dependency registry missing from pipeline data")
+					}
+					ctx.PipelineData.CompilationDependencies.Record(testCompilationDependency{})
+					return fn, nil
+				},
+			},
+		}
+	}); err != nil {
+		t.Fatalf("RegisterModuleBuilder: %v", err)
+	}
+
+	_, notes, err := RunTier2Pipeline(&Function{Analysis: NewAnalysisResult()}, nil)
+	if err != nil {
+		t.Fatalf("RunTier2Pipeline: %v", err)
+	}
+	if len(notes) != 0 {
+		t.Fatalf("intrinsic notes = %v, want none", notes)
+	}
+	if seenCtx == nil {
+		t.Fatal("probe module did not run")
+	}
+	if seenCtx.PipelineData.Plan == nil {
+		t.Fatal("pipeline data did not retain optimizer plan")
+	}
+	if got := seenCtx.PipelineData.CompilationDependencies.Len(); got != 1 {
+		t.Fatalf("dependency registry length = %d, want 1", got)
+	}
+}
+
+func TestTier2PipelineDataDiagnosticsModuleCallback(t *testing.T) {
+	var runs []Tier2ModuleRun
+	data := NewTier2PipelineData()
+	data.Diagnostics.ModuleRunCallback = func(run Tier2ModuleRun) {
+		runs = append(runs, run)
+	}
+	ctx := newTier2OptimizerContext(data)
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:  "DiagnosticsProbe",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					return fn, nil
+				},
+			},
+		},
+	}
+
+	_, err := runTier2OptimizerPlan(&Function{Analysis: NewAnalysisResult()}, nil, ctx, plan)
+	if err != nil {
+		t.Fatalf("runTier2OptimizerPlan: %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("module run callbacks = %d, want 1", len(runs))
+	}
+	if runs[0].ModuleName != "DiagnosticsProbe" || runs[0].StageName != "RunTier2Pipeline/numeric/DiagnosticsProbe" {
+		t.Fatalf("unexpected callback payload: %+v", runs[0])
 	}
 }
 

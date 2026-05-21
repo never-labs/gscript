@@ -122,11 +122,10 @@ func RunTier2Pipeline(fn *Function, opts *Tier2PipelineOpts) (*Function, []strin
 		protocolGlobals = opts.ProtocolGlobals
 	}
 
-	ctx := &Tier2OptimizerContext{
-		Globals:         globals,
-		ProtocolGlobals: protocolGlobals,
-		InlineMaxSize:   maxSize,
-	}
+	ctx := newTier2OptimizerContext(NewTier2PipelineData())
+	ctx.Globals = globals
+	ctx.ProtocolGlobals = protocolGlobals
+	ctx.InlineMaxSize = maxSize
 
 	fn, err = runTier2OptimizerPlan(fn, opts, ctx, newTier2OptimizerPlan(ctx))
 	if err != nil {

@@ -190,12 +190,12 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	// 4. Run optimizer with snapshot callback.
 	collector := newSnapshotCollector()
 	collector.addSnapshot("input", fn)
-	ctx := &Tier2OptimizerContext{
-		InlineMaxSize: 40,
-		ModuleRunCallback: func(run Tier2ModuleRun) {
-			collector.addModuleRun(run)
-		},
+	data := NewTier2PipelineData()
+	data.Diagnostics.ModuleRunCallback = func(run Tier2ModuleRun) {
+		collector.addModuleRun(run)
 	}
+	ctx := newTier2OptimizerContext(data)
+	ctx.InlineMaxSize = 40
 
 	optimized, pipeErr := runTier2OptimizerPlan(fn, nil, ctx, newTier2OptimizerPlan(ctx))
 	if pipeErr != nil {

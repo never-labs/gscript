@@ -26,6 +26,31 @@ type Tier2ModuleRun struct {
 // failed modules.
 type Tier2ModuleRunCallback func(Tier2ModuleRun)
 
+// Tier2PipelineDiagnostics groups per-run diagnostic hooks. The legacy fields
+// on Tier2OptimizerContext remain supported for callers that construct the
+// context directly.
+type Tier2PipelineDiagnostics struct {
+	SnapshotCallback  Tier2SnapshotCallback
+	ModuleRunCallback Tier2ModuleRunCallback
+}
+
+// Tier2PipelineData is the per-compilation data object shared across Tier 2
+// optimizer modules. It is deliberately small for now: modules can record
+// compile-time dependencies, diagnostics can inspect the constructed plan, and
+// future pipeline-owned state has a single home instead of growing ad hoc
+// fields on Tier2OptimizerContext.
+type Tier2PipelineData struct {
+	CompilationDependencies *CompilationDependencyRegistry
+	Plan                    *Tier2OptimizerPlan
+	Diagnostics             Tier2PipelineDiagnostics
+}
+
+func NewTier2PipelineData() *Tier2PipelineData {
+	return &Tier2PipelineData{
+		CompilationDependencies: NewCompilationDependencyRegistry(),
+	}
+}
+
 // Tier2OptimizerPhase names a coarse-grained extension point in the Tier 2
 // optimizer. New native optimizations should enter through a phase module
 // instead of being inserted ad hoc into RunTier2Pipeline.
@@ -87,6 +112,9 @@ const (
 // within a single Tier 2 optimization run. It is created by RunTier2Pipeline
 // and passed to modules that declare RunWithContext instead of Run.
 type Tier2OptimizerContext struct {
+	// PipelineData is the pipeline-owned per-compilation data shared by
+	// optimizer modules.
+	PipelineData *Tier2PipelineData
 	// Globals maps global function names to their protos, used for inlining
 	// and call ABI annotation.
 	Globals map[string]*vm.FuncProto
@@ -104,6 +132,27 @@ type Tier2OptimizerContext struct {
 	// ModuleRunCallback is an optional structured callback invoked after each
 	// module run, including failures.
 	ModuleRunCallback Tier2ModuleRunCallback
+}
+
+func newTier2OptimizerContext(data *Tier2PipelineData) *Tier2OptimizerContext {
+	if data == nil {
+		data = NewTier2PipelineData()
+	} else if data.CompilationDependencies == nil {
+		data.CompilationDependencies = NewCompilationDependencyRegistry()
+	}
+	return &Tier2OptimizerContext{PipelineData: data}
+}
+
+func (ctx *Tier2OptimizerContext) ensurePipelineData() *Tier2PipelineData {
+	if ctx == nil {
+		return nil
+	}
+	if ctx.PipelineData == nil {
+		ctx.PipelineData = NewTier2PipelineData()
+	} else if ctx.PipelineData.CompilationDependencies == nil {
+		ctx.PipelineData.CompilationDependencies = NewCompilationDependencyRegistry()
+	}
+	return ctx.PipelineData
 }
 
 // Tier2OptimizerModule is the smallest pluggable optimization unit. Modules
@@ -165,10 +214,17 @@ type Tier2OptimizerPlan struct {
 }
 
 func newTier2OptimizerPlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
-	return BuildModulePlan(ctx)
+	plan := BuildModulePlan(ctx)
+	if data := ctx.ensurePipelineData(); data != nil {
+		data.Plan = &plan
+	}
+	return plan
 }
 
 func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext, plan Tier2OptimizerPlan) (*Function, error) {
+	if data := ctx.ensurePipelineData(); data != nil {
+		data.Plan = &plan
+	}
 	if err := ValidateDependencyOrder(plan); err != nil {
 		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
 	}
@@ -224,8 +280,8 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		if opts != nil && opts.OptimizerTimings != nil {
 			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(stageName, duration, err))
 		}
-		if ctx != nil && ctx.ModuleRunCallback != nil {
-			ctx.ModuleRunCallback(Tier2ModuleRun{
+		if callback := ctxModuleRunCallback(ctx); callback != nil {
+			callback(Tier2ModuleRun{
 				Phase:      phase,
 				ModuleName: module.Name,
 				StageName:  stageName,
@@ -240,8 +296,8 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		attachRemarks(fn, opts)
 
 		// Invoke snapshot callback if set.
-		if ctx != nil && ctx.SnapshotCallback != nil {
-			ctx.SnapshotCallback(module.Name, fn, duration)
+		if callback := ctxSnapshotCallback(ctx); callback != nil {
+			callback(module.Name, fn, duration)
 		}
 	}
 	return fn, nil
@@ -249,6 +305,32 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 
 func tier2OptimizerModuleStageName(phase Tier2OptimizerPhase, moduleName string) string {
 	return fmt.Sprintf("RunTier2Pipeline/%s/%s", phase, moduleName)
+}
+
+func ctxModuleRunCallback(ctx *Tier2OptimizerContext) Tier2ModuleRunCallback {
+	if ctx == nil {
+		return nil
+	}
+	if ctx.ModuleRunCallback != nil {
+		return ctx.ModuleRunCallback
+	}
+	if ctx.PipelineData == nil {
+		return nil
+	}
+	return ctx.PipelineData.Diagnostics.ModuleRunCallback
+}
+
+func ctxSnapshotCallback(ctx *Tier2OptimizerContext) Tier2SnapshotCallback {
+	if ctx == nil {
+		return nil
+	}
+	if ctx.SnapshotCallback != nil {
+		return ctx.SnapshotCallback
+	}
+	if ctx.PipelineData == nil {
+		return nil
+	}
+	return ctx.PipelineData.Diagnostics.SnapshotCallback
 }
 
 func ctxGlobals(ctx *Tier2OptimizerContext) map[string]*vm.FuncProto {
