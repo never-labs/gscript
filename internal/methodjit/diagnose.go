@@ -80,6 +80,7 @@ type snapshotCollector struct {
 	snapshots       []Snapshot
 	timings         []PipelineStageTiming
 	moduleContracts []Tier2ModuleContract
+	moduleReasons   []Tier2ModuleReason
 }
 
 func newSnapshotCollector() *snapshotCollector {
@@ -108,6 +109,9 @@ func (sc *snapshotCollector) addModuleRun(run Tier2ModuleRun) {
 	sc.timings = append(sc.timings, newPipelineStageTiming(run.StageName, run.Duration, run.Err))
 	if len(run.Requires) > 0 || len(run.Provides) > 0 || len(run.Updates) > 0 {
 		sc.moduleContracts = append(sc.moduleContracts, run.Contract())
+	}
+	if reason, ok := run.ReasonRecord(); ok {
+		sc.moduleReasons = append(sc.moduleReasons, reason)
 	}
 	if run.Function == nil {
 		return
@@ -167,6 +171,7 @@ type DiagReport struct {
 	PassDiffs           []string // diff for each pass that changed the IR
 	PipelineStages      []PipelineStageTiming
 	ModuleContracts     []Tier2ModuleContract
+	ModuleReasons       []Tier2ModuleReason
 	OptimizationRemarks []OptimizationRemark // structured pass/gate diagnostics
 	ValidateErrors      []error              // structural invariant violations
 	RegAllocMap         string               // human-readable register assignments
@@ -223,6 +228,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.PassDiffs = collectPassDiffs(collector)
 		r.PipelineStages = collector.timings
 		r.ModuleContracts = append([]Tier2ModuleContract(nil), collector.moduleContracts...)
+		r.ModuleReasons = append([]Tier2ModuleReason(nil), collector.moduleReasons...)
 		r.OptimizationRemarks = remarks.List()
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
@@ -233,6 +239,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.OptimizationRemarks = remarks.List()
 	r.PipelineStages = collector.timings
 	r.ModuleContracts = append([]Tier2ModuleContract(nil), collector.moduleContracts...)
+	r.ModuleReasons = append([]Tier2ModuleReason(nil), collector.moduleReasons...)
 
 	// Collect diffs for passes that changed the IR.
 	r.PassDiffs = collectPassDiffs(collector)
@@ -402,6 +409,9 @@ func (r *DiagReport) String() string {
 	w("\n--- Pipeline summary ---\n%s", FormatPipelineStageTimings(r.PipelineStages))
 	if len(r.ModuleContracts) > 0 {
 		w("\n--- Module contracts ---\n%s", FormatTier2ModuleContracts(r.ModuleContracts))
+	}
+	if len(r.ModuleReasons) > 0 {
+		w("\n--- Module reasons ---\n%s", FormatTier2ModuleReasons(r.ModuleReasons))
 	}
 	w("\n--- Optimization remarks ---\n%s", formatOptimizationRemarks(r.OptimizationRemarks))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)

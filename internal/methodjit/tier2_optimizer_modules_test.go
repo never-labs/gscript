@@ -320,6 +320,71 @@ func TestTier2PipelineDataDiagnosticsModuleCallback(t *testing.T) {
 	}
 }
 
+func TestTier2ModuleRunRecordsHitSkipReasonsFromRemarks(t *testing.T) {
+	var runs []Tier2ModuleRun
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:  "SkipProbe",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					functionRemarks(fn).Add("SkipPass", "skipped", 0, 0, OpNop, "no candidate rewrite")
+					return fn, nil
+				},
+			},
+			{
+				Name:  "HitProbe",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					functionRemarks(fn).Add("HitPass", "changed", 1, 2, OpAdd, "folded constant add")
+					return fn, nil
+				},
+			},
+			{
+				Name:  "QuietProbe",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					return fn, nil
+				},
+			},
+		},
+	}
+	ctx := &Tier2OptimizerContext{
+		ModuleRunCallback: func(run Tier2ModuleRun) {
+			runs = append(runs, run)
+		},
+	}
+	fn := &Function{Analysis: NewAnalysisResult(), Remarks: &OptimizationRemarks{}}
+	if _, err := runTier2OptimizerPlan(fn, nil, ctx, plan); err != nil {
+		t.Fatalf("runTier2OptimizerPlan: %v", err)
+	}
+	if len(runs) != 3 {
+		t.Fatalf("module runs = %d, want 3", len(runs))
+	}
+	if runs[0].Outcome != "skip" || runs[0].ReasonPass != "SkipPass" || runs[0].Reason != "no candidate rewrite" {
+		t.Fatalf("skip reason not recorded: %+v", runs[0])
+	}
+	if runs[1].Outcome != "hit" || runs[1].ReasonPass != "HitPass" || runs[1].Reason != "folded constant add" {
+		t.Fatalf("hit reason not recorded: %+v", runs[1])
+	}
+	if runs[2].Outcome != "" || runs[2].Reason != "" {
+		t.Fatalf("quiet module should not record a reason: %+v", runs[2])
+	}
+	reasons := moduleReasonsFromRuns(runs)
+	if len(reasons) != 2 {
+		t.Fatalf("module reasons = %d, want 2: %+v", len(reasons), reasons)
+	}
+	text := FormatTier2ModuleReasons(reasons)
+	if !strings.Contains(text, "numeric/SkipProbe: skip") ||
+		!strings.Contains(text, "pass=SkipPass") ||
+		!strings.Contains(text, "reason=\"no candidate rewrite\"") ||
+		!strings.Contains(text, "numeric/HitProbe: hit") ||
+		strings.Contains(text, "QuietProbe") {
+		t.Fatalf("unexpected formatted reasons:\n%s", text)
+	}
+}
+
 func TestTier2OptimizerPlanDeduplicatesFallbackPhases(t *testing.T) {
 	var ran []string
 	makeModule := func(name string) Tier2OptimizerModule {

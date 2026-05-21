@@ -50,6 +50,7 @@ type WarmDumpRecord struct {
 	LoopDiagnostics      []LoopDiagnostic
 	PipelineStages       []PipelineStageTiming
 	ModuleContracts      []Tier2ModuleContract
+	ModuleReasons        []Tier2ModuleReason
 	CompiledCode         []byte
 	CodeStart            uintptr
 	CodeEnd              uintptr
@@ -95,6 +96,7 @@ type warmDumpProtoManifest struct {
 	LoopDiagnostics      []LoopDiagnostic           `json:"loop_diagnostics,omitempty"`
 	PipelineStages       []PipelineStageTiming      `json:"pipeline_stages,omitempty"`
 	ModuleContracts      []Tier2ModuleContract      `json:"module_contracts,omitempty"`
+	ModuleReasons        []Tier2ModuleReason        `json:"module_reasons,omitempty"`
 	Feedback             warmFeedbackSummary        `json:"feedback"`
 	Files                map[string]string          `json:"files,omitempty"`
 }
@@ -213,6 +215,7 @@ func (s *WarmDumpSession) record(proto *vm.FuncProto, trace *Tier2Trace, cf *Com
 			trace.LoopDiagnostics...),
 		PipelineStages:  append([]PipelineStageTiming(nil), trace.PipelineStages...),
 		ModuleContracts: moduleContractsFromRuns(trace.ModuleRuns),
+		ModuleReasons:   moduleReasonsFromRuns(trace.ModuleRuns),
 	}
 	if compileErr != nil {
 		rec.CompileErr = compileErr.Error()
@@ -313,6 +316,13 @@ func (s *WarmDumpSession) write(tm *TieringManager, top *vm.FuncProto) error {
 				}
 				files["module_contracts"] = name
 			}
+			if len(rec.ModuleReasons) > 0 {
+				name := base + ".reasons.txt"
+				if err := os.WriteFile(filepath.Join(s.dir, name), []byte(FormatTier2ModuleReasons(rec.ModuleReasons)), 0o644); err != nil {
+					return fmt.Errorf("write module reasons for %s: %w", proto.Name, err)
+				}
+				files["module_reasons"] = name
+			}
 			if len(rec.SourceMap) > 0 {
 				name := base + ".sourcemap.json"
 				data, err := json.MarshalIndent(rec.SourceMap, "", "  ")
@@ -408,6 +418,7 @@ func (s *WarmDumpSession) write(tm *TieringManager, top *vm.FuncProto) error {
 			protoManifest.LoopDiagnostics = append([]LoopDiagnostic(nil), rec.LoopDiagnostics...)
 			protoManifest.PipelineStages = append([]PipelineStageTiming(nil), rec.PipelineStages...)
 			protoManifest.ModuleContracts = append([]Tier2ModuleContract(nil), rec.ModuleContracts...)
+			protoManifest.ModuleReasons = append([]Tier2ModuleReason(nil), rec.ModuleReasons...)
 		}
 
 		statusName := base + ".status.json"

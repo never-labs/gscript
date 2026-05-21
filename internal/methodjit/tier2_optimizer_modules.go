@@ -23,6 +23,9 @@ type Tier2ModuleRun struct {
 	OutputFunction *Function
 	Duration       time.Duration
 	Err            error
+	Outcome        string
+	ReasonPass     string
+	Reason         string
 	Requires       []AnalysisFact
 	Provides       []AnalysisFact
 	Updates        []AnalysisFact
@@ -50,6 +53,18 @@ type Tier2ModuleContract struct {
 	Requires   []AnalysisFact      `json:"requires,omitempty"`
 	Provides   []AnalysisFact      `json:"provides,omitempty"`
 	Updates    []AnalysisFact      `json:"updates,omitempty"`
+}
+
+// Tier2ModuleReason records why an optimizer module/pass hit, skipped, or
+// failed when the module produced an explicit diagnostic reason. Modules that
+// do not emit a reason stay out of human and JSON reports.
+type Tier2ModuleReason struct {
+	Phase      Tier2OptimizerPhase `json:"phase"`
+	ModuleName string              `json:"module"`
+	StageName  string              `json:"stage"`
+	Outcome    string              `json:"outcome"`
+	Pass       string              `json:"pass,omitempty"`
+	Reason     string              `json:"reason,omitempty"`
 }
 
 // Tier2PipelineData is the per-compilation data object shared across Tier 2
@@ -503,6 +518,7 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		}
 		stageName := tier2OptimizerModuleStageName(phase, module.Name)
 		inputFn := fn
+		remarkStart := optimizationRemarkLen(fn)
 		var timingSink *[]PipelineStageTiming
 		if opts != nil {
 			timingSink = opts.OptimizerTimings
@@ -530,6 +546,15 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 				err = fmt.Errorf("%s: lightweight IR verifier failed: %w", stageName, verifyErr)
 			}
 		}
+		outcome, reasonPass, reason := tier2ModuleReasonFromRemarks(optimizationRemarksSince(fn, remarkStart))
+		if err != nil && reason == "" {
+			outcome = "error"
+			reasonPass = module.Name
+			reason = err.Error()
+		}
+		scope.moduleRun.Outcome = outcome
+		scope.moduleRun.ReasonPass = reasonPass
+		scope.moduleRun.Reason = reason
 		scope.finish(fn, err)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", module.Name, err)
@@ -554,6 +579,20 @@ func (run Tier2ModuleRun) Contract() Tier2ModuleContract {
 	}
 }
 
+func (run Tier2ModuleRun) ReasonRecord() (Tier2ModuleReason, bool) {
+	if run.Outcome == "" && run.Reason == "" {
+		return Tier2ModuleReason{}, false
+	}
+	return Tier2ModuleReason{
+		Phase:      run.Phase,
+		ModuleName: run.ModuleName,
+		StageName:  run.StageName,
+		Outcome:    run.Outcome,
+		Pass:       run.ReasonPass,
+		Reason:     run.Reason,
+	}, true
+}
+
 func moduleContractsFromRuns(runs []Tier2ModuleRun) []Tier2ModuleContract {
 	if len(runs) == 0 {
 		return nil
@@ -567,6 +606,21 @@ func moduleContractsFromRuns(runs []Tier2ModuleRun) []Tier2ModuleContract {
 		contracts = append(contracts, contract)
 	}
 	return contracts
+}
+
+func moduleReasonsFromRuns(runs []Tier2ModuleRun) []Tier2ModuleReason {
+	if len(runs) == 0 {
+		return nil
+	}
+	reasons := make([]Tier2ModuleReason, 0, len(runs))
+	for _, run := range runs {
+		reason, ok := run.ReasonRecord()
+		if !ok {
+			continue
+		}
+		reasons = append(reasons, reason)
+	}
+	return reasons
 }
 
 func cloneAnalysisFacts(facts []AnalysisFact) []AnalysisFact {
@@ -601,6 +655,63 @@ func formatAnalysisFacts(facts []AnalysisFact) string {
 		parts = append(parts, string(fact))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// FormatTier2ModuleReasons renders explicit module hit/skip reasons for human
+// diagnostics. It intentionally stays empty when modules did not record a
+// reason so default reports remain compact.
+func FormatTier2ModuleReasons(reasons []Tier2ModuleReason) string {
+	if len(reasons) == 0 {
+		return "(not recorded)\n"
+	}
+	var b strings.Builder
+	for _, reason := range reasons {
+		fmt.Fprintf(&b, "  %s/%s: %s", reason.Phase, reason.ModuleName, reason.Outcome)
+		if reason.Pass != "" && reason.Pass != reason.ModuleName {
+			fmt.Fprintf(&b, " pass=%s", reason.Pass)
+		}
+		if reason.Reason != "" {
+			fmt.Fprintf(&b, " reason=%q", reason.Reason)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func optimizationRemarkLen(fn *Function) int {
+	if fn == nil || fn.Remarks == nil {
+		return 0
+	}
+	return fn.Remarks.Len()
+}
+
+func optimizationRemarksSince(fn *Function, start int) []OptimizationRemark {
+	if fn == nil || fn.Remarks == nil {
+		return nil
+	}
+	return fn.Remarks.Since(start)
+}
+
+func tier2ModuleReasonFromRemarks(remarks []OptimizationRemark) (outcome, pass, reason string) {
+	var skipPass, skipReason string
+	for _, remark := range remarks {
+		if strings.TrimSpace(remark.Reason) == "" {
+			continue
+		}
+		switch remark.Kind {
+		case "changed", "emit":
+			return "hit", remark.Pass, remark.Reason
+		case "skipped", "missed", "blocked":
+			if skipReason == "" {
+				skipPass = remark.Pass
+				skipReason = remark.Reason
+			}
+		}
+	}
+	if skipReason != "" {
+		return "skip", skipPass, skipReason
+	}
+	return "", "", ""
 }
 
 func tier2OptimizerModuleStageName(phase Tier2OptimizerPhase, moduleName string) string {

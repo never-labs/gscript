@@ -65,6 +65,7 @@ type DiagArtifact struct {
 	LoopDiagnostics     []LoopDiagnostic
 	PipelineStages      []PipelineStageTiming
 	ModuleContracts     []Tier2ModuleContract
+	ModuleReasons       []Tier2ModuleReason
 	CompiledCode        []byte         // copy of cf.Code bytes
 	InsnCount           int            // total ARM64 instructions
 	InsnHistogram       map[string]int // class -> count
@@ -102,6 +103,7 @@ func (tm *TieringManager) CompileForDiagnostics(proto *vm.FuncProto) (*DiagArtif
 		LoopDiagnostics:     trace.LoopDiagnostics,
 		PipelineStages:      append([]PipelineStageTiming(nil), trace.PipelineStages...),
 		ModuleContracts:     moduleContractsFromRuns(trace.ModuleRuns),
+		ModuleReasons:       moduleReasonsFromRuns(trace.ModuleRuns),
 		CompileErr:          err,
 	}
 

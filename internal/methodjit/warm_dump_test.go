@@ -182,6 +182,9 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 				Phase:      Tier2PhaseNumeric,
 				ModuleName: "FailingModule",
 				StageName:  "RunTier2Pipeline/numeric/FailingModule",
+				Outcome:    "skip",
+				ReasonPass: "FailingPass",
+				Reason:     "missing input fact",
 				Requires:   analysisFacts(AnalysisFactIntRanges),
 				Provides:   analysisFacts(AnalysisFactInt48Safe),
 			},
@@ -217,11 +220,23 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 		len(got.ModuleContracts[0].Requires) != 1 || got.ModuleContracts[0].Requires[0] != AnalysisFactIntRanges {
 		t.Fatalf("module contracts missing failed module: %+v", got.ModuleContracts)
 	}
+	if len(got.ModuleReasons) != 1 || got.ModuleReasons[0].ModuleName != "FailingModule" ||
+		got.ModuleReasons[0].Outcome != "skip" || got.ModuleReasons[0].Reason != "missing input fact" ||
+		got.Files["module_reasons"] == "" {
+		t.Fatalf("module reasons missing failed module: reasons=%+v files=%+v", got.ModuleReasons, got.Files)
+	}
 	pipelineText, err := os.ReadFile(filepath.Join(outDir, got.Files["pipeline"]))
 	if err != nil {
 		t.Fatalf("read pipeline summary: %v", err)
 	}
 	if !strings.Contains(string(pipelineText), "FailingModule") || !strings.Contains(string(pipelineText), "error=") {
 		t.Fatalf("pipeline summary missing failed module:\n%s", string(pipelineText))
+	}
+	reasonsText, err := os.ReadFile(filepath.Join(outDir, got.Files["module_reasons"]))
+	if err != nil {
+		t.Fatalf("read module reasons: %v", err)
+	}
+	if !strings.Contains(string(reasonsText), "FailingModule: skip") || !strings.Contains(string(reasonsText), "missing input fact") {
+		t.Fatalf("module reasons missing details:\n%s", string(reasonsText))
 	}
 }

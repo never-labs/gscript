@@ -59,6 +59,25 @@ func (r *OptimizationRemarks) List() []OptimizationRemark {
 	return out
 }
 
+func (r *OptimizationRemarks) Len() int {
+	if r == nil {
+		return 0
+	}
+	return len(r.items)
+}
+
+func (r *OptimizationRemarks) Since(start int) []OptimizationRemark {
+	if r == nil || start >= len(r.items) {
+		return nil
+	}
+	if start < 0 {
+		start = 0
+	}
+	out := make([]OptimizationRemark, len(r.items[start:]))
+	copy(out, r.items[start:])
+	return out
+}
+
 func formatOptimizationRemarks(remarks []OptimizationRemark) string {
 	if len(remarks) == 0 {
 		return "(none)\n"
