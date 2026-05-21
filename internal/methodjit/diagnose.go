@@ -103,6 +103,17 @@ func (sc *snapshotCollector) addSnapshotAndTiming(name string, fn *Function, dur
 	sc.timings = append(sc.timings, newPipelineStageTiming(name, duration, nil))
 }
 
+func (sc *snapshotCollector) addModuleRun(run Tier2ModuleRun) {
+	sc.timings = append(sc.timings, newPipelineStageTiming(run.StageName, run.Duration, run.Err))
+	if run.Function == nil {
+		return
+	}
+	sc.snapshots = append(sc.snapshots, Snapshot{
+		Name: run.ModuleName,
+		IR:   Print(run.Function),
+	})
+}
+
 func (sc *snapshotCollector) diff(a, b string) string {
 	irA := sc.findSnapshot(a)
 	irB := sc.findSnapshot(b)
@@ -181,8 +192,8 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	collector.addSnapshot("input", fn)
 	ctx := &Tier2OptimizerContext{
 		InlineMaxSize: 40,
-		SnapshotCallback: func(moduleName string, fn *Function, duration time.Duration) {
-			collector.addSnapshotAndTiming(moduleName, fn, duration)
+		ModuleRunCallback: func(run Tier2ModuleRun) {
+			collector.addModuleRun(run)
 		},
 	}
 

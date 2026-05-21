@@ -7,9 +7,24 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-// Tier2SnapshotCallback is called after each optimizer module runs, for IR dump/snapshot.
-// The duration is the time the module took to execute (non-nil only if module succeeded).
+// Tier2SnapshotCallback is called after each successful optimizer module run,
+// for IR dump/snapshot. New diagnostics that need failure details should use
+// Tier2ModuleRunCallback.
 type Tier2SnapshotCallback func(moduleName string, fn *Function, duration time.Duration)
+
+// Tier2ModuleRun records one optimizer module execution scope.
+type Tier2ModuleRun struct {
+	Phase      Tier2OptimizerPhase
+	ModuleName string
+	StageName  string
+	Function   *Function
+	Duration   time.Duration
+	Err        error
+}
+
+// Tier2ModuleRunCallback is called after each optimizer module run, including
+// failed modules.
+type Tier2ModuleRunCallback func(Tier2ModuleRun)
 
 // Tier2OptimizerPhase names a coarse-grained extension point in the Tier 2
 // optimizer. New native optimizations should enter through a phase module
@@ -86,6 +101,9 @@ type Tier2OptimizerContext struct {
 	// SnapshotCallback is an optional callback invoked after each module for
 	// IR dump/snapshot. The duration is the time the module took to execute.
 	SnapshotCallback Tier2SnapshotCallback
+	// ModuleRunCallback is an optional structured callback invoked after each
+	// module run, including failures.
+	ModuleRunCallback Tier2ModuleRunCallback
 }
 
 // Tier2OptimizerModule is the smallest pluggable optimization unit. Modules
@@ -193,6 +211,7 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		if module.RunWithContext == nil && module.Run == nil {
 			return nil, fmt.Errorf("%s: missing optimizer module runner", module.Name)
 		}
+		stageName := tier2OptimizerModuleStageName(phase, module.Name)
 		start := time.Now()
 		if module.RunWithContext != nil {
 			fn, err = module.RunWithContext(fn, opts, ctx)
@@ -201,8 +220,17 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		}
 		duration := time.Since(start)
 		if opts != nil && opts.OptimizerTimings != nil {
-			name := fmt.Sprintf("RunTier2Pipeline/%s/%s", phase, module.Name)
-			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(name, duration, err))
+			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(stageName, duration, err))
+		}
+		if ctx != nil && ctx.ModuleRunCallback != nil {
+			ctx.ModuleRunCallback(Tier2ModuleRun{
+				Phase:      phase,
+				ModuleName: module.Name,
+				StageName:  stageName,
+				Function:   fn,
+				Duration:   duration,
+				Err:        err,
+			})
 		}
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", module.Name, err)
@@ -215,6 +243,10 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		}
 	}
 	return fn, nil
+}
+
+func tier2OptimizerModuleStageName(phase Tier2OptimizerPhase, moduleName string) string {
+	return fmt.Sprintf("RunTier2Pipeline/%s/%s", phase, moduleName)
 }
 
 func ctxGlobals(ctx *Tier2OptimizerContext) map[string]*vm.FuncProto {

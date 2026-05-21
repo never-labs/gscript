@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,5 +150,54 @@ b := sum(20)
 		!strings.Contains(string(symbols), "ir=") ||
 		!strings.Contains(string(symbols), "bcop=") {
 		t.Fatalf("JIT symbols missing expected metadata:\n%s", string(symbols))
+	}
+}
+
+func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
+	proto := &vm.FuncProto{Name: "failed", NumParams: 1, MaxStack: 2}
+	tm := NewTieringManager()
+	outDir := t.TempDir()
+	if err := tm.EnableWarmDump(outDir, "failed"); err != nil {
+		t.Fatalf("EnableWarmDump: %v", err)
+	}
+	compileErr := errors.New("synthetic compile failure")
+	trace := &Tier2Trace{
+		IRBefore: "before",
+		PipelineStages: []PipelineStageTiming{
+			newNestedPipelineStageTiming("RunTier2Pipeline/numeric/FailingModule", 12, compileErr),
+		},
+	}
+	tm.recordWarmDumpCompile(proto, trace, nil, compileErr)
+	if err := tm.WriteWarmDump(proto); err != nil {
+		t.Fatalf("WriteWarmDump: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "manifest.json"))
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+	var manifest warmDumpManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	if len(manifest.Protos) != 1 {
+		t.Fatalf("manifest protos = %d, want 1", len(manifest.Protos))
+	}
+	got := manifest.Protos[0]
+	if got.Status != "failed" || !got.Failed || got.Compiled {
+		t.Fatalf("unexpected failed status: %+v", got)
+	}
+	if !strings.Contains(got.FailureReason, compileErr.Error()) {
+		t.Fatalf("failure reason = %q, want %q", got.FailureReason, compileErr.Error())
+	}
+	if len(got.PipelineStages) != 1 || got.PipelineStages[0].Name != "RunTier2Pipeline/numeric/FailingModule" || got.PipelineStages[0].Error != compileErr.Error() {
+		t.Fatalf("pipeline stages missing failed module: %+v", got.PipelineStages)
+	}
+	pipelineText, err := os.ReadFile(filepath.Join(outDir, got.Files["pipeline"]))
+	if err != nil {
+		t.Fatalf("read pipeline summary: %v", err)
+	}
+	if !strings.Contains(string(pipelineText), "FailingModule") || !strings.Contains(string(pipelineText), "error=") {
+		t.Fatalf("pipeline summary missing failed module:\n%s", string(pipelineText))
 	}
 }

@@ -1,6 +1,7 @@
 package methodjit
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -121,6 +122,59 @@ func TestTier2OptimizerPlanDeduplicatesFallbackPhases(t *testing.T) {
 		if ran[i] != want[i] {
 			t.Fatalf("ran %v want %v", ran, want)
 		}
+	}
+}
+
+func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
+	wantErr := errors.New("synthetic failure")
+	var runs []Tier2ModuleRun
+	var timings []PipelineStageTiming
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:  "FailingModule",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					return fn, wantErr
+				},
+			},
+		},
+	}
+	ctx := &Tier2OptimizerContext{
+		ModuleRunCallback: func(run Tier2ModuleRun) {
+			runs = append(runs, run)
+		},
+	}
+	_, err := runTier2OptimizerPlan(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{OptimizerTimings: &timings}, ctx, plan)
+	if err == nil {
+		t.Fatal("expected optimizer failure")
+	}
+	if !strings.Contains(err.Error(), "FailingModule") || !strings.Contains(err.Error(), wantErr.Error()) {
+		t.Fatalf("error = %v, want module and cause", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("module runs = %d, want 1", len(runs))
+	}
+	run := runs[0]
+	if run.Phase != Tier2PhaseNumeric || run.ModuleName != "FailingModule" {
+		t.Fatalf("unexpected run scope: %+v", run)
+	}
+	wantStage := "RunTier2Pipeline/numeric/FailingModule"
+	if run.StageName != wantStage {
+		t.Fatalf("stage = %q, want %q", run.StageName, wantStage)
+	}
+	if run.Err == nil || !strings.Contains(run.Err.Error(), wantErr.Error()) {
+		t.Fatalf("run err = %v, want %v", run.Err, wantErr)
+	}
+	if run.Duration < 0 {
+		t.Fatalf("duration = %s, want non-negative", run.Duration)
+	}
+	if len(timings) != 1 {
+		t.Fatalf("timings = %d, want 1", len(timings))
+	}
+	if timings[0].Name != wantStage || timings[0].Error != wantErr.Error() || !timings[0].Nested {
+		t.Fatalf("unexpected timing: %+v", timings[0])
 	}
 }
 
