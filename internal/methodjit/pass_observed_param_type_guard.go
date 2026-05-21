@@ -72,4 +72,4 @@ func paramLoadSlot(fn *Function, instr *Instr) int {
 	return slot
 }
 
-const observedParamTypeGuardMinCount = 4
+const observedParamTypeGuardMinCount = 2

@@ -81,7 +81,7 @@ func f(x) {
 }
 `)
 	proto.ParamTypeFeedback = []vm.ParamTypeFeedbackEntry{
-		{Type: vm.FBFloat, Count: 2}, // below min count of 4
+		{Type: vm.FBFloat, Count: 1}, // below min count of 2
 	}
 	fn := BuildGraph(proto)
 
