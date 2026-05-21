@@ -668,7 +668,14 @@ func tier2LoopCallCalleeCanTierUp(callee *vm.FuncProto, globals map[string]*vm.F
 	}
 	if profile.LoopDepth < 2 {
 		if !profile.HasLoop {
-			return false
+			// Loop-free callees may still promote based on call count
+			// (e.g., simple constructors called millions of times from
+			// a loop). Accept if shouldPromoteTier2 says yes.
+			runtimeCallCount := callee.CallCount
+			if runtimeCallCount < tmDefaultTier2Threshold {
+				runtimeCallCount = tmDefaultTier2Threshold
+			}
+			return shouldPromoteTier2(callee, profile, runtimeCallCount)
 		}
 		return tier2LoopCallCalleePassesLoopDepth1Gate(callee, globals)
 	}
