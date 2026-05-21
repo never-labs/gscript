@@ -601,6 +601,12 @@ func (ts *typeSpecializer) inferType(instr *Instr) Type {
 		}
 		return TypeUnknown
 
+	case OpGetField:
+		if instr.Type != TypeAny && instr.Type != TypeUnknown {
+			return instr.Type
+		}
+		return TypeUnknown
+
 	default:
 		return TypeUnknown
 	}

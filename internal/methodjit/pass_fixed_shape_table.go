@@ -205,10 +205,20 @@ func seedGuardedFixedShapeArrayElementArgFacts(fn *Function, facts map[int]Fixed
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr.Op != OpGetTable || len(instr.Args) < 2 || instr.Args[0] == nil {
+			var tableDef *Instr
+			switch instr.Op {
+			case OpGetTable:
+				if len(instr.Args) < 2 || instr.Args[0] == nil {
+					continue
+				}
+				tableDef = instr.Args[0].Def
+			case OpTableArrayLoad:
+				if tv, ok := loweredTableArrayLoadTableValue(instr); ok {
+					tableDef = tv.Def
+				}
+			default:
 				continue
 			}
-			tableDef := instr.Args[0].Def
 			if tableDef == nil || tableDef.Op != OpLoadSlot || tableDef.Aux < 0 || int(tableDef.Aux) >= fn.Proto.NumParams {
 				continue
 			}
@@ -220,7 +230,7 @@ func seedGuardedFixedShapeArrayElementArgFacts(fn *Function, facts map[int]Fixed
 			if instr.Type == TypeAny || instr.Type == TypeUnknown {
 				instr.Type = TypeTable
 			}
-			if tableKeyProvenInt(instr.Args[1]) && instr.Aux2 == 0 {
+			if instr.Op == OpGetTable && tableKeyProvenInt(instr.Args[1]) && instr.Aux2 == 0 {
 				instr.Aux2 = int64(vm.FBKindMixed)
 			}
 			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
@@ -294,33 +304,39 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedS
 	valueFacts := make(map[int][]FixedShapeTableFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
+			var tableDef *Instr
 			switch instr.Op {
 			case OpGetTable:
 				if len(instr.Args) < 2 || instr.Args[0] == nil {
 					continue
 				}
-				tableDef := instr.Args[0].Def
-				if tableDef == nil || tableDef.Op != OpLoadSlot || tableDef.Aux < 0 || int(tableDef.Aux) >= fn.Proto.NumParams {
-					continue
+				tableDef = instr.Args[0].Def
+			case OpTableArrayLoad:
+				if tv, ok := loweredTableArrayLoadTableValue(instr); ok {
+					tableDef = tv.Def
 				}
+			default:
+				tableDef = nil
+			}
+			if tableDef != nil && tableDef.Op == OpLoadSlot && tableDef.Aux >= 0 && int(tableDef.Aux) < fn.Proto.NumParams {
 				poly := guardedFixedShapePolyFacts(argFacts[int(tableDef.Aux)])
-				if len(poly) == 0 {
-					continue
+				if len(poly) > 0 {
+					valueFacts[instr.ID] = poly
+					if fn.Analysis.FieldPolyShapeReceivers == nil {
+						fn.Analysis.FieldPolyShapeReceivers = make(map[int]bool)
+					}
+					fn.Analysis.FieldPolyShapeReceivers[instr.ID] = true
+					if instr.Type == TypeAny || instr.Type == TypeUnknown {
+						instr.Type = TypeTable
+					}
+					if instr.Op == OpGetTable && tableKeyProvenInt(instr.Args[1]) && instr.Aux2 == 0 {
+						instr.Aux2 = int64(vm.FBKindMixed)
+					}
+					functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+						fmt.Sprintf("parameter %d array element carries %d guarded polymorphic shapes", tableDef.Aux, len(poly)))
 				}
-				valueFacts[instr.ID] = poly
-				if fn.Analysis.FieldPolyShapeReceivers == nil {
-					fn.Analysis.FieldPolyShapeReceivers = make(map[int]bool)
-				}
-				fn.Analysis.FieldPolyShapeReceivers[instr.ID] = true
-				if instr.Type == TypeAny || instr.Type == TypeUnknown {
-					instr.Type = TypeTable
-				}
-				if tableKeyProvenInt(instr.Args[1]) && instr.Aux2 == 0 {
-					instr.Aux2 = int64(vm.FBKindMixed)
-				}
-				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
-					fmt.Sprintf("parameter %d array element carries %d guarded polymorphic shapes", tableDef.Aux, len(poly)))
-			case OpGetField, OpGetFieldNumToFloat:
+			}
+			if instr.Op == OpGetField || instr.Op == OpGetFieldNumToFloat {
 				if len(instr.Args) == 0 || instr.Args[0] == nil {
 					continue
 				}
