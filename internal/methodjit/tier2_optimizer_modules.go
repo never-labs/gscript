@@ -98,7 +98,7 @@ type Tier2OptimizerContext struct {
 type Tier2OptimizerModule struct {
 	Name           string
 	Phase          Tier2OptimizerPhase
-	Order          int    // reserved for stable intra-phase ordering (future use)
+	Order          int      // reserved for stable intra-phase ordering (future use)
 	Requires       []string // Facts this module needs to be already computed
 	Provides       []string // Facts this module computes
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
@@ -127,11 +127,21 @@ func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provi
 	}
 }
 
-// Tier2OptimizerPlan is the fully constructed optimization plan: an ordered
-// list of phases and the modules that belong to each phase.
-type Tier2OptimizerPlan struct {
-	Phases  []Tier2OptimizerPhase
+// Tier2OptimizerPhaseGroup is a stable execution unit in the optimizer plan.
+// Builders may contribute modules to the same phase; the phase itself must
+// still execute once.
+type Tier2OptimizerPhaseGroup struct {
+	Phase   Tier2OptimizerPhase
 	Modules []Tier2OptimizerModule
+}
+
+// Tier2OptimizerPlan is the fully constructed optimization plan. PhaseGroups
+// is the canonical execution shape; Phases and Modules are retained as flat
+// views for tests, diagnostics, and compatibility with older helpers.
+type Tier2OptimizerPlan struct {
+	Phases      []Tier2OptimizerPhase
+	Modules     []Tier2OptimizerModule
+	PhaseGroups []Tier2OptimizerPhaseGroup
 }
 
 func newTier2OptimizerPlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
@@ -143,13 +153,35 @@ func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2Opti
 		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
 	}
 	var err error
-	for _, phase := range plan.Phases {
-		fn, err = runTier2OptimizerModulesWithContext(fn, opts, ctx, phase, plan.Modules)
+	for _, group := range plan.phaseGroups() {
+		fn, err = runTier2OptimizerModulesWithContext(fn, opts, ctx, group.Phase, group.Modules)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return fn, nil
+}
+
+func (plan Tier2OptimizerPlan) phaseGroups() []Tier2OptimizerPhaseGroup {
+	if len(plan.PhaseGroups) > 0 {
+		return plan.PhaseGroups
+	}
+	groups := make([]Tier2OptimizerPhaseGroup, 0, len(plan.Phases))
+	seen := make(map[Tier2OptimizerPhase]bool, len(plan.Phases))
+	for _, phase := range plan.Phases {
+		if seen[phase] {
+			continue
+		}
+		seen[phase] = true
+		group := Tier2OptimizerPhaseGroup{Phase: phase}
+		for _, module := range plan.Modules {
+			if module.Phase == phase {
+				group.Modules = append(group.Modules, module)
+			}
+		}
+		groups = append(groups, group)
+	}
+	return groups
 }
 
 func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext, phase Tier2OptimizerPhase, modules []Tier2OptimizerModule) (*Function, error) {

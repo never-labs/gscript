@@ -43,12 +43,25 @@ func BuildModulePlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
 
 	phases := make([]Tier2OptimizerPhase, 0, len(sorted))
 	var modules []Tier2OptimizerModule
+	groupIndex := make(map[Tier2OptimizerPhase]int, len(sorted))
+	var groups []Tier2OptimizerPhaseGroup
 	for _, entry := range sorted {
-		phases = append(phases, entry.phase)
-		modules = append(modules, entry.builder(ctx)...)
+		built := entry.builder(ctx)
+		if idx, ok := groupIndex[entry.phase]; ok {
+			groups[idx].Modules = append(groups[idx].Modules, built...)
+		} else {
+			groupIndex[entry.phase] = len(groups)
+			phases = append(phases, entry.phase)
+			groups = append(groups, Tier2OptimizerPhaseGroup{
+				Phase:   entry.phase,
+				Modules: built,
+			})
+		}
+		modules = append(modules, built...)
 	}
 	return Tier2OptimizerPlan{
-		Phases:  phases,
-		Modules: modules,
+		Phases:      phases,
+		Modules:     modules,
+		PhaseGroups: groups,
 	}
 }

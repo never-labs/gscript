@@ -29,20 +29,16 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 
 	// Second pass: verify that all required facts are available before each module runs
 	available := make(map[string]bool)
-	for _, phase := range plan.Phases {
-		for _, module := range plan.Modules {
-			if module.Phase != phase {
-				continue
-			}
-
+	for _, group := range plan.phaseGroups() {
+		for _, module := range group.Modules {
 			// Check that all required facts are available
 			for _, required := range module.Requires {
 				if !available[required] {
 					provider, ok := provided[required]
 					if !ok {
-						return fmt.Errorf("%s/%s requires fact %s which is never provided", phase, module.Name, required)
+						return fmt.Errorf("%s/%s requires fact %s which is never provided", group.Phase, module.Name, required)
 					}
-					return fmt.Errorf("%s/%s requires fact %s which is provided by %s (but not yet available)", phase, module.Name, required, provider)
+					return fmt.Errorf("%s/%s requires fact %s which is provided by %s (but not yet available)", group.Phase, module.Name, required, provider)
 				}
 			}
 

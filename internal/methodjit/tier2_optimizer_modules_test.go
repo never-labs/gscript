@@ -92,6 +92,38 @@ func TestTier2OptimizerPlanCoversModulePhases(t *testing.T) {
 	}
 }
 
+func TestTier2OptimizerPlanDeduplicatesFallbackPhases(t *testing.T) {
+	var ran []string
+	makeModule := func(name string) Tier2OptimizerModule {
+		return Tier2OptimizerModule{
+			Name:  name,
+			Phase: Tier2PhaseNumeric,
+			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+				ran = append(ran, name)
+				return fn, nil
+			},
+		}
+	}
+	plan := Tier2OptimizerPlan{
+		Phases:  []Tier2OptimizerPhase{Tier2PhaseNumeric, Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{makeModule("first"), makeModule("second")},
+	}
+
+	_, err := runTier2OptimizerPlan(&Function{Analysis: NewAnalysisResult()}, nil, nil, plan)
+	if err != nil {
+		t.Fatalf("runTier2OptimizerPlan failed: %v", err)
+	}
+	want := []string{"first", "second"}
+	if len(ran) != len(want) {
+		t.Fatalf("ran %v want %v", ran, want)
+	}
+	for i := range want {
+		if ran[i] != want[i] {
+			t.Fatalf("ran %v want %v", ran, want)
+		}
+	}
+}
+
 func TestTier2EarlyCanonicalModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2EarlyCanonicalModules(nil), Tier2PhaseEarlyCanonical, []string{
 		"SimplifyPhis",
@@ -147,7 +179,7 @@ func TestTier2NumericModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2NumericModules(), Tier2PhaseNumeric, []string{
 		"LoopBoundRangeGuard",
 		"ObservedParamRangeGuard",
-			"ObservedParamTypeGuard",
+		"ObservedParamTypeGuard",
 		"ExactGuardConst",
 		"ConstProp (post-ExactGuardConst)",
 		"RangeAnalysis",

@@ -24,6 +24,13 @@ var stdStringSplitIdentity byte
 var stdStringSubIdentity byte
 var stdToNumberIdentity byte
 
+type compiledLuaPatternCacheEntry struct {
+	prog luaPatternProgram
+	re   *regexp.Regexp
+}
+
+var compiledLuaPatternCache sync.Map
+
 // NativeStringFormatIntCacheSize is the direct-mapped entry count used by the
 // Tier 2 native string.format(pattern, int) path.
 const NativeStringFormatIntCacheSize = 8192
@@ -217,6 +224,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		return result, nil
 	})
+	if v := t.RawGetString("byte"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = stringByte1Value
+		gf.FastArg2 = stringByte2Value
+	}
 
 	// string.char(i...) -> string
 	set("char", func(args []Value) ([]Value, error) {
@@ -281,8 +293,7 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			end := loc[1] + init - 1
 			return []Value{IntValue(int64(start)), IntValue(int64(end))}, nil
 		}
-		prog := compileLuaPattern(pattern)
-		re, err := regexp.Compile(prog.regex)
+		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
@@ -304,7 +315,6 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		return result, nil
 	})
-
 	// string.match(s, pattern [, init]) -> captures...
 	set("match", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
@@ -337,8 +347,7 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			}
 			return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 		}
-		prog := compileLuaPattern(pattern)
-		re, err := regexp.Compile(prog.regex)
+		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
@@ -362,7 +371,6 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		return result, nil
 	})
-
 	// string.gmatch(s, pattern [, init]) -> iterator
 	set("gmatch", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
@@ -410,8 +418,7 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			}
 			return []Value{FunctionValue(iter)}, nil
 		}
-		prog := compileLuaPattern(pattern)
-		re, err := regexp.Compile(prog.regex)
+		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
@@ -490,8 +497,7 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			return []Value{StringValue(result), IntValue(int64(count))}, nil
 		}
 
-		prog := compileLuaPattern(pattern)
-		re, err := regexp.Compile(prog.regex)
+		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
 		}
@@ -977,6 +983,32 @@ func stringSub3Value(sv, iv, jv Value) (Value, error) {
 		return StringValue(""), nil
 	}
 	return StringValue(s[i-1 : j]), nil
+}
+
+func stringByte1Value(sv Value) (Value, error) {
+	if !sv.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
+	}
+	s := sv.Str()
+	if len(s) == 0 {
+		return NilValue(), nil
+	}
+	return IntValue(int64(s[0])), nil
+}
+
+func stringByte2Value(sv, iv Value) (Value, error) {
+	if !sv.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
+	}
+	s := sv.Str()
+	i := int(toInt(iv))
+	if i < 0 {
+		i = len(s) + i + 1
+	}
+	if i < 1 || i > len(s) {
+		return NilValue(), nil
+	}
+	return IntValue(int64(s[i-1])), nil
 }
 
 func stringSplitValue(args []Value) (Value, error) {
@@ -2185,6 +2217,22 @@ func luaPatternToRegex(pattern string) string {
 func luaPatternToRegexWithCaptures(pattern string) (string, []luaPatternCaptureKind) {
 	prog := compileLuaPattern(pattern)
 	return prog.regex, prog.captureKinds
+}
+
+func cachedLuaPatternRegexp(pattern string) (luaPatternProgram, *regexp.Regexp, error) {
+	if cached, ok := compiledLuaPatternCache.Load(pattern); ok {
+		entry := cached.(compiledLuaPatternCacheEntry)
+		return entry.prog, entry.re, nil
+	}
+	prog := compileLuaPattern(pattern)
+	re, err := regexp.Compile(prog.regex)
+	if err != nil {
+		return luaPatternProgram{}, nil, err
+	}
+	entry := compiledLuaPatternCacheEntry{prog: prog, re: re}
+	actual, _ := compiledLuaPatternCache.LoadOrStore(pattern, entry)
+	entry = actual.(compiledLuaPatternCacheEntry)
+	return entry.prog, entry.re, nil
 }
 
 func compileLuaPattern(pattern string) luaPatternProgram {
