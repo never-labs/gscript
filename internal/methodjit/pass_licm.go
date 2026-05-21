@@ -202,8 +202,6 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 	setGlobals := make(map[int64]bool) // Aux (constant pool index) of in-loop SetGlobal
 	setUpvals := make(map[upvalueKey]bool)
 	var loopCalls []*Instr
-	hasEffectfulLoopCall := false
-	callOnlyCreates := true // tracks whether all loop calls only create objects
 	for _, b := range bodyList {
 		for _, instr := range b.Instrs {
 			switch instr.Op {
@@ -249,21 +247,13 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			case OpCall:
 				if !isPureLoopInvariantCall(fn, instr) {
 					loopCalls = append(loopCalls, instr)
-					hasEffectfulLoopCall = true
-					if !licmCallOnlyCreates(fn, instr) {
-						callOnlyCreates = false
 					}
-				}
 			case OpResume:
 				if !isPureNumericLoopCall(fn, instr) {
 					loopCalls = append(loopCalls, instr)
-					hasEffectfulLoopCall = true
-					callOnlyCreates = false
-				}
+					}
 			case OpSelf:
 				loopCalls = append(loopCalls, instr)
-				hasEffectfulLoopCall = true
-				callOnlyCreates = false
 			}
 		}
 	}
@@ -422,7 +412,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// GetGlobal and guarded global constants require no in-loop
 			// SetGlobal on same name and no calls.
 			if instr.Op == OpGetGlobal || instr.Op == OpGuardGlobalConst {
-				if hasEffectfulLoopCall && !callOnlyCreates {
+				if licmLoopCallMayMutateGlobals(fn, loopCalls) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate globals")
 					continue
@@ -434,7 +424,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 				}
 			}
 			if instr.Op == OpGetUpval {
-				if hasEffectfulLoopCall {
+				if licmLoopCallMayMutateUpvalues(fn, loopCalls) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate upvalues")
 					continue
@@ -703,43 +693,48 @@ func isPureLoopInvariantCall(fn *Function, call *Instr) bool {
 	return pureNumericInlineRejectReason(calleeFn) == ""
 }
 
-// licmCallOnlyCreates returns true if the call only creates objects (tables,
-// closures) without modifying globals, upvalues, or existing table fields.
-// This allows LICM to hoist GetGlobal past such calls since they don't mutate
-// observable global state.
-func licmCallOnlyCreates(fn *Function, call *Instr) bool {
-	if fn == nil || call == nil || call.Op != OpCall {
-		return false
-	}
-	if !callABIHasExactResultShape(fn, call, 1) {
-		return false
-	}
-	globals := callABIMergeGlobals(fn.Analysis.Globals, callABIStableGlobals(fn.Proto))
-	if len(globals) == 0 {
-		return false
-	}
-	_, callee := resolveCallee(call, fn, InlineConfig{Globals: globals})
-	if callee == nil {
-		return false
-	}
-	calleeFn := BuildGraph(callee)
-	if calleeFn == nil {
-		return false
-	}
-	for _, block := range calleeFn.Blocks {
-		for _, instr := range block.Instrs {
-			if instr == nil {
-				continue
-			}
-			switch instr.Op {
-			case OpSetGlobal, OpSetField, OpFieldStore, OpSetTable,
-				OpTableArrayStore, OpTableArraySwap, OpAppend, OpSetList,
-				OpSetUpval:
-				return false
+// licmLoopCallMayMutateGlobals returns true if any loop call's callee may
+// write to globals (has SetGlobal bytecode ops). Uses NoGlobalOps flag from
+// callee proto analysis.
+func licmLoopCallMayMutateGlobals(fn *Function, loopCalls []*Instr) bool {
+	for _, call := range loopCalls {
+		if call == nil {
+			continue
+		}
+		callees := licmCallCalleeProtos(fn, call)
+		if len(callees) == 0 {
+			return true // conservative: can't resolve callee
+		}
+		for _, callee := range callees {
+			if callee == nil || !callee.NoGlobalOps {
+				return true
 			}
 		}
 	}
-	return true
+	return false
+}
+
+// licmLoopCallMayMutateUpvalues returns true if any loop call's callee may
+// write to upvalues. A callee that captures no upvalues cannot mutate them.
+func licmLoopCallMayMutateUpvalues(fn *Function, loopCalls []*Instr) bool {
+	for _, call := range loopCalls {
+		if call == nil {
+			continue
+		}
+		callees := licmCallCalleeProtos(fn, call)
+		if len(callees) == 0 {
+			return true // conservative: can't resolve callee
+		}
+		for _, callee := range callees {
+			if callee == nil {
+				return true
+			}
+			if len(callee.Upvalues) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // sameValue returns true when every non-nil Value in args refers to the

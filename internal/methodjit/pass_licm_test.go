@@ -1475,3 +1475,111 @@ func TestLICM_GuardTypeHoist(t *testing.T) {
 			"got b1.Preds=%v, block=B%d", blockIDs(b1.Preds), gfBlock.ID)
 	}
 }
+
+func TestLICM_HoistGetGlobal_AcrossNoGlobalOpsCall(t *testing.T) {
+	fn := &Function{
+		NumRegs: 8,
+		Proto: &vm.FuncProto{
+			Name:      "test",
+			Constants: []runtime.Value{runtime.StringValue("g"), runtime.StringValue("helper")},
+		},
+		Analysis: &AnalysisResult{
+			Globals: map[string]*vm.FuncProto{
+				"helper": {Name: "helper", NoGlobalOps: true},
+			},
+		},
+	}
+	b0, b1, b2, b3 := buildSimpleLoop(fn)
+
+	helper := &Instr{ID: fn.newValueID(), Op: OpGetGlobal, Type: TypeFunction, Block: b0, Aux: 1}
+	b0Term := &Instr{ID: fn.newValueID(), Op: OpJump, Type: TypeUnknown, Block: b0, Aux: int64(b1.ID)}
+	b0.Instrs = []*Instr{helper, b0Term}
+
+	phi := &Instr{ID: fn.newValueID(), Op: OpPhi, Type: TypeInt, Block: b1}
+	cond := &Instr{ID: fn.newValueID(), Op: OpConstBool, Type: TypeBool, Block: b1, Aux: 1}
+	b1Term := &Instr{ID: fn.newValueID(), Op: OpBranch, Type: TypeUnknown, Block: b1,
+		Args: []*Value{cond.Value()}, Aux: int64(b2.ID), Aux2: int64(b3.ID)}
+	b1.Instrs = []*Instr{phi, cond, b1Term}
+
+	// GetGlobal in loop body — should be hoisted because call's callee has NoGlobalOps
+	gg := &Instr{ID: fn.newValueID(), Op: OpGetGlobal, Type: TypeAny, Block: b2, Aux: 0}
+	call := &Instr{ID: fn.newValueID(), Op: OpCall, Type: TypeAny, Block: b2,
+		Args: []*Value{helper.Value()}, Aux2: 1}
+	b2Term := &Instr{ID: fn.newValueID(), Op: OpJump, Type: TypeUnknown, Block: b2, Aux: int64(b1.ID)}
+	b2.Instrs = []*Instr{gg, call, b2Term}
+
+	phi.Args = []*Value{gg.Value(), gg.Value()}
+	b3.Instrs = []*Instr{
+		&Instr{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Block: b3,
+			Args: []*Value{phi.Value()}},
+	}
+
+	assertValidates(t, fn, "input")
+	ggID := gg.ID
+	_, err := LICMPass(fn)
+	if err != nil {
+		t.Fatalf("LICMPass: %v", err)
+	}
+	assertValidates(t, fn, "after LICM")
+	// GetGlobal should be hoisted out of b2 since call's callee has NoGlobalOps
+	for _, instr := range b2.Instrs {
+		if instr.ID == ggID {
+			t.Fatalf("GetGlobal v%d should have been hoisted across NoGlobalOps call:\n%s", ggID, Print(fn))
+		}
+	}
+}
+
+func TestLICM_HoistGetUpval_AcrossNoUpvalueCall(t *testing.T) {
+	fn := &Function{
+		NumRegs: 8,
+		Proto: &vm.FuncProto{
+			Name:      "test",
+			Constants: []runtime.Value{runtime.StringValue("helper")},
+		},
+		Analysis: &AnalysisResult{
+			Globals: map[string]*vm.FuncProto{
+				"helper": {Name: "helper", NoGlobalOps: true},
+			},
+		},
+	}
+	b0, b1, b2, b3 := buildSimpleLoop(fn)
+
+	helper := &Instr{ID: fn.newValueID(), Op: OpGetGlobal, Type: TypeFunction, Block: b0, Aux: 0}
+	closure := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeAny, Block: b0, Aux: 0}
+	b0Term := &Instr{ID: fn.newValueID(), Op: OpJump, Type: TypeUnknown, Block: b0, Aux: int64(b1.ID)}
+	b0.Instrs = []*Instr{helper, closure, b0Term}
+
+	phi := &Instr{ID: fn.newValueID(), Op: OpPhi, Type: TypeInt, Block: b1}
+	cond := &Instr{ID: fn.newValueID(), Op: OpConstBool, Type: TypeBool, Block: b1, Aux: 1}
+	b1Term := &Instr{ID: fn.newValueID(), Op: OpBranch, Type: TypeUnknown, Block: b1,
+		Args: []*Value{cond.Value()}, Aux: int64(b2.ID), Aux2: int64(b3.ID)}
+	b1.Instrs = []*Instr{phi, cond, b1Term}
+
+	// GetUpval in loop body — should be hoisted because call's callee has no upvalues
+	gu := &Instr{ID: fn.newValueID(), Op: OpGetUpval, Type: TypeAny, Block: b2,
+		Args: []*Value{closure.Value()}, Aux: 0}
+	call := &Instr{ID: fn.newValueID(), Op: OpCall, Type: TypeAny, Block: b2,
+		Args: []*Value{helper.Value()}, Aux2: 1}
+	b2Term := &Instr{ID: fn.newValueID(), Op: OpJump, Type: TypeUnknown, Block: b2, Aux: int64(b1.ID)}
+	b2.Instrs = []*Instr{gu, call, b2Term}
+
+	phi.Args = []*Value{gu.Value(), gu.Value()}
+	b3.Instrs = []*Instr{
+		&Instr{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Block: b3,
+			Args: []*Value{phi.Value()}},
+	}
+
+	assertValidates(t, fn, "input")
+	guID := gu.ID
+	_, err := LICMPass(fn)
+	if err != nil {
+		t.Fatalf("LICMPass: %v", err)
+	}
+	assertValidates(t, fn, "after LICM")
+	// GetUpval should be hoisted out of b2 since call's callee has no upvalues
+	for _, instr := range b2.Instrs {
+		if instr.ID == guID {
+			t.Fatalf("GetUpval v%d should have been hoisted across no-upvalue call:\n%s", guID, Print(fn))
+		}
+	}
+}
