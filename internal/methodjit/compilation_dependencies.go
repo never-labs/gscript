@@ -116,7 +116,7 @@ func (r *CompilationDependencyRegistry) CommitOrValidate(ctx CompilationDependen
 	}
 	if committer != nil {
 		if err := committer.CommitCompilationDependencies(r.Dependencies()); err != nil {
-			return err
+			return fmt.Errorf("commit compilation dependencies: %w", err)
 		}
 	}
 	r.sealed = true

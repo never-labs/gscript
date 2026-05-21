@@ -208,6 +208,7 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 	var inlineGlobals map[string]*vm.FuncProto
 	var loopCallGlobals map[string]*vm.FuncProto
 	var opts *Tier2PipelineOpts
+	dependencyRegistry := NewCompilationDependencyRegistry()
 	var optimizerTimings []PipelineStageTiming
 	optimizerTimingsFlushed := false
 	flushOptimizerTimings := func() {
@@ -278,6 +279,8 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 			FixedShapeEntryGuards:           true,
 			ForceBoxIntIDs:                  tm.forcedBoxTier2IntValues(proto),
 			Remarks:                         remarks,
+			DependencyRegistry:              dependencyRegistry,
+			DependencyContext:               CompilationDependencyContext{Globals: tm.callVM},
 		}
 		if trace != nil {
 			opts.OptimizerTimings = &optimizerTimings

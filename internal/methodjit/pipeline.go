@@ -85,6 +85,9 @@ type Tier2PipelineOpts struct {
 	ForceBoxIntIDs                  map[int]bool                   // IR value IDs forced out of raw-int after overflow feedback
 	Remarks                         *OptimizationRemarks           // optional structured optimization diagnostics
 	OptimizerTimings                *[]PipelineStageTiming         // optional per-module compile diagnostics
+	DependencyRegistry              *CompilationDependencyRegistry // optional dependency recorder for compile-time assumptions
+	DependencyContext               CompilationDependencyContext   // validation-time state for dependency commit
+	DependencyCommitter             CompilationDependencyCommitter // optional dependency publication hook
 	LastPassChanged                 bool                           // scratch flag for adjacent optimizer modules
 }
 
@@ -102,6 +105,10 @@ type Tier2PipelineOpts struct {
 //
 // If opts is nil, defaults are used (MaxSize: 40, no globals).
 func RunTier2Pipeline(fn *Function, opts *Tier2PipelineOpts) (*Function, []string, error) {
+	return runTier2PipelineWithPlan(fn, opts, newTier2OptimizerPlan)
+}
+
+func runTier2PipelineWithPlan(fn *Function, opts *Tier2PipelineOpts, buildPlan func(*Tier2OptimizerContext) Tier2OptimizerPlan) (*Function, []string, error) {
 	var err error
 	if opts != nil && opts.Remarks != nil {
 		fn.Remarks = opts.Remarks
@@ -122,17 +129,58 @@ func RunTier2Pipeline(fn *Function, opts *Tier2PipelineOpts) (*Function, []strin
 		protocolGlobals = opts.ProtocolGlobals
 	}
 
-	ctx := newTier2OptimizerContext(NewTier2PipelineData())
+	data := NewTier2PipelineData()
+	if reg := optsDependencyRegistry(opts); reg != nil {
+		data.CompilationDependencies = reg
+	}
+	ctx := newTier2OptimizerContext(data)
 	ctx.Globals = globals
 	ctx.ProtocolGlobals = protocolGlobals
 	ctx.InlineMaxSize = maxSize
+	ctx.DependencyRegistry = data.CompilationDependencies
 
-	fn, err = runTier2OptimizerPlan(fn, opts, ctx, newTier2OptimizerPlan(ctx))
+	if buildPlan == nil {
+		buildPlan = newTier2OptimizerPlan
+	}
+	fn, err = runTier2OptimizerPlan(fn, opts, ctx, buildPlan(ctx))
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := commitTier2PipelineDependencies(opts, ctx); err != nil {
 		return nil, nil, err
 	}
 
 	return fn, ctx.IntrinsicNotes, nil
+}
+
+func optsDependencyRegistry(opts *Tier2PipelineOpts) *CompilationDependencyRegistry {
+	if opts == nil {
+		return nil
+	}
+	return opts.DependencyRegistry
+}
+
+func commitTier2PipelineDependencies(opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) error {
+	registry := optsDependencyRegistry(opts)
+	if registry == nil && ctx != nil {
+		registry = ctx.DependencyRegistry
+	}
+	if registry == nil && ctx != nil && ctx.PipelineData != nil {
+		registry = ctx.PipelineData.CompilationDependencies
+	}
+	if registry == nil {
+		return nil
+	}
+	var depCtx CompilationDependencyContext
+	var committer CompilationDependencyCommitter
+	if opts != nil {
+		depCtx = opts.DependencyContext
+		committer = opts.DependencyCommitter
+	}
+	if err := registry.CommitOrValidate(depCtx, committer); err != nil {
+		return fmt.Errorf("tier2 dependency validation: %w", err)
+	}
+	return nil
 }
 
 func optsFixedShapeArgFacts(opts *Tier2PipelineOpts) map[int]FixedShapeTableFact {

@@ -132,6 +132,9 @@ type Tier2OptimizerContext struct {
 	// ModuleRunCallback is an optional structured callback invoked after each
 	// module run, including failures.
 	ModuleRunCallback Tier2ModuleRunCallback
+	// DependencyRegistry records compile-time assumptions made by optimizer
+	// modules and validated before the optimized function leaves the pipeline.
+	DependencyRegistry *CompilationDependencyRegistry
 }
 
 func newTier2OptimizerContext(data *Tier2PipelineData) *Tier2OptimizerContext {
@@ -352,4 +355,11 @@ func ctxInlineMaxSize(ctx *Tier2OptimizerContext) int {
 		return 40
 	}
 	return ctx.InlineMaxSize
+}
+
+func ctxDependencyRegistry(ctx *Tier2OptimizerContext) *CompilationDependencyRegistry {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.DependencyRegistry
 }

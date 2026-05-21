@@ -170,3 +170,93 @@ func TestCompilationDependencyRegistryCallABIValidationFails(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestRunTier2PipelineCommitsEmptyDependencyRegistry(t *testing.T) {
+	reg := NewCompilationDependencyRegistry()
+	committer := &recordingDependencyCommitter{}
+
+	_, _, err := runTier2PipelineWithPlan(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{
+		DependencyRegistry:  reg,
+		DependencyCommitter: committer,
+	}, func(*Tier2OptimizerContext) Tier2OptimizerPlan {
+		return Tier2OptimizerPlan{}
+	})
+	if err != nil {
+		t.Fatalf("runTier2PipelineWithPlan failed: %v", err)
+	}
+	if got := len(committer.records); got != 0 {
+		t.Fatalf("committed records = %d, want 0", got)
+	}
+	if reg.RecordNoMetatable(runtime.NewTable()) {
+		t.Fatalf("registry should be sealed after pipeline dependency commit")
+	}
+}
+
+func TestRunTier2PipelineCommitsDependencyRecordedByModule(t *testing.T) {
+	tbl := runtime.NewTable()
+	reg := NewCompilationDependencyRegistry()
+	committer := &recordingDependencyCommitter{}
+
+	_, _, err := runTier2PipelineWithPlan(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{
+		DependencyRegistry:  reg,
+		DependencyCommitter: committer,
+	}, func(*Tier2OptimizerContext) Tier2OptimizerPlan {
+		return Tier2OptimizerPlan{
+			PhaseGroups: []Tier2OptimizerPhaseGroup{{
+				Phase: Tier2PhaseEarlyCanonical,
+				Modules: []Tier2OptimizerModule{{
+					Name:  "RecordTestDependency",
+					Phase: Tier2PhaseEarlyCanonical,
+					RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+						if ctxDependencyRegistry(ctx) != reg {
+							t.Fatalf("context dependency registry was not propagated")
+						}
+						ctxDependencyRegistry(ctx).RecordNoMetatable(tbl)
+						return fn, nil
+					},
+				}},
+			}},
+		}
+	})
+	if err != nil {
+		t.Fatalf("runTier2PipelineWithPlan failed: %v", err)
+	}
+	if got, want := len(committer.records), 1; got != want {
+		t.Fatalf("committed records = %d, want %d", got, want)
+	}
+	if committer.records[0].Kind() != CompilationDependencyMetatable {
+		t.Fatalf("committed dependency kind = %s, want %s", committer.records[0].Kind(), CompilationDependencyMetatable)
+	}
+}
+
+func TestRunTier2PipelineDependencyValidationFailureIsClear(t *testing.T) {
+	tbl := runtime.NewTable()
+	reg := NewCompilationDependencyRegistry()
+
+	_, _, err := runTier2PipelineWithPlan(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{
+		DependencyRegistry: reg,
+	}, func(*Tier2OptimizerContext) Tier2OptimizerPlan {
+		return Tier2OptimizerPlan{
+			PhaseGroups: []Tier2OptimizerPhaseGroup{{
+				Phase: Tier2PhaseEarlyCanonical,
+				Modules: []Tier2OptimizerModule{{
+					Name:  "RecordInvalidTestDependency",
+					Phase: Tier2PhaseEarlyCanonical,
+					RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+						ctxDependencyRegistry(ctx).RecordNoMetatable(tbl)
+						tbl.SetMetatable(runtime.NewTable())
+						return fn, nil
+					},
+				}},
+			}},
+		}
+	})
+	if err == nil {
+		t.Fatalf("expected dependency validation failure")
+	}
+	if !strings.Contains(err.Error(), "tier2 dependency validation") ||
+		!strings.Contains(err.Error(), "metatable dependency") ||
+		!strings.Contains(err.Error(), "gained metatable") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
