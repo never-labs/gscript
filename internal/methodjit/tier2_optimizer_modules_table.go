@@ -22,7 +22,7 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 			Name:     "FixedShapeTableFacts",
 			Phase:    Tier2PhaseTableObjectPrep,
 			Requires: nil,
-			Provides: nil, // Updates existing facts
+			Updates:  fixedShapeTableFacts(),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
 					Globals:               globals,
@@ -76,7 +76,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 			Name:     "FixedShapeTableFacts (post-FieldSvalsLower)",
 			Phase:    Tier2PhaseTableFieldLower,
 			Requires: nil,
-			Provides: nil, // Updates existing facts
+			Updates:  fixedShapeTableFacts(),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
 					Globals:               globals,
@@ -99,7 +99,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModuleWith("ShapeFieldTypeGuard", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactShapeFieldTypeElided), ShapeFieldTypeGuardPass),
 		tier2PassModuleWith("LateModuloMultiplyOverflowBoxing", Tier2PhaseTableFieldLower, nil, nil, LateModuloMultiplyOverflowBoxingPass),
 		tier2PassModuleWith("ProfiledStringLenFold", Tier2PhaseTableFieldLower, nil, nil, ProfiledStringLenFoldPass),
-		tier2PassModuleWith("RangeAnalysis (post-TableFieldLower)", Tier2PhaseTableFieldLower, nil, rangeAnalysisFacts(), RangeAnalysisPass),
+		tier2PassModuleWithUpdates("RangeAnalysis (post-TableFieldLower)", Tier2PhaseTableFieldLower, nil, rangeAnalysisFacts(), RangeAnalysisPass),
 		tier2PassModuleWith("TableArrayStaticBounds", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
 		tier2PassModuleWith("DCE (post-TableArrayStoreLower)", Tier2PhaseTableFieldLower, nil, nil, DCEPass),
 	}

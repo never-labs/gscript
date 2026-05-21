@@ -173,6 +173,7 @@ type Tier2OptimizerModule struct {
 	Order          int            // optional stable intra-phase order; zero leaves the module unordered
 	Requires       []AnalysisFact // Facts this module needs to be already computed
 	Provides       []AnalysisFact // Facts this module computes
+	Updates        []AnalysisFact // Facts this module refreshes after an earlier provider
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
 	RunWithContext func(*Function, *Tier2PipelineOpts, *Tier2OptimizerContext) (*Function, error)
 }
@@ -193,6 +194,18 @@ func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provi
 		Phase:    phase,
 		Requires: requires,
 		Provides: provides,
+		Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+			return pass(fn)
+		},
+	}
+}
+
+func tier2PassModuleWithUpdates(name string, phase Tier2OptimizerPhase, requires, updates []AnalysisFact, pass PassFunc) Tier2OptimizerModule {
+	return Tier2OptimizerModule{
+		Name:     name,
+		Phase:    phase,
+		Requires: requires,
+		Updates:  updates,
 		Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 			return pass(fn)
 		},

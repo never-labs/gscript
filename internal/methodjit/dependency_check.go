@@ -5,10 +5,11 @@ import (
 	"sort"
 )
 
-// ValidateDependencyOrder checks that all module dependencies are satisfied
-// in the given optimizer plan. It iterates through phases and modules in order,
-// tracking which facts have been provided so far. If a module Requires a fact
-// that hasn't been provided yet, it returns an error with details.
+// ValidateDependencyOrder checks that all module dependencies are satisfied in
+// the given optimizer plan. It iterates through phases and modules in order,
+// tracking which facts have been provided so far. Requires facts must be
+// available before a module runs. Updates facts must also be available; they
+// document refreshes of an existing fact rather than first-time production.
 //
 // This is intended to be called at initialization or test time, not in the
 // production hot path.
@@ -39,6 +40,15 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 						return fmt.Errorf("%s/%s requires fact %s which is never provided", group.Phase, module.Name, required)
 					}
 					return fmt.Errorf("%s/%s requires fact %s which is provided by %s (but not yet available)", group.Phase, module.Name, required, provider)
+				}
+			}
+			for _, updated := range module.Updates {
+				if !available[updated] {
+					provider, ok := provided[updated]
+					if !ok {
+						return fmt.Errorf("%s/%s updates fact %s which is never provided", group.Phase, module.Name, updated)
+					}
+					return fmt.Errorf("%s/%s updates fact %s which is provided by %s (but not yet available)", group.Phase, module.Name, updated, provider)
 				}
 			}
 

@@ -44,6 +44,39 @@ func (testCompilationDependency) String() string {
 	return "test-dependency"
 }
 
+func findTier2Module(t *testing.T, plan Tier2OptimizerPlan, name string) Tier2OptimizerModule {
+	t.Helper()
+	for _, module := range plan.Modules {
+		if module.Name == name {
+			return module
+		}
+	}
+	t.Fatalf("module %q not found", name)
+	return Tier2OptimizerModule{}
+}
+
+func assertAnalysisFacts(t *testing.T, got []AnalysisFact, want ...AnalysisFact) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("facts=%v want %v", got, want)
+	}
+	counts := make(map[AnalysisFact]int, len(got))
+	for _, fact := range got {
+		counts[fact]++
+	}
+	for _, fact := range want {
+		if counts[fact] == 0 {
+			t.Fatalf("facts=%v missing %s", got, fact)
+		}
+		counts[fact]--
+	}
+	for fact, count := range counts {
+		if count != 0 {
+			t.Fatalf("facts=%v has unexpected %s", got, fact)
+		}
+	}
+}
+
 func TestTier2TableObjectPreparationModuleOrder(t *testing.T) {
 	mods := tier2TableObjectPreparationModules(nil)
 	want := []string{
@@ -482,6 +515,40 @@ func TestDependencyOrder(t *testing.T) {
 	}
 }
 
+func TestTier2RepeatedAnalysisModulesDeclareUpdates(t *testing.T) {
+	plan := newTier2OptimizerPlan(&Tier2OptimizerContext{InlineMaxSize: 40})
+
+	for _, name := range []string{
+		"FixedShapeTableFacts (post-inline)",
+		"FixedShapeTableFacts",
+		"FixedShapeTableFacts (post-FieldSvalsLower)",
+	} {
+		module := findTier2Module(t, plan, name)
+		if len(module.Provides) != 0 {
+			t.Fatalf("%s Provides=%v, want none", name, module.Provides)
+		}
+		assertAnalysisFacts(t, module.Updates, fixedShapeTableFacts()...)
+	}
+
+	assertAnalysisFacts(t, findTier2Module(t, plan, "CallABI (final)").Updates, AnalysisFactCallABIs)
+	assertAnalysisFacts(t, findTier2Module(t, plan, "WholeCallKernelExit (final)").Updates,
+		AnalysisFactWholeCallNoResultKernels,
+		AnalysisFactWholeCallNoResultBatches,
+	)
+	for _, name := range []string{
+		"RangeAnalysis (post-IntExactDivision)",
+		"RangeAnalysis (post-TableFieldLower)",
+		"RangeAnalysis (post-UnrollAndJam)",
+		"RangeAnalysis (post-final-call)",
+	} {
+		module := findTier2Module(t, plan, name)
+		if len(module.Provides) != 0 {
+			t.Fatalf("%s Provides=%v, want none", name, module.Provides)
+		}
+		assertAnalysisFacts(t, module.Updates, rangeAnalysisFacts()...)
+	}
+}
+
 func TestDependencyOrderRejectsMissingRequirement(t *testing.T) {
 	// Build a plan where a module requires a fact that is never provided.
 	plan := Tier2OptimizerPlan{
@@ -542,6 +609,60 @@ func TestDependencyOrderRejectsOutOfOrderDependency(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "LateFact") {
 		t.Fatalf("error should mention LateFact, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "not yet available") {
+		t.Fatalf("error should say 'not yet available', got: %v", err)
+	}
+}
+
+func TestDependencyOrderRejectsMissingUpdateProvider(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:    "Updater",
+				Phase:   Tier2PhaseNumeric,
+				Updates: []AnalysisFact{"MissingFact"},
+				Run:     func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected error for missing update provider, got nil")
+	}
+	if !strings.Contains(err.Error(), "updates fact MissingFact") {
+		t.Fatalf("error should mention updated fact, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "never provided") {
+		t.Fatalf("error should say 'never provided', got: %v", err)
+	}
+}
+
+func TestDependencyOrderRejectsOutOfOrderUpdate(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical, Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:    "Updater",
+				Phase:   Tier2PhaseEarlyCanonical,
+				Updates: []AnalysisFact{"LateFact"},
+				Run:     func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "LateProvider",
+				Phase:    Tier2PhaseNumeric,
+				Provides: []AnalysisFact{"LateFact"},
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected error for out-of-order update, got nil")
+	}
+	if !strings.Contains(err.Error(), "updates fact LateFact") {
+		t.Fatalf("error should mention updated fact, got: %v", err)
 	}
 	if !strings.Contains(err.Error(), "not yet available") {
 		t.Fatalf("error should say 'not yet available', got: %v", err)

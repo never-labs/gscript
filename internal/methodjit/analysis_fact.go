@@ -39,6 +39,16 @@ func analysisFacts(facts ...AnalysisFact) []AnalysisFact {
 	return facts
 }
 
+func fixedShapeTableFacts() []AnalysisFact {
+	return analysisFacts(
+		AnalysisFactFixedShapeTables,
+		AnalysisFactFixedShapeEntryGuards,
+		AnalysisFactFieldPolyShapeFacts,
+		AnalysisFactFieldPolyShapeCatalog,
+		AnalysisFactFixedTableConstructors,
+	)
+}
+
 func rangeAnalysisFacts() []AnalysisFact {
 	return analysisFacts(
 		AnalysisFactInt48Safe,

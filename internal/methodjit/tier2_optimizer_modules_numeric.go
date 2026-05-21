@@ -56,7 +56,7 @@ func tier2NumericModules() []Tier2OptimizerModule {
 			Name:     "RangeAnalysis (post-IntExactDivision)",
 			Phase:    Tier2PhaseNumeric,
 			Requires: nil,
-			Provides: rangeAnalysisFacts(),
+			Updates:  rangeAnalysisFacts(),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				if opts != nil && !opts.LastPassChanged {
 					functionRemarks(fn).Add("RangeAnalysis", "skipped", 0, 0, OpNop,
@@ -161,7 +161,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 			},
 		},
 		tier2PassModuleWith("QuadraticStepStrengthReduction", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, QuadraticStepStrengthReductionPass),
-		tier2PassModuleWith("RangeAnalysis (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, rangeAnalysisFacts(), RangeAnalysisPass),
+		tier2PassModuleWithUpdates("RangeAnalysis (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, rangeAnalysisFacts(), RangeAnalysisPass),
 		tier2PassModuleWith("IntAlgebraSimplify", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, IntAlgebraSimplifyPass),
 		tier2PassModuleWith("TableArrayStaticBounds (post-RangeAnalysis)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
