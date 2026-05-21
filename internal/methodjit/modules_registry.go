@@ -1,6 +1,9 @@
 package methodjit
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 // ModuleBuilder constructs a slice of Tier2OptimizerModules given the
 // optimizer context. Builder functions are registered via
@@ -8,9 +11,15 @@ import "sort"
 // file) and collected by BuildModulePlan.
 type ModuleBuilder func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule
 
-// moduleBuilders holds all registered module builders in insertion order.
-// Each domain file registers its builder via init().
-var moduleBuilders []moduleBuilderEntry
+// DefaultModuleRegistry holds the process-wide module builders registered by
+// init functions. Tests that need isolation should create their own registry
+// with NewModuleRegistry.
+var DefaultModuleRegistry = NewModuleRegistry()
+
+// ModuleRegistry stores module builders in insertion order.
+type ModuleRegistry struct {
+	builders []moduleBuilderEntry
+}
 
 type moduleBuilderEntry struct {
 	phase   Tier2OptimizerPhase
@@ -18,25 +27,60 @@ type moduleBuilderEntry struct {
 	builder ModuleBuilder
 }
 
+// NewModuleRegistry creates an empty module registry.
+func NewModuleRegistry() *ModuleRegistry {
+	return &ModuleRegistry{}
+}
+
 // RegisterModuleBuilder adds a module builder for the given phase.
 // The order parameter controls the position of this phase relative to
 // other phases when BuildModulePlan constructs the final plan.
 // Call this from an init() function in each domain-specific module file.
 func RegisterModuleBuilder(phase Tier2OptimizerPhase, order int, builder ModuleBuilder) {
-	moduleBuilders = append(moduleBuilders, moduleBuilderEntry{
+	if err := DefaultModuleRegistry.RegisterModuleBuilder(phase, order, builder); err != nil {
+		panic(err)
+	}
+}
+
+// RegisterModuleBuilder adds a module builder to this registry.
+func (r *ModuleRegistry) RegisterModuleBuilder(phase Tier2OptimizerPhase, order int, builder ModuleBuilder) error {
+	if r == nil {
+		return fmt.Errorf("methodjit: register module builder on nil registry")
+	}
+	if builder == nil {
+		return fmt.Errorf("methodjit: register module builder for phase %s with nil builder", phase)
+	}
+	for _, existing := range r.builders {
+		if existing.phase == phase && existing.order != order {
+			return fmt.Errorf("methodjit: phase %s already registered with order %d, cannot also use order %d", phase, existing.order, order)
+		}
+		if existing.phase != phase && existing.order == order {
+			return fmt.Errorf("methodjit: duplicate module builder order %d for phases %s and %s", order, existing.phase, phase)
+		}
+	}
+	r.builders = append(r.builders, moduleBuilderEntry{
 		phase:   phase,
 		order:   order,
 		builder: builder,
 	})
+	return nil
 }
 
 // BuildModulePlan constructs the ordered module plan from all registered
 // builders. It returns a Tier2OptimizerPlan with phases sorted by their
 // declared order and the concatenated module lists from each builder.
 func BuildModulePlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
+	return DefaultModuleRegistry.BuildModulePlan(ctx)
+}
+
+// BuildModulePlan constructs the ordered module plan from this registry.
+func (r *ModuleRegistry) BuildModulePlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
+	if r == nil {
+		return Tier2OptimizerPlan{}
+	}
 	// Sort builders by order to determine phase sequence.
-	sorted := make([]moduleBuilderEntry, len(moduleBuilders))
-	copy(sorted, moduleBuilders)
+	sorted := make([]moduleBuilderEntry, len(r.builders))
+	copy(sorted, r.builders)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].order < sorted[j].order
 	})
