@@ -99,7 +99,10 @@ type AnalysisResult struct {
 	// SuppressedSpecGuardKinds is the guard-kind-scoped form of
 	// SuppressedSpecGuardPCs. Passes that know the guard they are about to emit
 	// should consult this map so one unstable guard does not disable unrelated
-	// specializations at the same bytecode PC.
+	// specializations at the same bytecode PC. Nil is a sentinel meaning kind
+	// information is unavailable and consumers must fall back to
+	// SuppressedSpecGuardPCs; an empty non-nil map means kind-scoped suppression
+	// is available but currently has no suppressed guards.
 	SuppressedSpecGuardKinds map[int]map[string]bool
 
 	// ProtocolConstCallFolds records guarded whole-call protocol constants
@@ -173,12 +176,13 @@ type AnalysisResult struct {
 	// matching FixedShapeArgFacts are safe as callee-local shape facts.
 	FixedShapeEntryGuards map[int]FixedShapeTableFact
 
-	// Globals, if non-nil, maps global function names to their protos.
-	// Used by the IR interpreter to resolve residual cross-function calls
-	// (e.g., those left after bounded recursive inlining). Populated by
-	// the inline pass when its config includes a globals map. Production
-	// code paths never consult this field — it exists only as a hook for
-	// the IR correctness oracle.
+	// Globals maps global function names to their protos for the IR interpreter
+	// to resolve residual cross-function calls, such as calls left after bounded
+	// recursive inlining. Nil is a sentinel meaning the inline pass may still
+	// install its config.Globals; an empty non-nil map means globals were
+	// intentionally provided and no fallback install should occur. Production
+	// code paths never consult this field; it exists only as a hook for the IR
+	// correctness oracle.
 	Globals map[string]*vm.FuncProto
 
 	// NumericGlobalValues and GlobalArrayElementFacts are stable cross-proto
@@ -189,49 +193,44 @@ type AnalysisResult struct {
 	GlobalArrayElementFacts map[string]FixedShapeTableFact
 }
 
-// NewAnalysisResult creates a new AnalysisResult with all maps initialized.
+// NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	return &AnalysisResult{
-		Int48Safe:                  make(map[int]bool),
-		IntModNonZeroDivisor:       make(map[int]bool),
-		IntModNoSignAdjust:         make(map[int]bool),
-		IntRanges:                  make(map[int]intRange),
-		ProfiledIntRanges:          make(map[int]intRange),
-		ProfiledLenRanges:          make(map[int]intRange),
-		IntNonNegative:             make(map[int]bool),
-		TableArrayUpperBoundSafe:   make(map[int]bool),
-		TableArrayLowerBoundSafe:   make(map[int]bool),
-		LoopTableArrayFacts:        make(map[int]LoopTableArrayFact),
-		ShapeFieldTypeElidedLoads:  make(map[int]bool),
-		TableArrayDataPtrs:         make(map[int]TableArrayDataPtrFact),
-		RecordArrayLoopKernels:     make(map[int]RecordArrayLoopKernelSpec),
-		CallABIs:                   make(map[int]CallABIDescriptor),
-		SpecDependencyProtos:       make(map[*vm.FuncProto]bool),
-		SuppressedSpecGuardPCs:     make(map[int]bool),
-		// SuppressedSpecGuardKinds is intentionally left nil: production code
-		// uses nil as a sentinel to fall through to SuppressedSpecGuardPCs in
-		// specGuardKindSuppressed. Initializing it would break that logic.
+		Int48Safe:                 make(map[int]bool),
+		IntModNonZeroDivisor:      make(map[int]bool),
+		IntModNoSignAdjust:        make(map[int]bool),
+		IntRanges:                 make(map[int]intRange),
+		ProfiledIntRanges:         make(map[int]intRange),
+		ProfiledLenRanges:         make(map[int]intRange),
+		IntNonNegative:            make(map[int]bool),
+		TableArrayUpperBoundSafe:  make(map[int]bool),
+		TableArrayLowerBoundSafe:  make(map[int]bool),
+		LoopTableArrayFacts:       make(map[int]LoopTableArrayFact),
+		ShapeFieldTypeElidedLoads: make(map[int]bool),
+		TableArrayDataPtrs:        make(map[int]TableArrayDataPtrFact),
+		RecordArrayLoopKernels:    make(map[int]RecordArrayLoopKernelSpec),
+		CallABIs:                  make(map[int]CallABIDescriptor),
+		SpecDependencyProtos:      make(map[*vm.FuncProto]bool),
+		SuppressedSpecGuardPCs:    make(map[int]bool),
 
-		ProtocolConstCallFolds:     make(map[int]ProtocolConstCallFoldFact),
-		WholeCallNoResultKernels:   make(map[int]bool),
-		WholeCallNoResultBatches:   make(map[int]WholeCallNoResultBatchFact),
-		FixedShapeTables:           make(map[int]FixedShapeTableFact),
-		FieldPolyShapeFacts:        make(map[int][]FieldPolyShapeCase),
-		FieldPolyShapeReceivers:    make(map[int]bool),
-		FieldPolyShapeCatalog:      make(map[uint32]FixedShapeTableFact),
-		FieldCallPolyLenFusions:    make(map[int][]FieldCallPolyLenFusion),
-		FixedShapeArgFacts:         make(map[int]FixedShapeTableFact),
-		FixedTableConstructors:     make(map[int]FixedTableConstructorFact),
-		FixedRecordNewTableSites:   make(map[int]bool),
-		FixedShapeEntryGuards:      make(map[int]FixedShapeTableFact),
-		// Globals is intentionally left nil: the inline pass uses nil as a
-		// sentinel to decide whether to copy config.Globals into the function.
-		NumericGlobalValues:        make(map[string]runtime.Value),
-		GlobalArrayElementFacts:    make(map[string]FixedShapeTableFact),
+		ProtocolConstCallFolds:   make(map[int]ProtocolConstCallFoldFact),
+		WholeCallNoResultKernels: make(map[int]bool),
+		WholeCallNoResultBatches: make(map[int]WholeCallNoResultBatchFact),
+		FixedShapeTables:         make(map[int]FixedShapeTableFact),
+		FieldPolyShapeFacts:      make(map[int][]FieldPolyShapeCase),
+		FieldPolyShapeReceivers:  make(map[int]bool),
+		FieldPolyShapeCatalog:    make(map[uint32]FixedShapeTableFact),
+		FieldCallPolyLenFusions:  make(map[int][]FieldCallPolyLenFusion),
+		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),
+		FixedTableConstructors:   make(map[int]FixedTableConstructorFact),
+		FixedRecordNewTableSites: make(map[int]bool),
+		FixedShapeEntryGuards:    make(map[int]FixedShapeTableFact),
+		NumericGlobalValues:      make(map[string]runtime.Value),
+		GlobalArrayElementFacts:  make(map[string]FixedShapeTableFact),
 	}
 }
 
-// Initialize initializes all maps in the AnalysisResult.
+// Initialize initializes nil non-sentinel maps in the AnalysisResult.
 func (a *AnalysisResult) Initialize() {
 	if a.Int48Safe == nil {
 		a.Int48Safe = make(map[int]bool)
@@ -281,9 +280,6 @@ func (a *AnalysisResult) Initialize() {
 	if a.SuppressedSpecGuardPCs == nil {
 		a.SuppressedSpecGuardPCs = make(map[int]bool)
 	}
-	if a.SuppressedSpecGuardKinds == nil {
-		a.SuppressedSpecGuardKinds = make(map[int]map[string]bool)
-	}
 	if a.ProtocolConstCallFolds == nil {
 		a.ProtocolConstCallFolds = make(map[int]ProtocolConstCallFoldFact)
 	}
@@ -319,9 +315,6 @@ func (a *AnalysisResult) Initialize() {
 	}
 	if a.FixedShapeEntryGuards == nil {
 		a.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
-	}
-	if a.Globals == nil {
-		a.Globals = make(map[string]*vm.FuncProto)
 	}
 	if a.NumericGlobalValues == nil {
 		a.NumericGlobalValues = make(map[string]runtime.Value)
