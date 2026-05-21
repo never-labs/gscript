@@ -262,6 +262,28 @@ func (e *BaselineJITEngine) handleTForCall(ctx *ExecContext, regs []runtime.Valu
 		return nil
 	}
 	fnVal := regs[absA]
+	if gf := fnVal.GoFunction(); gf != nil && gf.FastArg2Ret2 != nil {
+		runtime.RecordRuntimePathNativeCallFastFor(gf)
+		r0, r1, n, err := gf.FastArg2Ret2(regs[absA+1], regs[absA+2])
+		if err != nil {
+			return err
+		}
+		for i := 0; i < c; i++ {
+			idx := absA + 3 + i
+			if idx >= len(regs) {
+				continue
+			}
+			switch {
+			case i == 0 && n > 0:
+				regs[idx] = r0
+			case i == 1 && n > 1:
+				regs[idx] = r1
+			default:
+				regs[idx] = runtime.NilValue()
+			}
+		}
+		return nil
+	}
 	args := []runtime.Value{regs[absA+1], regs[absA+2]}
 	results, err := e.callVM.CallValue(fnVal, args)
 	if err != nil {

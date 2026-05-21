@@ -566,6 +566,25 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 	}
 slowPath:
 	if gf := fnVal.GoFunction(); gf != nil {
+		if nArgs == 2 && gf.FastArg2Ret2 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			idx0 := absSlot + 1
+			idx1 := absSlot + 2
+			arg0 := runtime.NilValue()
+			arg1 := runtime.NilValue()
+			if idx0 < len(regs) {
+				arg0 = regs[idx0]
+			}
+			if idx1 < len(regs) {
+				arg1 = regs[idx1]
+			}
+			r0, r1, n, err := gf.FastArg2Ret2(arg0, arg1)
+			if err != nil {
+				return err
+			}
+			e.storeCallResult2(absSlot, rawC, r0, r1, n)
+			return nil
+		}
 		if nArgs == 1 && gf.FastArg1 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)
 			idx := absSlot + 1
@@ -846,6 +865,40 @@ func (e *BaselineJITEngine) storeSingleCallResult(absSlot, rawC int, result runt
 		if i == 0 {
 			currentRegs[idx] = result
 		} else {
+			currentRegs[idx] = runtime.NilValue()
+		}
+	}
+}
+
+func (e *BaselineJITEngine) storeCallResult2(absSlot, rawC int, r0, r1 runtime.Value, n int) {
+	currentRegs := e.callVM.Regs()
+	if n < 0 {
+		n = 0
+	} else if n > 2 {
+		n = 2
+	}
+	if rawC == 0 {
+		if n > 0 && absSlot < len(currentRegs) {
+			currentRegs[absSlot] = r0
+		}
+		if n > 1 && absSlot+1 < len(currentRegs) {
+			currentRegs[absSlot+1] = r1
+		}
+		e.callVM.SetTop(absSlot + n)
+		return
+	}
+	nr := rawC - 1
+	for i := 0; i < nr; i++ {
+		idx := absSlot + i
+		if idx >= len(currentRegs) {
+			continue
+		}
+		switch {
+		case i == 0 && n > 0:
+			currentRegs[idx] = r0
+		case i == 1 && n > 1:
+			currentRegs[idx] = r1
+		default:
 			currentRegs[idx] = runtime.NilValue()
 		}
 	}

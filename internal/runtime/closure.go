@@ -64,6 +64,9 @@ type GoFunction struct {
 	FastArg2 func(a, b Value) (Value, error)
 	FastArg3 func(a, b, c Value) (Value, error)
 	FastArg4 func(a, b, c, d Value) (Value, error)
+	// FastArg2Ret2 is a fixed-arity native fast path for iterator-style
+	// functions that return zero to two values without allocating result slices.
+	FastArg2Ret2 func(a, b Value) (Value, Value, int, error)
 	// NativeKind/NativeData let the bytecode VM attach optional direct-dispatch
 	// metadata while keeping Fn as the semantic fallback.
 	NativeKind uint8

@@ -979,77 +979,113 @@ func (vm *VM) RegisterTableProxyLib() {
 		return
 	}
 	tbl := tblVal.Table()
+	insert := func(t, posValue, value runtime.Value, hasPos bool) error {
+		if !t.IsTable() {
+			return fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+		}
+		length, err := vm.tableLenInt(t)
+		if err != nil {
+			return err
+		}
+		if !hasPos {
+			return vm.tableSet(t, runtime.IntValue(length+1), value)
+		}
+		pos := vmToInt(posValue)
+		if pos < 1 || pos > length+1 {
+			return fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+		}
+		for i := length; i >= pos; i-- {
+			v, err := vm.tableGet(t, runtime.IntValue(i))
+			if err != nil {
+				return err
+			}
+			if err := vm.tableSet(t, runtime.IntValue(i+1), v); err != nil {
+				return err
+			}
+		}
+		return vm.tableSet(t, runtime.IntValue(pos), value)
+	}
+	remove := func(t, posValue runtime.Value, hasPos bool) (runtime.Value, error) {
+		if !t.IsTable() {
+			return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
+		}
+		length, err := vm.tableLenInt(t)
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		pos := length
+		if hasPos {
+			pos = vmToInt(posValue)
+		}
+		if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
+			return runtime.NilValue(), fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+		}
+		if pos == length+1 {
+			return runtime.NilValue(), nil
+		}
+		removed, err := vm.tableGet(t, runtime.IntValue(pos))
+		if err != nil {
+			return runtime.NilValue(), err
+		}
+		for i := pos; i < length; i++ {
+			v, err := vm.tableGet(t, runtime.IntValue(i+1))
+			if err != nil {
+				return runtime.NilValue(), err
+			}
+			if err := vm.tableSet(t, runtime.IntValue(i), v); err != nil {
+				return runtime.NilValue(), err
+			}
+		}
+		if err := vm.tableSet(t, runtime.IntValue(length), runtime.NilValue()); err != nil {
+			return runtime.NilValue(), err
+		}
+		return removed, nil
+	}
 	tbl.RawSet(runtime.StringValue("insert"), runtime.FunctionValue(&runtime.GoFunction{
 		Name: "table.insert",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) < 1 || !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
-			}
 			if len(args) != 2 && len(args) != 3 {
 				return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
 			}
-			t := args[0]
-			length, err := vm.tableLenInt(t)
-			if err != nil {
-				return nil, err
-			}
 			if len(args) == 2 {
-				return nil, vm.tableSet(t, runtime.IntValue(length+1), args[1])
+				return nil, insert(args[0], runtime.NilValue(), args[1], false)
 			}
-			pos := vmToInt(args[1])
-			if pos < 1 || pos > length+1 {
-				return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+			return nil, insert(args[0], args[1], args[2], true)
+		},
+		FastArg2: func(t, value runtime.Value) (runtime.Value, error) {
+			if err := insert(t, runtime.NilValue(), value, false); err != nil {
+				return runtime.NilValue(), err
 			}
-			for i := length; i >= pos; i-- {
-				v, err := vm.tableGet(t, runtime.IntValue(i))
-				if err != nil {
-					return nil, err
-				}
-				if err := vm.tableSet(t, runtime.IntValue(i+1), v); err != nil {
-					return nil, err
-				}
+			return runtime.NilValue(), nil
+		},
+		FastArg3: func(t, pos, value runtime.Value) (runtime.Value, error) {
+			if err := insert(t, pos, value, true); err != nil {
+				return runtime.NilValue(), err
 			}
-			return nil, vm.tableSet(t, runtime.IntValue(pos), args[2])
+			return runtime.NilValue(), nil
 		},
 	}))
 	tbl.RawSet(runtime.StringValue("remove"), runtime.FunctionValue(&runtime.GoFunction{
 		Name: "table.remove",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) < 1 || !args[0].IsTable() {
+			if len(args) < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
 			}
-			t := args[0]
-			length, err := vm.tableLenInt(t)
-			if err != nil {
-				return nil, err
-			}
-			pos := length
+			pos := runtime.NilValue()
 			if len(args) >= 2 {
-				pos = vmToInt(args[1])
+				pos = args[1]
 			}
-			if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
-				return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
-			}
-			if pos == length+1 {
-				return []runtime.Value{runtime.NilValue()}, nil
-			}
-			removed, err := vm.tableGet(t, runtime.IntValue(pos))
+			removed, err := remove(args[0], pos, len(args) >= 2)
 			if err != nil {
-				return nil, err
-			}
-			for i := pos; i < length; i++ {
-				v, err := vm.tableGet(t, runtime.IntValue(i+1))
-				if err != nil {
-					return nil, err
-				}
-				if err := vm.tableSet(t, runtime.IntValue(i), v); err != nil {
-					return nil, err
-				}
-			}
-			if err := vm.tableSet(t, runtime.IntValue(length), runtime.NilValue()); err != nil {
 				return nil, err
 			}
 			return []runtime.Value{removed}, nil
+		},
+		FastArg1: func(t runtime.Value) (runtime.Value, error) {
+			return remove(t, runtime.NilValue(), false)
+		},
+		FastArg2: func(t, pos runtime.Value) (runtime.Value, error) {
+			return remove(t, pos, true)
 		},
 	}))
 	tbl.RawSet(runtime.StringValue("concat"), runtime.FunctionValue(&runtime.GoFunction{
@@ -1223,6 +1259,31 @@ func (vm *VM) newIPairsIteratorFunction() *runtime.GoFunction {
 			}
 			return []runtime.Value{key, v}, nil
 		},
+		FastArg2Ret2: func(table, keyValue runtime.Value) (runtime.Value, runtime.Value, int, error) {
+			if !table.IsTable() {
+				return runtime.NilValue(), runtime.NilValue(), 0, fmt.Errorf("bad argument #1 to 'for iterator' (table expected)")
+			}
+			i := int64(0)
+			if !keyValue.IsNil() {
+				if keyValue.IsInt() {
+					i = keyValue.Int()
+				} else if keyValue.IsFloat() {
+					i = int64(keyValue.Float())
+				} else {
+					return runtime.NilValue(), runtime.NilValue(), 0, fmt.Errorf("bad argument #2 to 'for iterator' (number expected)")
+				}
+			}
+			i++
+			key := runtime.IntValue(i)
+			v, err := vm.tableGet(table, key)
+			if err != nil {
+				return runtime.NilValue(), runtime.NilValue(), 0, err
+			}
+			if v.IsNil() {
+				return runtime.NilValue(), runtime.NilValue(), 1, nil
+			}
+			return key, v, 2, nil
+		},
 	}
 }
 
@@ -1265,6 +1326,14 @@ func (vm *VM) newPairsFunction() *runtime.GoFunction {
 					k := keys[idx]
 					idx++
 					return []runtime.Value{k, tbl.RawGet(k)}, nil
+				},
+				FastArg2Ret2: func(_, _ runtime.Value) (runtime.Value, runtime.Value, int, error) {
+					if idx >= len(keys) {
+						return runtime.NilValue(), runtime.NilValue(), 1, nil
+					}
+					k := keys[idx]
+					idx++
+					return k, tbl.RawGet(k), 2, nil
 				},
 			}
 			return []runtime.Value{runtime.FunctionValue(iter), args[0], runtime.NilValue()}, nil
@@ -3911,16 +3980,34 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 				}
 			} else {
-				args := []runtime.Value{vm.regs[base+a+1], vm.regs[base+a+2]}
-				results, err := vm.callValue(fnVal, args)
-				if err != nil {
-					return nil, err
-				}
-				for i := 0; i < c; i++ {
-					if i < len(results) {
-						vm.regs[base+a+3+i] = results[i]
-					} else {
-						vm.regs[base+a+3+i] = runtime.NilValue()
+				if gf := fnVal.GoFunction(); gf != nil && gf.FastArg2Ret2 != nil {
+					runtime.RecordRuntimePathNativeCallFastFor(gf)
+					r0, r1, n, err := gf.FastArg2Ret2(vm.regs[base+a+1], vm.regs[base+a+2])
+					if err != nil {
+						return nil, err
+					}
+					for i := 0; i < c; i++ {
+						switch {
+						case i == 0 && n > 0:
+							vm.regs[base+a+3+i] = r0
+						case i == 1 && n > 1:
+							vm.regs[base+a+3+i] = r1
+						default:
+							vm.regs[base+a+3+i] = runtime.NilValue()
+						}
+					}
+				} else {
+					args := []runtime.Value{vm.regs[base+a+1], vm.regs[base+a+2]}
+					results, err := vm.callValue(fnVal, args)
+					if err != nil {
+						return nil, err
+					}
+					for i := 0; i < c; i++ {
+						if i < len(results) {
+							vm.regs[base+a+3+i] = results[i]
+						} else {
+							vm.regs[base+a+3+i] = runtime.NilValue()
+						}
 					}
 				}
 			}

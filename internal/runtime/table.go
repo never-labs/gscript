@@ -85,6 +85,10 @@ type Table struct {
 	stringLookupCache   *StringLookupCache
 	stringLookupVersion uint64
 	arrayVersion        uint64
+
+	nextKey   Value
+	nextIndex int
+	nextValid bool
 }
 
 // SetConcurrent enables or disables mutex protection for concurrent access.
@@ -1655,6 +1659,7 @@ func (t *Table) rebuildKeys() {
 	if t.lazyTree != nil {
 		t.materializeLazyTreeLocked()
 	}
+	t.nextValid = false
 	t.keys = t.keys[:0]
 	// Typed int/float arrays track whether index 0 was explicitly written,
 	// because their zero value is otherwise indistinguishable from nil.
@@ -1791,21 +1796,41 @@ func (t *Table) Next(key Value) (Value, Value, bool) {
 		t.rebuildKeys()
 	}
 	if len(t.keys) == 0 {
+		t.nextValid = false
 		return NilValue(), NilValue(), false
 	}
 	if key.IsNil() {
 		k := t.keys[0]
+		t.nextKey = k
+		t.nextIndex = 0
+		t.nextValid = true
 		return k, t.rawGetForNextLocked(k), true
+	}
+	if t.nextValid && t.nextIndex >= 0 && t.nextIndex < len(t.keys) && t.nextKey.Equal(key) {
+		i := t.nextIndex
+		if i+1 < len(t.keys) {
+			nk := t.keys[i+1]
+			t.nextKey = nk
+			t.nextIndex = i + 1
+			return nk, t.rawGetForNextLocked(nk), true
+		}
+		t.nextValid = false
+		return NilValue(), NilValue(), false
 	}
 	for i, k := range t.keys {
 		if k.Equal(key) {
 			if i+1 < len(t.keys) {
 				nk := t.keys[i+1]
+				t.nextKey = nk
+				t.nextIndex = i + 1
+				t.nextValid = true
 				return nk, t.rawGetForNextLocked(nk), true
 			}
+			t.nextValid = false
 			return NilValue(), NilValue(), false
 		}
 	}
+	t.nextValid = false
 	return NilValue(), NilValue(), false
 }
 

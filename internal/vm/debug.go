@@ -292,7 +292,22 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 	}
 	var results []runtime.Value
 	var err error
-	if gf.Fast1 != nil {
+	if len(args) == 2 && gf.FastArg2Ret2 != nil {
+		runtime.RecordRuntimePathNativeCallFastFor(gf)
+		var r0, r1 runtime.Value
+		var n int
+		r0, r1, n, err = gf.FastArg2Ret2(args[0], args[1])
+		if err == nil {
+			switch {
+			case n <= 0:
+				results = nil
+			case n == 1:
+				results = []runtime.Value{r0}
+			default:
+				results = []runtime.Value{r0, r1}
+			}
+		}
+	} else if gf.Fast1 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var v runtime.Value
 		v, err = gf.Fast1(args)

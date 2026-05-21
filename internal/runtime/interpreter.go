@@ -439,6 +439,16 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", a.TypeName())
 			}
 		},
+		FastArg1: func(a Value) (Value, error) {
+			switch a.Type() {
+			case TypeString:
+				return IntValue(int64(StringLen(a))), nil
+			case TypeTable:
+				return IntValue(int64(a.Table().Length())), nil
+			default:
+				return NilValue(), fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", a.TypeName())
+			}
+		},
 	}))
 
 	interp.globals.Define("len", FunctionValue(&GoFunction{
@@ -455,6 +465,16 @@ func (interp *Interpreter) registerBuiltins() {
 				return []Value{IntValue(int64(a.Table().Length()))}, nil
 			default:
 				return nil, fmt.Errorf("bad argument to 'len' (table or string expected, got %s)", a.TypeName())
+			}
+		},
+		FastArg1: func(a Value) (Value, error) {
+			switch a.Type() {
+			case TypeString:
+				return IntValue(int64(StringLen(a))), nil
+			case TypeTable:
+				return IntValue(int64(a.Table().Length())), nil
+			default:
+				return NilValue(), fmt.Errorf("bad argument to 'len' (table or string expected, got %s)", a.TypeName())
 			}
 		},
 	}))
@@ -604,6 +624,14 @@ func (interp *Interpreter) registerBuiltins() {
 					v := tbl.RawGet(k)
 					return []Value{k, v}, nil
 				},
+				FastArg2Ret2: func(_, _ Value) (Value, Value, int, error) {
+					if idx >= len(keys) {
+						return NilValue(), NilValue(), 1, nil
+					}
+					k := keys[idx]
+					idx++
+					return k, tbl.RawGet(k), 2, nil
+				},
 			}
 			return []Value{FunctionValue(iter), args[0], NilValue()}, nil
 		},
@@ -628,6 +656,20 @@ func (interp *Interpreter) registerBuiltins() {
 				return []Value{NilValue()}, nil
 			}
 			return []Value{nk, nv}, nil
+		},
+		FastArg2Ret2: func(table, key Value) (Value, Value, int, error) {
+			if !table.IsTable() {
+				return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'next' (table expected)")
+			}
+			tbl := table.Table()
+			nk, nv, ok := tbl.Next(key)
+			if !ok {
+				if !key.IsNil() && tbl.RawGet(key).IsNil() {
+					return NilValue(), NilValue(), 0, fmt.Errorf("invalid key to 'next'")
+				}
+				return NilValue(), NilValue(), 1, nil
+			}
+			return nk, nv, 2, nil
 		},
 	}))
 
