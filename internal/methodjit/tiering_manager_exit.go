@@ -111,7 +111,42 @@ func (tm *TieringManager) executeCallExit(ctx *ExecContext, regs []runtime.Value
 		observeTier2CallExitResultFeedback(proto, cf, ctx, runtime.NilValue(), false)
 	}
 
+	// After the callee has executed once (in Tier 1 or interpreter),
+	// try to promote it to Tier 2. When the caller is Tier 2 and calls
+	// through the IC, the IC caches the callee's entry on the second
+	// call and never calls TryCompile again. This hook ensures the
+	// callee gets Tier 2 compiled after its first execution, so the
+	// IC picks up the Tier 2 entry via the version-refresh path.
+	tm.tryPromoteCallExitCallee(fnVal)
+
 	return nil
+}
+
+func (tm *TieringManager) tryPromoteCallExitCallee(fnVal runtime.Value) {
+	if tm == nil || fnVal.IsNil() {
+		return
+	}
+	cl, ok := vmClosureFromValue(fnVal)
+	if !ok || cl == nil || cl.Proto == nil {
+		return
+	}
+	calleeProto := cl.Proto
+	if _, ok := tm.tier2CompiledFor(calleeProto); ok {
+		return
+	}
+	if tm.tier2HasFailed(calleeProto) {
+		return
+	}
+	profile := tm.getProfile(calleeProto)
+	if !shouldPromoteTier2(calleeProto, profile, calleeProto.CallCount) {
+		return
+	}
+	if !canPromoteToTier2(calleeProto) {
+		return
+	}
+	if cf, err := tm.compileTier2(calleeProto); err == nil {
+		tm.markTier2Compiled(calleeProto, cf)
+	}
 }
 
 func observeTier2CallExitCalleeArgShapes(fnVal runtime.Value, args []runtime.Value) {
