@@ -1047,6 +1047,8 @@ func refineBranchEnvs(condValue *Value, trueEnv, falseEnv map[int]intRange) {
 		refineComparison(cond.Args[0], cond.Args[1], trueEnv, falseEnv, true)
 	case OpLeInt, OpLe:
 		refineComparison(cond.Args[0], cond.Args[1], trueEnv, falseEnv, false)
+	case OpEqInt:
+		refineEqInt(cond.Args[0], cond.Args[1], trueEnv, falseEnv)
 	}
 }
 
@@ -1073,6 +1075,42 @@ func refineComparison(lhs, rhs *Value, trueEnv, falseEnv map[int]intRange, stric
 		}
 		constrainLower(trueEnv, rhs.ID, trueMin)
 		constrainUpper(falseEnv, rhs.ID, falseMax)
+	}
+}
+
+// refineEqInt handles OpEqInt conditions for range refinement.
+// For `x == const`: true branch narrows to [const, const].
+// For `x == const` false branch: if x was known >= 0, then x >= 1 (excluding 0);
+// if x was known <= 0, then x <= -1 (excluding 0).
+func refineEqInt(lhs, rhs *Value, trueEnv, falseEnv map[int]intRange) {
+	c, ok := constIntFromValue(rhs)
+	if !ok {
+		return
+	}
+	if lhs == nil {
+		return
+	}
+	// True branch: lhs == c
+	constrainLower(trueEnv, lhs.ID, c)
+	constrainUpper(trueEnv, lhs.ID, c)
+	// False branch: lhs != c
+	if c == 0 {
+		refineNonZero(lhs.ID, falseEnv)
+	}
+}
+
+// refineNonZero refines the range of id to exclude 0.
+// If the existing range is known non-negative (min >= 0), set min to 1.
+// If the existing range is known non-positive (max <= 0), set max to -1.
+func refineNonZero(id int, env map[int]intRange) {
+	r := env[id]
+	if !r.known {
+		return
+	}
+	if r.min >= 0 {
+		constrainLower(env, id, 1)
+	} else if r.max <= 0 {
+		constrainUpper(env, id, -1)
 	}
 }
 
