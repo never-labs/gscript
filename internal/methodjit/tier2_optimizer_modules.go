@@ -292,6 +292,11 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		} else {
 			fn, err = module.Run(fn, opts)
 		}
+		if err == nil && tier2VerifyIROptEnabled(opts) {
+			if verifyErr := VerifyIRLightweight(fn); verifyErr != nil {
+				err = fmt.Errorf("%s: lightweight IR verifier failed: %w", stageName, verifyErr)
+			}
+		}
 		duration := time.Since(start)
 		if opts != nil && opts.OptimizerTimings != nil {
 			*opts.OptimizerTimings = append(*opts.OptimizerTimings, newNestedPipelineStageTiming(stageName, duration, err))
@@ -317,6 +322,10 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 		}
 	}
 	return fn, nil
+}
+
+func tier2VerifyIROptEnabled(opts *Tier2PipelineOpts) bool {
+	return opts != nil && opts.VerifyIR
 }
 
 func tier2OptimizerModuleStageName(phase Tier2OptimizerPhase, moduleName string) string {

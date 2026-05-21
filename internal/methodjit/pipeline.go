@@ -88,6 +88,7 @@ type Tier2PipelineOpts struct {
 	DependencyRegistry              *CompilationDependencyRegistry // optional dependency recorder for compile-time assumptions
 	DependencyContext               CompilationDependencyContext   // validation-time state for dependency commit
 	DependencyCommitter             CompilationDependencyCommitter // optional dependency publication hook
+	VerifyIR                        bool                           // run lightweight IR verification after each optimizer module
 	LastPassChanged                 bool                           // scratch flag for adjacent optimizer modules
 }
 

@@ -310,6 +310,54 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	}
 }
 
+func TestTier2OptimizerModuleVerifyIRRecordsScope(t *testing.T) {
+	var runs []Tier2ModuleRun
+	var timings []PipelineStageTiming
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:  "BreakIR",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					fn.Blocks[0].Instrs = append(fn.Blocks[0].Instrs, nil)
+					return fn, nil
+				},
+			},
+		},
+	}
+	block := &Block{ID: 1}
+	fn := &Function{Entry: block, Blocks: []*Block{block}, Analysis: NewAnalysisResult()}
+	ctx := &Tier2OptimizerContext{
+		ModuleRunCallback: func(run Tier2ModuleRun) {
+			runs = append(runs, run)
+		},
+	}
+
+	_, err := runTier2OptimizerPlan(fn, &Tier2PipelineOpts{OptimizerTimings: &timings, VerifyIR: true}, ctx, plan)
+	if err == nil {
+		t.Fatal("expected verifier failure")
+	}
+	wantStage := "RunTier2Pipeline/numeric/BreakIR"
+	for _, want := range []string{"BreakIR", wantStage, "lightweight IR verifier failed", "nil instruction"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error = %v, want substring %q", err, want)
+		}
+	}
+	if len(runs) != 1 {
+		t.Fatalf("module runs = %d, want 1", len(runs))
+	}
+	if runs[0].ModuleName != "BreakIR" || runs[0].StageName != wantStage {
+		t.Fatalf("unexpected run scope: %+v", runs[0])
+	}
+	if runs[0].Err == nil || !strings.Contains(runs[0].Err.Error(), "lightweight IR verifier failed") {
+		t.Fatalf("run err = %v, want verifier failure", runs[0].Err)
+	}
+	if len(timings) != 1 || timings[0].Name != wantStage || !strings.Contains(timings[0].Error, "lightweight IR verifier failed") {
+		t.Fatalf("unexpected timings: %+v", timings)
+	}
+}
+
 func TestTier2EarlyCanonicalModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2EarlyCanonicalModules(nil), Tier2PhaseEarlyCanonical, []string{
 		"SimplifyPhis",

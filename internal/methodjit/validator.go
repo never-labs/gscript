@@ -23,12 +23,137 @@ import (
 // Validate checks all structural invariants of a Function's IR.
 // Returns nil if the IR is well-formed, or a list of errors describing violations.
 func Validate(fn *Function) []error {
+	if fn == nil {
+		return []error{fmt.Errorf("function is nil")}
+	}
 	v := &validator{fn: fn}
 	v.run()
 	if len(v.errs) == 0 {
 		return nil
 	}
 	return v.errs
+}
+
+// VerifyIRLightweight checks cheap structural invariants suitable for optional
+// per-module optimizer verification. It intentionally avoids whole-graph
+// proofs such as reachability, dominance, use-def validation, and op-specific
+// contracts covered by Validate.
+func VerifyIRLightweight(fn *Function) error {
+	v := &lightweightVerifier{fn: fn}
+	v.run()
+	if len(v.errs) == 0 {
+		return nil
+	}
+	if len(v.errs) == 1 {
+		return v.errs[0]
+	}
+	return fmt.Errorf("%v (and %d more)", v.errs[0], len(v.errs)-1)
+}
+
+type lightweightVerifier struct {
+	fn     *Function
+	errs   []error
+	blocks map[*Block]bool
+}
+
+func (v *lightweightVerifier) errorf(format string, args ...interface{}) {
+	v.errs = append(v.errs, fmt.Errorf(format, args...))
+}
+
+func (v *lightweightVerifier) run() {
+	if v.fn == nil {
+		v.errorf("function is nil")
+		return
+	}
+	if v.fn.Entry == nil {
+		v.errorf("entry block is nil")
+	}
+	if len(v.fn.Blocks) == 0 {
+		v.errorf("function has no blocks")
+		return
+	}
+
+	v.blocks = make(map[*Block]bool, len(v.fn.Blocks))
+	blockIDs := make(map[int]*Block, len(v.fn.Blocks))
+	entryInBlocks := false
+	for i, blk := range v.fn.Blocks {
+		if blk == nil {
+			v.errorf("nil block at index %d", i)
+			continue
+		}
+		if blk == v.fn.Entry {
+			entryInBlocks = true
+		}
+		if v.blocks[blk] {
+			v.errorf("duplicate block pointer B%d", blk.ID)
+		}
+		v.blocks[blk] = true
+		if prev := blockIDs[blk.ID]; prev != nil && prev != blk {
+			v.errorf("duplicate block ID %d", blk.ID)
+		}
+		blockIDs[blk.ID] = blk
+	}
+	if v.fn.Entry != nil && !entryInBlocks {
+		v.errorf("entry block B%d is not in fn.Blocks", v.fn.Entry.ID)
+	}
+
+	for _, blk := range v.fn.Blocks {
+		if blk == nil {
+			continue
+		}
+		v.checkInstrs(blk)
+		v.checkEdges(blk)
+	}
+}
+
+func (v *lightweightVerifier) checkInstrs(blk *Block) {
+	for i, instr := range blk.Instrs {
+		if instr == nil {
+			v.errorf("B%d: nil instruction at index %d", blk.ID, i)
+			continue
+		}
+		if instr.Block != nil && instr.Block != blk {
+			v.errorf("B%d: instruction v%d has owner B%d", blk.ID, instr.ID, instr.Block.ID)
+		}
+		for argIdx, arg := range instr.Args {
+			if arg == nil {
+				v.errorf("B%d: %s (v%d) has nil arg at index %d", blk.ID, instr.Op, instr.ID, argIdx)
+				continue
+			}
+			if arg.Def != nil && arg.Def.Block != nil && !v.blocks[arg.Def.Block] {
+				v.errorf("B%d: %s (v%d) arg %d defined in block outside function", blk.ID, instr.Op, instr.ID, argIdx)
+			}
+		}
+	}
+}
+
+func (v *lightweightVerifier) checkEdges(blk *Block) {
+	for i, succ := range blk.Succs {
+		if succ == nil {
+			v.errorf("B%d: nil successor at index %d", blk.ID, i)
+			continue
+		}
+		if !v.blocks[succ] {
+			v.errorf("B%d: successor B%d is not in fn.Blocks", blk.ID, succ.ID)
+			continue
+		}
+		if !containsBlock(succ.Preds, blk) {
+			v.errorf("B%d in Succs of B%d, but B%d not in Preds of B%d", succ.ID, blk.ID, blk.ID, succ.ID)
+		}
+	}
+	for i, pred := range blk.Preds {
+		if pred == nil {
+			v.errorf("B%d: nil predecessor at index %d", blk.ID, i)
+			continue
+		}
+		if !v.blocks[pred] {
+			v.errorf("B%d: predecessor B%d is not in fn.Blocks", blk.ID, pred.ID)
+			continue
+		}
+		if !containsBlock(pred.Succs, blk) {
+			v.errorf("B%d in Preds of B%d, but B%d not in Succs of B%d", pred.ID, blk.ID, blk.ID, pred.ID)
+		}
+	}
 }
 
 // validator holds state for a single validation pass.
