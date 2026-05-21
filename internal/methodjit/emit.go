@@ -473,6 +473,10 @@ type CompiledFunction struct {
 	// the caller can be queued for recompilation with the newer facts.
 	SpecDependencyProtos []*vm.FuncProto
 
+	// CompilationDependencies are the centralized compile-time assumptions
+	// validated before this native body was installed.
+	CompilationDependencies []CompilationDependency
+
 	// DirectEntrySafe is false when a native caller would have to replay this
 	// function from pc=0 after the function may already have performed a
 	// visible side effect. In that case Tier 2 stays callable through the

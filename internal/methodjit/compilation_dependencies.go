@@ -44,6 +44,44 @@ type CompilationDependency interface {
 	String() string
 }
 
+// CompilationDependencyInvalidation is the structured reason a dependency set
+// can no longer be used for an optimized compilation artifact.
+type CompilationDependencyInvalidation struct {
+	Dependency CompilationDependency
+	Kind       CompilationDependencyKind
+	Key        string
+	Reason     string
+	Err        error
+}
+
+func newCompilationDependencyInvalidation(dep CompilationDependency, err error) *CompilationDependencyInvalidation {
+	reason := ""
+	if err != nil {
+		reason = err.Error()
+	}
+	return &CompilationDependencyInvalidation{
+		Dependency: dep,
+		Kind:       dep.Kind(),
+		Key:        dep.Key(),
+		Reason:     reason,
+		Err:        err,
+	}
+}
+
+func (i *CompilationDependencyInvalidation) Error() string {
+	if i == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s dependency %s invalid: %s", i.Kind, i.Key, i.Reason)
+}
+
+func (i *CompilationDependencyInvalidation) Unwrap() error {
+	if i == nil {
+		return nil
+	}
+	return i.Err
+}
+
 // CompilationDependencyCommitter is the installation hook. A future Tier 2
 // manager can use it to attach validated dependencies to compiled code for
 // invalidation; tests and dry runs may pass nil to only validate.
@@ -102,6 +140,32 @@ func (r *CompilationDependencyRegistry) Dependencies() []CompilationDependency {
 	return out
 }
 
+func (r *CompilationDependencyRegistry) Sealed() bool {
+	return r != nil && r.sealed
+}
+
+// Validate returns the first invalidated dependency, if any.
+func (r *CompilationDependencyRegistry) Validate(ctx CompilationDependencyContext) *CompilationDependencyInvalidation {
+	if r == nil {
+		return nil
+	}
+	return ValidateCompilationDependencies(r.deps, ctx)
+}
+
+// ValidateCompilationDependencies checks an already-published dependency set
+// and returns a structured invalidation reason for the first stale assumption.
+func ValidateCompilationDependencies(deps []CompilationDependency, ctx CompilationDependencyContext) *CompilationDependencyInvalidation {
+	for _, dep := range deps {
+		if dep == nil {
+			continue
+		}
+		if err := dep.Validate(ctx); err != nil {
+			return newCompilationDependencyInvalidation(dep, err)
+		}
+	}
+	return nil
+}
+
 // CommitOrValidate validates every recorded dependency and, if committer is
 // non-nil, publishes the validated records. A failed validation leaves the
 // registry open so callers can discard it without publishing stale code.
@@ -109,10 +173,8 @@ func (r *CompilationDependencyRegistry) CommitOrValidate(ctx CompilationDependen
 	if r == nil {
 		return nil
 	}
-	for _, dep := range r.deps {
-		if err := dep.Validate(ctx); err != nil {
-			return fmt.Errorf("%s dependency %s invalid: %w", dep.Kind(), dep.Key(), err)
-		}
+	if invalid := r.Validate(ctx); invalid != nil {
+		return invalid
 	}
 	if committer != nil {
 		if err := committer.CommitCompilationDependencies(r.Dependencies()); err != nil {
@@ -338,4 +400,19 @@ func (d CallABIDependency) Validate(CompilationDependencyContext) error {
 
 func (d CallABIDependency) String() string {
 	return d.Key()
+}
+
+func (cf *CompiledFunction) ValidateCompilationDependencies(ctx CompilationDependencyContext) *CompilationDependencyInvalidation {
+	if cf == nil {
+		return nil
+	}
+	return ValidateCompilationDependencies(cf.CompilationDependencies, ctx)
+}
+
+func (cf *CompiledFunction) DependencyInvalidationReason(ctx CompilationDependencyContext) (string, bool) {
+	invalid := cf.ValidateCompilationDependencies(ctx)
+	if invalid == nil {
+		return "", false
+	}
+	return invalid.Error(), true
 }

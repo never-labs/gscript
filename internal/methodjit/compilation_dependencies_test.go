@@ -1,6 +1,7 @@
 package methodjit
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -137,6 +138,13 @@ func TestCompilationDependencyRegistryGlobalValidationFails(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected global dependency to fail")
 	}
+	var invalid *CompilationDependencyInvalidation
+	if !errors.As(err, &invalid) {
+		t.Fatalf("error type = %T, want CompilationDependencyInvalidation", err)
+	}
+	if invalid.Kind != CompilationDependencyGlobal || invalid.Key != "global=limit" || invalid.Reason == "" {
+		t.Fatalf("unexpected invalidation: %+v", invalid)
+	}
 	if !strings.Contains(err.Error(), "global version changed") &&
 		!strings.Contains(err.Error(), "global \"limit\" changed") {
 		t.Fatalf("unexpected error: %v", err)
@@ -186,6 +194,9 @@ func TestRunTier2PipelineCommitsEmptyDependencyRegistry(t *testing.T) {
 	}
 	if got := len(committer.records); got != 0 {
 		t.Fatalf("committed records = %d, want 0", got)
+	}
+	if !reg.Sealed() {
+		t.Fatalf("registry should be sealed after pipeline dependency commit")
 	}
 	if reg.RecordNoMetatable(runtime.NewTable()) {
 		t.Fatalf("registry should be sealed after pipeline dependency commit")
@@ -258,5 +269,61 @@ func TestRunTier2PipelineDependencyValidationFailureIsClear(t *testing.T) {
 		!strings.Contains(err.Error(), "metatable dependency") ||
 		!strings.Contains(err.Error(), "gained metatable") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	var invalid *CompilationDependencyInvalidation
+	if !errors.As(err, &invalid) {
+		t.Fatalf("error type = %T, want CompilationDependencyInvalidation", err)
+	}
+	if invalid.Kind != CompilationDependencyMetatable || invalid.Reason != "table gained metatable" {
+		t.Fatalf("unexpected invalidation: %+v", invalid)
+	}
+}
+
+func TestCompiledFunctionDependencyInvalidationReason(t *testing.T) {
+	tbl := runtime.NewTable()
+	cf := &CompiledFunction{
+		CompilationDependencies: []CompilationDependency{NoMetatableDependency{Table: tbl}},
+	}
+
+	if reason, stale := cf.DependencyInvalidationReason(CompilationDependencyContext{}); stale || reason != "" {
+		t.Fatalf("fresh dependencies reported stale=%v reason=%q", stale, reason)
+	}
+
+	tbl.SetMetatable(runtime.NewTable())
+	reason, stale := cf.DependencyInvalidationReason(CompilationDependencyContext{})
+	if !stale {
+		t.Fatalf("expected stale dependency")
+	}
+	if !strings.Contains(reason, "metatable dependency") || !strings.Contains(reason, "gained metatable") {
+		t.Fatalf("unexpected reason: %q", reason)
+	}
+}
+
+func TestTieringManagerExplicitDependencyInvalidationClearsCompiledEntry(t *testing.T) {
+	tm := NewTieringManager()
+	proto := &vm.FuncProto{Name: "stale"}
+	tbl := runtime.NewTable()
+	cf := &CompiledFunction{
+		Proto: proto,
+		CompilationDependencies: []CompilationDependency{
+			NoMetatableDependency{Table: tbl},
+		},
+	}
+	tm.markTier2Compiled(proto, cf)
+
+	if invalidated, reason := tm.InvalidateTier2CompiledDependencies(proto, CompilationDependencyContext{}); invalidated || reason != "" {
+		t.Fatalf("fresh dependencies invalidated=%v reason=%q", invalidated, reason)
+	}
+
+	tbl.SetMetatable(runtime.NewTable())
+	invalidated, reason := tm.InvalidateTier2CompiledDependencies(proto, CompilationDependencyContext{})
+	if !invalidated {
+		t.Fatalf("expected compiled entry to be invalidated")
+	}
+	if !strings.Contains(reason, "metatable dependency") || !strings.Contains(reason, "gained metatable") {
+		t.Fatalf("unexpected reason: %q", reason)
+	}
+	if _, ok := tm.tier2CompiledFor(proto); ok {
+		t.Fatalf("compiled entry was not cleared")
 	}
 }

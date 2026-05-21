@@ -179,6 +179,22 @@ func (tm *TieringManager) markTier2Compiled(proto *vm.FuncProto, cf *CompiledFun
 	tm.queueSpecDependentsForRefresh(proto, "spec_dependency_compiled")
 }
 
+func (tm *TieringManager) InvalidateTier2CompiledDependencies(proto *vm.FuncProto, ctx CompilationDependencyContext) (bool, string) {
+	if tm == nil || proto == nil {
+		return false, ""
+	}
+	cf, ok := tm.tier2CompiledFor(proto)
+	if !ok || cf == nil {
+		return false, ""
+	}
+	reason, stale := cf.DependencyInvalidationReason(ctx)
+	if !stale {
+		return false, ""
+	}
+	tm.clearTier2Install(proto)
+	return true, reason
+}
+
 func (tm *TieringManager) markTier2Failed(proto *vm.FuncProto, reason string) {
 	if tm == nil || proto == nil {
 		return
