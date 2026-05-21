@@ -34,16 +34,16 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 				})(fn)
 			},
 		},
-		tier2PassModuleWith("LoadElimination", Tier2PhaseTableObjectPrep, []string{"FixedShapeTables"}, nil, LoadEliminationPass),
-		tier2PassModuleWith("FieldLenFold", Tier2PhaseTableObjectPrep, []string{"FixedShapeTables"}, nil, FieldLenFoldPass),
-		tier2PassModuleWith("StaticTableLenFold", Tier2PhaseTableObjectPrep, []string{"FixedShapeTables"}, nil, StaticTableLenFoldPass),
-		tier2PassModuleWith("EscapeAnalysis", Tier2PhaseTableObjectPrep, []string{"FixedShapeTables"}, nil, EscapeAnalysisPass),
-		tier2PassModuleWith("FixedTableConstructorLowering", Tier2PhaseTableObjectPrep, []string{"FixedShapeTables", "FixedTableConstructors"}, nil, FixedTableConstructorLoweringPass),
+		tier2PassModuleWith("LoadElimination", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, LoadEliminationPass),
+		tier2PassModuleWith("FieldLenFold", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, FieldLenFoldPass),
+		tier2PassModuleWith("StaticTableLenFold", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, StaticTableLenFoldPass),
+		tier2PassModuleWith("EscapeAnalysis", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, EscapeAnalysisPass),
+		tier2PassModuleWith("FixedTableConstructorLowering", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedTableConstructors), nil, FixedTableConstructorLoweringPass),
 		tier2PassModuleWith("TablePreallocHint (post-fixed-table-lowering)", Tier2PhaseTableObjectPrep, nil, nil, TablePreallocHintPass),
 		{
 			Name:     "EscapeAnalysis (post-fixed-table-lowering)",
 			Phase:    Tier2PhaseTableObjectPrep,
-			Requires: []string{"FixedShapeTables"},
+			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Provides: nil,
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				if !hasFixedTableScalarReplacementCandidate(fn) {
@@ -68,9 +68,9 @@ func tier2TableArrayNativeLoweringModules() []Tier2OptimizerModule {
 func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("TableArrayStoreLower", Tier2PhaseTableFieldLower, nil, nil, TableArrayStoreLowerPass),
-		tier2PassModuleWith("GuardFieldCallee", Tier2PhaseTableFieldLower, []string{"CallABIs"}, nil, GuardFieldCalleePass),
-		tier2PassModuleWith("FieldPolyLenPhi", Tier2PhaseTableFieldLower, []string{"FixedShapeTables"}, nil, FieldPolyLenPhiPass),
-		tier2PassModuleWith("FieldSvalsLower", Tier2PhaseTableFieldLower, []string{"FixedShapeTables", "FixedShapeEntryGuards"}, nil, FieldSvalsLowerPass),
+		tier2PassModuleWith("GuardFieldCallee", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactCallABIs), nil, GuardFieldCalleePass),
+		tier2PassModuleWith("FieldPolyLenPhi", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables), nil, FieldPolyLenPhiPass),
+		tier2PassModuleWith("FieldSvalsLower", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedShapeEntryGuards), nil, FieldSvalsLowerPass),
 		tier2PassModuleWith("FieldSvalsCSE", Tier2PhaseTableFieldLower, nil, nil, FieldSvalsCSEPass),
 		{
 			Name:     "FixedShapeTableFacts (post-FieldSvalsLower)",
@@ -88,7 +88,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 				})(fn)
 			},
 		},
-		tier2PassModuleWith("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, []string{"CallABIs"}, nil, GuardFieldCalleePass),
+		tier2PassModuleWith("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactCallABIs), nil, GuardFieldCalleePass),
 		tier2PassModuleWith("TableArrayLower (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, nil, nil, TableArrayLowerPass),
 		tier2PassModuleWith("TableArrayLoadTypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, nil, nil, TableArrayLoadTypeSpecializePass),
 		tier2PassModuleWith("StringEnumCompare (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, nil, nil, StringEnumComparePass),
@@ -96,22 +96,22 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModuleWith("TypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, nil, nil, TypeSpecializePass),
 		tier2PassModuleWith("FloorPhiSplit", Tier2PhaseTableFieldLower, nil, nil, FloorPhiSplitPass),
 		tier2PassModuleWith("DCE (post-FloorPhiSplit)", Tier2PhaseTableFieldLower, nil, nil, DCEPass),
-		tier2PassModuleWith("ShapeFieldTypeGuard", Tier2PhaseTableFieldLower, []string{"FixedShapeTables"}, []string{"ShapeFieldTypeElidedLoads"}, ShapeFieldTypeGuardPass),
+		tier2PassModuleWith("ShapeFieldTypeGuard", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactShapeFieldTypeElided), ShapeFieldTypeGuardPass),
 		tier2PassModuleWith("LateModuloMultiplyOverflowBoxing", Tier2PhaseTableFieldLower, nil, nil, LateModuloMultiplyOverflowBoxingPass),
 		tier2PassModuleWith("ProfiledStringLenFold", Tier2PhaseTableFieldLower, nil, nil, ProfiledStringLenFoldPass),
-		tier2PassModuleWith("RangeAnalysis (post-TableFieldLower)", Tier2PhaseTableFieldLower, nil, []string{"Int48Safe", "IntRanges", "IntNonNegative", "IntModNonZeroDivisor", "IntModNoSignAdjust"}, RangeAnalysisPass),
-		tier2PassModuleWith("TableArrayStaticBounds", Tier2PhaseTableFieldLower, []string{"IntRanges"}, nil, TableArrayStaticBoundsPass),
+		tier2PassModuleWith("RangeAnalysis (post-TableFieldLower)", Tier2PhaseTableFieldLower, nil, rangeAnalysisFacts(), RangeAnalysisPass),
+		tier2PassModuleWith("TableArrayStaticBounds", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
 		tier2PassModuleWith("DCE (post-TableArrayStoreLower)", Tier2PhaseTableFieldLower, nil, nil, DCEPass),
 	}
 }
 
 func tier2TableLoopKernelModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("BoolTableFillLoop", Tier2PhaseLoopKernel, []string{"FixedShapeTables", "IntRanges"}, nil, BoolTableFillLoopPass),
-		tier2PassModuleWith("TableArrayStoreLoopVersion", Tier2PhaseLoopKernel, []string{"IntRanges"}, nil, TableArrayStoreLoopVersionPass),
-		tier2PassModuleWith("RecordArrayLoopKernel", Tier2PhaseLoopKernel, []string{"FixedShapeTables", "CallABIs"}, []string{"RecordArrayLoopKernels", "RecordArrayLoopCaches"}, RecordArrayLoopKernelPass),
-		tier2PassModuleWith("TableIntArrayKernel", Tier2PhaseLoopKernel, []string{"FixedShapeTables", "CallABIs"}, nil, TableIntArrayKernelPass),
-		tier2PassModuleWith("BoolTableCountLoop", Tier2PhaseLoopKernel, []string{"FixedShapeTables"}, nil, BoolTableCountLoopPass),
+		tier2PassModuleWith("BoolTableFillLoop", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableFillLoopPass),
+		tier2PassModuleWith("TableArrayStoreLoopVersion", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStoreLoopVersionPass),
+		tier2PassModuleWith("RecordArrayLoopKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), analysisFacts(AnalysisFactRecordArrayLoopKernel, AnalysisFactRecordArrayLoopCaches), RecordArrayLoopKernelPass),
+		tier2PassModuleWith("TableIntArrayKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), nil, TableIntArrayKernelPass),
+		tier2PassModuleWith("BoolTableCountLoop", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables), nil, BoolTableCountLoopPass),
 	}
 }
 

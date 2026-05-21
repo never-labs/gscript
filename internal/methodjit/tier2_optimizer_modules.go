@@ -116,9 +116,9 @@ type Tier2OptimizerContext struct {
 type Tier2OptimizerModule struct {
 	Name           string
 	Phase          Tier2OptimizerPhase
-	Order          int      // reserved for stable intra-phase ordering (future use)
-	Requires       []string // Facts this module needs to be already computed
-	Provides       []string // Facts this module computes
+	Order          int            // reserved for stable intra-phase ordering (future use)
+	Requires       []AnalysisFact // Facts this module needs to be already computed
+	Provides       []AnalysisFact // Facts this module computes
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
 	RunWithContext func(*Function, *Tier2PipelineOpts, *Tier2OptimizerContext) (*Function, error)
 }
@@ -133,7 +133,7 @@ func tier2PassModule(name string, phase Tier2OptimizerPhase, pass PassFunc) Tier
 	}
 }
 
-func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provides []string, pass PassFunc) Tier2OptimizerModule {
+func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provides []AnalysisFact, pass PassFunc) Tier2OptimizerModule {
 	return Tier2OptimizerModule{
 		Name:     name,
 		Phase:    phase,

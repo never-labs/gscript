@@ -33,7 +33,7 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 			Name:     "Intrinsic",
 			Phase:    Tier2PhaseEarlyCanonical,
 			Requires: nil,
-			Provides: []string{"InlineComplete"},
+			Provides: analysisFacts(AnalysisFactInlineComplete),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				out, notes := IntrinsicPass(fn)
 				if ctx != nil && len(notes) > 0 {
@@ -59,7 +59,13 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 			Name:     "FixedShapeTableFacts (pre-inline)",
 			Phase:    Tier2PhaseEarlyCanonical,
 			Requires: nil,
-			Provides: []string{"FixedShapeTables", "FixedShapeEntryGuards", "FieldPolyShapeFacts", "FieldPolyShapeCatalog", "FixedTableConstructors"},
+			Provides: analysisFacts(
+				AnalysisFactFixedShapeTables,
+				AnalysisFactFixedShapeEntryGuards,
+				AnalysisFactFieldPolyShapeFacts,
+				AnalysisFactFieldPolyShapeCatalog,
+				AnalysisFactFixedTableConstructors,
+			),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
 					Globals:               globals,
@@ -76,12 +82,12 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 
 func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
-		tier2PassModuleWith("FieldShapeCallSplitPreInline", Tier2PhaseInlineCall, []string{"FieldPolyShapeFacts"}, nil, FieldShapeCallSplitPreInlinePass),
+		tier2PassModuleWith("FieldShapeCallSplitPreInline", Tier2PhaseInlineCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPreInlinePass),
 		{
 			Name:     "Inline",
 			Phase:    Tier2PhaseInlineCall,
-			Requires: []string{"InlineComplete"},
-			Provides: []string{"SpecDependencyProtos"},
+			Requires: analysisFacts(AnalysisFactInlineComplete),
+			Provides: analysisFacts(AnalysisFactSpecDependencyProtos),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				if len(globals) == 0 && !hasInlineFeedbackCallee(fn) {
 					if countOpHelper(fn, OpCall) > 0 {
@@ -165,7 +171,7 @@ func tier2PostInlinePassModule(name string, pass PassFunc) Tier2OptimizerModule 
 	}
 }
 
-func tier2PostInlinePassModuleWith(name string, provides []string, pass PassFunc) Tier2OptimizerModule {
+func tier2PostInlinePassModuleWith(name string, provides []AnalysisFact, pass PassFunc) Tier2OptimizerModule {
 	return Tier2OptimizerModule{
 		Name:     name,
 		Phase:    Tier2PhaseInlineCall,
@@ -185,8 +191,8 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 		{
 			Name:     "CallABI",
 			Phase:    Tier2PhaseCallLower,
-			Requires: []string{"FixedShapeTables"},
-			Provides: []string{"CallABIs"},
+			Requires: analysisFacts(AnalysisFactFixedShapeTables),
+			Provides: analysisFacts(AnalysisFactCallABIs),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalArrayElementFacts, collectStableGlobalArrayElementFacts(fn))
 				fn.Analysis.GlobalArrayElementFacts = cloneFixedShapeTableFactMap(globalArrayFacts)
@@ -204,8 +210,8 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 		{
 			Name:     "ProtocolConstCallFold",
 			Phase:    Tier2PhaseCallLower,
-			Requires: []string{"CallABIs"},
-			Provides: []string{"ProtocolConstCallFolds"},
+			Requires: analysisFacts(AnalysisFactCallABIs),
+			Provides: analysisFacts(AnalysisFactProtocolConstCallFolds),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return ProtocolConstCallFoldPass(protocolGlobals)(fn)
 			},
@@ -213,8 +219,8 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 		{
 			Name:     "WholeCallKernelExit",
 			Phase:    Tier2PhaseCallLower,
-			Requires: []string{"CallABIs"},
-			Provides: []string{"WholeCallNoResultKernels", "WholeCallNoResultBatches"},
+			Requires: analysisFacts(AnalysisFactCallABIs),
+			Provides: analysisFacts(AnalysisFactWholeCallNoResultKernels, AnalysisFactWholeCallNoResultBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return WholeCallKernelExitPass(protocolGlobals)(fn)
 			},
@@ -266,7 +272,7 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 		{
 			Name:     "CallABI (final)",
 			Phase:    Tier2PhaseFinalCall,
-			Requires: []string{"FixedShapeTables"},
+			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Provides: nil, // Updates existing CallABIs
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalArrayElementFacts, collectStableGlobalArrayElementFacts(fn))
@@ -281,7 +287,7 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 		{
 			Name:     "WholeCallKernelExit (final)",
 			Phase:    Tier2PhaseFinalCall,
-			Requires: []string{"CallABIs"},
+			Requires: analysisFacts(AnalysisFactCallABIs),
 			Provides: nil, // Updates existing kernels
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return WholeCallKernelExitPass(protocolGlobals)(fn)
@@ -290,11 +296,11 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 		tier2PassModuleWith("CallReturnProjection (final)", Tier2PhaseFinalCall, nil, nil, CallReturnProjectionPass),
 		tier2PassModuleWith("ModularCallFloorReduce (final)", Tier2PhaseFinalCall, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWith("CallResultRangeGuard (final)", Tier2PhaseFinalCall, nil, nil, CallResultRangeGuardPass),
-		tier2PassModuleWith("FieldCallPolyLenFusion", Tier2PhaseFinalCall, []string{"FieldPolyShapeFacts"}, nil, FieldCallPolyLenFusionPass),
-		tier2PassModuleWith("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, []string{"Int48Safe", "IntRanges", "IntNonNegative", "IntModNonZeroDivisor", "IntModNoSignAdjust"}, RangeAnalysisPass),
+		tier2PassModuleWith("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPass),
+		tier2PassModuleWith("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPass),
 	}
 	if os.Getenv("GSCRIPT_FIELD_SHAPE_SPLIT") == "1" {
-		modules = append(modules, tier2PassModuleWith("FieldShapeCallSplit (experimental)", Tier2PhaseFinalCall, []string{"FieldPolyShapeFacts"}, nil, FieldShapeCallSplitPass))
+		modules = append(modules, tier2PassModuleWith("FieldShapeCallSplit (experimental)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPass))
 	}
 	return modules
 }

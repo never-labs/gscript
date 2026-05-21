@@ -13,8 +13,8 @@ import (
 // This is intended to be called at initialization or test time, not in the
 // production hot path.
 func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
-	provided := make(map[string]string) // fact -> module that provided it
-	providers := make(map[string][]string)
+	provided := make(map[AnalysisFact]string) // fact -> module that provided it
+	providers := make(map[string][]AnalysisFact)
 
 	// First pass: collect all facts that are provided and by which modules.
 	// The same fact may be provided by multiple modules (e.g., RangeAnalysis
@@ -28,7 +28,7 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 	}
 
 	// Second pass: verify that all required facts are available before each module runs
-	available := make(map[string]bool)
+	available := make(map[AnalysisFact]bool)
 	for _, group := range plan.phaseGroups() {
 		for _, module := range group.Modules {
 			// Check that all required facts are available
@@ -51,7 +51,7 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 
 	// Optional: warn about facts that are provided but never required
 	// (these might still be used by codegen or other infrastructure)
-	neverRequired := []string{}
+	neverRequired := []AnalysisFact{}
 	for fact := range provided {
 		required := false
 		for _, module := range plan.Modules {
@@ -70,7 +70,9 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 		}
 	}
 	if len(neverRequired) > 0 {
-		sort.Strings(neverRequired)
+		sort.Slice(neverRequired, func(i, j int) bool {
+			return neverRequired[i] < neverRequired[j]
+		})
 		// This is informational, not an error
 		return nil
 	}

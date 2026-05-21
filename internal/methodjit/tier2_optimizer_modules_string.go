@@ -12,7 +12,7 @@ func tier2StringNativeModules() []Tier2OptimizerModule {
 			Name:     "StringNativeCleanup",
 			Phase:    Tier2PhaseStringNative,
 			Requires: nil,
-			Provides: []string{"StringConstTables", "StringFormatPatterns", "StringSplitSubSpecs"},
+			Provides: analysisFacts(AnalysisFactStringConstTables, AnalysisFactStringFormatPatterns, AnalysisFactStringSplitSubSpecs),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				out, notes := StringNativeCleanupPass(fn)
 				if ctx != nil && len(notes) > 0 {
