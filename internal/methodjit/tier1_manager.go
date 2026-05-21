@@ -233,6 +233,10 @@ func (e *BaselineJITEngine) TryCompile(proto *vm.FuncProto) interface{} {
 		return nil
 	}
 
+	// Ensure feedback vectors are initialized before Tier 1 runs, so that
+	// Tier 1 handlers can record type feedback that Tier 2 will consume.
+	proto.EnsureFeedback()
+
 	bf, err := CompileBaseline(proto)
 	if err != nil {
 		e.failed[proto] = true

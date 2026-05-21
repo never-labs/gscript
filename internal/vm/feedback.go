@@ -10,6 +10,33 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
+// ParamTypeFeedbackEntry records per-parameter type observations at function entry.
+// Tier 2 uses this to insert speculative type guards on parameters before SSA
+// type inference, extending TypeSpec coverage to parameters whose types cannot
+// be inferred from usage context alone.
+type ParamTypeFeedbackEntry struct {
+	Type  FeedbackType
+	Count uint32
+}
+
+func (e *ParamTypeFeedbackEntry) Observe(vt runtime.ValueType) {
+	observed := feedbackFromValueType[vt]
+	cur := e.Type
+	if cur == FBAny {
+		e.Count++
+		return
+	}
+	if cur == FBUnobserved {
+		e.Type = observed
+		e.Count++
+		return
+	}
+	if cur != observed {
+		e.Type = FBAny
+	}
+	e.Count++
+}
+
 // FeedbackType is a monotonic type lattice for type profiling.
 // Transitions: Unobserved -> concrete type -> Any. Never narrows.
 type FeedbackType uint8

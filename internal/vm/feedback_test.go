@@ -888,3 +888,31 @@ func TestFeedbackKind_ObserveKind_AllKinds(t *testing.T) {
 		}
 	}
 }
+
+func TestParamTypeFeedbackEntry_Observe(t *testing.T) {
+	var e ParamTypeFeedbackEntry
+
+	// First observation: int
+	e.Observe(runtime.TypeInt)
+	if e.Type != FBInt || e.Count != 1 {
+		t.Fatalf("after int: type=%v count=%d, want FBInt/1", e.Type, e.Count)
+	}
+
+	// Second observation: int
+	e.Observe(runtime.TypeInt)
+	if e.Type != FBInt || e.Count != 2 {
+		t.Fatalf("after 2x int: type=%v count=%d, want FBInt/2", e.Type, e.Count)
+	}
+
+	// Third observation: float -> widens to Any
+	e.Observe(runtime.TypeFloat)
+	if e.Type != FBAny || e.Count != 3 {
+		t.Fatalf("after float: type=%v count=%d, want FBAny/3", e.Type, e.Count)
+	}
+
+	// Fourth: stays Any
+	e.Observe(runtime.TypeInt)
+	if e.Type != FBAny || e.Count != 4 {
+		t.Fatalf("after re-int: type=%v count=%d, want FBAny/4", e.Type, e.Count)
+	}
+}
