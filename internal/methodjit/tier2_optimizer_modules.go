@@ -58,6 +58,7 @@ type Tier2ModuleContract struct {
 type Tier2PipelineData struct {
 	CompilationDependencies *CompilationDependencyRegistry
 	Plan                    *Tier2OptimizerPlan
+	ValidatedPlan           *Tier2ValidatedOptimizerPlan
 	Diagnostics             Tier2PipelineDiagnostics
 }
 
@@ -151,6 +152,12 @@ type Tier2OptimizerContext struct {
 	// DependencyRegistry records compile-time assumptions made by optimizer
 	// modules and validated before the optimized function leaves the pipeline.
 	DependencyRegistry *CompilationDependencyRegistry
+	// ModuleRegistry is the source of optimizer modules for this compilation.
+	// Nil uses DefaultModuleRegistry.
+	ModuleRegistry *ModuleRegistry
+	// FeatureFlags enables or disables optimizer phases and modules for this
+	// compilation. The zero value leaves the default plan unchanged.
+	FeatureFlags Tier2OptimizerFeatureFlags
 }
 
 func newTier2OptimizerContext(data *Tier2PipelineData) *Tier2OptimizerContext {
@@ -192,6 +199,24 @@ type Tier2OptimizerModule struct {
 	Updates        []AnalysisFact // Facts this module refreshes after an earlier provider
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
 	RunWithContext func(*Function, *Tier2PipelineOpts, *Tier2OptimizerContext) (*Function, error)
+}
+
+// Tier2OptimizerFeatureFlags controls coarse optimizer participation by phase
+// or module name. Disabled phases remove all modules in that phase; disabled
+// modules remove only matching module names.
+type Tier2OptimizerFeatureFlags struct {
+	DisabledPhases  map[Tier2OptimizerPhase]bool
+	DisabledModules map[string]bool
+}
+
+func (flags Tier2OptimizerFeatureFlags) moduleEnabled(module Tier2OptimizerModule) bool {
+	if flags.DisabledPhases != nil && flags.DisabledPhases[module.Phase] {
+		return false
+	}
+	if flags.DisabledModules != nil && flags.DisabledModules[module.Name] {
+		return false
+	}
+	return true
 }
 
 func tier2PassModule(name string, phase Tier2OptimizerPhase, pass PassFunc) Tier2OptimizerModule {
@@ -245,20 +270,72 @@ type Tier2OptimizerPlan struct {
 	PhaseGroups []Tier2OptimizerPhaseGroup
 }
 
+// Tier2ValidatedOptimizerPlan is an optimizer plan whose dependency ordering
+// has already been checked.
+type Tier2ValidatedOptimizerPlan struct {
+	plan Tier2OptimizerPlan
+}
+
+func (validated *Tier2ValidatedOptimizerPlan) Plan() Tier2OptimizerPlan {
+	if validated == nil {
+		return Tier2OptimizerPlan{}
+	}
+	return validated.plan
+}
+
 func newTier2OptimizerPlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
-	plan := BuildModulePlan(ctx)
-	if data := ctx.ensurePipelineData(); data != nil {
+	registry := DefaultModuleRegistry
+	if ctx != nil && ctx.ModuleRegistry != nil {
+		registry = ctx.ModuleRegistry
+	}
+	plan := registry.BuildModulePlan(ctx)
+	if ctx != nil {
+		plan = filterTier2OptimizerPlan(plan, ctx.FeatureFlags)
+	}
+	if ctx != nil {
+		data := ctx.ensurePipelineData()
 		data.Plan = &plan
 	}
 	return plan
 }
 
 func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext, plan Tier2OptimizerPlan) (*Function, error) {
-	if data := ctx.ensurePipelineData(); data != nil {
-		data.Plan = &plan
+	validated, err := validateTier2OptimizerPlanForRun(ctx, plan)
+	if err != nil {
+		return nil, err
 	}
+	return runTier2OptimizerValidatedPlan(fn, opts, ctx, validated)
+}
+
+func ValidateTier2OptimizerPlan(plan Tier2OptimizerPlan) (*Tier2ValidatedOptimizerPlan, error) {
 	if err := ValidateDependencyOrder(plan); err != nil {
 		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
+	}
+	return &Tier2ValidatedOptimizerPlan{plan: plan}, nil
+}
+
+func validateTier2OptimizerPlanForRun(ctx *Tier2OptimizerContext, plan Tier2OptimizerPlan) (*Tier2ValidatedOptimizerPlan, error) {
+	validated, err := ValidateTier2OptimizerPlan(plan)
+	if err != nil {
+		return nil, err
+	}
+	if data := ctx.ensurePipelineData(); data != nil {
+		data.ValidatedPlan = validated
+	}
+	return validated, nil
+}
+
+func runTier2OptimizerValidatedPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext, validated *Tier2ValidatedOptimizerPlan) (*Function, error) {
+	if validated == nil {
+		return nil, fmt.Errorf("tier2 optimizer validated plan is nil")
+	}
+	plan := validated.plan
+	if ctx == nil {
+		ctx = newTier2OptimizerContext(nil)
+	}
+	if data := ctx.ensurePipelineData(); data != nil {
+		data.Plan = &plan
+		data.ValidatedPlan = validated
 	}
 	var err error
 	for _, group := range plan.phaseGroups() {
@@ -268,6 +345,35 @@ func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2Opti
 		}
 	}
 	return fn, nil
+}
+
+func filterTier2OptimizerPlan(plan Tier2OptimizerPlan, flags Tier2OptimizerFeatureFlags) Tier2OptimizerPlan {
+	if flags.DisabledPhases == nil && flags.DisabledModules == nil {
+		return plan
+	}
+	filtered := Tier2OptimizerPlan{
+		Phases:      make([]Tier2OptimizerPhase, 0, len(plan.Phases)),
+		Modules:     make([]Tier2OptimizerModule, 0, len(plan.Modules)),
+		PhaseGroups: make([]Tier2OptimizerPhaseGroup, 0, len(plan.PhaseGroups)),
+	}
+	for _, group := range plan.phaseGroups() {
+		filteredGroup := Tier2OptimizerPhaseGroup{
+			Phase:   group.Phase,
+			Modules: make([]Tier2OptimizerModule, 0, len(group.Modules)),
+		}
+		for _, module := range group.Modules {
+			if flags.moduleEnabled(module) {
+				filteredGroup.Modules = append(filteredGroup.Modules, module)
+				filtered.Modules = append(filtered.Modules, module)
+			}
+		}
+		if len(filteredGroup.Modules) == 0 {
+			continue
+		}
+		filtered.Phases = append(filtered.Phases, filteredGroup.Phase)
+		filtered.PhaseGroups = append(filtered.PhaseGroups, filteredGroup)
+	}
+	return filtered
 }
 
 func (plan Tier2OptimizerPlan) phaseGroups() []Tier2OptimizerPhaseGroup {

@@ -74,6 +74,12 @@ func BuildModulePlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
 	return DefaultModuleRegistry.BuildModulePlan(ctx)
 }
 
+// BuildValidatedModulePlan constructs and dependency-validates the ordered
+// module plan from the default registry.
+func BuildValidatedModulePlan(ctx *Tier2OptimizerContext) (*Tier2ValidatedOptimizerPlan, error) {
+	return DefaultModuleRegistry.BuildValidatedModulePlan(ctx)
+}
+
 // BuildModulePlan constructs the ordered module plan from this registry.
 func (r *ModuleRegistry) BuildModulePlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
 	if r == nil {
@@ -113,6 +119,17 @@ func (r *ModuleRegistry) BuildModulePlan(ctx *Tier2OptimizerContext) Tier2Optimi
 		Modules:     modules,
 		PhaseGroups: groups,
 	}
+}
+
+// BuildValidatedModulePlan constructs and dependency-validates the ordered
+// module plan from this registry. The returned plan can be reused by
+// Tier2PipelineOpts.ValidatedPlan without re-running dependency validation.
+func (r *ModuleRegistry) BuildValidatedModulePlan(ctx *Tier2OptimizerContext) (*Tier2ValidatedOptimizerPlan, error) {
+	plan := r.BuildModulePlan(ctx)
+	if ctx != nil {
+		plan = filterTier2OptimizerPlan(plan, ctx.FeatureFlags)
+	}
+	return ValidateTier2OptimizerPlan(plan)
 }
 
 func sortTier2ModulesByOrder(modules []Tier2OptimizerModule) {

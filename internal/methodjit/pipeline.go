@@ -91,6 +91,9 @@ type Tier2PipelineOpts struct {
 	VerifyIR                        bool                           // run lightweight IR verification after each optimizer module
 	ModuleRuns                      *[]Tier2ModuleRun              // optional per-module contract/run diagnostics
 	ModuleRunCallback               Tier2ModuleRunCallback         // optional per-module observer
+	ModuleRegistry                  *ModuleRegistry                // optional optimizer module registry; nil uses DefaultModuleRegistry
+	ValidatedPlan                   *Tier2ValidatedOptimizerPlan   // optional pre-built, dependency-validated optimizer plan
+	FeatureFlags                    Tier2OptimizerFeatureFlags     // optional phase/module optimizer switches
 	LastPassChanged                 bool                           // scratch flag for adjacent optimizer modules
 }
 
@@ -141,6 +144,10 @@ func runTier2PipelineWithPlan(fn *Function, opts *Tier2PipelineOpts, buildPlan f
 	ctx.ProtocolGlobals = protocolGlobals
 	ctx.InlineMaxSize = maxSize
 	ctx.DependencyRegistry = data.CompilationDependencies
+	if opts != nil {
+		ctx.ModuleRegistry = opts.ModuleRegistry
+		ctx.FeatureFlags = opts.FeatureFlags
+	}
 	if opts != nil && (opts.ModuleRuns != nil || opts.ModuleRunCallback != nil) {
 		data.Diagnostics.ModuleRunCallback = func(run Tier2ModuleRun) {
 			if opts.ModuleRuns != nil {
@@ -155,7 +162,11 @@ func runTier2PipelineWithPlan(fn *Function, opts *Tier2PipelineOpts, buildPlan f
 	if buildPlan == nil {
 		buildPlan = newTier2OptimizerPlan
 	}
-	fn, err = runTier2OptimizerPlan(fn, opts, ctx, buildPlan(ctx))
+	if opts != nil && opts.ValidatedPlan != nil {
+		fn, err = runTier2OptimizerValidatedPlan(fn, opts, ctx, opts.ValidatedPlan)
+	} else {
+		fn, err = runTier2OptimizerPlan(fn, opts, ctx, buildPlan(ctx))
+	}
 	if err != nil {
 		return nil, nil, err
 	}

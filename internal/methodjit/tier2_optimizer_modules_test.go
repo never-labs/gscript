@@ -145,12 +145,7 @@ func TestTier2OptimizerPlanCoversModulePhases(t *testing.T) {
 }
 
 func TestRunTier2PipelineCreatesPipelineDataWithDependencyRegistry(t *testing.T) {
-	oldRegistry := DefaultModuleRegistry
 	registry := NewModuleRegistry()
-	DefaultModuleRegistry = registry
-	t.Cleanup(func() {
-		DefaultModuleRegistry = oldRegistry
-	})
 
 	var seenCtx *Tier2OptimizerContext
 	if err := registry.RegisterModuleBuilder(Tier2PhaseNumeric, 10, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
@@ -175,7 +170,9 @@ func TestRunTier2PipelineCreatesPipelineDataWithDependencyRegistry(t *testing.T)
 		t.Fatalf("RegisterModuleBuilder: %v", err)
 	}
 
-	_, notes, err := RunTier2Pipeline(&Function{Analysis: NewAnalysisResult()}, nil)
+	_, notes, err := RunTier2Pipeline(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{
+		ModuleRegistry: registry,
+	})
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline: %v", err)
 	}
@@ -190,6 +187,104 @@ func TestRunTier2PipelineCreatesPipelineDataWithDependencyRegistry(t *testing.T)
 	}
 	if got := seenCtx.PipelineData.CompilationDependencies.Len(); got != 1 {
 		t.Fatalf("dependency registry length = %d, want 1", got)
+	}
+	if seenCtx.PipelineData.ValidatedPlan == nil {
+		t.Fatal("pipeline data did not retain validated optimizer plan")
+	}
+	defaultPlan := newTier2OptimizerPlan(&Tier2OptimizerContext{InlineMaxSize: 40})
+	for _, module := range defaultPlan.Modules {
+		if module.Name == "DependencyProbe" {
+			t.Fatal("injected test module leaked into default registry")
+		}
+	}
+}
+
+func TestRunTier2PipelineUsesValidatedPlan(t *testing.T) {
+	var ran []string
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:  "ValidatedProbe",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					ran = append(ran, "ValidatedProbe")
+					return fn, nil
+				},
+			},
+		},
+	}
+	validated, err := ValidateTier2OptimizerPlan(plan)
+	if err != nil {
+		t.Fatalf("ValidateTier2OptimizerPlan: %v", err)
+	}
+
+	_, _, err = RunTier2Pipeline(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{
+		ValidatedPlan: validated,
+	})
+	if err != nil {
+		t.Fatalf("RunTier2Pipeline: %v", err)
+	}
+	if got, want := ran, []string{"ValidatedProbe"}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ran modules=%v want %v", got, want)
+	}
+	if got := tier2ModuleNames(validated.Plan().Modules); len(got) != 1 || got[0] != "ValidatedProbe" {
+		t.Fatalf("validated plan modules=%v want [ValidatedProbe]", got)
+	}
+}
+
+func TestRunTier2PipelineFeatureFlagsDisableModuleAndPhase(t *testing.T) {
+	registry := NewModuleRegistry()
+	var ran []string
+	if err := registry.RegisterModuleBuilder(Tier2PhaseEarlyCanonical, 10, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
+		return []Tier2OptimizerModule{
+			{
+				Name:  "Keep",
+				Phase: Tier2PhaseEarlyCanonical,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					ran = append(ran, "Keep")
+					return fn, nil
+				},
+			},
+			{
+				Name:  "DisabledModule",
+				Phase: Tier2PhaseEarlyCanonical,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					ran = append(ran, "DisabledModule")
+					return fn, nil
+				},
+			},
+		}
+	}); err != nil {
+		t.Fatalf("register early: %v", err)
+	}
+	if err := registry.RegisterModuleBuilder(Tier2PhaseNumeric, 20, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
+		return []Tier2OptimizerModule{
+			{
+				Name:  "DisabledPhase",
+				Phase: Tier2PhaseNumeric,
+				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+					ran = append(ran, "DisabledPhase")
+					return fn, nil
+				},
+			},
+		}
+	}); err != nil {
+		t.Fatalf("register numeric: %v", err)
+	}
+
+	_, _, err := RunTier2Pipeline(&Function{Analysis: NewAnalysisResult()}, &Tier2PipelineOpts{
+		ModuleRegistry: registry,
+		FeatureFlags: Tier2OptimizerFeatureFlags{
+			DisabledModules: map[string]bool{"DisabledModule": true},
+			DisabledPhases:  map[Tier2OptimizerPhase]bool{Tier2PhaseNumeric: true},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunTier2Pipeline: %v", err)
+	}
+	if got, want := ran, []string{"Keep"}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("ran modules=%v want %v", got, want)
 	}
 }
 
