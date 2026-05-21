@@ -200,7 +200,7 @@ func TestTier2SpeculationPlanRejectsConflictingSameFieldWriteTypes(t *testing.T)
 	}
 }
 
-func TestTier2SpeculationPlanDoesNotInferSameFieldFloatWrites(t *testing.T) {
+func TestTier2SpeculationPlanInfersSameFieldFloatWrites(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name: "same_field_float",
 		Code: []uint32{
@@ -212,8 +212,8 @@ func TestTier2SpeculationPlanDoesNotInferSameFieldFloatWrites(t *testing.T) {
 	proto.Feedback[1].Result = vm.FBFloat
 
 	plan := NewTier2SpeculationPlan(proto)
-	if typ, ok := plan.FieldValueGuardType(0); ok || typ != TypeUnknown {
-		t.Fatalf("FieldValueGuardType=%v ok=%v want unknown,false", typ, ok)
+	if typ, ok := plan.FieldValueGuardType(0); !ok || typ != TypeFloat {
+		t.Fatalf("FieldValueGuardType=%v ok=%v want float,true", typ, ok)
 	}
 }
 

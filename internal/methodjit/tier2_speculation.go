@@ -692,9 +692,6 @@ func (p Tier2SpeculationPlan) sameFieldWriteValueGuardType(pc int) (Type, bool) 
 	if observed == TypeUnknown {
 		return TypeUnknown, false
 	}
-	if observed != TypeInt {
-		return TypeUnknown, false
-	}
 	return observed, true
 }
 

@@ -279,9 +279,17 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 			}
 		}
 		if fn.Proto != nil && fn.Proto.Name == "<main>" && calleeHasAllocationIR(calleeFn) {
-			functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
-				fmt.Sprintf("callee %s allocates; keep <main> call boundary", calleeName))
-			continue
+			// Allow small fixed-shape constructors: they are cheap to inline
+			// and LoadElim can forward their field values, potentially
+			// eliminating the allocation via DCE if the table doesn't escape.
+			if len(calleeProto.Code) <= 10 && calleeOnlyFixedTableAlloc(calleeFn) {
+				functionRemarks(fn).Add("Inline", "changed", block.ID, instr.ID, instr.Op,
+					fmt.Sprintf("admitted small fixed-shape constructor %s into <main>", calleeName))
+			} else {
+				functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
+					fmt.Sprintf("callee %s allocates; keep <main> call boundary", calleeName))
+				continue
+			}
 		}
 
 		// Multi-block inlining rewires predecessor lists and phi args. General
@@ -1090,6 +1098,26 @@ func calleeHasAllocationIR(calleeFn *Function) bool {
 		}
 	}
 	return false
+}
+
+func calleeOnlyFixedTableAlloc(calleeFn *Function) bool {
+	if calleeFn == nil {
+		return false
+	}
+	for _, block := range calleeFn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			switch instr.Op {
+			case OpNewFixedTable:
+				// ok
+			case OpNewTable, OpSetList:
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func nativeEffectLoopInlineOp(op Op) bool {
