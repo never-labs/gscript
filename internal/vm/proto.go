@@ -73,12 +73,28 @@ type FuncProto struct {
 	TableStringKeyCache          []runtime.TableStringKeyCacheEntry
 }
 
-// MethodJITCallable reports whether the method JIT can enter this function
+// MethodJITTier1Callable reports whether Tier 1 may enter this function
 // through the fixed-register calling convention. A function may declare varargs
 // for API compatibility while never reading them; in that case extra arguments
-// are ignored exactly as compiled fixed-arity code would do.
-func (p *FuncProto) MethodJITCallable() bool {
+// are ignored exactly as compiled fixed-arity Tier 1 code would do.
+func (p *FuncProto) MethodJITTier1Callable() bool {
 	return p != nil && (!p.IsVarArg || !p.UsesVarargBytecode)
+}
+
+// MethodJITTier2Callable reports whether Tier 2 may compile and publish direct
+// entries for this proto. Tier 2 keeps a stricter ABI boundary than Tier 1:
+// declared vararg functions stay out of Tier 2 even if the bytecode never
+// executes OP_VARARG, because Tier 2 direct entries and continuations do not
+// own the vararg frame contract.
+func (p *FuncProto) MethodJITTier2Callable() bool {
+	return p != nil && !p.IsVarArg && !p.UsesVarargBytecode
+}
+
+// MethodJITCallable reports whether the VM may hand this proto to the method
+// JIT entry path. This is the Tier 1 boundary; Tier 2 promotion must use
+// MethodJITTier2Callable instead.
+func (p *FuncProto) MethodJITCallable() bool {
+	return p.MethodJITTier1Callable()
 }
 
 // TableCtor2 describes a static two-string-field table constructor.

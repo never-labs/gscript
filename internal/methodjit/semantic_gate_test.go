@@ -59,6 +59,27 @@ func TestJITSemanticGateRejectsDynamicOperators(t *testing.T) {
 	}
 }
 
+func TestTier2CallableGateRejectsDeclaredVarargWithoutOPVararg(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:     "vararg_unused",
+		IsVarArg: true,
+		Code:     []uint32{vm.EncodeABC(vm.OP_RETURN, 0, 1, 0)},
+	}
+	if !proto.MethodJITTier1Callable() {
+		t.Fatal("declared but unread vararg function should remain Tier 1 callable")
+	}
+	if proto.MethodJITTier2Callable() {
+		t.Fatal("declared vararg function should not be Tier 2 callable")
+	}
+	if canPromoteToTier2(proto) {
+		t.Fatal("declared vararg function should not pass Tier 2 bytecode gate")
+	}
+	gate := jitTier2CallableGate(proto)
+	if gate.Allowed {
+		t.Fatal("Tier2Callable gate should reject declared vararg function")
+	}
+}
+
 func findFirstProtoWithName(t *testing.T, root *vm.FuncProto, name string) *vm.FuncProto {
 	t.Helper()
 	if root.Name == name {

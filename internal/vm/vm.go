@@ -2267,7 +2267,7 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 	}
 
 	// Method JIT: check for compiled function.
-	if vm.methodJIT != nil && proto.MethodJITCallable() && !proto.JITDisabled {
+	if vm.methodJIT != nil && proto.MethodJITTier1Callable() && !proto.JITDisabled {
 		proto.CallCount++
 		if proto.CallCount <= 64 {
 			proto.ObserveArgShapes(args)
@@ -3580,7 +3580,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				}
 
 				// Method JIT: check for compiled function
-				if vm.methodJIT != nil && proto.MethodJITCallable() && !proto.JITDisabled {
+				if vm.methodJIT != nil && proto.MethodJITTier1Callable() && !proto.JITDisabled {
 					proto.CallCount++
 					if proto.CallCount <= 64 {
 						argEnd := newBase + nArgs

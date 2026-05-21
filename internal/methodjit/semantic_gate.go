@@ -52,6 +52,22 @@ func jitRequiresInterpreter(proto *vm.FuncProto) bool {
 	return jitUnsupportedVMOnlyControl(proto)
 }
 
+func jitTier2CallableGate(proto *vm.FuncProto) GateResult {
+	if proto == nil {
+		return allowGate("Tier2Callable", "no proto")
+	}
+	if proto.MethodJITTier2Callable() {
+		return allowGate("Tier2Callable", "fixed-arity Tier 2 callable")
+	}
+	if proto.IsVarArg {
+		return blockGate("Tier2Callable", "declared vararg function is Tier 1 only")
+	}
+	if proto.UsesVarargBytecode {
+		return blockGate("Tier2Callable", "OP_VARARG requires VM vararg frame state")
+	}
+	return blockGate("Tier2Callable", "function is not Tier 2 callable")
+}
+
 func jitSemanticGateEnabled() bool {
 	return os.Getenv("GSCRIPT_OFFICIAL_CHECK_JIT") == "1" ||
 		os.Getenv("GSCRIPT_JIT_SEMANTIC_GATE") == "1"

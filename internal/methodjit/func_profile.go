@@ -322,7 +322,7 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 	if shouldStayTier1ForBoxedRawIntKernel(proto, profile) {
 		return false
 	}
-	if proto != nil && proto.IsVarArg {
+	if proto != nil && !proto.MethodJITTier2Callable() {
 		return false
 	}
 	// Top-level drivers are only invoked once and often contain bytecode ops

@@ -23,7 +23,7 @@ import (
 // Exit-resume (exit to Go, execute, resume JIT):
 //   - SETGLOBAL, NEWTABLE, SETLIST, APPEND, LEN, CONCAT, SELF, POW: emitOpExit
 //   - CLOSURE, GETUPVAL, SETUPVAL: emitOpExit with closure state from VM
-//   - VARARG: emitOpExit with vararg state from VM frame
+//   - VARARG: Tier 1 only until Tier 2 owns the vararg frame contract
 //
 // Only bytecodes that require VM-only control state are blocked:
 //   - GO, MAKECHAN, SEND, RECV
@@ -34,6 +34,9 @@ import (
 // after inlining, the function falls back to Tier 1 where BLR calls are faster.
 // GETGLOBAL is fully native with a per-instruction value cache matching Tier 1.
 func canPromoteToTier2(proto *vm.FuncProto) bool {
+	if !jitTier2CallableGate(proto).Allowed {
+		return false
+	}
 	for _, inst := range proto.Code {
 		op := vm.DecodeOp(inst)
 		switch op {
@@ -54,6 +57,9 @@ func firstUnsupportedTier2Bytecode(proto *vm.FuncProto) (string, bool) {
 func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 	if proto == nil {
 		return allowGate("Tier2Bytecode", "no proto")
+	}
+	if gate := jitTier2CallableGate(proto); !gate.Allowed {
+		return gate
 	}
 	for _, inst := range proto.Code {
 		op := vm.DecodeOp(inst)
@@ -84,6 +90,9 @@ func feedbackHasObservations(fv []vm.TypeFeedback) bool {
 // functions that don't need the inline pass. GETGLOBAL is allowed because
 // Tier 2 has a per-instruction value cache matching Tier 1's performance.
 func canPromoteToTier2NoCalls(proto *vm.FuncProto) bool {
+	if !jitTier2CallableGate(proto).Allowed {
+		return false
+	}
 	for _, inst := range proto.Code {
 		op := vm.DecodeOp(inst)
 		switch op {
