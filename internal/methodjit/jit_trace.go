@@ -150,6 +150,37 @@ func (tm *TieringManager) traceTier1CompileResult(proto *vm.FuncProto, alreadyCo
 	tm.traceEvent("tier1_compile", "tier1", proto, attrs)
 }
 
+func (tm *TieringManager) tracePromotionDecision(proto *vm.FuncProto, decision PromotionDecision) {
+	if tm == nil || tm.timeline == nil {
+		return
+	}
+	callCount := 0
+	tier1Callable := vm.MethodJITCallableDecision{Tier: vm.MethodJITTier1, Reason: vm.MethodJITCallableReasonNilProto}
+	tier2Callable := vm.MethodJITCallableDecision{Tier: vm.MethodJITTier2, Reason: vm.MethodJITCallableReasonNilProto}
+	if proto != nil {
+		callCount = proto.CallCount
+		tier1Callable = proto.MethodJITTier1CallableDecision()
+		tier2Callable = proto.MethodJITTier2CallableDecision()
+	}
+	attrs := map[string]any{
+		"action":                decision.Action,
+		"reason":                decision.Reason,
+		"promote_tier2":         decision.PromoteTier2,
+		"call_count":            callCount,
+		"gate":                  decision.Gate.Gate,
+		"gate_reason":           decision.Gate.Reason,
+		"gate_severity":         decision.Gate.Severity,
+		"tier1_callable":        tier1Callable.Allowed,
+		"tier1_callable_reason": tier1Callable.Reason,
+		"tier2_callable":        tier2Callable.Allowed,
+		"tier2_callable_reason": tier2Callable.Reason,
+	}
+	if decision.Gate.Op != 0 {
+		attrs["gate_op"] = decision.Gate.Op.String()
+	}
+	tm.traceEvent("promotion_decision", "tiering", proto, attrs)
+}
+
 func (tm *TieringManager) traceTier2Success(proto *vm.FuncProto, cf *CompiledFunction, attempt int) {
 	if tm == nil || tm.timeline == nil {
 		return

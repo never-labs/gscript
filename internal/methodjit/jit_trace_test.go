@@ -112,3 +112,52 @@ func TestTraceTier2SuccessIncludesSpecializationVersion(t *testing.T) {
 		t.Fatalf("missing suppressed count: %#v", attrs)
 	}
 }
+
+func TestTracePromotionDecisionRecordsReasonAndCallablePolicy(t *testing.T) {
+	var buf bytes.Buffer
+	timeline, err := NewJITTimeline(&buf, JITTimelineJSON)
+	if err != nil {
+		t.Fatalf("NewJITTimeline: %v", err)
+	}
+	tm := NewTieringManager()
+	tm.SetTimeline(timeline)
+	proto := &vm.FuncProto{Name: "vararg_unused", IsVarArg: true}
+
+	tm.tracePromotionDecision(proto, PromotionDecision{
+		Action:       TieringActionUseTier1,
+		Reason:       PromotionReasonNotReadyForTier2,
+		Gate:         blockGate("Tier2Callable", vm.MethodJITCallableReasonDeclaredVarargTier2),
+		PromoteTier2: false,
+	})
+	tm.tracePromotionDecision(&vm.FuncProto{Name: "hot", CallCount: 10}, PromotionDecision{
+		Action:       TieringActionPromoteTier2,
+		Reason:       PromotionReasonSmartTier2,
+		Gate:         allowGate("SmartTiering", "profile selected Tier 2"),
+		PromoteTier2: true,
+	})
+	if err := timeline.Flush(); err != nil {
+		t.Fatalf("Flush: %v", err)
+	}
+
+	var events []JITTimelineEvent
+	if err := json.Unmarshal(buf.Bytes(), &events); err != nil {
+		t.Fatalf("unmarshal JSON events: %v\n%s", err, buf.String())
+	}
+	if len(events) != 2 {
+		t.Fatalf("events=%d want 2", len(events))
+	}
+	first := events[0].Attrs
+	if first["action"] != string(TieringActionUseTier1) || first["reason"] != string(PromotionReasonNotReadyForTier2) {
+		t.Fatalf("missing non-promotion reason attrs: %#v", first)
+	}
+	if first["tier1_callable"] != true || first["tier1_callable_reason"] != vm.MethodJITCallableReasonDeclaredVarargTier1 {
+		t.Fatalf("missing Tier 1 callable attrs: %#v", first)
+	}
+	if first["tier2_callable"] != false || first["tier2_callable_reason"] != vm.MethodJITCallableReasonDeclaredVarargTier2 {
+		t.Fatalf("missing Tier 2 callable attrs: %#v", first)
+	}
+	second := events[1].Attrs
+	if second["action"] != string(TieringActionPromoteTier2) || second["reason"] != string(PromotionReasonSmartTier2) || second["promote_tier2"] != true {
+		t.Fatalf("missing promotion reason attrs: %#v", second)
+	}
+}

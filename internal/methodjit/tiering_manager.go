@@ -380,9 +380,19 @@ func (tm *TieringManager) getProfile(proto *vm.FuncProto) FuncProfile {
 // call count.
 func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 	if jitRequiresInterpreter(proto) {
+		tm.tracePromotionDecision(proto, PromotionDecision{
+			Action: TieringActionStayInterpreted,
+			Reason: PromotionReasonInterpreterRequired,
+			Gate:   blockGate("JITSemanticGate", "VM-only control requires interpreter"),
+		})
 		return nil
 	}
 	if jitSemanticGateEnabled() && jitShouldStayInInterpreter(proto) {
+		tm.tracePromotionDecision(proto, PromotionDecision{
+			Action: TieringActionStayInterpreted,
+			Reason: PromotionReasonSemanticGate,
+			Gate:   blockGate("JITSemanticGate", "semantic gate kept function interpreted"),
+		})
 		return nil
 	}
 	if tm.envR154Trace {
@@ -404,9 +414,20 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 		compiled = nil
 	}
 	if compiled != nil {
+		tm.tracePromotionDecision(proto, PromotionDecision{
+			Action:   TieringActionReturnCompiled,
+			Reason:   PromotionReasonCachedCompiled,
+			Gate:     allowGate("tier2_cache", "already compiled at Tier 2"),
+			Compiled: compiled,
+		})
 		return compiled
 	}
 	if !recompileRequested && tm.tier1Only[proto] {
+		tm.tracePromotionDecision(proto, PromotionDecision{
+			Action: TieringActionUseTier1,
+			Reason: PromotionReasonTier1OnlyCached,
+			Gate:   blockGate("Tier1OnlyCache", "proto cached as Tier 1 only"),
+		})
 		return tm.tier1.TryCompile(proto)
 	}
 	profile := tm.getProfile(proto)
@@ -416,6 +437,7 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 		Tier2Failed:        tm.tier2HasFailed(proto),
 		RecompileRequested: recompileRequested,
 	})
+	tm.tracePromotionDecision(proto, decision)
 	if decision.Action == TieringActionUseTier1 &&
 		proto.CallCount >= 128 &&
 		!profile.HasLoop &&

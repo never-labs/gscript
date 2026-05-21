@@ -73,12 +73,43 @@ type FuncProto struct {
 	TableStringKeyCache          []runtime.TableStringKeyCacheEntry
 }
 
+type MethodJITCallableTier string
+
+const (
+	MethodJITTier1 MethodJITCallableTier = "tier1"
+	MethodJITTier2 MethodJITCallableTier = "tier2"
+)
+
+const (
+	MethodJITCallableReasonNilProto              = "nil_proto"
+	MethodJITCallableReasonFixedArity            = "fixed_arity_callable"
+	MethodJITCallableReasonDeclaredVarargTier1   = "declared_vararg_without_op_vararg_tier1_callable"
+	MethodJITCallableReasonDeclaredVarargTier2   = "declared_vararg_function_is_tier1_only"
+	MethodJITCallableReasonOPVarargTier1         = "op_vararg_without_declaration_tier1_callable"
+	MethodJITCallableReasonOPVarargNeedsVMFrame  = "op_vararg_requires_vm_vararg_frame_state"
+	MethodJITCallableReasonUnsupportedVarargForm = "unsupported_vararg_callable_shape"
+)
+
+type MethodJITCallableDecision struct {
+	Tier               MethodJITCallableTier
+	Allowed            bool
+	Reason             string
+	IsVarArg           bool
+	UsesVarargBytecode bool
+}
+
 // MethodJITTier1Callable reports whether Tier 1 may enter this function
 // through the fixed-register calling convention. A function may declare varargs
 // for API compatibility while never reading them; in that case extra arguments
 // are ignored exactly as compiled fixed-arity Tier 1 code would do.
 func (p *FuncProto) MethodJITTier1Callable() bool {
 	return p != nil && (!p.IsVarArg || !p.UsesVarargBytecode)
+}
+
+// MethodJITTier1CallableDecision explains the Tier 1 callable policy without
+// putting reason construction on the VM's hot MethodJITTier1Callable path.
+func (p *FuncProto) MethodJITTier1CallableDecision() MethodJITCallableDecision {
+	return methodJITCallableDecision(p, MethodJITTier1)
 }
 
 // MethodJITTier2Callable reports whether Tier 2 may compile and publish direct
@@ -88,6 +119,61 @@ func (p *FuncProto) MethodJITTier1Callable() bool {
 // own the vararg frame contract.
 func (p *FuncProto) MethodJITTier2Callable() bool {
 	return p != nil && !p.IsVarArg && !p.UsesVarargBytecode
+}
+
+// MethodJITTier2CallableDecision explains the Tier 2 callable policy without
+// changing the fast boolean used by promotion and dispatch gates.
+func (p *FuncProto) MethodJITTier2CallableDecision() MethodJITCallableDecision {
+	return methodJITCallableDecision(p, MethodJITTier2)
+}
+
+func methodJITCallableDecision(p *FuncProto, tier MethodJITCallableTier) MethodJITCallableDecision {
+	if p == nil {
+		return MethodJITCallableDecision{Tier: tier, Reason: MethodJITCallableReasonNilProto}
+	}
+	d := MethodJITCallableDecision{
+		Tier:               tier,
+		IsVarArg:           p.IsVarArg,
+		UsesVarargBytecode: p.UsesVarargBytecode,
+	}
+	switch tier {
+	case MethodJITTier1:
+		if !p.IsVarArg && !p.UsesVarargBytecode {
+			d.Allowed = true
+			d.Reason = MethodJITCallableReasonFixedArity
+			return d
+		}
+		if !p.IsVarArg && p.UsesVarargBytecode {
+			d.Allowed = true
+			d.Reason = MethodJITCallableReasonOPVarargTier1
+			return d
+		}
+		if p.IsVarArg && !p.UsesVarargBytecode {
+			d.Allowed = true
+			d.Reason = MethodJITCallableReasonDeclaredVarargTier1
+			return d
+		}
+		if p.UsesVarargBytecode {
+			d.Reason = MethodJITCallableReasonOPVarargNeedsVMFrame
+			return d
+		}
+	case MethodJITTier2:
+		if !p.IsVarArg && !p.UsesVarargBytecode {
+			d.Allowed = true
+			d.Reason = MethodJITCallableReasonFixedArity
+			return d
+		}
+		if p.IsVarArg {
+			d.Reason = MethodJITCallableReasonDeclaredVarargTier2
+			return d
+		}
+		if p.UsesVarargBytecode {
+			d.Reason = MethodJITCallableReasonOPVarargNeedsVMFrame
+			return d
+		}
+	}
+	d.Reason = MethodJITCallableReasonUnsupportedVarargForm
+	return d
 }
 
 // MethodJITCallable reports whether the VM may hand this proto to the method

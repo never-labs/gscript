@@ -64,6 +64,9 @@ const (
 	PromotionReasonRecursivePartition  PromotionReason = "recursive_partition_table_mutation"
 	PromotionReasonLoopCallSuppressed  PromotionReason = "loop_call_suppressed"
 	PromotionReasonFeedbackRefresh     PromotionReason = "feedback_refresh"
+	PromotionReasonTier1OnlyCached     PromotionReason = "tier1_only_cached"
+	PromotionReasonInterpreterRequired PromotionReason = "interpreter_required"
+	PromotionReasonSemanticGate        PromotionReason = "semantic_gate"
 )
 
 type PromotionDecision struct {

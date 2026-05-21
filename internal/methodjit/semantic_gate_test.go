@@ -78,6 +78,33 @@ func TestTier2CallableGateRejectsDeclaredVarargWithoutOPVararg(t *testing.T) {
 	if gate.Allowed {
 		t.Fatal("Tier2Callable gate should reject declared vararg function")
 	}
+	if gate.Reason != vm.MethodJITCallableReasonDeclaredVarargTier2 {
+		t.Fatalf("Tier2Callable reason = %q, want %q", gate.Reason, vm.MethodJITCallableReasonDeclaredVarargTier2)
+	}
+}
+
+func TestTier2CallableGateRejectsOPVarargWithoutDeclaration(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name:               "op_vararg",
+		UsesVarargBytecode: true,
+		Code:               []uint32{vm.EncodeABC(vm.OP_VARARG, 0, 2, 0), vm.EncodeABC(vm.OP_RETURN, 0, 2, 0)},
+	}
+	if !proto.MethodJITTier1Callable() {
+		t.Fatal("legacy Tier 1 callable boundary should continue allowing this bytecode shape")
+	}
+	if proto.MethodJITTier2Callable() {
+		t.Fatal("OP_VARARG function should not be Tier 2 callable")
+	}
+	if canPromoteToTier2(proto) {
+		t.Fatal("OP_VARARG function should not pass Tier 2 bytecode gate")
+	}
+	gate := jitTier2CallableGate(proto)
+	if gate.Allowed {
+		t.Fatal("Tier2Callable gate should reject OP_VARARG function")
+	}
+	if gate.Reason != vm.MethodJITCallableReasonOPVarargNeedsVMFrame {
+		t.Fatalf("Tier2Callable reason = %q, want %q", gate.Reason, vm.MethodJITCallableReasonOPVarargNeedsVMFrame)
+	}
 }
 
 func findFirstProtoWithName(t *testing.T, root *vm.FuncProto, name string) *vm.FuncProto {
