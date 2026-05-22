@@ -346,10 +346,11 @@ func (ec *emitContext) emitConstPositiveModSingleSubtract(instr *Instr, dst jit.
 	if divisor > MaxInt48 {
 		return false
 	}
-	if ec.fn == nil || ec.fn.Analysis == nil || ec.fn.Analysis.IntRanges == nil {
+	numeric := functionNumericFacts(ec.fn)
+	if numeric == nil {
 		return false
 	}
-	lhsRange, ok := ec.fn.Analysis.IntRanges[instr.Args[0].ID]
+	lhsRange, ok := numeric.IntRange(instr.Args[0].ID)
 	if !ok || !lhsRange.known || lhsRange.min < 0 || lhsRange.max >= divisor*2 {
 		return false
 	}
@@ -629,29 +630,22 @@ func (ec *emitContext) int48Safe(id int) bool {
 	if ec.fn == nil || ec.fn.Analysis == nil {
 		return false
 	}
-	if ec.fn.Analysis.Int48Safe != nil && ec.fn.Analysis.Int48Safe[id] {
+	numeric := ec.fn.Analysis.NumericFacts()
+	if numeric.IsInt48Safe(id) {
 		return true
 	}
-	if ec.fn.Analysis.IntRanges != nil {
-		if r, ok := ec.fn.Analysis.IntRanges[id]; ok {
-			return r.fitsInt48()
-		}
+	if r, ok := numeric.IntRange(id); ok {
+		return r.fitsInt48()
 	}
 	return false
 }
 
 func (ec *emitContext) intModNonZeroDivisor(id int) bool {
-	if ec.fn == nil || ec.fn.Analysis == nil || ec.fn.Analysis.IntModNonZeroDivisor == nil {
-		return false
-	}
-	return ec.fn.Analysis.IntModNonZeroDivisor[id]
+	return functionNumericFacts(ec.fn).IsIntModNonZeroDivisor(id)
 }
 
 func (ec *emitContext) intModNoSignAdjust(id int) bool {
-	if ec.fn == nil || ec.fn.Analysis == nil || ec.fn.Analysis.IntModNoSignAdjust == nil {
-		return false
-	}
-	return ec.fn.Analysis.IntModNoSignAdjust[id]
+	return functionNumericFacts(ec.fn).IsIntModNoSignAdjust(id)
 }
 
 // --- Raw int unary negate (type-specialized, no unbox/box) ---

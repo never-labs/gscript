@@ -1991,10 +1991,7 @@ func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact
 				instr.Type = typ
 			}
 			if r, ok := fact.FieldRanges[name]; ok && r.known && !fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, idx) {
-				if fn.Analysis.ProfiledIntRanges == nil {
-					fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
-				}
-				fn.Analysis.ProfiledIntRanges[instr.ID] = r
+				fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeInt
 				}
@@ -2095,17 +2092,13 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 		instr.Type = typ
 	}
 	fieldMayMutate := fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, fieldIdx)
-	if fieldMayMutate && fn.Analysis.ProfiledIntRanges != nil {
-		delete(fn.Analysis.ProfiledIntRanges, instr.ID)
-	}
-	if fieldMayMutate && fn.Analysis.ProfiledLenRanges != nil {
-		delete(fn.Analysis.ProfiledLenRanges, instr.ID)
+	if fieldMayMutate {
+		numeric := fn.Analysis.NumericFacts()
+		numeric.DeleteProfiledIntRange(instr.ID)
+		numeric.DeleteProfiledLenRange(instr.ID)
 	}
 	if r, ok := fact.FieldRanges[name]; ok && r.known && !fieldMayMutate {
-		if fn.Analysis.ProfiledIntRanges == nil {
-			fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
-		}
-		fn.Analysis.ProfiledIntRanges[instr.ID] = r
+		fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
 		if instr.Op == OpFieldLoad && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = TypeInt
 		}
@@ -2473,10 +2466,7 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedSha
 					instr.Type = typ
 				}
 				if r := fact.ArrayElementRange; r.known {
-					if fn.Analysis.ProfiledIntRanges == nil {
-						fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
-					}
-					fn.Analysis.ProfiledIntRanges[instr.ID] = r
+					fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("table value carries guarded array element kind %d", kind))
@@ -2489,10 +2479,7 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedSha
 					instr.Type = typ
 				}
 				if r := fact.ArrayElementRange; r.known {
-					if fn.Analysis.ProfiledIntRanges == nil {
-						fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
-					}
-					fn.Analysis.ProfiledIntRanges[instr.ID] = r
+					fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("lowered table value carries guarded array element kind %d", kind))
@@ -2743,13 +2730,10 @@ func cloneStringTypeMap(in map[string]Type) map[string]Type {
 }
 
 func recordProfiledLenRange(fn *Function, valueID int, r intRange) {
-	if fn == nil || valueID == 0 || !r.known {
+	if fn == nil {
 		return
 	}
-	if fn.Analysis.ProfiledLenRanges == nil {
-		fn.Analysis.ProfiledLenRanges = make(map[int]intRange)
-	}
-	fn.Analysis.ProfiledLenRanges[valueID] = r
+	functionNumericFacts(fn).RecordProfiledLenRange(valueID, r)
 }
 
 func cloneStringRangeMap(in map[string]intRange) map[string]intRange {

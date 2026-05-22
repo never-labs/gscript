@@ -170,7 +170,7 @@ func foldProfiledExactLen(fn *Function, block *Block, lenInstr *Instr, mutations
 	if profiledLenFoldReadsMutatedField(fn, lenInstr.Args[0], mutations) {
 		return false
 	}
-	r, ok := fn.Analysis.ProfiledLenRanges[lenInstr.Args[0].ID]
+	r, ok := functionNumericFacts(fn).ProfiledLenRange(lenInstr.Args[0].ID)
 	if !ok || !r.known || r.min != r.max || r.min < 0 {
 		return false
 	}
@@ -197,7 +197,7 @@ func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr) bool {
 		if arg == nil {
 			return false
 		}
-		r, ok := fn.Analysis.ProfiledLenRanges[arg.ID]
+		r, ok := functionNumericFacts(fn).ProfiledLenRange(arg.ID)
 		if !ok || !r.known || r.min != r.max || r.min < 0 {
 			return false
 		}
@@ -239,10 +239,7 @@ func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMut
 	fn.Analysis.TableShapeFacts().RecordFieldPolyShapeCases(lenInstr.ID, cases)
 	name := fieldNameFromAux(fn, get.Aux)
 	if r, ok := fieldPolyLenRange(fn, name, cases); ok {
-		if fn.Analysis.ProfiledIntRanges == nil {
-			fn.Analysis.ProfiledIntRanges = make(map[int]intRange)
-		}
-		fn.Analysis.ProfiledIntRanges[lenInstr.ID] = r
+		fn.Analysis.NumericFacts().RecordProfiledIntRange(lenInstr.ID, r)
 	}
 	lenInstr.Op = OpFieldPolyLen
 	lenInstr.Type = TypeInt

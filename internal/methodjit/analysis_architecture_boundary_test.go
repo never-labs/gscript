@@ -95,6 +95,34 @@ func TestProductionCodeUsesKernelFactsBoundary(t *testing.T) {
 	}
 }
 
+func TestProductionCodeUsesNumericFactsBoundary(t *testing.T) {
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob methodjit files: %v", err)
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") || file == "analysis_result.go" {
+			continue
+		}
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok || !legacyNumericFactField(sel.Sel.Name) {
+				return true
+			}
+			if isSelectorNamed(sel.X, "Analysis") {
+				pos := fset.Position(sel.Pos())
+				t.Fatalf("%s directly accesses Analysis.%s; use NumericFacts helpers", pos, sel.Sel.Name)
+			}
+			return true
+		})
+	}
+}
+
 func legacyTableShapeField(name string) bool {
 	switch name {
 	case "FieldPolyShapeFacts", "FieldPolyShapeReceivers", "FieldPolyShapeCatalog", "FieldCallPolyLenFusions":
@@ -116,6 +144,15 @@ func legacyCallFactField(name string) bool {
 func legacyKernelFactField(name string) bool {
 	switch name {
 	case "RecordArrayLoopKernels", "TableArrayUpperBoundSafe", "TableArrayLowerBoundSafe", "LoopTableArrayFacts":
+		return true
+	default:
+		return false
+	}
+}
+
+func legacyNumericFactField(name string) bool {
+	switch name {
+	case "Int48Safe", "IntModNonZeroDivisor", "IntModNoSignAdjust", "IntRanges", "ProfiledIntRanges", "ProfiledLenRanges", "IntNonNegative":
 		return true
 	default:
 		return false

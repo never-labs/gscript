@@ -1089,10 +1089,7 @@ func (ec *emitContext) emitCheckTableArrayLoadExitResult(instr *Instr, deoptLabe
 }
 
 func (ec *emitContext) intNonNegative(id int) bool {
-	if ec.fn == nil || ec.fn.Analysis.IntNonNegative == nil {
-		return false
-	}
-	return ec.fn.Analysis.IntNonNegative[id]
+	return functionNumericFacts(ec.fn).IsIntNonNegative(id)
 }
 
 func (ec *emitContext) tableArrayUpperBoundSafe(id int) bool {
@@ -1107,10 +1104,11 @@ func (ec *emitContext) tableArrayKeyKnownNonZero(id int) bool {
 	if kv, ok := ec.constInts[id]; ok {
 		return kv != 0
 	}
-	if ec.fn == nil || ec.fn.Analysis.IntRanges == nil {
+	numeric := functionNumericFacts(ec.fn)
+	if numeric == nil {
 		return false
 	}
-	r, ok := ec.fn.Analysis.IntRanges[id]
+	r, ok := numeric.IntRange(id)
 	return ok && r.known && (r.min > 0 || r.max < 0)
 }
 

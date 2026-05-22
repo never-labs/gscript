@@ -7,7 +7,8 @@ func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if len(fn.Analysis.Int48Safe) == 0 {
+	numeric := fn.Analysis.NumericFacts()
+	if numeric.Int48SafeCount() == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -15,10 +16,10 @@ func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Type != TypeInt || len(instr.Args) < 2 || !fn.Analysis.Int48Safe[instr.ID] {
+			if instr == nil || instr.Type != TypeInt || len(instr.Args) < 2 || !numeric.IsInt48Safe(instr.ID) {
 				continue
 			}
-			base, ok := cancellingIntAddSubBase(instr, fn.Analysis.Int48Safe)
+			base, ok := cancellingIntAddSubBase(instr, numeric)
 			if !ok {
 				continue
 			}
@@ -35,7 +36,7 @@ func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
-func cancellingIntAddSubBase(instr *Instr, safe map[int]bool) (*Value, bool) {
+func cancellingIntAddSubBase(instr *Instr, numeric *NumericFacts) (*Value, bool) {
 	if instr == nil || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[0].Def == nil || instr.Args[1] == nil {
 		return nil, false
 	}
@@ -44,7 +45,7 @@ func cancellingIntAddSubBase(instr *Instr, safe map[int]bool) (*Value, bool) {
 		return nil, false
 	}
 	inner := instr.Args[0].Def
-	if inner == nil || len(inner.Args) < 2 || inner.Args[0] == nil || inner.Args[1] == nil || !safe[inner.ID] {
+	if inner == nil || len(inner.Args) < 2 || inner.Args[0] == nil || inner.Args[1] == nil || !numeric.IsInt48Safe(inner.ID) {
 		return nil, false
 	}
 	innerConst, ok := constIntFromValue(inner.Args[1])

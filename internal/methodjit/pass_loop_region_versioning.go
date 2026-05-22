@@ -139,7 +139,8 @@ func loopRegionKeyNonNegative(fn *Function, li *loopInfo, header *Block, key *Va
 	if fn == nil || li == nil || header == nil || key == nil {
 		return false
 	}
-	if fn.Analysis.IntNonNegative != nil && fn.Analysis.IntNonNegative[key.ID] {
+	numeric := functionNumericFacts(fn)
+	if numeric.IsIntNonNegative(key.ID) {
 		return true
 	}
 	if c, ok := constIntFromValue(key); ok {
@@ -148,7 +149,7 @@ func loopRegionKeyNonNegative(fn *Function, li *loopInfo, header *Block, key *Va
 	if key.Def == nil {
 		return false
 	}
-	if r, ok := fn.Analysis.IntRanges[key.ID]; ok && r.nonNegative() {
+	if r, ok := numeric.IntRange(key.ID); ok && r.nonNegative() {
 		return true
 	}
 	for _, instr := range header.Instrs {

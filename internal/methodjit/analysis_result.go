@@ -48,6 +48,11 @@ type AnalysisResult struct {
 	// a sign fact and must not reuse Int48Safe's overflow-specific meaning.
 	IntNonNegative map[int]bool
 
+	// Numeric groups integer range and arithmetic safety facts. The map fields
+	// above remain for compatibility and are kept pointed at this domain's maps
+	// by constructors, Initialize, and domain mutators.
+	Numeric *NumericFacts
+
 	// TableArrayUpperBoundSafe is the set of table-array access instruction IDs
 	// whose key < len check is already guaranteed by an enclosing loop-region
 	// fact. The emitter still performs key type and non-negative checks unless
@@ -211,6 +216,326 @@ type AnalysisResult struct {
 	// protect any optimized path that consumes present facts.
 	NumericGlobalValues     map[string]runtime.Value
 	GlobalArrayElementFacts map[string]FixedShapeTableFact
+}
+
+// NumericFacts groups integer range and arithmetic safety facts produced and
+// consumed by numeric optimization passes.
+type NumericFacts struct {
+	owner *AnalysisResult
+
+	// Int48Safe is the set of integer arithmetic SSA value IDs whose runtime
+	// result is provably within the int48 signed range.
+	Int48Safe map[int]bool
+
+	// IntModNonZeroDivisor is the set of ModInt SSA value IDs whose divisor
+	// range excludes zero.
+	IntModNonZeroDivisor map[int]bool
+
+	// IntModNoSignAdjust is the set of ModInt SSA value IDs whose operand signs
+	// prove that ARM64 SDIV/MSUB already matches Lua modulo semantics.
+	IntModNoSignAdjust map[int]bool
+
+	// IntRanges records integer range facts computed by range analysis.
+	IntRanges map[int]intRange
+
+	// ProfiledIntRanges records guarded integer range facts from runtime
+	// feedback, keyed by SSA value ID.
+	ProfiledIntRanges map[int]intRange
+
+	// ProfiledLenRanges records guarded len() result ranges keyed by the value
+	// whose length is being read.
+	ProfiledLenRanges map[int]intRange
+
+	// IntNonNegative is the set of integer SSA value IDs whose runtime result is
+	// provably >= 0.
+	IntNonNegative map[int]bool
+}
+
+func NewNumericFacts() *NumericFacts {
+	n := &NumericFacts{}
+	n.Initialize()
+	return n
+}
+
+func (n *NumericFacts) Initialize() {
+	if n.Int48Safe == nil {
+		n.Int48Safe = make(map[int]bool)
+	}
+	if n.IntModNonZeroDivisor == nil {
+		n.IntModNonZeroDivisor = make(map[int]bool)
+	}
+	if n.IntModNoSignAdjust == nil {
+		n.IntModNoSignAdjust = make(map[int]bool)
+	}
+	if n.IntRanges == nil {
+		n.IntRanges = make(map[int]intRange)
+	}
+	if n.ProfiledIntRanges == nil {
+		n.ProfiledIntRanges = make(map[int]intRange)
+	}
+	if n.ProfiledLenRanges == nil {
+		n.ProfiledLenRanges = make(map[int]intRange)
+	}
+	if n.IntNonNegative == nil {
+		n.IntNonNegative = make(map[int]bool)
+	}
+}
+
+func (n *NumericFacts) SetInt48Safe(facts map[int]bool) {
+	if n == nil {
+		return
+	}
+	n.Int48Safe = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) IsInt48Safe(id int) bool {
+	return n != nil && n.Int48Safe != nil && n.Int48Safe[id]
+}
+
+func (n *NumericFacts) Int48SafeCount() int {
+	if n == nil {
+		return 0
+	}
+	return len(n.Int48Safe)
+}
+
+func (n *NumericFacts) SetIntModNonZeroDivisor(facts map[int]bool) {
+	if n == nil {
+		return
+	}
+	n.IntModNonZeroDivisor = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) IsIntModNonZeroDivisor(id int) bool {
+	return n != nil && n.IntModNonZeroDivisor != nil && n.IntModNonZeroDivisor[id]
+}
+
+func (n *NumericFacts) SetIntModNoSignAdjust(facts map[int]bool) {
+	if n == nil {
+		return
+	}
+	n.IntModNoSignAdjust = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) IsIntModNoSignAdjust(id int) bool {
+	return n != nil && n.IntModNoSignAdjust != nil && n.IntModNoSignAdjust[id]
+}
+
+func (n *NumericFacts) SetIntRanges(facts map[int]intRange) {
+	if n == nil {
+		return
+	}
+	n.IntRanges = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) IntRange(id int) (intRange, bool) {
+	if n == nil || n.IntRanges == nil {
+		return intRange{}, false
+	}
+	r, ok := n.IntRanges[id]
+	return r, ok
+}
+
+func (n *NumericFacts) IntRangeMap() map[int]intRange {
+	if n == nil {
+		return nil
+	}
+	return n.IntRanges
+}
+
+func (n *NumericFacts) SetProfiledIntRanges(facts map[int]intRange) {
+	if n == nil {
+		return
+	}
+	n.ProfiledIntRanges = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) ProfiledIntRange(id int) (intRange, bool) {
+	if n == nil || n.ProfiledIntRanges == nil {
+		return intRange{}, false
+	}
+	r, ok := n.ProfiledIntRanges[id]
+	return r, ok
+}
+
+func (n *NumericFacts) ProfiledIntRangeMap() map[int]intRange {
+	if n == nil {
+		return nil
+	}
+	return n.ProfiledIntRanges
+}
+
+func (n *NumericFacts) RecordProfiledIntRange(id int, r intRange) {
+	if n == nil || !r.known {
+		return
+	}
+	if n.ProfiledIntRanges == nil {
+		n.ProfiledIntRanges = make(map[int]intRange)
+	}
+	n.ProfiledIntRanges[id] = r
+	n.bindOwner()
+}
+
+func (n *NumericFacts) DeleteProfiledIntRange(id int) {
+	if n == nil || n.ProfiledIntRanges == nil {
+		return
+	}
+	delete(n.ProfiledIntRanges, id)
+	n.bindOwner()
+}
+
+func (n *NumericFacts) SetProfiledLenRanges(facts map[int]intRange) {
+	if n == nil {
+		return
+	}
+	n.ProfiledLenRanges = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) ProfiledLenRange(id int) (intRange, bool) {
+	if n == nil || n.ProfiledLenRanges == nil {
+		return intRange{}, false
+	}
+	r, ok := n.ProfiledLenRanges[id]
+	return r, ok
+}
+
+func (n *NumericFacts) ProfiledLenRangeMap() map[int]intRange {
+	if n == nil {
+		return nil
+	}
+	return n.ProfiledLenRanges
+}
+
+func (n *NumericFacts) RecordProfiledLenRange(id int, r intRange) {
+	if n == nil || id == 0 || !r.known {
+		return
+	}
+	if n.ProfiledLenRanges == nil {
+		n.ProfiledLenRanges = make(map[int]intRange)
+	}
+	n.ProfiledLenRanges[id] = r
+	n.bindOwner()
+}
+
+func (n *NumericFacts) DeleteProfiledLenRange(id int) {
+	if n == nil || n.ProfiledLenRanges == nil {
+		return
+	}
+	delete(n.ProfiledLenRanges, id)
+	n.bindOwner()
+}
+
+func (n *NumericFacts) SetIntNonNegative(facts map[int]bool) {
+	if n == nil {
+		return
+	}
+	n.IntNonNegative = facts
+	n.bindOwner()
+}
+
+func (n *NumericFacts) IsIntNonNegative(id int) bool {
+	return n != nil && n.IntNonNegative != nil && n.IntNonNegative[id]
+}
+
+func (n *NumericFacts) SetComputedRanges(safe map[int]bool, ranges map[int]intRange, nonNegative map[int]bool) {
+	if n == nil {
+		return
+	}
+	n.Int48Safe = safe
+	n.IntRanges = ranges
+	n.IntNonNegative = nonNegative
+	n.bindOwner()
+}
+
+func (n *NumericFacts) SetModuloFacts(nonZeroDivisor map[int]bool, noSignAdjust map[int]bool) {
+	if n == nil {
+		return
+	}
+	n.IntModNonZeroDivisor = nonZeroDivisor
+	n.IntModNoSignAdjust = noSignAdjust
+	n.bindOwner()
+}
+
+func (n *NumericFacts) bindOwner() {
+	if n != nil && n.owner != nil {
+		n.owner.bindNumericCompatibilityFields()
+	}
+}
+
+func (a *AnalysisResult) NumericFacts() *NumericFacts {
+	if a == nil {
+		return nil
+	}
+	if a.Numeric == nil {
+		a.Numeric = &NumericFacts{
+			Int48Safe:            a.Int48Safe,
+			IntModNonZeroDivisor: a.IntModNonZeroDivisor,
+			IntModNoSignAdjust:   a.IntModNoSignAdjust,
+			IntRanges:            a.IntRanges,
+			ProfiledIntRanges:    a.ProfiledIntRanges,
+			ProfiledLenRanges:    a.ProfiledLenRanges,
+			IntNonNegative:       a.IntNonNegative,
+		}
+	} else {
+		if a.Int48Safe != nil || a.Numeric.Int48Safe == nil {
+			a.Numeric.Int48Safe = a.Int48Safe
+		}
+		if a.IntModNonZeroDivisor != nil || a.Numeric.IntModNonZeroDivisor == nil {
+			a.Numeric.IntModNonZeroDivisor = a.IntModNonZeroDivisor
+		}
+		if a.IntModNoSignAdjust != nil || a.Numeric.IntModNoSignAdjust == nil {
+			a.Numeric.IntModNoSignAdjust = a.IntModNoSignAdjust
+		}
+		if a.IntRanges != nil || a.Numeric.IntRanges == nil {
+			a.Numeric.IntRanges = a.IntRanges
+		}
+		if a.ProfiledIntRanges != nil || a.Numeric.ProfiledIntRanges == nil {
+			a.Numeric.ProfiledIntRanges = a.ProfiledIntRanges
+		}
+		if a.ProfiledLenRanges != nil || a.Numeric.ProfiledLenRanges == nil {
+			a.Numeric.ProfiledLenRanges = a.ProfiledLenRanges
+		}
+		if a.IntNonNegative != nil || a.Numeric.IntNonNegative == nil {
+			a.Numeric.IntNonNegative = a.IntNonNegative
+		}
+	}
+	a.Numeric.owner = a
+	a.bindNumericCompatibilityFields()
+	return a.Numeric
+}
+
+func functionNumericFacts(fn *Function) *NumericFacts {
+	if fn == nil || fn.Analysis == nil {
+		return nil
+	}
+	return fn.Analysis.NumericFacts()
+}
+
+func (a *AnalysisResult) initializeNumericFacts() {
+	if a == nil {
+		return
+	}
+	a.NumericFacts().Initialize()
+	a.bindNumericCompatibilityFields()
+}
+
+func (a *AnalysisResult) bindNumericCompatibilityFields() {
+	if a == nil || a.Numeric == nil {
+		return
+	}
+	a.Int48Safe = a.Numeric.Int48Safe
+	a.IntModNonZeroDivisor = a.Numeric.IntModNonZeroDivisor
+	a.IntModNoSignAdjust = a.Numeric.IntModNoSignAdjust
+	a.IntRanges = a.Numeric.IntRanges
+	a.ProfiledIntRanges = a.Numeric.ProfiledIntRanges
+	a.ProfiledLenRanges = a.Numeric.ProfiledLenRanges
+	a.IntNonNegative = a.Numeric.IntNonNegative
 }
 
 // CallFacts groups analysis facts produced and consumed by call-specialization passes.
@@ -1013,13 +1338,7 @@ func (a *AnalysisResult) bindTableShapeCompatibilityFields() {
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	a := &AnalysisResult{
-		Int48Safe:                 make(map[int]bool),
-		IntModNonZeroDivisor:      make(map[int]bool),
-		IntModNoSignAdjust:        make(map[int]bool),
-		IntRanges:                 make(map[int]intRange),
-		ProfiledIntRanges:         make(map[int]intRange),
-		ProfiledLenRanges:         make(map[int]intRange),
-		IntNonNegative:            make(map[int]bool),
+		Numeric:                   NewNumericFacts(),
 		TableArrayUpperBoundSafe:  make(map[int]bool),
 		TableArrayLowerBoundSafe:  make(map[int]bool),
 		LoopTableArrayFacts:       make(map[int]LoopTableArrayFact),
@@ -1039,6 +1358,7 @@ func NewAnalysisResult() *AnalysisResult {
 		NumericGlobalValues:      make(map[string]runtime.Value),
 		GlobalArrayElementFacts:  make(map[string]FixedShapeTableFact),
 	}
+	a.bindNumericCompatibilityFields()
 	a.bindCallCompatibilityFields()
 	a.bindSpeculationCompatibilityFields()
 	a.bindTableShapeCompatibilityFields()
@@ -1048,34 +1368,14 @@ func NewAnalysisResult() *AnalysisResult {
 
 // Initialize initializes nil non-sentinel maps in the AnalysisResult.
 func (a *AnalysisResult) Initialize() {
-	if a.Int48Safe == nil {
-		a.Int48Safe = make(map[int]bool)
-	}
-	if a.IntModNonZeroDivisor == nil {
-		a.IntModNonZeroDivisor = make(map[int]bool)
-	}
-	if a.IntModNoSignAdjust == nil {
-		a.IntModNoSignAdjust = make(map[int]bool)
-	}
-	if a.IntRanges == nil {
-		a.IntRanges = make(map[int]intRange)
-	}
-	if a.ProfiledIntRanges == nil {
-		a.ProfiledIntRanges = make(map[int]intRange)
-	}
-	if a.ProfiledLenRanges == nil {
-		a.ProfiledLenRanges = make(map[int]intRange)
-	}
-	if a.IntNonNegative == nil {
-		a.IntNonNegative = make(map[int]bool)
-	}
+	a.initializeNumericFacts()
+	a.initializeKernelFacts()
 	if a.ShapeFieldTypeElidedLoads == nil {
 		a.ShapeFieldTypeElidedLoads = make(map[int]bool)
 	}
 	if a.TableArrayDataPtrs == nil {
 		a.TableArrayDataPtrs = make(map[int]TableArrayDataPtrFact)
 	}
-	a.initializeKernelFacts()
 	a.initializeCallFacts()
 	a.initializeSpeculationFacts()
 	if a.FixedShapeTables == nil {

@@ -30,7 +30,7 @@
 //   - OpGuardTruthy/OpGuardNonNil are NOT hoisted (control-flow guards).
 //   - OpLoadSlot is only hoisted if no in-loop OpStoreSlot writes the
 //     same slot number (slots are independent VM registers).
-//   - Int arithmetic is only hoisted when fn.Analysis.Int48Safe marks it safe
+//   - Int arithmetic is only hoisted when NumericFacts marks it safe
 //     (otherwise hoisting past an overflow check would relocate a deopt).
 
 package methodjit
@@ -440,7 +440,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			}
 			// Int arithmetic: require Int48Safe marking.
 			if isIntArithOp(instr.Op) {
-				if fn.Analysis.Int48Safe == nil || !fn.Analysis.Int48Safe[instr.ID] {
+				if !functionNumericFacts(fn).IsInt48Safe(instr.ID) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"integer arithmetic is not proven int48-safe")
 					continue
@@ -913,7 +913,7 @@ func canHoistOp(op Op) bool {
 	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpFMA, OpFMSUB:
 		return true
 	case OpAddInt, OpSubInt, OpMulInt, OpDivIntExact, OpNegInt:
-		// Caller must also check fn.Analysis.Int48Safe.
+		// Caller must also check NumericFacts.
 		return true
 	case OpLtInt, OpLeInt, OpEqInt, OpModZeroInt, OpLtFloat, OpLeFloat, OpEqString, OpNot:
 		return true

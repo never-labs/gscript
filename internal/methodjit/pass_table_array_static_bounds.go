@@ -90,7 +90,8 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 	nonNegative := false
 	var max int64
 	maxKnown := false
-	if r, ok := fn.Analysis.IntRanges[key.ID]; ok && r.known {
+	numeric := functionNumericFacts(fn)
+	if r, ok := numeric.IntRange(key.ID); ok && r.known {
 		nonNegative = r.min >= 0
 		max = r.max
 		maxKnown = true
@@ -102,7 +103,7 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 			maxKnown = true
 		}
 	}
-	if fn.Analysis.IntNonNegative != nil && fn.Analysis.IntNonNegative[key.ID] {
+	if numeric.IsIntNonNegative(key.ID) {
 		nonNegative = true
 	}
 	if tableArrayKeyNonNegativeFromInduction(li, key) {

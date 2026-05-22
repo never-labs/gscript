@@ -46,6 +46,93 @@ func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 	}
 }
 
+func TestAnalysisResultNumericFactsBindsCompatibilityFields(t *testing.T) {
+	a := NewAnalysisResult()
+	numeric := a.NumericFacts()
+
+	numeric.SetInt48Safe(map[int]bool{11: true})
+	numeric.SetIntModNonZeroDivisor(map[int]bool{12: true})
+	numeric.SetIntModNoSignAdjust(map[int]bool{13: true})
+	numeric.SetIntRanges(map[int]intRange{14: pointRange(5)})
+	numeric.SetIntNonNegative(map[int]bool{15: true})
+	numeric.RecordProfiledIntRange(16, intRange{min: 1, max: 3, known: true})
+	numeric.RecordProfiledLenRange(17, intRange{min: 2, max: 4, known: true})
+
+	if !a.Int48Safe[11] || !a.IntModNonZeroDivisor[12] || !a.IntModNoSignAdjust[13] || !a.IntNonNegative[15] {
+		t.Fatalf("NumericFacts boolean mutators did not update compatibility fields")
+	}
+	if got, ok := a.IntRanges[14]; !ok || !got.known || got.min != 5 || got.max != 5 {
+		t.Fatalf("NumericFacts.SetIntRanges did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+	if got, ok := a.ProfiledIntRanges[16]; !ok || !got.known || got.min != 1 || got.max != 3 {
+		t.Fatalf("NumericFacts.RecordProfiledIntRange did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+	if got, ok := a.ProfiledLenRanges[17]; !ok || !got.known || got.min != 2 || got.max != 4 {
+		t.Fatalf("NumericFacts.RecordProfiledLenRange did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+}
+
+func TestAnalysisResultNumericFactsAdoptsLegacyFields(t *testing.T) {
+	a := &AnalysisResult{
+		Int48Safe:            map[int]bool{21: true},
+		IntModNonZeroDivisor: map[int]bool{22: true},
+		IntModNoSignAdjust:   map[int]bool{23: true},
+		IntRanges:            map[int]intRange{24: pointRange(6)},
+		ProfiledIntRanges:    map[int]intRange{25: {min: 1, max: 9, known: true}},
+		ProfiledLenRanges:    map[int]intRange{26: {min: 2, max: 8, known: true}},
+		IntNonNegative:       map[int]bool{27: true},
+	}
+
+	numeric := a.NumericFacts()
+	if !numeric.IsInt48Safe(21) || !numeric.IsIntModNonZeroDivisor(22) || !numeric.IsIntModNoSignAdjust(23) || !numeric.IsIntNonNegative(27) {
+		t.Fatalf("NumericFacts did not adopt legacy boolean fields")
+	}
+	if got, ok := numeric.IntRange(24); !ok || !got.known || got.min != 6 || got.max != 6 {
+		t.Fatalf("NumericFacts did not adopt legacy IntRanges: got %#v ok=%v", got, ok)
+	}
+	if got, ok := numeric.ProfiledIntRange(25); !ok || !got.known || got.min != 1 || got.max != 9 {
+		t.Fatalf("NumericFacts did not adopt legacy ProfiledIntRanges: got %#v ok=%v", got, ok)
+	}
+	if got, ok := numeric.ProfiledLenRange(26); !ok || !got.known || got.min != 2 || got.max != 8 {
+		t.Fatalf("NumericFacts did not adopt legacy ProfiledLenRanges: got %#v ok=%v", got, ok)
+	}
+}
+
+func TestNumericFactsHelpersAreNilSafe(t *testing.T) {
+	var numeric *NumericFacts
+	if numeric.IsInt48Safe(1) || numeric.IsIntModNonZeroDivisor(1) || numeric.IsIntModNoSignAdjust(1) || numeric.IsIntNonNegative(1) {
+		t.Fatalf("nil NumericFacts reported boolean facts")
+	}
+	if _, ok := numeric.IntRange(1); ok {
+		t.Fatalf("nil NumericFacts reported IntRange")
+	}
+	if _, ok := numeric.ProfiledIntRange(1); ok {
+		t.Fatalf("nil NumericFacts reported ProfiledIntRange")
+	}
+	if _, ok := numeric.ProfiledLenRange(1); ok {
+		t.Fatalf("nil NumericFacts reported ProfiledLenRange")
+	}
+	numeric.SetComputedRanges(map[int]bool{1: true}, map[int]intRange{1: pointRange(1)}, map[int]bool{1: true})
+	numeric.SetModuloFacts(map[int]bool{1: true}, map[int]bool{1: true})
+	numeric.RecordProfiledIntRange(1, pointRange(1))
+	numeric.RecordProfiledLenRange(1, pointRange(1))
+}
+
+func TestAnalysisResultNumericFactsRebindsAfterLegacyMutation(t *testing.T) {
+	a := NewAnalysisResult()
+	numeric := a.NumericFacts()
+	a.IntRanges = map[int]intRange{31: pointRange(7)}
+	a.Int48Safe = map[int]bool{32: true}
+
+	numeric = a.NumericFacts()
+	if got, ok := numeric.IntRange(31); !ok || !got.known || got.min != 7 || got.max != 7 {
+		t.Fatalf("NumericFacts did not rebind legacy IntRanges: got %#v ok=%v", got, ok)
+	}
+	if !numeric.IsInt48Safe(32) {
+		t.Fatalf("NumericFacts did not rebind legacy Int48Safe")
+	}
+}
+
 func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
 	a := NewAnalysisResult()
 	calls := a.CallFacts()

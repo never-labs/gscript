@@ -842,10 +842,8 @@ func callABIValueIntRange(fn *Function, v *Value) (intRange, bool) {
 			return intRange{min: v.Def.Aux, max: v.Def.Aux2, known: true}, true
 		}
 	}
-	if fn.Analysis.IntRanges != nil {
-		if r, ok := fn.Analysis.IntRanges[v.ID]; ok && r.known {
-			return r, true
-		}
+	if r, ok := functionNumericFacts(fn).IntRange(v.ID); ok && r.known {
+		return r, true
 	}
 	return intRange{}, false
 }

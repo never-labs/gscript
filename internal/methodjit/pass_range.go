@@ -1,7 +1,7 @@
 // pass_range.go implements forward dataflow range analysis for integer SSA
 // values. It computes [min, max] ranges over the IR, then marks every
 // AddInt/SubInt/MulInt/DivIntExact/NegInt whose range provably fits in the signed int48
-// space. The emitter consults `fn.Analysis.Int48Safe` to skip the 3-instruction
+// space. The emitter consults NumericFacts to skip the 3-instruction
 // SBFX+CMP+B.NE overflow check on provably safe arithmetic.
 //
 // Motivation: loop counters are already exempted at graph-build time (Aux2=1),
@@ -20,7 +20,7 @@
 //     Constants seed their own range. AddInt/SubInt/MulInt/NegInt/ModInt
 //     propagate using saturating arithmetic. Phi nodes join (min-of-mins,
 //     max-of-maxes). All other ops are "top" (unbounded).
-//   Phase C: Populate fn.Analysis.Int48Safe and sign facts from the final ranges.
+//   Phase C: Populate NumericFacts safety and sign facts from the final ranges.
 
 package methodjit
 
@@ -308,10 +308,13 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
+	numeric := fn.Analysis.NumericFacts()
 
 	intInstrs := rangeAnalysisIntInstrs(fn)
-	ranges := make(map[int]intRange, len(intInstrs)+len(fn.Analysis.ProfiledIntRanges))
-	for id, r := range fn.Analysis.ProfiledIntRanges {
+	profiledIntRanges := numeric.ProfiledIntRangeMap()
+	profiledLenRanges := numeric.ProfiledLenRangeMap()
+	ranges := make(map[int]intRange, len(intInstrs)+len(profiledIntRanges))
+	for id, r := range profiledIntRanges {
 		if r.known {
 			ranges[id] = r
 		}
@@ -330,7 +333,7 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 	for iter := 0; iter < maxIter; iter++ {
 		changed := false
 		for _, instr := range intInstrs {
-			newR := computeRange(instr, ranges, staticLens, fn.Analysis.ProfiledIntRanges, fn.Analysis.ProfiledLenRanges)
+			newR := computeRange(instr, ranges, staticLens, profiledIntRanges, profiledLenRanges)
 			if old, ok := ranges[instr.ID]; ok {
 				if !rangeEqual(old, newR) {
 					ranges[instr.ID] = newR
@@ -360,9 +363,7 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 	}
 	markConvergingInductionSafe(fn, safe)
 	markGuardedForwardInductionUpdatesSafe(fn, ranges, safe)
-	fn.Analysis.Int48Safe = safe
-	fn.Analysis.IntRanges = ranges
-	fn.Analysis.IntNonNegative = collectIntNonNegativeFacts(intInstrs, ranges)
+	numeric.SetComputedRanges(safe, ranges, collectIntNonNegativeFacts(intInstrs, ranges))
 	populateIntModFacts(fn, ranges)
 	return fn, nil
 }
@@ -904,8 +905,7 @@ func populateIntModFacts(fn *Function, baseRanges map[int]intRange) {
 		}
 	}
 
-	fn.Analysis.IntModNonZeroDivisor = nonZeroDivisor
-	fn.Analysis.IntModNoSignAdjust = noSignAdjust
+	functionNumericFacts(fn).SetModuloFacts(nonZeroDivisor, noSignAdjust)
 }
 
 func computeBlockEntryRanges(fn *Function, baseRanges map[int]intRange) map[int]map[int]intRange {

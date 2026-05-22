@@ -15,7 +15,7 @@ func BoolTableFillLoopPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
 	for _, header := range append([]*Block(nil), fn.Blocks...) {
 		cand, ok := detectBoolTableFillLoop(fn, header)
 		if !ok || !boolFillLoopDefsAreLocal(fn, cand) {
@@ -238,10 +238,10 @@ func boolFillPositiveStep(fn *Function, step *Value) bool {
 	if step.Def.Op == OpConstInt {
 		return step.Def.Aux > 0
 	}
-	if step.Def.Type != TypeInt || fn == nil || fn.Analysis.IntRanges == nil {
+	if step.Def.Type != TypeInt {
 		return false
 	}
-	r, ok := fn.Analysis.IntRanges[step.ID]
+	r, ok := functionNumericFacts(fn).IntRange(step.ID)
 	return ok && r.known && r.min > 0
 }
 
@@ -348,10 +348,8 @@ func boolFillValueRange(fn *Function, v *Value) intRange {
 	if v.Def.Op == OpConstInt {
 		return pointRange(v.Def.Aux)
 	}
-	if fn != nil && fn.Analysis.IntRanges != nil {
-		if r, ok := fn.Analysis.IntRanges[v.ID]; ok {
-			return r
-		}
+	if r, ok := functionNumericFacts(fn).IntRange(v.ID); ok {
+		return r
 	}
 	return topRange()
 }

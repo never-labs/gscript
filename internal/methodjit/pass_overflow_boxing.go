@@ -11,7 +11,7 @@ package methodjit
 // generic boxed numeric ops, where codegen can promote overflow to float in
 // place and continue.
 func OverflowBoxingPass(fn *Function) (*Function, error) {
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
 	return OverflowBoxingPassWith(nil)(fn)
 }
 
@@ -470,10 +470,8 @@ func additiveModuloValueHasNonInt48Leaf(fn *Function, v *Value, phiID int, seen 
 	case OpConstInt:
 		return v.Def.Aux < MinInt48 || v.Def.Aux > MaxInt48
 	default:
-		if fn != nil && fn.Analysis.IntRanges != nil {
-			if r, ok := fn.Analysis.IntRanges[v.ID]; ok && r.known {
-				return !r.fitsInt48()
-			}
+		if r, ok := functionNumericFacts(fn).IntRange(v.ID); ok && r.known {
+			return !r.fitsInt48()
 		}
 		return false
 	}
@@ -656,9 +654,9 @@ func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
 		if instr.Aux2 != 0 {
 			return false
 		}
-		return fn.Analysis.Int48Safe == nil || !fn.Analysis.Int48Safe[instr.ID]
+		return !functionNumericFacts(fn).IsInt48Safe(instr.ID)
 	case OpDivIntExact:
-		return fn.Analysis.Int48Safe == nil || !fn.Analysis.Int48Safe[instr.ID]
+		return !functionNumericFacts(fn).IsInt48Safe(instr.ID)
 	default:
 		return false
 	}
@@ -811,10 +809,11 @@ func nonNegativeLoopInvariantStep(fn *Function, step *Value, body map[int]bool) 
 	if c, ok := constIntFromValue(step); ok {
 		return c >= 0
 	}
-	if fn == nil || fn.Analysis.IntRanges == nil {
+	numeric := functionNumericFacts(fn)
+	if numeric == nil {
 		return false
 	}
-	r, ok := fn.Analysis.IntRanges[step.ID]
+	r, ok := numeric.IntRange(step.ID)
 	return ok && r.known && r.min >= 0
 }
 

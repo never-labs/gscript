@@ -64,6 +64,11 @@ func snapshotAnalysisResultDomains(result *AnalysisResult) map[string]analysisFa
 			continue
 		}
 		name := valueType.Field(i).Name
+		if name == "Numeric" {
+			// NumericFacts is a compatibility wrapper around the existing
+			// top-level numeric fact domains, so reporting both would double-count.
+			continue
+		}
 		snapshotAnalysisResultDomainStruct(out, name, field)
 	}
 	return out

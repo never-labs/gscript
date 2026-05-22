@@ -9,7 +9,8 @@ func ModRangeSimplifyPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if len(fn.Analysis.IntRanges) == 0 {
+	numeric := fn.Analysis.NumericFacts()
+	if len(numeric.IntRangeMap()) == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -32,7 +33,7 @@ func ModRangeSimplifyPass(fn *Function) (*Function, error) {
 				continue
 			}
 			lhs := instr.Args[0]
-			r, ok := fn.Analysis.IntRanges[lhs.ID]
+			r, ok := numeric.IntRange(lhs.ID)
 			if !ok || !r.known || r.min < 0 || r.max >= divisor {
 				continue
 			}
