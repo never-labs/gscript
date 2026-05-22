@@ -12,8 +12,9 @@ const (
 )
 
 type rawIntNestedKernelCache struct {
-	analyzed bool
-	kernel   *rawIntNestedKernel
+	fingerprint wholeCallKernelFingerprint
+	analyzed    bool
+	kernel      *rawIntNestedKernel
 }
 
 type rawIntNestedKernel struct {
@@ -25,11 +26,15 @@ type rawIntNestedKernel struct {
 }
 
 func IsRawIntNestedKernelProto(proto *FuncProto) bool {
-	_, ok := analyzeRawIntNestedKernel(proto)
-	return ok
+	cache := rawIntNestedKernelForProto(proto)
+	return cache != nil && cache.kernel != nil
 }
 
 func (vm *VM) tryRunRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+	return vm.runRawIntNestedValueKernel(cl, args)
+}
+
+func (vm *VM) runRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if vm == nil || cl == nil || cl.Proto == nil || len(args) != 2 {
 		return false, nil, nil
 	}
@@ -47,14 +52,19 @@ func (vm *VM) tryRunRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (
 }
 
 func rawIntNestedKernelForProto(proto *FuncProto) *rawIntNestedKernelCache {
-	cache := proto.RawIntNestedKernel
-	if cache == nil {
-		cache = &rawIntNestedKernelCache{analyzed: true}
-		if kernel, ok := analyzeRawIntNestedKernel(proto); ok {
-			cache.kernel = kernel
-		}
-		proto.RawIntNestedKernel = cache
+	if proto == nil {
+		return nil
 	}
+	fp := wholeCallKernelFingerprintForProto(proto)
+	cache := proto.RawIntNestedKernel
+	if cache != nil && cache.analyzed && cache.fingerprint == fp {
+		return cache
+	}
+	cache = &rawIntNestedKernelCache{fingerprint: fp, analyzed: true}
+	if kernel, ok := analyzeRawIntNestedKernel(proto); ok {
+		cache.kernel = kernel
+	}
+	proto.RawIntNestedKernel = cache
 	return cache
 }
 
@@ -67,7 +77,7 @@ func (vm *VM) rawIntNestedSelfGlobalMatches(cl *Closure, selfName string) bool {
 }
 
 func analyzeRawIntNestedKernel(proto *FuncProto) (*rawIntNestedKernel, bool) {
-	if proto == nil || proto.IsVarArg || proto.NumParams != 2 || proto.Name == "" {
+	if proto == nil || proto.IsVarArg || proto.NumParams != 2 {
 		return nil, false
 	}
 	if len(proto.Upvalues) != 0 || len(proto.Protos) != 0 || len(proto.Code) < 20 {

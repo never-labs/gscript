@@ -74,6 +74,7 @@ type wholeCallKernelFingerprint struct {
 	codeLen      int
 	constLen     int
 	protoLen     int
+	upvalueLen   int
 	tableCtorLen int
 	hash         uint64
 }
@@ -259,7 +260,13 @@ var driverLoopKernelRegistry = [...]driverLoopKernelRecognizer{
 // WholeCallKernelCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.
 func WholeCallKernelCatalog() []KernelInfo {
-	out := make([]KernelInfo, 0, len(wholeCallKernelRegistry))
+	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
+	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" {
+			continue
+		}
+		out = append(out, entry.Info)
+	}
 	for _, entry := range wholeCallKernelRegistry {
 		if entry.info.Name == "" {
 			continue
@@ -283,6 +290,15 @@ func DriverLoopKernelCatalog() []KernelInfo {
 // structural recognizer accepts p. It does not inspect FuncProto.Name or Source.
 func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 	out := make([]KernelInfo, 0, 1)
+	runtimeRecognized := recognizedRuntimeSpecializationBits(p)
+	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" {
+			continue
+		}
+		if runtimeRecognized&(uint64(1)<<uint(i)) != 0 {
+			out = append(out, entry.Info)
+		}
+	}
 	recognized := recognizedWholeCallKernelBits(p)
 	for i, entry := range wholeCallKernelRegistry {
 		if entry.info.Name == "" {
@@ -299,7 +315,19 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 // registered whole-call kernel. It is intended for tests and diagnostics, not
 // hot dispatch.
 func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, 0, len(wholeCallKernelRegistry))
+	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
+	runtimeRecognizedBits := recognizedRuntimeSpecializationBits(p)
+	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" {
+			continue
+		}
+		recognized := runtimeRecognizedBits&(uint64(1)<<uint(i)) != 0
+		out = append(out, KernelDiagnostic{
+			Kernel:     entry.Info,
+			Recognized: recognized,
+			Reason:     wholeCallKernelReason(p, recognized),
+		})
+	}
 	recognizedBits := recognizedWholeCallKernelBits(p)
 	for i, entry := range wholeCallKernelRegistry {
 		if entry.info.Name == "" {
@@ -379,6 +407,7 @@ func wholeCallKernelFingerprintForProto(proto *FuncProto) wholeCallKernelFingerp
 	fp.codeLen = len(proto.Code)
 	fp.constLen = len(proto.Constants)
 	fp.protoLen = len(proto.Protos)
+	fp.upvalueLen = len(proto.Upvalues)
 	fp.tableCtorLen = len(proto.TableCtors2)
 
 	h := uint64(1469598103934665603)
@@ -387,6 +416,7 @@ func wholeCallKernelFingerprintForProto(proto *FuncProto) wholeCallKernelFingerp
 		h = fnvMixUint64(h, 1)
 	}
 	h = fnvMixUint64(h, uint64(fp.maxStack))
+	h = fnvMixUint64(h, uint64(fp.upvalueLen))
 	for _, inst := range proto.Code {
 		h = fnvMixUint64(h, uint64(inst))
 	}

@@ -34,6 +34,103 @@ func TestRawIntNestedRuntimeKernelRecognizesShiftedNestedRecurrence(t *testing.T
 	}
 }
 
+func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *testing.T) {
+	top := compileProto(t, rawIntNestedShiftedSource)
+	fn := findTestProtoByName(top, "nestwave")
+	if fn == nil {
+		t.Fatal("nestwave proto not found")
+	}
+
+	requireKernelInfo(t, WholeCallKernelCatalog(), "nested_int_recurrence")
+	requireKernelInfo(t, RecognizedWholeCallKernels(fn), "nested_int_recurrence")
+	if !cachedRuntimeSpecializationRecognized(fn, runtimeSpecializationRawIntNested) {
+		t.Fatal("raw nested int runtime specialization rejected by hot cache")
+	}
+	if fn.RuntimeSpecialization == nil || fn.RuntimeSpecialization.recognized == 0 {
+		t.Fatal("runtime specialization cache was not populated")
+	}
+	if fn.RawIntNestedKernel == nil || fn.RawIntNestedKernel.kernel == nil {
+		t.Fatal("raw nested int kernel cache was not populated")
+	}
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(fn), "nested_int_recurrence")
+	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	}
+	if diag.Kernel.Route != KernelRouteWholeCallValue || diag.Kernel.Arity != 2 || diag.Kernel.Results != 1 {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	}
+
+	mutated := *fn
+	mutated.Code = nil
+	rejectKernelInfo(t, RecognizedWholeCallKernels(&mutated), "nested_int_recurrence")
+	diag = requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(&mutated), "nested_int_recurrence")
+	if diag.Recognized || diag.Reason != kernelReasonShapeMismatch {
+		t.Fatalf("mutated diagnostic = %+v, want shape mismatch", diag)
+	}
+}
+
+func TestRawIntNestedRuntimeSpecializationRecordsHit(t *testing.T) {
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	globals := compileAndRun(t, rawIntNestedShiftedSource+`
+result := nestwave(2, 6)
+`)
+	expectGlobalInt(t, globals, "result", 764)
+	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "nested_int_recurrence"); got != 1 {
+		t.Fatalf("nested_int_recurrence structural hit count = %d, want 1", got)
+	}
+}
+
+func TestRawIntNestedRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *testing.T) {
+	top := compileProto(t, rawIntNestedShiftedSource)
+	v := New(runtime.NewInterpreterGlobals())
+	if _, err := v.Execute(top); err != nil {
+		t.Fatalf("runtime error: %v", err)
+	}
+	fn := v.GetGlobal("nestwave")
+	cl, ok := closureFromValue(fn)
+	if !ok {
+		t.Fatalf("nestwave global is not a VM closure: %s", fn.TypeName())
+	}
+	v.SetGlobal("nestwave", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "replacement",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			return []runtime.Value{runtime.IntValue(41)}, nil
+		},
+	}))
+
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	handled, _, err := v.tryRunValueWholeCallKernel(cl, []runtime.Value{runtime.IntValue(1), runtime.IntValue(0)})
+	if err != nil {
+		t.Fatalf("runtime specialization returned error: %v", err)
+	}
+	if handled {
+		t.Fatal("runtime specialization handled call after self global changed")
+	}
+	results, err := v.CallValue(fn, []runtime.Value{runtime.IntValue(1), runtime.IntValue(0)})
+	if err != nil {
+		t.Fatalf("fallback call error: %v", err)
+	}
+	if len(results) != 1 || !results[0].IsInt() || results[0].Int() != 41 {
+		t.Fatalf("fallback result = %+v, want 41", results)
+	}
+	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "nested_int_recurrence"); got != 0 {
+		t.Fatalf("nested_int_recurrence structural hit count = %d, want 0", got)
+	}
+}
+
+func runtimeStructuralKernelHitCount(stats *runtime.RuntimePathStats, route KernelRoute, name string) uint64 {
+	for _, entry := range stats.Snapshot().StructuralKernel.PerKernel {
+		if entry.Route == string(route) && entry.Name == name {
+			return entry.Count
+		}
+	}
+	return 0
+}
+
 func dumpRawIntNestedTestBytecode(proto *FuncProto) string {
 	var b strings.Builder
 	for pc, inst := range proto.Code {
