@@ -73,42 +73,12 @@ func (tm *TieringManager) disableForStructuralKernelTiering(proto *vm.FuncProto,
 }
 
 func recognizedWholeCallKernelForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
-	if vm.IsRawIntNestedKernelProto(proto) {
-		return vm.KernelInfo{
-			Name:    "nested_int_recurrence",
-			Route:   vm.KernelRouteWholeCallValue,
-			Arity:   2,
-			Results: 1,
-		}, true
-	}
 	for _, info := range vm.RecognizedWholeCallKernels(proto) {
-		if info.Route == vm.KernelRouteWholeCallValue &&
-			(info.Name == "record_walk_fold" ||
-				info.Name == "int_grid_aggregate" ||
-				info.Name == "permutation_flip_checksum" ||
-				info.Name == "bool_table_strike_count" ||
-				info.Name == "matrix_multiply" ||
-				info.Name == "lazy_recursive_table_builder" ||
-				info.Name == "lazy_recursive_table_fold") {
-			return info, true
-		}
-		if info.Route == vm.KernelRouteWholeCallNoResult && protoHasFloatConstant(proto) {
+		if info.AllowsStructuralTiering(proto) {
 			return info, true
 		}
 	}
 	return vm.KernelInfo{}, false
-}
-
-func protoHasFloatConstant(proto *vm.FuncProto) bool {
-	if proto == nil {
-		return false
-	}
-	for _, c := range proto.Constants {
-		if c.IsFloat() {
-			return true
-		}
-	}
-	return false
 }
 
 func (tm *TieringManager) wholeCallKernelCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.KernelInfo, bool) {
@@ -143,7 +113,9 @@ func (tm *TieringManager) driverLoopKernelForTiering(proto *vm.FuncProto) (vm.Ke
 		return vm.KernelInfo{}, false
 	}
 	for _, info := range vm.RecognizedDriverLoopKernels(proto, globals) {
-		return info, true
+		if info.AllowsStructuralTiering(proto) {
+			return info, true
+		}
 	}
 	return vm.KernelInfo{}, false
 }

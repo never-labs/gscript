@@ -45,10 +45,11 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	{
 		RuntimeSpecialization: RuntimeSpecialization{
 			Info: KernelInfo{
-				Name:    "nested_int_recurrence",
-				Route:   KernelRouteWholeCallValue,
-				Arity:   2,
-				Results: kernelWholeCallSingleResultCount,
+				Name:          "nested_int_recurrence",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         2,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
 			},
 			Recognize: IsRawIntNestedKernelProto,
 		},
@@ -59,10 +60,11 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCount]DriverLoopRuntimeSpecialization{
 	{
 		Info: KernelInfo{
-			Name:    "generic_record_array_loop",
-			Route:   KernelRouteDriverLoop,
-			Arity:   kernelUnknownDriverLoopArity,
-			Results: kernelUnknownDriverLoopResultCount,
+			Name:          "generic_record_array_loop",
+			Route:         KernelRouteDriverLoop,
+			Arity:         kernelUnknownDriverLoopArity,
+			Results:       kernelUnknownDriverLoopResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		Recognize: HasGenericRecordArrayDriverLoopKernel,
 		Run:       (*VM).tryGenericRecordArrayForLoopKernel,

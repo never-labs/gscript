@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gscript/gscript/internal/runtime"
 )
 
 func TestCachedWholeCallKernelRecognizedUsesHotCache(t *testing.T) {
@@ -77,6 +79,36 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	}
 }
 
+func TestKernelTieringPolicyCatalogCoversRuntimeAndLegacySources(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		infos []KernelInfo
+	}{
+		{name: "nested_int_recurrence", infos: WholeCallKernelCatalog()},
+		{name: "generic_record_array_loop", infos: DriverLoopKernelCatalog()},
+		{name: "record_pairwise_numeric_loop", infos: DriverLoopKernelCatalog()},
+	} {
+		info := findKernelInfo(t, tc.infos, tc.name)
+		if !info.HasCapability(KernelCapabilityStructuralTiering) {
+			t.Fatalf("%s missing structural tiering capability: %+v", tc.name, info)
+		}
+		if !info.AllowsStructuralTiering(&FuncProto{}) {
+			t.Fatalf("%s structural tiering policy rejected default proto: %+v", tc.name, info)
+		}
+	}
+
+	info := findKernelInfo(t, WholeCallKernelCatalog(), "record_pairwise_numeric")
+	if !info.HasCapability(KernelCapabilityStructuralTiering) {
+		t.Fatalf("record_pairwise_numeric missing structural tiering capability: %+v", info)
+	}
+	if info.AllowsStructuralTiering(&FuncProto{}) {
+		t.Fatal("record_pairwise_numeric structural tiering should require a float constant")
+	}
+	if !info.AllowsStructuralTiering(&FuncProto{Constants: []runtime.Value{runtime.FloatValue(1)}}) {
+		t.Fatal("record_pairwise_numeric structural tiering should allow float-specialized protos")
+	}
+}
+
 func requireKernelInfo(t *testing.T, infos []KernelInfo, name string) {
 	t.Helper()
 	if !hasKernelInfo(infos, name) {
@@ -98,6 +130,17 @@ func hasKernelInfo(infos []KernelInfo, name string) bool {
 		}
 	}
 	return false
+}
+
+func findKernelInfo(t *testing.T, infos []KernelInfo, name string) KernelInfo {
+	t.Helper()
+	for _, info := range infos {
+		if info.Name == name {
+			return info
+		}
+	}
+	t.Fatalf("kernel %q not found in %+v", name, infos)
+	return KernelInfo{}
 }
 
 func requireKernelDiagnostic(t *testing.T, diagnostics []KernelDiagnostic, name string) KernelDiagnostic {

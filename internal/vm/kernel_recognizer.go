@@ -16,16 +16,70 @@ const (
 	KernelRouteDriverLoop        KernelRoute = "driver_loop"
 )
 
+// KernelCapability identifies cross-package behavior exposed by structural
+// kernel metadata.
+type KernelCapability uint64
+
+const (
+	KernelCapabilityStructuralTiering KernelCapability = 1 << iota
+)
+
+// Has reports whether all bits in want are present.
+func (c KernelCapability) Has(want KernelCapability) bool {
+	return c&want == want
+}
+
+// KernelTieringPolicy describes whether a recognized kernel should keep its
+// bytecode on the VM structural-kernel route instead of entering methodjit.
+type KernelTieringPolicy struct {
+	Capabilities         KernelCapability
+	RequireFloatConstant bool
+}
+
+// AllowsStructuralTiering reports whether this policy permits structural
+// kernel tiering for proto.
+func (p KernelTieringPolicy) AllowsStructuralTiering(proto *FuncProto) bool {
+	if !p.Capabilities.Has(KernelCapabilityStructuralTiering) {
+		return false
+	}
+	if p.RequireFloatConstant && !kernelProtoHasFloatConstant(proto) {
+		return false
+	}
+	return true
+}
+
+var (
+	kernelTieringStructural = KernelTieringPolicy{
+		Capabilities: KernelCapabilityStructuralTiering,
+	}
+	kernelTieringStructuralWithFloatConstant = KernelTieringPolicy{
+		Capabilities:         KernelCapabilityStructuralTiering,
+		RequireFloatConstant: true,
+	}
+)
+
 // KernelInfo is stable diagnostic metadata for structural VM kernels.
 //
 // Recognizers intentionally inspect only bytecode, constants, arity, and
 // guarded callee shapes. FuncProto.Name and FuncProto.Source are debugging
 // metadata and are not part of kernel admission.
 type KernelInfo struct {
-	Name    string
-	Route   KernelRoute
-	Arity   int
-	Results int
+	Name          string
+	Route         KernelRoute
+	Arity         int
+	Results       int
+	TieringPolicy KernelTieringPolicy
+}
+
+// HasCapability reports whether this kernel advertises cap.
+func (info KernelInfo) HasCapability(cap KernelCapability) bool {
+	return info.TieringPolicy.Capabilities.Has(cap)
+}
+
+// AllowsStructuralTiering reports whether this kernel can keep a recognized
+// proto on the VM structural-kernel route.
+func (info KernelInfo) AllowsStructuralTiering(proto *FuncProto) bool {
+	return info.TieringPolicy.AllowsStructuralTiering(proto)
 }
 
 // KernelDiagnostic reports whether one registered structural kernel recognizes
@@ -98,60 +152,66 @@ type wholeCallKernelRecognizer struct {
 var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	{
 		info: KernelInfo{
-			Name:    "record_walk_fold",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   3,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "record_walk_fold",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         3,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize: isRecordWalkFoldProto,
 		runValue:  (*VM).runRecordWalkFoldWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "int_grid_aggregate",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   2,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "int_grid_aggregate",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         2,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize: isIntGridAggregateProto,
 		runValue:  (*VM).runIntGridAggregateWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "permutation_flip_checksum",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   1,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "permutation_flip_checksum",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         1,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize: isPermutationFlipChecksumKernelProto,
 		runValue:  (*VM).runPermutationFlipChecksumWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "bool_table_strike_count",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   1,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "bool_table_strike_count",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         1,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize: isBoolTableStrikeCountProto,
 		runValue:  (*VM).runBoolTableStrikeCountWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "matrix_multiply",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   3,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "matrix_multiply",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         3,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize: isMatrixMultiplyProto,
 		runValue:  (*VM).runMatrixMultiplyWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "lazy_recursive_table_builder",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   1,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "lazy_recursive_table_builder",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         1,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize:      IsLazyRecursiveTableBuilderKernelProto,
 		runValue:       (*VM).tryRunRecursiveTableValueKernel,
@@ -159,10 +219,11 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 	{
 		info: KernelInfo{
-			Name:    "lazy_recursive_table_fold",
-			Route:   KernelRouteWholeCallValue,
-			Arity:   1,
-			Results: kernelWholeCallSingleResultCount,
+			Name:          "lazy_recursive_table_fold",
+			Route:         KernelRouteWholeCallValue,
+			Arity:         1,
+			Results:       kernelWholeCallSingleResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize:      IsLazyRecursiveTableFoldKernelProto,
 		runValue:       (*VM).tryRunRecursiveTableValueKernel,
@@ -170,70 +231,77 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 	{
 		info: KernelInfo{
-			Name:    "record_pairwise_numeric",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   1,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "record_pairwise_numeric",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         1,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   isRecordPairwiseNumericProto,
 		runNoResult: (*VM).runRecordPairwiseNumericKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "numeric_array_region_sort",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   3,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "numeric_array_region_sort",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         3,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   isNumericArrayRegionSortProto,
 		runNoResult: (*VM).runNumericArrayRegionSortWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "coefficient_matrix_vector",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   3,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "coefficient_matrix_vector",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         3,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   func(p *FuncProto) bool { return classifySpectralMultiplyProto(p) == spectralAv },
 		runNoResult: (*VM).runSpectralWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "coefficient_matrix_transpose_vector",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   3,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "coefficient_matrix_transpose_vector",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         3,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   func(p *FuncProto) bool { return classifySpectralMultiplyProto(p) == spectralAtv },
 		runNoResult: (*VM).runSpectralWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "coefficient_matrix_ata_vector",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   3,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "coefficient_matrix_ata_vector",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         3,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   isSpectralAtAvProto,
 		runNoResult: (*VM).runSpectralWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "dense_coefficient_matrix_ata_vector",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   4,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "dense_coefficient_matrix_ata_vector",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         4,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   isDenseSpectralAtAvProto,
 		runNoResult: (*VM).runSpectralWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
-			Name:    "dense_matrix_multiply_transposed",
-			Route:   KernelRouteWholeCallNoResult,
-			Arity:   4,
-			Results: kernelWholeCallInPlaceResultCount,
+			Name:          "dense_matrix_multiply_transposed",
+			Route:         KernelRouteWholeCallNoResult,
+			Arity:         4,
+			Results:       kernelWholeCallInPlaceResultCount,
+			TieringPolicy: kernelTieringStructuralWithFloatConstant,
 		},
 		recognize:   isDenseMatrixMultiplyTransposedProto,
 		runNoResult: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
@@ -248,10 +316,11 @@ type driverLoopKernelRecognizer struct {
 var driverLoopKernelRegistry = [...]driverLoopKernelRecognizer{
 	{
 		info: KernelInfo{
-			Name:    "record_pairwise_numeric_loop",
-			Route:   KernelRouteDriverLoop,
-			Arity:   kernelUnknownDriverLoopArity,
-			Results: kernelUnknownDriverLoopResultCount,
+			Name:          "record_pairwise_numeric_loop",
+			Route:         KernelRouteDriverLoop,
+			Arity:         kernelUnknownDriverLoopArity,
+			Results:       kernelUnknownDriverLoopResultCount,
+			TieringPolicy: kernelTieringStructural,
 		},
 		recognize: HasRecordPairwiseNumericDriverLoopKernel,
 	},
@@ -459,6 +528,18 @@ func fnvMixRuntimeValue(h uint64, v runtime.Value) uint64 {
 	default:
 		return h
 	}
+}
+
+func kernelProtoHasFloatConstant(proto *FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, c := range proto.Constants {
+		if c.IsFloat() {
+			return true
+		}
+	}
+	return false
 }
 
 func fnvMixInt(h uint64, v int) uint64 {
