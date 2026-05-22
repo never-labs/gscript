@@ -115,7 +115,6 @@ func (vm *VM) tryGenericRecordArrayForLoopKernel(frame *CallFrame, base int, cod
 	if !handled || err != nil {
 		return handled, err
 	}
-	runtime.RecordRuntimePathStructuralKernelHit(string(KernelRouteDriverLoop), "generic_record_array_loop")
 	vm.regs[base+a] = limitV
 	vm.regs[base+a+3] = limitV
 	frame.pc = shape.loopPC + 1
@@ -164,6 +163,46 @@ func matchGenericRecordArrayDriverLoopShape(code []uint32, constants []runtime.V
 		argConsts[i] = constIdx
 	}
 	return genericRecordArrayDriverLoopShape{loopPC: loopPC, fnConst: fnConst, argConsts: argConsts}, true
+}
+
+// HasGenericRecordArrayDriverLoopKernel reports whether p contains a structural
+// driver loop that repeatedly calls a generic record-array loop callee.
+func HasGenericRecordArrayDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
+	if p == nil {
+		return false
+	}
+	for pc, inst := range p.Code {
+		if DecodeOp(inst) != OP_FORPREP {
+			continue
+		}
+		if IsGenericRecordArrayDriverLoopAt(p, pc, globals) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsGenericRecordArrayDriverLoopAt checks one FORPREP site for the guarded
+// generic record-array call-loop shape. Runtime admission still checks trip
+// count, current globals, array layout, and field guards before executing.
+func IsGenericRecordArrayDriverLoopAt(p *FuncProto, forprepPC int, globals map[string]*FuncProto) bool {
+	if p == nil || len(globals) == 0 || forprepPC < 0 || forprepPC >= len(p.Code) {
+		return false
+	}
+	inst := p.Code[forprepPC]
+	if DecodeOp(inst) != OP_FORPREP {
+		return false
+	}
+	shape, ok := matchGenericRecordArrayDriverLoopShape(p.Code, p.Constants, forprepPC, DecodeA(inst), DecodesBx(inst))
+	if !ok {
+		return false
+	}
+	callee := globals[p.Constants[shape.fnConst].Str()]
+	if callee == nil || len(shape.argConsts) != callee.NumParams {
+		return false
+	}
+	_, ok = genericRecordArrayLoopKernelSpecForProto(callee)
+	return ok
 }
 
 func (vm *VM) runGenericRecordArrayLoopKernelN(proto *FuncProto, args []runtime.Value, steps int64) (bool, error) {

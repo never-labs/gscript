@@ -7,6 +7,11 @@ const (
 	runtimeSpecializationCount
 )
 
+const (
+	driverLoopRuntimeSpecializationGenericRecordArrayLoop = iota
+	driverLoopRuntimeSpecializationCount
+)
+
 type runtimeSpecializationProtoCache struct {
 	fingerprint wholeCallKernelFingerprint
 	recognized  uint64
@@ -26,6 +31,16 @@ type WholeCallValueSpecialization struct {
 	Run wholeCallValueKernelRunner
 }
 
+type driverLoopRuntimeSpecializationRunner func(*VM, *CallFrame, int, []uint32, []runtime.Value, int, int) (bool, error)
+
+// DriverLoopRuntimeSpecialization handles OP_FORPREP sites whose admission
+// depends on runtime values in addition to structural bytecode shape.
+type DriverLoopRuntimeSpecialization struct {
+	Info      KernelInfo
+	Recognize func(*FuncProto, map[string]*FuncProto) bool
+	Run       driverLoopRuntimeSpecializationRunner
+}
+
 var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]WholeCallValueSpecialization{
 	{
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -38,6 +53,19 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			Recognize: IsRawIntNestedKernelProto,
 		},
 		Run: (*VM).runRawIntNestedValueKernel,
+	},
+}
+
+var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCount]DriverLoopRuntimeSpecialization{
+	{
+		Info: KernelInfo{
+			Name:    "generic_record_array_loop",
+			Route:   KernelRouteDriverLoop,
+			Arity:   kernelUnknownDriverLoopArity,
+			Results: kernelUnknownDriverLoopResultCount,
+		},
+		Recognize: HasGenericRecordArrayDriverLoopKernel,
+		Run:       (*VM).tryGenericRecordArrayForLoopKernel,
 	},
 }
 
@@ -65,6 +93,25 @@ func (vm *VM) tryRunWholeCallValueRuntimeSpecialization(cl *Closure, args []runt
 		}
 	}
 	return false, nil, nil
+}
+
+func (vm *VM) tryRunDriverLoopRuntimeSpecialization(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
+	if frame == nil || frame.closure == nil || frame.closure.Proto == nil {
+		return false, nil
+	}
+	for _, entry := range driverLoopRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" || entry.Run == nil {
+			continue
+		}
+		handled, err := entry.Run(vm, frame, base, code, constants, a, sbx)
+		if handled || err != nil {
+			if handled {
+				runtime.RecordRuntimePathStructuralKernelHit(string(entry.Info.Route), entry.Info.Name)
+			}
+			return handled, err
+		}
+	}
+	return false, nil
 }
 
 func mayHaveWholeCallValueRuntimeSpecializationCandidate(proto *FuncProto, argc int) bool {
