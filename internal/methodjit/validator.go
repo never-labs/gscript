@@ -20,6 +20,90 @@ import (
 	"fmt"
 )
 
+const opArgMaxAny = -1
+
+// OpArgPolicy describes the SSA argument-count contract for an IR op.
+// A zero-value policy means the validator does not enforce argument count.
+type OpArgPolicy struct {
+	Min int
+	Max int
+	Set bool
+}
+
+func fixedOpArgs(n int) OpArgPolicy {
+	return OpArgPolicy{Min: n, Max: n, Set: true}
+}
+
+func rangedOpArgs(min, max int) OpArgPolicy {
+	return OpArgPolicy{Min: min, Max: max, Set: true}
+}
+
+func (p OpArgPolicy) accepts(got int) bool {
+	if !p.Set {
+		return true
+	}
+	if got < p.Min {
+		return false
+	}
+	return p.Max == opArgMaxAny || got <= p.Max
+}
+
+func (p OpArgPolicy) describe() string {
+	if p.Max == opArgMaxAny {
+		return fmt.Sprintf("at least %d", p.Min)
+	}
+	return fmt.Sprintf("%d..%d", p.Min, p.Max)
+}
+
+// OpSpec is the validator-facing operation contract. It is intentionally
+// minimal here so this branch can merge cleanly with a broader OpSpec owner.
+type OpSpec struct {
+	Args       OpArgPolicy
+	Terminator bool
+	SuccCount  int // opArgMaxAny means successor count is not checked.
+}
+
+func opSpecFor(op Op) OpSpec {
+	if int(op) >= 0 && int(op) < len(validatorOpSpecs) {
+		return validatorOpSpecs[op]
+	}
+	return OpSpec{SuccCount: opArgMaxAny}
+}
+
+var validatorOpSpecs = func() [OpMax]OpSpec {
+	var specs [OpMax]OpSpec
+	for op := range specs {
+		specs[op].SuccCount = opArgMaxAny
+	}
+
+	specs[OpJump] = OpSpec{Args: fixedOpArgs(0), Terminator: true, SuccCount: 1}
+	specs[OpBranch] = OpSpec{Args: fixedOpArgs(1), Terminator: true, SuccCount: 2}
+	specs[OpReturn] = OpSpec{Args: rangedOpArgs(0, opArgMaxAny), Terminator: true, SuccCount: 0}
+
+	specs[OpSetTable].Args = fixedOpArgs(3)
+	specs[OpTableArrayStore].Args = rangedOpArgs(5, 6)
+	specs[OpTableShapeID].Args = fixedOpArgs(1)
+	specs[OpTableArraySwapPairs].Args = fixedOpArgs(3)
+	specs[OpGuardType].Args = fixedOpArgs(1)
+	specs[OpGuardGlobalConst].Args = fixedOpArgs(0)
+	specs[OpGuardConstString].Args = fixedOpArgs(1)
+	specs[OpGuardTableKind].Args = fixedOpArgs(1)
+	specs[OpGuardCalleeProto].Args = fixedOpArgs(1)
+	specs[OpGuardNonNil].Args = fixedOpArgs(1)
+	specs[OpGuardTruthy].Args = fixedOpArgs(1)
+	specs[OpGuardFieldCalleeProto].Args = fixedOpArgs(1)
+	specs[OpGuardShapeFieldType].Args = fixedOpArgs(0)
+	specs[OpGuardShapeFieldTypeMask].Args = fixedOpArgs(0)
+	specs[OpFieldSvals].Args = fixedOpArgs(1)
+	specs[OpFieldLoad].Args = fixedOpArgs(1)
+	specs[OpFieldLoadNumToFloat].Args = fixedOpArgs(1)
+	specs[OpFieldStore].Args = fixedOpArgs(2)
+	specs[OpFieldPolyLen].Args = fixedOpArgs(1)
+	specs[OpRecordArrayLoopKernel].Args = rangedOpArgs(3, 16)
+
+	return specs
+}()
+
 // Validate checks all structural invariants of a Function's IR.
 // Returns nil if the IR is well-formed, or a list of errors describing violations.
 func Validate(fn *Function) []error {
@@ -187,22 +271,19 @@ func (v *validator) run() {
 	// 5. All blocks terminated + no terminator in middle.
 	v.checkTerminators()
 
-	// 6. Terminator successor counts.
-	v.checkTerminatorSuccCounts()
+	// 6. OpSpec argument and successor counts.
+	v.checkOpSpecs()
 
 	// 7. Succ/Pred consistency.
 	v.checkSuccPredConsistency()
 
-	// 8. Branch arg count.
-	v.checkBranchArgs()
-
-	// 9. Safety-critical operation contracts.
+	// 8. Safety-critical operation contracts.
 	v.checkOpContracts()
 
-	// 10. Unique value IDs.
+	// 9. Unique value IDs.
 	v.checkValueIDUniqueness()
 
-	// 11. Reachability.
+	// 10. Reachability.
 	v.checkReachability()
 }
 
@@ -256,14 +337,14 @@ func (v *validator) checkTerminators() {
 
 		// Last instruction must be a terminator.
 		last := blk.Instrs[len(blk.Instrs)-1]
-		if !last.Op.IsTerminator() {
+		if !opSpecFor(last.Op).Terminator {
 			v.errorf("B%d: last instruction %s (v%d) is not a terminator",
 				blk.ID, last.Op, last.ID)
 		}
 
 		// No terminator should appear in the middle.
 		for i := 0; i < len(blk.Instrs)-1; i++ {
-			if blk.Instrs[i].Op.IsTerminator() {
+			if opSpecFor(blk.Instrs[i].Op).Terminator {
 				v.errorf("B%d: terminator %s (v%d) in middle of block at position %d",
 					blk.ID, blk.Instrs[i].Op, blk.Instrs[i].ID, i)
 			}
@@ -271,31 +352,34 @@ func (v *validator) checkTerminators() {
 	}
 }
 
-// checkTerminatorSuccCounts verifies each terminator has the correct number
-// of successors: Branch=2, Jump=1, Return=0.
-func (v *validator) checkTerminatorSuccCounts() {
+// checkOpSpecs verifies the basic operation contracts described by OpSpec.
+func (v *validator) checkOpSpecs() {
 	for _, blk := range v.fn.Blocks {
-		if len(blk.Instrs) == 0 {
-			continue
-		}
-		last := blk.Instrs[len(blk.Instrs)-1]
-		nSuccs := len(blk.Succs)
-
-		switch last.Op {
-		case OpBranch:
-			if nSuccs != 2 {
-				v.errorf("B%d: Branch must have 2 successors, got %d", blk.ID, nSuccs)
+		for i, instr := range blk.Instrs {
+			spec := opSpecFor(instr.Op)
+			v.checkArgPolicy(blk, instr, spec.Args)
+			if spec.SuccCount == opArgMaxAny || i != len(blk.Instrs)-1 {
+				continue
 			}
-		case OpJump:
-			if nSuccs != 1 {
-				v.errorf("B%d: Jump must have 1 successor, got %d", blk.ID, nSuccs)
-			}
-		case OpReturn:
-			if nSuccs != 0 {
-				v.errorf("B%d: Return must have 0 successors, got %d", blk.ID, nSuccs)
+			nSuccs := len(blk.Succs)
+			if nSuccs != spec.SuccCount {
+				v.errorf("B%d: %s must have %d successors, got %d", blk.ID, instr.Op, spec.SuccCount, nSuccs)
 			}
 		}
 	}
+}
+
+func (v *validator) checkArgPolicy(blk *Block, instr *Instr, policy OpArgPolicy) {
+	if instr == nil || policy.accepts(len(instr.Args)) {
+		return
+	}
+	if policy.Min == policy.Max {
+		v.errorf("B%d: %s (v%d) must have exactly %d args, got %d",
+			blk.ID, instr.Op, instr.ID, policy.Min, len(instr.Args))
+		return
+	}
+	v.errorf("B%d: %s (v%d) must have %s args, got %d",
+		blk.ID, instr.Op, instr.ID, policy.describe(), len(instr.Args))
 }
 
 // checkSuccPredConsistency verifies that if B is in A.Succs then A is in B.Preds,
@@ -328,58 +412,31 @@ func (v *validator) checkSuccPredConsistency() {
 	}
 }
 
-// checkBranchArgs verifies OpBranch instructions have exactly 1 arg (the condition).
-func (v *validator) checkBranchArgs() {
-	for _, blk := range v.fn.Blocks {
-		for _, instr := range blk.Instrs {
-			if instr.Op == OpBranch && len(instr.Args) != 1 {
-				v.errorf("B%d: Branch (v%d) must have exactly 1 arg (condition), got %d",
-					blk.ID, instr.ID, len(instr.Args))
-			}
-		}
-	}
-}
-
 func (v *validator) checkOpContracts() {
 	for _, blk := range v.fn.Blocks {
 		for _, instr := range blk.Instrs {
 			switch instr.Op {
-			case OpSetTable:
-				v.checkArgCount(blk, instr, 3, 3)
-			case OpTableArrayStore:
-				v.checkArgCount(blk, instr, 5, 6)
-			case OpTableShapeID:
-				v.checkArgCount(blk, instr, 1, 1)
-			case OpTableArraySwapPairs:
-				v.checkArgCount(blk, instr, 3, 3)
 			case OpGuardType:
-				v.checkArgCount(blk, instr, 1, 1)
 				if Type(instr.Aux) == TypeUnknown || Type(instr.Aux) == TypeAny {
 					v.errorf("B%d: GuardType (v%d) must carry a concrete type in Aux, got %s",
 						blk.ID, instr.ID, Type(instr.Aux))
 				}
 			case OpGuardGlobalConst:
-				v.checkArgCount(blk, instr, 0, 0)
 				if instr.Aux < 0 {
 					v.errorf("B%d: GuardGlobalConst (v%d) must carry a non-negative constant index in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
 			case OpGuardConstString:
-				v.checkArgCount(blk, instr, 1, 1)
 				if instr.Aux < 0 {
 					v.errorf("B%d: GuardConstString (v%d) must carry a non-negative constant index in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
 			case OpGuardTableKind:
-				v.checkArgCount(blk, instr, 1, 1)
 				if _, ok := fbKindToAK(instr.Aux); !ok {
 					v.errorf("B%d: GuardTableKind (v%d) must carry a concrete table array kind in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
-			case OpGuardCalleeProto, OpGuardNonNil, OpGuardTruthy:
-				v.checkArgCount(blk, instr, 1, 1)
 			case OpGuardFieldCalleeProto:
-				v.checkArgCount(blk, instr, 1, 1)
 				shapeID := uint32(instr.Aux2 >> 32)
 				fieldIdx := int(int32(instr.Aux2 & 0xFFFFFFFF))
 				if instr.Aux == 0 || shapeID == 0 || fieldIdx < 0 {
@@ -387,7 +444,6 @@ func (v *validator) checkOpContracts() {
 						blk.ID, instr.ID, instr.Aux, instr.Aux2)
 				}
 			case OpGuardShapeFieldType:
-				v.checkArgCount(blk, instr, 0, 0)
 				shapeID := uint32(instr.Aux >> 32)
 				fieldIdx := int(int32(instr.Aux & 0xFFFFFFFF))
 				if shapeID == 0 || fieldIdx < 0 || Type(instr.Aux2) == TypeAny || Type(instr.Aux2) == TypeUnknown {
@@ -395,7 +451,6 @@ func (v *validator) checkOpContracts() {
 						blk.ID, instr.ID, instr.Aux, instr.Aux2)
 				}
 			case OpGuardShapeFieldTypeMask:
-				v.checkArgCount(blk, instr, 0, 0)
 				shapeID := uint32(instr.Aux >> 32)
 				typ := Type(uint32(instr.Aux))
 				if shapeID == 0 || typ == TypeAny || typ == TypeUnknown || instr.Aux2 == 0 {
@@ -403,54 +458,36 @@ func (v *validator) checkOpContracts() {
 						blk.ID, instr.ID, instr.Aux, instr.Aux2)
 				}
 			case OpFieldSvals:
-				v.checkArgCount(blk, instr, 1, 1)
 				if instr.Aux <= 0 {
 					v.errorf("B%d: FieldSvals (v%d) must carry a positive shape id in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
 			case OpFieldLoad, OpFieldLoadNumToFloat:
-				v.checkArgCount(blk, instr, 1, 1)
 				if instr.Aux < 0 {
 					v.errorf("B%d: %s (v%d) must carry a non-negative field index in Aux, got %d",
 						blk.ID, instr.Op, instr.ID, instr.Aux)
 				}
 			case OpFieldStore:
-				v.checkArgCount(blk, instr, 2, 2)
 				if instr.Aux < 0 {
 					v.errorf("B%d: FieldStore (v%d) must carry a non-negative field index in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
 			case OpFieldPolyLen:
-				v.checkArgCount(blk, instr, 1, 1)
 				if instr.Aux < 0 {
 					v.errorf("B%d: FieldPolyLen (v%d) must carry a non-negative constant index in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
 			case OpRecordArrayLoopKernel:
-				v.checkArgCount(blk, instr, 3, 16)
+				if v.fn.Analysis == nil || v.fn.Analysis.RecordArrayLoopKernels == nil {
+					v.errorf("B%d: RecordArrayLoopKernel (v%d) must have a kernel spec", blk.ID, instr.ID)
+					continue
+				}
 				if _, ok := v.fn.Analysis.RecordArrayLoopKernels[instr.ID]; !ok {
 					v.errorf("B%d: RecordArrayLoopKernel (v%d) must have a kernel spec", blk.ID, instr.ID)
 				}
 			}
 		}
 	}
-}
-
-func (v *validator) checkArgCount(blk *Block, instr *Instr, min, max int) {
-	if instr == nil {
-		return
-	}
-	got := len(instr.Args)
-	if got >= min && got <= max {
-		return
-	}
-	if min == max {
-		v.errorf("B%d: %s (v%d) must have exactly %d args, got %d",
-			blk.ID, instr.Op, instr.ID, min, got)
-		return
-	}
-	v.errorf("B%d: %s (v%d) must have %d..%d args, got %d",
-		blk.ID, instr.Op, instr.ID, min, max, got)
 }
 
 // checkValueIDUniqueness verifies no two instructions share a value ID.
