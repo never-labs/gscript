@@ -16,6 +16,9 @@ func TestOpEmitterFamiliesMatchEmitDispatch(t *testing.T) {
 		if !ok {
 			t.Fatalf("%d has no OpSpec", op)
 		}
+		if spec.EmitterFamily == OpEmitterMatrix {
+			continue
+		}
 		dispatchFamily, inDispatchTable := emitInstrDispatchFamily(op)
 		_, inEmitSwitch := handled[op]
 		if inDispatchTable != inEmitSwitch {

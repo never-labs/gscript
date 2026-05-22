@@ -51,7 +51,7 @@ func emitMatrixInstrHandledOps(t *testing.T) map[Op]bool {
 				if !ok {
 					continue
 				}
-				op, ok := opByName(ident.Name)
+				op, ok := matrixTestOpByName(ident.Name)
 				if !ok {
 					t.Fatalf("emitMatrixInstr has unknown op case %s", ident.Name)
 				}
@@ -66,7 +66,7 @@ func emitMatrixInstrHandledOps(t *testing.T) map[Op]bool {
 	return nil
 }
 
-func opByName(name string) (Op, bool) {
+func matrixTestOpByName(name string) (Op, bool) {
 	for op := Op(0); op < OpMax; op++ {
 		if "Op"+op.String() == name {
 			return op, true
