@@ -16,17 +16,10 @@ func TestOpEmitterFamiliesMatchEmitDispatch(t *testing.T) {
 		if !ok {
 			t.Fatalf("%d has no OpSpec", op)
 		}
-		if spec.EmitterFamily == OpEmitterMatrix || spec.EmitterFamily == OpEmitterString {
-			continue
-		}
-		dispatchFamily, inDispatchTable := emitInstrDispatchFamily(op)
-		_, inEmitSwitch := handled[op]
-		if inDispatchTable != inEmitSwitch {
-			t.Fatalf("%s emit_dispatch case=%v, ownership table=%v", spec.Name, inEmitSwitch, inDispatchTable)
-		}
-		if inEmitSwitch {
-			if spec.EmitterFamily != dispatchFamily {
-				t.Fatalf("%s OpSpec family=%v, emit_dispatch family=%v", spec.Name, spec.EmitterFamily, dispatchFamily)
+		dispatchFamily, isHandled := handled[op]
+		if isHandled {
+			if dispatchFamily != OpEmitterInvalid && spec.EmitterFamily != dispatchFamily {
+				t.Fatalf("%s OpSpec family=%v, emitter helper family=%v", spec.Name, spec.EmitterFamily, dispatchFamily)
 			}
 			continue
 		}
@@ -36,10 +29,24 @@ func TestOpEmitterFamiliesMatchEmitDispatch(t *testing.T) {
 	}
 }
 
+func TestEmitInstrDelegatesRegisteredEmitterFamilies(t *testing.T) {
+	calls := emitterMethodCalls(t, "emit_dispatch.go", "emitInstr")
+	for _, delegate := range emitterFamilyDelegateRegistry() {
+		if !calls[delegate.funcName] {
+			t.Fatalf("emitInstr does not delegate to %s for family %v", delegate.funcName, delegate.family)
+		}
+	}
+}
+
 func TestOpBackendPolicyMatchesEmitDispatchExplicitCleanup(t *testing.T) {
 	explicitClears := emitInstrOpsCalling(t, "clearTableArrayBoundedKeys")
-	mergeOps(explicitClears, emitterOpsCalling(t, "emit_string.go", "emitStringInstr", "clearTableArrayBoundedKeys"))
+	for _, delegate := range emitterFamilyDelegateRegistry() {
+		mergeOps(explicitClears, emitterOpsCalling(t, delegate.filename, delegate.funcName, "clearTableArrayBoundedKeys"))
+	}
 	shapeInvalidations := emitInstrOpsInvalidatingShape(t)
+	for _, delegate := range emitterFamilyDelegateRegistry() {
+		mergeOps(shapeInvalidations, emitterOpsInvalidatingShape(t, delegate.filename, delegate.funcName))
+	}
 	for op := Op(0); op < OpMax; op++ {
 		spec, ok := op.Spec()
 		if !ok {
@@ -78,18 +85,56 @@ func TestOpBackendPolicyMatchesDispatchPreserveHelpers(t *testing.T) {
 	}
 }
 
-func emitInstrHandledOps(t *testing.T) map[Op]bool {
+type emitterFamilyDelegate struct {
+	filename string
+	funcName string
+	family   OpEmitterFamily
+}
+
+func emitterFamilyDelegateRegistry() []emitterFamilyDelegate {
+	return []emitterFamilyDelegate{
+		{filename: "emit_const.go", funcName: "emitConstInstr", family: OpEmitterConst},
+		{filename: "emit_slot.go", funcName: "emitSlotInstr", family: OpEmitterSlot},
+		{filename: "emit_matrix.go", funcName: "emitMatrixInstr", family: OpEmitterMatrix},
+		{filename: "emit_string.go", funcName: "emitStringInstr", family: OpEmitterString},
+	}
+}
+
+func emitInstrHandledOps(t *testing.T) map[Op]OpEmitterFamily {
+	t.Helper()
+
+	ops := make(map[Op]OpEmitterFamily)
+	for op := range emitInstrSwitchHandledOps(t) {
+		ops[op] = OpEmitterInvalid
+	}
+	for _, delegate := range emitterFamilyDelegateRegistry() {
+		for op := range emitterSwitchHandledOps(t, delegate.filename, delegate.funcName) {
+			if existingFamily, exists := ops[op]; exists {
+				t.Fatalf("%s handled by both emitInstr/direct family %v and %s", op, existingFamily, delegate.funcName)
+			}
+			ops[op] = delegate.family
+		}
+	}
+	return ops
+}
+
+func emitInstrSwitchHandledOps(t *testing.T) map[Op]bool {
+	t.Helper()
+	return emitterSwitchHandledOps(t, "emit_dispatch.go", "emitInstr")
+}
+
+func emitterSwitchHandledOps(t *testing.T, filename, funcName string) map[Op]bool {
 	t.Helper()
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "emit_dispatch.go", nil, 0)
+	file, err := parser.ParseFile(fset, filename, nil, 0)
 	if err != nil {
-		t.Fatalf("parse emit_dispatch.go: %v", err)
+		t.Fatalf("parse %s: %v", filename, err)
 	}
 	ops := make(map[Op]bool)
 	found := false
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "emitInstr" {
+		if !ok || fn.Name.Name != funcName {
 			continue
 		}
 		found = true
@@ -104,7 +149,9 @@ func emitInstrHandledOps(t *testing.T) map[Op]bool {
 					if ident, ok := expr.(*ast.Ident); ok {
 						if op, ok := opByName(ident.Name); ok {
 							ops[op] = true
+							continue
 						}
+						t.Fatalf("%s has unknown op case %s", funcName, ident.Name)
 					}
 				}
 			}
@@ -112,7 +159,7 @@ func emitInstrHandledOps(t *testing.T) map[Op]bool {
 		})
 	}
 	if !found {
-		t.Fatal("emitInstr not found in emit_dispatch.go")
+		t.Fatalf("%s not found in %s", funcName, filename)
 	}
 	return ops
 }
@@ -140,6 +187,28 @@ func emitInstrOpsCalling(t *testing.T, method string) map[Op]bool {
 func emitInstrOpsInvalidatingShape(t *testing.T) map[Op]bool {
 	t.Helper()
 	return emitInstrOpsWithCaseBehavior(t, func(cc *ast.CaseClause) bool {
+		found := false
+		ast.Inspect(cc, func(n ast.Node) bool {
+			assign, ok := n.(*ast.AssignStmt)
+			if !ok {
+				return true
+			}
+			for _, lhs := range assign.Lhs {
+				sel, ok := lhs.(*ast.SelectorExpr)
+				if ok && sel.Sel.Name == "shapeVerified" {
+					found = true
+					return false
+				}
+			}
+			return true
+		})
+		return found
+	})
+}
+
+func emitterOpsInvalidatingShape(t *testing.T, filename, funcName string) map[Op]bool {
+	t.Helper()
+	return emitterOpsWithCaseBehavior(t, filename, funcName, func(cc *ast.CaseClause) bool {
 		found := false
 		ast.Inspect(cc, func(n ast.Node) bool {
 			assign, ok := n.(*ast.AssignStmt)
@@ -232,6 +301,38 @@ func mergeOps(dst, src map[Op]bool) {
 	}
 }
 
+func emitterMethodCalls(t *testing.T, filename, funcName string) map[string]bool {
+	t.Helper()
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filename, nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v", filename, err)
+	}
+	calls := make(map[string]bool)
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != funcName {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if ok {
+				calls[sel.Sel.Name] = true
+			}
+			return true
+		})
+		return calls
+	}
+
+	t.Fatalf("%s not found in %s", funcName, filename)
+	return nil
+}
+
 func opByName(name string) (Op, bool) {
 	if name == "OpTableArrayNestedLoad" {
 		return OpTableArrayNestedLoad, true
@@ -252,70 +353,5 @@ func opIntentionallyNotHandledByEmitInstr(op Op) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func emitInstrDispatchFamily(op Op) (OpEmitterFamily, bool) {
-	switch op {
-	case OpConstInt, OpConstNil, OpConstBool, OpConstFloat, OpConstString:
-		return OpEmitterConst, true
-	case OpLoadSlot, OpStoreSlot:
-		return OpEmitterSlot, true
-	case OpAdd, OpSub, OpMul, OpMod, OpAddInt, OpSubInt, OpMulInt, OpModInt,
-		OpDivIntExact, OpAddFloat, OpSubFloat, OpMulFloat, OpDiv, OpDivFloat,
-		OpUnm, OpNegInt, OpNegFloat, OpSqrt, OpFloor, OpFMA, OpFMSUB, OpNot,
-		OpPow, OpLen:
-		return OpEmitterArithmetic, true
-	case OpMatrixDense, OpMatrixGetF, OpMatrixSetF, OpMatrixFlat, OpMatrixStride,
-		OpMatrixLoadFAt, OpMatrixStoreFAt, OpMatrixRowPtr, OpMatrixLoadFRow,
-		OpMatrixStoreFRow, OpMatrixLoadFRowConst, OpMatrixStoreFRowConst:
-		return OpEmitterMatrix, true
-	case OpComplexEscapeInSet, OpComplexEscapeRowCount, OpRecordArrayLoopKernel:
-		return OpEmitterKernel, true
-	case OpLt, OpLe, OpEq, OpLtInt, OpLeInt, OpEqInt, OpEqString, OpModZeroInt,
-		OpLtFloat, OpLeFloat:
-		return OpEmitterCompare, true
-	case OpConcat, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst,
-		OpStringFormatConstLen, OpGetTableStringFormatInt, OpStringSplitPart,
-		OpStringSplitSubstr, OpStringSplitSubstrNumber:
-		return OpEmitterString, true
-	case OpNewTable, OpNewFixedTable, OpGetTable, OpSetTable, OpTableArrayHeader,
-		OpTableArrayLen, OpTableArrayData, OpTableArrayLoad, OpTableShapeID,
-		OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpTableBoolArrayFill, OpTableBoolArrayCount, OpTableIntArrayReversePrefix,
-		OpTableIntArrayCopyPrefix, OpTableArrayNestedLoad, OpSetList, OpAppend:
-		return OpEmitterTable, true
-	case OpGetField, OpGetFieldNumToFloat, OpFieldPolyLen, OpFieldSvals,
-		OpFieldLoad, OpFieldLoadNumToFloat, OpFieldStore, OpSetField:
-		return OpEmitterField, true
-	case OpGetGlobal, OpSetGlobal:
-		return OpEmitterGlobal, true
-	case OpGetUpval, OpSetUpval:
-		return OpEmitterUpvalue, true
-	case OpNumToFloat:
-		return OpEmitterConversion, true
-	case OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString,
-		OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto,
-		OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardTruthy,
-		OpGuardNonNil:
-		return OpEmitterGuard, true
-	case OpJump, OpBranch, OpReturn, OpTestSet:
-		return OpEmitterControl, true
-	case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpSelf:
-		return OpEmitterCall, true
-	case OpForPrep, OpForLoop, OpTForCall, OpTForLoop:
-		return OpEmitterLoop, true
-	case OpClosure, OpClose:
-		return OpEmitterClosure, true
-	case OpVararg:
-		return OpEmitterVararg, true
-	case OpGo, OpMakeChan, OpSend, OpRecv:
-		return OpEmitterConcurrency, true
-	case OpPhi:
-		return OpEmitterPhi, true
-	case OpNop:
-		return OpEmitterSpecial, true
-	default:
-		return OpEmitterInvalid, false
 	}
 }

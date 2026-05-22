@@ -45,6 +45,12 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if instr.Op != OpBranch {
 		ec.fusedActive = false
 	}
+	if ec.emitConstInstr(instr, block) {
+		goto done
+	}
+	if ec.emitSlotInstr(instr, block) {
+		goto done
+	}
 	if ec.emitMatrixInstr(instr) {
 		goto done
 	}
@@ -52,24 +58,6 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 		goto done
 	}
 	switch instr.Op {
-	// --- Constants ---
-	case OpConstInt:
-		ec.emitConstInt(instr)
-	case OpConstNil:
-		ec.emitConstNil(instr)
-	case OpConstBool:
-		ec.emitConstBool(instr)
-	case OpConstFloat:
-		ec.emitConstFloat(instr)
-	case OpConstString:
-		ec.emitConstString(instr)
-
-	// --- Slot access ---
-	case OpLoadSlot:
-		ec.emitLoadSlot(instr)
-	case OpStoreSlot:
-		ec.emitStoreSlot(instr)
-
 	// --- Type-generic arithmetic (float-aware) ---
 	case OpAdd:
 		ec.emitFloatBinOp(instr, intBinAdd)
