@@ -635,7 +635,7 @@ func fieldShapeCalleeCases(fn *Function, instr *Instr) []FieldPolyShapeCase {
 	if calleeLoad.Op != OpGetField {
 		return nil
 	}
-	cases := fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
+	cases, _ := functionTableShapeFacts(fn).FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) == 0 {
 		return nil
 	}
