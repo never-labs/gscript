@@ -57,6 +57,18 @@ const (
 	OpArgControl
 )
 
+// OpBackendPolicy describes backend-local cache and verification effects that
+// are easy to miss in emit_dispatch.go.
+type OpBackendPolicy uint16
+
+const (
+	OpBackendPreservesFieldSvalsCache OpBackendPolicy = 1 << iota
+	OpBackendPreservesFieldSvalsCacheForFloatResult
+	OpBackendPreservesTableArrayBounds
+	OpBackendClearsTableArrayBounds
+	OpBackendInvalidatesShape
+)
+
 // OpSpec is the lightweight metadata contract for an IR op.
 type OpSpec struct {
 	Name          string
@@ -65,6 +77,7 @@ type OpSpec struct {
 	ArgPolicy     OpArgPolicy
 	EmitterFamily OpEmitterFamily
 	MayDeopt      bool
+	BackendPolicy OpBackendPolicy
 }
 
 func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSideEffect, mayDeopt bool) OpSpec {
@@ -223,7 +236,11 @@ var opSpecs = [...]OpSpec{
 
 func (op Op) Spec() (OpSpec, bool) {
 	if int(op) < len(opSpecs) && opSpecs[op].Name != "" {
-		return opSpecs[op], true
+		spec := opSpecs[op]
+		if int(op) < len(opBackendPolicies) {
+			spec.BackendPolicy = opBackendPolicies[op]
+		}
+		return spec, true
 	}
 	return OpSpec{}, false
 }
@@ -238,4 +255,114 @@ func OpsByEmitterFamily(family OpEmitterFamily) []Op {
 		ops = append(ops, op)
 	}
 	return ops
+}
+
+var opBackendPolicies = [...]OpBackendPolicy{
+	OpConstInt:                   OpBackendPreservesTableArrayBounds,
+	OpConstFloat:                 OpBackendPreservesTableArrayBounds,
+	OpConstBool:                  OpBackendPreservesTableArrayBounds,
+	OpConstNil:                   OpBackendPreservesTableArrayBounds,
+	OpConstString:                OpBackendPreservesTableArrayBounds,
+	OpLoadSlot:                   OpBackendPreservesTableArrayBounds,
+	OpStoreSlot:                  OpBackendPreservesTableArrayBounds,
+	OpAdd:                        OpBackendPreservesTableArrayBounds,
+	OpSub:                        OpBackendPreservesTableArrayBounds,
+	OpMul:                        OpBackendPreservesTableArrayBounds,
+	OpDiv:                        OpBackendPreservesTableArrayBounds,
+	OpMod:                        OpBackendPreservesTableArrayBounds,
+	OpUnm:                        OpBackendPreservesTableArrayBounds,
+	OpNot:                        OpBackendPreservesTableArrayBounds,
+	OpLen:                        OpBackendClearsTableArrayBounds,
+	OpAddInt:                     OpBackendPreservesTableArrayBounds,
+	OpSubInt:                     OpBackendPreservesTableArrayBounds,
+	OpMulInt:                     OpBackendPreservesTableArrayBounds,
+	OpModInt:                     OpBackendPreservesTableArrayBounds,
+	OpNegInt:                     OpBackendPreservesTableArrayBounds,
+	OpAddFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpSubFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpMulFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpDivFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpNegFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpSqrt:                       OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpFloor:                      OpBackendPreservesTableArrayBounds,
+	OpFMA:                        OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpFMSUB:                      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpComplexEscapeInSet:         OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpComplexEscapeRowCount:      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpRecordArrayLoopKernel:      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpEq:                         OpBackendPreservesTableArrayBounds,
+	OpLt:                         OpBackendPreservesTableArrayBounds,
+	OpLe:                         OpBackendPreservesTableArrayBounds,
+	OpEqInt:                      OpBackendPreservesTableArrayBounds,
+	OpLtInt:                      OpBackendPreservesTableArrayBounds,
+	OpLeInt:                      OpBackendPreservesTableArrayBounds,
+	OpModZeroInt:                 OpBackendPreservesTableArrayBounds,
+	OpLtFloat:                    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpLeFloat:                    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpEqString:                   OpBackendPreservesTableArrayBounds,
+	OpStringFormatConstLen:       OpBackendPreservesTableArrayBounds | OpBackendClearsTableArrayBounds,
+	OpNewTable:                   0,
+	OpSetTable:                   OpBackendClearsTableArrayBounds | OpBackendInvalidatesShape,
+	OpTableArrayHeader:           OpBackendPreservesTableArrayBounds,
+	OpTableArrayLen:              OpBackendPreservesTableArrayBounds,
+	OpTableArrayData:             OpBackendPreservesTableArrayBounds,
+	OpTableArrayLoad:             OpBackendPreservesTableArrayBounds,
+	OpTableShapeID:               OpBackendPreservesTableArrayBounds,
+	OpTableArrayStore:            OpBackendPreservesTableArrayBounds,
+	OpTableArraySwap:             OpBackendPreservesTableArrayBounds,
+	OpTableArraySwapPairs:        OpBackendPreservesTableArrayBounds | OpBackendClearsTableArrayBounds,
+	OpTableBoolArrayFill:         OpBackendClearsTableArrayBounds,
+	OpTableIntArrayReversePrefix: OpBackendClearsTableArrayBounds,
+	OpTableIntArrayCopyPrefix:    OpBackendClearsTableArrayBounds,
+	OpGetField:                   OpBackendPreservesFieldSvalsCache,
+	OpGetFieldNumToFloat:         OpBackendPreservesFieldSvalsCache,
+	OpFieldPolyLen:               OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpSetField:                   OpBackendPreservesFieldSvalsCache | OpBackendClearsTableArrayBounds,
+	OpGetGlobal:                  OpBackendClearsTableArrayBounds,
+	OpSetGlobal:                  OpBackendClearsTableArrayBounds,
+	OpGetUpval:                   OpBackendClearsTableArrayBounds,
+	OpSetUpval:                   OpBackendClearsTableArrayBounds,
+	OpBoxInt:                     OpBackendPreservesTableArrayBounds,
+	OpBoxFloat:                   OpBackendPreservesTableArrayBounds,
+	OpUnboxInt:                   OpBackendPreservesTableArrayBounds,
+	OpUnboxFloat:                 OpBackendPreservesTableArrayBounds,
+	OpNumToFloat:                 OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardType:                  OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardIntRange:              OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardGlobalConst:           OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardConstString:           OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardTableKind:             OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardCalleeProto:           OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardFieldCalleeProto:      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardShapeFieldType:        OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardShapeFieldTypeMask:    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpGuardTruthy:                OpBackendPreservesTableArrayBounds,
+	OpCall:                       OpBackendClearsTableArrayBounds,
+	OpCallFloor:                  OpBackendClearsTableArrayBounds,
+	OpFieldCallFloor:             OpBackendClearsTableArrayBounds,
+	OpResume:                     OpBackendClearsTableArrayBounds,
+	OpSelf:                       OpBackendClearsTableArrayBounds | OpBackendInvalidatesShape,
+	OpForPrep:                    OpBackendClearsTableArrayBounds,
+	OpForLoop:                    OpBackendClearsTableArrayBounds,
+	OpTForCall:                   OpBackendClearsTableArrayBounds,
+	OpTForLoop:                   OpBackendClearsTableArrayBounds,
+	OpClosure:                    OpBackendClearsTableArrayBounds,
+	OpClose:                      OpBackendClearsTableArrayBounds,
+	OpVararg:                     OpBackendClearsTableArrayBounds,
+	OpTestSet:                    OpBackendClearsTableArrayBounds,
+	OpGo:                         OpBackendClearsTableArrayBounds,
+	OpMakeChan:                   OpBackendClearsTableArrayBounds,
+	OpSend:                       OpBackendClearsTableArrayBounds,
+	OpRecv:                       OpBackendClearsTableArrayBounds,
+	OpNop:                        OpBackendPreservesTableArrayBounds,
+	OpConcat:                     OpBackendClearsTableArrayBounds,
+	OpStringConstLookup:          OpBackendClearsTableArrayBounds,
+	OpStringFormatInt:            OpBackendClearsTableArrayBounds,
+	OpStringFormatConst:          OpBackendClearsTableArrayBounds,
+	OpStringSplitPart:            OpBackendClearsTableArrayBounds,
+	OpStringSplitSubstr:          OpBackendClearsTableArrayBounds,
+	OpStringSplitSubstrNumber:    OpBackendClearsTableArrayBounds,
+	OpAppend:                     OpBackendClearsTableArrayBounds,
+	OpPow:                        OpBackendClearsTableArrayBounds,
+	OpGuardNonNil:                OpBackendClearsTableArrayBounds,
 }

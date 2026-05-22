@@ -350,46 +350,21 @@ func instrPreservesTableArrayBoundedKeys(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString,
-		OpLoadSlot, OpStoreSlot,
-		OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm, OpNot,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpSqrt, OpFloor, OpFMA, OpFMSUB,
-		OpEq, OpLt, OpLe,
-		OpEqInt, OpLtInt, OpLeInt, OpModZeroInt, OpEqString,
-		OpLtFloat, OpLeFloat, OpComplexEscapeInSet, OpComplexEscapeRowCount, OpRecordArrayLoopKernel,
-		OpBoxInt, OpBoxFloat, OpUnboxInt, OpUnboxFloat,
-		OpNumToFloat, OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardTruthy,
-		OpTableArrayHeader, OpTableArrayLen, OpTableArrayData, OpTableArrayLoad, OpTableShapeID, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpStringFormatConstLen,
-		OpFieldPolyLen,
-		OpNop:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.BackendPolicy&OpBackendPreservesTableArrayBounds != 0
 }
 
 func instrPreservesFieldSvalsCache(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpGetField, OpGetFieldNumToFloat, OpFieldPolyLen, OpSetField:
-		return true
-	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpSqrt, OpFMA, OpFMSUB:
-		return instr.Type == TypeFloat
-	case OpLtFloat, OpLeFloat, OpComplexEscapeInSet, OpComplexEscapeRowCount, OpRecordArrayLoopKernel:
-		return true
-	case OpNumToFloat, OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask:
-		// These paths use X0/X2/X3 and FPR temporaries on the fast path.
-		// Failure exits through deopt rather than resuming after the guard.
-		return true
-	default:
+	spec, ok := instr.Op.Spec()
+	if !ok {
 		return false
 	}
+	policy := spec.BackendPolicy
+	return policy&OpBackendPreservesFieldSvalsCache != 0 ||
+		(policy&OpBackendPreservesFieldSvalsCacheForFloatResult != 0 && instr.Type == TypeFloat)
 }
 
 func instrPreservesScratchFPRCache(instr *Instr) bool {

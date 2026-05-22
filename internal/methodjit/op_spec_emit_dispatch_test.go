@@ -36,6 +36,47 @@ func TestOpEmitterFamiliesMatchEmitDispatch(t *testing.T) {
 	}
 }
 
+func TestOpBackendPolicyMatchesEmitDispatchExplicitCleanup(t *testing.T) {
+	explicitClears := emitInstrOpsCalling(t, "clearTableArrayBoundedKeys")
+	shapeInvalidations := emitInstrOpsInvalidatingShape(t)
+	for op := Op(0); op < OpMax; op++ {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if got, want := spec.BackendPolicy&OpBackendClearsTableArrayBounds != 0, explicitClears[op]; got != want {
+			t.Fatalf("%s clears table array bounds policy=%v, emit_dispatch=%v", spec.Name, got, want)
+		}
+		if got, want := spec.BackendPolicy&OpBackendInvalidatesShape != 0, shapeInvalidations[op]; got != want {
+			t.Fatalf("%s invalidates shape policy=%v, emit_dispatch=%v", spec.Name, got, want)
+		}
+	}
+}
+
+func TestOpBackendPolicyMatchesDispatchPreserveHelpers(t *testing.T) {
+	for op := Op(0); op < OpMax; op++ {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		policy := spec.BackendPolicy
+		if got, want := instrPreservesTableArrayBoundedKeys(&Instr{Op: op}), policy&OpBackendPreservesTableArrayBounds != 0; got != want {
+			t.Fatalf("%s table array bounds preserve helper=%v, policy=%v", spec.Name, got, want)
+		}
+
+		unknownInstr := &Instr{Op: op, Type: TypeUnknown}
+		floatInstr := &Instr{Op: op, Type: TypeFloat}
+		wantUnknown := policy&OpBackendPreservesFieldSvalsCache != 0
+		wantFloat := wantUnknown || policy&OpBackendPreservesFieldSvalsCacheForFloatResult != 0
+		if got := instrPreservesFieldSvalsCache(unknownInstr); got != wantUnknown {
+			t.Fatalf("%s field svals preserve helper with unknown type=%v, policy=%v", spec.Name, got, wantUnknown)
+		}
+		if got := instrPreservesFieldSvalsCache(floatInstr); got != wantFloat {
+			t.Fatalf("%s field svals preserve helper with float type=%v, policy=%v", spec.Name, got, wantFloat)
+		}
+	}
+}
+
 func emitInstrHandledOps(t *testing.T) map[Op]bool {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -58,6 +99,90 @@ func emitInstrHandledOps(t *testing.T) map[Op]bool {
 			}
 			for _, stmt := range sw.Body.List {
 				cc := stmt.(*ast.CaseClause)
+				for _, expr := range cc.List {
+					if ident, ok := expr.(*ast.Ident); ok {
+						if op, ok := opByName(ident.Name); ok {
+							ops[op] = true
+						}
+					}
+				}
+			}
+			return false
+		})
+	}
+	if !found {
+		t.Fatal("emitInstr not found in emit_dispatch.go")
+	}
+	return ops
+}
+
+func emitInstrOpsCalling(t *testing.T, method string) map[Op]bool {
+	t.Helper()
+	return emitInstrOpsWithCaseBehavior(t, func(cc *ast.CaseClause) bool {
+		found := false
+		ast.Inspect(cc, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if ok && sel.Sel.Name == method {
+				found = true
+				return false
+			}
+			return true
+		})
+		return found
+	})
+}
+
+func emitInstrOpsInvalidatingShape(t *testing.T) map[Op]bool {
+	t.Helper()
+	return emitInstrOpsWithCaseBehavior(t, func(cc *ast.CaseClause) bool {
+		found := false
+		ast.Inspect(cc, func(n ast.Node) bool {
+			assign, ok := n.(*ast.AssignStmt)
+			if !ok {
+				return true
+			}
+			for _, lhs := range assign.Lhs {
+				sel, ok := lhs.(*ast.SelectorExpr)
+				if ok && sel.Sel.Name == "shapeVerified" {
+					found = true
+					return false
+				}
+			}
+			return true
+		})
+		return found
+	})
+}
+
+func emitInstrOpsWithCaseBehavior(t *testing.T, hasBehavior func(*ast.CaseClause) bool) map[Op]bool {
+	t.Helper()
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "emit_dispatch.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse emit_dispatch.go: %v", err)
+	}
+	ops := make(map[Op]bool)
+	found := false
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "emitInstr" {
+			continue
+		}
+		found = true
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			sw, ok := n.(*ast.SwitchStmt)
+			if !ok {
+				return true
+			}
+			for _, stmt := range sw.Body.List {
+				cc := stmt.(*ast.CaseClause)
+				if !hasBehavior(cc) {
+					continue
+				}
 				for _, expr := range cc.List {
 					if ident, ok := expr.(*ast.Ident); ok {
 						if op, ok := opByName(ident.Name); ok {
