@@ -9,8 +9,9 @@ import (
 )
 
 // AnalysisFactDomainDiff records a lightweight before/after change for one
-// AnalysisResult map field. It intentionally stores only the domain count and
-// content hash, not the map contents.
+// AnalysisResult fact map. Top-level compatibility maps use their field name;
+// maps owned by a fact domain struct use Domain.Field. It intentionally stores
+// only the domain count and content hash, not the map contents.
 type AnalysisFactDomainDiff struct {
 	Domain      string `json:"domain"`
 	BeforeCount int    `json:"before_count"`
@@ -54,13 +55,47 @@ func snapshotAnalysisResultDomains(result *AnalysisResult) map[string]analysisFa
 			continue
 		}
 		name := valueType.Field(i).Name
-		out[name] = analysisFactDomainSnapshot{
-			Domain: name,
-			Count:  field.Len(),
-			Hash:   hashAnalysisFactDomain(field),
+		recordAnalysisFactMapSnapshot(out, name, field)
+	}
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Field(i)
+		field, ok := analysisResultDomainStructValue(field)
+		if !ok {
+			continue
 		}
+		name := valueType.Field(i).Name
+		snapshotAnalysisResultDomainStruct(out, name, field)
 	}
 	return out
+}
+
+func analysisResultDomainStructValue(value reflect.Value) (reflect.Value, bool) {
+	if value.Kind() == reflect.Pointer {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		value = value.Elem()
+	}
+	return value, value.Kind() == reflect.Struct
+}
+
+func snapshotAnalysisResultDomainStruct(out map[string]analysisFactDomainSnapshot, domain string, value reflect.Value) {
+	valueType := value.Type()
+	for i := 0; i < value.NumField(); i++ {
+		field := value.Field(i)
+		if field.Kind() != reflect.Map {
+			continue
+		}
+		recordAnalysisFactMapSnapshot(out, domain+"."+valueType.Field(i).Name, field)
+	}
+}
+
+func recordAnalysisFactMapSnapshot(out map[string]analysisFactDomainSnapshot, domain string, field reflect.Value) {
+	out[domain] = analysisFactDomainSnapshot{
+		Domain: domain,
+		Count:  field.Len(),
+		Hash:   hashAnalysisFactDomain(field),
+	}
 }
 
 func diffAnalysisFactDomains(before, after map[string]analysisFactDomainSnapshot) []AnalysisFactDomainDiff {
