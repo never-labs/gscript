@@ -17,6 +17,7 @@ func AnnotateProtocolConstCallFolds(fn *Function, globals map[string]*vm.FuncPro
 	if fn == nil || fn.Proto == nil || len(globals) == 0 {
 		return fn
 	}
+	callFacts := fn.Analysis.CallFacts()
 	stableInts := collectProtocolStableIntGlobals(fn)
 	folds := make(map[int]ProtocolConstCallFoldFact)
 	for _, block := range fn.Blocks {
@@ -55,10 +56,10 @@ func AnnotateProtocolConstCallFolds(fn *Function, globals map[string]*vm.FuncPro
 		}
 	}
 	if len(folds) == 0 {
-		fn.Analysis.ProtocolConstCallFolds = nil
+		callFacts.SetProtocolConstCallFolds(nil)
 		return fn
 	}
-	fn.Analysis.ProtocolConstCallFolds = folds
+	callFacts.SetProtocolConstCallFolds(folds)
 	return fn
 }
 

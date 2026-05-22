@@ -46,6 +46,56 @@ func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 	}
 }
 
+func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
+	a := NewAnalysisResult()
+	calls := a.CallFacts()
+
+	desc := CallABIDescriptor{NumArgs: 2, NumRets: 1}
+	calls.SetCallABIs(map[int]CallABIDescriptor{11: desc})
+	if got, ok := a.CallABIs[11]; !ok || got.NumArgs != desc.NumArgs || got.NumRets != desc.NumRets {
+		t.Fatalf("CallFacts.SetCallABIs did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+
+	calls.SetProtocolConstCallFolds(map[int]ProtocolConstCallFoldFact{12: {Result: 99}})
+	if got, ok := a.ProtocolConstCallFolds[12]; !ok || got.Result != 99 {
+		t.Fatalf("CallFacts.SetProtocolConstCallFolds did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+
+	calls.SetWholeCallNoResultKernels(map[int]bool{13: true})
+	if !a.WholeCallNoResultKernels[13] {
+		t.Fatalf("CallFacts.SetWholeCallNoResultKernels did not update compatibility field")
+	}
+
+	calls.SetWholeCallNoResultBatches(map[int]WholeCallNoResultBatchFact{13: {ExitPC: 44}})
+	if got, ok := a.WholeCallNoResultBatches[13]; !ok || got.ExitPC != 44 {
+		t.Fatalf("CallFacts.SetWholeCallNoResultBatches did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+}
+
+func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
+	desc := CallABIDescriptor{NumArgs: 3, NumRets: 1}
+	a := &AnalysisResult{
+		CallABIs:                 map[int]CallABIDescriptor{21: desc},
+		ProtocolConstCallFolds:   map[int]ProtocolConstCallFoldFact{22: {Result: 7}},
+		WholeCallNoResultKernels: map[int]bool{23: true},
+		WholeCallNoResultBatches: map[int]WholeCallNoResultBatchFact{23: {ExitPC: 8}},
+	}
+
+	calls := a.CallFacts()
+	if got, ok := calls.CallABI(21); !ok || got.NumArgs != desc.NumArgs {
+		t.Fatalf("CallFacts did not adopt legacy CallABIs: got %#v ok=%v", got, ok)
+	}
+	if got, ok := calls.ProtocolConstCallFold(22); !ok || got.Result != 7 {
+		t.Fatalf("CallFacts did not adopt legacy ProtocolConstCallFolds: got %#v ok=%v", got, ok)
+	}
+	if !calls.WholeCallNoResultKernel(23) {
+		t.Fatalf("CallFacts did not adopt legacy WholeCallNoResultKernels")
+	}
+	if got, ok := calls.WholeCallNoResultBatch(23); !ok || got.ExitPC != 8 {
+		t.Fatalf("CallFacts did not adopt legacy WholeCallNoResultBatches: got %#v ok=%v", got, ok)
+	}
+}
+
 func TestSpecGuardKindSuppressedNilKindsFallsBackToPCs(t *testing.T) {
 	fn := &Function{Analysis: &AnalysisResult{
 		SuppressedSpecGuardPCs: map[int]bool{42: true},

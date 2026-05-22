@@ -12,7 +12,8 @@ func (ec *emitContext) emitWholeCallKernelOpExitIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
-	if !ec.fn.Analysis.WholeCallNoResultKernels[instr.ID] {
+	callFacts := ec.fn.Analysis.CallFacts()
+	if !callFacts.WholeCallNoResultKernel(instr.ID) {
 		return false
 	}
 	funcSlot := int(instr.Aux)
@@ -60,7 +61,7 @@ func (ec *emitContext) emitWholeCallKernelOpExitIfEligible(instr *Instr) bool {
 	asm.Label(continueLabel)
 	ec.emitReloadAllActiveRegs()
 	ec.invalidateCallClobberedFactsAfterResume()
-	if fact, ok := ec.fn.Analysis.WholeCallNoResultBatches[instr.ID]; ok && fact.ExitPC > 0 {
+	if fact, ok := callFacts.WholeCallNoResultBatch(instr.ID); ok && fact.ExitPC > 0 {
 		if target := ec.blockLabelAtOrAfterSourcePC(fact.ExitPC); target != "" {
 			noBatchLabel := ec.uniqueLabel("wholecall_no_batch")
 			asm.LDR(jit.X0, mRegCtx, execCtxOffOpExitAux)

@@ -27,7 +27,8 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 		return fn
 	}
 	globals := callABIMergeGlobals(config.Globals, callABIStableGlobals(fn.Proto))
-	fn.Analysis.CallABIs = nil
+	callFacts := fn.Analysis.CallFacts()
+	callFacts.SetCallABIs(nil)
 
 	tails := callABITailCalls(fn)
 	shiftAddOverflowVersions := make(map[*vm.FuncProto]*shiftAddOverflowVersion)
@@ -81,7 +82,7 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 		}
 	}
 	if len(descs) > 0 {
-		fn.Analysis.CallABIs = descs
+		callFacts.SetCallABIs(descs)
 	}
 	return fn
 }

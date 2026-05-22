@@ -85,6 +85,11 @@ type AnalysisResult struct {
 	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
 	CallABIs map[int]CallABIDescriptor
 
+	// Call groups call-oriented analysis facts. The map fields above and below
+	// remain for compatibility and are kept pointed at this domain's maps by
+	// constructors, Initialize, and domain mutators.
+	Call *CallFacts
+
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
 	// inlined callees and guarded polymorphic call targets.
@@ -193,9 +198,143 @@ type AnalysisResult struct {
 	GlobalArrayElementFacts map[string]FixedShapeTableFact
 }
 
+// CallFacts groups analysis facts produced and consumed by call-specialization passes.
+type CallFacts struct {
+	owner *AnalysisResult
+
+	// CallABIs records stable callsite ABI facts keyed by OpCall instruction
+	// ID. A descriptor is required before codegen may use a specialized
+	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
+	CallABIs map[int]CallABIDescriptor
+
+	// ProtocolConstCallFolds records guarded whole-call protocol constants
+	// keyed by OpCall instruction ID.
+	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
+
+	// WholeCallNoResultKernels records stable structural no-result whole-call
+	// kernels keyed by OpCall instruction ID. Codegen routes them through a
+	// precise op-exit rather than the generic CallExit path.
+	WholeCallNoResultKernels map[int]bool
+
+	// WholeCallNoResultBatches records loop-tail no-result whole-call kernel
+	// sites that can safely batch future complete loop iterations after the
+	// current iteration's final kernel call has run.
+	WholeCallNoResultBatches map[int]WholeCallNoResultBatchFact
+}
+
+func NewCallFacts() *CallFacts {
+	c := &CallFacts{}
+	c.Initialize()
+	return c
+}
+
+func (c *CallFacts) Initialize() {
+	if c.CallABIs == nil {
+		c.CallABIs = make(map[int]CallABIDescriptor)
+	}
+	if c.ProtocolConstCallFolds == nil {
+		c.ProtocolConstCallFolds = make(map[int]ProtocolConstCallFoldFact)
+	}
+	if c.WholeCallNoResultKernels == nil {
+		c.WholeCallNoResultKernels = make(map[int]bool)
+	}
+	if c.WholeCallNoResultBatches == nil {
+		c.WholeCallNoResultBatches = make(map[int]WholeCallNoResultBatchFact)
+	}
+}
+
+func (c *CallFacts) SetCallABIs(facts map[int]CallABIDescriptor) {
+	c.CallABIs = facts
+	c.bindOwner()
+}
+
+func (c *CallFacts) CallABI(id int) (CallABIDescriptor, bool) {
+	if c == nil || c.CallABIs == nil {
+		return CallABIDescriptor{}, false
+	}
+	desc, ok := c.CallABIs[id]
+	return desc, ok
+}
+
+func (c *CallFacts) SetProtocolConstCallFolds(facts map[int]ProtocolConstCallFoldFact) {
+	c.ProtocolConstCallFolds = facts
+	c.bindOwner()
+}
+
+func (c *CallFacts) ProtocolConstCallFold(id int) (ProtocolConstCallFoldFact, bool) {
+	if c == nil || c.ProtocolConstCallFolds == nil {
+		return ProtocolConstCallFoldFact{}, false
+	}
+	fact, ok := c.ProtocolConstCallFolds[id]
+	return fact, ok
+}
+
+func (c *CallFacts) SetWholeCallNoResultKernels(facts map[int]bool) {
+	c.WholeCallNoResultKernels = facts
+	c.bindOwner()
+}
+
+func (c *CallFacts) WholeCallNoResultKernel(id int) bool {
+	return c != nil && c.WholeCallNoResultKernels != nil && c.WholeCallNoResultKernels[id]
+}
+
+func (c *CallFacts) SetWholeCallNoResultBatches(facts map[int]WholeCallNoResultBatchFact) {
+	c.WholeCallNoResultBatches = facts
+	c.bindOwner()
+}
+
+func (c *CallFacts) WholeCallNoResultBatch(id int) (WholeCallNoResultBatchFact, bool) {
+	if c == nil || c.WholeCallNoResultBatches == nil {
+		return WholeCallNoResultBatchFact{}, false
+	}
+	fact, ok := c.WholeCallNoResultBatches[id]
+	return fact, ok
+}
+
+func (c *CallFacts) bindOwner() {
+	if c != nil && c.owner != nil {
+		c.owner.bindCallCompatibilityFields()
+	}
+}
+
+func (a *AnalysisResult) CallFacts() *CallFacts {
+	if a == nil {
+		return nil
+	}
+	if a.Call == nil {
+		a.Call = &CallFacts{
+			CallABIs:                 a.CallABIs,
+			ProtocolConstCallFolds:   a.ProtocolConstCallFolds,
+			WholeCallNoResultKernels: a.WholeCallNoResultKernels,
+			WholeCallNoResultBatches: a.WholeCallNoResultBatches,
+		}
+	}
+	a.Call.owner = a
+	a.bindCallCompatibilityFields()
+	return a.Call
+}
+
+func (a *AnalysisResult) initializeCallFacts() {
+	if a == nil {
+		return
+	}
+	a.CallFacts().Initialize()
+	a.bindCallCompatibilityFields()
+}
+
+func (a *AnalysisResult) bindCallCompatibilityFields() {
+	if a == nil || a.Call == nil {
+		return
+	}
+	a.CallABIs = a.Call.CallABIs
+	a.ProtocolConstCallFolds = a.Call.ProtocolConstCallFolds
+	a.WholeCallNoResultKernels = a.Call.WholeCallNoResultKernels
+	a.WholeCallNoResultBatches = a.Call.WholeCallNoResultBatches
+}
+
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
-	return &AnalysisResult{
+	a := &AnalysisResult{
 		Int48Safe:                 make(map[int]bool),
 		IntModNonZeroDivisor:      make(map[int]bool),
 		IntModNoSignAdjust:        make(map[int]bool),
@@ -209,13 +348,10 @@ func NewAnalysisResult() *AnalysisResult {
 		ShapeFieldTypeElidedLoads: make(map[int]bool),
 		TableArrayDataPtrs:        make(map[int]TableArrayDataPtrFact),
 		RecordArrayLoopKernels:    make(map[int]RecordArrayLoopKernelSpec),
-		CallABIs:                  make(map[int]CallABIDescriptor),
+		Call:                      NewCallFacts(),
 		SpecDependencyProtos:      make(map[*vm.FuncProto]bool),
 		SuppressedSpecGuardPCs:    make(map[int]bool),
 
-		ProtocolConstCallFolds:   make(map[int]ProtocolConstCallFoldFact),
-		WholeCallNoResultKernels: make(map[int]bool),
-		WholeCallNoResultBatches: make(map[int]WholeCallNoResultBatchFact),
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
 		FieldPolyShapeFacts:      make(map[int][]FieldPolyShapeCase),
 		FieldPolyShapeReceivers:  make(map[int]bool),
@@ -228,6 +364,8 @@ func NewAnalysisResult() *AnalysisResult {
 		NumericGlobalValues:      make(map[string]runtime.Value),
 		GlobalArrayElementFacts:  make(map[string]FixedShapeTableFact),
 	}
+	a.bindCallCompatibilityFields()
+	return a
 }
 
 // Initialize initializes nil non-sentinel maps in the AnalysisResult.
@@ -271,23 +409,12 @@ func (a *AnalysisResult) Initialize() {
 	if a.RecordArrayLoopKernels == nil {
 		a.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
 	}
-	if a.CallABIs == nil {
-		a.CallABIs = make(map[int]CallABIDescriptor)
-	}
+	a.initializeCallFacts()
 	if a.SpecDependencyProtos == nil {
 		a.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
 	}
 	if a.SuppressedSpecGuardPCs == nil {
 		a.SuppressedSpecGuardPCs = make(map[int]bool)
-	}
-	if a.ProtocolConstCallFolds == nil {
-		a.ProtocolConstCallFolds = make(map[int]ProtocolConstCallFoldFact)
-	}
-	if a.WholeCallNoResultKernels == nil {
-		a.WholeCallNoResultKernels = make(map[int]bool)
-	}
-	if a.WholeCallNoResultBatches == nil {
-		a.WholeCallNoResultBatches = make(map[int]WholeCallNoResultBatchFact)
 	}
 	if a.FixedShapeTables == nil {
 		a.FixedShapeTables = make(map[int]FixedShapeTableFact)

@@ -16,6 +16,7 @@ func AnnotateWholeCallKernelExits(fn *Function, globals map[string]*vm.FuncProto
 	if fn == nil {
 		return fn
 	}
+	callFacts := fn.Analysis.CallFacts()
 	kernels := make(map[int]bool)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -33,12 +34,12 @@ func AnnotateWholeCallKernelExits(fn *Function, globals map[string]*vm.FuncProto
 		}
 	}
 	if len(kernels) == 0 {
-		fn.Analysis.WholeCallNoResultKernels = nil
-		fn.Analysis.WholeCallNoResultBatches = nil
+		callFacts.SetWholeCallNoResultKernels(nil)
+		callFacts.SetWholeCallNoResultBatches(nil)
 		return fn
 	}
-	fn.Analysis.WholeCallNoResultKernels = kernels
-	fn.Analysis.WholeCallNoResultBatches = buildWholeCallNoResultBatches(fn, globals, kernels)
+	callFacts.SetWholeCallNoResultKernels(kernels)
+	callFacts.SetWholeCallNoResultBatches(buildWholeCallNoResultBatches(fn, globals, kernels))
 	return fn
 }
 

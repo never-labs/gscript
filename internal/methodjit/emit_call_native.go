@@ -1051,8 +1051,8 @@ func (ec *emitContext) emitCallNativeRawIntPeerIfEligible(instr *Instr) bool {
 	if nRets != 1 || nArgs != callee.NumParams || nArgs < 1 || nArgs > 4 {
 		return false
 	}
-	if ec.fn != nil && ec.fn.Analysis.CallABIs != nil {
-		if desc, ok := ec.fn.Analysis.CallABIs[instr.ID]; ok {
+	if ec.fn != nil {
+		if desc, ok := ec.fn.Analysis.CallFacts().CallABI(instr.ID); ok {
 			ec.traceNativeCallEmit(instr, "raw-int peer", callee, &desc)
 		} else {
 			ec.traceNativeCallEmit(instr, "raw-int peer", callee, nil)
@@ -1195,10 +1195,10 @@ func (ec *emitContext) emitCallNativeRawIntPeerIfEligible(instr *Instr) bool {
 }
 
 func (ec *emitContext) emitCallNativeTypedPeerIfEligible(instr *Instr) bool {
-	if ec == nil || ec.fn == nil || instr == nil || ec.fn.Analysis.CallABIs == nil {
+	if ec == nil || ec.fn == nil || instr == nil {
 		return false
 	}
-	desc, ok := ec.fn.Analysis.CallABIs[instr.ID]
+	desc, ok := ec.fn.Analysis.CallFacts().CallABI(instr.ID)
 	if !ok || !desc.TypedPeer || desc.Callee == nil {
 		return false
 	}
@@ -2718,10 +2718,10 @@ func (ec *emitContext) rawIntPeerCallee(instr *Instr) *vm.FuncProto {
 	if ec.tailCallInstrs[instr.ID] || ec.isStaticSelfCall(instr) {
 		return nil
 	}
-	if len(instr.Args) < 2 || ec.fn.Analysis.CallABIs == nil {
+	if len(instr.Args) < 2 {
 		return nil
 	}
-	desc, ok := ec.fn.Analysis.CallABIs[instr.ID]
+	desc, ok := ec.fn.Analysis.CallFacts().CallABI(instr.ID)
 	if !ok || desc.Callee == nil || !desc.RawIntReturn || desc.NumRets != 1 {
 		return nil
 	}
