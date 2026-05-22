@@ -38,6 +38,7 @@ func TestOpEmitterFamiliesMatchEmitDispatch(t *testing.T) {
 
 func TestOpBackendPolicyMatchesEmitDispatchExplicitCleanup(t *testing.T) {
 	explicitClears := emitInstrOpsCalling(t, "clearTableArrayBoundedKeys")
+	mergeOps(explicitClears, emitterOpsCalling(t, "emit_string.go", "emitStringInstr", "clearTableArrayBoundedKeys"))
 	shapeInvalidations := emitInstrOpsInvalidatingShape(t)
 	for op := Op(0); op < OpMax; op++ {
 		spec, ok := op.Spec()
@@ -160,16 +161,41 @@ func emitInstrOpsInvalidatingShape(t *testing.T) map[Op]bool {
 
 func emitInstrOpsWithCaseBehavior(t *testing.T, hasBehavior func(*ast.CaseClause) bool) map[Op]bool {
 	t.Helper()
+	return emitterOpsWithCaseBehavior(t, "emit_dispatch.go", "emitInstr", hasBehavior)
+}
+
+func emitterOpsCalling(t *testing.T, filename, funcName, method string) map[Op]bool {
+	t.Helper()
+	return emitterOpsWithCaseBehavior(t, filename, funcName, func(cc *ast.CaseClause) bool {
+		found := false
+		ast.Inspect(cc, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if ok && sel.Sel.Name == method {
+				found = true
+				return false
+			}
+			return true
+		})
+		return found
+	})
+}
+
+func emitterOpsWithCaseBehavior(t *testing.T, filename, funcName string, hasBehavior func(*ast.CaseClause) bool) map[Op]bool {
+	t.Helper()
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "emit_dispatch.go", nil, 0)
+	file, err := parser.ParseFile(fset, filename, nil, 0)
 	if err != nil {
-		t.Fatalf("parse emit_dispatch.go: %v", err)
+		t.Fatalf("parse %s: %v", filename, err)
 	}
 	ops := make(map[Op]bool)
 	found := false
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "emitInstr" {
+		if !ok || fn.Name.Name != funcName {
 			continue
 		}
 		found = true
@@ -195,9 +221,15 @@ func emitInstrOpsWithCaseBehavior(t *testing.T, hasBehavior func(*ast.CaseClause
 		})
 	}
 	if !found {
-		t.Fatal("emitInstr not found in emit_dispatch.go")
+		t.Fatalf("%s not found in %s", funcName, filename)
 	}
 	return ops
+}
+
+func mergeOps(dst, src map[Op]bool) {
+	for op := range src {
+		dst[op] = true
+	}
 }
 
 func opByName(name string) (Op, bool) {
