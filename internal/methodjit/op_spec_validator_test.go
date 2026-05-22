@@ -24,15 +24,19 @@ func TestValidatorOpSpecArgCountError(t *testing.T) {
 }
 
 func TestValidatorTerminatorShapeComesFromOpSpec(t *testing.T) {
-	spec := opSpecFor(OpBranch)
+	spec, ok := OpBranch.Spec()
+	if !ok {
+		t.Fatalf("Branch should have an OpSpec")
+	}
 	if !spec.Terminator {
 		t.Fatalf("Branch should be marked as a terminator by OpSpec")
 	}
-	if spec.SuccCount != 2 {
-		t.Fatalf("Branch should require 2 successors by OpSpec, got %d", spec.SuccCount)
+	contract := validatorContractForOp(OpBranch)
+	if contract.SuccCount != 2 {
+		t.Fatalf("Branch should require 2 successors by validator contract, got %d", contract.SuccCount)
 	}
-	if !spec.Args.Set || spec.Args.Min != 1 || spec.Args.Max != 1 {
-		t.Fatalf("Branch should require exactly 1 arg by OpSpec, got %+v", spec.Args)
+	if !contract.Args.Set || contract.Args.Min != 1 || contract.Args.Max != 1 {
+		t.Fatalf("Branch should require exactly 1 arg by validator contract, got %+v", contract.Args)
 	}
 
 	fn := &Function{}

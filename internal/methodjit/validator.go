@@ -22,23 +22,23 @@ import (
 
 const opArgMaxAny = -1
 
-// OpArgPolicy describes the SSA argument-count contract for an IR op.
+// validatorArgPolicy describes the SSA argument-count contract for an IR op.
 // A zero-value policy means the validator does not enforce argument count.
-type OpArgPolicy struct {
+type validatorArgPolicy struct {
 	Min int
 	Max int
 	Set bool
 }
 
-func fixedOpArgs(n int) OpArgPolicy {
-	return OpArgPolicy{Min: n, Max: n, Set: true}
+func fixedOpArgs(n int) validatorArgPolicy {
+	return validatorArgPolicy{Min: n, Max: n, Set: true}
 }
 
-func rangedOpArgs(min, max int) OpArgPolicy {
-	return OpArgPolicy{Min: min, Max: max, Set: true}
+func rangedOpArgs(min, max int) validatorArgPolicy {
+	return validatorArgPolicy{Min: min, Max: max, Set: true}
 }
 
-func (p OpArgPolicy) accepts(got int) bool {
+func (p validatorArgPolicy) accepts(got int) bool {
 	if !p.Set {
 		return true
 	}
@@ -48,60 +48,65 @@ func (p OpArgPolicy) accepts(got int) bool {
 	return p.Max == opArgMaxAny || got <= p.Max
 }
 
-func (p OpArgPolicy) describe() string {
+func (p validatorArgPolicy) describe() string {
 	if p.Max == opArgMaxAny {
 		return fmt.Sprintf("at least %d", p.Min)
 	}
 	return fmt.Sprintf("%d..%d", p.Min, p.Max)
 }
 
-// OpSpec is the validator-facing operation contract. It is intentionally
-// minimal here so this branch can merge cleanly with a broader OpSpec owner.
-type OpSpec struct {
-	Args       OpArgPolicy
+type validatorOpContract struct {
+	Args       validatorArgPolicy
 	Terminator bool
 	SuccCount  int // opArgMaxAny means successor count is not checked.
 }
 
-func opSpecFor(op Op) OpSpec {
-	if int(op) >= 0 && int(op) < len(validatorOpSpecs) {
-		return validatorOpSpecs[op]
+func validatorContractForOp(op Op) validatorOpContract {
+	contract := validatorOpContract{SuccCount: opArgMaxAny}
+	if spec, ok := op.Spec(); ok {
+		contract.Terminator = spec.Terminator
 	}
-	return OpSpec{SuccCount: opArgMaxAny}
+	if int(op) >= 0 && int(op) < len(validatorOpContracts) {
+		contract.Args = validatorOpContracts[op].Args
+		if validatorOpContracts[op].SuccCount != opArgMaxAny {
+			contract.SuccCount = validatorOpContracts[op].SuccCount
+		}
+	}
+	return contract
 }
 
-var validatorOpSpecs = func() [OpMax]OpSpec {
-	var specs [OpMax]OpSpec
-	for op := range specs {
-		specs[op].SuccCount = opArgMaxAny
+var validatorOpContracts = func() [OpMax]validatorOpContract {
+	var contracts [OpMax]validatorOpContract
+	for op := range contracts {
+		contracts[op].SuccCount = opArgMaxAny
 	}
 
-	specs[OpJump] = OpSpec{Args: fixedOpArgs(0), Terminator: true, SuccCount: 1}
-	specs[OpBranch] = OpSpec{Args: fixedOpArgs(1), Terminator: true, SuccCount: 2}
-	specs[OpReturn] = OpSpec{Args: rangedOpArgs(0, opArgMaxAny), Terminator: true, SuccCount: 0}
+	contracts[OpJump] = validatorOpContract{Args: fixedOpArgs(0), SuccCount: 1}
+	contracts[OpBranch] = validatorOpContract{Args: fixedOpArgs(1), SuccCount: 2}
+	contracts[OpReturn] = validatorOpContract{Args: rangedOpArgs(0, opArgMaxAny), SuccCount: 0}
 
-	specs[OpSetTable].Args = fixedOpArgs(3)
-	specs[OpTableArrayStore].Args = rangedOpArgs(5, 6)
-	specs[OpTableShapeID].Args = fixedOpArgs(1)
-	specs[OpTableArraySwapPairs].Args = fixedOpArgs(3)
-	specs[OpGuardType].Args = fixedOpArgs(1)
-	specs[OpGuardGlobalConst].Args = fixedOpArgs(0)
-	specs[OpGuardConstString].Args = fixedOpArgs(1)
-	specs[OpGuardTableKind].Args = fixedOpArgs(1)
-	specs[OpGuardCalleeProto].Args = fixedOpArgs(1)
-	specs[OpGuardNonNil].Args = fixedOpArgs(1)
-	specs[OpGuardTruthy].Args = fixedOpArgs(1)
-	specs[OpGuardFieldCalleeProto].Args = fixedOpArgs(1)
-	specs[OpGuardShapeFieldType].Args = fixedOpArgs(0)
-	specs[OpGuardShapeFieldTypeMask].Args = fixedOpArgs(0)
-	specs[OpFieldSvals].Args = fixedOpArgs(1)
-	specs[OpFieldLoad].Args = fixedOpArgs(1)
-	specs[OpFieldLoadNumToFloat].Args = fixedOpArgs(1)
-	specs[OpFieldStore].Args = fixedOpArgs(2)
-	specs[OpFieldPolyLen].Args = fixedOpArgs(1)
-	specs[OpRecordArrayLoopKernel].Args = rangedOpArgs(3, 16)
+	contracts[OpSetTable].Args = fixedOpArgs(3)
+	contracts[OpTableArrayStore].Args = rangedOpArgs(5, 6)
+	contracts[OpTableShapeID].Args = fixedOpArgs(1)
+	contracts[OpTableArraySwapPairs].Args = fixedOpArgs(3)
+	contracts[OpGuardType].Args = fixedOpArgs(1)
+	contracts[OpGuardGlobalConst].Args = fixedOpArgs(0)
+	contracts[OpGuardConstString].Args = fixedOpArgs(1)
+	contracts[OpGuardTableKind].Args = fixedOpArgs(1)
+	contracts[OpGuardCalleeProto].Args = fixedOpArgs(1)
+	contracts[OpGuardNonNil].Args = fixedOpArgs(1)
+	contracts[OpGuardTruthy].Args = fixedOpArgs(1)
+	contracts[OpGuardFieldCalleeProto].Args = fixedOpArgs(1)
+	contracts[OpGuardShapeFieldType].Args = fixedOpArgs(0)
+	contracts[OpGuardShapeFieldTypeMask].Args = fixedOpArgs(0)
+	contracts[OpFieldSvals].Args = fixedOpArgs(1)
+	contracts[OpFieldLoad].Args = fixedOpArgs(1)
+	contracts[OpFieldLoadNumToFloat].Args = fixedOpArgs(1)
+	contracts[OpFieldStore].Args = fixedOpArgs(2)
+	contracts[OpFieldPolyLen].Args = fixedOpArgs(1)
+	contracts[OpRecordArrayLoopKernel].Args = rangedOpArgs(3, 16)
 
-	return specs
+	return contracts
 }()
 
 // Validate checks all structural invariants of a Function's IR.
@@ -337,14 +342,14 @@ func (v *validator) checkTerminators() {
 
 		// Last instruction must be a terminator.
 		last := blk.Instrs[len(blk.Instrs)-1]
-		if !opSpecFor(last.Op).Terminator {
+		if !validatorContractForOp(last.Op).Terminator {
 			v.errorf("B%d: last instruction %s (v%d) is not a terminator",
 				blk.ID, last.Op, last.ID)
 		}
 
 		// No terminator should appear in the middle.
 		for i := 0; i < len(blk.Instrs)-1; i++ {
-			if opSpecFor(blk.Instrs[i].Op).Terminator {
+			if validatorContractForOp(blk.Instrs[i].Op).Terminator {
 				v.errorf("B%d: terminator %s (v%d) in middle of block at position %d",
 					blk.ID, blk.Instrs[i].Op, blk.Instrs[i].ID, i)
 			}
@@ -356,20 +361,20 @@ func (v *validator) checkTerminators() {
 func (v *validator) checkOpSpecs() {
 	for _, blk := range v.fn.Blocks {
 		for i, instr := range blk.Instrs {
-			spec := opSpecFor(instr.Op)
-			v.checkArgPolicy(blk, instr, spec.Args)
-			if spec.SuccCount == opArgMaxAny || i != len(blk.Instrs)-1 {
+			contract := validatorContractForOp(instr.Op)
+			v.checkArgPolicy(blk, instr, contract.Args)
+			if contract.SuccCount == opArgMaxAny || i != len(blk.Instrs)-1 {
 				continue
 			}
 			nSuccs := len(blk.Succs)
-			if nSuccs != spec.SuccCount {
-				v.errorf("B%d: %s must have %d successors, got %d", blk.ID, instr.Op, spec.SuccCount, nSuccs)
+			if nSuccs != contract.SuccCount {
+				v.errorf("B%d: %s must have %d successors, got %d", blk.ID, instr.Op, contract.SuccCount, nSuccs)
 			}
 		}
 	}
 }
 
-func (v *validator) checkArgPolicy(blk *Block, instr *Instr, policy OpArgPolicy) {
+func (v *validator) checkArgPolicy(blk *Block, instr *Instr, policy validatorArgPolicy) {
 	if instr == nil || policy.accepts(len(instr.Args)) {
 		return
 	}

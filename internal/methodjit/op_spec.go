@@ -227,3 +227,15 @@ func (op Op) Spec() (OpSpec, bool) {
 	}
 	return OpSpec{}, false
 }
+
+func OpsByEmitterFamily(family OpEmitterFamily) []Op {
+	var ops []Op
+	for op := Op(0); op < OpMax; op++ {
+		spec, ok := op.Spec()
+		if !ok || spec.EmitterFamily != family {
+			continue
+		}
+		ops = append(ops, op)
+	}
+	return ops
+}

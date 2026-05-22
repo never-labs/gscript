@@ -37,3 +37,42 @@ func TestOpIsTerminatorUsesSpec(t *testing.T) {
 		}
 	}
 }
+
+func TestOpsByEmitterFamily(t *testing.T) {
+	got := OpsByEmitterFamily(OpEmitterControl)
+	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}
+	if !sameOps(got, want) {
+		t.Fatalf("control family ops = %v, want %v", got, want)
+	}
+
+	got = OpsByEmitterFamily(OpEmitterMatrix)
+	want = []Op{
+		OpMatrixDense,
+		OpMatrixGetF,
+		OpMatrixSetF,
+		OpMatrixFlat,
+		OpMatrixStride,
+		OpMatrixLoadFAt,
+		OpMatrixStoreFAt,
+		OpMatrixRowPtr,
+		OpMatrixLoadFRow,
+		OpMatrixStoreFRow,
+		OpMatrixLoadFRowConst,
+		OpMatrixStoreFRowConst,
+	}
+	if !sameOps(got, want) {
+		t.Fatalf("matrix family ops = %v, want %v", got, want)
+	}
+}
+
+func sameOps(a, b []Op) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
