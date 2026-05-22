@@ -1096,17 +1096,11 @@ func (ec *emitContext) intNonNegative(id int) bool {
 }
 
 func (ec *emitContext) tableArrayUpperBoundSafe(id int) bool {
-	if ec.fn == nil || ec.fn.Analysis.TableArrayUpperBoundSafe == nil {
-		return false
-	}
-	return ec.fn.Analysis.TableArrayUpperBoundSafe[id]
+	return functionKernelFacts(ec.fn).TableArrayUpperBoundIsSafe(id)
 }
 
 func (ec *emitContext) tableArrayLowerBoundSafe(id int) bool {
-	if ec.fn == nil || ec.fn.Analysis.TableArrayLowerBoundSafe == nil {
-		return false
-	}
-	return ec.fn.Analysis.TableArrayLowerBoundSafe[id]
+	return functionKernelFacts(ec.fn).TableArrayLowerBoundIsSafe(id)
 }
 
 func (ec *emitContext) tableArrayKeyKnownNonZero(id int) bool {

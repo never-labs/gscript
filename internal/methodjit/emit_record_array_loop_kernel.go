@@ -21,7 +21,7 @@ func (ec *emitContext) emitRecordArrayLoopKernel(instr *Instr) {
 	if instr == nil || len(instr.Args) < 4 || ec == nil || ec.fn == nil {
 		return
 	}
-	spec, ok := ec.fn.Analysis.RecordArrayLoopKernels[instr.ID]
+	spec, ok := functionKernelFacts(ec.fn).RecordArrayLoopKernel(instr.ID)
 	if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
 		ec.emitPreciseDeopt(instr)
 		return

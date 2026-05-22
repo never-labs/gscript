@@ -27,7 +27,8 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	fn.Analysis.LoopTableArrayFacts = nil
+	kernelFacts := functionKernelFacts(fn)
+	kernelFacts.SetLoopTableArrayFacts(nil)
 
 	li := computeLoopInfo(fn)
 	if !li.hasLoops() {
@@ -36,8 +37,8 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 
 	dom := computeDominators(fn)
 	preheaders := computeLoopPreheaders(fn, li)
-	safe := cloneTableArrayBoolMap(fn.Analysis.TableArrayUpperBoundSafe)
-	lowerSafe := cloneTableArrayBoolMap(fn.Analysis.TableArrayLowerBoundSafe)
+	safe := cloneTableArrayBoolMap(kernelFacts.TableArrayUpperBoundSafeMap())
+	lowerSafe := cloneTableArrayBoolMap(kernelFacts.TableArrayLowerBoundSafeMap())
 	accessFacts := make(map[int]LoopTableArrayFact)
 
 	for _, header := range fn.Blocks {
@@ -116,15 +117,15 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 	}
 
 	if len(safe) == 0 {
-		fn.Analysis.TableArrayUpperBoundSafe = nil
-		fn.Analysis.TableArrayLowerBoundSafe = nil
+		kernelFacts.SetTableArrayUpperBoundSafe(nil)
+		kernelFacts.SetTableArrayLowerBoundSafe(nil)
 		return fn, nil
 	}
-	fn.Analysis.TableArrayUpperBoundSafe = safe
+	kernelFacts.SetTableArrayUpperBoundSafe(safe)
 	if len(lowerSafe) > 0 {
-		fn.Analysis.TableArrayLowerBoundSafe = lowerSafe
+		kernelFacts.SetTableArrayLowerBoundSafe(lowerSafe)
 	}
-	fn.Analysis.LoopTableArrayFacts = accessFacts
+	kernelFacts.SetLoopTableArrayFacts(accessFacts)
 	return fn, nil
 }
 

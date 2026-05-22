@@ -100,6 +100,11 @@ type AnalysisResult struct {
 	// constructors, Initialize, and domain mutators.
 	TableShape *TableShapeFacts
 
+	// Kernel groups loop-kernel and table-array bound facts. The map fields
+	// above remain for compatibility and are kept pointed at this domain's maps
+	// by constructors, Initialize, and domain mutators.
+	Kernel *KernelFacts
+
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
 	// inlined callees and guarded polymorphic call targets.
@@ -403,6 +408,213 @@ func (a *AnalysisResult) bindCallCompatibilityFields() {
 	a.ProtocolConstCallFolds = a.Call.ProtocolConstCallFolds
 	a.WholeCallNoResultKernels = a.Call.WholeCallNoResultKernels
 	a.WholeCallNoResultBatches = a.Call.WholeCallNoResultBatches
+}
+
+// KernelFacts groups analysis facts produced and consumed by loop-kernel and
+// table-array bound passes.
+type KernelFacts struct {
+	owner *AnalysisResult
+
+	// TableArrayUpperBoundSafe is the set of table-array access instruction IDs
+	// whose key < len check is already guaranteed by an enclosing loop-region
+	// fact.
+	TableArrayUpperBoundSafe map[int]bool
+
+	// TableArrayLowerBoundSafe is the set of table-array access instruction IDs
+	// whose key >= 0 check is already guaranteed by loop-region induction facts.
+	TableArrayLowerBoundSafe map[int]bool
+
+	// LoopTableArrayFacts records the table/len/data/key contract behind each
+	// TableArrayUpperBoundSafe access.
+	LoopTableArrayFacts map[int]LoopTableArrayFact
+
+	// RecordArrayLoopKernels records generated loop-body dataflow graphs keyed
+	// by OpRecordArrayLoopKernel instruction ID.
+	RecordArrayLoopKernels map[int]RecordArrayLoopKernelSpec
+}
+
+func NewKernelFacts() *KernelFacts {
+	k := &KernelFacts{}
+	k.Initialize()
+	return k
+}
+
+func (k *KernelFacts) Initialize() {
+	if k.TableArrayUpperBoundSafe == nil {
+		k.TableArrayUpperBoundSafe = make(map[int]bool)
+	}
+	if k.TableArrayLowerBoundSafe == nil {
+		k.TableArrayLowerBoundSafe = make(map[int]bool)
+	}
+	if k.LoopTableArrayFacts == nil {
+		k.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
+	}
+	if k.RecordArrayLoopKernels == nil {
+		k.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
+	}
+}
+
+func (k *KernelFacts) SetTableArrayUpperBoundSafe(facts map[int]bool) {
+	k.TableArrayUpperBoundSafe = facts
+	k.bindOwner()
+}
+
+func (k *KernelFacts) TableArrayUpperBoundIsSafe(id int) bool {
+	return k != nil && k.TableArrayUpperBoundSafe != nil && k.TableArrayUpperBoundSafe[id]
+}
+
+func (k *KernelFacts) TableArrayUpperBoundSafeMap() map[int]bool {
+	if k == nil {
+		return nil
+	}
+	return k.TableArrayUpperBoundSafe
+}
+
+func (k *KernelFacts) RecordTableArrayUpperBoundSafe(id int) {
+	if k == nil {
+		return
+	}
+	if k.TableArrayUpperBoundSafe == nil {
+		k.TableArrayUpperBoundSafe = make(map[int]bool)
+	}
+	k.TableArrayUpperBoundSafe[id] = true
+	k.bindOwner()
+}
+
+func (k *KernelFacts) SetTableArrayLowerBoundSafe(facts map[int]bool) {
+	k.TableArrayLowerBoundSafe = facts
+	k.bindOwner()
+}
+
+func (k *KernelFacts) TableArrayLowerBoundIsSafe(id int) bool {
+	return k != nil && k.TableArrayLowerBoundSafe != nil && k.TableArrayLowerBoundSafe[id]
+}
+
+func (k *KernelFacts) TableArrayLowerBoundSafeMap() map[int]bool {
+	if k == nil {
+		return nil
+	}
+	return k.TableArrayLowerBoundSafe
+}
+
+func (k *KernelFacts) RecordTableArrayLowerBoundSafe(id int) {
+	if k == nil {
+		return
+	}
+	if k.TableArrayLowerBoundSafe == nil {
+		k.TableArrayLowerBoundSafe = make(map[int]bool)
+	}
+	k.TableArrayLowerBoundSafe[id] = true
+	k.bindOwner()
+}
+
+func (k *KernelFacts) SetLoopTableArrayFacts(facts map[int]LoopTableArrayFact) {
+	k.LoopTableArrayFacts = facts
+	k.bindOwner()
+}
+
+func (k *KernelFacts) LoopTableArrayFact(id int) (LoopTableArrayFact, bool) {
+	if k == nil || k.LoopTableArrayFacts == nil {
+		return LoopTableArrayFact{}, false
+	}
+	fact, ok := k.LoopTableArrayFacts[id]
+	return fact, ok
+}
+
+func (k *KernelFacts) RecordLoopTableArrayFact(id int, fact LoopTableArrayFact) {
+	if k == nil {
+		return
+	}
+	if k.LoopTableArrayFacts == nil {
+		k.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
+	}
+	k.LoopTableArrayFacts[id] = fact
+	k.bindOwner()
+}
+
+func (k *KernelFacts) SetRecordArrayLoopKernels(facts map[int]RecordArrayLoopKernelSpec) {
+	k.RecordArrayLoopKernels = facts
+	k.bindOwner()
+}
+
+func (k *KernelFacts) RecordArrayLoopKernel(id int) (RecordArrayLoopKernelSpec, bool) {
+	if k == nil || k.RecordArrayLoopKernels == nil {
+		return RecordArrayLoopKernelSpec{}, false
+	}
+	spec, ok := k.RecordArrayLoopKernels[id]
+	return spec, ok
+}
+
+func (k *KernelFacts) SetRecordArrayLoopKernel(id int, spec RecordArrayLoopKernelSpec) {
+	if k == nil {
+		return
+	}
+	if k.RecordArrayLoopKernels == nil {
+		k.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
+	}
+	k.RecordArrayLoopKernels[id] = spec
+	k.bindOwner()
+}
+
+func (k *KernelFacts) bindOwner() {
+	if k != nil && k.owner != nil {
+		k.owner.bindKernelCompatibilityFields()
+	}
+}
+
+func (a *AnalysisResult) KernelFacts() *KernelFacts {
+	if a == nil {
+		return nil
+	}
+	if a.Kernel == nil {
+		a.Kernel = &KernelFacts{
+			TableArrayUpperBoundSafe: a.TableArrayUpperBoundSafe,
+			TableArrayLowerBoundSafe: a.TableArrayLowerBoundSafe,
+			LoopTableArrayFacts:      a.LoopTableArrayFacts,
+			RecordArrayLoopKernels:   a.RecordArrayLoopKernels,
+		}
+	} else {
+		if a.TableArrayUpperBoundSafe != nil || a.Kernel.TableArrayUpperBoundSafe == nil {
+			a.Kernel.TableArrayUpperBoundSafe = a.TableArrayUpperBoundSafe
+		}
+		if a.TableArrayLowerBoundSafe != nil || a.Kernel.TableArrayLowerBoundSafe == nil {
+			a.Kernel.TableArrayLowerBoundSafe = a.TableArrayLowerBoundSafe
+		}
+		if a.LoopTableArrayFacts != nil || a.Kernel.LoopTableArrayFacts == nil {
+			a.Kernel.LoopTableArrayFacts = a.LoopTableArrayFacts
+		}
+		if a.RecordArrayLoopKernels != nil || a.Kernel.RecordArrayLoopKernels == nil {
+			a.Kernel.RecordArrayLoopKernels = a.RecordArrayLoopKernels
+		}
+	}
+	a.Kernel.owner = a
+	a.bindKernelCompatibilityFields()
+	return a.Kernel
+}
+
+func functionKernelFacts(fn *Function) *KernelFacts {
+	if fn == nil || fn.Analysis == nil {
+		return nil
+	}
+	return fn.Analysis.KernelFacts()
+}
+
+func (a *AnalysisResult) initializeKernelFacts() {
+	if a == nil {
+		return
+	}
+	a.KernelFacts().Initialize()
+	a.bindKernelCompatibilityFields()
+}
+
+func (a *AnalysisResult) bindKernelCompatibilityFields() {
+	if a == nil || a.Kernel == nil {
+		return
+	}
+	a.TableArrayUpperBoundSafe = a.Kernel.TableArrayUpperBoundSafe
+	a.TableArrayLowerBoundSafe = a.Kernel.TableArrayLowerBoundSafe
+	a.LoopTableArrayFacts = a.Kernel.LoopTableArrayFacts
+	a.RecordArrayLoopKernels = a.Kernel.RecordArrayLoopKernels
 }
 
 // SpeculationFacts groups analysis facts produced and consumed by Tier 2
@@ -817,6 +1029,7 @@ func NewAnalysisResult() *AnalysisResult {
 		Call:                      NewCallFacts(),
 		Speculation:               NewSpeculationFacts(),
 		TableShape:                NewTableShapeFacts(),
+		Kernel:                    NewKernelFacts(),
 
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
 		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),
@@ -829,6 +1042,7 @@ func NewAnalysisResult() *AnalysisResult {
 	a.bindCallCompatibilityFields()
 	a.bindSpeculationCompatibilityFields()
 	a.bindTableShapeCompatibilityFields()
+	a.bindKernelCompatibilityFields()
 	return a
 }
 
@@ -855,24 +1069,13 @@ func (a *AnalysisResult) Initialize() {
 	if a.IntNonNegative == nil {
 		a.IntNonNegative = make(map[int]bool)
 	}
-	if a.TableArrayUpperBoundSafe == nil {
-		a.TableArrayUpperBoundSafe = make(map[int]bool)
-	}
-	if a.TableArrayLowerBoundSafe == nil {
-		a.TableArrayLowerBoundSafe = make(map[int]bool)
-	}
-	if a.LoopTableArrayFacts == nil {
-		a.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
-	}
 	if a.ShapeFieldTypeElidedLoads == nil {
 		a.ShapeFieldTypeElidedLoads = make(map[int]bool)
 	}
 	if a.TableArrayDataPtrs == nil {
 		a.TableArrayDataPtrs = make(map[int]TableArrayDataPtrFact)
 	}
-	if a.RecordArrayLoopKernels == nil {
-		a.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
-	}
+	a.initializeKernelFacts()
 	a.initializeCallFacts()
 	a.initializeSpeculationFacts()
 	if a.FixedShapeTables == nil {

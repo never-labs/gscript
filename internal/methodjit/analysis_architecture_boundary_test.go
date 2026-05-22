@@ -67,6 +67,34 @@ func TestProductionCodeUsesCallFactsBoundary(t *testing.T) {
 	}
 }
 
+func TestProductionCodeUsesKernelFactsBoundary(t *testing.T) {
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob methodjit files: %v", err)
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") || file == "analysis_result.go" {
+			continue
+		}
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok || !legacyKernelFactField(sel.Sel.Name) {
+				return true
+			}
+			if isSelectorNamed(sel.X, "Analysis") {
+				pos := fset.Position(sel.Pos())
+				t.Fatalf("%s directly accesses Analysis.%s; use KernelFacts helpers", pos, sel.Sel.Name)
+			}
+			return true
+		})
+	}
+}
+
 func legacyTableShapeField(name string) bool {
 	switch name {
 	case "FieldPolyShapeFacts", "FieldPolyShapeReceivers", "FieldPolyShapeCatalog", "FieldCallPolyLenFusions":
@@ -79,6 +107,15 @@ func legacyTableShapeField(name string) bool {
 func legacyCallFactField(name string) bool {
 	switch name {
 	case "CallABIs", "ProtocolConstCallFolds", "WholeCallNoResultKernels", "WholeCallNoResultBatches":
+		return true
+	default:
+		return false
+	}
+}
+
+func legacyKernelFactField(name string) bool {
+	switch name {
+	case "RecordArrayLoopKernels", "TableArrayUpperBoundSafe", "TableArrayLowerBoundSafe", "LoopTableArrayFacts":
 		return true
 	default:
 		return false

@@ -7,7 +7,7 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
 	facts := collectStaticTableLenFacts(fn)
 	dom := computeDominators(fn)
 	li := computeLoopInfo(fn)
@@ -314,15 +314,9 @@ func tableArrayLenGuardDominates(fact tableArrayLenGuardFact, dom *domInfo, orde
 }
 
 func markTableArrayLowerBoundSafe(fn *Function, instr *Instr) {
-	if fn.Analysis.TableArrayLowerBoundSafe == nil {
-		fn.Analysis.TableArrayLowerBoundSafe = make(map[int]bool)
-	}
-	fn.Analysis.TableArrayLowerBoundSafe[instr.ID] = true
+	functionKernelFacts(fn).RecordTableArrayLowerBoundSafe(instr.ID)
 }
 
 func markTableArrayUpperBoundSafe(fn *Function, instr *Instr) {
-	if fn.Analysis.TableArrayUpperBoundSafe == nil {
-		fn.Analysis.TableArrayUpperBoundSafe = make(map[int]bool)
-	}
-	fn.Analysis.TableArrayUpperBoundSafe[instr.ID] = true
+	functionKernelFacts(fn).RecordTableArrayUpperBoundSafe(instr.ID)
 }
