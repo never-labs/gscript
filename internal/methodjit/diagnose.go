@@ -81,6 +81,7 @@ type snapshotCollector struct {
 	timings         []PipelineStageTiming
 	moduleContracts []Tier2ModuleContract
 	moduleReasons   []Tier2ModuleReason
+	moduleFactDiffs []Tier2ModuleFactDiff
 }
 
 func newSnapshotCollector() *snapshotCollector {
@@ -112,6 +113,9 @@ func (sc *snapshotCollector) addModuleRun(run Tier2ModuleRun) {
 	}
 	if reason, ok := run.ReasonRecord(); ok {
 		sc.moduleReasons = append(sc.moduleReasons, reason)
+	}
+	if diff, ok := run.FactDiffRecord(); ok {
+		sc.moduleFactDiffs = append(sc.moduleFactDiffs, diff)
 	}
 	if run.Function == nil {
 		return
@@ -172,6 +176,7 @@ type DiagReport struct {
 	PipelineStages      []PipelineStageTiming
 	ModuleContracts     []Tier2ModuleContract
 	ModuleReasons       []Tier2ModuleReason
+	ModuleFactDiffs     []Tier2ModuleFactDiff
 	OptimizationRemarks []OptimizationRemark // structured pass/gate diagnostics
 	ValidateErrors      []error              // structural invariant violations
 	RegAllocMap         string               // human-readable register assignments
@@ -229,6 +234,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 		r.PipelineStages = collector.timings
 		r.ModuleContracts = append([]Tier2ModuleContract(nil), collector.moduleContracts...)
 		r.ModuleReasons = append([]Tier2ModuleReason(nil), collector.moduleReasons...)
+		r.ModuleFactDiffs = append([]Tier2ModuleFactDiff(nil), collector.moduleFactDiffs...)
 		r.OptimizationRemarks = remarks.List()
 		r.NativeError = fmt.Errorf("pipeline error: %w", pipeErr)
 		r.compareResults()
@@ -240,6 +246,7 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.PipelineStages = collector.timings
 	r.ModuleContracts = append([]Tier2ModuleContract(nil), collector.moduleContracts...)
 	r.ModuleReasons = append([]Tier2ModuleReason(nil), collector.moduleReasons...)
+	r.ModuleFactDiffs = append([]Tier2ModuleFactDiff(nil), collector.moduleFactDiffs...)
 
 	// Collect diffs for passes that changed the IR.
 	r.PassDiffs = collectPassDiffs(collector)
@@ -412,6 +419,9 @@ func (r *DiagReport) String() string {
 	}
 	if len(r.ModuleReasons) > 0 {
 		w("\n--- Module reasons ---\n%s", FormatTier2ModuleReasons(r.ModuleReasons))
+	}
+	if len(r.ModuleFactDiffs) > 0 {
+		w("\n--- Module fact diffs ---\n%s", FormatTier2ModuleFactDiffs(r.ModuleFactDiffs))
 	}
 	w("\n--- Optimization remarks ---\n%s", formatOptimizationRemarks(r.OptimizationRemarks))
 	w("\n--- IR (after passes) ---\n%s", r.IRAfter)

@@ -187,6 +187,18 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 				Reason:     "missing input fact",
 				Requires:   analysisFacts(AnalysisFactIntRanges),
 				Provides:   analysisFacts(AnalysisFactInt48Safe),
+				ChangedDomains: []string{
+					"Int48Safe",
+				},
+				ActualFactDiff: []AnalysisFactDomainDiff{
+					{
+						Domain:      "Int48Safe",
+						BeforeCount: 0,
+						AfterCount:  1,
+						BeforeHash:  0,
+						AfterHash:   0x1234,
+					},
+				},
 			},
 		},
 	}
@@ -225,6 +237,12 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 		got.Files["module_reasons"] == "" {
 		t.Fatalf("module reasons missing failed module: reasons=%+v files=%+v", got.ModuleReasons, got.Files)
 	}
+	if len(got.ModuleFactDiffs) != 1 || got.ModuleFactDiffs[0].ModuleName != "FailingModule" ||
+		len(got.ModuleFactDiffs[0].ActualFactDiff) != 1 ||
+		got.ModuleFactDiffs[0].ActualFactDiff[0].Domain != "Int48Safe" ||
+		got.Files["module_fact_diffs"] == "" {
+		t.Fatalf("module fact diffs missing failed module: diffs=%+v files=%+v", got.ModuleFactDiffs, got.Files)
+	}
 	pipelineText, err := os.ReadFile(filepath.Join(outDir, got.Files["pipeline"]))
 	if err != nil {
 		t.Fatalf("read pipeline summary: %v", err)
@@ -238,5 +256,12 @@ func TestWarmDump_FailedCompileKeepsPipelineScope(t *testing.T) {
 	}
 	if !strings.Contains(string(reasonsText), "FailingModule: skip") || !strings.Contains(string(reasonsText), "missing input fact") {
 		t.Fatalf("module reasons missing details:\n%s", string(reasonsText))
+	}
+	factDiffText, err := os.ReadFile(filepath.Join(outDir, got.Files["module_fact_diffs"]))
+	if err != nil {
+		t.Fatalf("read module fact diffs: %v", err)
+	}
+	if !strings.Contains(string(factDiffText), "FailingModule: Int48Safe") || !strings.Contains(string(factDiffText), "count 0->1") {
+		t.Fatalf("module fact diffs missing details:\n%s", string(factDiffText))
 	}
 }

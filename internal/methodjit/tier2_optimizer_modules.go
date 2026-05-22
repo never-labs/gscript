@@ -29,6 +29,8 @@ type Tier2ModuleRun struct {
 	Requires       []AnalysisFact
 	Provides       []AnalysisFact
 	Updates        []AnalysisFact
+	ActualFactDiff []AnalysisFactDomainDiff
+	ChangedDomains []string
 }
 
 // Tier2ModuleRunCallback is called after each optimizer module run, including
@@ -248,6 +250,7 @@ type PhaseScope struct {
 	snapshotCallback Tier2SnapshotCallback
 	moduleRun        Tier2ModuleRun
 	moduleCallback   Tier2ModuleRunCallback
+	factBefore       map[string]analysisFactDomainSnapshot
 	hasModuleRun     bool
 }
 
@@ -282,6 +285,9 @@ func phaseScopeModuleRun(run Tier2ModuleRun, callback Tier2ModuleRunCallback) Ph
 	return func(scope *PhaseScope) {
 		scope.moduleRun = run
 		scope.moduleCallback = callback
+		if callback != nil {
+			scope.factBefore = snapshotAnalysisFactDomains(run.InputFunction)
+		}
 		scope.hasModuleRun = true
 	}
 }
@@ -297,6 +303,8 @@ func (scope *PhaseScope) finish(fn *Function, err error) time.Duration {
 		run.Err = err
 		run.OutputFunction = fn
 		run.Function = bestTier2ModuleRunFunction(run.InputFunction, fn)
+		run.ActualFactDiff = diffAnalysisFactDomains(scope.factBefore, snapshotAnalysisFactDomains(run.Function))
+		run.ChangedDomains = changedAnalysisFactDomains(run.ActualFactDiff)
 		scope.moduleCallback(run)
 	}
 	if err == nil && scope.snapshotCallback != nil {
