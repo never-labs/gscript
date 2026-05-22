@@ -523,6 +523,24 @@ func (t *TableShapeFacts) FieldPolyShapeCases(id int) ([]FieldPolyShapeCase, boo
 	return cases, ok
 }
 
+func (t *TableShapeFacts) HasFieldPolyShapeCases(id int) bool {
+	cases, _ := t.FieldPolyShapeCases(id)
+	return len(cases) > 0
+}
+
+func (t *TableShapeFacts) ForEachFieldPolyShapeCase(visit func(id int, c FieldPolyShapeCase) bool) {
+	if t == nil || t.FieldPolyShapeFacts == nil || visit == nil {
+		return
+	}
+	for id, cases := range t.FieldPolyShapeFacts {
+		for _, c := range cases {
+			if !visit(id, c) {
+				return
+			}
+		}
+	}
+}
+
 func (t *TableShapeFacts) SetFieldPolyShapeReceivers(facts map[int]bool) {
 	t.FieldPolyShapeReceivers = facts
 	t.bindOwner()
@@ -556,6 +574,17 @@ func (t *TableShapeFacts) FieldPolyShapeCatalogFact(shapeID uint32) (FixedShapeT
 	return fact, ok
 }
 
+func (t *TableShapeFacts) ForEachFieldPolyShapeCatalogFact(visit func(shapeID uint32, fact FixedShapeTableFact) bool) {
+	if t == nil || t.FieldPolyShapeCatalog == nil || visit == nil {
+		return
+	}
+	for shapeID, fact := range t.FieldPolyShapeCatalog {
+		if !visit(shapeID, fact) {
+			return
+		}
+	}
+}
+
 func (t *TableShapeFacts) SetFieldCallPolyLenFusions(facts map[int][]FieldCallPolyLenFusion) {
 	t.FieldCallPolyLenFusions = facts
 	t.bindOwner()
@@ -567,6 +596,13 @@ func (t *TableShapeFacts) FieldCallPolyLenFusionCases(id int) ([]FieldCallPolyLe
 	}
 	fusions, ok := t.FieldCallPolyLenFusions[id]
 	return fusions, ok
+}
+
+func functionTableShapeFacts(fn *Function) *TableShapeFacts {
+	if fn == nil || fn.Analysis == nil {
+		return nil
+	}
+	return fn.Analysis.TableShapeFacts()
 }
 
 func (t *TableShapeFacts) bindOwner() {

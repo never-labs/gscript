@@ -557,10 +557,11 @@ func fieldSvalsLowerable(fn *Function, instr *Instr) bool {
 	if instr == nil || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 == 0 {
 		return false
 	}
-	if fn != nil && len(fn.Analysis.FieldPolyShapeFacts[instr.ID]) > 0 {
+	shapes := functionTableShapeFacts(fn)
+	if shapes.HasFieldPolyShapeCases(instr.ID) {
 		return false
 	}
-	if fn != nil && fn.Analysis.FieldPolyShapeReceivers[instr.Args[0].ID] {
+	if shapes.FieldPolyShapeReceiver(instr.Args[0].ID) {
 		return false
 	}
 	switch instr.Op {

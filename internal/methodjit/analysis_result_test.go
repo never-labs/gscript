@@ -209,6 +209,56 @@ func TestAnalysisResultTableShapeFactsAdoptsLegacyFields(t *testing.T) {
 	}
 }
 
+func TestTableShapeFactsReadHelpers(t *testing.T) {
+	a := &AnalysisResult{
+		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+			301: {
+				{ShapeID: 31, FieldIdx: 1},
+				{ShapeID: 32, FieldIdx: 2},
+			},
+		},
+		FieldPolyShapeCatalog: map[uint32]FixedShapeTableFact{
+			33: {ShapeID: 33},
+		},
+	}
+	shapes := a.TableShapeFacts()
+
+	if !shapes.HasFieldPolyShapeCases(301) {
+		t.Fatalf("HasFieldPolyShapeCases returned false for populated cases")
+	}
+	if shapes.HasFieldPolyShapeCases(302) {
+		t.Fatalf("HasFieldPolyShapeCases returned true for missing cases")
+	}
+
+	visitedCases := 0
+	shapes.ForEachFieldPolyShapeCase(func(id int, c FieldPolyShapeCase) bool {
+		if id != 301 {
+			t.Fatalf("visited unexpected field poly shape id: %d", id)
+		}
+		visitedCases++
+		return visitedCases < 1
+	})
+	if visitedCases != 1 {
+		t.Fatalf("ForEachFieldPolyShapeCase short-circuit visits=%d want 1", visitedCases)
+	}
+
+	visitedCatalog := 0
+	shapes.ForEachFieldPolyShapeCatalogFact(func(shapeID uint32, fact FixedShapeTableFact) bool {
+		if shapeID != 33 || fact.ShapeID != 33 {
+			t.Fatalf("visited unexpected catalog fact: shapeID=%d fact=%#v", shapeID, fact)
+		}
+		visitedCatalog++
+		return true
+	})
+	if visitedCatalog != 1 {
+		t.Fatalf("ForEachFieldPolyShapeCatalogFact visits=%d want 1", visitedCatalog)
+	}
+
+	if functionTableShapeFacts(nil).HasFieldPolyShapeCases(301) {
+		t.Fatalf("nil function table shape helper returned cases")
+	}
+}
+
 func TestAnalysisResultTableShapeFactsRebindsAfterLegacyMutation(t *testing.T) {
 	a := NewAnalysisResult()
 	shapes := a.TableShapeFacts()

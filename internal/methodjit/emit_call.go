@@ -265,7 +265,7 @@ func (ec *emitContext) guardFieldCalleeExactClosure(instr *Instr, shapeID uint32
 	if ec == nil || ec.fn == nil || instr == nil || shapeID == 0 || fieldIdx < 0 || instr.Aux == 0 {
 		return 0
 	}
-	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(instr.ID)
 	if len(cases) != 1 {
 		return 0
 	}

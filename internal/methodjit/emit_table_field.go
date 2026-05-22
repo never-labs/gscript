@@ -291,7 +291,7 @@ func (ec *emitContext) emitGetFieldDirectPolyShapeFacts(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || len(instr.Args) == 0 {
 		return false
 	}
-	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(instr.ID)
 	if len(cases) < 2 {
 		return false
 	}
@@ -362,7 +362,7 @@ func (ec *emitContext) emitFieldPolyLen(instr *Instr) {
 	if ec.hasReg(instr.ID) && ec.valueReprOf(instr.ID) == valueReprRawInt {
 		return
 	}
-	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(instr.ID)
 	if len(cases) < 2 {
 		ec.emitDeopt(instr)
 		return

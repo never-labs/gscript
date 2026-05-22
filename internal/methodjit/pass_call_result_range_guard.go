@@ -132,7 +132,7 @@ func callFloorSpeculativeNarrowRangeCandidate(fn *Function, instr *Instr, fb vm.
 		_, vmOK := fb.StableCalleeVMProto()
 		return nativeOK || vmOK
 	case OpFieldCallFloor:
-		return fn != nil && len(fn.Analysis.FieldPolyShapeFacts[instr.ID]) > 0
+		return functionTableShapeFacts(fn).HasFieldPolyShapeCases(instr.ID)
 	default:
 		return false
 	}

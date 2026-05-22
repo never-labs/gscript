@@ -108,12 +108,9 @@ func shapeFieldTypeGuardedLoadType(t Type) bool {
 }
 
 func seedShapeFieldTypesFromCatalog(fn *Function) {
-	if fn == nil || len(fn.Analysis.FieldPolyShapeCatalog) == 0 {
-		return
-	}
-	for shapeID, fact := range fn.Analysis.FieldPolyShapeCatalog {
+	functionTableShapeFacts(fn).ForEachFieldPolyShapeCatalogFact(func(shapeID uint32, fact FixedShapeTableFact) bool {
 		if shapeID == 0 || fact.ShapeID != shapeID || len(fact.FieldNames) == 0 || len(fact.FieldTypes) == 0 {
-			continue
+			return true
 		}
 		for fieldIdx, name := range fact.FieldNames {
 			typ := fact.FieldTypes[name]
@@ -133,7 +130,8 @@ func seedShapeFieldTypesFromCatalog(fn *Function) {
 					fmt.Sprintf("seeded catalog shape %d field %d type as %s", shapeID, fieldIdx, state))
 			}
 		}
-	}
+		return true
+	})
 }
 
 func seedShapeFieldTypesFromFixedConstructors(fn *Function) {

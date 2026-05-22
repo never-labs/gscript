@@ -1385,7 +1385,7 @@ func (ec *emitContext) fieldShapeTypedPeerCallCases(instr *Instr) []fieldShapeTy
 	if callResultCountFromAux2(instr.Aux2) != 1 || nArgs < 1 || nArgs > 4 {
 		return nil
 	}
-	cases := ec.fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) < 2 {
 		return nil
 	}
@@ -1458,7 +1458,7 @@ func (ec *emitContext) fieldShapeTypedPeerMethodCallCases(instr *Instr) []fieldS
 	if callResultCountFromAux2(instr.Aux2) != 1 || nArgs < 1 || nArgs > 4 {
 		return nil
 	}
-	cases := ec.fn.Analysis.FieldPolyShapeFacts[instr.ID]
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(instr.ID)
 	if len(cases) == 0 {
 		return nil
 	}
@@ -1998,7 +1998,7 @@ func (ec *emitContext) emitFieldCallPolyLenFusionStores(callID int, shapeID uint
 	if ec == nil || ec.fn == nil {
 		return
 	}
-	fusions := ec.fn.Analysis.FieldCallPolyLenFusions[callID]
+	fusions, _ := functionTableShapeFacts(ec.fn).FieldCallPolyLenFusionCases(callID)
 	if len(fusions) == 0 {
 		return
 	}

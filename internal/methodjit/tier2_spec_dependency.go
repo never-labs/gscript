@@ -46,11 +46,10 @@ func sortedSpecDependencyProtos(fn *Function) []*vm.FuncProto {
 	for proto := range spec.SpecDependencyProtos {
 		recordSpecDependencyProto(fn, deps, proto)
 	}
-	for _, cases := range fn.Analysis.FieldPolyShapeFacts {
-		for _, c := range cases {
-			recordSpecDependencyProto(fn, deps, c.VMProto)
-		}
-	}
+	functionTableShapeFacts(fn).ForEachFieldPolyShapeCase(func(_ int, c FieldPolyShapeCase) bool {
+		recordSpecDependencyProto(fn, deps, c.VMProto)
+		return true
+	})
 	if len(deps) == 0 {
 		return nil
 	}
