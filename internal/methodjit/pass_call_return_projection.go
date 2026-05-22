@@ -75,10 +75,8 @@ func callReturnProjectionCandidate(fn *Function, instr *Instr) bool {
 	if fn == nil || instr == nil || instr.Op != OpCall {
 		return false
 	}
-	if fn.Analysis.CallABIs != nil {
-		if _, ok := fn.Analysis.CallABIs[instr.ID]; ok {
-			return true
-		}
+	if _, ok := functionCallFacts(fn).CallABI(instr.ID); ok {
+		return true
 	}
 	return fieldShapeTypedPeerProjectionCandidate(fn, instr)
 }

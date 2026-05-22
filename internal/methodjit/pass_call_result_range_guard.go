@@ -123,10 +123,8 @@ func callFloorSpeculativeNarrowRangeCandidate(fn *Function, instr *Instr, fb vm.
 	}
 	switch instr.Op {
 	case OpCallFloor:
-		if fn != nil && fn.Analysis.CallABIs != nil {
-			if desc, ok := fn.Analysis.CallABIs[instr.ID]; ok && desc.ReturnRep != SpecializedABIReturnNone {
-				return true
-			}
+		if desc, ok := functionCallFacts(fn).CallABI(instr.ID); ok && desc.ReturnRep != SpecializedABIReturnNone {
+			return true
 		}
 		_, _, nativeOK := fb.StableCalleeNativeIdentity()
 		_, vmOK := fb.StableCalleeVMProto()

@@ -247,11 +247,11 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			case OpCall:
 				if !isPureLoopInvariantCall(fn, instr) {
 					loopCalls = append(loopCalls, instr)
-					}
+				}
 			case OpResume:
 				if !isPureNumericLoopCall(fn, instr) {
 					loopCalls = append(loopCalls, instr)
-					}
+				}
 			case OpSelf:
 				loopCalls = append(loopCalls, instr)
 			}
@@ -649,7 +649,7 @@ func isPureNumericLoopCall(fn *Function, call *Instr) bool {
 	if fn == nil || call == nil || call.Op != OpCall {
 		return false
 	}
-	desc, hasDesc := fn.Analysis.CallABIs[call.ID]
+	desc, hasDesc := functionCallFacts(fn).CallABI(call.ID)
 	if !hasDesc || desc.Callee == nil || desc.NumRets != 1 || !desc.RawIntReturn {
 		return false
 	}

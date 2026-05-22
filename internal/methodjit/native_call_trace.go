@@ -28,10 +28,8 @@ func (ec *emitContext) traceNativeCallEmit(instr *Instr, pathKind string, callee
 	abi := "none"
 	if desc != nil {
 		abi = callABIDescSummary(*desc)
-	} else if ec.fn != nil && ec.fn.Analysis.CallABIs != nil {
-		if d, ok := ec.fn.Analysis.CallABIs[instr.ID]; ok {
-			abi = callABIDescSummary(d)
-		}
+	} else if d, ok := functionCallFacts(ec.fn).CallABI(instr.ID); ok {
+		abi = callABIDescSummary(d)
 	}
 	reason := fmt.Sprintf("caller=%s instr=%d source_pc=%d path=%s callee=%s callee_ops=%s call_abi=%s",
 		traceProtoName(caller), instr.ID, sourcePC, pathKind, traceProtoName(callee),

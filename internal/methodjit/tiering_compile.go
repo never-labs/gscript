@@ -475,18 +475,20 @@ func lastTier2ModuleRunFunction(runs []Tier2ModuleRun) *Function {
 }
 
 func typedPeerCallRegisterReserve(fn *Function, baseSlots int) int {
-	if fn == nil || len(fn.Analysis.CallABIs) == 0 {
+	callFacts := functionCallFacts(fn)
+	if callFacts.CallABICount() == 0 {
 		return 0
 	}
 	reserve := baseSlots
-	for _, desc := range fn.Analysis.CallABIs {
+	callFacts.ForEachCallABI(func(_ int, desc CallABIDescriptor) bool {
 		if !desc.TypedPeer || desc.Callee == nil {
-			continue
+			return true
 		}
 		needed := baseSlots + desc.Callee.MaxStack + 1
 		if needed > reserve {
 			reserve = needed
 		}
-	}
+		return true
+	})
 	return reserve
 }

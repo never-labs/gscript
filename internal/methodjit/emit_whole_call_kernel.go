@@ -12,7 +12,7 @@ func (ec *emitContext) emitWholeCallKernelOpExitIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
-	callFacts := ec.fn.Analysis.CallFacts()
+	callFacts := functionCallFacts(ec.fn)
 	if !callFacts.WholeCallNoResultKernel(instr.ID) {
 		return false
 	}

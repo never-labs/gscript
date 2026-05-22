@@ -266,6 +266,24 @@ func (c *CallFacts) CallABI(id int) (CallABIDescriptor, bool) {
 	return desc, ok
 }
 
+func (c *CallFacts) CallABICount() int {
+	if c == nil {
+		return 0
+	}
+	return len(c.CallABIs)
+}
+
+func (c *CallFacts) ForEachCallABI(visit func(int, CallABIDescriptor) bool) {
+	if c == nil || visit == nil {
+		return
+	}
+	for id, desc := range c.CallABIs {
+		if !visit(id, desc) {
+			return
+		}
+	}
+}
+
 func (c *CallFacts) SetProtocolConstCallFolds(facts map[int]ProtocolConstCallFoldFact) {
 	c.ProtocolConstCallFolds = facts
 	c.bindOwner()
@@ -277,6 +295,24 @@ func (c *CallFacts) ProtocolConstCallFold(id int) (ProtocolConstCallFoldFact, bo
 	}
 	fact, ok := c.ProtocolConstCallFolds[id]
 	return fact, ok
+}
+
+func (c *CallFacts) ProtocolConstCallFoldCount() int {
+	if c == nil {
+		return 0
+	}
+	return len(c.ProtocolConstCallFolds)
+}
+
+func (c *CallFacts) ForEachProtocolConstCallFold(visit func(int, ProtocolConstCallFoldFact) bool) {
+	if c == nil || visit == nil {
+		return
+	}
+	for id, fact := range c.ProtocolConstCallFolds {
+		if !visit(id, fact) {
+			return
+		}
+	}
 }
 
 func (c *CallFacts) SetWholeCallNoResultKernels(facts map[int]bool) {
@@ -301,6 +337,13 @@ func (c *CallFacts) WholeCallNoResultBatch(id int) (WholeCallNoResultBatchFact, 
 	return fact, ok
 }
 
+func (c *CallFacts) WholeCallNoResultBatchMap() map[int]WholeCallNoResultBatchFact {
+	if c == nil {
+		return nil
+	}
+	return c.WholeCallNoResultBatches
+}
+
 func (c *CallFacts) bindOwner() {
 	if c != nil && c.owner != nil {
 		c.owner.bindCallCompatibilityFields()
@@ -318,10 +361,30 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 			WholeCallNoResultKernels: a.WholeCallNoResultKernels,
 			WholeCallNoResultBatches: a.WholeCallNoResultBatches,
 		}
+	} else {
+		if a.CallABIs != nil || a.Call.CallABIs == nil {
+			a.Call.CallABIs = a.CallABIs
+		}
+		if a.ProtocolConstCallFolds != nil || a.Call.ProtocolConstCallFolds == nil {
+			a.Call.ProtocolConstCallFolds = a.ProtocolConstCallFolds
+		}
+		if a.WholeCallNoResultKernels != nil || a.Call.WholeCallNoResultKernels == nil {
+			a.Call.WholeCallNoResultKernels = a.WholeCallNoResultKernels
+		}
+		if a.WholeCallNoResultBatches != nil || a.Call.WholeCallNoResultBatches == nil {
+			a.Call.WholeCallNoResultBatches = a.WholeCallNoResultBatches
+		}
 	}
 	a.Call.owner = a
 	a.bindCallCompatibilityFields()
 	return a.Call
+}
+
+func functionCallFacts(fn *Function) *CallFacts {
+	if fn == nil || fn.Analysis == nil {
+		return nil
+	}
+	return fn.Analysis.CallFacts()
 }
 
 func (a *AnalysisResult) initializeCallFacts() {

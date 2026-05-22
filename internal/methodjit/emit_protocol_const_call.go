@@ -14,7 +14,7 @@ func (ec *emitContext) emitProtocolConstCallIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
-	callFacts := ec.fn.Analysis.CallFacts()
+	callFacts := functionCallFacts(ec.fn)
 	fact, ok := callFacts.ProtocolConstCallFold(instr.ID)
 	if !ok || fact.CalleeProto == nil || len(fact.GuardConsts) != len(fact.GuardProtos) ||
 		len(fact.IntGuardConsts) != len(fact.IntGuardValues) || len(instr.Args) == 0 {
@@ -84,7 +84,7 @@ func (ec *emitContext) emitProtocolConstCallIfEligible(instr *Instr) bool {
 }
 
 func (ec *emitContext) protocolConstCallEntryGuarded(fact ProtocolConstCallFoldFact) bool {
-	if ec == nil || ec.fn == nil || len(ec.fn.Analysis.CallFacts().ProtocolConstCallFolds) == 0 {
+	if ec == nil || ec.fn == nil || functionCallFacts(ec.fn).ProtocolConstCallFoldCount() == 0 {
 		return false
 	}
 	writes := protocolConstCallSetGlobalConsts(ec.fn)
@@ -97,14 +97,18 @@ func (ec *emitContext) protocolConstCallEntryGuarded(fact ProtocolConstCallFoldF
 }
 
 func (ec *emitContext) emitProtocolConstCallEntryGuards() {
-	if ec == nil || ec.fn == nil || len(ec.fn.Analysis.CallFacts().ProtocolConstCallFolds) == 0 {
+	var callFacts *CallFacts
+	if ec != nil {
+		callFacts = functionCallFacts(ec.fn)
+	}
+	if callFacts.ProtocolConstCallFoldCount() == 0 {
 		return
 	}
 	seen := make(map[int]*vm.FuncProto)
 	writes := protocolConstCallSetGlobalConsts(ec.fn)
-	for _, fact := range ec.fn.Analysis.CallFacts().ProtocolConstCallFolds {
+	callFacts.ForEachProtocolConstCallFold(func(_ int, fact ProtocolConstCallFoldFact) bool {
 		if len(fact.IntGuardConsts) != 0 || len(fact.GuardConsts) != len(fact.GuardProtos) {
-			continue
+			return true
 		}
 		for i, constIdx := range fact.GuardConsts {
 			if writes[constIdx] {
@@ -114,7 +118,8 @@ func (ec *emitContext) emitProtocolConstCallEntryGuards() {
 				seen[constIdx] = fact.GuardProtos[i]
 			}
 		}
-	}
+		return true
+	})
 	if len(seen) == 0 {
 		return
 	}
