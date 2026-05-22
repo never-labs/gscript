@@ -116,6 +116,18 @@ func (s *TierStateStore) temporarilyDisableJIT(proto *vm.FuncProto, body func())
 }
 
 func (tm *TieringManager) tier2CompiledFor(proto *vm.FuncProto) (*CompiledFunction, bool) {
+	cf, ok := tm.rawTier2CompiledFor(proto)
+	if !ok || cf == nil {
+		return nil, false
+	}
+	if reason, stale := cf.DependencyInvalidationReason(tm.compilationDependencyContext()); stale {
+		tm.invalidateStaleTier2Compiled(proto, reason)
+		return nil, false
+	}
+	return cf, true
+}
+
+func (tm *TieringManager) rawTier2CompiledFor(proto *vm.FuncProto) (*CompiledFunction, bool) {
 	if tm == nil || proto == nil {
 		return nil, false
 	}
@@ -173,6 +185,7 @@ func (tm *TieringManager) markTier2Compiled(proto *vm.FuncProto, cf *CompiledFun
 		cf.SpecializationVersion = profile.Version
 	}
 	tm.ensureTierStateStore()
+	delete(tm.tier2InvalidReason, proto)
 	tm.tierState.markCompiled(proto, cf)
 	tm.installTier2(proto, cf)
 	tm.registerTier2SpecDependencies(proto, cf)
@@ -183,7 +196,7 @@ func (tm *TieringManager) InvalidateTier2CompiledDependencies(proto *vm.FuncProt
 	if tm == nil || proto == nil {
 		return false, ""
 	}
-	cf, ok := tm.tier2CompiledFor(proto)
+	cf, ok := tm.rawTier2CompiledFor(proto)
 	if !ok || cf == nil {
 		return false, ""
 	}
@@ -191,8 +204,40 @@ func (tm *TieringManager) InvalidateTier2CompiledDependencies(proto *vm.FuncProt
 	if !stale {
 		return false, ""
 	}
-	tm.clearTier2Install(proto)
+	tm.invalidateStaleTier2Compiled(proto, reason)
 	return true, reason
+}
+
+func (tm *TieringManager) compilationDependencyContext() CompilationDependencyContext {
+	if tm == nil {
+		return CompilationDependencyContext{}
+	}
+	return CompilationDependencyContext{Globals: tm.callVM}
+}
+
+func (tm *TieringManager) invalidateStaleTier2Compiled(proto *vm.FuncProto, reason string) {
+	if tm == nil || proto == nil {
+		return
+	}
+	if reason == "" {
+		reason = "tier2 compilation dependency invalidated"
+	}
+	if tm.tier2InvalidReason == nil {
+		tm.tier2InvalidReason = make(map[*vm.FuncProto]string)
+	}
+	tm.tier2InvalidReason[proto] = reason
+	tm.traceEvent("tier2_dependency_invalidated", "tier2", proto, map[string]any{
+		"reason":  reason,
+		"install": "cleared",
+	})
+	tm.clearTier2Install(proto)
+}
+
+func (tm *TieringManager) tier2InvalidReasonFor(proto *vm.FuncProto) string {
+	if tm == nil || proto == nil {
+		return ""
+	}
+	return tm.tier2InvalidReason[proto]
 }
 
 func (tm *TieringManager) markTier2Failed(proto *vm.FuncProto, reason string) {
@@ -245,6 +290,9 @@ func (tm *TieringManager) ensureTierStateStore() {
 	}
 	if tm.tier2FailReason == nil {
 		tm.tier2FailReason = make(map[*vm.FuncProto]string)
+	}
+	if tm.tier2InvalidReason == nil {
+		tm.tier2InvalidReason = make(map[*vm.FuncProto]string)
 	}
 	tm.tierState = newTierStateStore(tm.tier2Compiled, tm.tier2Failed, tm.tier2FailReason)
 }

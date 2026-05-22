@@ -327,3 +327,32 @@ func TestTieringManagerExplicitDependencyInvalidationClearsCompiledEntry(t *test
 		t.Fatalf("compiled entry was not cleared")
 	}
 }
+
+func TestTieringManagerCachedCompiledDependencyStaleIsNotReused(t *testing.T) {
+	tm := NewTieringManager()
+	proto := &vm.FuncProto{Name: "cached_stale"}
+	tbl := runtime.NewTable()
+	cf := &CompiledFunction{
+		Proto: proto,
+		CompilationDependencies: []CompilationDependency{
+			NoMetatableDependency{Table: tbl},
+		},
+	}
+	tm.markTier2Compiled(proto, cf)
+
+	if got, ok := tm.tier2CompiledFor(proto); !ok || got != cf {
+		t.Fatalf("fresh compiled entry was not reusable")
+	}
+
+	tbl.SetMetatable(runtime.NewTable())
+	if got, ok := tm.tier2CompiledFor(proto); ok || got != nil {
+		t.Fatalf("stale compiled entry reused: got=%p ok=%v", got, ok)
+	}
+	if _, ok := tm.rawTier2CompiledFor(proto); ok {
+		t.Fatalf("stale compiled entry was not cleared from state")
+	}
+	reason := tm.tier2InvalidReasonFor(proto)
+	if !strings.Contains(reason, "metatable dependency") || !strings.Contains(reason, "gained metatable") {
+		t.Fatalf("unexpected invalidation reason: %q", reason)
+	}
+}

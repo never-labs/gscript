@@ -67,7 +67,8 @@ type TieringManager struct {
 	tier2Compiled      map[*vm.FuncProto]*CompiledFunction
 	tier2Failed        map[*vm.FuncProto]bool
 	tier2FailReason    map[*vm.FuncProto]string // reason a function failed Tier 2 (keyed by proto)
-	tier2Attempts      int                      // total Tier 2 compilation attempts
+	tier2InvalidReason map[*vm.FuncProto]string
+	tier2Attempts      int // total Tier 2 compilation attempts
 	exitStats          exitStatsCollector
 	exitProfile        tier2ExitProfileCollector
 	recompileQueue     tier2RecompileQueue
@@ -118,6 +119,7 @@ func NewTieringManager() *TieringManager {
 		tier2Compiled:      make(map[*vm.FuncProto]*CompiledFunction),
 		tier2Failed:        make(map[*vm.FuncProto]bool),
 		tier2FailReason:    make(map[*vm.FuncProto]string),
+		tier2InvalidReason: make(map[*vm.FuncProto]string),
 		specDependents:     make(map[*vm.FuncProto]map[*vm.FuncProto]bool),
 		tier2GuardSuppress: make(map[*vm.FuncProto]map[int]map[string]bool),
 		tier2GuardFailures: make(map[*vm.FuncProto]map[int]map[string]uint64),
