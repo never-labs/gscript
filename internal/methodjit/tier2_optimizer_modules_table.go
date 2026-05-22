@@ -70,7 +70,14 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModuleWith("TableArrayStoreLower", Tier2PhaseTableFieldLower, nil, nil, TableArrayStoreLowerPass),
 		tier2PassModuleWith("GuardFieldCallee", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactCallABIs), nil, GuardFieldCalleePass),
 		tier2PassModuleWith("FieldPolyLenPhi", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables), nil, FieldPolyLenPhiPass),
-		tier2PassModuleWith("FieldSvalsLower", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedShapeEntryGuards), nil, FieldSvalsLowerPass),
+		{
+			Name:     "FieldSvalsLower",
+			Phase:    Tier2PhaseTableFieldLower,
+			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedShapeEntryGuards),
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				return FieldSvalsLowerPassWith(ctxDependencyRegistry(ctx))(fn)
+			},
+		},
 		tier2PassModuleWith("FieldSvalsCSE", Tier2PhaseTableFieldLower, nil, nil, FieldSvalsCSEPass),
 		{
 			Name:     "FixedShapeTableFacts (post-FieldSvalsLower)",
@@ -96,7 +103,15 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModuleWith("TypeSpecialize (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, nil, nil, TypeSpecializePass),
 		tier2PassModuleWith("FloorPhiSplit", Tier2PhaseTableFieldLower, nil, nil, FloorPhiSplitPass),
 		tier2PassModuleWith("DCE (post-FloorPhiSplit)", Tier2PhaseTableFieldLower, nil, nil, DCEPass),
-		tier2PassModuleWith("ShapeFieldTypeGuard", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactShapeFieldTypeElided), ShapeFieldTypeGuardPass),
+		{
+			Name:     "ShapeFieldTypeGuard",
+			Phase:    Tier2PhaseTableFieldLower,
+			Requires: analysisFacts(AnalysisFactFixedShapeTables),
+			Provides: analysisFacts(AnalysisFactShapeFieldTypeElided),
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				return ShapeFieldTypeGuardPassWith(ctxDependencyRegistry(ctx))(fn)
+			},
+		},
 		tier2PassModuleWith("LateModuloMultiplyOverflowBoxing", Tier2PhaseTableFieldLower, nil, nil, LateModuloMultiplyOverflowBoxingPass),
 		tier2PassModuleWith("ProfiledStringLenFold", Tier2PhaseTableFieldLower, nil, nil, ProfiledStringLenFoldPass),
 		tier2PassModuleWithUpdates("RangeAnalysis (post-TableFieldLower)", Tier2PhaseTableFieldLower, nil, rangeAnalysisFacts(), RangeAnalysisPass),

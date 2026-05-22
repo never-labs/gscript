@@ -10,10 +10,20 @@ import (
 // into one epoch guard per compiled function. After the guard, fixed-shape
 // FieldLoad sites can skip their per-load tag check.
 func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
+	return ShapeFieldTypeGuardPassWith(nil)(fn)
+}
+
+func ShapeFieldTypeGuardPassWith(registry *CompilationDependencyRegistry) PassFunc {
+	return func(fn *Function) (*Function, error) {
+		return shapeFieldTypeGuardPass(fn, registry)
+	}
+}
+
+func shapeFieldTypeGuardPass(fn *Function, registry *CompilationDependencyRegistry) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
 	seedShapeFieldTypesFromFixedConstructors(fn)
 	seedShapeFieldTypesFromCatalog(fn)
 	type key struct {
@@ -54,6 +64,9 @@ fn.ensureAnalysis()
 			}
 			k := key{shapeID: shapeID, typ: instr.Type}
 			guardMasks[k] |= uint64(1) << uint(fieldIdx)
+			if registry != nil {
+				registry.RecordShapeField(shapeID, fieldIdx)
+			}
 			if fn.Analysis.ShapeFieldTypeElidedLoads == nil {
 				fn.Analysis.ShapeFieldTypeElidedLoads = make(map[int]bool)
 			}

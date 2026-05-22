@@ -59,6 +59,9 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 				continue
 			}
 			descs[instr.ID] = desc
+			if config.DependencyRegistry != nil {
+				config.DependencyRegistry.RecordCallABI(instr.ID, desc)
+			}
 			switch desc.ReturnRep {
 			case SpecializedABIReturnRawInt:
 				instr.Type = TypeInt

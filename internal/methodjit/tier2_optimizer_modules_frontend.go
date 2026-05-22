@@ -47,11 +47,15 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 			Phase:    Tier2PhaseEarlyCanonical,
 			Requires: nil,
 			Provides: nil,
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				if opts == nil || len(opts.GlobalConstValues) == 0 {
 					return fn, nil
 				}
-				return GlobalConstSpecializationPass(opts.GlobalConstValues)(fn)
+				return GlobalConstSpecializationPassWith(GlobalConstSpecializationConfig{
+					Values:             opts.GlobalConstValues,
+					Globals:            opts.DependencyContext.Globals,
+					DependencyRegistry: ctxDependencyRegistry(ctx),
+				})(fn)
 			},
 		},
 		tier2PassModuleWith("TypeSpecialize (post-intrinsic)", Tier2PhaseEarlyCanonical, nil, nil, TypeSpecializePass),
@@ -194,6 +198,7 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 					Globals:                 ctxGlobals(ctx),
 					NumericGlobalValues:     fn.Analysis.NumericGlobalValues,
 					GlobalArrayElementFacts: globalArrayFacts,
+					DependencyRegistry:      ctxDependencyRegistry(ctx),
 				})(fn)
 			},
 		},
@@ -275,6 +280,7 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 					Globals:                 ctxGlobals(ctx),
 					NumericGlobalValues:     fn.Analysis.NumericGlobalValues,
 					GlobalArrayElementFacts: globalArrayFacts,
+					DependencyRegistry:      ctxDependencyRegistry(ctx),
 				})(fn)
 			},
 		},

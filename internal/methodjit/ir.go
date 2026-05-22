@@ -134,11 +134,11 @@ type RecordArrayLoopKernelCache struct {
 
 // Function is the complete IR for one compiled function.
 type Function struct {
-	Entry   *Block        // entry basic block
-	Blocks  []*Block      // all blocks in RPO (reverse postorder)
-	Proto   *vm.FuncProto // source bytecode
-	NumRegs int           // number of VM registers used
-	nextID  int           // next value ID
+	Entry    *Block          // entry basic block
+	Blocks   []*Block        // all blocks in RPO (reverse postorder)
+	Proto    *vm.FuncProto   // source bytecode
+	NumRegs  int             // number of VM registers used
+	nextID   int             // next value ID
 	Analysis *AnalysisResult // analysis results from optimization passes
 
 	// StringConstTables records small immutable lookup tables used by narrow
@@ -215,6 +215,7 @@ type CallABIAnnotationConfig struct {
 	Globals                 map[string]*vm.FuncProto
 	NumericGlobalValues     map[string]runtime.Value
 	GlobalArrayElementFacts map[string]FixedShapeTableFact
+	DependencyRegistry      *CompilationDependencyRegistry
 }
 
 // TableArrayDataPtrFact describes the guard-backed ABI contract for a typed

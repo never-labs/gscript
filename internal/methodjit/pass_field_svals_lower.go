@@ -16,12 +16,22 @@ import (
 // field index already attached by feedback/fixed-shape analysis. It does not
 // inspect benchmark names or field-name literals.
 func FieldSvalsLowerPass(fn *Function) (*Function, error) {
+	return FieldSvalsLowerPassWith(nil)(fn)
+}
+
+func FieldSvalsLowerPassWith(registry *CompilationDependencyRegistry) PassFunc {
+	return func(fn *Function) (*Function, error) {
+		return fieldSvalsLowerPass(fn, registry)
+	}
+}
+
+func fieldSvalsLowerPass(fn *Function, registry *CompilationDependencyRegistry) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
 	for i := 0; i < 3; i++ {
-		if !crossBlockFieldSvalsLower(fn) {
+		if !crossBlockFieldSvalsLower(fn, registry) {
 			break
 		}
 		relinkValueDefs(fn)
@@ -62,6 +72,7 @@ func FieldSvalsLowerPass(fn *Function) (*Function, error) {
 					functionRemarks(fn).Add("FieldSvalsLower", "changed", block.ID, svals.ID, svals.Op,
 						fmt.Sprintf("created shared svals pointer for table v%d shape %d", key.tableID, key.shapeID))
 				}
+				recordFieldSvalsShapeDependency(registry, shapeID)
 				if svals := cache[key]; svals != nil {
 					instr.Op = OpFieldStore
 					instr.Type = TypeUnknown
@@ -95,6 +106,7 @@ func FieldSvalsLowerPass(fn *Function) (*Function, error) {
 				functionRemarks(fn).Add("FieldSvalsLower", "changed", block.ID, svals.ID, svals.Op,
 					fmt.Sprintf("created shared svals pointer for table v%d shape %d", key.tableID, key.shapeID))
 			}
+			recordFieldSvalsShapeDependency(registry, shapeID)
 			if instr.Op == OpGetFieldNumToFloat {
 				instr.Op = OpFieldLoadNumToFloat
 			} else {
@@ -122,7 +134,14 @@ func FieldSvalsLowerPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
-func crossBlockFieldSvalsLower(fn *Function) bool {
+func recordFieldSvalsShapeDependency(registry *CompilationDependencyRegistry, shapeID uint32) {
+	if registry == nil || shapeID == 0 {
+		return
+	}
+	registry.RecordTableShape(shapeID)
+}
+
+func crossBlockFieldSvalsLower(fn *Function, registry *CompilationDependencyRegistry) bool {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return false
 	}
@@ -189,6 +208,7 @@ func crossBlockFieldSvalsLower(fn *Function) bool {
 		insertAfterInstr(def.Block, def, svals)
 		functionRemarks(fn).Add("FieldSvalsLower", "changed", def.Block.ID, svals.ID, svals.Op,
 			fmt.Sprintf("created cross-block shared svals pointer for table v%d shape %d", key.tableID, key.shapeID))
+		recordFieldSvalsShapeDependency(registry, key.shapeID)
 		for _, use := range uses {
 			fieldIdx := int(int32(use.instr.Aux2 & 0xFFFFFFFF))
 			if use.instr.Op == OpGetFieldNumToFloat {

@@ -1,6 +1,16 @@
 package methodjit
 
-import "github.com/gscript/gscript/internal/runtime"
+import (
+	"reflect"
+
+	"github.com/gscript/gscript/internal/runtime"
+)
+
+type GlobalConstSpecializationConfig struct {
+	Values             map[int]runtime.Value
+	Globals            CompilationGlobalLookup
+	DependencyRegistry *CompilationDependencyRegistry
+}
 
 func GlobalConstSpecializationPass(values map[int]runtime.Value) PassFunc {
 	return func(fn *Function) (*Function, error) {
@@ -9,6 +19,17 @@ func GlobalConstSpecializationPass(values map[int]runtime.Value) PassFunc {
 }
 
 func globalConstSpecializationPass(fn *Function, values map[int]runtime.Value) (*Function, error) {
+	return GlobalConstSpecializationPassWith(GlobalConstSpecializationConfig{Values: values})(fn)
+}
+
+func GlobalConstSpecializationPassWith(config GlobalConstSpecializationConfig) PassFunc {
+	return func(fn *Function) (*Function, error) {
+		return globalConstSpecializationPassWith(fn, config)
+	}
+}
+
+func globalConstSpecializationPassWith(fn *Function, config GlobalConstSpecializationConfig) (*Function, error) {
+	values := config.Values
 	if fn == nil || len(values) == 0 {
 		return fn, nil
 	}
@@ -42,6 +63,7 @@ func globalConstSpecializationPass(fn *Function, values map[int]runtime.Value) (
 			guard := emitIRInstr(fn, block, OpGuardGlobalConst, TypeUnknown, nil, instr.Aux, int64(uint64(v)))
 			guard.copySourceFrom(instr)
 			newInstrs = append(newInstrs, guard)
+			recordGlobalConstDependency(fn, int(instr.Aux), config)
 			if v.IsInt() {
 				instr.Op = OpConstInt
 				instr.Type = TypeInt
@@ -60,6 +82,31 @@ func globalConstSpecializationPass(fn *Function, values map[int]runtime.Value) (
 		block.Instrs = newInstrs
 	}
 	return fn, nil
+}
+
+func recordGlobalConstDependency(fn *Function, constIdx int, config GlobalConstSpecializationConfig) {
+	if config.DependencyRegistry == nil || compilationGlobalLookupNil(config.Globals) || fn == nil || fn.Proto == nil ||
+		constIdx < 0 || constIdx >= len(fn.Proto.Constants) {
+		return
+	}
+	c := fn.Proto.Constants[constIdx]
+	if !c.IsString() || c.Str() == "" {
+		return
+	}
+	config.DependencyRegistry.RecordGlobalValue(config.Globals, c.Str())
+}
+
+func compilationGlobalLookupNil(globals CompilationGlobalLookup) bool {
+	if globals == nil {
+		return true
+	}
+	v := reflect.ValueOf(globals)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 func globalConstFunctionSafe(fn *Function) bool {
