@@ -1,0 +1,126 @@
+package tests_test
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestFeatureMatrixSchema(t *testing.T) {
+	root := findRepoRoot(t)
+	path := filepath.Join(root, "tests", "feature_matrix.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read feature matrix: %v", err)
+	}
+
+	var matrix struct {
+		SchemaVersion  int                          `json:"schema_version"`
+		StatusValues   []string                     `json:"status_values"`
+		RequiredFields []string                     `json:"required_fields"`
+		FieldNotes     map[string]string            `json:"field_notes"`
+		Features       []map[string]json.RawMessage `json:"features"`
+	}
+	if err := json.Unmarshal(data, &matrix); err != nil {
+		t.Fatalf("decode feature matrix: %v", err)
+	}
+	if matrix.SchemaVersion != 1 {
+		t.Fatalf("schema_version = %d, want 1", matrix.SchemaVersion)
+	}
+	if len(matrix.Features) == 0 {
+		t.Fatal("feature matrix must contain at least one feature")
+	}
+
+	statuses := make(map[string]bool, len(matrix.StatusValues))
+	for _, status := range matrix.StatusValues {
+		if status == "" {
+			t.Fatal("status_values must not contain empty strings")
+		}
+		statuses[status] = true
+	}
+	if len(statuses) != len(matrix.StatusValues) {
+		t.Fatal("status_values must not contain duplicates")
+	}
+
+	required := make(map[string]bool, len(matrix.RequiredFields))
+	for _, field := range matrix.RequiredFields {
+		if field == "" {
+			t.Fatal("required_fields must not contain empty strings")
+		}
+		required[field] = true
+		if matrix.FieldNotes[field] == "" {
+			t.Fatalf("missing field_notes entry for %q", field)
+		}
+	}
+	for _, field := range []string{"parser", "bytecode", "interpreter", "tier1", "tier2", "semantic_gate", "official_case", "perf_hot_case"} {
+		if !required[field] {
+			t.Fatalf("required_fields missing %q", field)
+		}
+	}
+
+	seenIDs := map[string]bool{}
+	for i, feature := range matrix.Features {
+		id := decodeRequiredString(t, feature, i, "id")
+		if seenIDs[id] {
+			t.Fatalf("features[%d] duplicate id %q", i, id)
+		}
+		seenIDs[id] = true
+		_ = decodeRequiredString(t, feature, i, "name")
+		_ = decodeRequiredString(t, feature, i, "category")
+
+		for _, field := range matrix.RequiredFields {
+			raw, ok := feature[field]
+			if !ok {
+				t.Fatalf("features[%d] %s missing required field %q", i, id, field)
+			}
+			var cell struct {
+				Status string   `json:"status"`
+				Refs   []string `json:"refs"`
+			}
+			if err := json.Unmarshal(raw, &cell); err != nil {
+				t.Fatalf("features[%d] %s.%s: %v", i, id, field, err)
+			}
+			if !statuses[cell.Status] {
+				t.Fatalf("features[%d] %s.%s has invalid status %q", i, id, field, cell.Status)
+			}
+			for _, ref := range cell.Refs {
+				assertRepoRelativeFileRef(t, root, id, field, ref)
+			}
+		}
+	}
+}
+
+func decodeRequiredString(t *testing.T, feature map[string]json.RawMessage, index int, field string) string {
+	t.Helper()
+	raw, ok := feature[field]
+	if !ok {
+		t.Fatalf("features[%d] missing %q", index, field)
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		t.Fatalf("features[%d].%s: %v", index, field, err)
+	}
+	if value == "" {
+		t.Fatalf("features[%d].%s must not be empty", index, field)
+	}
+	return value
+}
+
+func assertRepoRelativeFileRef(t *testing.T, root, featureID, field, ref string) {
+	t.Helper()
+	if ref == "" {
+		t.Fatalf("%s.%s has empty ref", featureID, field)
+	}
+	if filepath.IsAbs(ref) || strings.Contains(ref, "\\") {
+		t.Fatalf("%s.%s ref %q must be a repo-relative slash path", featureID, field, ref)
+	}
+	clean := filepath.Clean(ref)
+	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." {
+		t.Fatalf("%s.%s ref %q escapes repository root", featureID, field, ref)
+	}
+	if _, err := os.Stat(filepath.Join(root, clean)); err != nil {
+		t.Fatalf("%s.%s ref %q does not resolve to a file: %v", featureID, field, ref, err)
+	}
+}
