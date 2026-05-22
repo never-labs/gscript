@@ -21,6 +21,38 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
+func (ec *emitContext) emitMatrixInstr(instr *Instr) bool {
+	switch instr.Op {
+	case OpMatrixDense:
+		ec.emitOpExit(instr)
+	case OpMatrixGetF:
+		ec.emitMatrixGetF(instr)
+	case OpMatrixSetF:
+		ec.emitMatrixSetF(instr)
+	case OpMatrixFlat:
+		ec.emitMatrixFlat(instr)
+	case OpMatrixStride:
+		ec.emitMatrixStride(instr)
+	case OpMatrixLoadFAt:
+		ec.emitMatrixLoadFAt(instr)
+	case OpMatrixStoreFAt:
+		ec.emitMatrixStoreFAt(instr)
+	case OpMatrixRowPtr:
+		ec.emitMatrixRowPtr(instr)
+	case OpMatrixLoadFRow:
+		ec.emitMatrixLoadFRow(instr)
+	case OpMatrixStoreFRow:
+		ec.emitMatrixStoreFRow(instr)
+	case OpMatrixLoadFRowConst:
+		ec.emitMatrixLoadFRowConst(instr)
+	case OpMatrixStoreFRowConst:
+		ec.emitMatrixStoreFRowConst(instr)
+	default:
+		return false
+	}
+	return true
+}
+
 // emitMatrixGetF emits ARM64 code for OpMatrixGetF(m, i, j) → float.
 //
 // Layout:

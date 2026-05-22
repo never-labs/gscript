@@ -45,6 +45,9 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if instr.Op != OpBranch {
 		ec.fusedActive = false
 	}
+	if ec.emitMatrixInstr(instr) {
+		goto done
+	}
 	switch instr.Op {
 	// --- Constants ---
 	case OpConstInt:
@@ -113,30 +116,6 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 		ec.emitFMA(instr)
 	case OpFMSUB:
 		ec.emitFMSUB(instr)
-	case OpMatrixDense:
-		ec.emitOpExit(instr)
-	case OpMatrixGetF:
-		ec.emitMatrixGetF(instr)
-	case OpMatrixSetF:
-		ec.emitMatrixSetF(instr)
-	case OpMatrixFlat:
-		ec.emitMatrixFlat(instr)
-	case OpMatrixStride:
-		ec.emitMatrixStride(instr)
-	case OpMatrixLoadFAt:
-		ec.emitMatrixLoadFAt(instr)
-	case OpMatrixStoreFAt:
-		ec.emitMatrixStoreFAt(instr)
-	case OpMatrixRowPtr:
-		ec.emitMatrixRowPtr(instr)
-	case OpMatrixLoadFRow:
-		ec.emitMatrixLoadFRow(instr)
-	case OpMatrixStoreFRow:
-		ec.emitMatrixStoreFRow(instr)
-	case OpMatrixLoadFRowConst:
-		ec.emitMatrixLoadFRowConst(instr)
-	case OpMatrixStoreFRowConst:
-		ec.emitMatrixStoreFRowConst(instr)
 	case OpNot:
 		ec.emitNot(instr)
 
@@ -368,6 +347,7 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	default:
 		ec.asm.NOP() // truly unknown op placeholder
 	}
+done:
 	codeEnd := len(ec.asm.Code())
 	if codeEnd > codeStart {
 		pass := "normal"
