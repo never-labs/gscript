@@ -198,6 +198,18 @@ func TestDiagnose_ReportString(t *testing.T) {
 	if len(report.PipelineStages) == 0 {
 		t.Error("expected pipeline stages in diagnostic report")
 	}
+	foundNestedModuleTiming := false
+	for _, stage := range report.PipelineStages {
+		if strings.HasPrefix(stage.Name, "RunTier2Pipeline/") {
+			if !stage.Nested {
+				t.Fatalf("module timing %q was not marked nested: %+v", stage.Name, stage)
+			}
+			foundNestedModuleTiming = true
+		}
+	}
+	if !foundNestedModuleTiming {
+		t.Fatal("expected at least one module timing in diagnostic report")
+	}
 	if len(report.ModuleContracts) == 0 {
 		t.Fatal("expected module contracts in diagnostic report")
 	}

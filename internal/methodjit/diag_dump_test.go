@@ -37,6 +37,8 @@ type diagProtoStats struct {
 	SkipReason          string                `json:"skip_reason,omitempty"`
 	OptimizationRemarks []OptimizationRemark  `json:"optimization_remarks,omitempty"`
 	PipelineStages      []PipelineStageTiming `json:"pipeline_stages,omitempty"`
+	ModuleContracts     []Tier2ModuleContract `json:"module_contracts,omitempty"`
+	ModuleReasons       []Tier2ModuleReason   `json:"module_reasons,omitempty"`
 }
 
 // TestDiagDump writes diagnostic artifacts for one benchmark to disk. It
@@ -86,6 +88,8 @@ func TestDiagDump(t *testing.T) {
 				SkipReason:          art.CompileErr.Error(),
 				OptimizationRemarks: art.OptimizationRemarks,
 				PipelineStages:      art.PipelineStages,
+				ModuleContracts:     art.ModuleContracts,
+				ModuleReasons:       art.ModuleReasons,
 			})
 			continue
 		}
@@ -123,32 +127,12 @@ func TestDiagDump(t *testing.T) {
 
 		// IR text — post-RunTier2Pipeline, as Print(fn) formats it.
 		irPath := filepath.Join(outDir, base+".ir.txt")
-		irContent := fmt.Sprintf("=== %s (numParams=%d, maxStack=%d) ===\n\n", art.ProtoName, art.NumParams, art.MaxStack)
-		irContent += "--- Register allocation ---\n" + art.RegAllocMap + "\n\n"
-		if len(art.IntrinsicNotes) > 0 {
-			irContent += "--- Intrinsic rewrite notes ---\n"
-			for _, n := range art.IntrinsicNotes {
-				irContent += "  " + n + "\n"
-			}
-			irContent += "\n"
-		}
-		irContent += "--- Optimization remarks ---\n" + formatOptimizationRemarks(art.OptimizationRemarks) + "\n"
-		irContent += "--- Pipeline summary ---\n" + FormatPipelineStageTimings(art.PipelineStages) + "\n"
-		irContent += "--- IR (after full Tier 2 pipeline) ---\n" + art.IRAfter
+		irContent := diagArtifactIRContent(art)
 		if err := os.WriteFile(irPath, []byte(irContent), 0o644); err != nil {
 			t.Fatalf("write %s: %v", irPath, err)
 		}
 
-		stats = append(stats, diagProtoStats{
-			Name:                art.ProtoName,
-			NumParams:           art.NumParams,
-			MaxStack:            art.MaxStack,
-			InsnCount:           art.InsnCount,
-			InsnHistogram:       art.InsnHistogram,
-			CodeBytes:           len(art.CompiledCode),
-			OptimizationRemarks: art.OptimizationRemarks,
-			PipelineStages:      art.PipelineStages,
-		})
+		stats = append(stats, diagStatsFromArtifact(art))
 	}
 
 	// Sort by InsnCount descending so the hottest function is first.
@@ -180,6 +164,88 @@ func TestDiagDump(t *testing.T) {
 		}
 	}
 	t.Logf("wrote %d artifacts (%d protos) to %s", 4*nonSkipped, len(stats), outDir)
+}
+
+func diagArtifactIRContent(art *DiagArtifact) string {
+	irContent := fmt.Sprintf("=== %s (numParams=%d, maxStack=%d) ===\n\n", art.ProtoName, art.NumParams, art.MaxStack)
+	irContent += "--- Register allocation ---\n" + art.RegAllocMap + "\n\n"
+	if len(art.IntrinsicNotes) > 0 {
+		irContent += "--- Intrinsic rewrite notes ---\n"
+		for _, n := range art.IntrinsicNotes {
+			irContent += "  " + n + "\n"
+		}
+		irContent += "\n"
+	}
+	irContent += "--- Optimization remarks ---\n" + formatOptimizationRemarks(art.OptimizationRemarks) + "\n"
+	irContent += "--- Pipeline summary ---\n" + FormatPipelineStageTimings(art.PipelineStages) + "\n"
+	irContent += "--- Module contracts ---\n" + FormatTier2ModuleContracts(art.ModuleContracts) + "\n"
+	irContent += "--- Module reasons ---\n" + FormatTier2ModuleReasons(art.ModuleReasons) + "\n"
+	irContent += "--- IR (after full Tier 2 pipeline) ---\n" + art.IRAfter
+	return irContent
+}
+
+func diagStatsFromArtifact(art *DiagArtifact) diagProtoStats {
+	return diagProtoStats{
+		Name:                art.ProtoName,
+		NumParams:           art.NumParams,
+		MaxStack:            art.MaxStack,
+		InsnCount:           art.InsnCount,
+		InsnHistogram:       art.InsnHistogram,
+		CodeBytes:           len(art.CompiledCode),
+		OptimizationRemarks: art.OptimizationRemarks,
+		PipelineStages:      art.PipelineStages,
+		ModuleContracts:     art.ModuleContracts,
+		ModuleReasons:       art.ModuleReasons,
+	}
+}
+
+func TestDiagDumpArtifactIncludesModuleContractsAndReasons(t *testing.T) {
+	art := &DiagArtifact{
+		ProtoName: "target",
+		NumParams: 2,
+		MaxStack:  8,
+		IRAfter:   "func target\n",
+		ModuleContracts: []Tier2ModuleContract{
+			{
+				Phase:      Tier2PhaseNumeric,
+				ModuleName: "RangeAnalysis",
+				StageName:  "RunTier2Pipeline/numeric/RangeAnalysis",
+				Requires:   analysisFacts(AnalysisFactInt48Safe),
+				Provides:   analysisFacts(AnalysisFactIntRanges),
+			},
+		},
+		ModuleReasons: []Tier2ModuleReason{
+			{
+				Phase:      Tier2PhaseNumeric,
+				ModuleName: "RangeAnalysis",
+				StageName:  "RunTier2Pipeline/numeric/RangeAnalysis",
+				Outcome:    "hit",
+				Reason:     "range facts changed",
+			},
+		},
+	}
+
+	ir := diagArtifactIRContent(art)
+	for _, want := range []string{
+		"--- Module contracts ---",
+		"numeric/RangeAnalysis",
+		"requires:",
+		"provides:",
+		"--- Module reasons ---",
+		`reason="range facts changed"`,
+	} {
+		if !strings.Contains(ir, want) {
+			t.Fatalf("diag IR content missing %q:\n%s", want, ir)
+		}
+	}
+
+	stats := diagStatsFromArtifact(art)
+	if len(stats.ModuleContracts) != 1 || stats.ModuleContracts[0].ModuleName != "RangeAnalysis" {
+		t.Fatalf("stats missing module contracts: %+v", stats.ModuleContracts)
+	}
+	if len(stats.ModuleReasons) != 1 || stats.ModuleReasons[0].Reason != "range facts changed" {
+		t.Fatalf("stats missing module reasons: %+v", stats.ModuleReasons)
+	}
 }
 
 // disasmARM64 decodes a flat ARM64 code region into a human-readable

@@ -28,10 +28,9 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-// TestDiag_ProductionParity_Sieve asserts that the ARM64 bytes produced
-// by TieringManager.CompileForDiagnostics are bit-identical to the bytes
-// produced by the production compileTier2 path, for the sieve benchmark's
-// hottest function.
+// TestDiag_ProductionParity_Sieve asserts that CompileForDiagnostics remains
+// structurally identical to the production compileTier2 path for the sieve
+// benchmark's hottest function.
 //
 // Parity is enforced by construction (both paths call compileTier2Pipeline)
 // but this test catches any future refactor that drifts.
