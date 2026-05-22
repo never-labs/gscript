@@ -236,10 +236,7 @@ func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMut
 	if len(cases) < 2 {
 		return false
 	}
-	if fn.Analysis.FieldPolyShapeFacts == nil {
-		fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
-	}
-	fn.Analysis.FieldPolyShapeFacts[lenInstr.ID] = cases
+	fn.Analysis.TableShapeFacts().RecordFieldPolyShapeCases(lenInstr.ID, cases)
 	name := fieldNameFromAux(fn, get.Aux)
 	if r, ok := fieldPolyLenRange(fn, name, cases); ok {
 		if fn.Analysis.ProfiledIntRanges == nil {
@@ -263,7 +260,7 @@ func fieldPolyExactLenCases(fn *Function, get *Instr, mutations fieldLenMutation
 	if name == "" {
 		return nil
 	}
-	src := fn.Analysis.FieldPolyShapeFacts[get.ID]
+	src, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(get.ID)
 	if len(src) < 2 {
 		return nil
 	}

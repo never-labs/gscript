@@ -186,6 +186,46 @@ func TestAnalysisResultTableShapeFactsBindsCompatibilityFields(t *testing.T) {
 	}
 }
 
+func TestAnalysisResultTableShapeFactsRecordHelpersBindLegacyMaps(t *testing.T) {
+	a := NewAnalysisResult()
+	shapes := a.TableShapeFacts()
+
+	cases := []FieldPolyShapeCase{{
+		ShapeID:  51,
+		FieldIdx: 2,
+		ReceiverFact: FixedShapeTableFact{
+			ShapeID:    51,
+			FieldNames: []string{"step"},
+		},
+	}}
+	shapes.RecordFieldPolyShapeCases(501, cases)
+	if got := a.FieldPolyShapeFacts[501]; len(got) != 1 || got[0].ShapeID != 51 {
+		t.Fatalf("RecordFieldPolyShapeCases did not update compatibility field: got %#v", got)
+	}
+	if got, ok := a.FieldPolyShapeCatalog[51]; !ok || got.ShapeID != 51 || len(got.FieldNames) != 1 || got.FieldNames[0] != "step" {
+		t.Fatalf("RecordFieldPolyShapeCases did not record catalog clone: got %#v ok=%v", got, ok)
+	}
+	cases[0].ReceiverFact.FieldNames[0] = "mutated"
+	if got := a.FieldPolyShapeCatalog[51]; got.FieldNames[0] != "step" {
+		t.Fatalf("catalog fact should be cloned, got %#v", got.FieldNames)
+	}
+
+	shapes.RecordFieldPolyShapeReceiver(502)
+	if !a.FieldPolyShapeReceivers[502] {
+		t.Fatalf("RecordFieldPolyShapeReceiver did not update compatibility field")
+	}
+
+	shapes.RecordFieldCallPolyLenFusions(503, []FieldCallPolyLenFusion{{LenValueID: 504, ShapeID: 51, Len: 7}})
+	if got := a.FieldCallPolyLenFusions[503]; len(got) != 1 || got[0].Len != 7 {
+		t.Fatalf("RecordFieldCallPolyLenFusions did not update compatibility field: got %#v", got)
+	}
+
+	shapes.DeleteFieldPolyShapeCases(501)
+	if _, ok := a.FieldPolyShapeFacts[501]; ok {
+		t.Fatalf("DeleteFieldPolyShapeCases did not update compatibility field")
+	}
+}
+
 func TestAnalysisResultTableShapeFactsAdoptsLegacyFields(t *testing.T) {
 	a := &AnalysisResult{
 		FieldPolyShapeFacts:     map[int][]FieldPolyShapeCase{201: {{ShapeID: 21, FieldIdx: 1}}},

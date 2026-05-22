@@ -17,7 +17,7 @@ func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
+	if fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	for splits := 0; splits < 16; splits++ {
@@ -58,7 +58,7 @@ func FieldShapeCallSplitPreInlinePass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
+	if fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	for splits := 0; splits < 16; splits++ {
@@ -89,7 +89,7 @@ func fieldShapeSplitPreInlineCallCase(fn *Function, block *Block, idx int, call 
 	if calleeLoad == nil {
 		return false
 	}
-	cases := fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
+	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) < 2 || len(call.Args) < 2 {
 		return false
 	}
@@ -191,8 +191,8 @@ func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, cal
 	caseJump.copySourceFrom(call)
 	caseBlock.Instrs = []*Instr{caseLoad, caseCall, caseJump}
 	caseBlock.Succs = []*Block{mergeBlock}
-	fn.Analysis.FieldPolyShapeFacts[caseLoad.ID] = []FieldPolyShapeCase{c}
-	recordFieldPolyShapeCatalog(fn, []FieldPolyShapeCase{c})
+	tableShapes := fn.Analysis.TableShapeFacts()
+	tableShapes.RecordFieldPolyShapeCases(caseLoad.ID, []FieldPolyShapeCase{c})
 
 	fallbackInstrs := make([]*Instr, 0, 3)
 	remaining := fieldShapeCasesWithout(cases, caseIdx)
@@ -214,15 +214,13 @@ func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, cal
 		fallbackArgs[0] = fallbackLoad.Value()
 		call.Args = fallbackArgs
 		fallbackInstrs = append(fallbackInstrs, fallbackLoad)
-		fn.Analysis.FieldPolyShapeFacts[fallbackLoad.ID] = remaining
-		recordFieldPolyShapeCatalog(fn, remaining)
-		delete(fn.Analysis.FieldPolyShapeFacts, calleeLoad.ID)
+		tableShapes.RecordFieldPolyShapeCases(fallbackLoad.ID, remaining)
+		tableShapes.DeleteFieldPolyShapeCases(calleeLoad.ID)
 	} else {
 		if aux2 := fieldPolyShapeCasesAux2(remaining); aux2 != 0 {
 			calleeLoad.Aux2 = aux2
 		}
-		fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID] = remaining
-		recordFieldPolyShapeCatalog(fn, remaining)
+		tableShapes.RecordFieldPolyShapeCases(calleeLoad.ID, remaining)
 	}
 	call.Block = fallbackBlock
 	fallbackJump := &Instr{ID: fn.newValueID(), Op: OpJump, Block: fallbackBlock}
@@ -277,7 +275,7 @@ func removeInstrByID(instrs []*Instr, id int) []*Instr {
 }
 
 func fieldShapeSplitSingleBlockCase(fn *Function, block *Block, idx int, call *Instr) bool {
-	cases := fn.Analysis.FieldPolyShapeFacts[call.ID]
+	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(call.ID)
 	if len(cases) < 2 || len(call.Args) == 0 {
 		functionRemarks(fn).Add("FieldShapeCallSplit", "missed", block.ID, call.ID, call.Op,
 			fmt.Sprintf("missing field-shape cases for call: cases=%d args=%d", len(cases), len(call.Args)))
@@ -548,8 +546,8 @@ func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c Fie
 	}
 	caseCall.copySourceFrom(call)
 	caseBlock.Instrs = append(caseBlock.Instrs, caseCall)
-	fn.Analysis.FieldPolyShapeFacts[caseCall.ID] = []FieldPolyShapeCase{c}
-	recordFieldPolyShapeCatalog(fn, []FieldPolyShapeCase{c})
+	tableShapes := fn.Analysis.TableShapeFacts()
+	tableShapes.RecordFieldPolyShapeCases(caseCall.ID, []FieldPolyShapeCase{c})
 	caseResult := caseCall.Value()
 	caseJump := &Instr{ID: fn.newValueID(), Op: OpJump, Block: caseBlock}
 	caseJump.copySourceFrom(call)
@@ -562,8 +560,7 @@ func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c Fie
 	fallbackBlock.Instrs = []*Instr{call, fallbackJump}
 	fallbackBlock.Succs = []*Block{mergeBlock}
 	remaining := fieldShapeCasesWithout(cases, caseIdx)
-	fn.Analysis.FieldPolyShapeFacts[call.ID] = remaining
-	recordFieldPolyShapeCatalog(fn, remaining)
+	tableShapes.RecordFieldPolyShapeCases(call.ID, remaining)
 
 	mergeBlock.Preds = []*Block{caseBlock, fallbackBlock}
 	phi := &Instr{

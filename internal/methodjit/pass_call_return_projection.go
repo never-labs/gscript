@@ -9,6 +9,7 @@ func CallReturnProjectionPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
+	tableShapes := fn.Analysis.TableShapeFacts()
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {
 		for i, instr := range block.Instrs {
@@ -32,10 +33,8 @@ func CallReturnProjectionPass(fn *Function) (*Function, error) {
 			instr.Type = TypeInt
 			if calleeLoad := fieldShapeMethodCalleeLoad(instr); calleeLoad != nil &&
 				uses[calleeLoad.ID] == 1 && fieldShapeTypedPeerProjectionCandidate(fn, instr) {
-				if fn.Analysis.FieldPolyShapeFacts != nil {
-					if cases := fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]; len(cases) > 0 {
-						fn.Analysis.FieldPolyShapeFacts[instr.ID] = cases
-					}
+				if cases, _ := tableShapes.FieldPolyShapeCases(calleeLoad.ID); len(cases) > 0 {
+					tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
 				}
 				instr.Op = OpFieldCallFloor
 				instr.Args = append([]*Value(nil), instr.Args[1:]...)
@@ -101,7 +100,7 @@ func fieldShapeTypedPeerProjectionCandidate(fn *Function, instr *Instr) bool {
 	if callResultCountFromAux2(instr.Aux2) != 1 || nArgs < 1 || nArgs > 4 {
 		return false
 	}
-	cases := fn.Analysis.FieldPolyShapeFacts[calleeLoad.ID]
+	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) < 2 {
 		return false
 	}

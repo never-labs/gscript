@@ -18,7 +18,8 @@ func GuardFieldCalleePass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
+	tableShapes := fn.Analysis.TableShapeFacts()
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {
 		if block == nil || len(block.Instrs) == 0 {
@@ -37,11 +38,7 @@ fn.ensureAnalysis()
 					instr.Args = []*Value{load.Args[0]}
 					instr.Aux2 = aux2
 					if hasCase {
-						if fn.Analysis.FieldPolyShapeFacts == nil {
-							fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
-						}
-						fn.Analysis.FieldPolyShapeFacts[instr.ID] = []FieldPolyShapeCase{c}
-						recordFieldPolyShapeCatalog(fn, []FieldPolyShapeCase{c})
+						tableShapes.RecordFieldPolyShapeCases(instr.ID, []FieldPolyShapeCase{c})
 					}
 					functionRemarks(fn).Add("GuardFieldCallee", "changed", block.ID, instr.ID, instr.Op,
 						fmt.Sprintf("fused field callee guard for shape/field aux2=%d", instr.Aux2))
@@ -73,7 +70,7 @@ func guardFieldCalleeLoadAux2ForGuard(fn *Function, instr *Instr, protoPtr int64
 		if fn == nil || instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
 			return 0, FieldPolyShapeCase{}, false, false
 		}
-		cases := fn.Analysis.FieldPolyShapeFacts[instr.ID]
+		cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(instr.ID)
 		if protoPtr != 0 {
 			cases = guardFieldCalleeCasesForProto(cases, uintptr(protoPtr))
 		}
@@ -88,7 +85,8 @@ func guardFieldCalleeLoadAux2ForGuard(fn *Function, instr *Instr, protoPtr int64
 		return 0, FieldPolyShapeCase{}, false, false
 	}
 	if fn != nil {
-		cases := guardFieldCalleeCasesForProto(fn.Analysis.FieldPolyShapeFacts[instr.ID], uintptr(protoPtr))
+		baseCases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(instr.ID)
+		cases := guardFieldCalleeCasesForProto(baseCases, uintptr(protoPtr))
 		if len(cases) == 1 && cases[0].ShapeID == shapeID && cases[0].FieldIdx == fieldIdx {
 			return instr.Aux2, cases[0], true, true
 		}

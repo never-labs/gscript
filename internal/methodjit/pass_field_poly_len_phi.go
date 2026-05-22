@@ -10,7 +10,7 @@ func FieldPolyLenPhiPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
+	if fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	changed := false
@@ -70,7 +70,8 @@ func fieldPolyLenExactLens(fn *Function, instr *Instr) map[uint32]int64 {
 	if name == "" {
 		return nil
 	}
-	for _, c := range fn.Analysis.FieldPolyShapeFacts[instr.ID] {
+	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(instr.ID)
+	for _, c := range cases {
 		r, ok := c.ReceiverFact.FieldLenRanges[name]
 		if c.ShapeID == 0 || !ok || !r.known || r.min != r.max {
 			return nil

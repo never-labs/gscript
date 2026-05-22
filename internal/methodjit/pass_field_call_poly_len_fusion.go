@@ -10,7 +10,8 @@ func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if len(fn.Analysis.FieldPolyShapeFacts) == 0 {
+	tableShapes := fn.Analysis.TableShapeFacts()
+	if tableShapes.FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -21,7 +22,7 @@ func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
 			if call == nil || call.Op != OpFieldCallFloor || len(call.Args) == 0 || call.Args[0] == nil {
 				continue
 			}
-			callCases := fn.Analysis.FieldPolyShapeFacts[call.ID]
+			callCases, _ := tableShapes.FieldPolyShapeCases(call.ID)
 			if len(callCases) < 2 {
 				continue
 			}
@@ -37,10 +38,7 @@ func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
 				if len(fusions) == 0 {
 					continue
 				}
-				if fn.Analysis.FieldCallPolyLenFusions == nil {
-					fn.Analysis.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
-				}
-				fn.Analysis.FieldCallPolyLenFusions[call.ID] = append(fn.Analysis.FieldCallPolyLenFusions[call.ID], fusions...)
+				tableShapes.RecordFieldCallPolyLenFusions(call.ID, fusions)
 				if remarks := functionRemarks(fn); remarks != nil {
 					remarks.Add("FieldCallPolyLenFusion", "changed", block.ID, call.ID, call.Op,
 						"reused field-call shape dispatch for later field length")
@@ -75,7 +73,7 @@ func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []Fiel
 	if name == "" {
 		return nil
 	}
-	lenCases := fn.Analysis.FieldPolyShapeFacts[ln.ID]
+	lenCases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(ln.ID)
 	if len(lenCases) == 0 {
 		return nil
 	}

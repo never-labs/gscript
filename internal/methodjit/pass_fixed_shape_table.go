@@ -157,7 +157,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		arrayElementFacts := inferLocalArrayElementTableFacts(fn, facts)
 		seedLocalArrayElementTableFacts(fn, facts, arrayElementFacts)
 
-		if len(facts) == 0 && len(fn.Analysis.FieldPolyShapeFacts) == 0 {
+		if len(facts) == 0 && fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
 			return fn, nil
 		}
 		fn.Analysis.FixedShapeTables = facts
@@ -243,6 +243,7 @@ func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTab
 	if fn == nil || fn.Proto == nil || len(argFacts) == 0 {
 		return
 	}
+	tableShapes := fn.Analysis.TableShapeFacts()
 	valueFacts := make(map[int][]FixedShapeTableFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -256,10 +257,7 @@ func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTab
 					continue
 				}
 				valueFacts[instr.ID] = poly
-				if fn.Analysis.FieldPolyShapeReceivers == nil {
-					fn.Analysis.FieldPolyShapeReceivers = make(map[int]bool)
-				}
-				fn.Analysis.FieldPolyShapeReceivers[instr.ID] = true
+				tableShapes.RecordFieldPolyShapeReceiver(instr.ID)
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeTable
 				}
@@ -281,11 +279,7 @@ func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTab
 				if len(cases) < 2 {
 					continue
 				}
-				if fn.Analysis.FieldPolyShapeFacts == nil {
-					fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
-				}
-				fn.Analysis.FieldPolyShapeFacts[instr.ID] = cases
-				recordFieldPolyShapeCatalog(fn, cases)
+				tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
 				instr.Aux2 = 0
 				if typ != TypeUnknown && typ != TypeAny {
 					instr.Type = typ
@@ -301,6 +295,7 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedS
 	if fn == nil || fn.Proto == nil || len(argFacts) == 0 {
 		return
 	}
+	tableShapes := fn.Analysis.TableShapeFacts()
 	valueFacts := make(map[int][]FixedShapeTableFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -322,10 +317,7 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedS
 				poly := guardedFixedShapePolyFacts(argFacts[int(tableDef.Aux)])
 				if len(poly) > 0 {
 					valueFacts[instr.ID] = poly
-					if fn.Analysis.FieldPolyShapeReceivers == nil {
-						fn.Analysis.FieldPolyShapeReceivers = make(map[int]bool)
-					}
-					fn.Analysis.FieldPolyShapeReceivers[instr.ID] = true
+					tableShapes.RecordFieldPolyShapeReceiver(instr.ID)
 					if instr.Type == TypeAny || instr.Type == TypeUnknown {
 						instr.Type = TypeTable
 					}
@@ -352,11 +344,7 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedS
 				if len(cases) < 2 {
 					continue
 				}
-				if fn.Analysis.FieldPolyShapeFacts == nil {
-					fn.Analysis.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
-				}
-				fn.Analysis.FieldPolyShapeFacts[instr.ID] = cases
-				recordFieldPolyShapeCatalog(fn, cases)
+				tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
 				instr.Aux2 = 0
 				if typ != TypeUnknown && typ != TypeAny {
 					instr.Type = typ
@@ -372,25 +360,14 @@ func recordFieldPolyShapeCatalog(fn *Function, cases []FieldPolyShapeCase) {
 	if fn == nil || len(cases) == 0 {
 		return
 	}
-	if fn.Analysis.FieldPolyShapeCatalog == nil {
-		fn.Analysis.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, len(cases))
-	}
-	for _, c := range cases {
-		if c.ShapeID == 0 || c.ReceiverFact.ShapeID != c.ShapeID {
-			continue
-		}
-		fn.Analysis.FieldPolyShapeCatalog[c.ShapeID] = cloneFixedShapeTableFact(c.ReceiverFact)
-	}
+	fn.Analysis.TableShapeFacts().RecordFieldPolyShapeCatalogCases(cases)
 }
 
 func recordFixedShapeCatalogFact(fn *Function, fact FixedShapeTableFact) {
 	if fn == nil || fact.ShapeID == 0 || len(fact.FieldNames) == 0 {
 		return
 	}
-	if fn.Analysis.FieldPolyShapeCatalog == nil {
-		fn.Analysis.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, 1)
-	}
-	fn.Analysis.FieldPolyShapeCatalog[fact.ShapeID] = cloneFixedShapeTableFact(fact)
+	fn.Analysis.TableShapeFacts().RecordFixedShapeCatalogFact(fact)
 }
 
 func guardedFixedShapePolyFacts(facts []FixedShapeTableFact) []FixedShapeTableFact {
@@ -2202,30 +2179,35 @@ func fixedShapeFactForFieldSvals(fn *Function, facts map[int]FixedShapeTableFact
 	if fact, ok := facts[svals.Args[0].ID]; ok && fact.ShapeID == shapeID {
 		return fact, true
 	}
-	if fn != nil && fn.Analysis.FieldPolyShapeCatalog != nil {
-		if fact, ok := fn.Analysis.FieldPolyShapeCatalog[shapeID]; ok && fact.ShapeID == shapeID {
+	if fn != nil {
+		tableShapes := fn.Analysis.TableShapeFacts()
+		if fact, ok := tableShapes.FieldPolyShapeCatalogFact(shapeID); ok && fact.ShapeID == shapeID {
 			return fact, true
 		}
-	}
-	if fn == nil || len(fn.Analysis.FieldPolyShapeFacts) == 0 {
-		return FixedShapeTableFact{}, false
-	}
-	var found FixedShapeTableFact
-	for _, cases := range fn.Analysis.FieldPolyShapeFacts {
-		for _, c := range cases {
-			if c.ShapeID != shapeID || c.ReceiverFact.ShapeID != shapeID {
-				continue
-			}
-			if found.ShapeID != 0 {
-				return FixedShapeTableFact{}, false
-			}
-			found = c.ReceiverFact
+		if tableShapes.FieldPolyShapeFactCount() == 0 {
+			return FixedShapeTableFact{}, false
 		}
+		var found FixedShapeTableFact
+		ambiguous := false
+		tableShapes.RangeFieldPolyShapeCases(func(_ int, cases []FieldPolyShapeCase) bool {
+			for _, c := range cases {
+				if c.ShapeID != shapeID || c.ReceiverFact.ShapeID != shapeID {
+					continue
+				}
+				if found.ShapeID != 0 {
+					ambiguous = true
+					return false
+				}
+				found = c.ReceiverFact
+			}
+			return true
+		})
+		if ambiguous || found.ShapeID == 0 {
+			return FixedShapeTableFact{}, false
+		}
+		return found, true
 	}
-	if found.ShapeID == 0 {
-		return FixedShapeTableFact{}, false
-	}
-	return found, true
+	return FixedShapeTableFact{}, false
 }
 
 func annotateFixedShapeSetFields(fn *Function, facts map[int]FixedShapeTableFact) {
