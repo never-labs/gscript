@@ -38,6 +38,23 @@ func TestOpIsTerminatorUsesSpec(t *testing.T) {
 	}
 }
 
+func TestOnlyControlTransferOpsAreTerminators(t *testing.T) {
+	allowed := map[Op]bool{
+		OpJump:   true,
+		OpBranch: true,
+		OpReturn: true,
+	}
+	for op := Op(0); op < OpMax; op++ {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if spec.Terminator != allowed[op] {
+			t.Fatalf("%s terminator=%v, want %v", spec.Name, spec.Terminator, allowed[op])
+		}
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}
