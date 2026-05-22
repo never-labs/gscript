@@ -159,6 +159,95 @@ func TestAnalysisResultSpeculationFactsPreservesSuppressedKindsNilSentinel(t *te
 	}
 }
 
+func TestAnalysisResultTableShapeFactsBindsCompatibilityFields(t *testing.T) {
+	a := NewAnalysisResult()
+	shapes := a.TableShapeFacts()
+
+	cases := []FieldPolyShapeCase{{ShapeID: 11, FieldIdx: 2}}
+	shapes.SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{101: cases})
+	if got, ok := a.FieldPolyShapeFacts[101]; !ok || len(got) != 1 || got[0].ShapeID != 11 {
+		t.Fatalf("TableShapeFacts.SetFieldPolyShapeFacts did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+
+	shapes.SetFieldPolyShapeReceivers(map[int]bool{102: true})
+	if !a.FieldPolyShapeReceivers[102] {
+		t.Fatalf("TableShapeFacts.SetFieldPolyShapeReceivers did not update compatibility field")
+	}
+
+	shapes.SetFieldPolyShapeCatalog(map[uint32]FixedShapeTableFact{12: {ShapeID: 12}})
+	if got, ok := a.FieldPolyShapeCatalog[12]; !ok || got.ShapeID != 12 {
+		t.Fatalf("TableShapeFacts.SetFieldPolyShapeCatalog did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+
+	fusions := []FieldCallPolyLenFusion{{LenValueID: 103, ShapeID: 13, Len: 4}}
+	shapes.SetFieldCallPolyLenFusions(map[int][]FieldCallPolyLenFusion{104: fusions})
+	if got, ok := a.FieldCallPolyLenFusions[104]; !ok || len(got) != 1 || got[0].LenValueID != 103 {
+		t.Fatalf("TableShapeFacts.SetFieldCallPolyLenFusions did not update compatibility field: got %#v ok=%v", got, ok)
+	}
+}
+
+func TestAnalysisResultTableShapeFactsAdoptsLegacyFields(t *testing.T) {
+	a := &AnalysisResult{
+		FieldPolyShapeFacts:     map[int][]FieldPolyShapeCase{201: {{ShapeID: 21, FieldIdx: 1}}},
+		FieldPolyShapeReceivers: map[int]bool{202: true},
+		FieldPolyShapeCatalog:   map[uint32]FixedShapeTableFact{22: {ShapeID: 22}},
+		FieldCallPolyLenFusions: map[int][]FieldCallPolyLenFusion{203: {{LenValueID: 204, ShapeID: 23}}},
+	}
+
+	shapes := a.TableShapeFacts()
+	if got, ok := shapes.FieldPolyShapeCases(201); !ok || len(got) != 1 || got[0].ShapeID != 21 {
+		t.Fatalf("TableShapeFacts did not adopt legacy FieldPolyShapeFacts: got %#v ok=%v", got, ok)
+	}
+	if !shapes.FieldPolyShapeReceiver(202) {
+		t.Fatalf("TableShapeFacts did not adopt legacy FieldPolyShapeReceivers")
+	}
+	if got, ok := shapes.FieldPolyShapeCatalogFact(22); !ok || got.ShapeID != 22 {
+		t.Fatalf("TableShapeFacts did not adopt legacy FieldPolyShapeCatalog: got %#v ok=%v", got, ok)
+	}
+	if got, ok := shapes.FieldCallPolyLenFusionCases(203); !ok || len(got) != 1 || got[0].LenValueID != 204 {
+		t.Fatalf("TableShapeFacts did not adopt legacy FieldCallPolyLenFusions: got %#v ok=%v", got, ok)
+	}
+}
+
+func TestAnalysisResultTableShapeFactsRebindsAfterLegacyMutation(t *testing.T) {
+	a := NewAnalysisResult()
+	shapes := a.TableShapeFacts()
+
+	a.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{301: {{ShapeID: 31}}}
+	shapes = a.TableShapeFacts()
+	if got, ok := shapes.FieldPolyShapeCases(301); !ok || len(got) != 1 || got[0].ShapeID != 31 {
+		t.Fatalf("TableShapeFacts did not rebind from mutated legacy FieldPolyShapeFacts: got %#v ok=%v", got, ok)
+	}
+
+	shapes.SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{302: {{ShapeID: 32}}})
+	if _, ok := a.FieldPolyShapeFacts[301]; ok {
+		t.Fatalf("TableShapeFacts.SetFieldPolyShapeFacts did not replace legacy compatibility field")
+	}
+	if got, ok := a.FieldPolyShapeFacts[302]; !ok || len(got) != 1 || got[0].ShapeID != 32 {
+		t.Fatalf("TableShapeFacts.SetFieldPolyShapeFacts did not rebind legacy compatibility field: got %#v ok=%v", got, ok)
+	}
+}
+
+func TestAnalysisResultTableShapeFactsPreservesEmptyMapSentinelBehavior(t *testing.T) {
+	a := &AnalysisResult{
+		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{401: {{ShapeID: 41}}},
+	}
+	shapes := a.TableShapeFacts()
+
+	shapes.SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{})
+	if _, ok := shapes.FieldPolyShapeCases(401); ok {
+		t.Fatalf("empty non-nil FieldPolyShapeFacts should not fall back to previous legacy entries")
+	}
+	if len(a.FieldPolyShapeFacts) != 0 {
+		t.Fatalf("empty non-nil FieldPolyShapeFacts should remain bound to legacy field: got %#v", a.FieldPolyShapeFacts)
+	}
+
+	shapes.SetFieldCallPolyLenFusions(map[int][]FieldCallPolyLenFusion{})
+	if got := len(a.FieldCallPolyLenFusions); got != 0 {
+		t.Fatalf("empty non-nil FieldCallPolyLenFusions should remain bound to legacy field: len=%d", got)
+	}
+}
+
 func TestSpecGuardKindSuppressedNilKindsFallsBackToPCs(t *testing.T) {
 	fn := &Function{Analysis: &AnalysisResult{
 		SuppressedSpecGuardPCs: map[int]bool{42: true},

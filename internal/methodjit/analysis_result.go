@@ -95,6 +95,11 @@ type AnalysisResult struct {
 	// constructors, Initialize, and domain mutators.
 	Speculation *SpeculationFacts
 
+	// TableShape groups table/field shape analysis facts. The map fields below
+	// remain for compatibility and are kept pointed at this domain's maps by
+	// constructors, Initialize, and domain mutators.
+	TableShape *TableShapeFacts
+
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
 	// inlined callees and guarded polymorphic call targets.
@@ -461,6 +466,163 @@ func (a *AnalysisResult) bindSpeculationCompatibilityFields() {
 	a.SuppressedSpecGuardKinds = a.Speculation.SuppressedSpecGuardKinds
 }
 
+// TableShapeFacts groups analysis facts produced and consumed by table/field
+// shape passes.
+type TableShapeFacts struct {
+	owner *AnalysisResult
+
+	// FieldPolyShapeFacts records small guarded polymorphic field caches keyed
+	// by OpGetField instruction ID. Each case maps receiver shapeID to the
+	// field index for that static field name.
+	FieldPolyShapeFacts map[int][]FieldPolyShapeCase
+
+	// FieldPolyShapeReceivers records table SSA values known to carry guarded
+	// polymorphic shape facts.
+	FieldPolyShapeReceivers map[int]bool
+
+	// FieldPolyShapeCatalog records the receiver facts behind polymorphic field
+	// caches keyed by shape ID.
+	FieldPolyShapeCatalog map[uint32]FixedShapeTableFact
+
+	// FieldCallPolyLenFusions records same-block guarded field-call/field-len
+	// pairs keyed by OpFieldCallFloor instruction ID.
+	FieldCallPolyLenFusions map[int][]FieldCallPolyLenFusion
+}
+
+func NewTableShapeFacts() *TableShapeFacts {
+	t := &TableShapeFacts{}
+	t.Initialize()
+	return t
+}
+
+func (t *TableShapeFacts) Initialize() {
+	if t.FieldPolyShapeFacts == nil {
+		t.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+	}
+	if t.FieldPolyShapeReceivers == nil {
+		t.FieldPolyShapeReceivers = make(map[int]bool)
+	}
+	if t.FieldPolyShapeCatalog == nil {
+		t.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact)
+	}
+	if t.FieldCallPolyLenFusions == nil {
+		t.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
+	}
+}
+
+func (t *TableShapeFacts) SetFieldPolyShapeFacts(facts map[int][]FieldPolyShapeCase) {
+	t.FieldPolyShapeFacts = facts
+	t.bindOwner()
+}
+
+func (t *TableShapeFacts) FieldPolyShapeCases(id int) ([]FieldPolyShapeCase, bool) {
+	if t == nil || t.FieldPolyShapeFacts == nil {
+		return nil, false
+	}
+	cases, ok := t.FieldPolyShapeFacts[id]
+	return cases, ok
+}
+
+func (t *TableShapeFacts) SetFieldPolyShapeReceivers(facts map[int]bool) {
+	t.FieldPolyShapeReceivers = facts
+	t.bindOwner()
+}
+
+func (t *TableShapeFacts) RecordFieldPolyShapeReceiver(id int) {
+	if t == nil {
+		return
+	}
+	if t.FieldPolyShapeReceivers == nil {
+		t.FieldPolyShapeReceivers = make(map[int]bool)
+	}
+	t.FieldPolyShapeReceivers[id] = true
+	t.bindOwner()
+}
+
+func (t *TableShapeFacts) FieldPolyShapeReceiver(id int) bool {
+	return t != nil && t.FieldPolyShapeReceivers != nil && t.FieldPolyShapeReceivers[id]
+}
+
+func (t *TableShapeFacts) SetFieldPolyShapeCatalog(facts map[uint32]FixedShapeTableFact) {
+	t.FieldPolyShapeCatalog = facts
+	t.bindOwner()
+}
+
+func (t *TableShapeFacts) FieldPolyShapeCatalogFact(shapeID uint32) (FixedShapeTableFact, bool) {
+	if t == nil || t.FieldPolyShapeCatalog == nil {
+		return FixedShapeTableFact{}, false
+	}
+	fact, ok := t.FieldPolyShapeCatalog[shapeID]
+	return fact, ok
+}
+
+func (t *TableShapeFacts) SetFieldCallPolyLenFusions(facts map[int][]FieldCallPolyLenFusion) {
+	t.FieldCallPolyLenFusions = facts
+	t.bindOwner()
+}
+
+func (t *TableShapeFacts) FieldCallPolyLenFusionCases(id int) ([]FieldCallPolyLenFusion, bool) {
+	if t == nil || t.FieldCallPolyLenFusions == nil {
+		return nil, false
+	}
+	fusions, ok := t.FieldCallPolyLenFusions[id]
+	return fusions, ok
+}
+
+func (t *TableShapeFacts) bindOwner() {
+	if t != nil && t.owner != nil {
+		t.owner.bindTableShapeCompatibilityFields()
+	}
+}
+
+func (a *AnalysisResult) TableShapeFacts() *TableShapeFacts {
+	if a == nil {
+		return nil
+	}
+	if a.TableShape == nil {
+		a.TableShape = &TableShapeFacts{
+			FieldPolyShapeFacts:     a.FieldPolyShapeFacts,
+			FieldPolyShapeReceivers: a.FieldPolyShapeReceivers,
+			FieldPolyShapeCatalog:   a.FieldPolyShapeCatalog,
+			FieldCallPolyLenFusions: a.FieldCallPolyLenFusions,
+		}
+	} else {
+		if a.FieldPolyShapeFacts != nil || a.TableShape.FieldPolyShapeFacts == nil {
+			a.TableShape.FieldPolyShapeFacts = a.FieldPolyShapeFacts
+		}
+		if a.FieldPolyShapeReceivers != nil || a.TableShape.FieldPolyShapeReceivers == nil {
+			a.TableShape.FieldPolyShapeReceivers = a.FieldPolyShapeReceivers
+		}
+		if a.FieldPolyShapeCatalog != nil || a.TableShape.FieldPolyShapeCatalog == nil {
+			a.TableShape.FieldPolyShapeCatalog = a.FieldPolyShapeCatalog
+		}
+		if a.FieldCallPolyLenFusions != nil || a.TableShape.FieldCallPolyLenFusions == nil {
+			a.TableShape.FieldCallPolyLenFusions = a.FieldCallPolyLenFusions
+		}
+	}
+	a.TableShape.owner = a
+	a.bindTableShapeCompatibilityFields()
+	return a.TableShape
+}
+
+func (a *AnalysisResult) initializeTableShapeFacts() {
+	if a == nil {
+		return
+	}
+	a.TableShapeFacts().Initialize()
+	a.bindTableShapeCompatibilityFields()
+}
+
+func (a *AnalysisResult) bindTableShapeCompatibilityFields() {
+	if a == nil || a.TableShape == nil {
+		return
+	}
+	a.FieldPolyShapeFacts = a.TableShape.FieldPolyShapeFacts
+	a.FieldPolyShapeReceivers = a.TableShape.FieldPolyShapeReceivers
+	a.FieldPolyShapeCatalog = a.TableShape.FieldPolyShapeCatalog
+	a.FieldCallPolyLenFusions = a.TableShape.FieldCallPolyLenFusions
+}
+
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	a := &AnalysisResult{
@@ -479,12 +641,9 @@ func NewAnalysisResult() *AnalysisResult {
 		RecordArrayLoopKernels:    make(map[int]RecordArrayLoopKernelSpec),
 		Call:                      NewCallFacts(),
 		Speculation:               NewSpeculationFacts(),
+		TableShape:                NewTableShapeFacts(),
 
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
-		FieldPolyShapeFacts:      make(map[int][]FieldPolyShapeCase),
-		FieldPolyShapeReceivers:  make(map[int]bool),
-		FieldPolyShapeCatalog:    make(map[uint32]FixedShapeTableFact),
-		FieldCallPolyLenFusions:  make(map[int][]FieldCallPolyLenFusion),
 		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),
 		FixedTableConstructors:   make(map[int]FixedTableConstructorFact),
 		FixedRecordNewTableSites: make(map[int]bool),
@@ -494,6 +653,7 @@ func NewAnalysisResult() *AnalysisResult {
 	}
 	a.bindCallCompatibilityFields()
 	a.bindSpeculationCompatibilityFields()
+	a.bindTableShapeCompatibilityFields()
 	return a
 }
 
@@ -543,18 +703,7 @@ func (a *AnalysisResult) Initialize() {
 	if a.FixedShapeTables == nil {
 		a.FixedShapeTables = make(map[int]FixedShapeTableFact)
 	}
-	if a.FieldPolyShapeFacts == nil {
-		a.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
-	}
-	if a.FieldPolyShapeReceivers == nil {
-		a.FieldPolyShapeReceivers = make(map[int]bool)
-	}
-	if a.FieldPolyShapeCatalog == nil {
-		a.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact)
-	}
-	if a.FieldCallPolyLenFusions == nil {
-		a.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
-	}
+	a.initializeTableShapeFacts()
 	if a.FixedShapeArgFacts == nil {
 		a.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
 	}
