@@ -54,21 +54,36 @@ func TestSortedSpecDependencyProtosDropsSelfAndOrdersByName(t *testing.T) {
 	b := &vm.FuncProto{Name: "b"}
 	c := &vm.FuncProto{Name: "c"}
 	fn := &Function{
-		Proto: self,
-		Analysis: &AnalysisResult{
-			SpecDependencyProtos: map[*vm.FuncProto]bool{
-				b:    true,
-				self: true,
-				a:    true,
-			},
-			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-				10: {{VMProto: c}},
-			},
-		},
+		Proto:    self,
+		Analysis: NewAnalysisResult(),
+	}
+	fn.Analysis.SpeculationFacts().SetSpecDependencyProtos(map[*vm.FuncProto]bool{
+		b:    true,
+		self: true,
+		a:    true,
+	})
+	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+		10: {{VMProto: c}},
 	}
 
 	got := sortedSpecDependencyProtos(fn)
 	if len(got) != 3 || got[0] != a || got[1] != b || got[2] != c {
 		t.Fatalf("dependencies=%v, want [a b c] without self", got)
+	}
+}
+
+func TestSortedSpecDependencyProtosAdoptsLegacyDependencies(t *testing.T) {
+	self := &vm.FuncProto{Name: "self"}
+	callee := &vm.FuncProto{Name: "callee"}
+	fn := &Function{
+		Proto: self,
+		Analysis: &AnalysisResult{
+			SpecDependencyProtos: map[*vm.FuncProto]bool{callee: true},
+		},
+	}
+
+	got := sortedSpecDependencyProtos(fn)
+	if len(got) != 1 || got[0] != callee {
+		t.Fatalf("dependencies=%v, want [callee]", got)
 	}
 }

@@ -688,23 +688,10 @@ func fieldShapeCalleeABISummary(fn *Function, instr *Instr) string {
 }
 
 func specGuardKindSuppressed(fn *Function, pc int, kind string) bool {
-	if fn == nil {
+	if fn == nil || fn.Analysis == nil {
 		return false
 	}
-	if fn.Analysis != nil && fn.Analysis.SuppressedSpecGuardKinds != nil {
-		if global := fn.Analysis.SuppressedSpecGuardKinds[tier2GlobalGuardSuppressPC]; len(global) > 0 && (global[kind] || global["*"]) {
-			return true
-		}
-		if pc < 0 {
-			return false
-		}
-		kinds := fn.Analysis.SuppressedSpecGuardKinds[pc]
-		return kinds[kind] || kinds["*"]
-	}
-	if pc < 0 {
-		return false
-	}
-	return fn.Analysis != nil && fn.Analysis.SuppressedSpecGuardPCs != nil && fn.Analysis.SuppressedSpecGuardPCs[pc]
+	return fn.Analysis.SpeculationFacts().SpecGuardKindSuppressed(pc, kind)
 }
 
 func callABIHasExactResultShape(fn *Function, instr *Instr, wantRets int) bool {

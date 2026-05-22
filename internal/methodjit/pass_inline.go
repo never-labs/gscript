@@ -391,13 +391,10 @@ func irHasOp(fn *Function, op Op) bool {
 }
 
 func recordTier2SpecDependency(fn *Function, callee *vm.FuncProto) {
-	if fn == nil || callee == nil || callee == fn.Proto {
+	if fn == nil || fn.Analysis == nil || callee == nil || callee == fn.Proto {
 		return
 	}
-	if fn.Analysis.SpecDependencyProtos == nil {
-		fn.Analysis.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
-	}
-	fn.Analysis.SpecDependencyProtos[callee] = true
+	fn.Analysis.SpeculationFacts().RecordSpecDependencyProto(fn.Proto, callee)
 }
 
 func inlineFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool) {

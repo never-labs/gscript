@@ -90,6 +90,11 @@ type AnalysisResult struct {
 	// constructors, Initialize, and domain mutators.
 	Call *CallFacts
 
+	// Speculation groups Tier 2 speculation facts. The map fields below remain
+	// for compatibility and are kept pointed at this domain's maps by
+	// constructors, Initialize, and domain mutators.
+	Speculation *SpeculationFacts
+
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
 	// inlined callees and guarded polymorphic call targets.
@@ -332,6 +337,130 @@ func (a *AnalysisResult) bindCallCompatibilityFields() {
 	a.WholeCallNoResultBatches = a.Call.WholeCallNoResultBatches
 }
 
+// SpeculationFacts groups analysis facts produced and consumed by Tier 2
+// speculation and guard-specialization paths.
+type SpeculationFacts struct {
+	owner *AnalysisResult
+
+	// SpecDependencyProtos records other protos whose runtime feedback or native
+	// entry publication can change this function's optimized shape. It covers
+	// inlined callees and guarded polymorphic call targets.
+	SpecDependencyProtos map[*vm.FuncProto]bool
+
+	// SuppressedSpecGuardPCs records bytecode PCs whose runtime guards have
+	// already failed for this proto version.
+	SuppressedSpecGuardPCs map[int]bool
+
+	// SuppressedSpecGuardKinds is the guard-kind-scoped form of
+	// SuppressedSpecGuardPCs. Nil is a sentinel meaning kind information is
+	// unavailable and consumers must fall back to SuppressedSpecGuardPCs.
+	SuppressedSpecGuardKinds map[int]map[string]bool
+}
+
+func NewSpeculationFacts() *SpeculationFacts {
+	s := &SpeculationFacts{}
+	s.Initialize()
+	return s
+}
+
+func (s *SpeculationFacts) Initialize() {
+	if s.SpecDependencyProtos == nil {
+		s.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
+	}
+	if s.SuppressedSpecGuardPCs == nil {
+		s.SuppressedSpecGuardPCs = make(map[int]bool)
+	}
+}
+
+func (s *SpeculationFacts) SetSpecDependencyProtos(facts map[*vm.FuncProto]bool) {
+	s.SpecDependencyProtos = facts
+	s.bindOwner()
+}
+
+func (s *SpeculationFacts) RecordSpecDependencyProto(owner *vm.FuncProto, callee *vm.FuncProto) {
+	if s == nil || callee == nil || callee == owner {
+		return
+	}
+	if s.SpecDependencyProtos == nil {
+		s.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
+	}
+	s.SpecDependencyProtos[callee] = true
+	s.bindOwner()
+}
+
+func (s *SpeculationFacts) SetSuppressedSpecGuardPCs(facts map[int]bool) {
+	s.SuppressedSpecGuardPCs = facts
+	s.bindOwner()
+}
+
+func (s *SpeculationFacts) SetSuppressedSpecGuardKinds(facts map[int]map[string]bool) {
+	s.SuppressedSpecGuardKinds = facts
+	s.bindOwner()
+}
+
+func (s *SpeculationFacts) SpecGuardKindSuppressed(pc int, kind string) bool {
+	if s == nil {
+		return false
+	}
+	if s.SuppressedSpecGuardKinds != nil {
+		if global := s.SuppressedSpecGuardKinds[tier2GlobalGuardSuppressPC]; len(global) > 0 && (global[kind] || global["*"]) {
+			return true
+		}
+		if pc < 0 {
+			return false
+		}
+		kinds := s.SuppressedSpecGuardKinds[pc]
+		return kinds[kind] || kinds["*"]
+	}
+	if pc < 0 {
+		return false
+	}
+	return s.SuppressedSpecGuardPCs != nil && s.SuppressedSpecGuardPCs[pc]
+}
+
+func (s *SpeculationFacts) bindOwner() {
+	if s != nil && s.owner != nil {
+		s.owner.bindSpeculationCompatibilityFields()
+	}
+}
+
+func (a *AnalysisResult) SpeculationFacts() *SpeculationFacts {
+	if a == nil {
+		return nil
+	}
+	if a.Speculation == nil {
+		a.Speculation = &SpeculationFacts{
+			SpecDependencyProtos:     a.SpecDependencyProtos,
+			SuppressedSpecGuardPCs:   a.SuppressedSpecGuardPCs,
+			SuppressedSpecGuardKinds: a.SuppressedSpecGuardKinds,
+		}
+	} else {
+		a.Speculation.SpecDependencyProtos = a.SpecDependencyProtos
+		a.Speculation.SuppressedSpecGuardPCs = a.SuppressedSpecGuardPCs
+		a.Speculation.SuppressedSpecGuardKinds = a.SuppressedSpecGuardKinds
+	}
+	a.Speculation.owner = a
+	a.bindSpeculationCompatibilityFields()
+	return a.Speculation
+}
+
+func (a *AnalysisResult) initializeSpeculationFacts() {
+	if a == nil {
+		return
+	}
+	a.SpeculationFacts().Initialize()
+	a.bindSpeculationCompatibilityFields()
+}
+
+func (a *AnalysisResult) bindSpeculationCompatibilityFields() {
+	if a == nil || a.Speculation == nil {
+		return
+	}
+	a.SpecDependencyProtos = a.Speculation.SpecDependencyProtos
+	a.SuppressedSpecGuardPCs = a.Speculation.SuppressedSpecGuardPCs
+	a.SuppressedSpecGuardKinds = a.Speculation.SuppressedSpecGuardKinds
+}
+
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	a := &AnalysisResult{
@@ -349,8 +478,7 @@ func NewAnalysisResult() *AnalysisResult {
 		TableArrayDataPtrs:        make(map[int]TableArrayDataPtrFact),
 		RecordArrayLoopKernels:    make(map[int]RecordArrayLoopKernelSpec),
 		Call:                      NewCallFacts(),
-		SpecDependencyProtos:      make(map[*vm.FuncProto]bool),
-		SuppressedSpecGuardPCs:    make(map[int]bool),
+		Speculation:               NewSpeculationFacts(),
 
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
 		FieldPolyShapeFacts:      make(map[int][]FieldPolyShapeCase),
@@ -365,6 +493,7 @@ func NewAnalysisResult() *AnalysisResult {
 		GlobalArrayElementFacts:  make(map[string]FixedShapeTableFact),
 	}
 	a.bindCallCompatibilityFields()
+	a.bindSpeculationCompatibilityFields()
 	return a
 }
 
@@ -410,12 +539,7 @@ func (a *AnalysisResult) Initialize() {
 		a.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
 	}
 	a.initializeCallFacts()
-	if a.SpecDependencyProtos == nil {
-		a.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
-	}
-	if a.SuppressedSpecGuardPCs == nil {
-		a.SuppressedSpecGuardPCs = make(map[int]bool)
-	}
+	a.initializeSpeculationFacts()
 	if a.FixedShapeTables == nil {
 		a.FixedShapeTables = make(map[int]FixedShapeTableFact)
 	}

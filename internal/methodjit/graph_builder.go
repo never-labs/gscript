@@ -19,9 +19,9 @@ func BuildGraph(proto *vm.FuncProto) *Function {
 func BuildGraphWithSpeculation(proto *vm.FuncProto, speculation Tier2SpeculationPlan) *Function {
 	b := &graphBuilder{
 		fn: &Function{
-			Proto:                    proto,
-			NumRegs:                  proto.MaxStack,
-			Analysis:                 NewAnalysisResult(),
+			Proto:    proto,
+			NumRegs:  proto.MaxStack,
+			Analysis: NewAnalysisResult(),
 		},
 		proto:           proto,
 		speculation:     speculation,
@@ -30,11 +30,12 @@ func BuildGraphWithSpeculation(proto *vm.FuncProto, speculation Tier2Speculation
 		lastMultiRetReg: -1,
 	}
 	// Initialize suppressed spec guard PCs and kinds from speculation
+	specFacts := b.fn.Analysis.SpeculationFacts()
 	if speculation.SuppressedGuardPCs() != nil {
-		b.fn.Analysis.SuppressedSpecGuardPCs = speculation.SuppressedGuardPCs()
+		specFacts.SetSuppressedSpecGuardPCs(speculation.SuppressedGuardPCs())
 	}
 	if speculation.SuppressedGuardKinds() != nil {
-		b.fn.Analysis.SuppressedSpecGuardKinds = speculation.SuppressedGuardKinds()
+		specFacts.SetSuppressedSpecGuardKinds(speculation.SuppressedGuardKinds())
 	}
 	b.build()
 	return b.fn

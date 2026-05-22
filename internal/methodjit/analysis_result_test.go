@@ -96,6 +96,69 @@ func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	}
 }
 
+func TestAnalysisResultSpeculationFactsBindsCompatibilityFields(t *testing.T) {
+	a := NewAnalysisResult()
+	spec := a.SpeculationFacts()
+	callee := &vm.FuncProto{Name: "callee"}
+
+	spec.SetSpecDependencyProtos(map[*vm.FuncProto]bool{callee: true})
+	if !a.SpecDependencyProtos[callee] {
+		t.Fatalf("SpeculationFacts.SetSpecDependencyProtos did not update compatibility field")
+	}
+
+	spec.SetSuppressedSpecGuardPCs(map[int]bool{31: true})
+	if !a.SuppressedSpecGuardPCs[31] {
+		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardPCs did not update compatibility field")
+	}
+
+	spec.SetSuppressedSpecGuardKinds(map[int]map[string]bool{
+		32: {"GuardType": true},
+	})
+	if !a.SuppressedSpecGuardKinds[32]["GuardType"] {
+		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardKinds did not update compatibility field")
+	}
+}
+
+func TestAnalysisResultSpeculationFactsAdoptsLegacyFields(t *testing.T) {
+	callee := &vm.FuncProto{Name: "callee"}
+	a := &AnalysisResult{
+		SpecDependencyProtos:     map[*vm.FuncProto]bool{callee: true},
+		SuppressedSpecGuardPCs:   map[int]bool{41: true},
+		SuppressedSpecGuardKinds: map[int]map[string]bool{42: {"GuardCalleeProto": true}},
+	}
+
+	spec := a.SpeculationFacts()
+	if !spec.SpecDependencyProtos[callee] {
+		t.Fatalf("SpeculationFacts did not adopt legacy SpecDependencyProtos")
+	}
+	if !spec.SuppressedSpecGuardPCs[41] {
+		t.Fatalf("SpeculationFacts did not adopt legacy SuppressedSpecGuardPCs")
+	}
+	if !spec.SuppressedSpecGuardKinds[42]["GuardCalleeProto"] {
+		t.Fatalf("SpeculationFacts did not adopt legacy SuppressedSpecGuardKinds")
+	}
+}
+
+func TestAnalysisResultSpeculationFactsPreservesSuppressedKindsNilSentinel(t *testing.T) {
+	a := NewAnalysisResult()
+	spec := a.SpeculationFacts()
+
+	if spec.SuppressedSpecGuardKinds != nil || a.SuppressedSpecGuardKinds != nil {
+		t.Fatalf("NewAnalysisResult initialized SuppressedSpecGuardKinds nil sentinel")
+	}
+
+	spec.SetSuppressedSpecGuardKinds(map[int]map[string]bool{})
+	if specGuardKindSuppressed(&Function{Analysis: a}, 51, "GuardType") {
+		t.Fatalf("empty non-nil SuppressedSpecGuardKinds should not fall back to SuppressedSpecGuardPCs")
+	}
+
+	a.SuppressedSpecGuardPCs = map[int]bool{51: true}
+	a.SuppressedSpecGuardKinds = nil
+	if !specGuardKindSuppressed(&Function{Analysis: a}, 51, "GuardType") {
+		t.Fatalf("legacy nil SuppressedSpecGuardKinds sentinel should restore PC fallback")
+	}
+}
+
 func TestSpecGuardKindSuppressedNilKindsFallsBackToPCs(t *testing.T) {
 	fn := &Function{Analysis: &AnalysisResult{
 		SuppressedSpecGuardPCs: map[int]bool{42: true},

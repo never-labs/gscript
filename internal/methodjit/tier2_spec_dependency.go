@@ -38,11 +38,12 @@ func specDependencyIDs(protos []*vm.FuncProto) []string {
 }
 
 func sortedSpecDependencyProtos(fn *Function) []*vm.FuncProto {
-	if fn == nil {
+	if fn == nil || fn.Analysis == nil {
 		return nil
 	}
-	deps := make(map[*vm.FuncProto]bool, len(fn.Analysis.SpecDependencyProtos))
-	for proto := range fn.Analysis.SpecDependencyProtos {
+	spec := fn.Analysis.SpeculationFacts()
+	deps := make(map[*vm.FuncProto]bool, len(spec.SpecDependencyProtos))
+	for proto := range spec.SpecDependencyProtos {
 		recordSpecDependencyProto(fn, deps, proto)
 	}
 	for _, cases := range fn.Analysis.FieldPolyShapeFacts {
