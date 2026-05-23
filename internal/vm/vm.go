@@ -4280,7 +4280,23 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 				}
 			} else {
-				if gf := fnVal.GoFunction(); gf != nil && gf.FastArg2Ret2 != nil {
+				if gf := fnVal.GoFunction(); gf != nil && gf.FastArg1Ret2 != nil {
+					runtime.RecordRuntimePathNativeCallFastFor(gf)
+					r0, r1, n, err := gf.FastArg1Ret2(vm.regs[base+a+1])
+					if err != nil {
+						return nil, err
+					}
+					for i := 0; i < c; i++ {
+						switch {
+						case i == 0 && n > 0:
+							vm.regs[base+a+3+i] = r0
+						case i == 1 && n > 1:
+							vm.regs[base+a+3+i] = r1
+						default:
+							vm.regs[base+a+3+i] = runtime.NilValue()
+						}
+					}
+				} else if gf := fnVal.GoFunction(); gf != nil && gf.FastArg2Ret2 != nil {
 					runtime.RecordRuntimePathNativeCallFastFor(gf)
 					r0, r1, n, err := gf.FastArg2Ret2(vm.regs[base+a+1], vm.regs[base+a+2])
 					if err != nil {

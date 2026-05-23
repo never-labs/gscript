@@ -37,6 +37,10 @@ func callGoFunctionFast(gf *runtime.GoFunction, regs []runtime.Value, absSlot, n
 			return v, true, err
 		}
 	case 1:
+		if gf.FastArg1Ret2 != nil && absSlot+1 >= 0 && absSlot+1 < len(regs) {
+			v, _, _, err := gf.FastArg1Ret2(regs[absSlot+1])
+			return v, true, err
+		}
 		if gf.FastArg1 != nil && absSlot+1 >= 0 && absSlot+1 < len(regs) {
 			v, err := gf.FastArg1(regs[absSlot+1])
 			return v, true, err

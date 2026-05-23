@@ -295,7 +295,7 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 	if len(args) > 3 {
 		a3 = args[3]
 	}
-	fixedArgFastPath := (len(args) == 1 && gf.FastArg1 != nil) ||
+	fixedArgFastPath := (len(args) == 1 && (gf.FastArg1Ret2 != nil || gf.FastArg1 != nil)) ||
 		(len(args) == 2 && (gf.FastArg2Ret2 != nil || gf.FastArg2 != nil)) ||
 		(len(args) == 3 && gf.FastArg3 != nil) ||
 		(len(args) == 4 && gf.FastArg4 != nil)
@@ -307,7 +307,22 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 	}
 	var results []runtime.Value
 	var err error
-	if len(args) == 2 && gf.FastArg2Ret2 != nil {
+	if len(args) == 1 && gf.FastArg1Ret2 != nil {
+		runtime.RecordRuntimePathNativeCallFastFor(gf)
+		var r0, r1 runtime.Value
+		var n int
+		r0, r1, n, err = gf.FastArg1Ret2(a0)
+		if err == nil {
+			switch {
+			case n <= 0:
+				results = nil
+			case n == 1:
+				results = []runtime.Value{r0}
+			default:
+				results = []runtime.Value{r0, r1}
+			}
+		}
+	} else if len(args) == 2 && gf.FastArg2Ret2 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var r0, r1 runtime.Value
 		var n int

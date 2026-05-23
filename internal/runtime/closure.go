@@ -64,6 +64,9 @@ type GoFunction struct {
 	FastArg2 func(a, b Value) (Value, error)
 	FastArg3 func(a, b, c Value) (Value, error)
 	FastArg4 func(a, b, c, d Value) (Value, error)
+	// FastArg1Ret2 is a fixed-arity native fast path for common host calls
+	// that return either one value or a value plus nil/error.
+	FastArg1Ret2 func(a Value) (Value, Value, int, error)
 	// FastArg2Ret2 is a fixed-arity native fast path for iterator-style
 	// functions that return zero to two values without allocating result slices.
 	FastArg2Ret2 func(a, b Value) (Value, Value, int, error)

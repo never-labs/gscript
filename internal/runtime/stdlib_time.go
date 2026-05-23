@@ -131,6 +131,20 @@ func buildTimeLib() *Table {
 			FastArg1: fast,
 		}))
 	}
+	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "time." + name,
+			Fn:       fn,
+			FastArg2: fast,
+		}))
+	}
+	setFastArg2Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, Value, int, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:         "time." + name,
+			Fn:           fn,
+			FastArg2Ret2: fast,
+		}))
+	}
 
 	// Constants
 	t.RawSet(StringValue("SECOND"), FloatValue(1.0))
@@ -179,31 +193,48 @@ func buildTimeLib() *Table {
 	})
 
 	// time.format(t, layout) -> string
-	set("format", func(args []Value) ([]Value, error) {
+	timeFormat := func(tval, layoutVal Value) (Value, error) {
+		goTime, err := tableToGoTime(tval)
+		if err != nil {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'time.format': %v", err)
+		}
+		layout := strftimeToGo(layoutVal.Str())
+		return StringValue(goTime.Format(layout)), nil
+	}
+	setFastArg2("format", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'time.format'")
 		}
-		goTime, err := tableToGoTime(args[0])
+		v, err := timeFormat(args[0], args[1])
 		if err != nil {
-			return nil, fmt.Errorf("bad argument #1 to 'time.format': %v", err)
+			return nil, err
 		}
-		layout := strftimeToGo(args[1].Str())
-		return []Value{StringValue(goTime.Format(layout))}, nil
-	})
+		return []Value{v}, nil
+	}, timeFormat)
 
 	// time.parse(str, layout) -> time table, nil | nil, errMsg
-	set("parse", func(args []Value) ([]Value, error) {
+	timeParse := func(strVal, layoutVal Value) (Value, Value, int, error) {
+		str := strVal.Str()
+		layout := strftimeToGo(layoutVal.Str())
+		goTime, err := time.Parse(layout, str)
+		if err != nil {
+			return NilValue(), StringValue(err.Error()), 2, nil
+		}
+		return TableValue(goTimeToTable(goTime)), NilValue(), 2, nil
+	}
+	setFastArg2Ret2("parse", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'time.parse'")
 		}
-		str := args[0].Str()
-		layout := strftimeToGo(args[1].Str())
-		goTime, err := time.Parse(layout, str)
+		r0, r1, n, err := timeParse(args[0], args[1])
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return nil, err
 		}
-		return []Value{TableValue(goTimeToTable(goTime)), NilValue()}, nil
-	})
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, timeParse)
 
 	// time.diff(t1, t2) -> float seconds (t2 - t1)
 	set("diff", func(args []Value) ([]Value, error) {

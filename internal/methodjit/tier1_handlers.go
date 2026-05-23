@@ -586,6 +586,20 @@ slowPath:
 				}
 			}
 		}
+		if nArgs == 1 && gf.FastArg1Ret2 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			idx := absSlot + 1
+			arg := runtime.NilValue()
+			if idx < len(regs) {
+				arg = regs[idx]
+			}
+			r0, r1, n, err := gf.FastArg1Ret2(arg)
+			if err != nil {
+				return err
+			}
+			e.storeCallResult2(absSlot, rawC, r0, r1, n)
+			return nil
+		}
 		if nArgs == 2 && gf.FastArg2Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)
 			idx0 := absSlot + 1

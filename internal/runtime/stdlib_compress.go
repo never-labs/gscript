@@ -7,7 +7,28 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
+	"sync"
 )
+
+var (
+	stdlibGzipWriterPools    [10]sync.Pool
+	stdlibZlibWriterPools    [10]sync.Pool
+	stdlibDeflateWriterPools [10]sync.Pool
+)
+
+func normalizeCompressLevel(level, def int) int {
+	if level < 1 || level > 9 {
+		return def
+	}
+	return level
+}
+
+func compressLevelIndex(level int) (int, bool) {
+	if level < 1 || level > 9 {
+		return 0, false
+	}
+	return level, true
+}
 
 // buildCompressLib creates the "compress" standard library table.
 // Provides gzip, zlib, and deflate compression/decompression.
@@ -15,10 +36,18 @@ import (
 func buildCompressLib() *Table {
 	t := NewTable()
 
-	set := func(name string, fn func([]Value) ([]Value, error)) {
+	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
-			Name: "compress." + name,
-			Fn:   fn,
+			Name:     "compress." + name,
+			Fn:       fn,
+			FastArg2: fast,
+		}))
+	}
+	setFastArg1Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, Value, int, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:         "compress." + name,
+			Fn:           fn,
+			FastArg1Ret2: fast,
 		}))
 	}
 
@@ -28,144 +57,249 @@ func buildCompressLib() *Table {
 
 	// compress.gzipEncode(str [, level]) -> compressed string
 	// level: 1-9 (1=fastest, 9=best compression), default=6
-	set("gzipEncode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'compress.gzipEncode' (string expected)")
+	gzipEncode := func(dataVal, levelVal Value) (Value, error) {
+		if !dataVal.IsString() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'compress.gzipEncode' (string expected)")
 		}
-		data := []byte(args[0].Str())
 		level := gzip.DefaultCompression
-		if len(args) >= 2 && args[1].IsNumber() {
-			level = int(toInt(args[1]))
-			if level < 1 || level > 9 {
-				level = gzip.DefaultCompression
+		if levelVal.IsNumber() {
+			level = normalizeCompressLevel(int(toInt(levelVal)), gzip.DefaultCompression)
+		}
+		var buf bytes.Buffer
+		var w *gzip.Writer
+		poolIdx, poolOK := compressLevelIndex(level)
+		if idx, ok := compressLevelIndex(level); ok {
+			if cached := stdlibGzipWriterPools[idx].Get(); cached != nil {
+				w = cached.(*gzip.Writer)
+				w.Reset(&buf)
 			}
 		}
-
-		var buf bytes.Buffer
-		w, err := gzip.NewWriterLevel(&buf, level)
-		if err != nil {
-			return nil, fmt.Errorf("compress.gzipEncode: %v", err)
+		if w == nil {
+			var err error
+			w, err = gzip.NewWriterLevel(&buf, level)
+			if err != nil {
+				return NilValue(), fmt.Errorf("compress.gzipEncode: %v", err)
+			}
 		}
-		if _, err := w.Write(data); err != nil {
-			return nil, fmt.Errorf("compress.gzipEncode: %v", err)
+		if _, err := w.Write([]byte(dataVal.Str())); err != nil {
+			return NilValue(), fmt.Errorf("compress.gzipEncode: %v", err)
 		}
 		if err := w.Close(); err != nil {
-			return nil, fmt.Errorf("compress.gzipEncode: %v", err)
+			return NilValue(), fmt.Errorf("compress.gzipEncode: %v", err)
 		}
-		return []Value{StringValue(buf.String())}, nil
-	})
+		out := StringValue(buf.String())
+		if poolOK {
+			w.Reset(io.Discard)
+			stdlibGzipWriterPools[poolIdx].Put(w)
+		}
+		return out, nil
+	}
+	setFastArg2("gzipEncode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'compress.gzipEncode' (string expected)")
+		}
+		level := NilValue()
+		if len(args) >= 2 {
+			level = args[1]
+		}
+		v, err := gzipEncode(args[0], level)
+		return []Value{v}, err
+	}, gzipEncode)
 
 	// compress.gzipDecode(str) -> decompressed string, or nil, error
-	set("gzipDecode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'compress.gzipDecode' (string expected)")
+	gzipDecode := func(arg Value) (Value, Value, int, error) {
+		if !arg.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.gzipDecode' (string expected)")
 		}
-		r, err := gzip.NewReader(bytes.NewReader([]byte(args[0].Str())))
+		r, err := gzip.NewReader(bytes.NewReader([]byte(arg.Str())))
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
 		defer r.Close()
 		decoded, err := io.ReadAll(r)
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return []Value{StringValue(string(decoded))}, nil
-	})
+		return StringValue(string(decoded)), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("gzipDecode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'compress.gzipDecode' (string expected)")
+		}
+		r0, r1, n, err := gzipDecode(args[0])
+		if err != nil {
+			return nil, err
+		}
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, gzipDecode)
 
 	// ---------------------------------------------------------------
 	// Zlib
 	// ---------------------------------------------------------------
 
 	// compress.zlibEncode(str [, level]) -> compressed string
-	set("zlibEncode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'compress.zlibEncode' (string expected)")
+	zlibEncode := func(dataVal, levelVal Value) (Value, error) {
+		if !dataVal.IsString() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'compress.zlibEncode' (string expected)")
 		}
-		data := []byte(args[0].Str())
 		level := zlib.DefaultCompression
-		if len(args) >= 2 && args[1].IsNumber() {
-			level = int(toInt(args[1]))
-			if level < 1 || level > 9 {
-				level = zlib.DefaultCompression
+		if levelVal.IsNumber() {
+			level = normalizeCompressLevel(int(toInt(levelVal)), zlib.DefaultCompression)
+		}
+		var buf bytes.Buffer
+		var w *zlib.Writer
+		poolIdx, poolOK := compressLevelIndex(level)
+		if idx, ok := compressLevelIndex(level); ok {
+			if cached := stdlibZlibWriterPools[idx].Get(); cached != nil {
+				w = cached.(*zlib.Writer)
+				w.Reset(&buf)
 			}
 		}
-
-		var buf bytes.Buffer
-		w, err := zlib.NewWriterLevel(&buf, level)
-		if err != nil {
-			return nil, fmt.Errorf("compress.zlibEncode: %v", err)
+		if w == nil {
+			var err error
+			w, err = zlib.NewWriterLevel(&buf, level)
+			if err != nil {
+				return NilValue(), fmt.Errorf("compress.zlibEncode: %v", err)
+			}
 		}
-		if _, err := w.Write(data); err != nil {
-			return nil, fmt.Errorf("compress.zlibEncode: %v", err)
+		if _, err := w.Write([]byte(dataVal.Str())); err != nil {
+			return NilValue(), fmt.Errorf("compress.zlibEncode: %v", err)
 		}
 		if err := w.Close(); err != nil {
-			return nil, fmt.Errorf("compress.zlibEncode: %v", err)
+			return NilValue(), fmt.Errorf("compress.zlibEncode: %v", err)
 		}
-		return []Value{StringValue(buf.String())}, nil
-	})
+		out := StringValue(buf.String())
+		if poolOK {
+			w.Reset(io.Discard)
+			stdlibZlibWriterPools[poolIdx].Put(w)
+		}
+		return out, nil
+	}
+	setFastArg2("zlibEncode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'compress.zlibEncode' (string expected)")
+		}
+		level := NilValue()
+		if len(args) >= 2 {
+			level = args[1]
+		}
+		v, err := zlibEncode(args[0], level)
+		return []Value{v}, err
+	}, zlibEncode)
 
 	// compress.zlibDecode(str) -> decompressed string, or nil, error
-	set("zlibDecode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'compress.zlibDecode' (string expected)")
+	zlibDecode := func(arg Value) (Value, Value, int, error) {
+		if !arg.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.zlibDecode' (string expected)")
 		}
-		r, err := zlib.NewReader(bytes.NewReader([]byte(args[0].Str())))
+		r, err := zlib.NewReader(bytes.NewReader([]byte(arg.Str())))
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
 		defer r.Close()
 		decoded, err := io.ReadAll(r)
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return []Value{StringValue(string(decoded))}, nil
-	})
+		return StringValue(string(decoded)), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("zlibDecode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'compress.zlibDecode' (string expected)")
+		}
+		r0, r1, n, err := zlibDecode(args[0])
+		if err != nil {
+			return nil, err
+		}
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, zlibDecode)
 
 	// ---------------------------------------------------------------
 	// Deflate (raw, no header)
 	// ---------------------------------------------------------------
 
 	// compress.deflateEncode(str [, level]) -> compressed string
-	set("deflateEncode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'compress.deflateEncode' (string expected)")
+	deflateEncode := func(dataVal, levelVal Value) (Value, error) {
+		if !dataVal.IsString() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'compress.deflateEncode' (string expected)")
 		}
-		data := []byte(args[0].Str())
 		level := flate.DefaultCompression
-		if len(args) >= 2 && args[1].IsNumber() {
-			level = int(toInt(args[1]))
-			if level < 1 || level > 9 {
-				level = flate.DefaultCompression
+		if levelVal.IsNumber() {
+			level = normalizeCompressLevel(int(toInt(levelVal)), flate.DefaultCompression)
+		}
+		var buf bytes.Buffer
+		var w *flate.Writer
+		poolIdx, poolOK := compressLevelIndex(level)
+		if idx, ok := compressLevelIndex(level); ok {
+			if cached := stdlibDeflateWriterPools[idx].Get(); cached != nil {
+				w = cached.(*flate.Writer)
+				w.Reset(&buf)
 			}
 		}
-
-		var buf bytes.Buffer
-		w, err := flate.NewWriter(&buf, level)
-		if err != nil {
-			return nil, fmt.Errorf("compress.deflateEncode: %v", err)
+		if w == nil {
+			var err error
+			w, err = flate.NewWriter(&buf, level)
+			if err != nil {
+				return NilValue(), fmt.Errorf("compress.deflateEncode: %v", err)
+			}
 		}
-		if _, err := w.Write(data); err != nil {
-			return nil, fmt.Errorf("compress.deflateEncode: %v", err)
+		if _, err := w.Write([]byte(dataVal.Str())); err != nil {
+			return NilValue(), fmt.Errorf("compress.deflateEncode: %v", err)
 		}
 		if err := w.Close(); err != nil {
-			return nil, fmt.Errorf("compress.deflateEncode: %v", err)
+			return NilValue(), fmt.Errorf("compress.deflateEncode: %v", err)
 		}
-		return []Value{StringValue(buf.String())}, nil
-	})
+		out := StringValue(buf.String())
+		if poolOK {
+			w.Reset(io.Discard)
+			stdlibDeflateWriterPools[poolIdx].Put(w)
+		}
+		return out, nil
+	}
+	setFastArg2("deflateEncode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'compress.deflateEncode' (string expected)")
+		}
+		level := NilValue()
+		if len(args) >= 2 {
+			level = args[1]
+		}
+		v, err := deflateEncode(args[0], level)
+		return []Value{v}, err
+	}, deflateEncode)
 
 	// compress.deflateDecode(str) -> decompressed string, or nil, error
-	set("deflateDecode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'compress.deflateDecode' (string expected)")
+	deflateDecode := func(arg Value) (Value, Value, int, error) {
+		if !arg.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.deflateDecode' (string expected)")
 		}
-		r := flate.NewReader(bytes.NewReader([]byte(args[0].Str())))
+		r := flate.NewReader(bytes.NewReader([]byte(arg.Str())))
 		defer r.Close()
 		decoded, err := io.ReadAll(r)
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return []Value{StringValue(string(decoded))}, nil
-	})
+		return StringValue(string(decoded)), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("deflateDecode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'compress.deflateDecode' (string expected)")
+		}
+		r0, r1, n, err := deflateDecode(args[0])
+		if err != nil {
+			return nil, err
+		}
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, deflateDecode)
 
 	return t
 }

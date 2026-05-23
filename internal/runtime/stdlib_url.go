@@ -15,6 +15,27 @@ func buildURLLib() *Table {
 			Fn:   fn,
 		}))
 	}
+	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "url." + name,
+			Fn:       fn,
+			FastArg1: fast,
+		}))
+	}
+	setFastArg1Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, Value, int, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:         "url." + name,
+			Fn:           fn,
+			FastArg1Ret2: fast,
+		}))
+	}
+	setFastArg2Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, Value, int, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:         "url." + name,
+			Fn:           fn,
+			FastArg2Ret2: fast,
+		}))
+	}
 
 	// url.parse(str) -- parse URL string -> table
 	set("parse", func(args []Value) ([]Value, error) {
@@ -100,24 +121,44 @@ func buildURLLib() *Table {
 	})
 
 	// url.encode(str) -- percent-encode a string
-	set("encode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
+	urlEncode := func(arg Value) (Value, error) {
+		if !arg.IsString() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'url.encode' (string expected)")
+		}
+		return StringValue(url.QueryEscape(arg.Str())), nil
+	}
+	setFastArg1("encode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'url.encode' (string expected)")
 		}
-		return []Value{StringValue(url.QueryEscape(args[0].Str()))}, nil
-	})
+		v, err := urlEncode(args[0])
+		return []Value{v}, err
+	}, urlEncode)
 
 	// url.decode(str) -- percent-decode a string
-	set("decode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
+	urlDecode := func(arg Value) (Value, Value, int, error) {
+		if !arg.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'url.decode' (string expected)")
+		}
+		decoded, err := url.QueryUnescape(arg.Str())
+		if err != nil {
+			return NilValue(), StringValue(err.Error()), 2, nil
+		}
+		return StringValue(decoded), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("decode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'url.decode' (string expected)")
 		}
-		decoded, err := url.QueryUnescape(args[0].Str())
+		r0, r1, n, err := urlDecode(args[0])
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return nil, err
 		}
-		return []Value{StringValue(decoded)}, nil
-	})
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, urlDecode)
 
 	// url.queryEncode(t) -- encode table as URL query string: "a=1&b=2"
 	set("queryEncode", func(args []Value) ([]Value, error) {
@@ -153,20 +194,33 @@ func buildURLLib() *Table {
 	})
 
 	// url.join(base, ref) -- resolve ref relative to base URL
-	set("join", func(args []Value) ([]Value, error) {
-		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
+	urlJoin := func(baseVal, refVal Value) (Value, Value, int, error) {
+		if !baseVal.IsString() || !refVal.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument to 'url.join' (string expected)")
+		}
+		base, err := url.Parse(baseVal.Str())
+		if err != nil {
+			return NilValue(), StringValue(err.Error()), 2, nil
+		}
+		ref, err := url.Parse(refVal.Str())
+		if err != nil {
+			return NilValue(), StringValue(err.Error()), 2, nil
+		}
+		return StringValue(base.ResolveReference(ref).String()), NilValue(), 1, nil
+	}
+	setFastArg2Ret2("join", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'url.join' (string expected)")
 		}
-		base, err := url.Parse(args[0].Str())
+		r0, r1, n, err := urlJoin(args[0], args[1])
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return nil, err
 		}
-		ref, err := url.Parse(args[1].Str())
-		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+		if n == 1 {
+			return []Value{r0}, nil
 		}
-		return []Value{StringValue(base.ResolveReference(ref).String())}, nil
-	})
+		return []Value{r0, r1}, nil
+	}, urlJoin)
 
 	// url.isValid(str) -- bool
 	set("isValid", func(args []Value) ([]Value, error) {
