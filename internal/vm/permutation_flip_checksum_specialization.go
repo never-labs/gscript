@@ -35,10 +35,6 @@ func (vm *VM) runPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args 
 	return true, []runtime.Value{runtime.FreshTableValue(result)}, nil
 }
 
-func IsPermutationFlipChecksumSpecializationProto(p *FuncProto) bool {
-	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationPermutationFlipChecksum)
-}
-
 func isPermutationFlipChecksumSpecializationProto(p *FuncProto) bool {
 	_, ok := permutationFlipChecksumSpecializationSpecForProto(p)
 	return ok

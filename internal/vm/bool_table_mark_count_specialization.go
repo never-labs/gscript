@@ -74,10 +74,6 @@ func (spec *boolTableMarkCountSpecializationSpec) run(n int) int64 {
 	return count
 }
 
-func IsBoolTableMarkCountSpecializationProto(p *FuncProto) bool {
-	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationBoolTableMarkCount)
-}
-
 func isBoolTableMarkCountProto(p *FuncProto) bool {
 	_, ok := boolTableMarkCountSpecializationSpecForProto(p)
 	return ok
