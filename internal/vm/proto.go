@@ -36,7 +36,6 @@ type FuncProto struct {
 	RuntimeSpecialization                 *runtimeSpecializationProtoCache            // guarded runtime specialization recognizer cache, nil until first probe
 	CallSiteNoResultRuntime               *runtimeSpecializationProtoCache            // guarded no-result call-site runtime specialization cache, nil until first probe
 	PermutationFlipChecksumSpecialization *permutationFlipChecksumSpecializationCache // guarded runtime-generated permutation checksum specialization cache
-	IntGridAggregateSpecialization        *intGridAggregateSpecializationCache        // guarded runtime-generated integer grid aggregate specialization cache
 	MatrixMultiplySpecialization          *matrixMultiplySpecializationCache          // guarded runtime-generated matrix multiply specialization cache
 	DenseMatrixMultiplyTBSpecialization   *denseMatrixMultiplyTBSpecializationCache   // guarded runtime-generated dense transposed matrix multiply specialization cache
 	SpectralRuntimeSpecialization         *spectralRuntimeSpecializationCache         // guarded runtime-generated spectral call-site runtime specialization cache

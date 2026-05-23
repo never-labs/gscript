@@ -7,7 +7,6 @@ const (
 	runtimeSpecializationLazyRecursiveTableBuilder
 	runtimeSpecializationLazyRecursiveTableFold
 	runtimeSpecializationPermutationFlipChecksum
-	runtimeSpecializationIntGridAggregate
 	runtimeSpecializationMatrixMultiply
 	runtimeSpecializationRecordWalkFold
 	runtimeSpecializationBoolTableMarkCount
@@ -122,19 +121,6 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isPermutationFlipChecksumSpecializationProto,
 		},
 		Run: (*VM).runPermutationFlipChecksumRuntimeSpecialization,
-	},
-	runtimeSpecializationIntGridAggregate: {
-		RuntimeSpecialization: RuntimeSpecialization{
-			Info: RuntimeSpecializationInfo{
-				Name:          "int_grid_aggregate",
-				Route:         RuntimeSpecializationRouteCallSiteValue,
-				Arity:         2,
-				Results:       runtimeSpecializationCallSiteSingleResultCount,
-				TieringPolicy: runtimeSpecializationTieringStructural,
-			},
-			Recognize: isIntGridAggregateProto,
-		},
-		Run: (*VM).runIntGridAggregateRuntimeSpecialization,
 	},
 	runtimeSpecializationMatrixMultiply: {
 		RuntimeSpecialization: RuntimeSpecialization{
