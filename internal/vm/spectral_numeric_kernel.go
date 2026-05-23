@@ -14,6 +14,16 @@ const (
 	spectralAtv
 )
 
+type spectralWholeCallKind uint8
+
+const (
+	spectralWholeCallInvalid spectralWholeCallKind = iota
+	spectralWholeCallAv
+	spectralWholeCallAtv
+	spectralWholeCallAtAv
+	spectralWholeCallDenseAtAv
+)
+
 // maxSpectralCoefficientFloats caps the combined A and A^T coefficient cache.
 // The spectral whole-call kernel is dominated by repeated coefficient division
 // when the cache is disabled; a 64 MiB budget keeps the hot benchmark sizes on
@@ -26,11 +36,17 @@ type spectralKernelCache struct {
 	at []float64
 }
 
+type spectralWholeCallKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *spectralWholeCallKernelSpec
+}
+
+type spectralWholeCallKernelSpec struct {
+	kind spectralWholeCallKind
+}
+
 func (vm *VM) tryRunSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
-	if cl == nil || cl.Proto == nil ||
-		!(hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelCoefficientMatrixVector) ||
-			hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelCoefficientMatrixTransposeVector) ||
-			hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelCoefficientMatrixAtAVector)) {
+	if cl == nil || cl.Proto == nil {
 		return false, nil
 	}
 	return vm.runSpectralWholeCallKernel(cl, args)
@@ -41,8 +57,12 @@ func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 		return false, nil
 	}
 	proto := cl.Proto
-	switch classifySpectralMultiplyProto(proto) {
-	case spectralAv:
+	spec, ok := spectralWholeCallKernelSpecForProto(proto)
+	if !ok {
+		return false, nil
+	}
+	switch spec.kind {
+	case spectralWholeCallAv:
 		if len(args) != 3 {
 			return false, nil
 		}
@@ -53,7 +73,7 @@ func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 			return false, nil
 		}
 		return true, nil
-	case spectralAtv:
+	case spectralWholeCallAtv:
 		if len(args) != 3 {
 			return false, nil
 		}
@@ -64,23 +84,24 @@ func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 			return false, nil
 		}
 		return true, nil
-	default:
-		if len(args) == 4 && isDenseSpectralAtAvProto(proto) && vm.guardDenseSpectralAtAvCallees(proto) {
-			if !vm.runDenseSpectralAtAv(args) {
-				return false, nil
-			}
-			return true, nil
-		}
-		if len(args) != 3 {
+	case spectralWholeCallDenseAtAv:
+		if len(args) != 4 || !vm.guardDenseSpectralAtAvCallees(proto) {
 			return false, nil
 		}
-		if !isSpectralAtAvProto(proto) || !vm.guardSpectralAtAvCallees(proto) {
+		if !vm.runDenseSpectralAtAv(args) {
+			return false, nil
+		}
+		return true, nil
+	case spectralWholeCallAtAv:
+		if len(args) != 3 || !vm.guardSpectralAtAvCallees(proto) {
 			return false, nil
 		}
 		if !vm.runSpectralAtAv(args) {
 			return false, nil
 		}
 		return true, nil
+	default:
+		return false, nil
 	}
 }
 
@@ -467,6 +488,50 @@ func classifyDenseSpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
 	return spectralNotMultiply
 }
 
+func isSpectralAvProto(p *FuncProto) bool {
+	spec, ok := spectralWholeCallKernelSpecForProto(p)
+	return ok && spec.kind == spectralWholeCallAv
+}
+
+func isSpectralAtvProto(p *FuncProto) bool {
+	spec, ok := spectralWholeCallKernelSpecForProto(p)
+	return ok && spec.kind == spectralWholeCallAtv
+}
+
+func spectralWholeCallKernelSpecForProto(p *FuncProto) (*spectralWholeCallKernelSpec, bool) {
+	if p == nil {
+		return nil, false
+	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.SpectralWholeCallKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzeSpectralWholeCallKernelSpec(p)
+	if !ok {
+		p.SpectralWholeCallKernel = &spectralWholeCallKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.SpectralWholeCallKernel = &spectralWholeCallKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzeSpectralWholeCallKernelSpec(p *FuncProto) (*spectralWholeCallKernelSpec, bool) {
+	switch classifySpectralMultiplyBytecode(p) {
+	case spectralAv:
+		return &spectralWholeCallKernelSpec{kind: spectralWholeCallAv}, true
+	case spectralAtv:
+		return &spectralWholeCallKernelSpec{kind: spectralWholeCallAtv}, true
+	}
+	if isSpectralAtAvBytecode(p) {
+		return &spectralWholeCallKernelSpec{kind: spectralWholeCallAtAv}, true
+	}
+	if isDenseSpectralAtAvBytecode(p) {
+		return &spectralWholeCallKernelSpec{kind: spectralWholeCallDenseAtAv}, true
+	}
+	return nil, false
+}
+
 func isSpectralAProto(p *FuncProto) bool {
 	if p == nil || p.NumParams != 2 || p.IsVarArg || len(p.Constants) < 1 || !numberConst(p.Constants[0], 1.0) {
 		return false
@@ -489,6 +554,11 @@ func isSpectralAProto(p *FuncProto) bool {
 }
 
 func isDenseSpectralAtAvProto(p *FuncProto) bool {
+	spec, ok := spectralWholeCallKernelSpecForProto(p)
+	return ok && spec.kind == spectralWholeCallDenseAtAv
+}
+
+func isDenseSpectralAtAvBytecode(p *FuncProto) bool {
 	if p == nil || p.NumParams != 4 || p.IsVarArg || len(p.Constants) != 5 ||
 		!p.Constants[0].IsString() ||
 		!p.Constants[1].IsString() ||
@@ -531,6 +601,21 @@ func valueStringConst(v runtime.Value, want string) bool {
 }
 
 func classifySpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
+	spec, ok := spectralWholeCallKernelSpecForProto(p)
+	if !ok {
+		return spectralNotMultiply
+	}
+	switch spec.kind {
+	case spectralWholeCallAv:
+		return spectralAv
+	case spectralWholeCallAtv:
+		return spectralAtv
+	default:
+		return spectralNotMultiply
+	}
+}
+
+func classifySpectralMultiplyBytecode(p *FuncProto) spectralMultiplyKind {
 	if p == nil || p.NumParams != 3 || p.IsVarArg || len(p.Constants) < 2 ||
 		len(p.Code) != 28 || !numberConst(p.Constants[0], 0.0) || !p.Constants[1].IsString() {
 		return spectralNotMultiply
@@ -579,6 +664,11 @@ func classifySpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
 }
 
 func isSpectralAtAvProto(p *FuncProto) bool {
+	spec, ok := spectralWholeCallKernelSpecForProto(p)
+	return ok && spec.kind == spectralWholeCallAtAv
+}
+
+func isSpectralAtAvBytecode(p *FuncProto) bool {
 	if p == nil || p.NumParams != 3 || p.IsVarArg || len(p.Constants) < 3 ||
 		!numberConst(p.Constants[0], 0.0) || !p.Constants[1].IsString() || !p.Constants[2].IsString() {
 		return false

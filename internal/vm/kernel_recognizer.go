@@ -105,10 +105,6 @@ const (
 
 const (
 	wholeCallKernelPermutationFlipChecksum = iota
-	wholeCallKernelCoefficientMatrixVector
-	wholeCallKernelCoefficientMatrixTransposeVector
-	wholeCallKernelCoefficientMatrixAtAVector
-	wholeCallKernelDenseCoefficientMatrixAtAVector
 	wholeCallKernelCount
 )
 
@@ -153,50 +149,6 @@ var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecogni
 		},
 		recognize: isPermutationFlipChecksumKernelProto,
 		runValue:  (*VM).runPermutationFlipChecksumWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "coefficient_matrix_vector",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         3,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   func(p *FuncProto) bool { return classifySpectralMultiplyProto(p) == spectralAv },
-		runNoResult: (*VM).runSpectralWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "coefficient_matrix_transpose_vector",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         3,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   func(p *FuncProto) bool { return classifySpectralMultiplyProto(p) == spectralAtv },
-		runNoResult: (*VM).runSpectralWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "coefficient_matrix_ata_vector",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         3,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   isSpectralAtAvProto,
-		runNoResult: (*VM).runSpectralWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "dense_coefficient_matrix_ata_vector",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         4,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   isDenseSpectralAtAvProto,
-		runNoResult: (*VM).runSpectralWholeCallKernel,
 	},
 }
 

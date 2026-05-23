@@ -17,6 +17,10 @@ const (
 	wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric = iota
 	wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort
 	wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed
+	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector
+	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector
+	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector
+	wholeCallNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector
 	wholeCallNoResultRuntimeSpecializationCount
 )
 
@@ -198,6 +202,58 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			Recognize: isDenseMatrixMultiplyTransposedProto,
 		},
 		Run: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
+	},
+	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "coefficient_matrix_vector",
+				Route:         KernelRouteWholeCallNoResult,
+				Arity:         3,
+				Results:       kernelWholeCallInPlaceResultCount,
+				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+			},
+			Recognize: isSpectralAvProto,
+		},
+		Run: (*VM).runSpectralWholeCallKernel,
+	},
+	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "coefficient_matrix_transpose_vector",
+				Route:         KernelRouteWholeCallNoResult,
+				Arity:         3,
+				Results:       kernelWholeCallInPlaceResultCount,
+				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+			},
+			Recognize: isSpectralAtvProto,
+		},
+		Run: (*VM).runSpectralWholeCallKernel,
+	},
+	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "coefficient_matrix_ata_vector",
+				Route:         KernelRouteWholeCallNoResult,
+				Arity:         3,
+				Results:       kernelWholeCallInPlaceResultCount,
+				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+			},
+			Recognize: isSpectralAtAvProto,
+		},
+		Run: (*VM).runSpectralWholeCallKernel,
+	},
+	wholeCallNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "dense_coefficient_matrix_ata_vector",
+				Route:         KernelRouteWholeCallNoResult,
+				Arity:         4,
+				Results:       kernelWholeCallInPlaceResultCount,
+				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+			},
+			Recognize: isDenseSpectralAtAvProto,
+		},
+		Run: (*VM).runSpectralWholeCallKernel,
 	},
 }
 
