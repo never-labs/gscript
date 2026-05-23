@@ -78,7 +78,7 @@ func TestIntGridAggregateRuntimeSpecializationRecordsHit(t *testing.T) {
 	if !handled || len(results) != 1 || !results[0].IsInt() {
 		t.Fatalf("handled=%v results=%v, want one int result", handled, results)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "int_grid_aggregate"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "int_grid_aggregate"); got != 1 {
 		t.Fatalf("int_grid_aggregate structural hit count = %d, want 1", got)
 	}
 }

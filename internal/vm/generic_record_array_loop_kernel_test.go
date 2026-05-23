@@ -68,7 +68,7 @@ drive(128)
 result := rows[1].x
 `)
 	expectGlobalFloat(t, globals, "result", 129)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteDriverLoop, "generic_record_array_loop"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteDriverLoop, "generic_record_array_loop"); got != 1 {
 		t.Fatalf("generic_record_array_loop structural hit count = %d, want 1", got)
 	}
 }

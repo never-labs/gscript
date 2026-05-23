@@ -77,7 +77,7 @@ func sieve(n) {
 result := sieve(100)
 `)
 	expectGlobalInt(t, globals, "result", 25)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "bool_table_strike_count"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "bool_table_strike_count"); got != 1 {
 		t.Fatalf("bool_table_strike_count structural hit count = %d, want 1", got)
 	}
 }

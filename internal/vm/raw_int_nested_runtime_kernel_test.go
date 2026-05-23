@@ -77,7 +77,7 @@ func TestRawIntNestedRuntimeSpecializationRecordsHit(t *testing.T) {
 result := nestwave(2, 6)
 `)
 	expectGlobalInt(t, globals, "result", 764)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "nested_int_recurrence"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "nested_int_recurrence"); got != 1 {
 		t.Fatalf("nested_int_recurrence structural hit count = %d, want 1", got)
 	}
 }
@@ -117,13 +117,13 @@ func TestRawIntNestedRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *test
 	if len(results) != 1 || !results[0].IsInt() || results[0].Int() != 41 {
 		t.Fatalf("fallback result = %+v, want 41", results)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "nested_int_recurrence"); got != 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "nested_int_recurrence"); got != 0 {
 		t.Fatalf("nested_int_recurrence structural hit count = %d, want 0", got)
 	}
 }
 
-func runtimeStructuralKernelHitCount(stats *runtime.RuntimePathStats, route RuntimeSpecializationRoute, name string) uint64 {
-	for _, entry := range stats.Snapshot().StructuralKernel.PerKernel {
+func runtimeRuntimeSpecializationHitCount(stats *runtime.RuntimePathStats, route RuntimeSpecializationRoute, name string) uint64 {
+	for _, entry := range stats.Snapshot().RuntimeSpecialization.PerSpecialization {
 		if entry.Route == string(route) && entry.Name == name {
 			return entry.Count
 		}

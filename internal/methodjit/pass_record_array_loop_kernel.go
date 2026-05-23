@@ -10,7 +10,7 @@ type tableFieldUpdatePair struct {
 // RecordArrayLoopKernelPass recognizes fixed-shape table-array loops whose
 // bodies are expressible as float field loads, scalar operands, a small DAG,
 // and field stores. The generated op is parameterized by a runtime-built
-// RecordArrayLoopKernelSpec rather than a benchmark-specific static opcode.
+// RecordArrayLoopKernelSpec rather than a benchmark-specific runtime-generated loop body.
 func RecordArrayLoopKernelPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

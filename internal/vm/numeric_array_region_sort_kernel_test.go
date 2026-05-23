@@ -64,7 +64,7 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationRecordsHits(t *testi
 
 	globals := compileAndRun(t, numericArrayRegionSortSource)
 	expectGlobalBool(t, globals, "sorted", true)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "numeric_array_region_sort"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "numeric_array_region_sort"); got == 0 {
 		t.Fatal("numeric_array_region_sort structural hit count = 0, want at least 1")
 	}
 }

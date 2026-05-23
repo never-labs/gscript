@@ -152,13 +152,13 @@ root := makeTree(4)
 result := checkTree(root)
 `)
 	expectGlobalInt(t, globals, "result", 31)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "lazy_recursive_table_builder"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "lazy_recursive_table_builder"); got != 1 {
 		t.Fatalf("builder structural hit count = %d, want 1", got)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "lazy_recursive_table_fold"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "lazy_recursive_table_fold"); got != 1 {
 		t.Fatalf("fold structural hit count = %d, want 1", got)
 	}
-	if got := stats.Snapshot().StructuralKernel.Total; got != 2 {
+	if got := stats.Snapshot().RuntimeSpecialization.Total; got != 2 {
 		t.Fatalf("total structural hit count = %d, want 2", got)
 	}
 }

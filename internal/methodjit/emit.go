@@ -532,25 +532,25 @@ type CompiledFunction struct {
 	// be allowed.
 	TypedPeerFramePlan Tier2TypedPeerFramePlan
 
-	// RuntimeRecursiveTableFold is a whole-call Tier 2 protocol for pure
+	// RuntimeRecursiveTableFold is a whole-call Tier 2 runtime specialization for pure
 	// recursive table folds recognized from bytecode shape at runtime.
 	RuntimeRecursiveTableFold *runtimeRecursiveTableFoldProtocol
 
-	// RuntimeRecursiveTableBuilder is a whole-call Tier 2 protocol for pure
+	// RuntimeRecursiveTableBuilder is a whole-call Tier 2 runtime specialization for pure
 	// recursive table builders recognized from bytecode shape at runtime.
 	RuntimeRecursiveTableBuilder *runtimeRecursiveTableBuilderProtocol
 
-	// RuntimeRecursiveIntFold is a whole-call Tier 2 protocol for pure integer
+	// RuntimeRecursiveIntFold is a whole-call Tier 2 runtime specialization for pure integer
 	// self-recursive folds recognized from bytecode shape at runtime.
 	RuntimeRecursiveIntFold *runtimeRecursiveIntFoldProtocol
 
-	// MutualRecursiveIntSCC is a whole-call Tier 2 protocol for small pure
+	// MutualRecursiveIntSCC is a whole-call Tier 2 runtime specialization for small pure
 	// integer mutual-recursive SCCs. It memoizes bounded recurrence evaluation
 	// after guarding that all global function closures still match the analyzed
 	// SCC members.
 	MutualRecursiveIntSCC *mutualRecursiveIntSCCProtocol
 
-	// RuntimeRecursiveNestedIntFold is a whole-call Tier 2 protocol for bounded
+	// RuntimeRecursiveNestedIntFold is a whole-call Tier 2 runtime specialization for bounded
 	// nested integer recurrences recognized from bytecode shape at runtime.
 	RuntimeRecursiveNestedIntFold *runtimeRecursiveNestedIntFoldProtocol
 

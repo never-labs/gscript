@@ -899,7 +899,7 @@ func walk(node) {
 		t.Fatalf("expected typed table self ABI candidate, got %s", abi.RejectWhy)
 	}
 	if shouldPromoteTier2(walkProto, p, 2) {
-		t.Error("general typed table self recursion should stay closed without the fixed fold protocol")
+		t.Error("general typed table self recursion should stay closed without the runtime fold protocol")
 	}
 }
 

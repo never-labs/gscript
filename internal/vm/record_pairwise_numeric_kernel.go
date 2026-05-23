@@ -937,7 +937,7 @@ func isRecordPairwiseNumericProtoWithGlobalCount(p *FuncProto) bool {
 }
 
 // HasRecordPairwiseNumericWholeCallRuntimeSpecialization reports whether p matches the guarded
-// record-field pairwise numeric advance(dt) kernel shape. MethodJIT uses this to
+// record-field pairwise numeric advance(dt) runtime-specialization shape. MethodJIT uses this to
 // keep driver loops on the VM route where the whole-call runtime specialization can fire.
 func HasRecordPairwiseNumericWholeCallRuntimeSpecialization(p *FuncProto) bool {
 	return cachedWholeCallNoResultRuntimeSpecializationRecognized(p, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric)
@@ -945,7 +945,7 @@ func HasRecordPairwiseNumericWholeCallRuntimeSpecialization(p *FuncProto) bool {
 
 // HasRecordPairwiseNumericDriverLoopKernel reports whether p contains a structural
 // driver loop that repeatedly calls an pairwise numeric whole-call
-// kernel candidate.
+// runtime-specialization candidate.
 func HasRecordPairwiseNumericDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
 	if p == nil {
 		return false

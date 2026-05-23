@@ -82,7 +82,7 @@ func TestRecordPairwiseDriverLoopRuntimeSpecializationRecordsSingleHit(t *testin
 
 	globals := compileAndRun(t, recordPairwiseDriverLoopSource(t, "1024"))
 	expectGlobalInt(t, globals, "N", 1024)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteDriverLoop, "record_pairwise_numeric_loop"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteDriverLoop, "record_pairwise_numeric_loop"); got != 1 {
 		t.Fatalf("record_pairwise_numeric_loop structural hit count = %d, want 1", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationRecordsSingleHit(t 
 
 	globals := compileAndRun(t, recordPairwiseDriverLoopSource(t, "1"))
 	expectGlobalInt(t, globals, "N", 1)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "record_pairwise_numeric"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "record_pairwise_numeric"); got != 1 {
 		t.Fatalf("record_pairwise_numeric structural hit count = %d, want 1", got)
 	}
 }

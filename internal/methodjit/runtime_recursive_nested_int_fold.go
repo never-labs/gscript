@@ -12,7 +12,7 @@ import (
 const (
 	// Small nested integer recurrences can expand quickly. Keep a generous but
 	// bounded envelope so larger inputs fall back before a speculative
-	// whole-call protocol monopolizes the process.
+	// whole-call runtime-specialization protocol monopolizes the process.
 	maxRuntimeRecursiveNestedIntFoldIterations = 1_000_000
 	maxRuntimeRecursiveNestedIntFoldStack      = 65_536
 )

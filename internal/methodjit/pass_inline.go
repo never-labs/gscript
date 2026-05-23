@@ -211,7 +211,7 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 		}
 		if computeLoopInfo(fn).loopBlocks[block.ID] && inlineCalleeHasWholeCallProtocol(calleeProto, config.Globals) {
 			functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
-				fmt.Sprintf("preserved %s call for whole-call protocol", calleeName))
+				fmt.Sprintf("preserved %s call for whole-call runtime-specialization protocol", calleeName))
 			continue
 		}
 

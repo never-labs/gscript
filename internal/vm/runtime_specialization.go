@@ -317,7 +317,7 @@ func (vm *VM) tryRunWholeCallValueRuntimeSpecialization(cl *Closure, args []runt
 		handled, results, err := entry.Run(vm, cl, args)
 		if handled || err != nil {
 			if handled {
-				runtime.RecordRuntimePathStructuralKernelHit(string(entry.Info.Route), entry.Info.Name)
+				runtime.RecordRuntimePathRuntimeSpecializationHit(string(entry.Info.Route), entry.Info.Name)
 			}
 			return handled, results, err
 		}
@@ -343,7 +343,7 @@ func (vm *VM) tryRunWholeCallNoResultRuntimeSpecialization(cl *Closure, args []r
 		handled, err := entry.Run(vm, cl, args)
 		if handled || err != nil {
 			if handled {
-				runtime.RecordRuntimePathStructuralKernelHit(string(entry.Info.Route), entry.Info.Name)
+				runtime.RecordRuntimePathRuntimeSpecializationHit(string(entry.Info.Route), entry.Info.Name)
 			}
 			return handled, err
 		}
@@ -362,7 +362,7 @@ func (vm *VM) tryRunDriverLoopRuntimeSpecialization(frame *CallFrame, base int, 
 		handled, err := entry.Run(vm, frame, base, code, constants, a, sbx)
 		if handled || err != nil {
 			if handled {
-				runtime.RecordRuntimePathStructuralKernelHit(string(entry.Info.Route), entry.Info.Name)
+				runtime.RecordRuntimePathRuntimeSpecializationHit(string(entry.Info.Route), entry.Info.Name)
 			}
 			return handled, err
 		}

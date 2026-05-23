@@ -87,7 +87,7 @@ rows := build(64)
 result := fold_rows(rows, 64, 5)
 seen1 := rows[1].counters.seen
 `)
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "record_walk_fold"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "record_walk_fold"); got != 1 {
 		t.Fatalf("record_walk_fold structural hit count = %d, want 1", got)
 	}
 	fallbackSrc := strings.Replace(src, `

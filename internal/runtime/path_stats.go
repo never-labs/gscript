@@ -42,7 +42,7 @@ type RuntimePathStats struct {
 	stringConcatLazy     atomic.Uint64
 	stringConcatBuilder  atomic.Uint64
 
-	structuralKernelHit sync.Map
+	runtimeSpecializationHit sync.Map
 
 	// nativeCallByBuiltin attributes native_call fast/fallback events to a
 	// specific *GoFunction. Keys are *GoFunction; values are
@@ -59,13 +59,13 @@ type nativeCallBuiltinCounters struct {
 }
 
 type RuntimePathStatsSnapshot struct {
-	NativeCall       RuntimePathNativeCallStats       `json:"native_call"`
-	Coroutine        RuntimePathCoroutineStats        `json:"coroutine"`
-	TableArray       RuntimePathTableArrayStats       `json:"table_array"`
-	TableString      RuntimePathTableStringStats      `json:"table_string"`
-	StringFormat     RuntimePathStringStats           `json:"string_format"`
-	StringConcat     RuntimePathStringConcatStats     `json:"string_concat"`
-	StructuralKernel RuntimePathStructuralKernelStats `json:"structural_kernel"`
+	NativeCall            RuntimePathNativeCallStats            `json:"native_call"`
+	Coroutine             RuntimePathCoroutineStats             `json:"coroutine"`
+	TableArray            RuntimePathTableArrayStats            `json:"table_array"`
+	TableString           RuntimePathTableStringStats           `json:"table_string"`
+	StringFormat          RuntimePathStringStats                `json:"string_format"`
+	StringConcat          RuntimePathStringConcatStats          `json:"string_concat"`
+	RuntimeSpecialization RuntimePathRuntimeSpecializationStats `json:"runtime_specialization"`
 }
 
 type RuntimePathNativeCallStats struct {
@@ -119,26 +119,26 @@ type RuntimePathStringConcatStats struct {
 	Builder uint64 `json:"builder"`
 }
 
-type RuntimePathStructuralKernelStats struct {
-	Total     uint64                             `json:"total"`
-	PerKernel []RuntimePathStructuralKernelEntry `json:"per_kernel,omitempty"`
+type RuntimePathRuntimeSpecializationStats struct {
+	Total             uint64                                  `json:"total"`
+	PerSpecialization []RuntimePathRuntimeSpecializationEntry `json:"per_specialization,omitempty"`
 }
 
-// RuntimePathStructuralKernelEntry attributes guarded structural-kernel hits.
+// RuntimePathRuntimeSpecializationEntry attributes guarded runtime-specialization hits.
 // Route is a stable VM-level category such as whole_call_value or
 // whole_call_no_result; Name is the structural recognizer name.
-type RuntimePathStructuralKernelEntry struct {
+type RuntimePathRuntimeSpecializationEntry struct {
 	Route string `json:"route"`
 	Name  string `json:"name"`
 	Count uint64 `json:"count"`
 }
 
-type structuralKernelStatsKey struct {
+type runtimeSpecializationStatsKey struct {
 	route string
 	name  string
 }
 
-type structuralKernelCounters struct {
+type runtimeSpecializationCounters struct {
 	count atomic.Uint64
 }
 
@@ -200,7 +200,7 @@ func (s *RuntimePathStats) Snapshot() RuntimePathStatsSnapshot {
 			Lazy:    s.stringConcatLazy.Load(),
 			Builder: s.stringConcatBuilder.Load(),
 		},
-		StructuralKernel: s.snapshotStructuralKernels(),
+		RuntimeSpecialization: s.snapshotRuntimeSpecializations(),
 	}
 }
 
@@ -243,11 +243,11 @@ func (s *RuntimePathStats) WriteText(w io.Writer) {
 	fmt.Fprintln(w, "  string_concat:")
 	fmt.Fprintf(w, "    lazy: %d\n", snap.StringConcat.Lazy)
 	fmt.Fprintf(w, "    builder: %d\n", snap.StringConcat.Builder)
-	fmt.Fprintln(w, "  structural_kernel:")
-	fmt.Fprintf(w, "    total: %d\n", snap.StructuralKernel.Total)
-	if len(snap.StructuralKernel.PerKernel) > 0 {
-		fmt.Fprintln(w, "    per_kernel:")
-		for _, e := range snap.StructuralKernel.PerKernel {
+	fmt.Fprintln(w, "  runtime_specialization:")
+	fmt.Fprintf(w, "    total: %d\n", snap.RuntimeSpecialization.Total)
+	if len(snap.RuntimeSpecialization.PerSpecialization) > 0 {
+		fmt.Fprintln(w, "    per_specialization:")
+		for _, e := range snap.RuntimeSpecialization.PerSpecialization {
 			fmt.Fprintf(w, "      %s/%s: count=%d\n", e.Route, e.Name, e.Count)
 		}
 	}
@@ -478,42 +478,42 @@ func RecordRuntimePathStringConcatBuilder() {
 	}
 }
 
-// RecordRuntimePathStructuralKernelHit attributes a guarded structural-kernel
+// RecordRuntimePathRuntimeSpecializationHit attributes a guarded runtime-specialization
 // execution. It is diagnostic-only; disabled runs pay one atomic pointer load
 // and a nil check.
-func RecordRuntimePathStructuralKernelHit(route, name string) {
+func RecordRuntimePathRuntimeSpecializationHit(route, name string) {
 	s := runtimePathStats.Load()
 	if s == nil || route == "" || name == "" {
 		return
 	}
-	c := s.loadOrCreateStructuralKernel(route, name)
+	c := s.loadOrCreateRuntimeSpecialization(route, name)
 	c.count.Add(1)
 }
 
-func (s *RuntimePathStats) loadOrCreateStructuralKernel(route, name string) *structuralKernelCounters {
-	key := structuralKernelStatsKey{route: route, name: name}
-	if v, ok := s.structuralKernelHit.Load(key); ok {
-		return v.(*structuralKernelCounters)
+func (s *RuntimePathStats) loadOrCreateRuntimeSpecialization(route, name string) *runtimeSpecializationCounters {
+	key := runtimeSpecializationStatsKey{route: route, name: name}
+	if v, ok := s.runtimeSpecializationHit.Load(key); ok {
+		return v.(*runtimeSpecializationCounters)
 	}
-	c := &structuralKernelCounters{}
-	if actual, loaded := s.structuralKernelHit.LoadOrStore(key, c); loaded {
-		return actual.(*structuralKernelCounters)
+	c := &runtimeSpecializationCounters{}
+	if actual, loaded := s.runtimeSpecializationHit.LoadOrStore(key, c); loaded {
+		return actual.(*runtimeSpecializationCounters)
 	}
 	return c
 }
 
-func (s *RuntimePathStats) snapshotStructuralKernels() RuntimePathStructuralKernelStats {
-	var out []RuntimePathStructuralKernelEntry
+func (s *RuntimePathStats) snapshotRuntimeSpecializations() RuntimePathRuntimeSpecializationStats {
+	var out []RuntimePathRuntimeSpecializationEntry
 	var total uint64
-	s.structuralKernelHit.Range(func(k, v any) bool {
-		key, _ := k.(structuralKernelStatsKey)
-		c, _ := v.(*structuralKernelCounters)
+	s.runtimeSpecializationHit.Range(func(k, v any) bool {
+		key, _ := k.(runtimeSpecializationStatsKey)
+		c, _ := v.(*runtimeSpecializationCounters)
 		if c == nil {
 			return true
 		}
 		count := c.count.Load()
 		total += count
-		out = append(out, RuntimePathStructuralKernelEntry{
+		out = append(out, RuntimePathRuntimeSpecializationEntry{
 			Route: key.route,
 			Name:  key.name,
 			Count: count,
@@ -529,5 +529,5 @@ func (s *RuntimePathStats) snapshotStructuralKernels() RuntimePathStructuralKern
 		}
 		return out[i].Name < out[j].Name
 	})
-	return RuntimePathStructuralKernelStats{Total: total, PerKernel: out}
+	return RuntimePathRuntimeSpecializationStats{Total: total, PerSpecialization: out}
 }

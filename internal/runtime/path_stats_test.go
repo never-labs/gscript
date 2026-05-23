@@ -69,7 +69,7 @@ func TestRuntimePathStatsJSONSmoke(t *testing.T) {
 	defer DisableRuntimePathStats()
 
 	RecordRuntimePathNativeCallFast()
-	RecordRuntimePathStructuralKernelHit("whole_call_value", "unit_kernel")
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "unit_kernel")
 	var buf testWriter
 	if err := stats.WriteJSON(&buf); err != nil {
 		t.Fatalf("WriteJSON: %v", err)
@@ -79,28 +79,28 @@ func TestRuntimePathStatsJSONSmoke(t *testing.T) {
 	}
 }
 
-func TestRuntimePathStatsStructuralKernelAttribution(t *testing.T) {
-	RecordRuntimePathStructuralKernelHit("whole_call_value", "disabled")
+func TestRuntimePathStatsRuntimeSpecializationAttribution(t *testing.T) {
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "disabled")
 
 	stats := EnableRuntimePathStats()
 	defer DisableRuntimePathStats()
 
-	RecordRuntimePathStructuralKernelHit("whole_call_value", "alpha")
-	RecordRuntimePathStructuralKernelHit("whole_call_value", "alpha")
-	RecordRuntimePathStructuralKernelHit("whole_call_no_result", "beta")
-	RecordRuntimePathStructuralKernelHit("", "ignored")
-	RecordRuntimePathStructuralKernelHit("whole_call_value", "")
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "alpha")
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "alpha")
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_no_result", "beta")
+	RecordRuntimePathRuntimeSpecializationHit("", "ignored")
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "")
 
 	snap := stats.Snapshot()
-	if snap.StructuralKernel.Total != 3 {
-		t.Fatalf("StructuralKernel.Total = %d, want 3", snap.StructuralKernel.Total)
+	if snap.RuntimeSpecialization.Total != 3 {
+		t.Fatalf("RuntimeSpecialization.Total = %d, want 3", snap.RuntimeSpecialization.Total)
 	}
-	if len(snap.StructuralKernel.PerKernel) != 2 {
-		t.Fatalf("PerKernel length = %d, want 2: %+v", len(snap.StructuralKernel.PerKernel), snap.StructuralKernel.PerKernel)
+	if len(snap.RuntimeSpecialization.PerSpecialization) != 2 {
+		t.Fatalf("PerSpecialization length = %d, want 2: %+v", len(snap.RuntimeSpecialization.PerSpecialization), snap.RuntimeSpecialization.PerSpecialization)
 	}
-	first := snap.StructuralKernel.PerKernel[0]
+	first := snap.RuntimeSpecialization.PerSpecialization[0]
 	if first.Route != "whole_call_value" || first.Name != "alpha" || first.Count != 2 {
-		t.Fatalf("first structural kernel row = %+v, want alpha count 2", first)
+		t.Fatalf("first runtime specialization row = %+v, want alpha count 2", first)
 	}
 
 	var buf testWriter

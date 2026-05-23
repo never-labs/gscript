@@ -50,7 +50,7 @@ func TestWholeCallRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 	}
 	info, ok := recognizedWholeCallRuntimeSpecializationForTiering(fn)
 	if !ok {
-		t.Fatal("nested_int_recurrence should expose a whole-call structural tiering kernel")
+		t.Fatal("nested_int_recurrence should expose a whole-call runtime specialization")
 	}
 	if info.Name != "nested_int_recurrence" {
 		t.Fatalf("whole-call runtime specialization=%q, want nested_int_recurrence", info.Name)

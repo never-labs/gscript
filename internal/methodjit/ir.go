@@ -32,7 +32,7 @@ type LoopTableArrayFact struct {
 }
 
 // ProtocolConstCallFoldFact records a callsite whose callee is a guarded
-// whole-call protocol and whose integer arguments are compile-time constants or
+// whole-call runtime-specialization protocol and whose integer arguments are compile-time constants or
 // guarded stable globals. Codegen guards dependencies before materializing the
 // folded Result; guard miss falls back to the normal call-exit path.
 type ProtocolConstCallFoldFact struct {

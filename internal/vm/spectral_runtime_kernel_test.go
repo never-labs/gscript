@@ -85,7 +85,7 @@ func TestSpectralRuntimeSpecializationRecordsHit(t *testing.T) {
 	if v := globals["result"]; !v.IsNumber() {
 		t.Fatalf("result = %s (%v), want number", v.TypeName(), v)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "coefficient_matrix_ata_vector"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "coefficient_matrix_ata_vector"); got == 0 {
 		t.Fatal("coefficient_matrix_ata_vector structural hit count = 0, want at least 1")
 	}
 }
@@ -101,7 +101,7 @@ func TestDenseSpectralRuntimeSpecializationRecordsHit(t *testing.T) {
 	if v := globals["result"]; !v.IsNumber() {
 		t.Fatalf("result = %s (%v), want number", v.TypeName(), v)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "dense_coefficient_matrix_ata_vector"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "dense_coefficient_matrix_ata_vector"); got == 0 {
 		t.Fatal("dense_coefficient_matrix_ata_vector structural hit count = 0, want at least 1")
 	}
 }

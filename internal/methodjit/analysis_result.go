@@ -130,7 +130,7 @@ type AnalysisResult struct {
 	// is available but currently has no suppressed guards.
 	SuppressedSpecGuardKinds map[int]map[string]bool
 
-	// ProtocolConstCallFolds records guarded whole-call protocol constants
+	// ProtocolConstCallFolds records guarded whole-call runtime-specialization protocol constants
 	// keyed by OpCall instruction ID.
 	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
 
@@ -548,7 +548,7 @@ type CallFacts struct {
 	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
 	CallABIs map[int]CallABIDescriptor
 
-	// ProtocolConstCallFolds records guarded whole-call protocol constants
+	// ProtocolConstCallFolds records guarded whole-call runtime-specialization protocol constants
 	// keyed by OpCall instruction ID.
 	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
 

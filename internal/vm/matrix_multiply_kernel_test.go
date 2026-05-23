@@ -69,7 +69,7 @@ func TestMatrixMultiplyRuntimeSpecializationRecordsHit(t *testing.T) {
 	if v := globals["result"]; !v.IsNumber() {
 		t.Fatalf("result = %s (%v), want number", v.TypeName(), v)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "matrix_multiply"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "matrix_multiply"); got == 0 {
 		t.Fatal("matrix_multiply structural hit count = 0, want at least 1")
 	}
 }
@@ -111,7 +111,7 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationRecordsHit(t *testing
 	if v := globals["c"]; !v.IsTable() {
 		t.Fatalf("c = %s (%v), want table", v.TypeName(), v)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "dense_matrix_multiply_transposed"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "dense_matrix_multiply_transposed"); got != 1 {
 		t.Fatalf("dense_matrix_multiply_transposed structural hit count = %d, want 1", got)
 	}
 }
