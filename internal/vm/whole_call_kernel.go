@@ -21,6 +21,7 @@ func (vm *VM) tryRunValueWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, true); handled || err != nil {
 		return handled, results, err
 	}
+	// Legacy fallback for fixed protocols that have not yet been generalized.
 	return vm.tryRunCachedValueWholeCallKernel(cl, args)
 }
 
@@ -46,6 +47,7 @@ func (vm *VM) tryRunWholeCallKernel(cl *Closure, args []runtime.Value) (bool, er
 	if handled, err := vm.tryRunWholeCallNoResultRuntimeSpecialization(cl, args); handled || err != nil {
 		return handled, err
 	}
+	// Legacy fallback for fixed protocols that have not yet been generalized.
 	return vm.tryRunCachedNoResultWholeCallKernel(cl, args)
 }
 
@@ -71,7 +73,7 @@ func (vm *VM) tryRunCachedValueWholeCallKernel(cl *Closure, args []runtime.Value
 	if recognized == 0 {
 		return false, nil, nil
 	}
-	for i, entry := range wholeCallKernelRegistry {
+	for i, entry := range legacyWholeCallKernelRegistry {
 		if recognized&(uint64(1)<<uint(i)) == 0 || entry.info.Route != KernelRouteWholeCallValue || entry.runValue == nil {
 			continue
 		}
@@ -97,7 +99,7 @@ func (vm *VM) tryRunCachedNoResultWholeCallKernel(cl *Closure, args []runtime.Va
 	if recognized == 0 {
 		return false, nil
 	}
-	for i, entry := range wholeCallKernelRegistry {
+	for i, entry := range legacyWholeCallKernelRegistry {
 		if recognized&(uint64(1)<<uint(i)) == 0 || entry.info.Route != KernelRouteWholeCallNoResult || entry.runNoResult == nil {
 			continue
 		}

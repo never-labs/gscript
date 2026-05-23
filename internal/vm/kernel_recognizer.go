@@ -144,7 +144,10 @@ type wholeCallKernelRecognizer struct {
 	runNoResult wholeCallNoResultKernelRunner
 }
 
-var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
+// legacyWholeCallKernelRegistry contains fixed whole-call protocols that have
+// not yet been lifted into runtime-discovered shape specializations. New
+// whole-call fast paths should not be added here.
+var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	{
 		info: KernelInfo{
 			Name:          "record_walk_fold",
@@ -260,7 +263,7 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 // WholeCallKernelCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.
 func WholeCallKernelCatalog() []KernelInfo {
-	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
+	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry)+len(legacyWholeCallKernelRegistry))
 	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
@@ -273,7 +276,7 @@ func WholeCallKernelCatalog() []KernelInfo {
 		}
 		out = append(out, entry.Info)
 	}
-	for _, entry := range wholeCallKernelRegistry {
+	for _, entry := range legacyWholeCallKernelRegistry {
 		if entry.info.Name == "" {
 			continue
 		}
@@ -318,7 +321,7 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 		}
 	}
 	recognized := recognizedWholeCallKernelBits(p)
-	for i, entry := range wholeCallKernelRegistry {
+	for i, entry := range legacyWholeCallKernelRegistry {
 		if entry.info.Name == "" {
 			continue
 		}
@@ -333,7 +336,7 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 // registered whole-call kernel. It is intended for tests and diagnostics, not
 // hot dispatch.
 func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
+	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry)+len(legacyWholeCallKernelRegistry))
 	runtimeRecognizedBits := recognizedRuntimeSpecializationBits(p)
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
@@ -359,7 +362,7 @@ func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
 		})
 	}
 	recognizedBits := recognizedWholeCallKernelBits(p)
-	for i, entry := range wholeCallKernelRegistry {
+	for i, entry := range legacyWholeCallKernelRegistry {
 		if entry.info.Name == "" {
 			continue
 		}
@@ -380,9 +383,9 @@ func recognizedWholeCallKernelBits(proto *FuncProto) uint64 {
 	return wholeCallKernelCacheForProto(proto).recognized
 }
 
-// cachedWholeCallKernelBits is for OP_CALL hot dispatch. FuncProto bytecode is
-// immutable after compilation, while diagnostics use recognizedWholeCallKernelBits
-// to keep mutation-oriented tests exact.
+// cachedWholeCallKernelBits is for OP_CALL legacy fallback dispatch. FuncProto
+// bytecode is immutable after compilation, while diagnostics use
+// recognizedWholeCallKernelBits to keep mutation-oriented tests exact.
 func cachedWholeCallKernelBits(proto *FuncProto) uint64 {
 	if proto == nil {
 		return 0
@@ -394,14 +397,14 @@ func cachedWholeCallKernelBits(proto *FuncProto) uint64 {
 }
 
 func cachedWholeCallKernelRecognized(proto *FuncProto, id int) bool {
-	if id < 0 || id >= len(wholeCallKernelRegistry) {
+	if id < 0 || id >= len(legacyWholeCallKernelRegistry) {
 		return false
 	}
 	return cachedWholeCallKernelBits(proto)&(uint64(1)<<uint(id)) != 0
 }
 
 func hotWholeCallKernelRecognized(proto *FuncProto, id int) bool {
-	if id < 0 || id >= len(wholeCallKernelRegistry) {
+	if id < 0 || id >= len(legacyWholeCallKernelRegistry) {
 		return false
 	}
 	return cachedWholeCallKernelBits(proto)&(uint64(1)<<uint(id)) != 0
@@ -414,7 +417,7 @@ func wholeCallKernelCacheForProto(proto *FuncProto) *wholeCallKernelProtoCache {
 		return cache
 	}
 	cache = &wholeCallKernelProtoCache{fingerprint: fp}
-	for i, entry := range wholeCallKernelRegistry {
+	for i, entry := range legacyWholeCallKernelRegistry {
 		if entry.info.Name == "" || entry.recognize == nil {
 			continue
 		}
