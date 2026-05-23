@@ -624,8 +624,8 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 		})
 		return nil
 
-	case TieringActionStructuralKernel:
-		tm.disableForStructuralKernelTiering(proto, decision.Kernel)
+	case TieringActionRuntimeSpecialization:
+		tm.disableForRuntimeSpecializationTiering(proto, decision.RuntimeSpecialization)
 		return nil
 
 	case TieringActionFixedTableBuilder:

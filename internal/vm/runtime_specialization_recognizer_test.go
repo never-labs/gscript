@@ -35,8 +35,8 @@ func advance(dt) { return dt }
 			if diag.Recognized {
 				t.Fatalf("metadata-only proto %q/%q recognized by diagnostic %+v", child.Name, child.Source, diag)
 			}
-			if diag.Reason != kernelReasonShapeMismatch {
-				t.Fatalf("metadata-only diagnostic reason = %q, want %q", diag.Reason, kernelReasonShapeMismatch)
+			if diag.Reason != runtimeSpecializationReasonShapeMismatch {
+				t.Fatalf("metadata-only diagnostic reason = %q, want %q", diag.Reason, runtimeSpecializationReasonShapeMismatch)
 			}
 		}
 	}
@@ -64,17 +64,17 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	}
 }
 
-func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
+func TestRuntimeSpecializationTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
-		infos []KernelInfo
+		infos []RuntimeSpecializationInfo
 	}{
 		{name: "nested_int_recurrence", infos: WholeCallRuntimeSpecializationCatalog()},
-		{name: "generic_record_array_loop", infos: DriverLoopKernelCatalog()},
-		{name: "record_pairwise_numeric_loop", infos: DriverLoopKernelCatalog()},
+		{name: "generic_record_array_loop", infos: DriverLoopRuntimeSpecializationCatalog()},
+		{name: "record_pairwise_numeric_loop", infos: DriverLoopRuntimeSpecializationCatalog()},
 	} {
-		info := findKernelInfo(t, tc.infos, tc.name)
-		if !info.HasCapability(KernelCapabilityStructuralTiering) {
+		info := findRuntimeSpecializationInfo(t, tc.infos, tc.name)
+		if !info.HasCapability(RuntimeSpecializationCapabilityStructuralTiering) {
 			t.Fatalf("%s missing structural tiering capability: %+v", tc.name, info)
 		}
 		if !info.AllowsStructuralTiering(&FuncProto{}) {
@@ -82,8 +82,8 @@ func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 		}
 	}
 
-	info := findKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
-	if !info.HasCapability(KernelCapabilityStructuralTiering) {
+	info := findRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
+	if !info.HasCapability(RuntimeSpecializationCapabilityStructuralTiering) {
 		t.Fatalf("record_pairwise_numeric missing structural tiering capability: %+v", info)
 	}
 	if info.AllowsStructuralTiering(&FuncProto{}) {
@@ -94,21 +94,21 @@ func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 	}
 }
 
-func requireKernelInfo(t *testing.T, infos []KernelInfo, name string) {
+func requireRuntimeSpecializationInfo(t *testing.T, infos []RuntimeSpecializationInfo, name string) {
 	t.Helper()
-	if !hasKernelInfo(infos, name) {
+	if !hasRuntimeSpecializationInfo(infos, name) {
 		t.Fatalf("kernel %q not found in %+v", name, infos)
 	}
 }
 
-func rejectKernelInfo(t *testing.T, infos []KernelInfo, name string) {
+func rejectRuntimeSpecializationInfo(t *testing.T, infos []RuntimeSpecializationInfo, name string) {
 	t.Helper()
-	if hasKernelInfo(infos, name) {
+	if hasRuntimeSpecializationInfo(infos, name) {
 		t.Fatalf("kernel %q unexpectedly found in %+v", name, infos)
 	}
 }
 
-func hasKernelInfo(infos []KernelInfo, name string) bool {
+func hasRuntimeSpecializationInfo(infos []RuntimeSpecializationInfo, name string) bool {
 	for _, info := range infos {
 		if info.Name == name {
 			return true
@@ -117,7 +117,7 @@ func hasKernelInfo(infos []KernelInfo, name string) bool {
 	return false
 }
 
-func findKernelInfo(t *testing.T, infos []KernelInfo, name string) KernelInfo {
+func findRuntimeSpecializationInfo(t *testing.T, infos []RuntimeSpecializationInfo, name string) RuntimeSpecializationInfo {
 	t.Helper()
 	for _, info := range infos {
 		if info.Name == name {
@@ -125,16 +125,16 @@ func findKernelInfo(t *testing.T, infos []KernelInfo, name string) KernelInfo {
 		}
 	}
 	t.Fatalf("kernel %q not found in %+v", name, infos)
-	return KernelInfo{}
+	return RuntimeSpecializationInfo{}
 }
 
-func requireKernelDiagnostic(t *testing.T, diagnostics []KernelDiagnostic, name string) KernelDiagnostic {
+func requireRuntimeSpecializationDiagnostic(t *testing.T, diagnostics []RuntimeSpecializationDiagnostic, name string) RuntimeSpecializationDiagnostic {
 	t.Helper()
 	for _, diag := range diagnostics {
-		if diag.Kernel.Name == name {
+		if diag.Specialization.Name == name {
 			return diag
 		}
 	}
 	t.Fatalf("diagnostic for %q not found in %+v", name, diagnostics)
-	return KernelDiagnostic{}
+	return RuntimeSpecializationDiagnostic{}
 }

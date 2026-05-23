@@ -26,16 +26,16 @@ func TestRecordPairwiseDriverLoopRuntimeSpecializationDiagnostics(t *testing.T) 
 	}
 	globals := map[string]*FuncProto{"advance": advance}
 
-	requireKernelInfo(t, DriverLoopKernelCatalog(), "record_pairwise_numeric_loop")
-	requireKernelInfo(t, RecognizedDriverLoopKernels(top, globals), "record_pairwise_numeric_loop")
-	diag := requireKernelDiagnostic(t, DiagnoseDriverLoopKernels(top, globals), "record_pairwise_numeric_loop")
-	if !diag.Recognized || diag.Reason != kernelReasonDriverRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonDriverRecognized)
+	requireRuntimeSpecializationInfo(t, DriverLoopRuntimeSpecializationCatalog(), "record_pairwise_numeric_loop")
+	requireRuntimeSpecializationInfo(t, RecognizedDriverLoopRuntimeSpecializations(top, globals), "record_pairwise_numeric_loop")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseDriverLoopRuntimeSpecializations(top, globals), "record_pairwise_numeric_loop")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonDriverRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonDriverRecognized)
 	}
-	if diag.Kernel.Route != KernelRouteDriverLoop ||
-		diag.Kernel.Arity != kernelUnknownDriverLoopArity ||
-		diag.Kernel.Results != kernelUnknownDriverLoopResultCount {
-		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	if diag.Specialization.Route != RuntimeSpecializationRouteDriverLoop ||
+		diag.Specialization.Arity != runtimeSpecializationUnknownDriverLoopArity ||
+		diag.Specialization.Results != runtimeSpecializationUnknownDriverLoopResultCount {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
 
@@ -46,8 +46,8 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationDiagnostics(t *test
 		t.Fatal("missing advance proto")
 	}
 
-	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
-	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(advance), "record_pairwise_numeric")
+	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
+	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(advance), "record_pairwise_numeric")
 	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(advance, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		t.Fatal("record_pairwise_numeric rejected by no-result runtime specialization cache")
 	}
@@ -55,24 +55,24 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationDiagnostics(t *test
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(advance), "record_pairwise_numeric")
-	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(advance), "record_pairwise_numeric")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Kernel.Route != KernelRouteWholeCallNoResult ||
-		diag.Kernel.Arity != 1 ||
-		diag.Kernel.Results != kernelWholeCallInPlaceResultCount {
-		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallNoResult ||
+		diag.Specialization.Arity != 1 ||
+		diag.Specialization.Results != runtimeSpecializationWholeCallInPlaceResultCount {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
 
 func TestRecordPairwiseDriverLoopRuntimeSpecializationMissingGlobals(t *testing.T) {
 	top := compileProto(t, recordPairwiseDriverLoopSource(t, "1024"))
 
-	rejectKernelInfo(t, RecognizedDriverLoopKernels(top, nil), "record_pairwise_numeric_loop")
-	diag := requireKernelDiagnostic(t, DiagnoseDriverLoopKernels(top, nil), "record_pairwise_numeric_loop")
-	if diag.Recognized || diag.Reason != kernelReasonMissingGlobalProtoMap {
-		t.Fatalf("missing-global diagnostic = %+v, want %q", diag, kernelReasonMissingGlobalProtoMap)
+	rejectRuntimeSpecializationInfo(t, RecognizedDriverLoopRuntimeSpecializations(top, nil), "record_pairwise_numeric_loop")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseDriverLoopRuntimeSpecializations(top, nil), "record_pairwise_numeric_loop")
+	if diag.Recognized || diag.Reason != runtimeSpecializationReasonMissingGlobalProtoMap {
+		t.Fatalf("missing-global diagnostic = %+v, want %q", diag, runtimeSpecializationReasonMissingGlobalProtoMap)
 	}
 }
 
@@ -82,7 +82,7 @@ func TestRecordPairwiseDriverLoopRuntimeSpecializationRecordsSingleHit(t *testin
 
 	globals := compileAndRun(t, recordPairwiseDriverLoopSource(t, "1024"))
 	expectGlobalInt(t, globals, "N", 1024)
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteDriverLoop, "record_pairwise_numeric_loop"); got != 1 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteDriverLoop, "record_pairwise_numeric_loop"); got != 1 {
 		t.Fatalf("record_pairwise_numeric_loop structural hit count = %d, want 1", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationRecordsSingleHit(t 
 
 	globals := compileAndRun(t, recordPairwiseDriverLoopSource(t, "1"))
 	expectGlobalInt(t, globals, "N", 1)
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallNoResult, "record_pairwise_numeric"); got != 1 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "record_pairwise_numeric"); got != 1 {
 		t.Fatalf("record_pairwise_numeric structural hit count = %d, want 1", got)
 	}
 }

@@ -38,8 +38,8 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 		t.Fatal("missing quicksort proto")
 	}
 
-	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "numeric_array_region_sort")
-	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(quicksort), "numeric_array_region_sort")
+	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "numeric_array_region_sort")
+	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(quicksort), "numeric_array_region_sort")
 	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(quicksort, wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort) {
 		t.Fatal("numeric_array_region_sort rejected by no-result runtime specialization cache")
 	}
@@ -47,14 +47,14 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(quicksort), "numeric_array_region_sort")
-	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(quicksort), "numeric_array_region_sort")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Kernel.Route != KernelRouteWholeCallNoResult ||
-		diag.Kernel.Arity != 3 ||
-		diag.Kernel.Results != kernelWholeCallInPlaceResultCount {
-		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallNoResult ||
+		diag.Specialization.Arity != 3 ||
+		diag.Specialization.Results != runtimeSpecializationWholeCallInPlaceResultCount {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
 
@@ -64,7 +64,7 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationRecordsHits(t *testi
 
 	globals := compileAndRun(t, numericArrayRegionSortSource)
 	expectGlobalBool(t, globals, "sorted", true)
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallNoResult, "numeric_array_region_sort"); got == 0 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "numeric_array_region_sort"); got == 0 {
 		t.Fatal("numeric_array_region_sort structural hit count = 0, want at least 1")
 	}
 }

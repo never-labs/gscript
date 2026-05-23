@@ -39,34 +39,34 @@ func forceGate(gate, reason string) GateResult {
 type TieringAction string
 
 const (
-	TieringActionReturnCompiled      TieringAction = "return_compiled"
-	TieringActionStayInterpreted     TieringAction = "stay_interpreted"
-	TieringActionStructuralKernel    TieringAction = "structural_kernel"
-	TieringActionFixedTableBuilder   TieringAction = "fixed_table_builder"
-	TieringActionDisableTier0        TieringAction = "disable_tier0"
-	TieringActionUseTier1            TieringAction = "use_tier1"
-	TieringActionUseTier1Tier2Failed TieringAction = "use_tier1_tier2_failed"
-	TieringActionPromoteTier2        TieringAction = "promote_tier2"
+	TieringActionReturnCompiled        TieringAction = "return_compiled"
+	TieringActionStayInterpreted       TieringAction = "stay_interpreted"
+	TieringActionRuntimeSpecialization TieringAction = "runtime_specialization"
+	TieringActionFixedTableBuilder     TieringAction = "fixed_table_builder"
+	TieringActionDisableTier0          TieringAction = "disable_tier0"
+	TieringActionUseTier1              TieringAction = "use_tier1"
+	TieringActionUseTier1Tier2Failed   TieringAction = "use_tier1_tier2_failed"
+	TieringActionPromoteTier2          TieringAction = "promote_tier2"
 )
 
 type PromotionReason string
 
 const (
-	PromotionReasonCachedCompiled      PromotionReason = "cached_compiled"
-	PromotionReasonBelowTier1Threshold PromotionReason = "below_tier1_threshold"
-	PromotionReasonStructuralKernel    PromotionReason = "structural_kernel"
-	PromotionReasonFixedTableBuilder   PromotionReason = "fixed_table_builder"
-	PromotionReasonTier0Policy         PromotionReason = "tier0_policy"
-	PromotionReasonNotReadyForTier2    PromotionReason = "not_ready_for_tier2"
-	PromotionReasonTier2Failed         PromotionReason = "tier2_failed"
-	PromotionReasonSmartTier2          PromotionReason = "smart_tier2"
-	PromotionReasonNativeLoopDriver    PromotionReason = "native_loop_driver"
-	PromotionReasonRecursivePartition  PromotionReason = "recursive_partition_table_mutation"
-	PromotionReasonLoopCallSuppressed  PromotionReason = "loop_call_suppressed"
-	PromotionReasonFeedbackRefresh     PromotionReason = "feedback_refresh"
-	PromotionReasonTier1OnlyCached     PromotionReason = "tier1_only_cached"
-	PromotionReasonInterpreterRequired PromotionReason = "interpreter_required"
-	PromotionReasonSemanticGate        PromotionReason = "semantic_gate"
+	PromotionReasonCachedCompiled        PromotionReason = "cached_compiled"
+	PromotionReasonBelowTier1Threshold   PromotionReason = "below_tier1_threshold"
+	PromotionReasonRuntimeSpecialization PromotionReason = "runtime_specialization"
+	PromotionReasonFixedTableBuilder     PromotionReason = "fixed_table_builder"
+	PromotionReasonTier0Policy           PromotionReason = "tier0_policy"
+	PromotionReasonNotReadyForTier2      PromotionReason = "not_ready_for_tier2"
+	PromotionReasonTier2Failed           PromotionReason = "tier2_failed"
+	PromotionReasonSmartTier2            PromotionReason = "smart_tier2"
+	PromotionReasonNativeLoopDriver      PromotionReason = "native_loop_driver"
+	PromotionReasonRecursivePartition    PromotionReason = "recursive_partition_table_mutation"
+	PromotionReasonLoopCallSuppressed    PromotionReason = "loop_call_suppressed"
+	PromotionReasonFeedbackRefresh       PromotionReason = "feedback_refresh"
+	PromotionReasonTier1OnlyCached       PromotionReason = "tier1_only_cached"
+	PromotionReasonInterpreterRequired   PromotionReason = "interpreter_required"
+	PromotionReasonSemanticGate          PromotionReason = "semantic_gate"
 )
 
 type PromotionDecision struct {
@@ -74,7 +74,7 @@ type PromotionDecision struct {
 	Reason                       PromotionReason
 	Gate                         GateResult
 	Compiled                     *CompiledFunction
-	Kernel                       tieringKernelDecision
+	RuntimeSpecialization        tieringRuntimeSpecializationDecision
 	Tier0Disable                 tier0DisableDecision
 	SuppressedRecursivePartition bool
 	PromoteTier2                 bool
@@ -102,12 +102,12 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 	if tm.shouldSuppressRecursivePartitionTableMutationTier2(proto, profile) {
 		return tier0PolicyDecision("Tier0RecursivePartitionTableMutation", "stay_tier0_recursive_partition_table_mutation", "recursive_partition_table_mutation")
 	}
-	if d, ok := tm.structuralKernelTieringDecision(proto); ok {
+	if d, ok := tm.runtimeSpecializationTieringDecision(proto); ok {
 		return PromotionDecision{
-			Action: TieringActionStructuralKernel,
-			Reason: PromotionReasonStructuralKernel,
-			Gate:   blockGate("StructuralKernel", d.reason),
-			Kernel: d,
+			Action:                TieringActionRuntimeSpecialization,
+			Reason:                PromotionReasonRuntimeSpecialization,
+			Gate:                  blockGate("RuntimeSpecialization", d.reason),
+			RuntimeSpecialization: d,
 		}
 	}
 	if !state.Tier2Failed && tm.shouldPromoteNativeLoopDriver(proto, profile) {

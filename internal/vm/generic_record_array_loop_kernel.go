@@ -464,7 +464,7 @@ func (vm *VM) runGenericRecordArrayNativeKernelN(table *runtime.Table, array []r
 	}
 	jit.CallJIT(uintptr(cache.native.code.Ptr()), uintptr(unsafe.Pointer(&ctx)))
 	table.MarkArrayMutationForNumericKernel()
-	runtime.RecordRuntimePathStructuralKernelHit(string(KernelRouteDriverLoop), "generic_record_array_native_loop")
+	runtime.RecordRuntimePathStructuralKernelHit(string(RuntimeSpecializationRouteDriverLoop), "generic_record_array_native_loop")
 	return true, nil
 }
 

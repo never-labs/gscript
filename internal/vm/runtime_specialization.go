@@ -40,7 +40,7 @@ type runtimeSpecializationProtoCache struct {
 // specializations. A specialization may still perform runtime dependency
 // checks before handling a call.
 type RuntimeSpecialization struct {
-	Info      KernelInfo
+	Info      RuntimeSpecializationInfo
 	Recognize func(*FuncProto) bool
 }
 
@@ -63,7 +63,7 @@ type driverLoopRuntimeSpecializationRunner func(*VM, *CallFrame, int, []uint32, 
 // DriverLoopRuntimeSpecialization handles OP_FORPREP sites whose admission
 // depends on runtime values in addition to structural bytecode shape.
 type DriverLoopRuntimeSpecialization struct {
-	Info      KernelInfo
+	Info      RuntimeSpecializationInfo
 	Recognize func(*FuncProto, map[string]*FuncProto) bool
 	Run       driverLoopRuntimeSpecializationRunner
 }
@@ -71,12 +71,12 @@ type DriverLoopRuntimeSpecialization struct {
 var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]WholeCallValueSpecialization{
 	runtimeSpecializationRawIntNested: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "nested_int_recurrence",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         2,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: IsRawIntNestedKernelProto,
 		},
@@ -84,12 +84,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationLazyRecursiveTableBuilder: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "lazy_recursive_table_builder",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         1,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: IsLazyRecursiveTableBuilderKernelProto,
 		},
@@ -98,12 +98,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationLazyRecursiveTableFold: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "lazy_recursive_table_fold",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         1,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: IsLazyRecursiveTableFoldKernelProto,
 		},
@@ -112,12 +112,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationPermutationFlipChecksum: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "permutation_flip_checksum",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         1,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: isPermutationFlipChecksumKernelProto,
 		},
@@ -125,12 +125,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationIntGridAggregate: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "int_grid_aggregate",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         2,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: isIntGridAggregateProto,
 		},
@@ -138,12 +138,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationMatrixMultiply: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "matrix_multiply",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         3,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: isMatrixMultiplyProto,
 		},
@@ -151,12 +151,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationRecordWalkFold: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "record_walk_fold",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         3,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: isRecordWalkFoldProto,
 		},
@@ -164,12 +164,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 	},
 	runtimeSpecializationBoolTableStrikeCount: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "bool_table_strike_count",
-				Route:         KernelRouteWholeCallValue,
+				Route:         RuntimeSpecializationRouteWholeCallValue,
 				Arity:         1,
-				Results:       kernelWholeCallSingleResultCount,
-				TieringPolicy: kernelTieringStructural,
+				Results:       runtimeSpecializationWholeCallSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
 			Recognize: isBoolTableStrikeCountProto,
 		},
@@ -180,12 +180,12 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSpecializationCount]WholeCallNoResultSpecialization{
 	wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "record_pairwise_numeric",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         1,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isRecordPairwiseNumericProto,
 		},
@@ -193,12 +193,12 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 	},
 	wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "numeric_array_region_sort",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         3,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isNumericArrayRegionSortProto,
 		},
@@ -206,12 +206,12 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 	},
 	wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "dense_matrix_multiply_transposed",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         4,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isDenseMatrixMultiplyTransposedProto,
 		},
@@ -219,12 +219,12 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "coefficient_matrix_vector",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         3,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isSpectralAvProto,
 		},
@@ -232,12 +232,12 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "coefficient_matrix_transpose_vector",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         3,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isSpectralAtvProto,
 		},
@@ -245,12 +245,12 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "coefficient_matrix_ata_vector",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         3,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isSpectralAtAvProto,
 		},
@@ -258,12 +258,12 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
-			Info: KernelInfo{
+			Info: RuntimeSpecializationInfo{
 				Name:          "dense_coefficient_matrix_ata_vector",
-				Route:         KernelRouteWholeCallNoResult,
+				Route:         RuntimeSpecializationRouteWholeCallNoResult,
 				Arity:         4,
-				Results:       kernelWholeCallInPlaceResultCount,
-				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+				Results:       runtimeSpecializationWholeCallInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
 			},
 			Recognize: isDenseSpectralAtAvProto,
 		},
@@ -273,23 +273,23 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 
 var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCount]DriverLoopRuntimeSpecialization{
 	driverLoopRuntimeSpecializationGenericRecordArrayLoop: {
-		Info: KernelInfo{
+		Info: RuntimeSpecializationInfo{
 			Name:          "generic_record_array_loop",
-			Route:         KernelRouteDriverLoop,
-			Arity:         kernelUnknownDriverLoopArity,
-			Results:       kernelUnknownDriverLoopResultCount,
-			TieringPolicy: kernelTieringStructural,
+			Route:         RuntimeSpecializationRouteDriverLoop,
+			Arity:         runtimeSpecializationUnknownDriverLoopArity,
+			Results:       runtimeSpecializationUnknownDriverLoopResultCount,
+			TieringPolicy: runtimeSpecializationTieringStructural,
 		},
 		Recognize: HasGenericRecordArrayDriverLoopKernel,
 		Run:       (*VM).tryGenericRecordArrayForLoopKernel,
 	},
 	driverLoopRuntimeSpecializationRecordPairwiseNumericLoop: {
-		Info: KernelInfo{
+		Info: RuntimeSpecializationInfo{
 			Name:          "record_pairwise_numeric_loop",
-			Route:         KernelRouteDriverLoop,
-			Arity:         kernelUnknownDriverLoopArity,
-			Results:       kernelUnknownDriverLoopResultCount,
-			TieringPolicy: kernelTieringStructural,
+			Route:         RuntimeSpecializationRouteDriverLoop,
+			Arity:         runtimeSpecializationUnknownDriverLoopArity,
+			Results:       runtimeSpecializationUnknownDriverLoopResultCount,
+			TieringPolicy: runtimeSpecializationTieringStructural,
 		},
 		Recognize: HasRecordPairwiseNumericDriverLoopKernel,
 		Run:       (*VM).tryRecordPairwiseNumericForLoopKernel,

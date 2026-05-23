@@ -47,8 +47,8 @@ func intGridAggregateTestProto() *FuncProto {
 func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 	aggregate := intGridAggregateTestProto()
 
-	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "int_grid_aggregate")
-	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(aggregate), "int_grid_aggregate")
+	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "int_grid_aggregate")
+	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(aggregate), "int_grid_aggregate")
 	if !cachedRuntimeSpecializationRecognized(aggregate, runtimeSpecializationIntGridAggregate) {
 		t.Fatal("int_grid_aggregate rejected by runtime specialization cache")
 	}
@@ -56,9 +56,9 @@ func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("int_grid_aggregate proto-local spec was not generated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(aggregate), "int_grid_aggregate")
-	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(aggregate), "int_grid_aggregate")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
 }
 
@@ -78,7 +78,7 @@ func TestIntGridAggregateRuntimeSpecializationRecordsHit(t *testing.T) {
 	if !handled || len(results) != 1 || !results[0].IsInt() {
 		t.Fatalf("handled=%v results=%v, want one int result", handled, results)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "int_grid_aggregate"); got != 1 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "int_grid_aggregate"); got != 1 {
 		t.Fatalf("int_grid_aggregate structural hit count = %d, want 1", got)
 	}
 }

@@ -55,63 +55,63 @@ func TestWholeCallRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 	if info.Name != "nested_int_recurrence" {
 		t.Fatalf("whole-call runtime specialization=%q, want nested_int_recurrence", info.Name)
 	}
-	if !info.HasCapability(vm.KernelCapabilityStructuralTiering) {
+	if !info.HasCapability(vm.RuntimeSpecializationCapabilityStructuralTiering) {
 		t.Fatalf("nested_int_recurrence missing structural tiering capability: %+v", info)
 	}
 	tm := NewTieringManager()
 	decision := tm.policy.Decide(fn, analyzeFuncProfile(fn), PromotionPolicyState{Manager: tm})
-	if decision.Action != TieringActionStructuralKernel {
-		t.Fatalf("tiering action=%s, want %s", decision.Action, TieringActionStructuralKernel)
+	if decision.Action != TieringActionRuntimeSpecialization {
+		t.Fatalf("tiering action=%s, want %s", decision.Action, TieringActionRuntimeSpecialization)
 	}
-	if decision.Kernel.kernel != "nested_int_recurrence" {
-		t.Fatalf("decision kernel=%q, want nested_int_recurrence", decision.Kernel.kernel)
+	if decision.RuntimeSpecialization.specialization != "nested_int_recurrence" {
+		t.Fatalf("decision runtime specialization=%q, want nested_int_recurrence", decision.RuntimeSpecialization.specialization)
 	}
 }
 
 func TestDriverLoopRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 	top := compileProto(t, genericRecordArrayLoopTieringSource)
 	tm := NewTieringManager()
-	info, ok := tm.driverLoopKernelForTiering(top)
+	info, ok := tm.driverLoopRuntimeSpecializationForTiering(top)
 	if !ok {
-		t.Fatal("generic record-array loop should expose a driver-loop structural kernel")
+		t.Fatal("generic record-array loop should expose a driver-loop structural runtime specialization")
 	}
 	if info.Name != "generic_record_array_loop" {
-		t.Fatalf("driver loop kernel=%q, want generic_record_array_loop", info.Name)
+		t.Fatalf("driver loop runtime specialization=%q, want generic_record_array_loop", info.Name)
 	}
-	if !info.HasCapability(vm.KernelCapabilityStructuralTiering) {
+	if !info.HasCapability(vm.RuntimeSpecializationCapabilityStructuralTiering) {
 		t.Fatalf("generic_record_array_loop missing structural tiering capability: %+v", info)
 	}
 	decision := tm.policy.Decide(top, analyzeFuncProfile(top), PromotionPolicyState{Manager: tm})
-	if decision.Action != TieringActionStructuralKernel {
-		t.Fatalf("tiering action=%s, want %s", decision.Action, TieringActionStructuralKernel)
+	if decision.Action != TieringActionRuntimeSpecialization {
+		t.Fatalf("tiering action=%s, want %s", decision.Action, TieringActionRuntimeSpecialization)
 	}
-	if decision.Kernel.kernel != "generic_record_array_loop" {
-		t.Fatalf("decision kernel=%q, want generic_record_array_loop", decision.Kernel.kernel)
+	if decision.RuntimeSpecialization.specialization != "generic_record_array_loop" {
+		t.Fatalf("decision runtime specialization=%q, want generic_record_array_loop", decision.RuntimeSpecialization.specialization)
 	}
 }
 
-func TestDriverLoopKernelTieringKeepsDensePairwiseLoopOnVMRoute(t *testing.T) {
+func TestDriverLoopRuntimeSpecializationTieringKeepsDensePairwiseLoopOnVMRoute(t *testing.T) {
 	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "nbody_dense.gs"))
 	if err != nil {
 		t.Fatalf("read nbody_dense benchmark: %v", err)
 	}
 	top := compileProto(t, string(src))
 	tm := NewTieringManager()
-	info, ok := tm.driverLoopKernelForTiering(top)
+	info, ok := tm.driverLoopRuntimeSpecializationForTiering(top)
 	if !ok {
-		t.Fatal("nbody_dense main should expose a driver-loop structural kernel")
+		t.Fatal("nbody_dense main should expose a driver-loop structural runtime specialization")
 	}
 	if info.Name != "record_pairwise_numeric_loop" {
-		t.Fatalf("driver loop kernel=%q, want record_pairwise_numeric_loop", info.Name)
+		t.Fatalf("driver loop runtime specialization=%q, want record_pairwise_numeric_loop", info.Name)
 	}
-	if !info.HasCapability(vm.KernelCapabilityStructuralTiering) {
+	if !info.HasCapability(vm.RuntimeSpecializationCapabilityStructuralTiering) {
 		t.Fatalf("record_pairwise_numeric_loop missing structural tiering capability: %+v", info)
 	}
 	decision := tm.policy.Decide(top, analyzeFuncProfile(top), PromotionPolicyState{Manager: tm})
-	if decision.Action != TieringActionStructuralKernel {
-		t.Fatalf("tiering action=%s, want %s", decision.Action, TieringActionStructuralKernel)
+	if decision.Action != TieringActionRuntimeSpecialization {
+		t.Fatalf("tiering action=%s, want %s", decision.Action, TieringActionRuntimeSpecialization)
 	}
-	if decision.Kernel.kernel != "record_pairwise_numeric_loop" {
-		t.Fatalf("decision kernel=%q, want record_pairwise_numeric_loop", decision.Kernel.kernel)
+	if decision.RuntimeSpecialization.specialization != "record_pairwise_numeric_loop" {
+		t.Fatalf("decision runtime specialization=%q, want record_pairwise_numeric_loop", decision.RuntimeSpecialization.specialization)
 	}
 }

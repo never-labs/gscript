@@ -38,21 +38,21 @@ func TestGenericRecordArrayLoopRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 	globals := map[string]*FuncProto{"update": update}
 
-	requireKernelInfo(t, DriverLoopKernelCatalog(), "generic_record_array_loop")
-	requireKernelInfo(t, RecognizedDriverLoopKernels(drive, globals), "generic_record_array_loop")
-	diag := requireKernelDiagnostic(t, DiagnoseDriverLoopKernels(drive, globals), "generic_record_array_loop")
-	if !diag.Recognized || diag.Reason != kernelReasonDriverRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonDriverRecognized)
+	requireRuntimeSpecializationInfo(t, DriverLoopRuntimeSpecializationCatalog(), "generic_record_array_loop")
+	requireRuntimeSpecializationInfo(t, RecognizedDriverLoopRuntimeSpecializations(drive, globals), "generic_record_array_loop")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseDriverLoopRuntimeSpecializations(drive, globals), "generic_record_array_loop")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonDriverRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonDriverRecognized)
 	}
-	if diag.Kernel.Route != KernelRouteDriverLoop ||
-		diag.Kernel.Arity != kernelUnknownDriverLoopArity ||
-		diag.Kernel.Results != kernelUnknownDriverLoopResultCount {
-		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	if diag.Specialization.Route != RuntimeSpecializationRouteDriverLoop ||
+		diag.Specialization.Arity != runtimeSpecializationUnknownDriverLoopArity ||
+		diag.Specialization.Results != runtimeSpecializationUnknownDriverLoopResultCount {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 
-	diag = requireKernelDiagnostic(t, DiagnoseDriverLoopKernels(drive, nil), "generic_record_array_loop")
-	if diag.Recognized || diag.Reason != kernelReasonMissingGlobalProtoMap {
-		t.Fatalf("missing-global diagnostic = %+v, want %q", diag, kernelReasonMissingGlobalProtoMap)
+	diag = requireRuntimeSpecializationDiagnostic(t, DiagnoseDriverLoopRuntimeSpecializations(drive, nil), "generic_record_array_loop")
+	if diag.Recognized || diag.Reason != runtimeSpecializationReasonMissingGlobalProtoMap {
+		t.Fatalf("missing-global diagnostic = %+v, want %q", diag, runtimeSpecializationReasonMissingGlobalProtoMap)
 	}
 }
 
@@ -68,7 +68,7 @@ drive(128)
 result := rows[1].x
 `)
 	expectGlobalFloat(t, globals, "result", 129)
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteDriverLoop, "generic_record_array_loop"); got != 1 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteDriverLoop, "generic_record_array_loop"); got != 1 {
 		t.Fatalf("generic_record_array_loop structural hit count = %d, want 1", got)
 	}
 }

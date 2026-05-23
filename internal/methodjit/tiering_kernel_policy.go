@@ -4,40 +4,40 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
-type tieringKernelDecision struct {
-	reason string
-	kernel string
-	route  string
-	callee *vm.FuncProto
+type tieringRuntimeSpecializationDecision struct {
+	reason         string
+	specialization string
+	route          string
+	callee         *vm.FuncProto
 }
 
-func (tm *TieringManager) structuralKernelTieringDecision(proto *vm.FuncProto) (tieringKernelDecision, bool) {
+func (tm *TieringManager) runtimeSpecializationTieringDecision(proto *vm.FuncProto) (tieringRuntimeSpecializationDecision, bool) {
 	if info, ok := recognizedWholeCallRuntimeSpecializationForTiering(proto); ok {
-		return tieringKernelDecision{
-			reason: "whole_call_structural_kernel",
-			kernel: info.Name,
-			route:  string(info.Route),
+		return tieringRuntimeSpecializationDecision{
+			reason:         "whole_call_runtime_specialization",
+			specialization: info.Name,
+			route:          string(info.Route),
 		}, true
 	}
 	if callee, info, ok := tm.wholeCallRuntimeSpecializationCalleeForTiering(proto); ok {
-		return tieringKernelDecision{
-			reason: "whole_call_kernel_callee",
-			kernel: info.Name,
-			route:  string(info.Route),
-			callee: callee,
+		return tieringRuntimeSpecializationDecision{
+			reason:         "whole_call_runtime_specialization_callee",
+			specialization: info.Name,
+			route:          string(info.Route),
+			callee:         callee,
 		}, true
 	}
-	if info, ok := tm.driverLoopKernelForTiering(proto); ok {
-		return tieringKernelDecision{
-			reason: "driver_loop_structural_kernel",
-			kernel: info.Name,
-			route:  string(info.Route),
+	if info, ok := tm.driverLoopRuntimeSpecializationForTiering(proto); ok {
+		return tieringRuntimeSpecializationDecision{
+			reason:         "driver_loop_runtime_specialization",
+			specialization: info.Name,
+			route:          string(info.Route),
 		}, true
 	}
-	return tieringKernelDecision{}, false
+	return tieringRuntimeSpecializationDecision{}, false
 }
 
-func (tm *TieringManager) disableForStructuralKernelTiering(proto *vm.FuncProto, d tieringKernelDecision) {
+func (tm *TieringManager) disableForRuntimeSpecializationTiering(proto *vm.FuncProto, d tieringRuntimeSpecializationDecision) {
 	tm.markJITDisabled(proto)
 	fields := map[string]any{
 		"reason":     d.reason,
@@ -48,10 +48,10 @@ func (tm *TieringManager) disableForStructuralKernelTiering(proto *vm.FuncProto,
 		"reason": d.reason,
 		"target": "interpreter",
 	}
-	if d.kernel != "" {
-		fields["kernel"] = d.kernel
-		tierFields["kernel"] = d.kernel
-		fallbackFields["kernel"] = d.kernel
+	if d.specialization != "" {
+		fields["specialization"] = d.specialization
+		tierFields["specialization"] = d.specialization
+		fallbackFields["specialization"] = d.specialization
 	}
 	if d.route != "" {
 		fields["route"] = d.route
@@ -72,22 +72,22 @@ func (tm *TieringManager) disableForStructuralKernelTiering(proto *vm.FuncProto,
 	tm.traceEvent("fallback", "tier0", proto, fallbackFields)
 }
 
-func recognizedWholeCallRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
+func recognizedWholeCallRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm.RuntimeSpecializationInfo, bool) {
 	for _, info := range vm.RecognizedWholeCallRuntimeSpecializations(proto) {
 		if info.AllowsStructuralTiering(proto) {
 			return info, true
 		}
 	}
-	return vm.KernelInfo{}, false
+	return vm.RuntimeSpecializationInfo{}, false
 }
 
-func (tm *TieringManager) wholeCallRuntimeSpecializationCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.KernelInfo, bool) {
+func (tm *TieringManager) wholeCallRuntimeSpecializationCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.RuntimeSpecializationInfo, bool) {
 	if tm == nil || tm.envTier2NoFilter || proto == nil {
-		return nil, vm.KernelInfo{}, false
+		return nil, vm.RuntimeSpecializationInfo{}, false
 	}
 	globals := tm.buildLoopCallGlobals(proto)
 	if len(globals) == 0 {
-		return nil, vm.KernelInfo{}, false
+		return nil, vm.RuntimeSpecializationInfo{}, false
 	}
 	for pc, inst := range proto.Code {
 		if vm.DecodeOp(inst) != vm.OP_CALL {
@@ -101,21 +101,21 @@ func (tm *TieringManager) wholeCallRuntimeSpecializationCalleeForTiering(proto *
 			return callee, info, true
 		}
 	}
-	return nil, vm.KernelInfo{}, false
+	return nil, vm.RuntimeSpecializationInfo{}, false
 }
 
-func (tm *TieringManager) driverLoopKernelForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
+func (tm *TieringManager) driverLoopRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm.RuntimeSpecializationInfo, bool) {
 	if tm == nil || tm.envTier2NoFilter || proto == nil {
-		return vm.KernelInfo{}, false
+		return vm.RuntimeSpecializationInfo{}, false
 	}
 	globals := tm.buildLoopCallGlobals(proto)
 	if len(globals) == 0 {
-		return vm.KernelInfo{}, false
+		return vm.RuntimeSpecializationInfo{}, false
 	}
-	for _, info := range vm.RecognizedDriverLoopKernels(proto, globals) {
+	for _, info := range vm.RecognizedDriverLoopRuntimeSpecializations(proto, globals) {
 		if info.AllowsStructuralTiering(proto) {
 			return info, true
 		}
 	}
-	return vm.KernelInfo{}, false
+	return vm.RuntimeSpecializationInfo{}, false
 }

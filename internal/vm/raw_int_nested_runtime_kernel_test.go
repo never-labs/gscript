@@ -41,8 +41,8 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 		t.Fatal("nestwave proto not found")
 	}
 
-	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "nested_int_recurrence")
-	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(fn), "nested_int_recurrence")
+	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "nested_int_recurrence")
+	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(fn), "nested_int_recurrence")
 	if !cachedRuntimeSpecializationRecognized(fn, runtimeSpecializationRawIntNested) {
 		t.Fatal("raw nested int runtime specialization rejected by hot cache")
 	}
@@ -52,19 +52,19 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 	if fn.RawIntNestedKernel == nil || fn.RawIntNestedKernel.kernel == nil {
 		t.Fatal("raw nested int kernel cache was not populated")
 	}
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(fn), "nested_int_recurrence")
-	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(fn), "nested_int_recurrence")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Kernel.Route != KernelRouteWholeCallValue || diag.Kernel.Arity != 2 || diag.Kernel.Results != 1 {
-		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallValue || diag.Specialization.Arity != 2 || diag.Specialization.Results != 1 {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 
 	mutated := *fn
 	mutated.Code = nil
-	rejectKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(&mutated), "nested_int_recurrence")
-	diag = requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(&mutated), "nested_int_recurrence")
-	if diag.Recognized || diag.Reason != kernelReasonShapeMismatch {
+	rejectRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(&mutated), "nested_int_recurrence")
+	diag = requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(&mutated), "nested_int_recurrence")
+	if diag.Recognized || diag.Reason != runtimeSpecializationReasonShapeMismatch {
 		t.Fatalf("mutated diagnostic = %+v, want shape mismatch", diag)
 	}
 }
@@ -77,7 +77,7 @@ func TestRawIntNestedRuntimeSpecializationRecordsHit(t *testing.T) {
 result := nestwave(2, 6)
 `)
 	expectGlobalInt(t, globals, "result", 764)
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "nested_int_recurrence"); got != 1 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "nested_int_recurrence"); got != 1 {
 		t.Fatalf("nested_int_recurrence structural hit count = %d, want 1", got)
 	}
 }
@@ -117,12 +117,12 @@ func TestRawIntNestedRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *test
 	if len(results) != 1 || !results[0].IsInt() || results[0].Int() != 41 {
 		t.Fatalf("fallback result = %+v, want 41", results)
 	}
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "nested_int_recurrence"); got != 0 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "nested_int_recurrence"); got != 0 {
 		t.Fatalf("nested_int_recurrence structural hit count = %d, want 0", got)
 	}
 }
 
-func runtimeStructuralKernelHitCount(stats *runtime.RuntimePathStats, route KernelRoute, name string) uint64 {
+func runtimeStructuralKernelHitCount(stats *runtime.RuntimePathStats, route RuntimeSpecializationRoute, name string) uint64 {
 	for _, entry := range stats.Snapshot().StructuralKernel.PerKernel {
 		if entry.Route == string(route) && entry.Name == name {
 			return entry.Count

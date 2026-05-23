@@ -24,8 +24,8 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("missing sieve proto")
 	}
 
-	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "bool_table_strike_count")
-	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(sieve), "bool_table_strike_count")
+	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "bool_table_strike_count")
+	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(sieve), "bool_table_strike_count")
 	if !cachedRuntimeSpecializationRecognized(sieve, runtimeSpecializationBoolTableStrikeCount) {
 		t.Fatal("bool_table_strike_count rejected by runtime specialization cache")
 	}
@@ -36,14 +36,14 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("bool table strike-count proto-local spec was not generated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(sieve), "bool_table_strike_count")
-	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
-		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(sieve), "bool_table_strike_count")
+	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Kernel.Route != KernelRouteWholeCallValue ||
-		diag.Kernel.Arity != 1 ||
-		diag.Kernel.Results != kernelWholeCallSingleResultCount {
-		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallValue ||
+		diag.Specialization.Arity != 1 ||
+		diag.Specialization.Results != runtimeSpecializationWholeCallSingleResultCount {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
 
@@ -77,7 +77,7 @@ func sieve(n) {
 result := sieve(100)
 `)
 	expectGlobalInt(t, globals, "result", 25)
-	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "bool_table_strike_count"); got != 1 {
+	if got := runtimeStructuralKernelHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "bool_table_strike_count"); got != 1 {
 		t.Fatalf("bool_table_strike_count structural hit count = %d, want 1", got)
 	}
 }

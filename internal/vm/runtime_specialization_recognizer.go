@@ -6,40 +6,42 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-// KernelRoute identifies how a structural kernel is reached. Whole-call
-// routes are probed at OP_CALL; driver-loop routes are probed at OP_FORPREP.
-type KernelRoute string
+// RuntimeSpecializationRoute identifies how a structural runtime specialization
+// is reached. Whole-call routes are probed at OP_CALL; driver-loop routes are
+// probed at OP_FORPREP.
+type RuntimeSpecializationRoute string
 
 const (
-	KernelRouteWholeCallValue    KernelRoute = "whole_call_value"
-	KernelRouteWholeCallNoResult KernelRoute = "whole_call_no_result"
-	KernelRouteDriverLoop        KernelRoute = "driver_loop"
+	RuntimeSpecializationRouteWholeCallValue    RuntimeSpecializationRoute = "whole_call_value"
+	RuntimeSpecializationRouteWholeCallNoResult RuntimeSpecializationRoute = "whole_call_no_result"
+	RuntimeSpecializationRouteDriverLoop        RuntimeSpecializationRoute = "driver_loop"
 )
 
-// KernelCapability identifies cross-package behavior exposed by structural
-// kernel metadata.
-type KernelCapability uint64
+// RuntimeSpecializationCapability identifies cross-package behavior exposed by
+// structural runtime specialization metadata.
+type RuntimeSpecializationCapability uint64
 
 const (
-	KernelCapabilityStructuralTiering KernelCapability = 1 << iota
+	RuntimeSpecializationCapabilityStructuralTiering RuntimeSpecializationCapability = 1 << iota
 )
 
 // Has reports whether all bits in want are present.
-func (c KernelCapability) Has(want KernelCapability) bool {
+func (c RuntimeSpecializationCapability) Has(want RuntimeSpecializationCapability) bool {
 	return c&want == want
 }
 
-// KernelTieringPolicy describes whether a recognized kernel should keep its
-// bytecode on the VM structural-kernel route instead of entering methodjit.
-type KernelTieringPolicy struct {
-	Capabilities         KernelCapability
+// RuntimeSpecializationTieringPolicy describes whether a recognized runtime
+// specialization should keep its bytecode on the VM structural-specialization
+// route instead of entering methodjit.
+type RuntimeSpecializationTieringPolicy struct {
+	Capabilities         RuntimeSpecializationCapability
 	RequireFloatConstant bool
 }
 
 // AllowsStructuralTiering reports whether this policy permits structural
-// kernel tiering for proto.
-func (p KernelTieringPolicy) AllowsStructuralTiering(proto *FuncProto) bool {
-	if !p.Capabilities.Has(KernelCapabilityStructuralTiering) {
+// runtime-specialization tiering for proto.
+func (p RuntimeSpecializationTieringPolicy) AllowsStructuralTiering(proto *FuncProto) bool {
+	if !p.Capabilities.Has(RuntimeSpecializationCapabilityStructuralTiering) {
 		return false
 	}
 	if p.RequireFloatConstant && !kernelProtoHasFloatConstant(proto) {
@@ -49,58 +51,59 @@ func (p KernelTieringPolicy) AllowsStructuralTiering(proto *FuncProto) bool {
 }
 
 var (
-	kernelTieringStructural = KernelTieringPolicy{
-		Capabilities: KernelCapabilityStructuralTiering,
+	runtimeSpecializationTieringStructural = RuntimeSpecializationTieringPolicy{
+		Capabilities: RuntimeSpecializationCapabilityStructuralTiering,
 	}
-	kernelTieringStructuralWithFloatConstant = KernelTieringPolicy{
-		Capabilities:         KernelCapabilityStructuralTiering,
+	runtimeSpecializationTieringStructuralWithFloatConstant = RuntimeSpecializationTieringPolicy{
+		Capabilities:         RuntimeSpecializationCapabilityStructuralTiering,
 		RequireFloatConstant: true,
 	}
 )
 
-// KernelInfo is stable diagnostic metadata for structural VM kernels.
+// RuntimeSpecializationInfo is stable diagnostic metadata for structural VM runtime specializations.
 //
 // Recognizers intentionally inspect only bytecode, constants, arity, and
 // guarded callee shapes. FuncProto.Name and FuncProto.Source are debugging
-// metadata and are not part of kernel admission.
-type KernelInfo struct {
+// metadata and are not part of runtime-specialization admission.
+type RuntimeSpecializationInfo struct {
 	Name          string
-	Route         KernelRoute
+	Route         RuntimeSpecializationRoute
 	Arity         int
 	Results       int
-	TieringPolicy KernelTieringPolicy
+	TieringPolicy RuntimeSpecializationTieringPolicy
 }
 
-// HasCapability reports whether this kernel advertises cap.
-func (info KernelInfo) HasCapability(cap KernelCapability) bool {
+// HasCapability reports whether this runtime specialization advertises cap.
+func (info RuntimeSpecializationInfo) HasCapability(cap RuntimeSpecializationCapability) bool {
 	return info.TieringPolicy.Capabilities.Has(cap)
 }
 
-// AllowsStructuralTiering reports whether this kernel can keep a recognized
-// proto on the VM structural-kernel route.
-func (info KernelInfo) AllowsStructuralTiering(proto *FuncProto) bool {
+// AllowsStructuralTiering reports whether this runtime specialization can keep
+// a recognized proto on the VM structural-specialization route.
+func (info RuntimeSpecializationInfo) AllowsStructuralTiering(proto *FuncProto) bool {
 	return info.TieringPolicy.AllowsStructuralTiering(proto)
 }
 
-// KernelDiagnostic reports whether one registered structural kernel recognizes
-// a prototype and, if not, the broad fallback reason.
-type KernelDiagnostic struct {
-	Kernel     KernelInfo
+// RuntimeSpecializationDiagnostic reports whether one registered structural
+// runtime specialization recognizes a prototype and, if not, the broad fallback
+// reason.
+type RuntimeSpecializationDiagnostic struct {
+	Specialization RuntimeSpecializationInfo
 	Recognized bool
 	Reason     string
 }
 
 const (
-	kernelReasonRecognized             = "recognized_structural_bytecode"
-	kernelReasonNilProto               = "nil_proto"
-	kernelReasonShapeMismatch          = "bytecode_or_constant_shape_mismatch"
-	kernelReasonDriverRecognized       = "recognized_structural_driver_loop"
-	kernelReasonDriverMismatch         = "bytecode_or_callee_shape_mismatch"
-	kernelReasonMissingGlobalProtoMap  = "missing_global_proto_map"
-	kernelUnknownDriverLoopArity       = -1
-	kernelUnknownDriverLoopResultCount = -1
-	kernelWholeCallInPlaceResultCount  = 0
-	kernelWholeCallSingleResultCount   = 1
+	runtimeSpecializationReasonRecognized             = "recognized_structural_bytecode"
+	runtimeSpecializationReasonNilProto               = "nil_proto"
+	runtimeSpecializationReasonShapeMismatch          = "bytecode_or_constant_shape_mismatch"
+	runtimeSpecializationReasonDriverRecognized       = "recognized_structural_driver_loop"
+	runtimeSpecializationReasonDriverMismatch         = "bytecode_or_callee_shape_mismatch"
+	runtimeSpecializationReasonMissingGlobalProtoMap  = "missing_global_proto_map"
+	runtimeSpecializationUnknownDriverLoopArity       = -1
+	runtimeSpecializationUnknownDriverLoopResultCount = -1
+	runtimeSpecializationWholeCallInPlaceResultCount  = 0
+	runtimeSpecializationWholeCallSingleResultCount   = 1
 )
 
 type runtimeSpecializationFingerprint struct {
@@ -118,10 +121,10 @@ type runtimeSpecializationFingerprint struct {
 type wholeCallValueRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, []runtime.Value, error)
 type wholeCallNoResultRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, error)
 
-// WholeCallRuntimeSpecializationCatalog returns diagnostic metadata for OP_CALL structural
-// kernels without probing any particular prototype.
-func WholeCallRuntimeSpecializationCatalog() []KernelInfo {
-	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
+// WholeCallRuntimeSpecializationCatalog returns diagnostic metadata for OP_CALL
+// structural runtime specializations without probing any particular prototype.
+func WholeCallRuntimeSpecializationCatalog() []RuntimeSpecializationInfo {
+	out := make([]RuntimeSpecializationInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
 	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
@@ -137,10 +140,11 @@ func WholeCallRuntimeSpecializationCatalog() []KernelInfo {
 	return out
 }
 
-// DriverLoopKernelCatalog returns diagnostic metadata for OP_FORPREP driver
-// loop kernels without probing any particular prototype.
-func DriverLoopKernelCatalog() []KernelInfo {
-	out := make([]KernelInfo, 0, len(driverLoopRuntimeSpecializationRegistry))
+// DriverLoopRuntimeSpecializationCatalog returns diagnostic metadata for
+// OP_FORPREP driver-loop runtime specializations without probing any particular
+// prototype.
+func DriverLoopRuntimeSpecializationCatalog() []RuntimeSpecializationInfo {
+	out := make([]RuntimeSpecializationInfo, 0, len(driverLoopRuntimeSpecializationRegistry))
 	for _, entry := range driverLoopRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
@@ -152,8 +156,8 @@ func DriverLoopKernelCatalog() []KernelInfo {
 
 // RecognizedWholeCallRuntimeSpecializations returns every registered whole-call runtime specialization whose
 // structural recognizer accepts p. It does not inspect FuncProto.Name or Source.
-func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []KernelInfo {
-	out := make([]KernelInfo, 0, 1)
+func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []RuntimeSpecializationInfo {
+	out := make([]RuntimeSpecializationInfo, 0, 1)
 	runtimeRecognized := recognizedRuntimeSpecializationBits(p)
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
@@ -178,16 +182,16 @@ func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []KernelInfo {
 // DiagnoseWholeCallRuntimeSpecializationProto reports structural recognizer results for every
 // registered whole-call runtime specialization. It is intended for tests and diagnostics, not
 // hot dispatch.
-func DiagnoseWholeCallRuntimeSpecializationProto(p *FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
+func DiagnoseWholeCallRuntimeSpecializationProto(p *FuncProto) []RuntimeSpecializationDiagnostic {
+	out := make([]RuntimeSpecializationDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
 	runtimeRecognizedBits := recognizedRuntimeSpecializationBits(p)
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		recognized := runtimeRecognizedBits&(uint64(1)<<uint(i)) != 0
-		out = append(out, KernelDiagnostic{
-			Kernel:     entry.Info,
+		out = append(out, RuntimeSpecializationDiagnostic{
+			Specialization:     entry.Info,
 			Recognized: recognized,
 			Reason:     runtimeSpecializationReason(p, recognized),
 		})
@@ -198,8 +202,8 @@ func DiagnoseWholeCallRuntimeSpecializationProto(p *FuncProto) []KernelDiagnosti
 			continue
 		}
 		recognized := noResultRuntimeRecognizedBits&(uint64(1)<<uint(i)) != 0
-		out = append(out, KernelDiagnostic{
-			Kernel:     entry.Info,
+		out = append(out, RuntimeSpecializationDiagnostic{
+			Specialization:     entry.Info,
 			Recognized: recognized,
 			Reason:     runtimeSpecializationReason(p, recognized),
 		})
@@ -297,10 +301,10 @@ func fnvMixUint64(h uint64, v uint64) uint64 {
 	return h
 }
 
-// RecognizedDriverLoopKernels returns every registered driver-loop kernel whose
+// RecognizedDriverLoopRuntimeSpecializations returns every registered driver-loop kernel whose
 // structural recognizer accepts proto with the supplied global callee map.
-func RecognizedDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) []KernelInfo {
-	out := make([]KernelInfo, 0, len(driverLoopRuntimeSpecializationRegistry))
+func RecognizedDriverLoopRuntimeSpecializations(proto *FuncProto, globals map[string]*FuncProto) []RuntimeSpecializationInfo {
+	out := make([]RuntimeSpecializationInfo, 0, len(driverLoopRuntimeSpecializationRegistry))
 	for _, entry := range driverLoopRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" || entry.Recognize == nil {
 			continue
@@ -312,19 +316,19 @@ func RecognizedDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto
 	return out
 }
 
-// DiagnoseDriverLoopKernels reports structural driver-loop recognizer results.
+// DiagnoseDriverLoopRuntimeSpecializations reports structural driver-loop recognizer results.
 // The globals map should contain compile-time global function protos by name.
-func DiagnoseDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, 0, len(driverLoopRuntimeSpecializationRegistry))
+func DiagnoseDriverLoopRuntimeSpecializations(proto *FuncProto, globals map[string]*FuncProto) []RuntimeSpecializationDiagnostic {
+	out := make([]RuntimeSpecializationDiagnostic, 0, len(driverLoopRuntimeSpecializationRegistry))
 	for _, entry := range driverLoopRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		recognized := proto != nil && entry.Recognize != nil && entry.Recognize(proto, globals)
-		out = append(out, KernelDiagnostic{
-			Kernel:     entry.Info,
+		out = append(out, RuntimeSpecializationDiagnostic{
+			Specialization:     entry.Info,
 			Recognized: recognized,
-			Reason:     driverLoopKernelReason(proto, globals, recognized),
+			Reason:     driverLoopRuntimeSpecializationReason(proto, globals, recognized),
 		})
 	}
 	return out
@@ -332,25 +336,25 @@ func DiagnoseDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) 
 
 func runtimeSpecializationReason(proto *FuncProto, recognized bool) string {
 	if proto == nil {
-		return kernelReasonNilProto
+		return runtimeSpecializationReasonNilProto
 	}
 	if recognized {
-		return kernelReasonRecognized
+		return runtimeSpecializationReasonRecognized
 	}
-	return kernelReasonShapeMismatch
+	return runtimeSpecializationReasonShapeMismatch
 }
 
-func driverLoopKernelReason(proto *FuncProto, globals map[string]*FuncProto, recognized bool) string {
+func driverLoopRuntimeSpecializationReason(proto *FuncProto, globals map[string]*FuncProto, recognized bool) string {
 	if proto == nil {
-		return kernelReasonNilProto
+		return runtimeSpecializationReasonNilProto
 	}
 	if recognized {
-		return kernelReasonDriverRecognized
+		return runtimeSpecializationReasonDriverRecognized
 	}
 	if len(globals) == 0 {
-		return kernelReasonMissingGlobalProtoMap
+		return runtimeSpecializationReasonMissingGlobalProtoMap
 	}
-	return kernelReasonDriverMismatch
+	return runtimeSpecializationReasonDriverMismatch
 }
 
 func codeEquals(got, want []uint32) bool {

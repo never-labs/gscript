@@ -73,7 +73,7 @@ func stableFeedbackCalleeProto(fn *Function, instr *Instr, nArgs int) (*vm.FuncP
 
 func protoHasNoResultWholeCallRuntimeSpecialization(proto *vm.FuncProto) bool {
 	for _, info := range vm.RecognizedWholeCallRuntimeSpecializations(proto) {
-		if info.Route == vm.KernelRouteWholeCallNoResult && info.Results == 0 {
+		if info.Route == vm.RuntimeSpecializationRouteWholeCallNoResult && info.Results == 0 {
 			return true
 		}
 	}
