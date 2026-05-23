@@ -49,6 +49,13 @@ class PerfRow:
             return True
         return self.current_source == self.luajit_source
 
+    def has_comparable_current_timing(self, other: "PerfRow") -> bool:
+        if self.current is None or other.current is None:
+            return False
+        if not self.current_source or not other.current_source:
+            return True
+        return self.current_source == other.current_source
+
 
 @dataclass(frozen=True)
 class Violation:
@@ -168,6 +175,8 @@ def check_rows(
             continue
         base = baseline.get(name)
         if base is None or base.current is None or row.current is None or base.current <= 0:
+            continue
+        if not row.has_comparable_current_timing(base):
             continue
         change = row.current / base.current - 1.0
         if change > regression_tolerance:

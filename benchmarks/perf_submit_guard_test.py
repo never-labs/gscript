@@ -57,6 +57,14 @@ class PerfSubmitGuardTest(unittest.TestCase):
         self.assertEqual(guard.check_rows(rows, ratio_threshold=0.8), [])
         self.assertNotIn("suite/a", guard.format_summary(rows, []))
 
+    def test_skips_baseline_regression_for_mixed_current_sources(self):
+        candidate = guard.load_rows(write_json(timing_payload([("suite/a", 0.90, 1.50, "wall_repeat", "script_repeat")])))
+        baseline = guard.load_rows(write_json(timing_payload([("suite/a", 0.70, 1.50, "script_repeat", "script_repeat")])))
+        self.assertEqual(
+            guard.check_rows(candidate, baseline=baseline, ratio_threshold=0.8, regression_tolerance=0.03),
+            [],
+        )
+
 
 def write_json(payload):
     td = tempfile.TemporaryDirectory()
