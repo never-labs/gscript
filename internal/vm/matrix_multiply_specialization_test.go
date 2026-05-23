@@ -58,6 +58,31 @@ func TestMatrixMultiplyRuntimeSpecializationDenseVariant(t *testing.T) {
 	}
 }
 
+func TestMatrixMultiplyRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		file string
+		kind matrixMultiplySpecializationKind
+	}{
+		{file: "matmul.gs", kind: matrixMultiplySpecializationPlain},
+		{file: "matmul_dense.gs", kind: matrixMultiplySpecializationDense},
+	} {
+		top := compileProto(t, matrixMultiplySource(t, tc.file))
+		matmul := findTestProtoByName(top, "matmul")
+		if matmul == nil {
+			t.Fatalf("%s: missing matmul proto", tc.file)
+		}
+		matmul.Name = "shape_only_matrix_product"
+		matmul.Source = "host/generated/not-a-benchmark.gs"
+		spec, ok := matrixMultiplySpecializationSpecForProto(matmul)
+		if !ok {
+			t.Fatalf("%s: matrix multiply should recognize bytecode shape independent of name/source", tc.file)
+		}
+		if spec.kind != tc.kind {
+			t.Fatalf("%s: kind = %d, want %d", tc.file, spec.kind, tc.kind)
+		}
+	}
+}
+
 func TestMatrixMultiplyRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
@@ -98,6 +123,19 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testin
 		diag.Specialization.Arity != 4 ||
 		diag.Specialization.Results != runtimeSpecializationCallSiteInPlaceResultCount {
 		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
+	}
+}
+
+func TestDenseMatrixMultiplyTransposedRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, matrixMultiplySource(t, "matmul_dense_tb.gs"))
+	matmul := findTestProtoByName(top, "matmul")
+	if matmul == nil {
+		t.Fatal("missing dense transposed matmul proto")
+	}
+	matmul.Name = "shape_only_transposed_matrix_product"
+	matmul.Source = "host/generated/not-a-benchmark.gs"
+	if !isDenseMatrixMultiplyTransposedProto(matmul) {
+		t.Fatal("dense matrix multiply transposed should recognize bytecode shape independent of name/source")
 	}
 }
 
