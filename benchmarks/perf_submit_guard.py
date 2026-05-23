@@ -23,12 +23,31 @@ class PerfRow:
     luajit: float | None
     current_status: str
     luajit_status: str
+    current_source: str
+    luajit_source: str
 
     @property
     def ratio(self) -> float | None:
-        if self.current is None or self.luajit is None or self.luajit <= 0:
+        if (
+            self.current is None
+            or self.luajit is None
+            or self.luajit <= 0
+            or not self.has_comparable_luajit_timing
+        ):
             return None
         return self.current / self.luajit
+
+    @property
+    def has_timed_luajit_pair(self) -> bool:
+        return self.current is not None and self.luajit is not None and self.luajit > 0
+
+    @property
+    def has_comparable_luajit_timing(self) -> bool:
+        if not self.has_timed_luajit_pair:
+            return False
+        if not self.current_source or not self.luajit_source:
+            return True
+        return self.current_source == self.luajit_source
 
 
 @dataclass(frozen=True)
@@ -56,6 +75,11 @@ def _subject_status(subject: dict[str, Any]) -> str:
     return str(status) if status is not None else "missing"
 
 
+def _subject_source(subject: dict[str, Any]) -> str:
+    source = subject.get("source")
+    return str(source) if source is not None else ""
+
+
 def _timing_compare_row(row: dict[str, Any], mode: str) -> PerfRow | None:
     modes = row.get("modes")
     if not isinstance(modes, dict):
@@ -78,6 +102,8 @@ def _timing_compare_row(row: dict[str, Any], mode: str) -> PerfRow | None:
         luajit=_subject_seconds(luajit),
         current_status=_subject_status(current),
         luajit_status=_subject_status(luajit),
+        current_source=_subject_source(current),
+        luajit_source=_subject_source(luajit),
     )
 
 
@@ -97,6 +123,8 @@ def _flat_guard_row(row: dict[str, Any]) -> PerfRow | None:
         luajit=_subject_seconds(luajit),
         current_status=_subject_status(default),
         luajit_status=_subject_status(luajit),
+        current_source=_subject_source(default),
+        luajit_source=_subject_source(luajit),
     )
 
 
@@ -127,10 +155,12 @@ def check_rows(
     violations: list[Violation] = []
     for name, row in sorted(candidate.items()):
         ratio = row.ratio
-        if ratio is None:
+        if not row.has_timed_luajit_pair:
             violations.append(
                 Violation("missing", name, f"current={row.current_status} luajit={row.luajit_status}", "timed current+luajit")
             )
+        elif not row.has_comparable_luajit_timing:
+            pass
         elif ratio > ratio_threshold:
             violations.append(Violation("luajit", name, f"{ratio:.3f}x", f"<={ratio_threshold:.3f}x"))
 
@@ -147,7 +177,7 @@ def check_rows(
 
 def format_summary(rows: dict[str, PerfRow], violations: list[Violation]) -> str:
     worst = sorted(
-        [row for row in rows.values() if row.ratio is not None],
+        [row for row in rows.values() if row.has_comparable_luajit_timing and row.ratio is not None],
         key=lambda row: row.ratio or -1.0,
         reverse=True,
     )[:12]

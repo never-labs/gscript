@@ -9,21 +9,30 @@ import perf_submit_guard as guard
 
 
 def timing_payload(rows):
-    return {
-        "results": [
+    results = []
+    for row in rows:
+        name, current, luajit = row[:3]
+        current_source = row[3] if len(row) > 3 else None
+        luajit_source = row[4] if len(row) > 4 else None
+        current_subject = {"status": "ok", "stats": {"median": current}}
+        luajit_subject = {"status": "ok", "stats": {"median": luajit}}
+        if current_source is not None:
+            current_subject["source"] = current_source
+        if luajit_source is not None:
+            luajit_subject["source"] = luajit_source
+        results.append(
             {
                 "benchmark": name.split("/", 1)[1],
                 "group": name.split("/", 1)[0],
                 "modes": {
                     "default": {
-                        "current": {"status": "ok", "stats": {"median": current}},
-                        "luajit": {"status": "ok", "stats": {"median": luajit}},
+                        "current": current_subject,
+                        "luajit": luajit_subject,
                     }
                 },
             }
-            for name, current, luajit in rows
-        ]
-    }
+        )
+    return {"results": results}
 
 
 class PerfSubmitGuardTest(unittest.TestCase):
@@ -42,6 +51,11 @@ class PerfSubmitGuardTest(unittest.TestCase):
         candidate = guard.load_rows(write_json(timing_payload([("suite/a", 0.72, 1.0)])))
         baseline = guard.load_rows(write_json(timing_payload([("suite/a", 0.71, 1.0)])))
         self.assertEqual(guard.check_rows(candidate, baseline=baseline, ratio_threshold=0.8), [])
+
+    def test_skips_luajit_ratio_for_mixed_timing_sources(self):
+        rows = guard.load_rows(write_json(timing_payload([("suite/a", 0.02, 0.01, "wall_repeat", "script_repeat")])))
+        self.assertEqual(guard.check_rows(rows, ratio_threshold=0.8), [])
+        self.assertNotIn("suite/a", guard.format_summary(rows, []))
 
 
 def write_json(payload):
