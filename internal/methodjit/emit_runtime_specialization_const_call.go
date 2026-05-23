@@ -44,8 +44,8 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallIfEligible(instr *Instr
 	}
 
 	if !ec.runtimeSpecializationConstCallEntryGuarded(fact) || len(fact.IntGuardConsts) != 0 {
-		deoptLabel := ec.uniqueLabel("protocol_const_call_deopt")
-		doneGuardLabel := ec.uniqueLabel("protocol_const_call_guard_done")
+		deoptLabel := ec.uniqueLabel("runtime_specialization_const_call_deopt")
+		doneGuardLabel := ec.uniqueLabel("runtime_specialization_const_call_guard_done")
 		if !ec.runtimeSpecializationConstCallEntryGuarded(fact) {
 			for i, constIdx := range fact.GuardConsts {
 				ec.emitIndexedGlobalAddress(constIdx, deoptLabel)
@@ -123,8 +123,8 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallEntryGuards() {
 	if len(seen) == 0 {
 		return
 	}
-	deoptLabel := ec.uniqueLabel("protocol_const_entry_deopt")
-	doneLabel := ec.uniqueLabel("protocol_const_entry_done")
+	deoptLabel := ec.uniqueLabel("runtime_specialization_const_entry_deopt")
+	doneLabel := ec.uniqueLabel("runtime_specialization_const_entry_done")
 	for constIdx, proto := range seen {
 		ec.globalCacheConsts = append(ec.globalCacheConsts, constIdx)
 		ec.emitIndexedGlobalAddress(constIdx, deoptLabel)

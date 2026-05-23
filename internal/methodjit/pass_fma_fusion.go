@@ -23,12 +23,11 @@
 // PIPELINE-AWARE SKIP: when the accumulator argument is a Phi (typical
 // loop-carried reduction pattern: `sum = sum + a*b`), fusion causes
 // the dependency chain to serialize across iterations. Measured on
-// matmul: FMA fusion regresses 0.035s → 0.042s (+20%) because the
-// separated FMUL+FADD form allows the FMUL to execute speculatively
-// ahead of the accumulator chain. This is a known ARM64 performance
-// gotcha (ARM Cortex Perf Analysis Guide §6.3, similar on Apple M4).
-// We skip fusion for Phi accumulators; non-reduction patterns still
-// fuse correctly.
+// measured row-product loops: fusing a Phi-carried accumulator can regress
+// because the separated FMUL+FADD form allows the FMUL to execute ahead of the
+// accumulator chain. This is a known ARM64 scheduling issue (ARM Cortex Perf
+// Analysis Guide section 6.3, similar on Apple M-series cores). We skip fusion
+// for Phi accumulators; non-reduction patterns still fuse correctly.
 
 package methodjit
 

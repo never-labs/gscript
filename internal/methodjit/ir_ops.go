@@ -69,8 +69,8 @@ const (
 	//   OpMatrixStoreFRow(rowPtr, j, v) → void
 	//   OpMatrixLoadFRowConst(rowPtr) Aux=j → float
 	//   OpMatrixStoreFRowConst(rowPtr, v) Aux=j → void
-	// When i is loop-invariant (matmul: i fixed in j-loop and k-loop),
-	// LICM hoists OpMatrixRowPtr out so the k body is one LDR per load.
+	// When the row index is loop-invariant, LICM hoists OpMatrixRowPtr out so
+	// the inner body is one LDR per load.
 	OpMatrixRowPtr
 	OpMatrixLoadFRow
 	OpMatrixStoreFRow

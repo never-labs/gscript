@@ -67,9 +67,6 @@ func analyzeRuntimeRecursiveTableFold(proto *vm.FuncProto) (*runtimeRecursiveTab
 		return nil, false
 	}
 	for _, child := range children {
-		if child.field != "left" && child.field != "right" {
-			return nil, false
-		}
 		if expr.calls[child.field] != 1 {
 			return nil, false
 		}
@@ -77,17 +74,29 @@ func analyzeRuntimeRecursiveTableFold(proto *vm.FuncProto) (*runtimeRecursiveTab
 	if len(expr.calls) != len(children) {
 		return nil, false
 	}
+	if !runtimeFoldHasChild(children, nilField) {
+		return nil, false
+	}
 
-	protocolChildren := make([]runtimeRecursiveTableFoldChild, len(children))
+	planChildren := make([]runtimeRecursiveTableFoldChild, len(children))
 	for i, child := range children {
-		protocolChildren[i] = runtimeRecursiveTableFoldChild{field: child.field}
+		planChildren[i] = runtimeRecursiveTableFoldChild{field: child.field}
 	}
 	return &runtimeRecursiveTableFoldSpecialization{
 		nilField:    nilField,
 		baseValue:   baseValue,
 		combineBias: expr.constant,
-		children:    protocolChildren,
+		children:    planChildren,
 	}, true
+}
+
+func runtimeFoldHasChild(children []runtimeRecursiveTableFoldChild, field string) bool {
+	for _, child := range children {
+		if child.field == field {
+			return true
+		}
+	}
+	return false
 }
 
 func runtimeFoldParseNilBaseHeader(proto *vm.FuncProto) (nilField string, basePC, recursePC int, ok bool) {

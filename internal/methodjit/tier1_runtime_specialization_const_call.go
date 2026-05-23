@@ -49,8 +49,8 @@ func emitBaselineRuntimeSpecializationConstCallIfEligible(asm *jit.Assembler, in
 		return false
 	}
 
-	slowLabel := nextLabel("protocol_const_call_slow")
-	doneLabel := nextLabel("protocol_const_call_done")
+	slowLabel := nextLabel("runtime_specialization_const_call_slow")
+	doneLabel := nextLabel("runtime_specialization_const_call_done")
 
 	asm.LDR(jit.X0, mRegCtx, execCtxOffTier2GlobalVerPtr)
 	asm.CBZ(jit.X0, slowLabel)

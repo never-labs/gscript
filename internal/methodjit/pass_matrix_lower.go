@@ -14,11 +14,11 @@
 //                              OpMatrixStoreFRow(rowPtr, j, v)
 //
 // Flat/Stride depend only on m → LICM-hoistable when m is invariant.
-// RowPtr depends on (flat, stride, i) → hoistable when i is also
-// invariant (matmul's inner k-loop: a[i][k] has i invariant).
+// RowPtr depends on (flat, stride, i) -> hoistable when i is also
+// invariant, as in row-fixed matrix loops.
 // LoadFRow depends on (rowPtr, j) → typically not hoistable (j varies).
 //
-// For matmul inner k-loop, post-LICM:
+// For a row-fixed inner product loop, post-LICM:
 //   preheader (j-loop):  flat_a, stride_a, flat_b, stride_b
 //   preheader (k-loop):  rowPtr_a = flat_a + i*stride_a*8
 //   k body:              rowPtr_b = flat_b + k*stride_b*8

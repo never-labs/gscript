@@ -40,13 +40,10 @@ import (
 
 // inlineMaxCalleeSize is the maximum bytecode count for a callee to be
 // considered inlineable during the pre-scan and by the inline pass.
-// R72: raised 80 → 250 so that medium-large callees like nbody's
-// advance() (241 bytecode ops) can inline into <main>. Combined with
-// the main-driver-promote clause in shouldPromoteTier2, this
-// eliminates Tier 1 → Tier 2 BLR per loop iteration on driver
-// patterns. The hasCallInLoop gate (tier2.compileTier2) prevents
-// partial inlining from regressing: if full inline fails, main stays
-// at Tier 1 as before, so the bump is safe-by-construction.
+// Medium-large numeric callees should still inline into hot driver loops so
+// Tier 1 does not pay a BLR per iteration. The hasCallInLoop gate prevents
+// partial inlining from regressing: if full inline fails, main stays at Tier 1
+// as before, so the bump is safe-by-construction.
 const inlineMaxCalleeSize = 500
 
 // tmDefaultTier2Threshold is the BLR tier-up threshold. Controls when Tier 1's
@@ -665,13 +662,11 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 		if t1 != nil && proto.Feedback == nil && !IsFeedbackCollectionDisabled(proto) {
 			proto.EnsureFeedback()
 		}
-		// R162 widened OSR to LoopDepth >= 1 for clean post-pipeline bodies.
-		// R170 keeps the classic LoopDepth>=2 path open for already-proven
-		// deep-loop benchmarks (for example fannkuch), while LoopDepth<2
-		// candidates must pass the restart-safety check so restart-style OSR
-		// cannot replay table mutations from single-loop drivers. No-filter
-		// may bypass the performance-only call-in-loop prefilter, but it must
-		// not bypass restart-safety: replayed side effects are correctness bugs.
+		// Deep loop bodies can use the classic OSR path. Shallower candidates
+		// must pass the restart-safety check so restart-style OSR cannot replay
+		// table mutations from single-loop drivers. No-filter may bypass the
+		// performance-only call-in-loop prefilter, but it must not bypass
+		// restart-safety: replayed side effects are correctness bugs.
 		osrGate := allowGate("OSR", "not considered")
 		if jitSemanticGateEnabled() && proto.Name == "<main>" {
 			osrGate = blockGate("OSREligibility", "top-level restart would replay observable effects")

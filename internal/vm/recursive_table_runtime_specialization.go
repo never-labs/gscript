@@ -289,18 +289,30 @@ func analyzeRecursiveTableFoldSpecialization(proto *FuncProto) (*recursiveTableF
 	if len(expr.calls) != len(children) {
 		return nil, false
 	}
+	if !recursiveTableFoldHasChild(children, nilField) {
+		return nil, false
+	}
 
-	protocolChildren := make([]recursiveTableFoldChild, len(children))
+	planChildren := make([]recursiveTableFoldChild, len(children))
 	for i, child := range children {
-		protocolChildren[i] = recursiveTableFoldChild{field: child.field}
+		planChildren[i] = recursiveTableFoldChild{field: child.field}
 	}
 	return &recursiveTableFoldSpecializationPlan{
 		selfName:    selfName,
 		nilField:    nilField,
 		baseValue:   baseValue,
 		combineBias: expr.constant,
-		children:    protocolChildren,
+		children:    planChildren,
 	}, true
+}
+
+func recursiveTableFoldHasChild(children []recursiveTableFoldChild, field string) bool {
+	for _, child := range children {
+		if child.field == field {
+			return true
+		}
+	}
+	return false
 }
 
 func recursiveTableFoldParseNilBaseHeader(proto *FuncProto) (nilField string, basePC, recursePC int, ok bool) {

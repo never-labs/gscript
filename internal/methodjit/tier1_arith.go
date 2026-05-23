@@ -931,9 +931,9 @@ func emitBaselineTestSet(asm *jit.Assembler, inst uint32, pc int, code []uint32)
 // Skips per-operand tag dispatch when operands are statically known-int.
 // Correctness: param-entry guard + overflow guard both exit via ExitDeopt,
 // which the engine handles by disabling int-spec for the proto and
-// recompiling generic. Overflow re-execution may replay side effects — for
-// the target benchmarks (ack/fib/mutual_recursion with small values) it
-// never fires.
+// recompiling generic. Overflow re-execution may replay side effects, so
+// callers only enable this path when profiling says overflow is outside the
+// observed hot range.
 
 // emitIntSpecDeopt emits the ExitDeopt exit sequence: store the guard PC,
 // set ExitCode=2, then branch to the exit epilogue based on CallMode.
@@ -1019,7 +1019,8 @@ func emitBaselineArithIntSpec(asm *jit.Assembler, inst uint32, op string, pc int
 	storeSlot(asm, a, jit.X4)
 	asm.B(doneLabel)
 
-	// Overflow → ExitDeopt (rare; target benchmarks never trip this).
+	// Overflow -> ExitDeopt. The tiering manager disables this int-specialized
+	// path and resumes through the generic interpreter.
 	// Store this instruction's PC so Execute can resume the interpreter at
 	// exactly this point, skipping re-execution of earlier side effects.
 	asm.Label(overflowLabel)
