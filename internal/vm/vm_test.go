@@ -1212,6 +1212,24 @@ func TestInlineTableLiteralCallArgsStayContiguous(t *testing.T) {
 	}
 }
 
+func TestTableMovePlainArrayFastPathPreservesZeroSlot(t *testing.T) {
+	g := compileAndRun(t, `
+		src := {}
+		src[0] = 99
+		src[1] = 10
+		src[2] = 20
+		dst := {}
+		dst[0] = 7
+		table.move(src, 1, 2, 1, dst)
+		r0 := dst[0]
+		r1 := dst[1]
+		r2 := dst[2]
+	`)
+	expectGlobalInt(t, g, "r0", 7)
+	expectGlobalInt(t, g, "r1", 10)
+	expectGlobalInt(t, g, "r2", 20)
+}
+
 func TestExplicitSpreadTableConstructor(t *testing.T) {
 	g := compileAndRun(t, `
 		func pair() { return 2, 3 }

@@ -1340,6 +1340,9 @@ func (vm *VM) RegisterTableProxyLib() {
 				dst = args[4]
 			}
 			if e >= f {
+				if dst.Table().TryPlainArrayMove(src.Table(), f, e, tPos) {
+					return []runtime.Value{dst}, nil
+				}
 				count := e - f + 1
 				if tPos <= f || src.Table() != dst.Table() {
 					for i := int64(0); i < count; i++ {

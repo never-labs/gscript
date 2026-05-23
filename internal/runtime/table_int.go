@@ -190,6 +190,107 @@ func (t *Table) PlainNumericValueArrayRegionForNumericSpecialization(lo, hi int)
 	return region, true
 }
 
+// TryPlainArrayMove copies a plain integer-key array region without invoking
+// table metamethods. It is intentionally limited to non-concurrent, non-lazy
+// tables with no metatables; callers must fall back to normal table access when
+// it returns false.
+func (dst *Table) TryPlainArrayMove(src *Table, first, last, target int64) bool {
+	if src == nil || dst == nil || src.mu != nil || dst.mu != nil ||
+		src.lazyTree != nil || dst.lazyTree != nil ||
+		src.metatable != nil || dst.metatable != nil ||
+		first < 0 || target < 0 {
+		return false
+	}
+	if last < first {
+		return true
+	}
+	count := last - first + 1
+	end := target + count - 1
+	if count < 0 || end < target {
+		return false
+	}
+	switch src.arrayKind {
+	case ArrayInt:
+		if first >= int64(len(src.intArray)) || last >= int64(len(src.intArray)) {
+			return false
+		}
+		if first == 0 && !src.arrayZeroValid {
+			return false
+		}
+		dstZeroEmpty := len(dst.array) == 0 || (len(dst.array) == 1 && dst.array[0].IsNil())
+		if dst.arrayKind == ArrayMixed && dstZeroEmpty && dst.imap == nil && dst.hash == nil && len(dst.skeys) == 0 && len(dst.svals) == 0 && dst.smap == nil {
+			dst.arrayKind = ArrayInt
+			dst.array = nil
+			dst.arrayZeroValid = false
+		}
+		if dst.arrayKind != ArrayInt {
+			return false
+		}
+		if int(end) >= len(dst.intArray) {
+			needed := int(end) + 1
+			if needed > cap(dst.intArray) {
+				dst.intArray = DefaultHeap.GrowInt64s(dst.intArray, growTypedArrayCap(cap(dst.intArray), needed))
+			}
+			oldLen := len(dst.intArray)
+			dst.intArray = dst.intArray[:needed]
+			clear(dst.intArray[oldLen:])
+		}
+		copyIntArrayMove(dst.intArray, target, src.intArray, first, count, src == dst)
+	case ArrayMixed:
+		if first >= int64(len(src.array)) || last >= int64(len(src.array)) {
+			return false
+		}
+		if dst.arrayKind != ArrayMixed {
+			return false
+		}
+		if int(end) >= len(dst.array) {
+			needed := int(end) + 1
+			if needed > cap(dst.array) {
+				dst.array = DefaultHeap.GrowValues(dst.array, growTypedArrayCap(cap(dst.array), needed))
+			}
+			oldLen := len(dst.array)
+			dst.array = dst.array[:needed]
+			nv := NilValue()
+			for i := oldLen; i < needed; i++ {
+				dst.array[i] = nv
+			}
+		}
+		copyValueArrayMove(dst.array, target, src.array, first, count, src == dst)
+	default:
+		return false
+	}
+	if target == 0 {
+		dst.arrayZeroValid = true
+	}
+	dst.keysDirty = true
+	dst.bumpArrayVersionLocked()
+	return true
+}
+
+func copyIntArrayMove(dst []int64, target int64, src []int64, first int64, count int64, sameTable bool) {
+	if sameTable && target > first && target < first+count {
+		for i := count - 1; i >= 0; i-- {
+			dst[target+i] = src[first+i]
+		}
+		return
+	}
+	for i := int64(0); i < count; i++ {
+		dst[target+i] = src[first+i]
+	}
+}
+
+func copyValueArrayMove(dst []Value, target int64, src []Value, first int64, count int64, sameTable bool) {
+	if sameTable && target > first && target < first+count {
+		for i := count - 1; i >= 0; i-- {
+			dst[target+i] = src[first+i]
+		}
+		return
+	}
+	for i := int64(0); i < count; i++ {
+		dst[target+i] = src[first+i]
+	}
+}
+
 // valueToInt64 converts a Value to int64 for storage in intArray.
 func valueToInt64(val Value) int64 {
 	return val.Int()
