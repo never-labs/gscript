@@ -58,6 +58,23 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 	}
 }
 
+func TestNumericArrayRegionSortIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, numericArrayRegionSortSource)
+	quicksort := findTestProtoByName(top, "quicksort")
+	if quicksort == nil {
+		t.Fatal("missing quicksort proto")
+	}
+	quicksort.Name = "runtime_generated_region_sort"
+	quicksort.Source = "host/generated/not-a-benchmark.gs"
+
+	if !isNumericArrayRegionSortProto(quicksort) {
+		t.Fatal("numeric_array_region_sort recognizer should depend on bytecode shape, not proto metadata")
+	}
+	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(quicksort, callSiteNoResultRuntimeSpecializationNumericArrayRegionSort) {
+		t.Fatal("numeric_array_region_sort cache rejected metadata-renamed proto")
+	}
+}
+
 func TestNumericArrayRegionSortNoResultRuntimeSpecializationRecordsHits(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()

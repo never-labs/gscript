@@ -24,10 +24,11 @@ const (
 	spectralRuntimeSpecializationDenseAtAv
 )
 
-// maxSpectralCoefficientFloats caps the combined A and A^T coefficient cache.
-// The spectral call-site runtime specialization is dominated by repeated coefficient division
-// when the cache is disabled; a 64 MiB budget keeps the hot benchmark sizes on
-// the precomputed matrix-vector path without allowing unbounded O(n^2) memory.
+// maxSpectralCoefficientFloats caps the combined coefficient matrix and
+// transpose cache. The runtime-specialized coefficient loops are dominated by
+// repeated coefficient evaluation when the cache is disabled; a 64 MiB budget
+// keeps large matrix-vector calls on the precomputed path without allowing
+// unbounded O(n^2) memory.
 const maxSpectralCoefficientFloats = 1 << 23
 
 type spectralCoefficientCache struct {

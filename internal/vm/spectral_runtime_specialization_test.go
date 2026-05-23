@@ -55,6 +55,31 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 }
 
+func TestSpectralRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, spectralSource(t, "spectral_norm.gs"))
+	multiplyAv := findTestProtoByName(top, "multiplyAv")
+	multiplyAtv := findTestProtoByName(top, "multiplyAtv")
+	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
+	if multiplyAv == nil || multiplyAtv == nil || multiplyAtAv == nil {
+		t.Fatal("missing spectral protos")
+	}
+
+	for _, proto := range []*FuncProto{multiplyAv, multiplyAtv, multiplyAtAv} {
+		proto.Name = "runtime_generated_coefficient_loop"
+		proto.Source = "host/generated/not-a-benchmark.gs"
+	}
+
+	if !isSpectralAvProto(multiplyAv) {
+		t.Fatal("coefficient_matrix_vector recognizer should depend on bytecode shape, not proto metadata")
+	}
+	if !isSpectralAtvProto(multiplyAtv) {
+		t.Fatal("coefficient_matrix_transpose_vector recognizer should depend on bytecode shape, not proto metadata")
+	}
+	if !isSpectralAtAvProto(multiplyAtAv) {
+		t.Fatal("coefficient_matrix_ata_vector recognizer should depend on bytecode shape, not proto metadata")
+	}
+}
+
 func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 	top := compileProto(t, spectralSource(t, "spectral_norm_dense.gs"))
 	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
@@ -72,6 +97,23 @@ func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 	if got := multiplyAtAv.SpectralRuntimeSpecialization.spec.kind; got != spectralRuntimeSpecializationDenseAtAv {
 		t.Fatalf("dense spectral kind = %d, want %d", got, spectralRuntimeSpecializationDenseAtAv)
+	}
+}
+
+func TestDenseSpectralRuntimeSpecializationIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, spectralSource(t, "spectral_norm_dense.gs"))
+	multiplyAtAv := findTestProtoByName(top, "multiplyAtAv")
+	if multiplyAtAv == nil {
+		t.Fatal("missing dense multiplyAtAv proto")
+	}
+	multiplyAtAv.Name = "runtime_generated_dense_coefficient_loop"
+	multiplyAtAv.Source = "host/generated/not-a-benchmark.gs"
+
+	if !isDenseSpectralAtAvProto(multiplyAtAv) {
+		t.Fatal("dense_coefficient_matrix_ata_vector recognizer should depend on bytecode shape, not proto metadata")
+	}
+	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(multiplyAtAv, callSiteNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector) {
+		t.Fatal("dense_coefficient_matrix_ata_vector cache rejected metadata-renamed proto")
 	}
 }
 
