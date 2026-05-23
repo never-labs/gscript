@@ -11,28 +11,6 @@ type permutationFlipChecksumSpecializationSpec struct {
 	resultCtor *runtime.SmallTableCtor2
 }
 
-type permutationFlipChecksumBytecodeCheck struct {
-	pc   int
-	inst uint32
-}
-
-var permutationFlipChecksumBytecodeChecks = [...]permutationFlipChecksumBytecodeCheck{
-	{pc: 0, inst: EncodeABC(OP_NEWTABLE, 1, 0, 0)},
-	{pc: 1, inst: EncodeABC(OP_NEWTABLE, 2, 0, 0)},
-	{pc: 2, inst: EncodeABC(OP_NEWTABLE, 3, 0, 0)},
-	{pc: 6, inst: EncodeAsBx(OP_FORPREP, 4, 6)},
-	{pc: 13, inst: EncodeAsBx(OP_FORLOOP, 4, -7)},
-	{pc: 20, inst: EncodeAsBx(OP_FORPREP, 10, 4)},
-	{pc: 25, inst: EncodeAsBx(OP_FORLOOP, 10, -5)},
-	{pc: 34, inst: EncodeABC(OP_LT, 0, 15, 16)},
-	{pc: 51, inst: EncodeAsBx(OP_JMP, 0, -18)},
-	{pc: 64, inst: EncodeABC(OP_MOD, 15, 9, 16)},
-	{pc: 80, inst: EncodeAsBx(OP_FORPREP, 16, 34)},
-	{pc: 88, inst: EncodeAsBx(OP_FORPREP, 21, 5)},
-	{pc: 94, inst: EncodeAsBx(OP_FORLOOP, 21, -6)},
-	{pc: 115, inst: EncodeAsBx(OP_FORLOOP, 16, -35)},
-}
-
 func (vm *VM) tryRunPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationPermutationFlipChecksum) {
 		return false, nil, nil
@@ -110,13 +88,93 @@ func matchPermutationFlipChecksumBytecode(code []uint32) bool {
 		return false
 	}
 	p := newBytecodePattern(code)
-	for _, check := range permutationFlipChecksumBytecodeChecks {
-		if check.pc >= len(code) || code[check.pc] != check.inst {
-			return false
+	return matchPermutationTableSeeds(p) &&
+		matchPermutationLoopSkeleton(p) &&
+		matchPermutationFlipAndChecksumSkeleton(p) &&
+		matchPermutationResultReturn(p)
+}
+
+func matchPermutationTableSeeds(p bytecodePattern) bool {
+	return p.abc(0, OP_NEWTABLE, 1, 0, 0) &&
+		p.abc(1, OP_NEWTABLE, 2, 0, 0) &&
+		p.abc(2, OP_NEWTABLE, 3, 0, 0)
+}
+
+func matchPermutationLoopSkeleton(p bytecodePattern) bool {
+	initLoop, ok := findNumericForLoopWithBodyLen(p, 0, 6)
+	if !ok || !matchPermutationSeedLoopBody(p, initLoop.bodyPC) {
+		return false
+	}
+	copyLoop, ok := findNumericForLoopWithBodyLen(p, initLoop.loopPC+1, 4)
+	if !ok || !matchPermutationCopyLoopBody(p, copyLoop.bodyPC) {
+		return false
+	}
+	rotateLoop, ok := findNumericForLoopWithBodyLen(p, copyLoop.loopPC+1, 34)
+	if !ok {
+		return false
+	}
+	innerRotateLoop, ok := findNumericForLoopWithBodyLen(p, rotateLoop.bodyPC, 5)
+	return ok && innerRotateLoop.loopPC < rotateLoop.loopPC
+}
+
+type numericForLoopShape struct {
+	forPrepPC int
+	bodyPC    int
+	loopPC    int
+}
+
+func findNumericForLoopWithBodyLen(p bytecodePattern, startPC int, bodyLen int) (numericForLoopShape, bool) {
+	for pc := startPC; pc < len(p.code); pc++ {
+		inst, ok := p.op(pc, OP_FORPREP)
+		if !ok {
+			continue
+		}
+		bodyPC, loopPC, ok := p.numericForLoop(pc, DecodeA(inst))
+		if ok && loopPC-bodyPC == bodyLen {
+			return numericForLoopShape{forPrepPC: pc, bodyPC: bodyPC, loopPC: loopPC}, true
 		}
 	}
-	_, ok := p.op(len(code)-2, OP_NEWOBJECT2)
-	return ok && p.returnFixed(len(code)-1, 19, 2)
+	return numericForLoopShape{}, false
+}
+
+func matchPermutationSeedLoopBody(p bytecodePattern, bodyPC int) bool {
+	firstSet, ok := p.op(bodyPC+2, OP_SETTABLE)
+	if !ok || DecodeA(firstSet) != 2 {
+		return false
+	}
+	secondSet, ok := p.op(bodyPC+5, OP_SETTABLE)
+	return ok && DecodeA(secondSet) == 3
+}
+
+func matchPermutationCopyLoopBody(p bytecodePattern, bodyPC int) bool {
+	get, ok := p.op(bodyPC+1, OP_GETTABLE)
+	if !ok || DecodeB(get) != 2 {
+		return false
+	}
+	set, ok := p.op(bodyPC+3, OP_SETTABLE)
+	return ok && DecodeA(set) == 1
+}
+
+func matchPermutationFlipAndChecksumSkeleton(p bytecodePattern) bool {
+	hasFlipLoop := false
+	hasChecksumParity := false
+	for pc := range p.code {
+		if p.abc(pc, OP_LT, 0, 15, 16) {
+			hasFlipLoop = true
+		}
+		if p.abc(pc, OP_MOD, 15, 9, 16) {
+			hasChecksumParity = true
+		}
+	}
+	return hasFlipLoop && hasChecksumParity
+}
+
+func matchPermutationResultReturn(p bytecodePattern) bool {
+	inst, ok := p.op(len(p.code)-2, OP_NEWOBJECT2)
+	if !ok || DecodeA(inst) != 19 {
+		return false
+	}
+	return p.returnFixed(len(p.code)-1, 19, 2)
 }
 
 func permutationFlipChecksumResultCtor(p *FuncProto) (*runtime.SmallTableCtor2, bool) {
