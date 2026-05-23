@@ -398,6 +398,51 @@ func TestFixedShapeTableFactsPass_PropagatesNestedStringMapValueShape(t *testing
 	}
 }
 
+func TestFixedShapeTableFactsPass_PropagatesStringMapValueShapeThroughPhiReceiver(t *testing.T) {
+	proto := &vm.FuncProto{
+		Name: "phi_string_map_value_fact",
+		Constants: []runtime.Value{
+			runtime.StringValue("region"),
+			runtime.StringValue("product"),
+			runtime.StringValue("count"),
+		},
+	}
+	fn := &Function{Proto: proto, NumRegs: 8}
+	b := &Block{ID: 0, defs: make(map[int]*Value)}
+	totals := &Instr{ID: fn.newValueID(), Op: OpNewTable, Type: TypeTable, Block: b}
+	regionKey := &Instr{ID: fn.newValueID(), Op: OpConstString, Type: TypeString, Aux: 0, Block: b}
+	existingRegion := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeAny, Args: []*Value{totals.Value(), regionKey.Value()}, Block: b}
+	freshRegion := &Instr{ID: fn.newValueID(), Op: OpNewTable, Type: TypeTable, Block: b}
+	storeRegion := &Instr{ID: fn.newValueID(), Op: OpSetTable, Args: []*Value{totals.Value(), regionKey.Value(), freshRegion.Value()}, Block: b}
+	byRegion := &Instr{ID: fn.newValueID(), Op: OpPhi, Type: TypeTable, Args: []*Value{existingRegion.Value(), freshRegion.Value()}, Block: b}
+	productKey := &Instr{ID: fn.newValueID(), Op: OpConstString, Type: TypeString, Aux: 1, Block: b}
+	agg := &Instr{ID: fn.newValueID(), Op: OpNewTable, Type: TypeTable, Block: b}
+	zero := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 0, Block: b}
+	setCount := &Instr{ID: fn.newValueID(), Op: OpSetField, Args: []*Value{agg.Value(), zero.Value()}, Aux: 2, Block: b}
+	storeProduct := &Instr{ID: fn.newValueID(), Op: OpSetTable, Args: []*Value{byRegion.Value(), productKey.Value(), agg.Value()}, Block: b}
+	loadedAgg := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeAny, Args: []*Value{byRegion.Value(), productKey.Value()}, Block: b}
+	count := &Instr{ID: fn.newValueID(), Op: OpGetField, Type: TypeAny, Aux: 2, Args: []*Value{loadedAgg.Value()}, Block: b}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{count.Value()}, Block: b}
+	b.Instrs = []*Instr{
+		totals, regionKey, existingRegion, freshRegion, storeRegion, byRegion,
+		productKey, agg, zero, setCount, storeProduct, loadedAgg, count, ret,
+	}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+
+	out, err := FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{})(fn)
+	if err != nil {
+		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
+	}
+	aggFact, ok := out.Analysis.FixedShapeTables[loadedAgg.ID]
+	if !ok || aggFact.ShapeID == 0 {
+		t.Fatalf("phi string-map lookup did not carry aggregate shape: %#v\n%s", aggFact, Print(out))
+	}
+	if count.Aux2 == 0 || count.Type != TypeInt {
+		t.Fatalf("aggregate field was not annotated: aux2=%d type=%s\n%s", count.Aux2, count.Type, Print(out))
+	}
+}
+
 func TestFixedShapeTableFactsPass_ForwardsReturnedParamField(t *testing.T) {
 	top := compileProto(t, `
 func makePair(x, y) {

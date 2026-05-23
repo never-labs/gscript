@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/gscript/gscript/internal/runtime"
@@ -670,10 +671,39 @@ func mergeStringValueFacts(a, b *FixedShapeTableFact) *FixedShapeTableFact {
 	return cloneFixedShapeTableFactPtr(merged)
 }
 
+func fixedShapeFactsEqual(a, b FixedShapeTableFact) bool {
+	return a.ShapeID == b.ShapeID &&
+		a.ObservationCount == b.ObservationCount &&
+		reflect.DeepEqual(a.FieldNames, b.FieldNames) &&
+		reflect.DeepEqual(a.FieldTypes, b.FieldTypes) &&
+		reflect.DeepEqual(a.FieldRanges, b.FieldRanges) &&
+		reflect.DeepEqual(a.FieldLenRanges, b.FieldLenRanges) &&
+		reflect.DeepEqual(a.FieldTableFacts, b.FieldTableFacts) &&
+		reflect.DeepEqual(a.StringValueFact, b.StringValueFact) &&
+		a.ArrayElementType == b.ArrayElementType &&
+		a.ArrayElementRange == b.ArrayElementRange &&
+		a.Guarded == b.Guarded &&
+		a.EntryGuarded == b.EntryGuarded
+}
+
 func seedLocalStringMapValueFacts(fn *Function, facts map[int]FixedShapeTableFact) {
 	if fn == nil || len(facts) == 0 {
 		return
 	}
+	changed := true
+	for changed {
+		changed = false
+		if seedLocalStringMapValueFactsOnce(fn, facts) {
+			changed = true
+		}
+		if propagateStringMapValueFactsThroughPhiArgs(fn, facts) {
+			changed = true
+		}
+	}
+}
+
+func seedLocalStringMapValueFactsOnce(fn *Function, facts map[int]FixedShapeTableFact) bool {
+	changed := false
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpSetTable || len(instr.Args) < 3 ||
@@ -692,15 +722,61 @@ func seedLocalStringMapValueFacts(fn *Function, facts map[int]FixedShapeTableFac
 			if tableFact.StringValueFact == nil {
 				tableFact.StringValueFact = cloneFixedShapeTableFactPtr(stripped)
 			} else if merged := mergeStringValueFacts(tableFact.StringValueFact, &stripped); merged != nil {
+				if fixedShapeFactsEqual(*tableFact.StringValueFact, *merged) {
+					continue
+				}
 				tableFact.StringValueFact = merged
 			} else {
 				continue
 			}
 			facts[instr.Args[0].ID] = tableFact
+			changed = true
 			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("local string-map value carries fixed table shape %v", stripped.FieldNames))
 		}
 	}
+	return changed
+}
+
+func propagateStringMapValueFactsThroughPhiArgs(fn *Function, facts map[int]FixedShapeTableFact) bool {
+	if fn == nil || len(facts) == 0 {
+		return false
+	}
+	changed := false
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpPhi || len(instr.Args) == 0 {
+				continue
+			}
+			phiFact, ok := facts[instr.ID]
+			if !ok || phiFact.StringValueFact == nil {
+				continue
+			}
+			for _, arg := range instr.Args {
+				if arg == nil {
+					continue
+				}
+				argFact := facts[arg.ID]
+				if argFact.StringValueFact != nil {
+					merged := mergeStringValueFacts(argFact.StringValueFact, phiFact.StringValueFact)
+					if merged == nil || fixedShapeFactsEqual(*argFact.StringValueFact, *merged) {
+						continue
+					}
+					argFact.StringValueFact = merged
+				} else {
+					argFact.StringValueFact = cloneFixedShapeTableFactPtrFromPtr(phiFact.StringValueFact)
+				}
+				facts[arg.ID] = argFact
+				changed = true
+				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+					"propagated string-map value fact through phi argument")
+			}
+		}
+	}
+	return changed
 }
 
 func seedLocalFieldTableFacts(fn *Function, facts map[int]FixedShapeTableFact) {
