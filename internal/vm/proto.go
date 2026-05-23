@@ -51,6 +51,8 @@ type FuncProto struct {
 	NoGlobalOps                           bool                                        // true if bytecode has no get/set global operations
 	CallCount                             int                                         // JIT call count (avoids map lookup in VM hot path)
 	JITDisabled                           bool                                        // true when the method JIT made a permanent per-proto stay-interpreted decision
+	NumericToIntegerWrapperShape          int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
+	UTF8CodepointSumLoopShape             int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
 	Feedback                              FeedbackVector                              // lazily-initialized per-PC type feedback for Method JIT
 	TableKeyFeedback                      TableKeyFeedbackVector                      // lazily-initialized per-PC table int-key range feedback
 	FieldAccessFeedback                   FieldAccessFeedbackVector                   // lazily-initialized per-PC table field shape feedback
@@ -372,16 +374,16 @@ func (u *Upvalue) Close() {
 
 // CallFrame represents a single activation record on the VM call stack.
 type CallFrame struct {
-	closure     *Closure
-	pc          int             // program counter within closure.Proto.Code
-	base        int             // base register index in the VM register file
-	numResults  int             // expected number of results (-1 = variable)
-	varargs     []runtime.Value // extra arguments beyond fixed params
+	closure       *Closure
+	pc            int             // program counter within closure.Proto.Code
+	base          int             // base register index in the VM register file
+	numResults    int             // expected number of results (-1 = variable)
+	varargs       []runtime.Value // extra arguments beyond fixed params
 	inlineVarargs [8]runtime.Value
-	resultBase  int             // register in parent frame where results should be placed (for inline return)
-	resultCount int             // C parameter from caller's OP_CALL (0 = return all; for inline return)
-	callSitePC  int             // caller OP_CALL pc for result feedback (-1 when not a bytecode call)
-	defers      []deferredVMCall
+	resultBase    int // register in parent frame where results should be placed (for inline return)
+	resultCount   int // C parameter from caller's OP_CALL (0 = return all; for inline return)
+	callSitePC    int // caller OP_CALL pc for result feedback (-1 when not a bytecode call)
+	defers        []deferredVMCall
 }
 
 type deferredVMCall struct {

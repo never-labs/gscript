@@ -461,6 +461,12 @@ func mathFmodValue(a, b Value) (Value, error) {
 }
 
 func mathToIntegerValue(v Value) Value {
+	return ToIntegerValue(v)
+}
+
+// ToIntegerValue converts a numeric or numeric-string value to an exact integer,
+// returning nil when the conversion is not possible.
+func ToIntegerValue(v Value) Value {
 	if v.IsInt() {
 		return v
 	}

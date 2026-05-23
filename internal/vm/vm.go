@@ -494,6 +494,11 @@ func (vm *VM) RegisterToStringLib() {
 			if len(args) == 0 {
 				return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
 			}
+			if args[0].IsInt() {
+				if v, ok := runtime.CachedIntStringValue(args[0].Int()); ok {
+					return []runtime.Value{v}, nil
+				}
+			}
 			s, err := vm.luaToString(args[0])
 			if err != nil {
 				return nil, err
@@ -501,6 +506,11 @@ func (vm *VM) RegisterToStringLib() {
 			return []runtime.Value{runtime.StringValue(s)}, nil
 		},
 		FastArg1: func(arg runtime.Value) (runtime.Value, error) {
+			if arg.IsInt() {
+				if v, ok := runtime.CachedIntStringValue(arg.Int()); ok {
+					return v, nil
+				}
+			}
 			s, err := vm.luaToString(arg)
 			if err != nil {
 				return runtime.NilValue(), err
@@ -510,6 +520,11 @@ func (vm *VM) RegisterToStringLib() {
 		Fast1: func(args []runtime.Value) (runtime.Value, error) {
 			if len(args) == 0 {
 				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
+			}
+			if args[0].IsInt() {
+				if v, ok := runtime.CachedIntStringValue(args[0].Int()); ok {
+					return v, nil
+				}
 			}
 			s, err := vm.luaToString(args[0])
 			if err != nil {
@@ -3715,6 +3730,12 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 
 			if fnVal.IsFunction() {
 				if gf := fnVal.GoFunction(); gf != nil {
+					if handled, err := vm.tryFuseToStringNumericToIntegerWrapper(frame, base, a, nArgs, c, gf); err != nil {
+						return nil, wrapLineErr(frame, err)
+					} else if handled {
+						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+						break
+					}
 					if handled, err := vm.tryFastCoroutineCall(gf, base, a, nArgs, c); handled {
 						if err != nil {
 							if err == errCoroutineYield {
@@ -3841,6 +3862,12 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				}
 
 				proto := cl.Proto
+				if handled, err := vm.tryExecuteNumericToIntegerWrapperCall(cl, base+a, nArgs, c); err != nil {
+					return nil, wrapLineErr(frame, err)
+				} else if handled {
+					observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+					break
+				}
 
 				// Compute new base: after current frame's registers
 				newBase := base + frame.closure.Proto.MaxStack
@@ -4312,6 +4339,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 		case OP_TFORCALL:
 			a := DecodeA(inst)
 			c := DecodeC(inst)
+			if handled, err := vm.tryUTF8CodepointSumLoopRuntimeSpecialization(frame, base, a); err != nil {
+				return nil, err
+			} else if handled {
+				break
+			}
 			fnVal := vm.regs[base+a]
 
 			if fnVal.IsChannel() {

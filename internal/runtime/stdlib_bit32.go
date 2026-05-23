@@ -274,13 +274,16 @@ func installBit32FoldFastPaths(gf *GoFunction, name string, zero uint32, op func
 		return IntValue(int64(uint32(n))), nil
 	}
 	gf.FastArg2 = func(a, b Value) (Value, error) {
-		return bit32FoldFixed(name, zero, op, a, b)
+		return bit32FoldFixed2(name, op, a, b)
 	}
 	gf.FastArg3 = func(a, b, c Value) (Value, error) {
-		return bit32FoldFixed(name, zero, op, a, b, c)
+		return bit32FoldFixed3(name, op, a, b, c)
 	}
 	gf.FastArg4 = func(a, b, c, d Value) (Value, error) {
-		return bit32FoldFixed(name, zero, op, a, b, c, d)
+		return bit32FoldFixed4(name, op, a, b, c, d)
+	}
+	gf.FastArg8 = func(a, b, c, d, e, f, g, h Value) (Value, error) {
+		return bit32FoldFixed8(name, op, a, b, c, d, e, f, g, h)
 	}
 	gf.Fast1 = func(args []Value) (Value, error) {
 		return bit32FoldValues(args, name, zero, op)
@@ -302,6 +305,80 @@ func installBit32BinaryFastPath(gf *GoFunction, fast func(Value, Value) (Value, 
 
 func bit32FoldFixed(name string, zero uint32, op func(uint32, uint32) uint32, args ...Value) (Value, error) {
 	return bit32FoldValues(args, name, zero, op)
+}
+
+func bit32FoldFixed2(name string, op func(uint32, uint32) uint32, a, b Value) (Value, error) {
+	result, err := bit32FoldFirst(name, a)
+	if err != nil {
+		return NilValue(), err
+	}
+	return bit32FoldNext(name, op, result, 1, b)
+}
+
+func bit32FoldFixed3(name string, op func(uint32, uint32) uint32, a, b, c Value) (Value, error) {
+	result, err := bit32FoldFirst(name, a)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 1, b)
+	if err != nil {
+		return NilValue(), err
+	}
+	return bit32FoldNext(name, op, result, 2, c)
+}
+
+func bit32FoldFixed4(name string, op func(uint32, uint32) uint32, a, b, c, d Value) (Value, error) {
+	result, err := bit32FoldFirst(name, a)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 1, b)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 2, c)
+	if err != nil {
+		return NilValue(), err
+	}
+	return bit32FoldNext(name, op, result, 3, d)
+}
+
+func bit32FoldFixed8(name string, op func(uint32, uint32) uint32, a, b, c, d, e, f, g, h Value) (Value, error) {
+	result, err := bit32FoldFirst(name, a)
+	if err != nil {
+		return NilValue(), err
+	}
+	for i, v := range [...]Value{b, c, d, e, f, g, h} {
+		result, err = bit32FoldNextUint(name, op, result, i+1, v)
+		if err != nil {
+			return NilValue(), err
+		}
+	}
+	return IntValue(int64(result)), nil
+}
+
+func bit32FoldFirst(name string, v Value) (uint32, error) {
+	n, err := bit32ValueArg(v, 0, name)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(n), nil
+}
+
+func bit32FoldNext(name string, op func(uint32, uint32) uint32, result uint32, index int, v Value) (Value, error) {
+	next, err := bit32FoldNextUint(name, op, result, index, v)
+	if err != nil {
+		return NilValue(), err
+	}
+	return IntValue(int64(next)), nil
+}
+
+func bit32FoldNextUint(name string, op func(uint32, uint32) uint32, result uint32, index int, v Value) (uint32, error) {
+	n, err := bit32ValueArg(v, index, name)
+	if err != nil {
+		return 0, err
+	}
+	return op(result, uint32(n)), nil
 }
 
 func bit32FoldValues(args []Value, name string, zero uint32, op func(uint32, uint32) uint32) (Value, error) {

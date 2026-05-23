@@ -243,7 +243,7 @@ func TestBit32HotBuiltinsExposeFastArgPaths(t *testing.T) {
 	lib := buildBit32Lib()
 	for _, name := range []string{"band", "bor", "bxor"} {
 		gf := lib.RawGetString(name).GoFunction()
-		if gf == nil || gf.Fast1 == nil || gf.FastArg1 == nil || gf.FastArg2 == nil || gf.FastArg3 == nil || gf.FastArg4 == nil {
+		if gf == nil || gf.Fast1 == nil || gf.FastArg1 == nil || gf.FastArg2 == nil || gf.FastArg3 == nil || gf.FastArg4 == nil || gf.FastArg8 == nil {
 			t.Fatalf("bit32.%s missing fold fast paths: %#v", name, gf)
 		}
 		got, err := gf.FastArg3(IntValue(255), IntValue(15), IntValue(7))
@@ -256,6 +256,17 @@ func TestBit32HotBuiltinsExposeFastArgPaths(t *testing.T) {
 		}
 		if len(results) != 1 || got != results[0] {
 			t.Fatalf("bit32.%s FastArg3=%s Fn=%v", name, got.String(), results)
+		}
+		got, err = gf.FastArg8(IntValue(255), IntValue(15), IntValue(7), IntValue(3), IntValue(1), IntValue(12), IntValue(9), IntValue(5))
+		if err != nil {
+			t.Fatalf("bit32.%s FastArg8: %v", name, err)
+		}
+		results, err = gf.Fn([]Value{IntValue(255), IntValue(15), IntValue(7), IntValue(3), IntValue(1), IntValue(12), IntValue(9), IntValue(5)})
+		if err != nil {
+			t.Fatalf("bit32.%s Fn eight args: %v", name, err)
+		}
+		if len(results) != 1 || got != results[0] {
+			t.Fatalf("bit32.%s FastArg8=%s Fn=%v", name, got.String(), results)
 		}
 	}
 	for _, name := range []string{"lshift", "rshift", "arshift", "lrotate", "rrotate"} {

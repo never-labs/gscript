@@ -227,6 +227,11 @@ func (interp *Interpreter) registerBuiltins() {
 			if len(args) == 0 {
 				return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
 			}
+			if args[0].IsInt() {
+				if v, ok := CachedIntStringValue(args[0].Int()); ok {
+					return []Value{v}, nil
+				}
+			}
 			s, err := interp.luaToString(args[0])
 			if err != nil {
 				return nil, err
@@ -234,6 +239,11 @@ func (interp *Interpreter) registerBuiltins() {
 			return []Value{StringValue(s)}, nil
 		},
 		FastArg1: func(arg Value) (Value, error) {
+			if arg.IsInt() {
+				if v, ok := CachedIntStringValue(arg.Int()); ok {
+					return v, nil
+				}
+			}
 			s, err := interp.luaToString(arg)
 			if err != nil {
 				return NilValue(), err
@@ -243,6 +253,11 @@ func (interp *Interpreter) registerBuiltins() {
 		Fast1: func(args []Value) (Value, error) {
 			if len(args) == 0 {
 				return NilValue(), fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
+			}
+			if args[0].IsInt() {
+				if v, ok := CachedIntStringValue(args[0].Int()); ok {
+					return v, nil
+				}
 			}
 			s, err := interp.luaToString(args[0])
 			if err != nil {
@@ -290,6 +305,13 @@ func (interp *Interpreter) registerBuiltins() {
 		},
 		FastArg1: func(arg Value) (Value, error) {
 			v, ok := arg.ToNumber()
+			if !ok {
+				return NilValue(), nil
+			}
+			return v, nil
+		},
+		FastArg2: func(value, base Value) (Value, error) {
+			v, ok := tonumberWithBase(value, base)
 			if !ok {
 				return NilValue(), nil
 			}

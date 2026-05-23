@@ -480,6 +480,28 @@ func StringValue(s string) Value {
 	return Value(tagPtr | ptrSubString | (uint64(uintptr(p)) & ptrAddrMask))
 }
 
+const (
+	cachedIntStringMin = 0
+	cachedIntStringMax = 1023
+)
+
+var (
+	cachedIntStringOnce   sync.Once
+	cachedIntStringValues [cachedIntStringMax - cachedIntStringMin + 1]Value
+)
+
+func CachedIntStringValue(i int64) (Value, bool) {
+	if i < cachedIntStringMin || i > cachedIntStringMax {
+		return NilValue(), false
+	}
+	cachedIntStringOnce.Do(func() {
+		for n := cachedIntStringMin; n <= cachedIntStringMax; n++ {
+			cachedIntStringValues[n-cachedIntStringMin] = StringValue(strconv.FormatInt(int64(n), 10))
+		}
+	})
+	return cachedIntStringValues[i-cachedIntStringMin], true
+}
+
 const lazyConcatThreshold = 64
 
 type lazyString struct {

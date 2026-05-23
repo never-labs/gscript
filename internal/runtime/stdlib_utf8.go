@@ -322,14 +322,19 @@ func utf8CodepointValues(args []Value) ([]Value, error) {
 }
 
 func utf8SingleCodepointValue(sv, iv Value) (Value, error) {
-	results, err := utf8CodepointValues([]Value{sv, iv})
-	if err != nil {
-		return NilValue(), err
+	s := sv.Str()
+	i := toInt(iv)
+	if i < 0 {
+		i = int64(len(s)) + i + 1
 	}
-	if len(results) == 0 {
-		return NilValue(), nil
+	if i < 1 || i > int64(len(s)) {
+		return NilValue(), fmt.Errorf("out of bounds")
 	}
-	return results[0], nil
+	r, size := utf8.DecodeRuneInString(s[int(i)-1:])
+	if r == utf8.RuneError && size == 1 {
+		return NilValue(), fmt.Errorf("invalid UTF-8 code")
+	}
+	return IntValue(int64(r)), nil
 }
 
 func utf8CodesIteratorValue(sv Value) Value {
