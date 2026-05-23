@@ -806,6 +806,16 @@ def luajit_gap_is_hot_timed(current: SubjectResult | None, luajit: SubjectResult
     return not source_is_wall_timed(current) and not source_is_wall_timed(luajit)
 
 
+def luajit_hot_ratio(current: SubjectResult | None, luajit: SubjectResult | None) -> float | None:
+    # A wall-timed sample includes process startup and compilation overhead;
+    # comparing it with LuaJIT's in-script timer can mis-rank hot-loop work.
+    # Leave the raw measurements visible, but suppress the ratio until the
+    # caller scales the workload enough for comparable script-timed samples.
+    if not luajit_gap_is_hot_timed(current, luajit):
+        return None
+    return ratio(seconds(current), seconds(luajit))
+
+
 def print_table(results: list[BenchmarkResult], modes: list[str]) -> None:
     header = (
         f"{'Benchmark':<34} {'Scale':<18} {'Mode':<9} {'Current':>12} {'HEAD':>12} {'LuaJIT':>12} "
@@ -824,7 +834,7 @@ def print_table(results: list[BenchmarkResult], modes: list[str]) -> None:
             print(
                 f"{row.group + '/' + row.benchmark:<34} {fmt_scale(row.scale):<18} {mode:<9} "
                 f"{fmt_seconds(cur_s):>12} {fmt_seconds(head_s):>12} {fmt_seconds(lj_s):>12} "
-                f"{fmt_ratio(ratio(cur_s, head_s)):>9} {fmt_ratio(ratio(cur_s, lj_s)):>9} "
+                f"{fmt_ratio(ratio(cur_s, head_s)):>9} {fmt_ratio(luajit_hot_ratio(current, luajit)):>9} "
                 f"{fmt_pct(current.stats.cv_pct if current else None):>8} "
                 f"{fmt_pct(current.stats.ci95_half_width_pct if current else None):>8} "
                 f"{(current.repeat if current else 0):>7} "
@@ -841,9 +851,7 @@ def sorted_results_for_print(results: list[BenchmarkResult], modes: list[str], s
     def key(row: BenchmarkResult) -> float:
         current = row.modes.get(mode, {}).get("current")
         luajit = row.modes.get(mode, {}).get("luajit")
-        gap = ratio(seconds(current), seconds(luajit)) or -1.0
-        hot_timed = 1.0 if luajit_gap_is_hot_timed(current, luajit) else 0.0
-        return hot_timed * 1_000_000.0 + gap
+        return luajit_hot_ratio(current, luajit) or -1.0
 
     return sorted(results, key=key, reverse=True)
 
@@ -854,7 +862,7 @@ def luajit_gap_rows(results: list[BenchmarkResult], modes: list[str]) -> list[tu
         for mode in modes:
             current = row.modes.get(mode, {}).get("current")
             luajit = row.modes.get(mode, {}).get("luajit")
-            gap = ratio(seconds(current), seconds(luajit))
+            gap = luajit_hot_ratio(current, luajit)
             if gap is not None:
                 rows.append((gap, luajit_gap_is_hot_timed(current, luajit), row, mode))
     return sorted(rows, key=lambda item: (item[1], item[0]), reverse=True)
@@ -903,7 +911,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                         fmt_seconds(head_s),
                         fmt_seconds(lj_s),
                         fmt_ratio(ratio(cur_s, head_s)),
-                        fmt_ratio(ratio(cur_s, lj_s)),
+                        fmt_ratio(luajit_hot_ratio(current, luajit)),
                         str(current.repeat if current else 0),
                         fmt_pct(current.stats.cv_pct if current else None),
                         fmt_pct(current.stats.ci95_half_width_pct if current else None),
