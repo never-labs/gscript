@@ -267,6 +267,123 @@ func (dst *Table) TryPlainArrayMove(src *Table, first, last, target int64) bool 
 	return true
 }
 
+// TryPlainArrayInsert inserts into a dense 1-based array table without
+// invoking metamethod-aware table access. It is a guarded table-library fast
+// path: callers must fall back to ordinary table.insert semantics when it
+// returns false.
+func (t *Table) TryPlainArrayInsert(pos int64, val Value) bool {
+	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil ||
+		t.dmMeta != nil || t.dmStride != 0 || pos < 1 {
+		return false
+	}
+	length := int64(t.Length())
+	if pos > length+1 {
+		return false
+	}
+	idx := int(pos)
+	switch t.arrayKind {
+	case ArrayInt:
+		if classifyValueForArray(val) != ArrayInt || int64(len(t.intArray)) != length+1 {
+			return false
+		}
+		t.intArray = append(t.intArray, 0)
+		copy(t.intArray[idx+1:], t.intArray[idx:])
+		t.intArray[idx] = valueToInt64(val)
+	case ArrayFloat:
+		if val.Type() != TypeFloat || int64(len(t.floatArray)) != length+1 {
+			return false
+		}
+		t.floatArray = append(t.floatArray, 0)
+		copy(t.floatArray[idx+1:], t.floatArray[idx:])
+		t.floatArray[idx] = val.Float()
+	case ArrayBool:
+		if val.Type() != TypeBool || int64(len(t.boolArray)) != length+1 {
+			return false
+		}
+		t.boolArray = append(t.boolArray, 0)
+		copy(t.boolArray[idx+1:], t.boolArray[idx:])
+		if val.Bool() {
+			t.boolArray[idx] = 2
+		} else {
+			t.boolArray[idx] = 1
+		}
+	case ArrayMixed:
+		if int64(len(t.array)) != length+1 || len(t.array) == 0 {
+			return false
+		}
+		t.array = append(t.array, NilValue())
+		copy(t.array[idx+1:], t.array[idx:])
+		t.array[idx] = val
+	default:
+		return false
+	}
+	t.keysDirty = true
+	t.bumpArrayVersionLocked()
+	return true
+}
+
+// TryPlainArrayRemove removes from a dense 1-based array table without
+// metamethod-aware table access. The boolean reports whether the guarded fast
+// path handled the operation.
+func (t *Table) TryPlainArrayRemove(pos int64) (Value, bool) {
+	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil ||
+		t.dmMeta != nil || t.dmStride != 0 {
+		return NilValue(), false
+	}
+	length := int64(t.Length())
+	if length == 0 && pos == 0 {
+		return NilValue(), false
+	}
+	if pos < 1 || pos > length {
+		return NilValue(), false
+	}
+	idx := int(pos)
+	var removed Value
+	switch t.arrayKind {
+	case ArrayInt:
+		if int64(len(t.intArray)) != length+1 {
+			return NilValue(), false
+		}
+		removed = IntValue(t.intArray[idx])
+		copy(t.intArray[idx:], t.intArray[idx+1:])
+		t.intArray = t.intArray[:len(t.intArray)-1]
+	case ArrayFloat:
+		if int64(len(t.floatArray)) != length+1 {
+			return NilValue(), false
+		}
+		removed = FloatValue(t.floatArray[idx])
+		copy(t.floatArray[idx:], t.floatArray[idx+1:])
+		t.floatArray = t.floatArray[:len(t.floatArray)-1]
+	case ArrayBool:
+		if int64(len(t.boolArray)) != length+1 {
+			return NilValue(), false
+		}
+		switch t.boolArray[idx] {
+		case 0:
+			removed = NilValue()
+		case 1:
+			removed = BoolValue(false)
+		default:
+			removed = BoolValue(true)
+		}
+		copy(t.boolArray[idx:], t.boolArray[idx+1:])
+		t.boolArray = t.boolArray[:len(t.boolArray)-1]
+	case ArrayMixed:
+		if int64(len(t.array)) != length+1 || len(t.array) == 0 {
+			return NilValue(), false
+		}
+		removed = t.array[idx]
+		copy(t.array[idx:], t.array[idx+1:])
+		t.array[len(t.array)-1] = NilValue()
+		t.array = t.array[:len(t.array)-1]
+	default:
+		return NilValue(), false
+	}
+	t.keysDirty = true
+	t.bumpArrayVersionLocked()
+	return removed, true
+}
+
 func copyIntArrayMove(dst []int64, target int64, src []int64, first int64, count int64, sameTable bool) {
 	if sameTable && target > first && target < first+count {
 		for i := count - 1; i >= 0; i-- {

@@ -391,6 +391,40 @@ func TestTableAsStack(t *testing.T) {
 	}
 }
 
+func TestPlainArrayInsertRemoveFastPath(t *testing.T) {
+	tbl := NewTableSizedKind(4, 0, ArrayInt)
+	for i := int64(1); i <= 4; i++ {
+		tbl.RawSetInt(i, IntValue(i*10))
+	}
+	if !tbl.TryPlainArrayInsert(2, IntValue(99)) {
+		t.Fatal("TryPlainArrayInsert did not handle dense int array")
+	}
+	wantAfterInsert := []int64{10, 99, 20, 30, 40}
+	for i, want := range wantAfterInsert {
+		got := tbl.RawGetInt(int64(i + 1))
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("after insert index %d = %v, want %d", i+1, got, want)
+		}
+	}
+	removed, ok := tbl.TryPlainArrayRemove(3)
+	if !ok {
+		t.Fatal("TryPlainArrayRemove did not handle dense int array")
+	}
+	if !removed.IsInt() || removed.Int() != 20 {
+		t.Fatalf("removed = %v, want 20", removed)
+	}
+	wantAfterRemove := []int64{10, 99, 30, 40}
+	for i, want := range wantAfterRemove {
+		got := tbl.RawGetInt(int64(i + 1))
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("after remove index %d = %v, want %d", i+1, got, want)
+		}
+	}
+	if got := tbl.Length(); got != len(wantAfterRemove) {
+		t.Fatalf("length = %d, want %d", got, len(wantAfterRemove))
+	}
+}
+
 // --- Table with function values ---
 
 func TestTableWithFunctions(t *testing.T) {

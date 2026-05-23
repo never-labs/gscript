@@ -1232,11 +1232,17 @@ func (vm *VM) RegisterTableProxyLib() {
 			return err
 		}
 		if !hasPos {
+			if t.Table().TryPlainArrayInsert(int64(length+1), value) {
+				return nil
+			}
 			return vm.tableSet(t, runtime.IntValue(length+1), value)
 		}
 		pos := vmToInt(posValue)
 		if pos < 1 || pos > length+1 {
 			return fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+		}
+		if t.Table().TryPlainArrayInsert(pos, value) {
+			return nil
 		}
 		for i := length; i >= pos; i-- {
 			v, err := vm.tableGet(t, runtime.IntValue(i))
@@ -1266,6 +1272,9 @@ func (vm *VM) RegisterTableProxyLib() {
 		}
 		if pos == length+1 {
 			return runtime.NilValue(), nil
+		}
+		if removed, ok := t.Table().TryPlainArrayRemove(pos); ok {
+			return removed, nil
 		}
 		removed, err := vm.tableGet(t, runtime.IntValue(pos))
 		if err != nil {
