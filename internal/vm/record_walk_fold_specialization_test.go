@@ -82,7 +82,7 @@ func fold_rows(rows, n, passes) {
 
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
-	kernelGlobals := compileAndRun(t, src+`
+	specializationGlobals := compileAndRun(t, src+`
 rows := build(64)
 result := fold_rows(rows, 64, 5)
 seen1 := rows[1].counters.seen
@@ -102,12 +102,12 @@ rows := build(64)
 result := fold_rows(rows, 64, 5)
 seen1 := rows[1].counters.seen
 `)
-	got := kernelGlobals["result"].Number()
+	got := specializationGlobals["result"].Number()
 	want := fallbackGlobals["result"].Number()
 	if math.Abs(got-want) > 0 {
 		t.Fatalf("specialization result %.0f, fallback %.0f", got, want)
 	}
-	gotSeen := kernelGlobals["seen1"].Number()
+	gotSeen := specializationGlobals["seen1"].Number()
 	wantSeen := fallbackGlobals["seen1"].Number()
 	if math.Abs(gotSeen-wantSeen) > 0 {
 		t.Fatalf("mutated metric %.0f, fallback %.0f", gotSeen, wantSeen)

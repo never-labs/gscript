@@ -20,7 +20,7 @@ func (tm *TieringManager) executeTier2(cf *CompiledFunction, regs []runtime.Valu
 }
 
 func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
-	if results, handled, err := tm.executeCompiledProtocol(cf, regs, base, proto, retBuf); handled {
+	if results, handled, err := tm.executeCompiledSpecialization(cf, regs, base, proto, retBuf); handled {
 		return results, err
 	}
 	if tm.callVM != nil {

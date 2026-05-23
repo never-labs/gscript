@@ -12,7 +12,7 @@ import (
 
 const maxRuntimeRecursiveIntFoldIterations = 1_000_000
 
-type runtimeRecursiveIntFoldProtocol struct {
+type runtimeRecursiveIntFoldSpecialization struct {
 	threshold int64
 	bias      int64
 	terms     []runtimeRecursiveIntFoldTerm
@@ -52,7 +52,7 @@ func qualifiesForRuntimeRecursiveIntFold(proto *vm.FuncProto) bool {
 	return ok
 }
 
-func analyzeRuntimeRecursiveIntFold(proto *vm.FuncProto) (*runtimeRecursiveIntFoldProtocol, bool) {
+func analyzeRuntimeRecursiveIntFold(proto *vm.FuncProto) (*runtimeRecursiveIntFoldSpecialization, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 1 || proto.Name == "" {
 		return nil, false
 	}
@@ -85,7 +85,7 @@ func analyzeRuntimeRecursiveIntFold(proto *vm.FuncProto) (*runtimeRecursiveIntFo
 			count:     expr.calls[decrement],
 		})
 	}
-	return &runtimeRecursiveIntFoldProtocol{
+	return &runtimeRecursiveIntFoldSpecialization{
 		threshold: threshold,
 		bias:      expr.constant,
 		terms:     terms,
@@ -235,14 +235,14 @@ func runtimeIntExprAdd(a, b runtimeRecursiveIntFoldExpr) (runtimeRecursiveIntFol
 }
 
 func newRuntimeRecursiveIntFoldCompiled(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	protocol, ok := analyzeRuntimeRecursiveIntFold(proto)
+	specialization, ok := analyzeRuntimeRecursiveIntFold(proto)
 	if !ok {
 		return nil, false
 	}
 	return &CompiledFunction{
 		Proto:                   proto,
 		numRegs:                 proto.MaxStack,
-		RuntimeRecursiveIntFold: protocol,
+		RuntimeRecursiveIntFold: specialization,
 	}, true
 }
 
@@ -254,9 +254,9 @@ func (tm *TieringManager) compileRuntimeRecursiveIntFoldTier2(proto *vm.FuncProt
 	tm.tier2Attempts++
 	attempt := tm.tier2Attempts
 	tm.traceEvent("tier2_attempt", "tier2", proto, map[string]any{
-		"attempt":    attempt,
-		"call_count": proto.CallCount,
-		"protocol":   "recursive_int_fold",
+		"attempt":        attempt,
+		"call_count":     proto.CallCount,
+		"specialization": "recursive_int_fold",
 	})
 	tm.traceTier2Success(proto, cf, attempt)
 	return cf, true
@@ -264,7 +264,7 @@ func (tm *TieringManager) compileRuntimeRecursiveIntFoldTier2(proto *vm.FuncProt
 
 func (tm *TieringManager) executeRuntimeRecursiveIntFold(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
 	if cf == nil || cf.RuntimeRecursiveIntFold == nil || proto == nil {
-		return nil, fmt.Errorf("tier2: missing runtime recursive int fold protocol")
+		return nil, fmt.Errorf("tier2: missing runtime recursive int fold specialization")
 	}
 	if base < 0 || base >= len(regs) {
 		return nil, fmt.Errorf("tier2: runtime recursive int fold base %d outside regs len %d", base, len(regs))
@@ -284,7 +284,7 @@ func (tm *TieringManager) executeRuntimeRecursiveIntFold(cf *CompiledFunction, r
 	return runtime.ReuseValueSlice1(retBuf, result), nil
 }
 
-func (p *runtimeRecursiveIntFoldProtocol) fold(v runtime.Value) (int64, bool) {
+func (p *runtimeRecursiveIntFoldSpecialization) fold(v runtime.Value) (int64, bool) {
 	if p == nil || !v.IsInt() {
 		return 0, false
 	}

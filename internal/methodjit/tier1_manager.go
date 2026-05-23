@@ -202,7 +202,7 @@ func (e *BaselineJITEngine) SetOuterCompiler(fn func(*vm.FuncProto) interface{})
 	e.outerCompiler = fn
 }
 
-func (e *BaselineJITEngine) SetCompiledProtocolCallExecutor(fn func(runtime.Value, []runtime.Value, int, int, int) (bool, error)) {
+func (e *BaselineJITEngine) SetCompiledSpecializationCallExecutor(fn func(runtime.Value, []runtime.Value, int, int, int) (bool, error)) {
 	e.protocolCallExecutor = fn
 }
 

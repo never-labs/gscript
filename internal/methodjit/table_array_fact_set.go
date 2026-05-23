@@ -1,11 +1,11 @@
 package methodjit
 
-// tableArrayFactSet owns the block-local protocol for typed table-array facts.
+// tableArrayFactSet owns the block-local consistency discipline for typed table-array facts.
 //
 // Invariant: a complete fact for (table, kind) is visible only after a matching
 // TableArrayHeader, TableArrayLen, and TableArrayData have all been observed
 // without an intervening structural mutation of that table or a call. Checked
-// OpTableArrayStore and OpTableArraySwap preserve the protocol;
+// OpTableArrayStore and OpTableArraySwap preserve that fact chain;
 // OpSetTable/OpAppend/OpSetList do not unless they have already been lowered.
 type tableArrayFactSet struct {
 	headersByTable map[tableArrayHeaderKey]*tableArrayHeaderFact

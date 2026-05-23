@@ -41,7 +41,7 @@ func AnnotateRuntimeSpecializationConstCallFolds(fn *Function, globals map[strin
 				guardNames = []string{name}
 				guardProtos = []*vm.FuncProto{callee}
 			}
-			guardConsts, ok := protocolEnsureGuardConstIndexes(fn.Proto, guardNames)
+			guardConsts, ok := specializationEnsureGuardConstIndexes(fn.Proto, guardNames)
 			if !ok {
 				continue
 			}
@@ -107,22 +107,22 @@ func foldRuntimeSpecializationConstCall(callee *vm.FuncProto, globals map[string
 			}
 			intArgs[i] = arg.Int()
 		}
-		protocol := cf.MutualRecursiveIntSCC
+		specialization := cf.MutualRecursiveIntSCC
 		e := &mutualRecursiveIntEvaluator{
-			protocol: protocol,
-			memo:     make(map[mutualRecursiveIntKey]int64),
-			active:   make(map[mutualRecursiveIntKey]bool),
+			specialization: specialization,
+			memo:           make(map[mutualRecursiveIntKey]int64),
+			active:         make(map[mutualRecursiveIntKey]bool),
 		}
-		out, ok := e.eval(protocol.entryIndex, intArgs)
+		out, ok := e.eval(specialization.entryIndex, intArgs)
 		if !ok {
 			return 0, nil, nil, false
 		}
-		return out, append([]string(nil), protocol.names...), append([]*vm.FuncProto(nil), protocol.protos...), true
+		return out, append([]string(nil), specialization.names...), append([]*vm.FuncProto(nil), specialization.protos...), true
 	}
 	return 0, nil, nil, false
 }
 
-func protocolEnsureGuardConstIndexes(proto *vm.FuncProto, names []string) ([]int, bool) {
+func specializationEnsureGuardConstIndexes(proto *vm.FuncProto, names []string) ([]int, bool) {
 	if proto == nil || len(names) == 0 {
 		return nil, false
 	}

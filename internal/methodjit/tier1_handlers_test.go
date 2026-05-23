@@ -105,7 +105,7 @@ func TestHandleCall_RecordsFeedbackAtCallPC(t *testing.T) {
 	}
 }
 
-func TestHandleCall_UsesCompiledProtocolExecutor(t *testing.T) {
+func TestHandleCall_UsesCompiledSpecializationExecutor(t *testing.T) {
 	proto := &vm.FuncProto{
 		Code: []uint32{
 			vm.EncodeABC(vm.OP_CALL, 0, 2, 2),
@@ -138,7 +138,7 @@ func TestHandleCall_UsesCompiledProtocolExecutor(t *testing.T) {
 		t.Fatalf("handleCall returned error: %v", err)
 	}
 	if !regs[0].IsInt() || regs[0].Int() != 42 {
-		t.Fatalf("protocol executor result=%v, want 42", regs[0])
+		t.Fatalf("specialization executor result=%v, want 42", regs[0])
 	}
 	if got := proto.CallSiteFeedback[0].Count; got != 1 {
 		t.Fatalf("call feedback count=%d, want 1", got)

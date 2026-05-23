@@ -15,7 +15,7 @@ import (
 // specialized runtime path monopolize the process.
 const runtimeRecursiveTableBuilderMaxDepth = 20
 
-type runtimeRecursiveTableBuilderProtocol struct {
+type runtimeRecursiveTableBuilderSpecialization struct {
 	ctor runtime.SmallTableCtor2
 }
 
@@ -24,7 +24,7 @@ func qualifiesForRuntimeRecursiveTableBuilder(proto *vm.FuncProto) bool {
 	return ok
 }
 
-func analyzeRuntimeRecursiveTableBuilder(proto *vm.FuncProto) (*runtimeRecursiveTableBuilderProtocol, bool) {
+func analyzeRuntimeRecursiveTableBuilder(proto *vm.FuncProto) (*runtimeRecursiveTableBuilderSpecialization, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 1 || proto.Name == "" {
 		return nil, false
 	}
@@ -71,7 +71,7 @@ func analyzeRuntimeRecursiveTableBuilder(proto *vm.FuncProto) (*runtimeRecursive
 	if !cacheableSmallCtor2(&ctor) {
 		return nil, false
 	}
-	return &runtimeRecursiveTableBuilderProtocol{ctor: ctor}, true
+	return &runtimeRecursiveTableBuilderSpecialization{ctor: ctor}, true
 }
 
 func runtimeBuilderSelfCall(proto *vm.FuncProto, get, one, sub, call uint32, fnSlot, argSlot int) bool {
@@ -95,14 +95,14 @@ func runtimeBuilderSelfCall(proto *vm.FuncProto, get, one, sub, call uint32, fnS
 }
 
 func newRuntimeRecursiveTableBuilderCompiled(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	protocol, ok := analyzeRuntimeRecursiveTableBuilder(proto)
+	specialization, ok := analyzeRuntimeRecursiveTableBuilder(proto)
 	if !ok {
 		return nil, false
 	}
 	return &CompiledFunction{
 		Proto:                        proto,
 		numRegs:                      proto.MaxStack,
-		RuntimeRecursiveTableBuilder: protocol,
+		RuntimeRecursiveTableBuilder: specialization,
 	}, true
 }
 
@@ -114,9 +114,9 @@ func (tm *TieringManager) compileRuntimeRecursiveTableBuilderTier2(proto *vm.Fun
 	tm.tier2Attempts++
 	attempt := tm.tier2Attempts
 	tm.traceEvent("tier2_attempt", "tier2", proto, map[string]any{
-		"attempt":    attempt,
-		"call_count": proto.CallCount,
-		"protocol":   "lazy_recursive_table_builder",
+		"attempt":        attempt,
+		"call_count":     proto.CallCount,
+		"specialization": "lazy_recursive_table_builder",
 	})
 	tm.traceTier2Success(proto, cf, attempt)
 	return cf, true
@@ -124,7 +124,7 @@ func (tm *TieringManager) compileRuntimeRecursiveTableBuilderTier2(proto *vm.Fun
 
 func (tm *TieringManager) executeRuntimeRecursiveTableBuilder(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
 	if cf == nil || cf.RuntimeRecursiveTableBuilder == nil || proto == nil {
-		return nil, fmt.Errorf("tier2: missing runtime recursive table builder protocol")
+		return nil, fmt.Errorf("tier2: missing runtime recursive table builder specialization")
 	}
 	if base < 0 || base >= len(regs) {
 		return nil, fmt.Errorf("tier2: runtime recursive table builder base %d outside regs len %d", base, len(regs))
@@ -149,6 +149,6 @@ func (tm *TieringManager) executeRuntimeRecursiveTableBuilder(cf *CompiledFuncti
 	return runtime.ReuseValueSlice1(retBuf, result), nil
 }
 
-func (p *runtimeRecursiveTableBuilderProtocol) build(depth int64) runtime.Value {
+func (p *runtimeRecursiveTableBuilderSpecialization) build(depth int64) runtime.Value {
 	return runtime.FreshTableValue(runtime.NewLazyRecursiveTable(&p.ctor, depth))
 }

@@ -129,7 +129,7 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
 | comparison branches | `__eq`/`__lt`/`__le` 与 raw equality 已覆盖 | comparison branches 被 gate | 补比较分支的 metamethod、error 和 deopt 合约 |
 | call/coroutine boundaries | call、xpcall、yield/resume 等语言语义已覆盖 | call/self/generic-for/resume/yield 被 gate | 先补 native call boundary 的 error/yield/fallback 协议 |
 | skipped Tier 2 quicksort / driver-loop tests | 不影响官方 translated VM/JIT output parity | methodjit 内部保留 skipped known bug/design-record tests | 作为 JIT correctness backlog，不写进 official `KNOWN_FAILURES.md` |
-| whole-call no-result kernel | 语言侧无缺口 | disabled optimization，fallback contract 尚未证明 | 定义无返回 call op-exit 的恢复与副作用合约后再启用 |
+| whole-call no-result specialization | 语言侧无缺口 | disabled optimization，fallback contract 尚未证明 | 定义无返回 call op-exit 的恢复与副作用合约后再启用 |
 
 ## Covered GScript equivalents
 

@@ -73,7 +73,7 @@ root := makeTree(5)
 		t.Fatal("missing Tier 2 compiled checkTree")
 	}
 	if !cf.TypedSelfABI.Eligible {
-		t.Fatalf("compiled checkTree did not use typed ABI: protocol=%s typed=%+v", cf.ProtocolKind(), cf.TypedSelfABI)
+		t.Fatalf("compiled checkTree did not use typed ABI: specialization=%s typed=%+v", cf.SpecializationKind(), cf.TypedSelfABI)
 	}
 
 	checkTree.EnteredTier2 = 0

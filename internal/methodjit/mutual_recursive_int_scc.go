@@ -20,7 +20,7 @@ const (
 	mutualRecursiveIntValueFunc       = 2
 )
 
-type mutualRecursiveIntSCCProtocol struct {
+type mutualRecursiveIntSCCSpecialization struct {
 	protos      []*vm.FuncProto
 	names       []string
 	indexByName map[string]int
@@ -50,14 +50,14 @@ type mutualRecursiveIntLast struct {
 }
 
 type mutualRecursiveIntEvaluator struct {
-	protocol *mutualRecursiveIntSCCProtocol
-	memo     map[mutualRecursiveIntKey]int64
-	active   map[mutualRecursiveIntKey]bool
-	evals    int
-	steps    int
+	specialization *mutualRecursiveIntSCCSpecialization
+	memo           map[mutualRecursiveIntKey]int64
+	active         map[mutualRecursiveIntKey]bool
+	evals          int
+	steps          int
 }
 
-func analyzeMutualRecursiveIntSCC(proto *vm.FuncProto, globals map[string]*vm.FuncProto) (*mutualRecursiveIntSCCProtocol, bool) {
+func analyzeMutualRecursiveIntSCC(proto *vm.FuncProto, globals map[string]*vm.FuncProto) (*mutualRecursiveIntSCCSpecialization, bool) {
 	if proto == nil || len(globals) == 0 || !qualifiesAsPureIntRecursiveMember(proto) {
 		return nil, false
 	}
@@ -134,7 +134,7 @@ func analyzeMutualRecursiveIntSCC(proto *vm.FuncProto, globals map[string]*vm.Fu
 	for i, p := range order {
 		names[i] = p.Name
 	}
-	return &mutualRecursiveIntSCCProtocol{
+	return &mutualRecursiveIntSCCSpecialization{
 		protos:      order,
 		names:       names,
 		indexByName: indexByName,
@@ -224,14 +224,14 @@ func mutualRecursiveIntStronglyConnected(protos []*vm.FuncProto, indexByName map
 }
 
 func newMutualRecursiveIntSCCCompiled(proto *vm.FuncProto, globals map[string]*vm.FuncProto) (*CompiledFunction, bool) {
-	protocol, ok := analyzeMutualRecursiveIntSCC(proto, globals)
+	specialization, ok := analyzeMutualRecursiveIntSCC(proto, globals)
 	if !ok {
 		return nil, false
 	}
 	return &CompiledFunction{
 		Proto:                 proto,
 		numRegs:               proto.MaxStack,
-		MutualRecursiveIntSCC: protocol,
+		MutualRecursiveIntSCC: specialization,
 	}, true
 }
 
@@ -247,9 +247,9 @@ func (tm *TieringManager) compileMutualRecursiveIntSCCTier2WithGlobals(proto *vm
 	tm.tier2Attempts++
 	attempt := tm.tier2Attempts
 	tm.traceEvent("tier2_attempt", "tier2", proto, map[string]any{
-		"attempt":    attempt,
-		"call_count": proto.CallCount,
-		"protocol":   "mutual_recursive_int_scc",
+		"attempt":        attempt,
+		"call_count":     proto.CallCount,
+		"specialization": "mutual_recursive_int_scc",
 	})
 	tm.traceTier2Success(proto, cf, attempt)
 	return cf, true
@@ -257,7 +257,7 @@ func (tm *TieringManager) compileMutualRecursiveIntSCCTier2WithGlobals(proto *vm
 
 func (tm *TieringManager) executeMutualRecursiveIntSCC(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
 	if cf == nil || cf.MutualRecursiveIntSCC == nil || proto == nil {
-		return nil, fmt.Errorf("tier2: missing mutual recursive int SCC protocol")
+		return nil, fmt.Errorf("tier2: missing mutual recursive int SCC specialization")
 	}
 	if base < 0 || base >= len(regs) {
 		return nil, fmt.Errorf("tier2: mutual recursive int SCC base %d outside regs len %d", base, len(regs))
@@ -285,100 +285,100 @@ func (tm *TieringManager) executeMutualRecursiveIntSCC(cf *CompiledFunction, reg
 
 func (tm *TieringManager) executeMutualRecursiveIntSCCArgs(cf *CompiledFunction, proto *vm.FuncProto, args [4]int64) (int64, bool, error) {
 	if cf == nil || cf.MutualRecursiveIntSCC == nil || proto == nil {
-		return 0, false, fmt.Errorf("tier2: missing mutual recursive int SCC protocol")
+		return 0, false, fmt.Errorf("tier2: missing mutual recursive int SCC specialization")
 	}
-	protocol := cf.MutualRecursiveIntSCC
-	markMutualRecursiveIntSCCEntered(protocol)
-	if !tm.mutualRecursiveIntSCCGlobalsMatch(protocol) {
+	specialization := cf.MutualRecursiveIntSCC
+	markMutualRecursiveIntSCCEntered(specialization)
+	if !tm.mutualRecursiveIntSCCGlobalsMatch(specialization) {
 		tm.disableTier2AfterRuntimeDeopt(proto, "tier2: mutual recursive int SCC global changed")
 		return 0, false, fmt.Errorf("tier2: mutual recursive int SCC global changed")
 	}
 	arity := proto.NumParams
-	key := mutualRecursiveIntKey{fn: protocol.entryIndex, arity: arity, args: args}
-	if last := protocol.last.Load(); last != nil && last.key == key {
+	key := mutualRecursiveIntKey{fn: specialization.entryIndex, arity: arity, args: args}
+	if last := specialization.last.Load(); last != nil && last.key == key {
 		return last.value, true, nil
 	}
-	protocol.memoMu.Lock()
-	defer protocol.memoMu.Unlock()
-	if last := protocol.last.Load(); last != nil && last.key == key {
+	specialization.memoMu.Lock()
+	defer specialization.memoMu.Unlock()
+	if last := specialization.last.Load(); last != nil && last.key == key {
 		return last.value, true, nil
 	}
-	if len(protocol.memo) >= maxMutualRecursiveIntSCCMemo {
-		protocol.memo = make(map[mutualRecursiveIntKey]int64)
-		protocol.last.Store(nil)
+	if len(specialization.memo) >= maxMutualRecursiveIntSCCMemo {
+		specialization.memo = make(map[mutualRecursiveIntKey]int64)
+		specialization.last.Store(nil)
 	}
-	if protocol.active == nil {
-		protocol.active = make(map[mutualRecursiveIntKey]bool)
+	if specialization.active == nil {
+		specialization.active = make(map[mutualRecursiveIntKey]bool)
 	}
 	e := &mutualRecursiveIntEvaluator{
-		protocol: protocol,
-		memo:     protocol.memo,
-		active:   protocol.active,
+		specialization: specialization,
+		memo:           specialization.memo,
+		active:         specialization.active,
 	}
-	result, ok := e.eval(protocol.entryIndex, args)
-	for key := range protocol.active {
-		delete(protocol.active, key)
+	result, ok := e.eval(specialization.entryIndex, args)
+	for key := range specialization.active {
+		delete(specialization.active, key)
 	}
 	if ok {
-		protocol.last.Store(&mutualRecursiveIntLast{key: key, value: result})
+		specialization.last.Store(&mutualRecursiveIntLast{key: key, value: result})
 	}
 	return result, ok, nil
 }
 
-func markMutualRecursiveIntSCCEntered(protocol *mutualRecursiveIntSCCProtocol) {
-	if protocol == nil {
+func markMutualRecursiveIntSCCEntered(specialization *mutualRecursiveIntSCCSpecialization) {
+	if specialization == nil {
 		return
 	}
-	for _, p := range protocol.protos {
+	for _, p := range specialization.protos {
 		if p != nil {
 			p.EnteredTier2 = 1
 		}
 	}
 }
 
-func (tm *TieringManager) mutualRecursiveIntSCCGlobalsMatch(protocol *mutualRecursiveIntSCCProtocol) bool {
-	if tm == nil || tm.callVM == nil || protocol == nil || len(protocol.protos) != len(protocol.names) {
+func (tm *TieringManager) mutualRecursiveIntSCCGlobalsMatch(specialization *mutualRecursiveIntSCCSpecialization) bool {
+	if tm == nil || tm.callVM == nil || specialization == nil || len(specialization.protos) != len(specialization.names) {
 		return false
 	}
-	if len(protocol.globalIdx) == len(protocol.names) {
-		for i, idx := range protocol.globalIdx {
+	if len(specialization.globalIdx) == len(specialization.names) {
+		for i, idx := range specialization.globalIdx {
 			v, ok := tm.callVM.GetGlobalByIndex(idx)
 			if !ok {
-				protocol.globalIdx = nil
+				specialization.globalIdx = nil
 				break
 			}
 			cl, ok := vmClosureFromValue(v)
-			if !ok || cl == nil || cl.Proto != protocol.protos[i] {
+			if !ok || cl == nil || cl.Proto != specialization.protos[i] {
 				return false
 			}
 		}
-		if len(protocol.globalIdx) == len(protocol.names) {
+		if len(specialization.globalIdx) == len(specialization.names) {
 			return true
 		}
 	}
-	for i, name := range protocol.names {
+	for i, name := range specialization.names {
 		cl, ok := vmClosureFromValue(tm.callVM.GetGlobal(name))
-		if !ok || cl == nil || cl.Proto != protocol.protos[i] {
+		if !ok || cl == nil || cl.Proto != specialization.protos[i] {
 			return false
 		}
 	}
-	idxs := make([]int, len(protocol.names))
-	for i, name := range protocol.names {
+	idxs := make([]int, len(specialization.names))
+	for i, name := range specialization.names {
 		idx, ok := tm.callVM.GlobalIndex(name)
 		if !ok {
 			return true
 		}
 		idxs[i] = idx
 	}
-	protocol.globalIdx = idxs
+	specialization.globalIdx = idxs
 	return true
 }
 
 func (e *mutualRecursiveIntEvaluator) eval(fn int, args [4]int64) (int64, bool) {
-	if e == nil || e.protocol == nil || fn < 0 || fn >= len(e.protocol.protos) {
+	if e == nil || e.specialization == nil || fn < 0 || fn >= len(e.specialization.protos) {
 		return 0, false
 	}
-	arity := e.protocol.protos[fn].NumParams
+	arity := e.specialization.protos[fn].NumParams
 	key := mutualRecursiveIntKey{fn: fn, arity: arity, args: args}
 	if v, ok := e.memo[key]; ok {
 		return v, true
@@ -400,7 +400,7 @@ func (e *mutualRecursiveIntEvaluator) eval(fn int, args [4]int64) (int64, bool) 
 }
 
 func (e *mutualRecursiveIntEvaluator) evalBytecode(fn int, args [4]int64) (int64, bool) {
-	proto := e.protocol.protos[fn]
+	proto := e.specialization.protos[fn]
 	if proto.MaxStack < 0 || proto.MaxStack > maxTrackedSlots {
 		return 0, false
 	}
@@ -441,7 +441,7 @@ func (e *mutualRecursiveIntEvaluator) evalBytecode(fn int, args [4]int64) (int64
 			if !mutualRecursiveIntSlotOK(slots, a) {
 				return 0, false
 			}
-			target, ok := e.protocol.indexByName[protoConstString(proto, vm.DecodeBx(inst))]
+			target, ok := e.specialization.indexByName[protoConstString(proto, vm.DecodeBx(inst))]
 			if !ok {
 				return 0, false
 			}
@@ -499,14 +499,14 @@ func (e *mutualRecursiveIntEvaluator) evalBytecode(fn int, args [4]int64) (int64
 				return 0, false
 			}
 			callee := slots[a].fn
-			if callee < 0 || callee >= len(e.protocol.protos) {
+			if callee < 0 || callee >= len(e.specialization.protos) {
 				return 0, false
 			}
 			numArgs := b - 1
 			if b == 0 {
-				numArgs = e.protocol.protos[callee].NumParams
+				numArgs = e.specialization.protos[callee].NumParams
 			}
-			if numArgs != e.protocol.protos[callee].NumParams {
+			if numArgs != e.specialization.protos[callee].NumParams {
 				return 0, false
 			}
 			if c != 0 && c != 1 && c != 2 {

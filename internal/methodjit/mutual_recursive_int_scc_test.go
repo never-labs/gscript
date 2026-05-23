@@ -27,14 +27,14 @@ func TestMutualRecursiveIntSCCQualifiesHofstadter(t *testing.T) {
 	if f == nil || m == nil {
 		t.Fatalf("missing protos: F=%v M=%v", f != nil, m != nil)
 	}
-	protocol, ok := analyzeMutualRecursiveIntSCC(f, map[string]*vm.FuncProto{"F": f, "M": m})
+	specialization, ok := analyzeMutualRecursiveIntSCC(f, map[string]*vm.FuncProto{"F": f, "M": m})
 	if !ok {
 		dumpProtoBytecode(t, f)
 		dumpProtoBytecode(t, m)
-		t.Fatal("Hofstadter F/M should qualify for mutual recursive int SCC protocol")
+		t.Fatal("Hofstadter F/M should qualify for mutual recursive int SCC specialization")
 	}
-	if len(protocol.protos) != 2 || protocol.entryIndex < 0 {
-		t.Fatalf("unexpected protocol: %#v", protocol)
+	if len(specialization.protos) != 2 || specialization.entryIndex < 0 {
+		t.Fatalf("unexpected specialization: %#v", specialization)
 	}
 }
 
@@ -51,8 +51,8 @@ func ack(m, n) {
 	if ack == nil {
 		t.Fatal("ack proto not found")
 	}
-	if protocol, ok := analyzeMutualRecursiveIntSCC(ack, map[string]*vm.FuncProto{"ack": ack}); ok {
-		t.Fatalf("ackermann must not qualify for mutual recursive int SCC: %#v", protocol)
+	if specialization, ok := analyzeMutualRecursiveIntSCC(ack, map[string]*vm.FuncProto{"ack": ack}); ok {
+		t.Fatalf("ackermann must not qualify for mutual recursive int SCC: %#v", specialization)
 	}
 }
 
@@ -95,7 +95,7 @@ func TestMutualRecursiveIntSCCExecutesHofstadter(t *testing.T) {
 	}
 	f := findProtoByName(top, "F")
 	if f == nil || f.EnteredTier2 == 0 {
-		t.Fatalf("F did not enter Tier2 protocol; proto=%v", f)
+		t.Fatalf("F did not enter Tier2 specialization; proto=%v", f)
 	}
 	cf := tm.tier2Compiled[f]
 	if cf == nil || cf.MutualRecursiveIntSCC == nil {

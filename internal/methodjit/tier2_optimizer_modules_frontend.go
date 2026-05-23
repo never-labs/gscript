@@ -15,13 +15,13 @@ func init() {
 		return tier2InlineCallModules(ctxGlobals(ctx), ctxInlineMaxSize(ctx))
 	})
 	RegisterModuleBuilder(Tier2PhaseCallLower, 30, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
-		return tier2CallLoweringModules(ctxProtocolGlobals(ctx))
+		return tier2CallLoweringModules(ctxSpecializationGlobals(ctx))
 	})
 	RegisterModuleBuilder(Tier2PhasePostRewrite, 60, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
 		return tier2PostRewriteModules()
 	})
 	RegisterModuleBuilder(Tier2PhaseFinalCall, 140, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
-		return tier2FinalCallModules(ctxProtocolGlobals(ctx))
+		return tier2FinalCallModules(ctxSpecializationGlobals(ctx))
 	})
 }
 
@@ -184,7 +184,7 @@ func tier2PostInlinePassModuleWith(name string, provides []AnalysisFact, pass Pa
 	}
 }
 
-func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		{
 			Name:     "CallABI",
@@ -212,7 +212,7 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 			Requires: analysisFacts(AnalysisFactCallABIs),
 			Provides: analysisFacts(AnalysisFactRuntimeSpecializationConstCallFolds),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return RuntimeSpecializationConstCallFoldPass(protocolGlobals)(fn)
+				return RuntimeSpecializationConstCallFoldPass(specializationGlobals)(fn)
 			},
 		},
 		{
@@ -221,7 +221,7 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 			Requires: analysisFacts(AnalysisFactCallABIs),
 			Provides: analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return CallSiteRuntimeSpecializationExitPass(protocolGlobals)(fn)
+				return CallSiteRuntimeSpecializationExitPass(specializationGlobals)(fn)
 			},
 		},
 	}
@@ -266,7 +266,7 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 	}
 }
 
-func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
 		{
 			Name:     "CallABI (final)",
@@ -290,7 +290,7 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 			Requires: analysisFacts(AnalysisFactCallABIs),
 			Updates:  analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return CallSiteRuntimeSpecializationExitPass(protocolGlobals)(fn)
+				return CallSiteRuntimeSpecializationExitPass(specializationGlobals)(fn)
 			},
 		},
 		tier2PassModuleWith("CallReturnProjection (final)", Tier2PhaseFinalCall, nil, nil, CallReturnProjectionPass),

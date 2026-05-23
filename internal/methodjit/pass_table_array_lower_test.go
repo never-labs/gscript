@@ -423,8 +423,8 @@ func TestTableArrayLower_LoadElimInvalidatesFactsAcrossTableMutation(t *testing.
 	}
 }
 
-func TestTableArrayFactProtocol_CheckedStorePreservesAppendInvalidates(t *testing.T) {
-	fn := &Function{Proto: &vm.FuncProto{Name: "table_array_fact_protocol"}, NumRegs: 4}
+func TestTableArrayFactSet_CheckedStorePreservesAppendInvalidates(t *testing.T) {
+	fn := &Function{Proto: &vm.FuncProto{Name: "table_array_fact_set"}, NumRegs: 4}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
 	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
 	key := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeInt, Aux: 1, Block: b}

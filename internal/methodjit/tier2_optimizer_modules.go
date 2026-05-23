@@ -101,7 +101,7 @@ const (
 	Tier2PhaseInlineCall Tier2OptimizerPhase = "inline_call"
 
 	// Tier2PhaseCallLower annotates callsites with ABI facts and folds
-	// protocol-level constant calls.
+	// runtime-specialization constant calls.
 	Tier2PhaseCallLower Tier2OptimizerPhase = "call_lower"
 
 	// Tier2PhaseStringNative rewrites string intrinsics into native IR ops.
@@ -154,8 +154,8 @@ type Tier2OptimizerContext struct {
 	// Globals maps global function names to their protos, used for inlining
 	// and call ABI annotation.
 	Globals map[string]*vm.FuncProto
-	// ProtocolGlobals maps stable protocol globals available for guarded folds.
-	ProtocolGlobals map[string]*vm.FuncProto
+	// SpecializationGlobals maps stable runtime-specialization globals available for guarded folds.
+	SpecializationGlobals map[string]*vm.FuncProto
 	// IntrinsicNotes collects human-readable notes from intrinsic rewrites.
 	IntrinsicNotes []string
 	// InlineApplied reports whether the inline pass made changes.
@@ -759,11 +759,11 @@ func ctxGlobals(ctx *Tier2OptimizerContext) map[string]*vm.FuncProto {
 	return ctx.Globals
 }
 
-func ctxProtocolGlobals(ctx *Tier2OptimizerContext) map[string]*vm.FuncProto {
+func ctxSpecializationGlobals(ctx *Tier2OptimizerContext) map[string]*vm.FuncProto {
 	if ctx == nil {
 		return nil
 	}
-	return ctx.ProtocolGlobals
+	return ctx.SpecializationGlobals
 }
 
 func ctxInlineMaxSize(ctx *Tier2OptimizerContext) int {

@@ -9,7 +9,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-type runtimeRecursiveTableFoldProtocol struct {
+type runtimeRecursiveTableFoldSpecialization struct {
 	nilField    string
 	nilCache    runtime.FieldCacheEntry
 	baseValue   int64
@@ -46,7 +46,7 @@ func qualifiesForRuntimeRecursiveTableFold(proto *vm.FuncProto) bool {
 	return ok
 }
 
-func analyzeRuntimeRecursiveTableFold(proto *vm.FuncProto) (*runtimeRecursiveTableFoldProtocol, bool) {
+func analyzeRuntimeRecursiveTableFold(proto *vm.FuncProto) (*runtimeRecursiveTableFoldSpecialization, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 1 || proto.Name == "" {
 		return nil, false
 	}
@@ -82,7 +82,7 @@ func analyzeRuntimeRecursiveTableFold(proto *vm.FuncProto) (*runtimeRecursiveTab
 	for i, child := range children {
 		protocolChildren[i] = runtimeRecursiveTableFoldChild{field: child.field}
 	}
-	return &runtimeRecursiveTableFoldProtocol{
+	return &runtimeRecursiveTableFoldSpecialization{
 		nilField:    nilField,
 		baseValue:   baseValue,
 		combineBias: expr.constant,
@@ -247,14 +247,14 @@ func runtimeFoldCheckedAdd(a, b int64) (int64, bool) {
 }
 
 func newRuntimeRecursiveTableFoldCompiled(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	protocol, ok := analyzeRuntimeRecursiveTableFold(proto)
+	specialization, ok := analyzeRuntimeRecursiveTableFold(proto)
 	if !ok {
 		return nil, false
 	}
 	return &CompiledFunction{
 		Proto:                     proto,
 		numRegs:                   proto.MaxStack,
-		RuntimeRecursiveTableFold: protocol,
+		RuntimeRecursiveTableFold: specialization,
 	}, true
 }
 
@@ -266,9 +266,9 @@ func (tm *TieringManager) compileRuntimeRecursiveTableFoldTier2(proto *vm.FuncPr
 	tm.tier2Attempts++
 	attempt := tm.tier2Attempts
 	tm.traceEvent("tier2_attempt", "tier2", proto, map[string]any{
-		"attempt":    attempt,
-		"call_count": proto.CallCount,
-		"protocol":   "lazy_recursive_table_fold",
+		"attempt":        attempt,
+		"call_count":     proto.CallCount,
+		"specialization": "lazy_recursive_table_fold",
 	})
 	tm.traceTier2Success(proto, cf, attempt)
 	return cf, true
@@ -276,7 +276,7 @@ func (tm *TieringManager) compileRuntimeRecursiveTableFoldTier2(proto *vm.FuncPr
 
 func (tm *TieringManager) executeRuntimeRecursiveTableFold(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
 	if cf == nil || cf.RuntimeRecursiveTableFold == nil || proto == nil {
-		return nil, fmt.Errorf("tier2: missing runtime recursive table fold protocol")
+		return nil, fmt.Errorf("tier2: missing runtime recursive table fold specialization")
 	}
 	if base < 0 || base >= len(regs) {
 		return nil, fmt.Errorf("tier2: runtime recursive table fold base %d outside regs len %d", base, len(regs))
@@ -304,7 +304,7 @@ func (tm *TieringManager) runtimeRecursiveSelfGlobalMatches(proto *vm.FuncProto)
 	return ok && cl != nil && cl.Proto == proto
 }
 
-func (p *runtimeRecursiveTableFoldProtocol) fold(v runtime.Value) (int64, bool) {
+func (p *runtimeRecursiveTableFoldSpecialization) fold(v runtime.Value) (int64, bool) {
 	t := v.Table()
 	if t == nil {
 		return 0, false
@@ -331,7 +331,7 @@ func (p *runtimeRecursiveTableFoldProtocol) fold(v runtime.Value) (int64, bool) 
 	return total, true
 }
 
-func (p *runtimeRecursiveTableFoldProtocol) foldLazy(t *runtime.Table) (int64, bool) {
+func (p *runtimeRecursiveTableFoldSpecialization) foldLazy(t *runtime.Table) (int64, bool) {
 	depth, key1, key2, ok := t.LazyRecursiveTablePureInfo()
 	if !ok || depth < 0 || p.nilField != key1 || len(p.children) != 2 {
 		return 0, false

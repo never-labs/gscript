@@ -755,7 +755,7 @@ func fieldShapeInlineSplitCaseRejectReason(c FieldPolyShapeCase, callArgs []*Val
 		return "size"
 	}
 	if inlineCalleeHasRuntimeSpecializationEntry(c.VMProto, config.Globals) {
-		return "call-site-protocol"
+		return "runtime-specialization-entry"
 	}
 	calleeFn := BuildGraph(c.VMProto)
 	if calleeFn == nil || calleeFn.Unpromotable {

@@ -50,7 +50,7 @@ func (tm *TieringManager) executeCallExit(ctx *ExecContext, regs []runtime.Value
 		return err
 	}
 
-	if handled, err := tm.tryCompiledProtocolCallExit(fnVal, regs, absSlot, nArgs, nRets); handled || err != nil {
+	if handled, err := tm.tryCompiledSpecializationCallExit(fnVal, regs, absSlot, nArgs, nRets); handled || err != nil {
 		if handled && err == nil {
 			currentRegs := tm.callVM.Regs()
 			if absSlot >= 0 && absSlot < len(currentRegs) {

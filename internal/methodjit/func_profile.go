@@ -493,13 +493,13 @@ func mainProtoHasRecursiveChild(proto *vm.FuncProto) bool {
 		}
 	}
 	childRefs := make(map[string]map[string]bool, len(proto.Protos))
-	hasProtocolChild := false
+	hasSpecializationChild := false
 	for _, child := range proto.Protos {
 		if child == nil {
 			continue
 		}
-		if childHasCallSiteRecursiveProtocol(child) {
-			hasProtocolChild = true
+		if childHasCallSiteRecursiveSpecialization(child) {
+			hasSpecializationChild = true
 			continue
 		}
 		if staticallyCallsOnlySelf(child) {
@@ -519,7 +519,7 @@ func mainProtoHasRecursiveChild(proto *vm.FuncProto) bool {
 			childRefs[child.Name][name] = true
 		}
 	}
-	if hasProtocolChild {
+	if hasSpecializationChild {
 		trip, ok := mainMaxConstantForLoopTrip(proto)
 		return ok && trip < 10000
 	}
@@ -533,7 +533,7 @@ func mainProtoHasRecursiveChild(proto *vm.FuncProto) bool {
 	return false
 }
 
-func childHasCallSiteRecursiveProtocol(child *vm.FuncProto) bool {
+func childHasCallSiteRecursiveSpecialization(child *vm.FuncProto) bool {
 	return false
 }
 

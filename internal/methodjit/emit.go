@@ -534,25 +534,25 @@ type CompiledFunction struct {
 
 	// RuntimeRecursiveTableFold is a call-site Tier 2 runtime specialization for pure
 	// recursive table folds recognized from bytecode shape at runtime.
-	RuntimeRecursiveTableFold *runtimeRecursiveTableFoldProtocol
+	RuntimeRecursiveTableFold *runtimeRecursiveTableFoldSpecialization
 
 	// RuntimeRecursiveTableBuilder is a call-site Tier 2 runtime specialization for pure
 	// recursive table builders recognized from bytecode shape at runtime.
-	RuntimeRecursiveTableBuilder *runtimeRecursiveTableBuilderProtocol
+	RuntimeRecursiveTableBuilder *runtimeRecursiveTableBuilderSpecialization
 
 	// RuntimeRecursiveIntFold is a call-site Tier 2 runtime specialization for pure integer
 	// self-recursive folds recognized from bytecode shape at runtime.
-	RuntimeRecursiveIntFold *runtimeRecursiveIntFoldProtocol
+	RuntimeRecursiveIntFold *runtimeRecursiveIntFoldSpecialization
 
 	// MutualRecursiveIntSCC is a call-site Tier 2 runtime specialization for small pure
 	// integer mutual-recursive SCCs. It memoizes bounded recurrence evaluation
 	// after guarding that all global function closures still match the analyzed
 	// SCC members.
-	MutualRecursiveIntSCC *mutualRecursiveIntSCCProtocol
+	MutualRecursiveIntSCC *mutualRecursiveIntSCCSpecialization
 
 	// RuntimeRecursiveNestedIntFold is a call-site Tier 2 runtime specialization for bounded
 	// nested integer recurrences recognized from bytecode shape at runtime.
-	RuntimeRecursiveNestedIntFold *runtimeRecursiveNestedIntFoldProtocol
+	RuntimeRecursiveNestedIntFold *runtimeRecursiveNestedIntFoldSpecialization
 
 	// DeoptFunc is called when the JIT bails out (ExitCode=ExitDeopt).
 	// It runs the function via the VM interpreter. Set by the caller

@@ -139,7 +139,7 @@ func NewTieringManager() *TieringManager {
 	t1.SetOuterCompiler(func(proto *vm.FuncProto) interface{} {
 		return tm.TryCompile(proto)
 	})
-	t1.SetCompiledProtocolCallExecutor(tm.tryCompiledProtocolCallExit)
+	t1.SetCompiledSpecializationCallExecutor(tm.tryCompiledSpecializationCallExit)
 	t1.SetCompiledTier2Executor(func(compiled interface{}, regs []runtime.Value, base int, proto *vm.FuncProto) ([]runtime.Value, error) {
 		return tm.Execute(compiled, regs, base, proto)
 	})

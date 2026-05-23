@@ -30,9 +30,9 @@ func advance(dt) {
 `
 	proto := compileTop(t, src)
 	fn, _, err := RunTier2Pipeline(BuildGraph(proto), &Tier2PipelineOpts{
-		InlineGlobals:   buildProtoInlineGlobals(proto),
-		ProtocolGlobals: buildProtoStableGlobals(proto),
-		InlineMaxSize:   1,
+		InlineGlobals:         buildProtoInlineGlobals(proto),
+		SpecializationGlobals: buildProtoStableGlobals(proto),
+		InlineMaxSize:         1,
 	})
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(<main>): %v", err)

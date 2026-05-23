@@ -14,13 +14,13 @@ import (
 )
 
 const (
-	perfTier2NativeExecution          = "tier2_native_execution"
-	perfTier2ExitResume               = "tier2_exit_resume"
-	perfTier2TableExit                = "tier2_table_exit"
-	perfTier2OpExit                   = "tier2_op_exit"
-	perfTier2NativeCallExitProtocol   = "tier2_native_call_exit_protocol"
-	perfTier2CompiledProtocol         = "tier2_compiled_protocol"
-	perfTier2CompiledProtocolCallExit = "tier2_compiled_protocol_call_exit"
+	perfTier2NativeExecution                = "tier2_native_execution"
+	perfTier2ExitResume                     = "tier2_exit_resume"
+	perfTier2TableExit                      = "tier2_table_exit"
+	perfTier2OpExit                         = "tier2_op_exit"
+	perfTier2NativeCallExitProtocol         = "tier2_native_call_exit_protocol"
+	perfTier2CompiledSpecialization         = "tier2_compiled_specialization"
+	perfTier2CompiledSpecializationCallExit = "tier2_compiled_specialization_call_exit"
 )
 
 type tier2PerfMark struct {
@@ -146,7 +146,7 @@ func (s *tier2PerfStatsCollector) snapshot() Tier2PerfStatsSnapshot {
 	return out
 }
 
-// EnableTier2PerfStats enables opt-in Tier 2 protocol/timing diagnostics.
+// EnableTier2PerfStats enables opt-in Tier 2 specialization/timing diagnostics.
 func (tm *TieringManager) EnableTier2PerfStats() {
 	if tm == nil {
 		return
@@ -158,7 +158,7 @@ func (tm *TieringManager) EnableTier2PerfStats() {
 	tm.perfStats.setEnabled(true)
 }
 
-// DisableTier2PerfStats disables Tier 2 protocol/timing diagnostics.
+// DisableTier2PerfStats disables Tier 2 specialization/timing diagnostics.
 func (tm *TieringManager) DisableTier2PerfStats() {
 	if tm == nil || tm.perfStats == nil {
 		return
@@ -276,7 +276,7 @@ func (tm *TieringManager) tier2CallPerfRows() []Tier2CallPerfRow {
 	return rows
 }
 
-// WriteTier2PerfStatsText prints Tier 2 protocol/timing diagnostics in a stable
+// WriteTier2PerfStatsText prints Tier 2 specialization/timing diagnostics in a stable
 // text form. Durations are inclusive for the named phase.
 func (tm *TieringManager) WriteTier2PerfStatsText(w io.Writer) {
 	snap := tm.Tier2PerfStats()

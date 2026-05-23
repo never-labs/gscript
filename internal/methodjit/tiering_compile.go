@@ -269,7 +269,7 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 		profiledArgPolyFacts := profiledFixedShapeArgPolyFactsForProto(proto)
 		opts = &Tier2PipelineOpts{
 			InlineGlobals:                   inlineGlobals,
-			ProtocolGlobals:                 loopCallGlobals,
+			SpecializationGlobals:           loopCallGlobals,
 			GlobalConstValues:               tm.buildNumericGlobalConstValues(proto),
 			InlineMaxSize:                   inlineMaxCalleeSize,
 			FixedShapeArgFacts:              mergeFixedShapeTableFacts(profiledArgFacts, staticArgFacts),

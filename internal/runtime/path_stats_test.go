@@ -69,7 +69,7 @@ func TestRuntimePathStatsJSONSmoke(t *testing.T) {
 	defer DisableRuntimePathStats()
 
 	RecordRuntimePathNativeCallFast()
-	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "unit_kernel")
+	RecordRuntimePathRuntimeSpecializationHit("whole_call_value", "unit_specialization")
 	var buf testWriter
 	if err := stats.WriteJSON(&buf); err != nil {
 		t.Fatalf("WriteJSON: %v", err)

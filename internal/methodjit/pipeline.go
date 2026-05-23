@@ -73,7 +73,7 @@ func FormatPipelineStageTimings(stages []PipelineStageTiming) string {
 // A nil *Tier2PipelineOpts uses defaults (MaxSize 40, no globals).
 type Tier2PipelineOpts struct {
 	InlineGlobals                   map[string]*vm.FuncProto       // global function protos for inlining
-	ProtocolGlobals                 map[string]*vm.FuncProto       // stable globals available for guarded protocol folds
+	SpecializationGlobals           map[string]*vm.FuncProto       // stable globals available for guarded runtime-specialization folds
 	GlobalConstValues               map[int]runtime.Value          // const-pool global name index -> observed numeric value
 	InlineMaxSize                   int                            // max callee bytecode count; 0 → 40
 	FixedShapeArgFacts              map[int]FixedShapeTableFact    // guarded fixed-shape facts for callee params
@@ -123,16 +123,16 @@ func runTier2PipelineWithPlan(fn *Function, opts *Tier2PipelineOpts, buildPlan f
 	maxSize := 40
 	var globals map[string]*vm.FuncProto
 	if opts != nil {
-		globals = callABIMergeGlobals(opts.InlineGlobals, opts.ProtocolGlobals)
+		globals = callABIMergeGlobals(opts.InlineGlobals, opts.SpecializationGlobals)
 		fn.Analysis.NumericGlobalValues = optsNumericGlobalValuesByName(fn, opts)
 		fn.Analysis.GlobalArrayElementFacts = cloneFixedShapeTableFactMap(opts.GlobalArrayElementFacts)
 		if opts.InlineMaxSize > 0 {
 			maxSize = opts.InlineMaxSize
 		}
 	}
-	protocolGlobals := globals
-	if opts != nil && len(opts.ProtocolGlobals) > 0 {
-		protocolGlobals = opts.ProtocolGlobals
+	specializationGlobals := globals
+	if opts != nil && len(opts.SpecializationGlobals) > 0 {
+		specializationGlobals = opts.SpecializationGlobals
 	}
 
 	data := NewTier2PipelineData()
@@ -141,7 +141,7 @@ func runTier2PipelineWithPlan(fn *Function, opts *Tier2PipelineOpts, buildPlan f
 	}
 	ctx := newTier2OptimizerContext(data)
 	ctx.Globals = globals
-	ctx.ProtocolGlobals = protocolGlobals
+	ctx.SpecializationGlobals = specializationGlobals
 	ctx.InlineMaxSize = maxSize
 	ctx.DependencyRegistry = data.CompilationDependencies
 	if opts != nil {

@@ -17,7 +17,7 @@ const (
 	maxRuntimeRecursiveNestedIntFoldStack      = 65_536
 )
 
-type runtimeRecursiveNestedIntFoldProtocol struct {
+type runtimeRecursiveNestedIntFoldSpecialization struct {
 	baseAdd int64
 	zeroArg int64
 	mStep   int64
@@ -29,7 +29,7 @@ func qualifiesForRuntimeRecursiveNestedIntFold(proto *vm.FuncProto) bool {
 	return ok
 }
 
-func analyzeRuntimeRecursiveNestedIntFold(proto *vm.FuncProto) (*runtimeRecursiveNestedIntFoldProtocol, bool) {
+func analyzeRuntimeRecursiveNestedIntFold(proto *vm.FuncProto) (*runtimeRecursiveNestedIntFoldSpecialization, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 2 || proto.Name == "" {
 		return nil, false
 	}
@@ -53,7 +53,7 @@ func analyzeRuntimeRecursiveNestedIntFold(proto *vm.FuncProto) (*runtimeRecursiv
 	if mStep <= 0 || nStep <= 0 || zeroArg < 0 {
 		return nil, false
 	}
-	return &runtimeRecursiveNestedIntFoldProtocol{
+	return &runtimeRecursiveNestedIntFoldSpecialization{
 		baseAdd: baseAdd,
 		zeroArg: zeroArg,
 		mStep:   mStep,
@@ -230,14 +230,14 @@ func runtimeNestedSelfGlobal(proto *vm.FuncProto, pc int) (slot int, ok bool) {
 }
 
 func newRuntimeRecursiveNestedIntFoldCompiled(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	protocol, ok := analyzeRuntimeRecursiveNestedIntFold(proto)
+	specialization, ok := analyzeRuntimeRecursiveNestedIntFold(proto)
 	if !ok {
 		return nil, false
 	}
 	return &CompiledFunction{
 		Proto:                         proto,
 		numRegs:                       proto.MaxStack,
-		RuntimeRecursiveNestedIntFold: protocol,
+		RuntimeRecursiveNestedIntFold: specialization,
 	}, true
 }
 
@@ -249,9 +249,9 @@ func (tm *TieringManager) compileRuntimeRecursiveNestedIntFoldTier2(proto *vm.Fu
 	tm.tier2Attempts++
 	attempt := tm.tier2Attempts
 	tm.traceEvent("tier2_attempt", "tier2", proto, map[string]any{
-		"attempt":    attempt,
-		"call_count": proto.CallCount,
-		"protocol":   "nested_recursive_int_fold",
+		"attempt":        attempt,
+		"call_count":     proto.CallCount,
+		"specialization": "nested_recursive_int_fold",
 	})
 	tm.traceTier2Success(proto, cf, attempt)
 	return cf, true
@@ -259,7 +259,7 @@ func (tm *TieringManager) compileRuntimeRecursiveNestedIntFoldTier2(proto *vm.Fu
 
 func (tm *TieringManager) executeRuntimeRecursiveNestedIntFold(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
 	if cf == nil || cf.RuntimeRecursiveNestedIntFold == nil || proto == nil {
-		return nil, fmt.Errorf("tier2: missing runtime recursive nested int fold protocol")
+		return nil, fmt.Errorf("tier2: missing runtime recursive nested int fold specialization")
 	}
 	if base < 0 || base+1 >= len(regs) {
 		return nil, fmt.Errorf("tier2: runtime recursive nested int fold base %d outside regs len %d", base, len(regs))
@@ -279,7 +279,7 @@ func (tm *TieringManager) executeRuntimeRecursiveNestedIntFold(cf *CompiledFunct
 	return runtime.ReuseValueSlice1(retBuf, result), nil
 }
 
-func (p *runtimeRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int64, bool) {
+func (p *runtimeRecursiveNestedIntFoldSpecialization) fold(mv, nv runtime.Value) (int64, bool) {
 	if p == nil || !mv.IsInt() || !nv.IsInt() || p.mStep <= 0 || p.nStep <= 0 {
 		return 0, false
 	}
@@ -326,7 +326,7 @@ func (p *runtimeRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int6
 	return 0, false
 }
 
-func (p *runtimeRecursiveNestedIntFoldProtocol) foldSmallRows(m, n int64) (int64, bool) {
+func (p *runtimeRecursiveNestedIntFoldSpecialization) foldSmallRows(m, n int64) (int64, bool) {
 	if p.mStep != 1 || p.nStep != 1 {
 		return 0, false
 	}
