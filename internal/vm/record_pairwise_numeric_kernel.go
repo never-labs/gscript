@@ -53,7 +53,7 @@ func (vm *VM) tryRunRecordPairwiseNumericKernel(cl *Closure, args []runtime.Valu
 	if vm.methodJIT != nil {
 		return false, nil
 	}
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelRecordPairwiseNumeric) {
+	if cl == nil || cl.Proto == nil || !hotWholeCallNoResultRuntimeSpecializationRecognized(cl.Proto, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		return false, nil
 	}
 	return vm.runRecordPairwiseNumericKernel(cl, args)
@@ -67,7 +67,7 @@ func (vm *VM) runRecordPairwiseNumericKernel(cl *Closure, args []runtime.Value) 
 }
 
 func (vm *VM) tryRunRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelRecordPairwiseNumeric) {
+	if cl == nil || cl.Proto == nil || !hotWholeCallNoResultRuntimeSpecializationRecognized(cl.Proto, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		return false, nil
 	}
 	return vm.runRecordPairwiseNumericKernelN(cl, args, steps)
@@ -940,7 +940,7 @@ func isRecordPairwiseNumericProtoWithGlobalCount(p *FuncProto) bool {
 // record-field pairwise numeric advance(dt) kernel shape. MethodJIT uses this to
 // keep driver loops on the VM route where the whole-call kernel can fire.
 func HasRecordPairwiseNumericWholeCallKernel(p *FuncProto) bool {
-	return cachedWholeCallKernelRecognized(p, wholeCallKernelRecordPairwiseNumeric)
+	return cachedWholeCallNoResultRuntimeSpecializationRecognized(p, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric)
 }
 
 // HasRecordPairwiseNumericDriverLoopKernel reports whether p contains a structural

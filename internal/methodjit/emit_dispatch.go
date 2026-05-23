@@ -157,17 +157,13 @@ func instrPreservesScratchFPRCache(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat,
-		OpNegFloat, OpSqrt, OpFMA, OpFMSUB:
-		return instr.Type == TypeFloat
-	case OpLtFloat, OpLeFloat:
-		return true
-	case OpNop:
-		return true
-	default:
+	spec, ok := instr.Op.Spec()
+	if !ok {
 		return false
 	}
+	policy := spec.BackendPolicy
+	return policy&OpBackendPreservesScratchFPRCache != 0 ||
+		(policy&OpBackendPreservesScratchFPRCacheForFloatResult != 0 && instr.Type == TypeFloat)
 }
 
 // Constant, slot, arithmetic, comparison emission in emit_arith.go

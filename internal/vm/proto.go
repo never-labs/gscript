@@ -34,6 +34,7 @@ type FuncProto struct {
 	FieldPolyCache               []runtime.FieldPolyCacheEntry      // lazily-initialized 4-way static field cache, indexed by PC
 	ResumePayloadCache           []int8                             // per-PC cache for ResumePayloadIsFieldOnly: 0 unknown, 1 false, 2 true
 	RuntimeSpecialization        *runtimeSpecializationProtoCache   // guarded runtime specialization recognizer cache, nil until first probe
+	WholeCallNoResultRuntime     *runtimeSpecializationProtoCache   // guarded no-result whole-call runtime specialization cache, nil until first probe
 	WholeCallKernel              *wholeCallKernelProtoCache         // structural whole-call kernel recognizer cache, nil until first probe
 	RecordPairwiseNumericKernel  *recordPairwiseNumericKernelCache  // guarded runtime-generated pairwise record numeric kernel cache
 	GenericRecordArrayLoopKernel *genericRecordArrayLoopKernelCache // guarded runtime-generated scalar record-array loop cache

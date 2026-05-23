@@ -67,6 +67,8 @@ const (
 	OpBackendPreservesTableArrayBounds
 	OpBackendClearsTableArrayBounds
 	OpBackendInvalidatesShape
+	OpBackendPreservesScratchFPRCache
+	OpBackendPreservesScratchFPRCacheForFloatResult
 )
 
 // OpSpec is the lightweight metadata contract for an IR op.
@@ -278,15 +280,15 @@ var opBackendPolicies = [...]OpBackendPolicy{
 	OpMulInt:                     OpBackendPreservesTableArrayBounds,
 	OpModInt:                     OpBackendPreservesTableArrayBounds,
 	OpNegInt:                     OpBackendPreservesTableArrayBounds,
-	OpAddFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
-	OpSubFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
-	OpMulFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
-	OpDivFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
-	OpNegFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
-	OpSqrt:                       OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpAddFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
+	OpSubFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
+	OpMulFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
+	OpDivFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
+	OpNegFloat:                   OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
+	OpSqrt:                       OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
 	OpFloor:                      OpBackendPreservesTableArrayBounds,
-	OpFMA:                        OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
-	OpFMSUB:                      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult,
+	OpFMA:                        OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
+	OpFMSUB:                      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCacheForFloatResult | OpBackendPreservesScratchFPRCacheForFloatResult,
 	OpComplexEscapeInSet:         OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
 	OpComplexEscapeRowCount:      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
 	OpRecordArrayLoopKernel:      OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
@@ -297,8 +299,8 @@ var opBackendPolicies = [...]OpBackendPolicy{
 	OpLtInt:                      OpBackendPreservesTableArrayBounds,
 	OpLeInt:                      OpBackendPreservesTableArrayBounds,
 	OpModZeroInt:                 OpBackendPreservesTableArrayBounds,
-	OpLtFloat:                    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
-	OpLeFloat:                    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache,
+	OpLtFloat:                    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache | OpBackendPreservesScratchFPRCache,
+	OpLeFloat:                    OpBackendPreservesTableArrayBounds | OpBackendPreservesFieldSvalsCache | OpBackendPreservesScratchFPRCache,
 	OpEqString:                   OpBackendPreservesTableArrayBounds,
 	OpStringFormatConstLen:       OpBackendPreservesTableArrayBounds | OpBackendClearsTableArrayBounds,
 	OpNewTable:                   0,
@@ -354,7 +356,7 @@ var opBackendPolicies = [...]OpBackendPolicy{
 	OpMakeChan:                   OpBackendClearsTableArrayBounds,
 	OpSend:                       OpBackendClearsTableArrayBounds,
 	OpRecv:                       OpBackendClearsTableArrayBounds,
-	OpNop:                        OpBackendPreservesTableArrayBounds,
+	OpNop:                        OpBackendPreservesTableArrayBounds | OpBackendPreservesScratchFPRCache,
 	OpConcat:                     OpBackendClearsTableArrayBounds,
 	OpStringConstLookup:          OpBackendClearsTableArrayBounds,
 	OpStringFormatInt:            OpBackendClearsTableArrayBounds,

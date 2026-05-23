@@ -109,7 +109,6 @@ const (
 	wholeCallKernelPermutationFlipChecksum
 	wholeCallKernelBoolTableStrikeCount
 	wholeCallKernelMatrixMultiply
-	wholeCallKernelRecordPairwiseNumeric
 	wholeCallKernelNumericArrayRegionSort
 	wholeCallKernelCoefficientMatrixVector
 	wholeCallKernelCoefficientMatrixTransposeVector
@@ -204,17 +203,6 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 	{
 		info: KernelInfo{
-			Name:          "record_pairwise_numeric",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         1,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   isRecordPairwiseNumericProto,
-		runNoResult: (*VM).runRecordPairwiseNumericKernel,
-	},
-	{
-		info: KernelInfo{
 			Name:          "numeric_array_region_sort",
 			Route:         KernelRouteWholeCallNoResult,
 			Arity:         3,
@@ -284,8 +272,14 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 // WholeCallKernelCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.
 func WholeCallKernelCatalog() []KernelInfo {
-	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
+	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
 	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" {
+			continue
+		}
+		out = append(out, entry.Info)
+	}
+	for _, entry := range wholeCallNoResultRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
@@ -326,6 +320,15 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 			out = append(out, entry.Info)
 		}
 	}
+	noResultRuntimeRecognized := recognizedWholeCallNoResultRuntimeSpecializationBits(p)
+	for i, entry := range wholeCallNoResultRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" {
+			continue
+		}
+		if noResultRuntimeRecognized&(uint64(1)<<uint(i)) != 0 {
+			out = append(out, entry.Info)
+		}
+	}
 	recognized := recognizedWholeCallKernelBits(p)
 	for i, entry := range wholeCallKernelRegistry {
 		if entry.info.Name == "" {
@@ -342,13 +345,25 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 // registered whole-call kernel. It is intended for tests and diagnostics, not
 // hot dispatch.
 func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
+	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry)+len(wholeCallKernelRegistry))
 	runtimeRecognizedBits := recognizedRuntimeSpecializationBits(p)
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		recognized := runtimeRecognizedBits&(uint64(1)<<uint(i)) != 0
+		out = append(out, KernelDiagnostic{
+			Kernel:     entry.Info,
+			Recognized: recognized,
+			Reason:     wholeCallKernelReason(p, recognized),
+		})
+	}
+	noResultRuntimeRecognizedBits := recognizedWholeCallNoResultRuntimeSpecializationBits(p)
+	for i, entry := range wholeCallNoResultRuntimeSpecializationRegistry {
+		if entry.Info.Name == "" {
+			continue
+		}
+		recognized := noResultRuntimeRecognizedBits&(uint64(1)<<uint(i)) != 0
 		out = append(out, KernelDiagnostic{
 			Kernel:     entry.Info,
 			Recognized: recognized,

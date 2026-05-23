@@ -43,6 +43,9 @@ func (vm *VM) tryWholeCallKernel(cl *Closure, args []runtime.Value, c int, dst i
 }
 
 func (vm *VM) tryRunWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
+	if handled, err := vm.tryRunWholeCallNoResultRuntimeSpecialization(cl, args); handled || err != nil {
+		return handled, err
+	}
 	return vm.tryRunCachedNoResultWholeCallKernel(cl, args)
 }
 

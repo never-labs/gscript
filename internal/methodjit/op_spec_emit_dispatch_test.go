@@ -82,7 +82,114 @@ func TestOpBackendPolicyMatchesDispatchPreserveHelpers(t *testing.T) {
 		if got := instrPreservesFieldSvalsCache(floatInstr); got != wantFloat {
 			t.Fatalf("%s field svals preserve helper with float type=%v, policy=%v", spec.Name, got, wantFloat)
 		}
+
+		wantUnknown = policy&OpBackendPreservesScratchFPRCache != 0
+		wantFloat = wantUnknown || policy&OpBackendPreservesScratchFPRCacheForFloatResult != 0
+		if got := instrPreservesScratchFPRCache(unknownInstr); got != wantUnknown {
+			t.Fatalf("%s scratch FPR preserve helper with unknown type=%v, policy=%v", spec.Name, got, wantUnknown)
+		}
+		if got := instrPreservesScratchFPRCache(floatInstr); got != wantFloat {
+			t.Fatalf("%s scratch FPR preserve helper with float type=%v, policy=%v", spec.Name, got, wantFloat)
+		}
 	}
+}
+
+func TestScratchFPRCachePreservePolicyBoundaries(t *testing.T) {
+	floatResultOps := []Op{
+		OpAddFloat,
+		OpSubFloat,
+		OpMulFloat,
+		OpDivFloat,
+		OpNegFloat,
+		OpSqrt,
+		OpFMA,
+		OpFMSUB,
+	}
+	for _, op := range floatResultOps {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if spec.BackendPolicy&OpBackendPreservesScratchFPRCacheForFloatResult == 0 {
+			t.Fatalf("%s missing scratch FPR float-result preserve policy", spec.Name)
+		}
+		if instrPreservesScratchFPRCache(&Instr{Op: op, Type: TypeUnknown}) {
+			t.Fatalf("%s preserves scratch FPR cache without float result type", spec.Name)
+		}
+		if !instrPreservesScratchFPRCache(&Instr{Op: op, Type: TypeFloat}) {
+			t.Fatalf("%s does not preserve scratch FPR cache with float result type", spec.Name)
+		}
+	}
+
+	generalOps := []Op{OpLtFloat, OpLeFloat, OpNop}
+	for _, op := range generalOps {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if spec.BackendPolicy&OpBackendPreservesScratchFPRCache == 0 {
+			t.Fatalf("%s missing unconditional scratch FPR preserve policy", spec.Name)
+		}
+		if !instrPreservesScratchFPRCache(&Instr{Op: op, Type: TypeUnknown}) {
+			t.Fatalf("%s should preserve scratch FPR cache independent of result type", spec.Name)
+		}
+	}
+
+	clearingOps := []Op{OpAddInt, OpLtInt, OpNumToFloat, OpBoxFloat}
+	for _, op := range clearingOps {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if spec.BackendPolicy&(OpBackendPreservesScratchFPRCache|OpBackendPreservesScratchFPRCacheForFloatResult) != 0 {
+			t.Fatalf("%s unexpectedly declares scratch FPR preserve policy", spec.Name)
+		}
+		if instrPreservesScratchFPRCache(&Instr{Op: op, Type: TypeFloat}) {
+			t.Fatalf("%s unexpectedly preserves scratch FPR cache", spec.Name)
+		}
+	}
+}
+
+func TestScratchFPRCachePreserveHelperUsesBackendPolicy(t *testing.T) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "emit_dispatch.go", nil, 0)
+	if err != nil {
+		t.Fatalf("parse emit_dispatch.go: %v", err)
+	}
+
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "instrPreservesScratchFPRCache" {
+			continue
+		}
+
+		foundGeneralPolicy := false
+		foundFloatResultPolicy := false
+		foundSwitch := false
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			switch node := n.(type) {
+			case *ast.SwitchStmt:
+				foundSwitch = true
+			case *ast.Ident:
+				switch node.Name {
+				case "OpBackendPreservesScratchFPRCache":
+					foundGeneralPolicy = true
+				case "OpBackendPreservesScratchFPRCacheForFloatResult":
+					foundFloatResultPolicy = true
+				}
+			}
+			return true
+		})
+		if foundSwitch {
+			t.Fatalf("instrPreservesScratchFPRCache should be policy-based, not an op switch")
+		}
+		if !foundGeneralPolicy || !foundFloatResultPolicy {
+			t.Fatalf("instrPreservesScratchFPRCache does not reference scratch FPR backend policies")
+		}
+		return
+	}
+
+	t.Fatalf("instrPreservesScratchFPRCache not found")
 }
 
 type emitterFamilyDelegate struct {
