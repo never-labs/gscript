@@ -88,10 +88,9 @@ type TieringManager struct {
 
 	// R162: env-var caches evaluated ONCE at construction. Previously
 	// R154's os.Getenv calls were placed inside hot paths
-	// (executeTier2's main loop, TryCompile) causing a 25% fib
-	// regression because os.Getenv is ~100-300ns per call on macOS.
-	// These caches preserve the env-var diagnostic hook at zero hot-
-	// path cost.
+	// (executeTier2's main loop, TryCompile), which is expensive for tight
+	// recursive workloads because os.Getenv is ~100-300ns per call on macOS.
+	// These caches preserve the env-var diagnostic hook at zero hot-path cost.
 	envR154Trace     bool
 	envTier2NoFilter bool
 	r154DeoptPrints  int

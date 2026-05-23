@@ -947,8 +947,8 @@ func canHoistOp(op Op) bool {
 		return true
 	case OpMatrixRowPtr:
 		// R46: row-pointer arithmetic is pure. Hoists when all 3 inputs
-		// (flat, stride, i) are loop-invariant. In matmul's inner k-loop
-		// with a[i][k], i is invariant → row_a hoists outside the k-loop.
+		// (flat, stride, i) are loop-invariant. In row-fixed inner loops,
+		// row_a hoists outside the inner body.
 		return true
 	}
 	return false

@@ -78,8 +78,9 @@ type Tier2CallCounterMeta struct {
 }
 
 // Tier2CallPerfRow is a native call-site path counter row for opt-in Tier 2
-// diagnostics. It lets benchmarks distinguish successful JIT-to-JIT calls from
-// Go fallback/exit recovery without instrumenting normal production code.
+// diagnostics. It lets performance tooling distinguish successful JIT-to-JIT
+// calls from Go fallback/exit recovery without instrumenting normal production
+// code.
 type Tier2CallPerfRow struct {
 	Proto   string `json:"proto"`
 	InstrID int    `json:"instr_id"`

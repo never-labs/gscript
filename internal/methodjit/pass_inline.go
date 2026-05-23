@@ -102,10 +102,9 @@ func InlinePassWith(config InlineConfig) PassFunc {
 		// recursiveMemo caches the isRecursiveOrMutual result so we don't
 		// re-walk the transitive call graph on every call site.
 		recursiveMemo := make(map[*vm.FuncProto]bool)
-		// R166: track cumulative bytecode across all inlines. V8's model
-		// (max-inlined-bytecode-size-cumulative=920). Bounds explosion for
-		// asymmetric call trees (ack) while allowing deeper linear inline
-		// for symmetric ones (fib).
+		// R166: track cumulative bytecode across all inlines. This follows
+		// V8's max-inlined-bytecode-size-cumulative style: bound asymmetric
+		// call-tree explosion while allowing deeper linear inline chains.
 		cumulativeCtx := &inlineCumulativeTracker{}
 		for i := 0; i < inlineMaxIterations; i++ {
 			var inlined bool
@@ -130,10 +129,9 @@ func InlinePassWith(config InlineConfig) PassFunc {
 // Returns (fn, inlined, err) where inlined indicates whether any call was
 // inlined during this pass (used by the fixpoint driver).
 // inlineCumulativeTracker tracks total inlined bytecode across the
-// entire fixpoint for a single compilation. R166's V8-alignment
-// prevents asymmetric call trees (e.g. ackermann: 2 nested calls per
-// level) from exploding the caller's code size when MaxRecursion is
-// raised to permit deeper inlining of symmetric trees (e.g. fib).
+// entire fixpoint for a single compilation. It prevents asymmetric call trees
+// from exploding the caller's code size when MaxRecursion is raised to permit
+// deeper inlining of symmetric trees.
 type inlineCumulativeTracker struct {
 	totalBytes int
 }

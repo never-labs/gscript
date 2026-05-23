@@ -5,11 +5,9 @@
 // SBFX+CMP+B.NE overflow check on provably safe arithmetic.
 //
 // Motivation: loop counters are already exempted at graph-build time (Aux2=1),
-// but operations *derived* from loop counters (e.g. `i+j`, `(i+j)*(i+j+1)` in
-// the inlined body of A(i,j) from spectral_norm) still carry overflow checks.
-// A single overflow check after every arithmetic op accounts for a ~3.7x
-// regression on spectral_norm. Eliminating provably-safe checks recovers
-// most of this.
+// but operations derived from loop counters still carry overflow checks. A
+// single overflow check after every arithmetic op is expensive in tight numeric
+// kernels; eliminating provably-safe checks recovers most of that cost.
 //
 // Algorithm (three phases):
 //   Phase A: Seed loop-counter ranges from FORLOOP structure and from
@@ -1681,7 +1679,7 @@ func isqrt64(v int64) int64 {
 // On the true branch, both operands are int48 values and the strict comparison
 // proves lo <= MaxInt48-1 and hi >= MinInt48+1. Therefore lo+1 and hi-1 cannot
 // leave the int48 payload range. This keeps swap/reverse loops in raw-int form
-// without making a benchmark-specific assumption about arrays or table values.
+// without making a workload-specific assumption about arrays or table values.
 func markConvergingInductionSafe(fn *Function, safe map[int]bool) {
 	if fn == nil || safe == nil {
 		return

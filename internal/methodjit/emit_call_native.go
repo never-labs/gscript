@@ -2333,7 +2333,7 @@ func (ec *emitContext) emitCallNativeTypedSelfIfEligible(instr *Instr) bool {
 		// Zero-result typed self recursion is side-effect-only. The native BL
 		// path has no return value to validate before restoring the caller
 		// frame, and it is not yet safe for mutating double-recursive specializations
-		// such as quicksort. Keep those calls on the boxed call-exit path.
+		// over shared tables. Keep those calls on the boxed call-exit path.
 		return false
 	}
 	wantRets := 1
@@ -3596,9 +3596,9 @@ func (ec *emitContext) emitCallExitFallback(instr *Instr, funcSlot, nArgs, nRets
 //  2. It's used by any instruction AFTER the call in the same block, OR
 //  3. It's used by a phi in a successor block (cross-block live).
 //
-// Typically only 1-3 registers are live across a call (e.g., fib(n) only has
-// n live across each recursive call). This lets selective spill emit 1-3 STR
-// instructions instead of spilling the full allocatable GPR/FPR pools.
+// Typically only a few registers are live across a recursive call. This lets
+// selective spill emit a small number of STR instructions instead of spilling
+// the full allocatable GPR/FPR pools.
 func (ec *emitContext) computeLiveAcrossCall(callInstr *Instr) (gprLive map[int]bool, fprLive map[int]bool) {
 	gprLive = make(map[int]bool)
 	fprLive = make(map[int]bool)

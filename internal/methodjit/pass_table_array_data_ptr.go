@@ -10,7 +10,7 @@ package methodjit
 // Codegen uses these facts to keep the backing pointer in raw pointer form
 // across loop-carried registers and fallback spills instead of treating it as
 // a boxed integer. The fact is generic for all typed table arrays; it does not
-// depend on a benchmark-specific source pattern.
+// depend on a fixed source-program pattern.
 func TableArrayDataPtrFactPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

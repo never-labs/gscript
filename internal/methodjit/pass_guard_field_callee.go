@@ -13,7 +13,7 @@ import (
 //
 // into one guard that loads obj.step and checks the closure proto in a single
 // native sequence. The optimization is generic over shape id, field index and
-// proto pointer; it does not inspect source names or benchmark names.
+// proto pointer; it does not inspect source names.
 func GuardFieldCalleePass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

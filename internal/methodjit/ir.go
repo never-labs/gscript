@@ -148,7 +148,7 @@ type Function struct {
 
 	// StringFormatPatterns records immutable pattern metadata shared by
 	// string.format lowerings. Patterns are accepted by syntax shape or guarded
-	// constant identity, not by benchmark-specific literal value.
+	// constant identity, not by fixed workload literal value.
 	StringFormatPatterns []string
 
 	// StringSplitSubSpecs records immutable split-token substring coordinates

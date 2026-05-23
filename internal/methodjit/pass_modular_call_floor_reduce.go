@@ -2,7 +2,7 @@ package methodjit
 
 // ModularCallFloorReducePass bounds wide floor-call results before they enter
 // an additive expression that is immediately reduced by a positive modulo. The
-// rewrite is algebraic, not benchmark-specific:
+// rewrite is algebraic, not workload-specific:
 //
 //	(a + floor(f(...))) % m  =>  (a + (floor(f(...)) % m)) % m
 //

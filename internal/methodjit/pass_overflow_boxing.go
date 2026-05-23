@@ -673,9 +673,8 @@ func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
 //
 // In that shape an overflow in the update is handled by the raw AddInt
 // overflow check before the next iteration observes the value. Keeping the Phi
-// raw avoids boxing hot induction loops like sieve's inner `j += i`, while
-// multiplicative/modulo recurrences such as LCGs remain boxed to avoid
-// predictable deopt storms.
+// raw avoids boxing monotonic induction loops, while multiplicative/modulo
+// recurrences such as LCGs remain boxed to avoid predictable deopt storms.
 func collectOverflowCheckedLinearInductionDeps(fn *Function) map[int]bool {
 	keep := make(map[int]bool)
 	if fn == nil || len(fn.Blocks) == 0 {

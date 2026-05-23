@@ -5,8 +5,8 @@
 // OpMatrixGetF / OpMatrixSetF skip the row-wrapper indirection for
 // `matrix.getf(m, i, j)` and `matrix.setf(m, i, j, v)` calls when
 // m is a DenseMatrix (dmStride > 0). Emits ~7 ARM64 insns per access
-// vs ~25 insns for the nested ArrayMixed + ArrayFloat path. Target:
-// matmul 0.095s → ~0.04s (close ~60% remaining gap to LuaJIT 0.021s).
+// vs ~25 insns for the nested ArrayMixed + ArrayFloat path. This targets
+// row/column numeric kernels, not a specific source program.
 //
 // Guard: dmStride == 0 → deopt (not a DenseMatrix). The intrinsic
 // does NOT validate row/column bounds; user code using matrix.getf

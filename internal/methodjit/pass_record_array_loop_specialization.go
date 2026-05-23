@@ -10,7 +10,7 @@ type tableFieldUpdatePair struct {
 // RecordArrayLoopSpecializationPass recognizes fixed-shape table-array loops whose
 // bodies are expressible as float field loads, scalar operands, a small DAG,
 // and field stores. The generated op is parameterized by a runtime-built
-// RecordArrayLoopSpecializationSpec rather than by benchmark identity.
+// RecordArrayLoopSpecializationSpec rather than by source-program identity.
 func RecordArrayLoopSpecializationPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

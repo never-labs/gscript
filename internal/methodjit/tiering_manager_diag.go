@@ -202,9 +202,8 @@ func arm64Class(insn uint32) string {
 // report the reason without losing the proto from the list.
 func (tm *TieringManager) ProtoTreeDiag(top *vm.FuncProto) []*DiagArtifact {
 	// Populate diagGlobals from the top-level proto so that child protos
-	// can resolve sibling closures (e.g., sum_primes calling is_prime).
-	// At runtime, buildInlineGlobals uses the VM's global table; the diag
-	// path has no VM, so this bridges the gap.
+	// can resolve sibling closures. At runtime, buildInlineGlobals uses the
+	// VM's global table; the diag path has no VM, so this bridges the gap.
 	if globals := buildProtoStableGlobals(top); len(globals) > 0 {
 		tm.diagGlobals = globals
 	}

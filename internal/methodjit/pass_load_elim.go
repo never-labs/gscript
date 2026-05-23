@@ -8,7 +8,7 @@
 // GuardType CSE: when the same value is guarded for the same type multiple
 // times within a block, redundant guards are eliminated. The redundant guard
 // is converted to OpNop (since guards are side-effecting and DCE would
-// otherwise keep them). This is important for hot loops like nbody where
+// otherwise keep them). This is important for hot record loops where
 // feedback-driven guards on the same GetField result appear multiple times.
 //
 // Store-to-load forwarding: after SetField(obj, field, val), the stored
@@ -373,9 +373,9 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 							"forwarded value from earlier SetTable")
 					}
 				}
-				// R94 (reverted): don't populate with GetTable's own result
-				// — caused sieve regression, likely due to increased register
-				// pressure extending SSA value lifetimes.
+				// R94 (reverted): don't populate with GetTable's own result.
+				// It increased register pressure by extending SSA value
+				// lifetimes in boolean-table loops.
 
 			case OpSetTable:
 				if len(instr.Args) < 3 {

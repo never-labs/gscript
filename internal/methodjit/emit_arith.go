@@ -696,7 +696,7 @@ func (ec *emitContext) emitInt48OverflowCheck(result jit.Reg, instr *Instr) {
 	// Flush ALL register-resident values to VM register file before deopt.
 	// This ensures the interpreter sees correct state when it re-runs.
 	// Without this, loopExitBoxPhis values live only in registers and the
-	// interpreter would find stale memory (e.g., fibonacci_iterative bug).
+	// interpreter would find stale memory after loop deopt.
 	ec.emitStoreAllActiveRegs()
 	// Deopt may happen anywhere inside the loop nest; box ALL deferred
 	// phis to keep the interpreter's view of memory consistent.

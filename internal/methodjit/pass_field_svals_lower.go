@@ -14,7 +14,7 @@ import (
 //
 // The pass is intentionally generic: it keys only on the runtime shape id and
 // field index already attached by feedback/fixed-shape analysis. It does not
-// inspect benchmark names or field-name literals.
+// inspect source names or field-name literals.
 func FieldSvalsLowerPass(fn *Function) (*Function, error) {
 	return FieldSvalsLowerPassWith(nil)(fn)
 }

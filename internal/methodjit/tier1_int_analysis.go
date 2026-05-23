@@ -15,14 +15,13 @@ import (
 
 // knownIntInfo is the result of the forward scan. perPC[pc] is the bitmap
 // of KnownInt slots before pc executes; bit i is set iff slot i is known
-// to hold int48. MaxStack > 64 is ineligible (ack/fib/mutual_recursion all
-// use <10 slots).
+// to hold int48. MaxStack > 64 is ineligible to keep the bitmap compact.
 //
 // guardedParams is the bitmap of param slots that the emitter must check
 // with a runtime tag-guard at function entry. Only params that are actually
 // used as operands of arith/compare ops are guarded; params used as tables
-// or callables (quicksort's `arr`) are excluded so their non-int runtime
-// type doesn't trigger a spurious deopt.
+// or callables are excluded so their non-int runtime type doesn't trigger a
+// spurious deopt.
 type knownIntInfo struct {
 	perPC         []uint64
 	numParams     int
@@ -157,7 +156,7 @@ func computeKnownIntSlots(proto *vm.FuncProto) (*knownIntInfo, bool) {
 	//                or as the callable in CALL
 	// A param with both classifications is inconsistent (can't be int AND table);
 	// the proto is ineligible. A param used only as non-int is excluded from
-	// the seed and not guarded at entry — that's exactly quicksort's `arr`.
+	// the seed and not guarded at entry.
 	var arithUse, nonIntUse uint64
 	for _, inst := range code {
 		op := vm.DecodeOp(inst)

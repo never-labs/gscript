@@ -9,7 +9,7 @@ import "math"
 //
 // into a recurrence for the second evaluation. This shape appears after pure
 // numeric helper inlining and two-way loop unrolling; the rewrite is generic to
-// the expression shape, not to a function or benchmark name.
+// the expression shape, not to a function or source-program name.
 func QuadraticStepStrengthReductionPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

@@ -11,7 +11,7 @@ import (
 // building the callee graph, but some profile facts can mature after the callee
 // was first compiled or be lost when a caller-owned pipeline rewrites inlined
 // instructions. SourceProto lets this pass recover those generic facts without
-// coupling to a specific benchmark.
+// coupling to a specific workload.
 func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

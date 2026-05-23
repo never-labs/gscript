@@ -56,13 +56,12 @@ func hasTailCall(proto *vm.FuncProto) bool {
 }
 
 // staticallyCallsOnlySelf returns true when the bytecode's GETGLOBAL
-// targets are all the proto's own name — i.e. this proto calls only
-// itself, no other globals. Used to gate Tier 2 promotion for purely-
-// self-recursive 1-param numeric protos (fib/ack): these benefit from
-// the numeric calling convention's raw-int BL path. Mutual-recursion
-// (F/M in Hofstadter) intentionally returns false — cross-proto BLR is
-// faster in Tier 1 than the mixed Tier 2 path that R132 first tried
-// (mut_recursion regressed +81% when F/M were promoted).
+// targets are all the proto's own name: this proto calls only itself, no other
+// globals. Used to gate Tier 2 promotion for purely self-recursive one-param
+// numeric protos: these benefit from the numeric calling convention's raw-int
+// BL path. Mutual recursion intentionally returns false; cross-proto BLR is
+// often faster in Tier 1 than mixed Tier 2 paths without a uniform native
+// calling convention.
 //
 // Requires at least one GETGLOBAL-of-self (else non-calling functions
 // would trivially qualify). Purely static — no proto compilation
@@ -182,10 +181,10 @@ func analyzeFuncProfile(proto *vm.FuncProto) FuncProfile {
 // leaves native code.
 //
 // Empty NEWTABLE sites are excluded from this gate only when every
-// allocation in the function is an empty NEWTABLE. Mixed constructors such
-// as binary_trees.makeTree still contain residual NEWOBJECT2 exits; putting
-// them in Tier 1 clears direct-entry recursion and is slower than Tier 0
-// until fixed-shape object construction is native too.
+// allocation in the function is an empty NEWTABLE. Mixed fixed-shape
+// constructors still contain residual NEWOBJECT2 exits; putting them in Tier 1
+// clears direct-entry recursion and is slower than Tier 0 until fixed-shape
+// object construction is native too.
 func shouldStayTier0ForProto(proto *vm.FuncProto, profile FuncProfile) bool {
 	return profile.BytecodeCount <= 25 &&
 		profile.NewTableCount > profile.EmptyNewTableCount &&

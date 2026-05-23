@@ -1378,12 +1378,12 @@ const numericSelfEntryFrameSize = 16
 
 // emitTier2EntryMark writes 1 to proto.EnteredTier2 (one byte). It is
 // called at the head of each Tier 2 entry point so that a single glance
-// at proto.EnteredTier2 (e.g. through -jit-stats or the bench harness)
+// at proto.EnteredTier2 (for example through -jit-stats or diagnostics)
 // answers "did native Tier 2 code actually run for this proto?". Uses
 // X16/X17 — AAPCS scratch registers (IP0/IP1) — which are safe at entry
-// before any callee-saved registers are live. Cost: ~6 insns per
-// invocation (LoadImm64 up to 4 + MOVimm16 + STRB). For fib at ~1M
-// entries per run this is ~1.5 ms out of 0.9 s (~0.17%, inside noise).
+// before any callee-saved registers are live. Cost: roughly six instructions
+// per invocation (LoadImm64 up to 4 + MOVimm16 + STRB), small enough for
+// recursive hot paths while keeping diagnostics explicit.
 //
 // The address of proto.EnteredTier2 is stable because Go's GC is
 // non-moving for heap allocations; FuncProto is heap-allocated and is
@@ -2273,10 +2273,9 @@ func (ec *emitContext) emitBlock(block *Block) {
 	ec.seedBranchShapeGuardState(block)
 	ec.tableArrayBoundedKeys = make(map[tableArrayBoundKey]bool)
 	ec.seedEntryShapeGuardState(block)
-	// R44: reset DenseMatrix verification at every block boundary. Cross-
-	// block propagation isn't critical for matmul's inner-k loop (k-loop
-	// body is one block) and complicates merge semantics; conservatively
-	// reset.
+	// R44: reset DenseMatrix verification at every block boundary. The hot
+	// matrix inner loops this targets keep the relevant body in one block, and
+	// cross-block propagation complicates merge semantics; conservatively reset.
 	ec.dmVerified = make(map[int]bool)
 	ec.invalidateFieldSvalsCache()
 

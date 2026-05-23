@@ -12,7 +12,7 @@ import "github.com/gscript/gscript/internal/vm"
 //
 // into one guarded nested load that keeps the row table pointer in scratch
 // registers. The transform is deliberately same-block and single-use only so
-// it does not undo source-level row residency such as matmul's ai := a[i].
+// it does not undo source-level row residency already expressed in the IR.
 func TableArrayNestedLoadPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

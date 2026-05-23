@@ -7,7 +7,7 @@ type matrixUnitStrideKey struct {
 // MatrixUnitStridePass speculates dense-vector style matrix accesses by
 // guarding a proven runtime stride value to 1 and then exposing that fact as a
 // constant to codegen. This is a generic guard+deopt lowering for any
-// DenseMatrix with one-column/unit-stride rows; it is not tied to a benchmark.
+// DenseMatrix with one-column/unit-stride rows; it is source-program independent.
 func MatrixUnitStridePass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil

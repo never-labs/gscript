@@ -182,7 +182,7 @@ func inferredArrayKindForIntKeyTableLoad(instr *Instr) (int64, bool) {
 	// Without mature array-kind feedback, an int-key table load can still use
 	// the ordinary guarded ArrayMixed fast path. The header guard checks table
 	// shape/metatable/kind and the existing table-exit path recovers misses, so
-	// this is speculation by representation, not by benchmark shape.
+	// this is speculation by representation, not by workload shape.
 	return int64(vm.FBKindMixed), true
 }
 

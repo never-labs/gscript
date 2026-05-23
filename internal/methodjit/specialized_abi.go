@@ -155,7 +155,7 @@ const (
 )
 
 // AnalyzeSpecializedABI recognizes generic raw-int ABI candidates. It is
-// intentionally not tied to any one benchmark: a candidate must have fixed
+// intentionally not tied to any one workload: a candidate must have fixed
 // integer parameters, a single integer return, and bytecode operations whose
 // values can be represented as raw int64/int48 along recursive call edges.
 func AnalyzeSpecializedABI(proto *vm.FuncProto) SpecializedABI {
