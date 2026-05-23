@@ -6,6 +6,7 @@ const (
 	runtimeSpecializationRawIntNested = iota
 	runtimeSpecializationLazyRecursiveTableBuilder
 	runtimeSpecializationLazyRecursiveTableFold
+	runtimeSpecializationBoolTableStrikeCount
 	runtimeSpecializationCount
 )
 
@@ -99,6 +100,19 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 		},
 		Run:            (*VM).tryRunRecursiveTableValueKernel,
 		RecursiveTable: true,
+	},
+	runtimeSpecializationBoolTableStrikeCount: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "bool_table_strike_count",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         1,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
+			},
+			Recognize: isBoolTableStrikeCountProto,
+		},
+		Run: (*VM).runBoolTableStrikeCountWholeCallKernel,
 	},
 }
 

@@ -36,6 +36,7 @@ type FuncProto struct {
 	RuntimeSpecialization        *runtimeSpecializationProtoCache   // guarded runtime specialization recognizer cache, nil until first probe
 	WholeCallNoResultRuntime     *runtimeSpecializationProtoCache   // guarded no-result whole-call runtime specialization cache, nil until first probe
 	WholeCallKernel              *wholeCallKernelProtoCache         // structural whole-call kernel recognizer cache, nil until first probe
+	BoolTableStrikeCountKernel   *boolTableStrikeCountKernelCache   // guarded runtime-generated bool table strike-count kernel cache
 	RecordPairwiseNumericKernel  *recordPairwiseNumericKernelCache  // guarded runtime-generated pairwise record numeric kernel cache
 	GenericRecordArrayLoopKernel *genericRecordArrayLoopKernelCache // guarded runtime-generated scalar record-array loop cache
 	RecursiveTableKernel         *recursiveTableKernelCache         // guarded runtime recursive table builder/fold kernel cache

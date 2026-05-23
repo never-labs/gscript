@@ -2,8 +2,17 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
+type boolTableStrikeCountKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *boolTableStrikeCountKernelSpec
+}
+
+type boolTableStrikeCountKernelSpec struct {
+	minValue int
+}
+
 func (vm *VM) tryRunBoolTableStrikeCountWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelBoolTableStrikeCount) {
+	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationBoolTableStrikeCount) {
 		return false, nil, nil
 	}
 	return vm.runBoolTableStrikeCountWholeCallKernel(cl, args)
@@ -11,6 +20,10 @@ func (vm *VM) tryRunBoolTableStrikeCountWholeCallKernel(cl *Closure, args []runt
 
 func (vm *VM) runBoolTableStrikeCountWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
+		return false, nil, nil
+	}
+	spec, ok := boolTableStrikeCountKernelSpecForProto(cl.Proto)
+	if !ok {
 		return false, nil, nil
 	}
 	if !args[0].IsNumber() {
@@ -21,11 +34,11 @@ func (vm *VM) runBoolTableStrikeCountWholeCallKernel(cl *Closure, args []runtime
 	if float64(n64) != nn || n64 < 0 || int64(int(n64)) != n64 {
 		return false, nil, nil
 	}
-	return true, []runtime.Value{runtime.IntValue(runBoolTableStrikeCountKernel(int(n64)))}, nil
+	return true, []runtime.Value{runtime.IntValue(spec.run(int(n64)))}, nil
 }
 
-func runBoolTableStrikeCountKernel(n int) int64 {
-	if n < 2 {
+func (spec *boolTableStrikeCountKernelSpec) run(n int) int64 {
+	if spec == nil || n < spec.minValue {
 		return 0
 	}
 	// Track only odd numbers. Index i represents 2*i+1, so index 1 is 3.
@@ -59,25 +72,44 @@ func runBoolTableStrikeCountKernel(n int) int64 {
 }
 
 func IsBoolTableStrikeCountKernelProto(p *FuncProto) bool {
-	return cachedWholeCallKernelRecognized(p, wholeCallKernelBoolTableStrikeCount)
+	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationBoolTableStrikeCount)
 }
 
 func isBoolTableStrikeCountProto(p *FuncProto) bool {
-	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack < 13 ||
-		len(p.Constants) != 0 || len(p.Protos) != 0 {
-		return false
-	}
-	return matchBoolTableStrikeCountBytecode(p.Code)
+	_, ok := boolTableStrikeCountKernelSpecForProto(p)
+	return ok
 }
 
-func matchBoolTableStrikeCountBytecode(code []uint32) bool {
+func boolTableStrikeCountKernelSpecForProto(p *FuncProto) (*boolTableStrikeCountKernelSpec, bool) {
+	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack < 13 ||
+		len(p.Constants) != 0 || len(p.Protos) != 0 {
+		return nil, false
+	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.BoolTableStrikeCountKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzeBoolTableStrikeCountKernelSpec(p.Code)
+	if !ok {
+		p.BoolTableStrikeCountKernel = &boolTableStrikeCountKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.BoolTableStrikeCountKernel = &boolTableStrikeCountKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzeBoolTableStrikeCountKernelSpec(code []uint32) (*boolTableStrikeCountKernelSpec, bool) {
 	if len(code) != 45 {
-		return false
+		return nil, false
 	}
 	p := newBytecodePattern(code)
-	return matchBoolTableInitFill(p) &&
-		matchBoolTableStrikeMultiples(p) &&
-		matchBoolTableCountTruthy(p)
+	if !matchBoolTableInitFill(p) ||
+		!matchBoolTableStrikeMultiples(p) ||
+		!matchBoolTableCountTruthy(p) {
+		return nil, false
+	}
+	return &boolTableStrikeCountKernelSpec{minValue: 2}, true
 }
 
 func matchBoolTableInitFill(p bytecodePattern) bool {

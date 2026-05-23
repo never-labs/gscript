@@ -107,7 +107,6 @@ const (
 	wholeCallKernelRecordWalkFold = iota
 	wholeCallKernelIntGridAggregate
 	wholeCallKernelPermutationFlipChecksum
-	wholeCallKernelBoolTableStrikeCount
 	wholeCallKernelMatrixMultiply
 	wholeCallKernelCoefficientMatrixVector
 	wholeCallKernelCoefficientMatrixTransposeVector
@@ -180,17 +179,6 @@ var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecogni
 		},
 		recognize: isPermutationFlipChecksumKernelProto,
 		runValue:  (*VM).runPermutationFlipChecksumWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "bool_table_strike_count",
-			Route:         KernelRouteWholeCallValue,
-			Arity:         1,
-			Results:       kernelWholeCallSingleResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize: isBoolTableStrikeCountProto,
-		runValue:  (*VM).runBoolTableStrikeCountWholeCallKernel,
 	},
 	{
 		info: KernelInfo{
