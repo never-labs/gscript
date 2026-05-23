@@ -576,6 +576,12 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return args, nil // return all args on success
 		},
+		FastArg1: func(arg Value) (Value, error) {
+			if !arg.Truthy() {
+				return NilValue(), &LuaError{Value: StringValue("assertion failed")}
+			}
+			return arg, nil
+		},
 	}))
 
 	interp.globals.Define("spread", FunctionValue(&GoFunction{

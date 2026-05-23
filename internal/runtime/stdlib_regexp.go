@@ -3,7 +3,22 @@ package runtime
 import (
 	"fmt"
 	"regexp"
+	"sync"
 )
+
+var stdlibRegexpCompileCache sync.Map // map[string]*regexp.Regexp
+
+func cachedStdlibRegexp(pattern string) (*regexp.Regexp, error) {
+	if cached, ok := stdlibRegexpCompileCache.Load(pattern); ok {
+		return cached.(*regexp.Regexp), nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	actual, _ := stdlibRegexpCompileCache.LoadOrStore(pattern, re)
+	return actual.(*regexp.Regexp), nil
+}
 
 // makeReObject wraps a compiled *regexp.Regexp into a GScript table with methods.
 func makeReObject(re *regexp.Regexp) *Table {
@@ -158,7 +173,7 @@ func buildRegexpLib() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'regexp.compile'")
 		}
 		pattern := args[0].Str()
-		re, err := regexp.Compile(pattern)
+		re, err := cachedStdlibRegexp(pattern)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -171,7 +186,7 @@ func buildRegexpLib() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'regexp.mustCompile'")
 		}
 		pattern := args[0].Str()
-		re, err := regexp.Compile(pattern)
+		re, err := cachedStdlibRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("regexp.mustCompile: %v", err)
 		}
@@ -183,10 +198,11 @@ func buildRegexpLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.match'")
 		}
-		matched, err := regexp.MatchString(args[0].Str(), args[1].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.match: %v", err)
 		}
+		matched := re.MatchString(args[1].Str())
 		return []Value{BoolValue(matched)}, nil
 	})
 
@@ -195,7 +211,7 @@ func buildRegexpLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.find'")
 		}
-		re, err := regexp.Compile(args[0].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.find: %v", err)
 		}
@@ -211,7 +227,7 @@ func buildRegexpLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.findAll'")
 		}
-		re, err := regexp.Compile(args[0].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.findAll: %v", err)
 		}
@@ -232,7 +248,7 @@ func buildRegexpLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.findAllSubmatch'")
 		}
-		re, err := regexp.Compile(args[0].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.findAllSubmatch: %v", err)
 		}
@@ -257,7 +273,7 @@ func buildRegexpLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'regexp.replace'")
 		}
-		re, err := regexp.Compile(args[0].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.replace: %v", err)
 		}
@@ -276,7 +292,7 @@ func buildRegexpLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'regexp.replaceAll'")
 		}
-		re, err := regexp.Compile(args[0].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.replaceAll: %v", err)
 		}
@@ -288,7 +304,7 @@ func buildRegexpLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.split'")
 		}
-		re, err := regexp.Compile(args[0].Str())
+		re, err := cachedStdlibRegexp(args[0].Str())
 		if err != nil {
 			return nil, fmt.Errorf("regexp.split: %v", err)
 		}

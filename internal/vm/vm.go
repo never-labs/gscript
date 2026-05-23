@@ -500,7 +500,7 @@ func (vm *VM) RegisterToStringLib() {
 	}))
 }
 
-func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int) error {
+func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunction) error {
 	if nArgs == 0 || absSlot+1 >= len(vm.regs) {
 		return fmt.Errorf("bad argument #1 to 'select'")
 	}
@@ -508,9 +508,9 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int) error {
 	if err != nil {
 		return err
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	runtime.RecordRuntimePathNativeCallFastFor(gf)
 	if countOnly {
-		vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{runtime.IntValue(int64(start))})
+		vm.storeStdSelectOne(absSlot, rawC, runtime.IntValue(int64(start)))
 		return nil
 	}
 	valueStart := absSlot + 1 + start
@@ -522,8 +522,61 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int) error {
 	if valueEnd > len(vm.regs) {
 		valueEnd = len(vm.regs)
 	}
-	vm.storeStdSelectResults(absSlot, rawC, vm.regs[valueStart:valueEnd])
+	vm.storeStdSelectRange(absSlot, rawC, valueStart, valueEnd)
 	return nil
+}
+
+func (vm *VM) storeStdSelectOne(absSlot, rawC int, value runtime.Value) {
+	if rawC == 0 {
+		if absSlot < len(vm.regs) {
+			vm.regs[absSlot] = value
+		}
+		vm.top = absSlot + 1
+		return
+	}
+	nr := rawC - 1
+	if nr <= 0 {
+		return
+	}
+	if absSlot < len(vm.regs) {
+		vm.regs[absSlot] = value
+	}
+	for i := 1; i < nr; i++ {
+		if idx := absSlot + i; idx < len(vm.regs) {
+			vm.regs[idx] = runtime.NilValue()
+		}
+	}
+}
+
+func (vm *VM) storeStdSelectRange(absSlot, rawC, valueStart, valueEnd int) {
+	if valueEnd < valueStart {
+		valueEnd = valueStart
+	}
+	if rawC == 0 {
+		n := valueEnd - valueStart
+		for i := 0; i < n; i++ {
+			dst := absSlot + i
+			src := valueStart + i
+			if dst < len(vm.regs) && src < len(vm.regs) {
+				vm.regs[dst] = vm.regs[src]
+			}
+		}
+		vm.top = absSlot + n
+		return
+	}
+	nr := rawC - 1
+	for i := 0; i < nr; i++ {
+		dst := absSlot + i
+		if dst >= len(vm.regs) {
+			continue
+		}
+		src := valueStart + i
+		if src < valueEnd && src < len(vm.regs) {
+			vm.regs[dst] = vm.regs[src]
+		} else {
+			vm.regs[dst] = runtime.NilValue()
+		}
+	}
 }
 
 func (vm *VM) storeStdSelectResults(absSlot, rawC int, results []runtime.Value) {
@@ -3750,7 +3803,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					switch gf.NativeKind {
 					case runtime.NativeKindStdSelect:
 						if gf.NativeData == runtime.StdSelectIdentityPtr() {
-							if err := vm.executeStdSelectCall(base+a, nArgs, c); err != nil {
+							if err := vm.executeStdSelectCall(base+a, nArgs, c, gf); err != nil {
 								return nil, wrapLineErr(frame, err)
 							}
 							observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)

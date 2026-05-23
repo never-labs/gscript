@@ -569,7 +569,7 @@ slowPath:
 		switch gf.NativeKind {
 		case runtime.NativeKindStdSelect:
 			if gf.NativeData == runtime.StdSelectIdentityPtr() {
-				return e.executeStdSelectCall(regs, absSlot, nArgs, rawC)
+				return e.executeStdSelectCall(regs, absSlot, nArgs, rawC, gf)
 			}
 		case runtime.NativeKindStdIPairs:
 			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdIPairsIdentityPtr() {
@@ -821,7 +821,7 @@ func (e *BaselineJITEngine) executeCompiledTier2Call(compiled interface{}, cl *v
 	return nil
 }
 
-func (e *BaselineJITEngine) executeStdSelectCall(regs []runtime.Value, absSlot, nArgs, rawC int) error {
+func (e *BaselineJITEngine) executeStdSelectCall(regs []runtime.Value, absSlot, nArgs, rawC int, gf *runtime.GoFunction) error {
 	if nArgs == 0 || absSlot+1 >= len(regs) {
 		return fmt.Errorf("bad argument #1 to 'select'")
 	}
@@ -829,13 +829,13 @@ func (e *BaselineJITEngine) executeStdSelectCall(regs []runtime.Value, absSlot, 
 	if err != nil {
 		return err
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(regs[absSlot].GoFunction())
+	runtime.RecordRuntimePathNativeCallFastFor(gf)
 	currentRegs := regs
 	if e != nil && e.callVM != nil {
 		currentRegs = e.callVM.Regs()
 	}
 	if countOnly {
-		storeStdSelectResults(e, currentRegs, absSlot, rawC, []runtime.Value{runtime.IntValue(int64(start))})
+		storeStdSelectOne(e, currentRegs, absSlot, rawC, runtime.IntValue(int64(start)))
 		return nil
 	}
 	valueStart := absSlot + 1 + start
@@ -847,8 +847,65 @@ func (e *BaselineJITEngine) executeStdSelectCall(regs []runtime.Value, absSlot, 
 	if valueEnd > len(currentRegs) {
 		valueEnd = len(currentRegs)
 	}
-	storeStdSelectResults(e, currentRegs, absSlot, rawC, currentRegs[valueStart:valueEnd])
+	storeStdSelectRange(e, currentRegs, absSlot, rawC, valueStart, valueEnd)
 	return nil
+}
+
+func storeStdSelectOne(e *BaselineJITEngine, regs []runtime.Value, absSlot, rawC int, value runtime.Value) {
+	if rawC == 0 {
+		if absSlot < len(regs) {
+			regs[absSlot] = value
+		}
+		if e != nil && e.callVM != nil {
+			e.callVM.SetTop(absSlot + 1)
+		}
+		return
+	}
+	nr := rawC - 1
+	if nr <= 0 {
+		return
+	}
+	if absSlot < len(regs) {
+		regs[absSlot] = value
+	}
+	for i := 1; i < nr; i++ {
+		if idx := absSlot + i; idx < len(regs) {
+			regs[idx] = runtime.NilValue()
+		}
+	}
+}
+
+func storeStdSelectRange(e *BaselineJITEngine, regs []runtime.Value, absSlot, rawC, valueStart, valueEnd int) {
+	if valueEnd < valueStart {
+		valueEnd = valueStart
+	}
+	if rawC == 0 {
+		n := valueEnd - valueStart
+		for i := 0; i < n; i++ {
+			dst := absSlot + i
+			src := valueStart + i
+			if dst < len(regs) && src < len(regs) {
+				regs[dst] = regs[src]
+			}
+		}
+		if e != nil && e.callVM != nil {
+			e.callVM.SetTop(absSlot + n)
+		}
+		return
+	}
+	nr := rawC - 1
+	for i := 0; i < nr; i++ {
+		dst := absSlot + i
+		if dst >= len(regs) {
+			continue
+		}
+		src := valueStart + i
+		if src < valueEnd && src < len(regs) {
+			regs[dst] = regs[src]
+		} else {
+			regs[dst] = runtime.NilValue()
+		}
+	}
 }
 
 func storeStdSelectResults(e *BaselineJITEngine, regs []runtime.Value, absSlot, rawC int, results []runtime.Value) {
