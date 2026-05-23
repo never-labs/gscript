@@ -104,6 +104,15 @@ func emitterFamilyDelegateRegistry() []emitterFamilyDelegate {
 		{filename: "emit_guard_instr.go", funcName: "emitGuardInstr", family: OpEmitterGuard},
 		{filename: "emit_call_instr.go", funcName: "emitCallInstr", family: OpEmitterCall},
 		{filename: "emit_global_instr.go", funcName: "emitGlobalInstr", family: OpEmitterGlobal},
+		{filename: "emit_misc_instr.go", funcName: "emitKernelInstr", family: OpEmitterKernel},
+		{filename: "emit_control_instr.go", funcName: "emitControlInstr", family: OpEmitterControl},
+		{filename: "emit_misc_instr.go", funcName: "emitUpvalueInstr", family: OpEmitterUpvalue},
+		{filename: "emit_misc_instr.go", funcName: "emitConversionInstr", family: OpEmitterConversion},
+		{filename: "emit_misc_instr.go", funcName: "emitLoopInstr", family: OpEmitterLoop},
+		{filename: "emit_misc_instr.go", funcName: "emitClosureInstr", family: OpEmitterClosure},
+		{filename: "emit_misc_instr.go", funcName: "emitVarargInstr", family: OpEmitterVararg},
+		{filename: "emit_misc_instr.go", funcName: "emitConcurrencyInstr", family: OpEmitterConcurrency},
+		{filename: "emit_misc_instr.go", funcName: "emitSpecialInstr", family: OpEmitterSpecial},
 	}
 }
 

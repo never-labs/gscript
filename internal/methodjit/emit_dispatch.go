@@ -78,53 +78,39 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if ec.emitGlobalInstr(instr) {
 		goto done
 	}
+	if ec.emitKernelInstr(instr, block) {
+		goto done
+	}
+	if ec.emitControlInstr(instr, block) {
+		goto done
+	}
+	if ec.emitUpvalueInstr(instr, block) {
+		goto done
+	}
+	if ec.emitConversionInstr(instr, block) {
+		goto done
+	}
+	if ec.emitLoopInstr(instr, block) {
+		goto done
+	}
+	if ec.emitClosureInstr(instr, block) {
+		goto done
+	}
+	if ec.emitVarargInstr(instr, block) {
+		goto done
+	}
+	if ec.emitConcurrencyInstr(instr, block) {
+		goto done
+	}
+	if ec.emitSpecialInstr(instr, block) {
+		goto done
+	}
 	switch instr.Op {
-	case OpComplexEscapeInSet:
-		ec.emitComplexEscapeInSet(instr)
-	case OpComplexEscapeRowCount:
-		ec.emitComplexEscapeRowCount(instr)
-	case OpRecordArrayLoopKernel:
-		ec.emitRecordArrayLoopKernel(instr)
-
 	// --- Phi ---
 	case OpPhi:
 		// Phi resolution happens at block transitions (emitPhiMoves).
 
-	// --- Control flow ---
-	case OpJump:
-		ec.emitJump(instr, block)
-	case OpBranch:
-		ec.emitBranch(instr, block)
-	case OpReturn:
-		ec.emitReturn(instr, block)
-
-	case OpNop:
-		// nothing
-
-	case OpNumToFloat:
-		ec.emitNumToFloat(instr)
-
-	// --- Op-exit: unsupported ops exit to Go, execute there, resume JIT ---
-	case OpGetUpval:
-		if len(instr.Args) > 0 {
-			ec.emitInlinedGetUpval(instr)
-		} else {
-			ec.emitOpExit(instr)
-		}
-		ec.clearTableArrayBoundedKeys()
-	case OpSetUpval:
-		if len(instr.Args) > 1 {
-			ec.emitInlinedSetUpval(instr)
-		} else {
-			ec.emitOpExit(instr)
-		}
-		ec.clearTableArrayBoundedKeys()
-	case OpPow,
-		OpClosure, OpClose,
-		OpForPrep, OpForLoop,
-		OpTForCall, OpTForLoop,
-		OpVararg, OpTestSet,
-		OpGo, OpMakeChan, OpSend, OpRecv:
+	case OpPow:
 		ec.emitOpExit(instr)
 		ec.clearTableArrayBoundedKeys()
 	default:
