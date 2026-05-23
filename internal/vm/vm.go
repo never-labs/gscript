@@ -85,6 +85,8 @@ type VM struct {
 	callSiteFloatBuf     []float64         // reusable non-pointer scratch for guarded call-site runtime specializations
 	callSiteIntBuf       []int64           // reusable non-pointer scratch for guarded call-site runtime specializations
 	callSiteValueBuf     []runtime.Value   // reusable Value scratch; scanned as GC roots below
+	typeNameValues       [runtime.TypeChannel + 1]runtime.Value
+	unknownTypeName      runtime.Value
 	spectralCoefficients spectralCoefficientCache
 	currentCoroutine     *VMCoroutine // coroutine currently running on this VM, if any
 	coroutineYielded     bool         // current coroutine VM paused through coroutine.yield
@@ -329,6 +331,35 @@ func (vm *VM) GlobalValueVersionPtr() (*uint64, uint64, bool) {
 	return &vm.globalValueVer, vm.globalValueVer, true
 }
 
+func (vm *VM) initTypeNameValues() {
+	vm.typeNameValues[runtime.TypeNil] = runtime.StringValue("nil")
+	vm.typeNameValues[runtime.TypeBool] = runtime.StringValue("boolean")
+	vm.typeNameValues[runtime.TypeInt] = runtime.StringValue("number")
+	vm.typeNameValues[runtime.TypeFloat] = runtime.StringValue("number")
+	vm.typeNameValues[runtime.TypeString] = runtime.StringValue("string")
+	vm.typeNameValues[runtime.TypeTable] = runtime.StringValue("table")
+	vm.typeNameValues[runtime.TypeFunction] = runtime.StringValue("function")
+	vm.typeNameValues[runtime.TypeCoroutine] = runtime.StringValue("coroutine")
+	vm.typeNameValues[runtime.TypeChannel] = runtime.StringValue("channel")
+	vm.unknownTypeName = runtime.StringValue("unknown")
+}
+
+func (vm *VM) typeNameValue(v runtime.Value) runtime.Value {
+	if vm == nil {
+		return runtime.StringValue(v.TypeName())
+	}
+	t := v.Type()
+	if int(t) < len(vm.typeNameValues) {
+		if tv := vm.typeNameValues[t]; !tv.IsNil() {
+			return tv
+		}
+	}
+	if !vm.unknownTypeName.IsNil() {
+		return vm.unknownTypeName
+	}
+	return runtime.StringValue("unknown")
+}
+
 // SetGlobal writes a global variable with proper locking.
 func (vm *VM) SetGlobal(name string, val runtime.Value) {
 	if vm.noGlobalLock {
@@ -539,6 +570,30 @@ func (vm *VM) RegisterToStringLib() {
 			return runtime.StringValue(s), nil
 		},
 	}))
+}
+
+// RegisterTypeLib installs a VM-aware type builtin that returns VM-owned,
+// preboxed strings. This keeps the builtin allocation-free while preserving
+// ordinary global override semantics through the normal GETGLOBAL guard.
+func (vm *VM) RegisterTypeLib() {
+	vm.SetGlobal("type", runtime.FunctionValue(vm.newTypeFunction()))
+}
+
+func (vm *VM) newTypeFunction() *runtime.GoFunction {
+	return &runtime.GoFunction{
+		Name: "type",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) == 0 {
+				return nil, fmt.Errorf("bad argument #1 to 'type' (value expected)")
+			}
+			return []runtime.Value{vm.typeNameValue(args[0])}, nil
+		},
+		FastArg1: func(arg runtime.Value) (runtime.Value, error) {
+			return vm.typeNameValue(arg), nil
+		},
+		NativeKind: runtime.NativeKindStdType,
+		NativeData: runtime.StdTypeIdentityPtr(),
+	}
 }
 
 func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunction) error {
@@ -846,6 +901,16 @@ func (vm *VM) ExecuteStdRawLenCall(absSlot, nArgs, rawC int) (bool, error) {
 	}
 	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
 	vm.writeSingleCallResult(absSlot, rawC, result)
+	return true, nil
+}
+
+// ExecuteStdTypeCall handles type(value) without allocating a fresh string box.
+func (vm *VM) ExecuteStdTypeCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs != 1 || absSlot+1 >= len(vm.regs) {
+		return false, nil
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.writeSingleCallResult(absSlot, rawC, vm.typeNameValue(vm.regs[absSlot+1]))
 	return true, nil
 }
 
@@ -1927,9 +1992,11 @@ func New(globals map[string]runtime.Value) *VM {
 		globalsMu:          &sync.RWMutex{},
 		noGlobalLock:       true, // single-threaded by default
 	}
+	v.initTypeNameValues()
 	v.RegisterCoroutineLib()
 	v.RegisterProtectedCallLib()
 	v.RegisterTestkitLib()
+	v.RegisterTypeLib()
 	v.RegisterToStringLib()
 	v.RegisterIPairsLib()
 	v.RegisterPairsLib()
@@ -2016,6 +2083,10 @@ func (vm *VM) ScanGCRoots(visitor func(unsafe.Pointer)) {
 	for _, v := range vm.callSiteValueBuf {
 		runtime.ScanValueRoots(v, visitor, seen)
 	}
+	for _, v := range vm.typeNameValues {
+		runtime.ScanValueRoots(v, visitor, seen)
+	}
+	runtime.ScanValueRoots(vm.unknownTypeName, visitor, seen)
 
 	// Scan string metatable.
 	if vm.stringMeta != nil {
@@ -2067,9 +2138,11 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		currentCoroutine:   co,
 		coroutineStats:     parent.coroutineStats,
 	}
+	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
 	child.setGlobalOverride("pcall", runtime.FunctionValue(child.newPCallFunction()))
 	child.setGlobalOverride("xpcall", runtime.FunctionValue(child.newXPCallFunction()))
+	child.setGlobalOverride("type", runtime.FunctionValue(child.newTypeFunction()))
 	child.setGlobalOverride("ipairs", runtime.FunctionValue(child.newIPairsFunction()))
 	child.setGlobalOverride("pairs", runtime.FunctionValue(child.newPairsFunction()))
 	child.setGlobalOverride("debug", runtime.TableValue(child.newDebugLib()))
@@ -2109,9 +2182,11 @@ func newIsolatedChildVM(parent *VM) *VM {
 		stringMeta:         parent.stringMeta,
 		coroutineStats:     parent.coroutineStats,
 	}
+	child.initTypeNameValues()
 	child.RegisterCoroutineLib()
 	child.RegisterProtectedCallLib()
 	child.RegisterTestkitLib()
+	child.RegisterTypeLib()
 	child.RegisterToStringLib()
 	child.RegisterIPairsLib()
 	child.RegisterPairsLib()
@@ -4163,6 +4238,17 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					case runtime.NativeKindStdRawLen:
 						if gf.NativeData == runtime.StdRawLenIdentityPtr() {
 							handled, err := vm.ExecuteStdRawLenCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdType:
+						if gf.NativeData == runtime.StdTypeIdentityPtr() {
+							handled, err := vm.ExecuteStdTypeCall(base+a, nArgs, c)
 							if err != nil {
 								return nil, wrapLineErr(frame, err)
 							}

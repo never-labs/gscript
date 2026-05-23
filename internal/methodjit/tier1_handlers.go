@@ -624,6 +624,13 @@ slowPath:
 					return err
 				}
 			}
+		case runtime.NativeKindStdType:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdTypeIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdTypeCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
 		}
 		if nArgs == 1 && gf.FastArg1Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)
