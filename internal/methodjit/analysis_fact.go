@@ -35,15 +35,15 @@ const (
 	AnalysisFactStringFormatPatterns AnalysisFact = "StringFormatPatterns"
 	AnalysisFactStringSplitSubSpecs  AnalysisFact = "StringSplitSubSpecs"
 
-	AnalysisFactInt48Safe             AnalysisFact = "Int48Safe"
-	AnalysisFactIntRanges             AnalysisFact = "IntRanges"
-	AnalysisFactIntNonNegative        AnalysisFact = "IntNonNegative"
-	AnalysisFactIntModNonZeroDivisor  AnalysisFact = "IntModNonZeroDivisor"
-	AnalysisFactIntModNoSignAdjust    AnalysisFact = "IntModNoSignAdjust"
-	AnalysisFactTableArrayDataPtrs    AnalysisFact = "TableArrayDataPtrs"
-	AnalysisFactShapeFieldTypeElided  AnalysisFact = "ShapeFieldTypeElidedLoads"
-	AnalysisFactRecordArrayLoopKernel AnalysisFact = "RecordArrayLoopKernels"
-	AnalysisFactRecordArrayLoopCaches AnalysisFact = "RecordArrayLoopCaches"
+	AnalysisFactInt48Safe                     AnalysisFact = "Int48Safe"
+	AnalysisFactIntRanges                     AnalysisFact = "IntRanges"
+	AnalysisFactIntNonNegative                AnalysisFact = "IntNonNegative"
+	AnalysisFactIntModNonZeroDivisor          AnalysisFact = "IntModNonZeroDivisor"
+	AnalysisFactIntModNoSignAdjust            AnalysisFact = "IntModNoSignAdjust"
+	AnalysisFactTableArrayDataPtrs            AnalysisFact = "TableArrayDataPtrs"
+	AnalysisFactShapeFieldTypeElided          AnalysisFact = "ShapeFieldTypeElidedLoads"
+	AnalysisFactRecordArrayLoopSpecialization AnalysisFact = "RecordArrayLoopSpecializations"
+	AnalysisFactRecordArrayLoopCaches         AnalysisFact = "RecordArrayLoopCaches"
 )
 
 var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
@@ -186,9 +186,9 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Producers:   []string{"ShapeFieldTypeGuard"},
 		Consumers:   []string{"codegen", "diagnostics"},
 	},
-	AnalysisFactRecordArrayLoopKernel: {
+	AnalysisFactRecordArrayLoopSpecialization: {
 		Owner:       "table",
-		Description: "Record-array loop kernels have been identified.",
+		Description: "Record-array loop specializations have been identified.",
 		Producers:   []string{"RecordArrayLoopKernel"},
 		Consumers:   []string{"codegen"},
 	},

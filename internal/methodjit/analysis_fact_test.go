@@ -46,7 +46,7 @@ func knownAnalysisFactsForTest() []AnalysisFact {
 		AnalysisFactIntModNoSignAdjust,
 		AnalysisFactTableArrayDataPtrs,
 		AnalysisFactShapeFieldTypeElided,
-		AnalysisFactRecordArrayLoopKernel,
+		AnalysisFactRecordArrayLoopSpecialization,
 		AnalysisFactRecordArrayLoopCaches,
 	}
 }

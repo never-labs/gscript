@@ -315,9 +315,9 @@ func tableArrayLenGuardDominates(fact tableArrayLenGuardFact, dom *domInfo, orde
 }
 
 func markTableArrayLowerBoundSafe(fn *Function, instr *Instr) {
-	functionKernelFacts(fn).RecordTableArrayLowerBoundSafe(instr.ID)
+	functionLoopSpecializationFacts(fn).RecordTableArrayLowerBoundSafe(instr.ID)
 }
 
 func markTableArrayUpperBoundSafe(fn *Function, instr *Instr) {
-	functionKernelFacts(fn).RecordTableArrayUpperBoundSafe(instr.ID)
+	functionLoopSpecializationFacts(fn).RecordTableArrayUpperBoundSafe(instr.ID)
 }

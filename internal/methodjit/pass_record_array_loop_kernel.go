@@ -18,7 +18,7 @@ func RecordArrayLoopKernelPass(fn *Function) (*Function, error) {
 	fn.ensureAnalysis()
 	changed := false
 	for _, header := range append([]*Block(nil), fn.Blocks...) {
-		if lowerRecordArrayLoopKernel(fn, header) {
+		if lowerRecordArrayLoopSpecialization(fn, header) {
 			changed = true
 		}
 	}
@@ -28,7 +28,7 @@ func RecordArrayLoopKernelPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
-func lowerRecordArrayLoopKernel(fn *Function, header *Block) bool {
+func lowerRecordArrayLoopSpecialization(fn *Function, header *Block) bool {
 	if fn == nil || header == nil || len(header.Preds) != 2 || len(header.Succs) != 2 {
 		return false
 	}
@@ -65,7 +65,7 @@ func lowerRecordArrayLoopKernel(fn *Function, header *Block) bool {
 	}
 	spec.kernel.Cache = &RecordArrayLoopKernelCache{}
 	fn.RecordArrayLoopCaches = append(fn.RecordArrayLoopCaches, spec.kernel.Cache)
-	functionKernelFacts(fn).SetRecordArrayLoopKernel(op.ID, spec.kernel)
+	functionLoopSpecializationFacts(fn).SetRecordArrayLoopSpecialization(op.ID, spec.kernel)
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Block: header}
 	header.Instrs = []*Instr{op, ret}
 	header.Preds = []*Block{pre}

@@ -17,11 +17,11 @@ const (
 	recordArrayLoopCacheOffSvals            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Svals))
 )
 
-func (ec *emitContext) emitRecordArrayLoopKernel(instr *Instr) {
+func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 	if instr == nil || len(instr.Args) < 4 || ec == nil || ec.fn == nil {
 		return
 	}
-	spec, ok := functionKernelFacts(ec.fn).RecordArrayLoopKernel(instr.ID)
+	spec, ok := functionLoopSpecializationFacts(ec.fn).RecordArrayLoopSpecialization(instr.ID)
 	if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
 		ec.emitPreciseDeopt(instr)
 		return

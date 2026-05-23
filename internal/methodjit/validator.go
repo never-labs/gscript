@@ -483,7 +483,7 @@ func (v *validator) checkOpContracts() {
 						blk.ID, instr.ID, instr.Aux)
 				}
 			case OpRecordArrayLoopKernel:
-				if _, ok := functionKernelFacts(v.fn).RecordArrayLoopKernel(instr.ID); !ok {
+				if _, ok := functionLoopSpecializationFacts(v.fn).RecordArrayLoopSpecialization(instr.ID); !ok {
 					v.errorf("B%d: RecordArrayLoopKernel (v%d) must have a kernel spec", blk.ID, instr.ID)
 				}
 			}

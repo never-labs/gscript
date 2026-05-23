@@ -124,7 +124,7 @@ func tier2TableLoopKernelModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("BoolTableFillLoop", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableFillLoopPass),
 		tier2PassModuleWith("TableArrayStoreLoopVersion", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStoreLoopVersionPass),
-		tier2PassModuleWith("RecordArrayLoopKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), analysisFacts(AnalysisFactRecordArrayLoopKernel, AnalysisFactRecordArrayLoopCaches), RecordArrayLoopKernelPass),
+		tier2PassModuleWith("RecordArrayLoopKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), analysisFacts(AnalysisFactRecordArrayLoopSpecialization, AnalysisFactRecordArrayLoopCaches), RecordArrayLoopKernelPass),
 		tier2PassModuleWith("TableIntArrayKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), nil, TableIntArrayKernelPass),
 		tier2PassModuleWith("BoolTableCountLoop", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables), nil, BoolTableCountLoopPass),
 	}

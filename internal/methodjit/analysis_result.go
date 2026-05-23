@@ -81,9 +81,9 @@ type AnalysisResult struct {
 	// backing-array pointer only while the matching header guard remains valid.
 	TableArrayDataPtrs map[int]TableArrayDataPtrFact
 
-	// RecordArrayLoopKernels records generated loop-body dataflow graphs keyed
+	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
 	// by OpRecordArrayLoopKernel instruction ID.
-	RecordArrayLoopKernels map[int]RecordArrayLoopKernelSpec
+	RecordArrayLoopSpecializations map[int]RecordArrayLoopKernelSpec
 
 	// CallABIs records stable callsite ABI facts keyed by OpCall instruction
 	// ID. A descriptor is required before codegen may use a specialized
@@ -105,10 +105,10 @@ type AnalysisResult struct {
 	// constructors, Initialize, and domain mutators.
 	TableShape *TableShapeFacts
 
-	// Kernel groups loop-kernel and table-array bound facts. The map fields
+	// Kernel groups loop-specialization and table-array bound facts. The map fields
 	// above remain for compatibility and are kept pointed at this domain's maps
 	// by constructors, Initialize, and domain mutators.
-	Kernel *KernelFacts
+	Kernel *LoopSpecializationFacts
 
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
@@ -737,9 +737,9 @@ func (a *AnalysisResult) bindCallCompatibilityFields() {
 	a.CallSiteNoResultRuntimeSpecializationBatches = a.Call.CallSiteNoResultRuntimeSpecializationBatches
 }
 
-// KernelFacts groups analysis facts produced and consumed by loop-kernel and
+// LoopSpecializationFacts groups analysis facts produced and consumed by loop-specialization and
 // table-array bound passes.
-type KernelFacts struct {
+type LoopSpecializationFacts struct {
 	owner *AnalysisResult
 
 	// TableArrayUpperBoundSafe is the set of table-array access instruction IDs
@@ -755,18 +755,18 @@ type KernelFacts struct {
 	// TableArrayUpperBoundSafe access.
 	LoopTableArrayFacts map[int]LoopTableArrayFact
 
-	// RecordArrayLoopKernels records generated loop-body dataflow graphs keyed
+	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
 	// by OpRecordArrayLoopKernel instruction ID.
-	RecordArrayLoopKernels map[int]RecordArrayLoopKernelSpec
+	RecordArrayLoopSpecializations map[int]RecordArrayLoopKernelSpec
 }
 
-func NewKernelFacts() *KernelFacts {
-	k := &KernelFacts{}
+func NewLoopSpecializationFacts() *LoopSpecializationFacts {
+	k := &LoopSpecializationFacts{}
 	k.Initialize()
 	return k
 }
 
-func (k *KernelFacts) Initialize() {
+func (k *LoopSpecializationFacts) Initialize() {
 	if k.TableArrayUpperBoundSafe == nil {
 		k.TableArrayUpperBoundSafe = make(map[int]bool)
 	}
@@ -776,28 +776,28 @@ func (k *KernelFacts) Initialize() {
 	if k.LoopTableArrayFacts == nil {
 		k.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
 	}
-	if k.RecordArrayLoopKernels == nil {
-		k.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
+	if k.RecordArrayLoopSpecializations == nil {
+		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopKernelSpec)
 	}
 }
 
-func (k *KernelFacts) SetTableArrayUpperBoundSafe(facts map[int]bool) {
+func (k *LoopSpecializationFacts) SetTableArrayUpperBoundSafe(facts map[int]bool) {
 	k.TableArrayUpperBoundSafe = facts
 	k.bindOwner()
 }
 
-func (k *KernelFacts) TableArrayUpperBoundIsSafe(id int) bool {
+func (k *LoopSpecializationFacts) TableArrayUpperBoundIsSafe(id int) bool {
 	return k != nil && k.TableArrayUpperBoundSafe != nil && k.TableArrayUpperBoundSafe[id]
 }
 
-func (k *KernelFacts) TableArrayUpperBoundSafeMap() map[int]bool {
+func (k *LoopSpecializationFacts) TableArrayUpperBoundSafeMap() map[int]bool {
 	if k == nil {
 		return nil
 	}
 	return k.TableArrayUpperBoundSafe
 }
 
-func (k *KernelFacts) RecordTableArrayUpperBoundSafe(id int) {
+func (k *LoopSpecializationFacts) RecordTableArrayUpperBoundSafe(id int) {
 	if k == nil {
 		return
 	}
@@ -808,23 +808,23 @@ func (k *KernelFacts) RecordTableArrayUpperBoundSafe(id int) {
 	k.bindOwner()
 }
 
-func (k *KernelFacts) SetTableArrayLowerBoundSafe(facts map[int]bool) {
+func (k *LoopSpecializationFacts) SetTableArrayLowerBoundSafe(facts map[int]bool) {
 	k.TableArrayLowerBoundSafe = facts
 	k.bindOwner()
 }
 
-func (k *KernelFacts) TableArrayLowerBoundIsSafe(id int) bool {
+func (k *LoopSpecializationFacts) TableArrayLowerBoundIsSafe(id int) bool {
 	return k != nil && k.TableArrayLowerBoundSafe != nil && k.TableArrayLowerBoundSafe[id]
 }
 
-func (k *KernelFacts) TableArrayLowerBoundSafeMap() map[int]bool {
+func (k *LoopSpecializationFacts) TableArrayLowerBoundSafeMap() map[int]bool {
 	if k == nil {
 		return nil
 	}
 	return k.TableArrayLowerBoundSafe
 }
 
-func (k *KernelFacts) RecordTableArrayLowerBoundSafe(id int) {
+func (k *LoopSpecializationFacts) RecordTableArrayLowerBoundSafe(id int) {
 	if k == nil {
 		return
 	}
@@ -835,12 +835,12 @@ func (k *KernelFacts) RecordTableArrayLowerBoundSafe(id int) {
 	k.bindOwner()
 }
 
-func (k *KernelFacts) SetLoopTableArrayFacts(facts map[int]LoopTableArrayFact) {
+func (k *LoopSpecializationFacts) SetLoopTableArrayFacts(facts map[int]LoopTableArrayFact) {
 	k.LoopTableArrayFacts = facts
 	k.bindOwner()
 }
 
-func (k *KernelFacts) LoopTableArrayFact(id int) (LoopTableArrayFact, bool) {
+func (k *LoopSpecializationFacts) LoopTableArrayFact(id int) (LoopTableArrayFact, bool) {
 	if k == nil || k.LoopTableArrayFacts == nil {
 		return LoopTableArrayFact{}, false
 	}
@@ -848,7 +848,7 @@ func (k *KernelFacts) LoopTableArrayFact(id int) (LoopTableArrayFact, bool) {
 	return fact, ok
 }
 
-func (k *KernelFacts) RecordLoopTableArrayFact(id int, fact LoopTableArrayFact) {
+func (k *LoopSpecializationFacts) RecordLoopTableArrayFact(id int, fact LoopTableArrayFact) {
 	if k == nil {
 		return
 	}
@@ -859,46 +859,46 @@ func (k *KernelFacts) RecordLoopTableArrayFact(id int, fact LoopTableArrayFact) 
 	k.bindOwner()
 }
 
-func (k *KernelFacts) SetRecordArrayLoopKernels(facts map[int]RecordArrayLoopKernelSpec) {
-	k.RecordArrayLoopKernels = facts
+func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecializations(facts map[int]RecordArrayLoopKernelSpec) {
+	k.RecordArrayLoopSpecializations = facts
 	k.bindOwner()
 }
 
-func (k *KernelFacts) RecordArrayLoopKernel(id int) (RecordArrayLoopKernelSpec, bool) {
-	if k == nil || k.RecordArrayLoopKernels == nil {
+func (k *LoopSpecializationFacts) RecordArrayLoopSpecialization(id int) (RecordArrayLoopKernelSpec, bool) {
+	if k == nil || k.RecordArrayLoopSpecializations == nil {
 		return RecordArrayLoopKernelSpec{}, false
 	}
-	spec, ok := k.RecordArrayLoopKernels[id]
+	spec, ok := k.RecordArrayLoopSpecializations[id]
 	return spec, ok
 }
 
-func (k *KernelFacts) SetRecordArrayLoopKernel(id int, spec RecordArrayLoopKernelSpec) {
+func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecialization(id int, spec RecordArrayLoopKernelSpec) {
 	if k == nil {
 		return
 	}
-	if k.RecordArrayLoopKernels == nil {
-		k.RecordArrayLoopKernels = make(map[int]RecordArrayLoopKernelSpec)
+	if k.RecordArrayLoopSpecializations == nil {
+		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopKernelSpec)
 	}
-	k.RecordArrayLoopKernels[id] = spec
+	k.RecordArrayLoopSpecializations[id] = spec
 	k.bindOwner()
 }
 
-func (k *KernelFacts) bindOwner() {
+func (k *LoopSpecializationFacts) bindOwner() {
 	if k != nil && k.owner != nil {
-		k.owner.bindKernelCompatibilityFields()
+		k.owner.bindLoopSpecializationCompatibilityFields()
 	}
 }
 
-func (a *AnalysisResult) KernelFacts() *KernelFacts {
+func (a *AnalysisResult) LoopSpecializationFacts() *LoopSpecializationFacts {
 	if a == nil {
 		return nil
 	}
 	if a.Kernel == nil {
-		a.Kernel = &KernelFacts{
-			TableArrayUpperBoundSafe: a.TableArrayUpperBoundSafe,
-			TableArrayLowerBoundSafe: a.TableArrayLowerBoundSafe,
-			LoopTableArrayFacts:      a.LoopTableArrayFacts,
-			RecordArrayLoopKernels:   a.RecordArrayLoopKernels,
+		a.Kernel = &LoopSpecializationFacts{
+			TableArrayUpperBoundSafe:       a.TableArrayUpperBoundSafe,
+			TableArrayLowerBoundSafe:       a.TableArrayLowerBoundSafe,
+			LoopTableArrayFacts:            a.LoopTableArrayFacts,
+			RecordArrayLoopSpecializations: a.RecordArrayLoopSpecializations,
 		}
 	} else {
 		if a.TableArrayUpperBoundSafe != nil || a.Kernel.TableArrayUpperBoundSafe == nil {
@@ -910,38 +910,38 @@ func (a *AnalysisResult) KernelFacts() *KernelFacts {
 		if a.LoopTableArrayFacts != nil || a.Kernel.LoopTableArrayFacts == nil {
 			a.Kernel.LoopTableArrayFacts = a.LoopTableArrayFacts
 		}
-		if a.RecordArrayLoopKernels != nil || a.Kernel.RecordArrayLoopKernels == nil {
-			a.Kernel.RecordArrayLoopKernels = a.RecordArrayLoopKernels
+		if a.RecordArrayLoopSpecializations != nil || a.Kernel.RecordArrayLoopSpecializations == nil {
+			a.Kernel.RecordArrayLoopSpecializations = a.RecordArrayLoopSpecializations
 		}
 	}
 	a.Kernel.owner = a
-	a.bindKernelCompatibilityFields()
+	a.bindLoopSpecializationCompatibilityFields()
 	return a.Kernel
 }
 
-func functionKernelFacts(fn *Function) *KernelFacts {
+func functionLoopSpecializationFacts(fn *Function) *LoopSpecializationFacts {
 	if fn == nil || fn.Analysis == nil {
 		return nil
 	}
-	return fn.Analysis.KernelFacts()
+	return fn.Analysis.LoopSpecializationFacts()
 }
 
-func (a *AnalysisResult) initializeKernelFacts() {
+func (a *AnalysisResult) initializeLoopSpecializationFacts() {
 	if a == nil {
 		return
 	}
-	a.KernelFacts().Initialize()
-	a.bindKernelCompatibilityFields()
+	a.LoopSpecializationFacts().Initialize()
+	a.bindLoopSpecializationCompatibilityFields()
 }
 
-func (a *AnalysisResult) bindKernelCompatibilityFields() {
+func (a *AnalysisResult) bindLoopSpecializationCompatibilityFields() {
 	if a == nil || a.Kernel == nil {
 		return
 	}
 	a.TableArrayUpperBoundSafe = a.Kernel.TableArrayUpperBoundSafe
 	a.TableArrayLowerBoundSafe = a.Kernel.TableArrayLowerBoundSafe
 	a.LoopTableArrayFacts = a.Kernel.LoopTableArrayFacts
-	a.RecordArrayLoopKernels = a.Kernel.RecordArrayLoopKernels
+	a.RecordArrayLoopSpecializations = a.Kernel.RecordArrayLoopSpecializations
 }
 
 // SpeculationFacts groups analysis facts produced and consumed by Tier 2
@@ -1340,17 +1340,17 @@ func (a *AnalysisResult) bindTableShapeCompatibilityFields() {
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	a := &AnalysisResult{
-		Numeric:                   NewNumericFacts(),
-		TableArrayUpperBoundSafe:  make(map[int]bool),
-		TableArrayLowerBoundSafe:  make(map[int]bool),
-		LoopTableArrayFacts:       make(map[int]LoopTableArrayFact),
-		ShapeFieldTypeElidedLoads: make(map[int]bool),
-		TableArrayDataPtrs:        make(map[int]TableArrayDataPtrFact),
-		RecordArrayLoopKernels:    make(map[int]RecordArrayLoopKernelSpec),
-		Call:                      NewCallFacts(),
-		Speculation:               NewSpeculationFacts(),
-		TableShape:                NewTableShapeFacts(),
-		Kernel:                    NewKernelFacts(),
+		Numeric:                        NewNumericFacts(),
+		TableArrayUpperBoundSafe:       make(map[int]bool),
+		TableArrayLowerBoundSafe:       make(map[int]bool),
+		LoopTableArrayFacts:            make(map[int]LoopTableArrayFact),
+		ShapeFieldTypeElidedLoads:      make(map[int]bool),
+		TableArrayDataPtrs:             make(map[int]TableArrayDataPtrFact),
+		RecordArrayLoopSpecializations: make(map[int]RecordArrayLoopKernelSpec),
+		Call:                           NewCallFacts(),
+		Speculation:                    NewSpeculationFacts(),
+		TableShape:                     NewTableShapeFacts(),
+		Kernel:                         NewLoopSpecializationFacts(),
 
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
 		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),
@@ -1364,14 +1364,14 @@ func NewAnalysisResult() *AnalysisResult {
 	a.bindCallCompatibilityFields()
 	a.bindSpeculationCompatibilityFields()
 	a.bindTableShapeCompatibilityFields()
-	a.bindKernelCompatibilityFields()
+	a.bindLoopSpecializationCompatibilityFields()
 	return a
 }
 
 // Initialize initializes nil non-sentinel maps in the AnalysisResult.
 func (a *AnalysisResult) Initialize() {
 	a.initializeNumericFacts()
-	a.initializeKernelFacts()
+	a.initializeLoopSpecializationFacts()
 	if a.ShapeFieldTypeElidedLoads == nil {
 		a.ShapeFieldTypeElidedLoads = make(map[int]bool)
 	}

@@ -545,7 +545,7 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 	case OpRecordArrayLoopKernel:
 		tbl := s.val(instr.Args[0])
 		limit := s.val(instr.Args[3]).Int()
-		spec, ok := functionKernelFacts(s.fn).RecordArrayLoopKernel(instr.ID)
+		spec, ok := functionLoopSpecializationFacts(s.fn).RecordArrayLoopSpecialization(instr.ID)
 		if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
 			return nil, false, fmt.Errorf("OpRecordArrayLoopKernel: missing or invalid kernel spec")
 		}

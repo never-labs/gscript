@@ -9,7 +9,7 @@ func (ec *emitContext) emitKernelInstr(instr *Instr, _ *Block) bool {
 	case OpComplexEscapeRowCount:
 		ec.emitComplexEscapeRowCount(instr)
 	case OpRecordArrayLoopKernel:
-		ec.emitRecordArrayLoopKernel(instr)
+		ec.emitRecordArrayLoopSpecialization(instr)
 	default:
 		return false
 	}

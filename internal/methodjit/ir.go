@@ -155,7 +155,7 @@ type Function struct {
 	// shared by string.split(...)[k] + string.sub(...) fusion lowerings.
 	StringSplitSubSpecs []StringSplitSubSpec
 
-	// RecordArrayLoopCaches tracks record-array loop kernel cache objects.
+	// RecordArrayLoopCaches tracks record-array loop specialization cache objects.
 	// This slice must stay in Function because it owns the cached data
 	// lifetime, not analysis results.
 	RecordArrayLoopCaches []*RecordArrayLoopKernelCache

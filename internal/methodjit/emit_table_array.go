@@ -1093,11 +1093,11 @@ func (ec *emitContext) intNonNegative(id int) bool {
 }
 
 func (ec *emitContext) tableArrayUpperBoundSafe(id int) bool {
-	return functionKernelFacts(ec.fn).TableArrayUpperBoundIsSafe(id)
+	return functionLoopSpecializationFacts(ec.fn).TableArrayUpperBoundIsSafe(id)
 }
 
 func (ec *emitContext) tableArrayLowerBoundSafe(id int) bool {
-	return functionKernelFacts(ec.fn).TableArrayLowerBoundIsSafe(id)
+	return functionLoopSpecializationFacts(ec.fn).TableArrayLowerBoundIsSafe(id)
 }
 
 func (ec *emitContext) tableArrayKeyKnownNonZero(id int) bool {

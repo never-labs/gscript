@@ -91,9 +91,9 @@ const (
 	// Row-count variant of the same runtime specialization.
 	// Args = [y, two, recip, ciBias, crBias], Aux = max iterations, Aux2 = row size.
 	OpComplexEscapeRowCount
-	// Runtime-generated loop kernel for fixed-shape record arrays.
+	// Runtime-generated loop specialization for fixed-shape record arrays.
 	// Args = [arrayData, arrayLen, limit, scalar...]; dataflow lives in
-	// Function.RecordArrayLoopKernels[instr.ID].
+	// Function.RecordArrayLoopSpecializations[instr.ID].
 	OpRecordArrayLoopKernel
 
 	// Comparison (type-generic)

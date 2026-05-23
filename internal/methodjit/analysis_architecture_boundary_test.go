@@ -67,7 +67,7 @@ func TestProductionCodeUsesCallFactsBoundary(t *testing.T) {
 	}
 }
 
-func TestProductionCodeUsesKernelFactsBoundary(t *testing.T) {
+func TestProductionCodeUsesLoopSpecializationFactsBoundary(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatalf("glob methodjit files: %v", err)
@@ -88,7 +88,7 @@ func TestProductionCodeUsesKernelFactsBoundary(t *testing.T) {
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
 				pos := fset.Position(sel.Pos())
-				t.Fatalf("%s directly accesses Analysis.%s; use KernelFacts helpers", pos, sel.Sel.Name)
+				t.Fatalf("%s directly accesses Analysis.%s; use LoopSpecializationFacts helpers", pos, sel.Sel.Name)
 			}
 			return true
 		})
@@ -143,7 +143,7 @@ func legacyCallFactField(name string) bool {
 
 func legacyKernelFactField(name string) bool {
 	switch name {
-	case "RecordArrayLoopKernels", "TableArrayUpperBoundSafe", "TableArrayLowerBoundSafe", "LoopTableArrayFacts":
+	case "RecordArrayLoopSpecializations", "TableArrayUpperBoundSafe", "TableArrayLowerBoundSafe", "LoopTableArrayFacts":
 		return true
 	default:
 		return false
