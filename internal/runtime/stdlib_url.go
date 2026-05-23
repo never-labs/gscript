@@ -161,28 +161,35 @@ func buildURLLib() *Table {
 	}, urlDecode)
 
 	// url.queryEncode(t) -- encode table as URL query string: "a=1&b=2"
-	set("queryEncode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'url.queryEncode' (table expected)")
+	urlQueryEncode := func(arg Value) (Value, error) {
+		if !arg.IsTable() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'url.queryEncode' (table expected)")
 		}
-		tbl := args[0].Table()
+		tbl := arg.Table()
 		q := url.Values{}
 		k, v, ok := tbl.Next(NilValue())
 		for ok {
 			q.Set(k.String(), v.String())
 			k, v, ok = tbl.Next(k)
 		}
-		return []Value{StringValue(q.Encode())}, nil
-	})
+		return StringValue(q.Encode()), nil
+	}
+	setFastArg1("queryEncode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'url.queryEncode' (table expected)")
+		}
+		v, err := urlQueryEncode(args[0])
+		return []Value{v}, err
+	}, urlQueryEncode)
 
 	// url.queryDecode(str) -- decode query string -> table
-	set("queryDecode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'url.queryDecode' (string expected)")
+	urlQueryDecode := func(arg Value) (Value, Value, int, error) {
+		if !arg.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'url.queryDecode' (string expected)")
 		}
-		vals, err := url.ParseQuery(args[0].Str())
+		vals, err := url.ParseQuery(arg.Str())
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
 		tbl := NewTableSized(0, len(vals))
 		for k, v := range vals {
@@ -190,8 +197,21 @@ func buildURLLib() *Table {
 				tbl.RawSetString(k, StringValue(v[0]))
 			}
 		}
-		return []Value{TableValue(tbl)}, nil
-	})
+		return TableValue(tbl), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("queryDecode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'url.queryDecode' (string expected)")
+		}
+		r0, r1, n, err := urlQueryDecode(args[0])
+		if err != nil {
+			return nil, err
+		}
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, urlQueryDecode)
 
 	// url.join(base, ref) -- resolve ref relative to base URL
 	urlJoin := func(baseVal, refVal Value) (Value, Value, int, error) {
@@ -249,16 +269,29 @@ func buildURLLib() *Table {
 	})
 
 	// url.getPath(str) -- extract just the path
-	set("getPath", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
+	urlGetPath := func(arg Value) (Value, Value, int, error) {
+		if !arg.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'url.getPath' (string expected)")
+		}
+		u, err := url.Parse(arg.Str())
+		if err != nil {
+			return NilValue(), StringValue(err.Error()), 2, nil
+		}
+		return StringValue(u.Path), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("getPath", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'url.getPath' (string expected)")
 		}
-		u, err := url.Parse(args[0].Str())
+		r0, r1, n, err := urlGetPath(args[0])
 		if err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return nil, err
 		}
-		return []Value{StringValue(u.Path)}, nil
-	})
+		if n == 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, urlGetPath)
 
 	return t
 }

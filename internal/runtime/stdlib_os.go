@@ -19,6 +19,13 @@ func buildOSLib() *Table {
 			Fn:   fn,
 		}))
 	}
+	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "os." + name,
+			Fn:       fn,
+			FastArg1: fast,
+		}))
+	}
 
 	// os.time() -> unix timestamp
 	set("time", func(args []Value) ([]Value, error) {
@@ -153,13 +160,19 @@ func buildOSLib() *Table {
 	})
 
 	// os.expand(s) -- expand $VAR and ${VAR} in string using os.Expand
-	set("expand", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsString() {
+	osExpand := func(arg Value) (Value, error) {
+		if !arg.IsString() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'os.expand' (string expected)")
+		}
+		return StringValue(os.ExpandEnv(arg.Str())), nil
+	}
+	setFastArg1("expand", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'os.expand' (string expected)")
 		}
-		result := os.ExpandEnv(args[0].Str())
-		return []Value{StringValue(result)}, nil
-	})
+		v, err := osExpand(args[0])
+		return []Value{v}, err
+	}, osExpand)
 
 	return t
 }
