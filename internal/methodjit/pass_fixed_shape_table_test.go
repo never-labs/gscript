@@ -913,6 +913,30 @@ func TestFixedShapeTableFactsPass_MutableFieldKeepsRangeWhenStoresStayRanged(t *
 	}
 }
 
+func TestFixedShapeTableFactsPass_FixedConstructorCarriesIntRanges(t *testing.T) {
+	top := compileProto(t, `
+result := {count: 0, qty: 3}
+`)
+	fn := BuildGraph(top)
+	out, err := FixedShapeTableFactsPass(nil)(fn)
+	if err != nil {
+		t.Fatalf("FixedShapeTableFactsPass: %v", err)
+	}
+	for _, fact := range out.Analysis.FixedShapeTables {
+		if len(fact.FieldNames) != 2 || fact.FieldNames[0] != "count" || fact.FieldNames[1] != "qty" {
+			continue
+		}
+		if r, ok := fact.FieldRanges["count"]; !ok || !r.known || r.min != 0 || r.max != 0 {
+			t.Fatalf("count range = %#v ok=%v", r, ok)
+		}
+		if r, ok := fact.FieldRanges["qty"]; !ok || !r.known || r.min != 3 || r.max != 3 {
+			t.Fatalf("qty range = %#v ok=%v", r, ok)
+		}
+		return
+	}
+	t.Fatalf("fixed constructor fact not found:\n%s", Print(out))
+}
+
 func TestFixedShapeTableFactsPass_FieldSvalsLoadCarriesNestedArrayFact(t *testing.T) {
 	shapeFields := []string{"lines"}
 	shapeID := runtime.GetShapeID(shapeFields)

@@ -1814,6 +1814,7 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 		allocFields := make(map[int][]string)
 		allocValues := make(map[int]map[string]int)
 		allocTypes := make(map[int]map[string]Type)
+		allocRanges := make(map[int]map[string]intRange)
 		allocFieldTableFacts := make(map[int]map[string]FixedShapeTableFact)
 		allocStringValueFacts := make(map[int]*FixedShapeTableFact)
 		killed := make(map[int]bool)
@@ -1823,6 +1824,7 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 				allocFields[instr.ID] = nil
 				allocValues[instr.ID] = make(map[string]int)
 				allocTypes[instr.ID] = make(map[string]Type)
+				allocRanges[instr.ID] = make(map[string]intRange)
 				allocFieldTableFacts[instr.ID] = make(map[string]FixedShapeTableFact)
 				out[instr.ID] = FixedShapeTableFact{}
 			case OpNewFixedTable:
@@ -1851,6 +1853,9 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 						allocTypes[allocID][name] = typ
 					}
 				}
+				if r, ok := inferFixedCtorArgRange(fn, instr.Args[1]); ok {
+					allocRanges[allocID][name] = r
+				}
 				if valueFact, ok := out[instr.Args[1].ID]; ok && fixedShapeTableFactHasUsableTableFact(valueFact) {
 					allocFieldTableFacts[allocID][name] = withoutFieldValues(valueFact)
 					allocTypes[allocID][name] = TypeTable
@@ -1860,6 +1865,7 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 					FieldNames:      append([]string(nil), allocFields[allocID]...),
 					FieldValueIDs:   cloneStringIntMap(allocValues[allocID]),
 					FieldTypes:      cloneStringTypeMap(allocTypes[allocID]),
+					FieldRanges:     cloneStringRangeMap(allocRanges[allocID]),
 					FieldTableFacts: cloneFixedShapeTableFactMap(allocFieldTableFacts[allocID]),
 				}
 			case OpSetTable:
@@ -1939,6 +1945,7 @@ func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes m
 	}
 	values := make(map[string]int, len(fields))
 	types := make(map[string]Type, len(fields))
+	ranges := make(map[string]intRange, len(fields))
 	for i, field := range fields {
 		values[field] = instr.Args[i].ID
 		if instr.Args[i].Def != nil {
@@ -1946,13 +1953,38 @@ func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes m
 				types[field] = typ
 			}
 		}
+		if r, ok := inferFixedCtorArgRange(fn, instr.Args[i]); ok {
+			ranges[field] = r
+		}
 	}
 	return FixedShapeTableFact{
 		ShapeID:       runtime.GetShapeID(fields),
 		FieldNames:    fields,
 		FieldValueIDs: values,
 		FieldTypes:    types,
+		FieldRanges:   ranges,
 	}, true
+}
+
+func inferFixedCtorArgRange(fn *Function, v *Value) (intRange, bool) {
+	if c, ok := constIntFromValue(v); ok {
+		return pointRange(c), true
+	}
+	if v == nil {
+		return intRange{}, false
+	}
+	if numeric := functionNumericFacts(fn); numeric != nil {
+		if r, ok := numeric.IntRange(v.ID); ok && r.known {
+			return r, true
+		}
+		if r, ok := numeric.ProfiledIntRange(v.ID); ok && r.known {
+			return r, true
+		}
+	}
+	if v.Def == nil || !v.Def.Type.isIntegerLike() {
+		return intRange{}, false
+	}
+	return intRange{}, false
 }
 
 func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact) {
