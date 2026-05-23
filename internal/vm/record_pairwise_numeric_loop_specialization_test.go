@@ -66,6 +66,34 @@ func TestRecordPairwiseCallSiteNoResultRuntimeSpecializationDiagnostics(t *testi
 	}
 }
 
+func TestRecordPairwiseCallSiteNoResultIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, recordPairwiseDriverLoopSource(t, "1"))
+	advance := findTestProtoByName(top, "advance")
+	if advance == nil {
+		t.Fatal("missing advance proto")
+	}
+	advance.Name = "shape_only_pairwise_update"
+	advance.Source = "host/generated/not-a-benchmark.gs"
+	if !isRecordPairwiseNumericProto(advance) {
+		t.Fatalf("record pairwise numeric should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(advance.Code), len(advance.Constants), advance.MaxStack)
+	}
+	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(advance, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
+		t.Fatal("record_pairwise_numeric rejected by no-result runtime specialization cache after metadata rewrite")
+	}
+}
+
+func TestRecordPairwiseDriverLoopIgnoresCalleeMetadata(t *testing.T) {
+	top := compileProto(t, recordPairwiseDriverLoopSource(t, "1024"))
+	advance := findTestProtoByName(top, "advance")
+	if advance == nil {
+		t.Fatal("missing advance proto")
+	}
+	advance.Name = "shape_only_pairwise_update"
+	advance.Source = "host/generated/not-a-benchmark.gs"
+	globals := map[string]*FuncProto{"advance": advance}
+	requireRuntimeSpecializationInfo(t, RecognizedDriverLoopRuntimeSpecializations(top, globals), "record_pairwise_numeric_loop")
+}
+
 func TestRecordPairwiseDriverLoopRuntimeSpecializationMissingGlobals(t *testing.T) {
 	top := compileProto(t, recordPairwiseDriverLoopSource(t, "1024"))
 
