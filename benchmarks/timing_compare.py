@@ -52,7 +52,7 @@ DEFAULT_SUITE = [
     "object_creation",
 ]
 
-GROUPS = ["suite", "extended", "variants"]
+GROUPS = ["suite", "extended", "variants", "official"]
 MODES = ["default", "vm", "no_filter"]
 TIME_SOURCES = ["auto", "script", "wall"]
 
@@ -519,6 +519,16 @@ def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
             )
             for path in sorted((root / "benchmarks" / "variants").glob("*.gs"))
         )
+    if "official" in groups:
+        specs.extend(
+            BenchmarkSpec(
+                "official",
+                path.stem,
+                f"benchmarks/official_hot/{path.name}",
+                f"benchmarks/lua_official_hot/{path.stem}.lua",
+            )
+            for path in sorted((root / "benchmarks" / "official_hot").glob("*.gs"))
+        )
     return specs
 
 
@@ -970,7 +980,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
     parser.add_argument("--group", action="append", choices=GROUPS, help="benchmark group; repeatable")
-    parser.add_argument("--all-groups", action="store_true", help="run suite, extended, and variants")
+    parser.add_argument("--all-groups", action="store_true", help="run all benchmark groups")
     parser.add_argument("--mode", action="append", choices=MODES, help="GScript mode; repeatable")
     parser.add_argument("--runs", type=positive_int, default=5, help="measured samples after calibration")
     parser.add_argument("--warmup", type=int, default=1, help="warmup samples after calibration")
