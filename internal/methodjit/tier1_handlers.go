@@ -603,6 +603,27 @@ slowPath:
 					return err
 				}
 			}
+		case runtime.NativeKindStdRawGet:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdRawGetIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdRawGetCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
+		case runtime.NativeKindStdRawSet:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdRawSetIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdRawSetCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
+		case runtime.NativeKindStdRawLen:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdRawLenIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdRawLenCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
 		}
 		if nArgs == 1 && gf.FastArg1Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)

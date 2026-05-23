@@ -805,6 +805,50 @@ func (vm *VM) ExecuteStdRawGetCall(absSlot, nArgs, rawC int) (bool, error) {
 	return true, nil
 }
 
+// ExecuteStdRawSetCall handles rawset(table, key, value) without allocating a
+// generic native argument/result slice.
+func (vm *VM) ExecuteStdRawSetCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs < 3 || absSlot+3 >= len(vm.regs) {
+		return false, nil
+	}
+	table := vm.regs[absSlot+1]
+	key := vm.regs[absSlot+2]
+	if !table.IsTable() {
+		return true, fmt.Errorf("bad argument #1 to 'rawset' (table expected, got %s)", table.TypeName())
+	}
+	if key.IsNil() {
+		return true, fmt.Errorf("table index is nil")
+	}
+	if key.IsFloat() && math.IsNaN(key.Float()) {
+		return true, fmt.Errorf("table index is NaN")
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	table.Table().RawSet(key, vm.regs[absSlot+3])
+	vm.writeSingleCallResult(absSlot, rawC, table)
+	return true, nil
+}
+
+// ExecuteStdRawLenCall handles rawlen(value) without allocating a generic
+// native argument/result slice.
+func (vm *VM) ExecuteStdRawLenCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs < 1 || absSlot+1 >= len(vm.regs) {
+		return false, nil
+	}
+	arg := vm.regs[absSlot+1]
+	var result runtime.Value
+	switch arg.Type() {
+	case runtime.TypeString:
+		result = runtime.IntValue(int64(runtime.StringLen(arg)))
+	case runtime.TypeTable:
+		result = runtime.IntValue(int64(arg.Table().Length()))
+	default:
+		return true, fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", arg.TypeName())
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.writeSingleCallResult(absSlot, rawC, result)
+	return true, nil
+}
+
 func (vm *VM) luaToString(v runtime.Value) (string, error) {
 	if v.IsTable() {
 		if mt := v.Table().GetMetatable(); mt != nil {
@@ -4097,6 +4141,28 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					case runtime.NativeKindStdRawGet:
 						if gf.NativeData == runtime.StdRawGetIdentityPtr() {
 							handled, err := vm.ExecuteStdRawGetCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdRawSet:
+						if gf.NativeData == runtime.StdRawSetIdentityPtr() {
+							handled, err := vm.ExecuteStdRawSetCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdRawLen:
+						if gf.NativeData == runtime.StdRawLenIdentityPtr() {
+							handled, err := vm.ExecuteStdRawLenCall(base+a, nArgs, c)
 							if err != nil {
 								return nil, wrapLineErr(frame, err)
 							}

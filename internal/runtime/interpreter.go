@@ -484,6 +484,8 @@ func (interp *Interpreter) registerBuiltins() {
 			table.Table().RawSet(key, value)
 			return table, nil
 		},
+		NativeKind: NativeKindStdRawSet,
+		NativeData: StdRawSetIdentityPtr(),
 	}))
 
 	interp.globals.Define("rawequal", FunctionValue(&GoFunction{
@@ -522,6 +524,8 @@ func (interp *Interpreter) registerBuiltins() {
 				return NilValue(), fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", a.TypeName())
 			}
 		},
+		NativeKind: NativeKindStdRawLen,
+		NativeData: StdRawLenIdentityPtr(),
 	}))
 
 	interp.globals.Define("len", FunctionValue(&GoFunction{
