@@ -55,9 +55,6 @@ func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 	if aggregate.IntGridAggregateKernel == nil || aggregate.IntGridAggregateKernel.spec == nil {
 		t.Fatal("int_grid_aggregate proto-local spec was not generated")
 	}
-	if got := cachedWholeCallKernelBits(aggregate); got != 0 {
-		t.Fatalf("int_grid_aggregate still recognized by legacy whole-call bits: %#x", got)
-	}
 
 	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(aggregate), "int_grid_aggregate")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {

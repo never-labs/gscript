@@ -48,9 +48,6 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		if got := tc.proto.SpectralWholeCallKernel.spec.kind; got != tc.kind {
 			t.Fatalf("%s kind = %d, want %d", tc.name, got, tc.kind)
 		}
-		if got := cachedWholeCallKernelBits(tc.proto); got != 0 {
-			t.Fatalf("%s still recognized by legacy whole-call bits: %#x", tc.name, got)
-		}
 		diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(tc.proto), tc.name)
 		if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 			t.Fatalf("%s diagnostic = %+v, want recognized %q", tc.name, diag, kernelReasonRecognized)
@@ -75,9 +72,6 @@ func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 	if got := multiplyAtAv.SpectralWholeCallKernel.spec.kind; got != spectralWholeCallDenseAtAv {
 		t.Fatalf("dense spectral kind = %d, want %d", got, spectralWholeCallDenseAtAv)
-	}
-	if got := cachedWholeCallKernelBits(multiplyAtAv); got != 0 {
-		t.Fatalf("dense spectral still recognized by legacy whole-call bits: %#x", got)
 	}
 }
 

@@ -46,9 +46,6 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 	if quicksort.WholeCallNoResultRuntime == nil || quicksort.WholeCallNoResultRuntime.recognized == 0 {
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
-	if got := cachedWholeCallKernelBits(quicksort); got != 0 {
-		t.Fatalf("numeric_array_region_sort still recognized by legacy whole-call kernel bits: %#x", got)
-	}
 
 	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(quicksort), "numeric_array_region_sort")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {

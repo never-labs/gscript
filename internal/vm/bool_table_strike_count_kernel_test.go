@@ -35,9 +35,6 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 	if sieve.BoolTableStrikeCountKernel == nil || sieve.BoolTableStrikeCountKernel.spec == nil {
 		t.Fatal("bool table strike-count proto-local spec was not generated")
 	}
-	if got := cachedWholeCallKernelBits(sieve); got != 0 {
-		t.Fatalf("bool_table_strike_count still recognized by legacy whole-call bits: %#x", got)
-	}
 
 	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(sieve), "bool_table_strike_count")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {

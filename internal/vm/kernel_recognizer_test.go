@@ -62,9 +62,6 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	if child.PermutationFlipChecksumKernel == nil || child.PermutationFlipChecksumKernel.spec == nil {
 		t.Fatal("permutation flip checksum proto-local spec was not generated")
 	}
-	if got := cachedWholeCallKernelBits(child); got != 0 {
-		t.Fatalf("permutation flip checksum still recognized by legacy whole-call bits: %#x", got)
-	}
 }
 
 func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {

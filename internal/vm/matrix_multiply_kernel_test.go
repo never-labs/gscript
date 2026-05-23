@@ -36,9 +36,6 @@ func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
 	if matmul.MatrixMultiplyKernel.spec.kind != matrixMultiplyKernelPlain {
 		t.Fatalf("matrix_multiply kind = %d, want plain", matmul.MatrixMultiplyKernel.spec.kind)
 	}
-	if got := cachedWholeCallKernelBits(matmul); got != 0 {
-		t.Fatalf("matrix_multiply still recognized by legacy whole-call bits: %#x", got)
-	}
 
 	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(matmul), "matrix_multiply")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
@@ -91,9 +88,6 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testin
 	}
 	if matmul.DenseMatrixMultiplyTBKernel == nil || matmul.DenseMatrixMultiplyTBKernel.spec == nil {
 		t.Fatal("dense transposed matrix multiply proto-local spec was not generated")
-	}
-	if got := cachedWholeCallKernelBits(matmul); got != 0 {
-		t.Fatalf("dense_matrix_multiply_transposed still recognized by legacy whole-call kernel bits: %#x", got)
 	}
 
 	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(matmul), "dense_matrix_multiply_transposed")

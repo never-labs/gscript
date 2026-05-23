@@ -207,12 +207,6 @@ func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
 	return out
 }
 
-// cachedWholeCallKernelBits is retained for tests that assert migrated kernels
-// no longer use the removed fixed whole-call registry.
-func cachedWholeCallKernelBits(proto *FuncProto) uint64 {
-	return 0
-}
-
 func wholeCallKernelFingerprintForProto(proto *FuncProto) wholeCallKernelFingerprint {
 	var fp wholeCallKernelFingerprint
 	if proto == nil {

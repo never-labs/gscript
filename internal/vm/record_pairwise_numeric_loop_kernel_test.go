@@ -54,9 +54,6 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationDiagnostics(t *test
 	if advance.WholeCallNoResultRuntime == nil || advance.WholeCallNoResultRuntime.recognized == 0 {
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
-	if got := cachedWholeCallKernelBits(advance); got != 0 {
-		t.Fatalf("record_pairwise_numeric still recognized by legacy whole-call kernel bits: %#x", got)
-	}
 
 	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(advance), "record_pairwise_numeric")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {

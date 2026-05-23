@@ -64,12 +64,6 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 	if !cachedRuntimeSpecializationRecognized(fold, runtimeSpecializationLazyRecursiveTableFold) {
 		t.Fatal("lazy recursive table fold rejected by runtime specialization cache")
 	}
-	if got := cachedWholeCallKernelBits(builder); got != 0 {
-		t.Fatalf("builder still recognized by legacy whole-call kernel bits: %#x", got)
-	}
-	if got := cachedWholeCallKernelBits(fold); got != 0 {
-		t.Fatalf("fold still recognized by legacy whole-call kernel bits: %#x", got)
-	}
 
 	builderDiag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(builder), "lazy_recursive_table_builder")
 	if !builderDiag.Recognized || builderDiag.Reason != kernelReasonRecognized {

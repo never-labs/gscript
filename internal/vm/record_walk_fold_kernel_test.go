@@ -73,9 +73,6 @@ func fold_rows(rows, n, passes) {
 	if fold.RecordWalkFoldKernel == nil || fold.RecordWalkFoldKernel.spec == nil {
 		t.Fatal("record_walk_fold proto-local spec was not generated")
 	}
-	if got := cachedWholeCallKernelBits(fold); got != 0 {
-		t.Fatalf("record_walk_fold still recognized by legacy whole-call bits: %#x", got)
-	}
 	if spec.recordFields != [6]string{"ident", "flavor", "live", "account", "counters", "labels"} ||
 		spec.metricFields != [3]string{"seen", "taps", "faults"} ||
 		spec.userFields != [2]string{"level", "zone"} ||
