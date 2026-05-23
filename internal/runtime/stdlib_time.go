@@ -6,24 +6,39 @@ import (
 	"time"
 )
 
+var timeTableCtor = NewSmallTableCtorN([]string{
+	"year",
+	"month",
+	"day",
+	"hour",
+	"min",
+	"sec",
+	"nsec",
+	"unix",
+	"weekday",
+	"yearday",
+	"tz",
+})
+
 // goTimeToTable converts a Go time.Time to a GScript time table.
 func goTimeToTable(t time.Time) *Table {
-	tbl := NewTable()
-	tbl.RawSet(StringValue("year"), IntValue(int64(t.Year())))
-	tbl.RawSet(StringValue("month"), IntValue(int64(t.Month())))
-	tbl.RawSet(StringValue("day"), IntValue(int64(t.Day())))
-	tbl.RawSet(StringValue("hour"), IntValue(int64(t.Hour())))
-	tbl.RawSet(StringValue("min"), IntValue(int64(t.Minute())))
-	tbl.RawSet(StringValue("sec"), IntValue(int64(t.Second())))
-	tbl.RawSet(StringValue("nsec"), IntValue(int64(t.Nanosecond())))
 	// unix timestamp as float64 with nanosecond precision
 	unix := float64(t.Unix()) + float64(t.Nanosecond())/1e9
-	tbl.RawSet(StringValue("unix"), FloatValue(unix))
-	tbl.RawSet(StringValue("weekday"), IntValue(int64(t.Weekday())))
-	tbl.RawSet(StringValue("yearday"), IntValue(int64(t.YearDay())))
 	name, _ := t.Zone()
-	tbl.RawSet(StringValue("tz"), StringValue(name))
-	return tbl
+	vals := [...]Value{
+		IntValue(int64(t.Year())),
+		IntValue(int64(t.Month())),
+		IntValue(int64(t.Day())),
+		IntValue(int64(t.Hour())),
+		IntValue(int64(t.Minute())),
+		IntValue(int64(t.Second())),
+		IntValue(int64(t.Nanosecond())),
+		FloatValue(unix),
+		IntValue(int64(t.Weekday())),
+		IntValue(int64(t.YearDay())),
+		StringValue(name),
+	}
+	return NewTableFromCtorNNonNilCache(&timeTableCtor, vals[:])
 }
 
 // tableToGoTime converts a GScript time table Value to a Go time.Time.

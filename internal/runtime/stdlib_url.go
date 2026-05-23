@@ -26,30 +26,31 @@ func buildURLLib() *Table {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 
-		result := NewTable()
-		result.RawSet(StringValue("scheme"), StringValue(u.Scheme))
-		result.RawSet(StringValue("host"), StringValue(u.Hostname()))
-		result.RawSet(StringValue("port"), StringValue(u.Port()))
-		result.RawSet(StringValue("path"), StringValue(u.Path))
-		result.RawSet(StringValue("fragment"), StringValue(u.Fragment))
-		result.RawSet(StringValue("raw"), StringValue(u.String()))
+		result := NewTableSized(0, 8)
+		result.RawSetString("scheme", StringValue(u.Scheme))
+		result.RawSetString("host", StringValue(u.Hostname()))
+		result.RawSetString("port", StringValue(u.Port()))
+		result.RawSetString("path", StringValue(u.Path))
+		result.RawSetString("fragment", StringValue(u.Fragment))
+		result.RawSetString("raw", StringValue(u.String()))
 
 		// User info
 		if u.User != nil {
-			result.RawSet(StringValue("user"), StringValue(u.User.Username()))
+			result.RawSetString("user", StringValue(u.User.Username()))
 			if pwd, ok := u.User.Password(); ok {
-				result.RawSet(StringValue("password"), StringValue(pwd))
+				result.RawSetString("password", StringValue(pwd))
 			}
 		}
 
 		// Query params as table
-		queryTbl := NewTable()
-		for k, vals := range u.Query() {
+		query := u.Query()
+		queryTbl := NewTableSized(0, len(query))
+		for k, vals := range query {
 			if len(vals) > 0 {
-				queryTbl.RawSet(StringValue(k), StringValue(vals[0]))
+				queryTbl.RawSetString(k, StringValue(vals[0]))
 			}
 		}
-		result.RawSet(StringValue("query"), TableValue(queryTbl))
+		result.RawSetString("query", TableValue(queryTbl))
 
 		return []Value{TableValue(result)}, nil
 	})
@@ -142,10 +143,10 @@ func buildURLLib() *Table {
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
-		tbl := NewTable()
+		tbl := NewTableSized(0, len(vals))
 		for k, v := range vals {
 			if len(v) > 0 {
-				tbl.RawSet(StringValue(k), StringValue(v[0]))
+				tbl.RawSetString(k, StringValue(v[0]))
 			}
 		}
 		return []Value{TableValue(tbl)}, nil

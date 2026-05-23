@@ -44,7 +44,7 @@ func buildCSVLib() *Table {
 			}
 		}
 
-		result := NewTable()
+		result := NewAppendArrayTable(8)
 		rowIdx := int64(1)
 		for {
 			record, err := r.Read()
@@ -54,11 +54,11 @@ func buildCSVLib() *Table {
 			if err != nil {
 				return nil, fmt.Errorf("csv.parse: %v", err)
 			}
-			row := NewTable()
+			row := NewSequentialArrayTable(len(record))
 			for i, field := range record {
-				row.RawSet(IntValue(int64(i+1)), StringValue(field))
+				row.RawSetInt(int64(i+1), StringValue(field))
 			}
-			result.RawSet(IntValue(rowIdx), TableValue(row))
+			result.RawSetInt(rowIdx, TableValue(row))
 			rowIdx++
 		}
 		return []Value{TableValue(result)}, nil
@@ -92,12 +92,12 @@ func buildCSVLib() *Table {
 		headers, err := r.Read()
 		if err != nil {
 			if err == io.EOF {
-				return []Value{TableValue(NewTable())}, nil
+				return []Value{TableValue(NewEmptyTable())}, nil
 			}
 			return nil, fmt.Errorf("csv.parseWithHeaders: %v", err)
 		}
 
-		result := NewTable()
+		result := NewAppendArrayTable(8)
 		rowIdx := int64(1)
 		for {
 			record, err := r.Read()
@@ -107,13 +107,13 @@ func buildCSVLib() *Table {
 			if err != nil {
 				return nil, fmt.Errorf("csv.parseWithHeaders: %v", err)
 			}
-			row := NewTable()
+			row := NewTableSized(0, len(headers))
 			for i, field := range record {
 				if i < len(headers) {
-					row.RawSet(StringValue(headers[i]), StringValue(field))
+					row.RawSetString(headers[i], StringValue(field))
 				}
 			}
-			result.RawSet(IntValue(rowIdx), TableValue(row))
+			result.RawSetInt(rowIdx, TableValue(row))
 			rowIdx++
 		}
 		return []Value{TableValue(result)}, nil

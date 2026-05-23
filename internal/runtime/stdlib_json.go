@@ -183,15 +183,15 @@ func jsonGoToGScript(v interface{}) Value {
 	case string:
 		return StringValue(val)
 	case []interface{}:
-		tbl := NewTable()
+		tbl := NewSequentialArrayTable(len(val))
 		for i, item := range val {
-			tbl.RawSet(IntValue(int64(i+1)), jsonGoToGScript(item))
+			tbl.RawSetInt(int64(i+1), jsonGoToGScript(item))
 		}
 		return TableValue(tbl)
 	case map[string]interface{}:
-		tbl := NewTable()
+		tbl := NewTableSized(0, len(val))
 		for k, item := range val {
-			tbl.RawSet(StringValue(k), jsonGoToGScript(item))
+			tbl.RawSetString(k, jsonGoToGScript(item))
 		}
 		return TableValue(tbl)
 	default:

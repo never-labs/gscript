@@ -282,10 +282,25 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 	if gf == nil {
 		return nil, fmt.Errorf("attempt to call a nil native function")
 	}
+	var a0, a1, a2, a3 runtime.Value
 	if len(args) > 0 {
-		stable := make([]runtime.Value, len(args))
-		copy(stable, args)
-		args = stable
+		a0 = args[0]
+	}
+	if len(args) > 1 {
+		a1 = args[1]
+	}
+	if len(args) > 2 {
+		a2 = args[2]
+	}
+	if len(args) > 3 {
+		a3 = args[3]
+	}
+	fixedArgFastPath := (len(args) == 1 && gf.FastArg1 != nil) ||
+		(len(args) == 2 && (gf.FastArg2Ret2 != nil || gf.FastArg2 != nil)) ||
+		(len(args) == 3 && gf.FastArg3 != nil) ||
+		(len(args) == 4 && gf.FastArg4 != nil)
+	if !fixedArgFastPath {
+		args = stableGoFunctionArgs(args)
 	}
 	if err := vm.emitDebugHook("call", "native", gf.Name, runtime.NilValue()); err != nil {
 		return nil, err
@@ -296,7 +311,7 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var r0, r1 runtime.Value
 		var n int
-		r0, r1, n, err = gf.FastArg2Ret2(args[0], args[1])
+		r0, r1, n, err = gf.FastArg2Ret2(a0, a1)
 		if err == nil {
 			switch {
 			case n <= 0:
@@ -310,28 +325,28 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 	} else if len(args) == 1 && gf.FastArg1 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var v runtime.Value
-		v, err = gf.FastArg1(args[0])
+		v, err = gf.FastArg1(a0)
 		if err == nil {
 			results = []runtime.Value{v}
 		}
 	} else if len(args) == 2 && gf.FastArg2 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var v runtime.Value
-		v, err = gf.FastArg2(args[0], args[1])
+		v, err = gf.FastArg2(a0, a1)
 		if err == nil {
 			results = []runtime.Value{v}
 		}
 	} else if len(args) == 3 && gf.FastArg3 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var v runtime.Value
-		v, err = gf.FastArg3(args[0], args[1], args[2])
+		v, err = gf.FastArg3(a0, a1, a2)
 		if err == nil {
 			results = []runtime.Value{v}
 		}
 	} else if len(args) == 4 && gf.FastArg4 != nil {
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var v runtime.Value
-		v, err = gf.FastArg4(args[0], args[1], args[2], args[3])
+		v, err = gf.FastArg4(a0, a1, a2, a3)
 		if err == nil {
 			results = []runtime.Value{v}
 		}
@@ -354,4 +369,13 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 		return nil, err
 	}
 	return results, nil
+}
+
+func stableGoFunctionArgs(args []runtime.Value) []runtime.Value {
+	if len(args) == 0 {
+		return args
+	}
+	stable := make([]runtime.Value, len(args))
+	copy(stable, args)
+	return stable
 }
