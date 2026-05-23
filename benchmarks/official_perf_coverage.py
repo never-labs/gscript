@@ -130,6 +130,20 @@ def hot_hints(paths: list[Path]) -> list[str]:
     return hinted
 
 
+def missing_benchmark_refs(cases: dict[str, list[Path]], known_benchmarks: set[str]) -> set[str]:
+    missing_refs: set[str] = set()
+    for prefix in cases:
+        cov = coverage_for(prefix)
+        for bench in cov.benchmarks:
+            if bench not in known_benchmarks:
+                missing_refs.add(bench)
+    return missing_refs
+
+
+def missing_coverage_families(cases: dict[str, list[Path]]) -> list[str]:
+    return sorted(prefix for prefix in cases if coverage_for(prefix).status == "missing")
+
+
 def coverage_for(prefix: str) -> FamilyCoverage:
     if prefix in COVERAGE:
         return COVERAGE[prefix]
@@ -141,13 +155,10 @@ def coverage_for(prefix: str) -> FamilyCoverage:
 def render_markdown(cases: dict[str, list[Path]], known_benchmarks: set[str]) -> str:
     rows: list[tuple[str, int, str, str, str, str]] = []
     summary: dict[str, int] = {}
-    missing_refs: set[str] = set()
+    missing_refs = missing_benchmark_refs(cases, known_benchmarks)
     for prefix, paths in sorted(cases.items()):
         cov = coverage_for(prefix)
         summary[cov.status] = summary.get(cov.status, 0) + len(paths)
-        for bench in cov.benchmarks:
-            if bench not in known_benchmarks:
-                missing_refs.add(bench)
         hot = hot_hints(paths)
         rows.append((
             prefix,
@@ -188,6 +199,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=Path)
     parser.add_argument("--markdown", type=Path)
+    parser.add_argument("--check", action="store_true", help="fail when a case family lacks classification or a mapped benchmark is missing")
     args = parser.parse_args()
 
     cases = official_cases(ROOT)
@@ -214,6 +226,16 @@ def main() -> int:
             })
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+    if args.check:
+        missing_families = missing_coverage_families(cases)
+        missing_refs = missing_benchmark_refs(cases, known)
+        if missing_families or missing_refs:
+            if missing_families:
+                print("missing coverage families: " + ", ".join(missing_families))
+            if missing_refs:
+                print("missing benchmark references: " + ", ".join(sorted(missing_refs)))
+            return 1
     return 0
 
 
