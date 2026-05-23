@@ -190,8 +190,28 @@ func (vm *VM) ensureFrameSlot() bool {
 	}
 	newFrames := make([]CallFrame, newLen)
 	copy(newFrames, vm.frames)
+	for i := 0; i < vm.frameCount; i++ {
+		if n := len(newFrames[i].varargs); n > 0 && n <= len(newFrames[i].inlineVarargs) {
+			copy(newFrames[i].inlineVarargs[:], newFrames[i].varargs)
+			newFrames[i].varargs = newFrames[i].inlineVarargs[:n]
+		}
+	}
 	vm.frames = newFrames
 	return true
+}
+
+func setFrameVarargs(frame *CallFrame, args []runtime.Value) {
+	if len(args) == 0 {
+		frame.varargs = nil
+		return
+	}
+	if len(args) <= len(frame.inlineVarargs) {
+		copy(frame.inlineVarargs[:], args)
+		frame.varargs = frame.inlineVarargs[:len(args)]
+		return
+	}
+	frame.varargs = make([]runtime.Value, len(args))
+	copy(frame.varargs, args)
 }
 
 func observeCallResultFixed(proto *FuncProto, pc int, regs []runtime.Value, resultBase int, resultCount int) {
@@ -2404,16 +2424,11 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 
 	// Place args in registers
 	nParams := proto.NumParams
-	var varargs []runtime.Value
 	for i := 0; i < nParams && i < len(args); i++ {
 		vm.regs[base+i] = args[i]
 	}
 	for i := len(args); i < nParams; i++ {
 		vm.regs[base+i] = runtime.NilValue()
-	}
-	if proto.IsVarArg && len(args) > nParams {
-		varargs = make([]runtime.Value, len(args)-nParams)
-		copy(varargs, args[nParams:])
 	}
 
 	// Push frame
@@ -2425,7 +2440,11 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 	frame.pc = 0
 	frame.base = base
 	frame.numResults = numResults
-	frame.varargs = varargs
+	if proto.IsVarArg && len(args) > nParams {
+		setFrameVarargs(frame, args[nParams:])
+	} else {
+		frame.varargs = nil
+	}
 	frame.callSitePC = -1
 	frame.defers = nil
 	vm.frameCount++
@@ -3720,13 +3739,6 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				for i := nArgs; i < nParams; i++ {
 					vm.regs[newBase+i] = runtime.NilValue()
 				}
-				var varargs []runtime.Value
-				if proto.IsVarArg && nArgs > nParams {
-					varargs = make([]runtime.Value, nArgs-nParams)
-					for i := range varargs {
-						varargs[i] = vm.regs[srcStart+nParams+i]
-					}
-				}
 
 				// Push new frame
 				if !vm.ensureFrameSlot() {
@@ -3736,7 +3748,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				newFrame.closure = cl
 				newFrame.pc = 0
 				newFrame.base = newBase
-				newFrame.varargs = varargs
+				if proto.IsVarArg && nArgs > nParams {
+					setFrameVarargs(newFrame, vm.regs[srcStart+nParams:srcStart+nArgs])
+				} else {
+					newFrame.varargs = nil
+				}
 				newFrame.resultBase = base + a
 				newFrame.resultCount = c
 				newFrame.callSitePC = callPC

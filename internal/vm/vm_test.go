@@ -1277,6 +1277,36 @@ func TestParenthesizedCallAdjustsToSingleResult(t *testing.T) {
 	expectGlobalInt(t, g, "rT2C", 30)
 }
 
+func TestSmallVarargsSurviveCallFrameGrowth(t *testing.T) {
+	g := compileAndRun(t, `
+func hold(depth, ...) {
+	if depth == 0 {
+		return select(1, ...) + select(2, ...) + select(3, ...) + select(4, ...)
+	}
+	child := hold(depth - 1, ...)
+	return child + select(1, ...)
+}
+result := hold(90, 1, 2, 3, 4)
+`)
+	expectGlobalInt(t, g, "result", 100)
+}
+
+func TestSmallVarargsSurviveCoroutineYield(t *testing.T) {
+	g := compileAndRun(t, `
+co := coroutine.create(func(...) {
+	first := select(1, ...)
+	coroutine.yield(first)
+	return select(2, ...) + select(3, ...)
+})
+ok1, v1 := coroutine.resume(co, 7, 11, 13)
+ok2, v2 := coroutine.resume(co)
+`)
+	expectGlobalBool(t, g, "ok1", true)
+	expectGlobalInt(t, g, "v1", 7)
+	expectGlobalBool(t, g, "ok2", true)
+	expectGlobalInt(t, g, "v2", 24)
+}
+
 func TestRecursiveMultiReturnTableConstructorsAndTailVarargs(t *testing.T) {
 	g := compileAndRun(t, `
 		func down(n) {
