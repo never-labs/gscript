@@ -156,6 +156,7 @@ type TableKeyFeedback struct {
 	FieldIdxSeen  bool
 	DenseMatrix   uint8
 	ValueShape    ArgArrayElementShapeFeedback
+	TableLenRange IntRangeFeedback
 }
 
 const (
@@ -587,11 +588,16 @@ func (rf *IntRangeFeedback) ObserveLen(value runtime.Value) {
 	if rf == nil {
 		return
 	}
-	if value.Type() != runtime.TypeString {
+	var n int64
+	switch value.Type() {
+	case runtime.TypeString:
+		n = int64(len(value.Str()))
+	case runtime.TypeTable:
+		n = int64(value.Table().Len())
+	default:
 		rf.Invalid = true
 		return
 	}
-	n := int64(len(value.Str()))
 	if rf.Count == 0 {
 		rf.Min = n
 		rf.Max = n
@@ -742,6 +748,7 @@ func (tk *TableKeyFeedback) ObserveTableAccess(tbl *runtime.Table, key, value ru
 	if tbl == nil {
 		return
 	}
+	tk.TableLenRange.Observe(runtime.IntValue(int64(tbl.Len())))
 	if tbl.HasMetatable() {
 		tk.Flags |= TableAccessMetatableSeen
 	}

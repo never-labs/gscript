@@ -546,7 +546,7 @@ func (ec *emitContext) storeRawFloat(srcFPR jit.FReg, valueID int) {
 			ec.asm.FMOVd(dstFPR, srcFPR)
 		}
 		// Write-through to memory if the value is used cross-block.
-		if ec.crossBlockLive[valueID] && !ec.loopFPPhiOnlyArgs[valueID] {
+		if ec.crossBlockLive[valueID] && !ec.loopFPPhiOnlyArgs[valueID] && !ec.rawFloatCarryNoStore[valueID] {
 			ec.asm.FMOVtoGP(jit.X0, dstFPR)
 			ec.storeValue(jit.X0, valueID)
 		}

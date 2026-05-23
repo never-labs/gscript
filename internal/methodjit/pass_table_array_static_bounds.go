@@ -35,12 +35,15 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpTableArrayLoad || len(instr.Args) < 3 ||
-				instr.Args[1] == nil || instr.Args[2] == nil || instr.Args[1].Def == nil {
+			if instr == nil {
 				continue
 			}
-			keyNonNegative, keyMax, keyMaxKnown := tableArrayStaticKeyBounds(fn, li, instr.Args[2], keyUpperGuards, dom, block.ID)
-			lenInstr := instr.Args[1].Def
+			lenValue, keyValue, ok := tableArrayStaticBoundsAccessOperands(instr)
+			if !ok || lenValue == nil || keyValue == nil || lenValue.Def == nil {
+				continue
+			}
+			keyNonNegative, keyMax, keyMaxKnown := tableArrayStaticKeyBounds(fn, li, keyValue, keyUpperGuards, dom, block.ID)
+			lenInstr := lenValue.Def
 			if lenInstr.Op != OpTableArrayLen || len(lenInstr.Args) < 1 || lenInstr.Args[0] == nil {
 				continue
 			}
@@ -58,9 +61,29 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 					}
 				}
 			}
-
-			if maxSafe, ok := dominatingTableArrayLenGuardMaxSafe(lenGuards[lenInstr.ID], dom, order, block.ID, instr.ID); ok && keyNonNegative {
+			if lenMax, ok := profiledTableArrayLenMax(fn, lenInstr); ok && keyNonNegative {
 				markTableArrayLowerBoundSafe(fn, instr)
+				if keyMaxKnown && keyMax <= lenMax {
+					markTableArrayUpperBoundSafe(fn, instr)
+					functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
+						"profiled table-array length and key range prove table-array bounds")
+					continue
+				}
+			}
+			if lenMax, ok := profiledTableAccessLenMax(fn, instr); ok && keyNonNegative {
+				markTableArrayLowerBoundSafe(fn, instr)
+				if keyMaxKnown && keyMax <= lenMax {
+					markTableArrayUpperBoundSafe(fn, instr)
+					functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
+						"profiled table access length and key range prove table-array bounds")
+					continue
+				}
+			}
+
+			if maxSafe, ok := dominatingTableArrayLenGuardMaxSafe(lenGuards[lenInstr.ID], dom, order, block.ID, instr.ID); ok {
+				if keyNonNegative {
+					markTableArrayLowerBoundSafe(fn, instr)
+				}
 				if keyMaxKnown && keyMax <= maxSafe {
 					markTableArrayUpperBoundSafe(fn, instr)
 					functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
@@ -70,6 +93,26 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 		}
 	}
 	return fn, nil
+}
+
+func tableArrayStaticBoundsAccessOperands(instr *Instr) (*Value, *Value, bool) {
+	if instr == nil {
+		return nil, nil, false
+	}
+	switch instr.Op {
+	case OpTableArrayLoad:
+		if len(instr.Args) < 3 {
+			return nil, nil, false
+		}
+		return instr.Args[1], instr.Args[2], true
+	case OpTableArrayStore:
+		if len(instr.Args) < 4 {
+			return nil, nil, false
+		}
+		return instr.Args[2], instr.Args[3], true
+	default:
+		return nil, nil, false
+	}
 }
 
 type tableArrayLenGuardFact struct {
@@ -116,6 +159,45 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 		}
 	}
 	return nonNegative, max, maxKnown
+}
+
+func profiledTableArrayLenMax(fn *Function, lenInstr *Instr) (int64, bool) {
+	if fn == nil || lenInstr == nil || len(lenInstr.Args) < 1 || lenInstr.Args[0] == nil {
+		return 0, false
+	}
+	numeric := functionNumericFacts(fn)
+	if r, ok := numeric.IntRange(lenInstr.ID); ok && r.known && r.max >= 0 {
+		return r.max, true
+	}
+	if r, ok := numeric.ProfiledLenRange(lenInstr.Args[0].ID); ok && r.known && r.max >= 0 {
+		return r.max, true
+	}
+	if table := tableArrayHeaderSourceTableValue(lenInstr.Args[0]); table != nil {
+		if r, ok := numeric.ProfiledLenRange(table.ID); ok && r.known && r.max >= 0 {
+			return r.max, true
+		}
+	}
+	return 0, false
+}
+
+func profiledTableAccessLenMax(fn *Function, instr *Instr) (int64, bool) {
+	proto := instrSourceProto(fn, instr)
+	if proto == nil || instr == nil || !instr.HasSource || instr.SourcePC < 0 || instr.SourcePC >= len(proto.TableKeyFeedback) {
+		return 0, false
+	}
+	rf := proto.TableKeyFeedback[instr.SourcePC].TableLenRange
+	min, max, ok := rf.StableRange()
+	if !ok || min < 0 || max < 0 {
+		return 0, false
+	}
+	return max, true
+}
+
+func tableArrayHeaderSourceTableValue(header *Value) *Value {
+	if header == nil || header.Def == nil || header.Def.Op != OpTableArrayHeader || len(header.Def.Args) < 1 {
+		return nil
+	}
+	return header.Def.Args[0]
 }
 
 func tableArrayKeyNonNegativeFromInduction(li *loopInfo, key *Value) bool {

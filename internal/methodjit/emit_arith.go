@@ -462,7 +462,11 @@ func (ec *emitContext) emitRawIntExactDiv(instr *Instr) {
 			return
 		}
 		if shift, negative, ok := exactPow2DivisorShift(divisor); ok {
-			ec.asm.SBFX(dst, lhs, shift, 64-shift)
+			if !negative && ec.intNonNegative(instr.Args[0].ID) {
+				ec.asm.LSRimm(dst, lhs, shift)
+			} else {
+				ec.asm.SBFX(dst, lhs, shift, 64-shift)
+			}
 			if negative {
 				ec.asm.NEG(dst, dst)
 			}
@@ -578,7 +582,11 @@ func (ec *emitContext) emitIntModX0X1(instr *Instr) {
 	if !nonZeroDivisor {
 		asm.CBZ(jit.X1, zero)
 	}
-	asm.SDIV(jit.X2, jit.X0, jit.X1)
+	if ec.intNonNegative(instr.Args[0].ID) && ec.intNonNegative(instr.Args[1].ID) {
+		asm.UDIV(jit.X2, jit.X0, jit.X1)
+	} else {
+		asm.SDIV(jit.X2, jit.X0, jit.X1)
+	}
 	asm.MSUB(jit.X0, jit.X2, jit.X1, jit.X0)
 
 	if ec.intModNoSignAdjust(instr.ID) {
@@ -761,6 +769,14 @@ func (ec *emitContext) emitModZeroInt(instr *Instr) {
 	divisor := instr.Aux
 	if divisor == 0 {
 		ec.emitDeopt(instr)
+		return
+	}
+
+	if ec.fusedCmps[instr.ID] && absDivisorUint64(divisor) == 2 {
+		ec.fusedBitTestReg = ec.resolveModZeroIntLHS(instr)
+		ec.fusedBitTestBit = 0
+		ec.fusedBitTestZero = true
+		ec.fusedBitTestActive = true
 		return
 	}
 

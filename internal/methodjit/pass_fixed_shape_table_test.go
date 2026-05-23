@@ -913,6 +913,48 @@ func TestFixedShapeTableFactsPass_MutableFieldKeepsRangeWhenStoresStayRanged(t *
 	}
 }
 
+func TestFixedShapeTableFactsPass_MutableFieldSelfAddNonNegativeStore(t *testing.T) {
+	shapeFields := []string{"total"}
+	shapeID := runtime.GetShapeID(shapeFields)
+	fn := &Function{Proto: &vm.FuncProto{NumParams: 1}, Analysis: NewAnalysisResult()}
+	block := &Block{ID: 0}
+	arg := &Instr{ID: 1, Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: block}
+	svals := &Instr{ID: 2, Op: OpFieldSvals, Type: TypeInt, Args: []*Value{arg.Value()}, Aux: int64(shapeID), Block: block}
+	old := &Instr{ID: 3, Op: OpFieldLoad, Type: TypeInt, Args: []*Value{svals.Value()}, Aux: 0, Block: block}
+	step := &Instr{ID: 4, Op: OpLoadSlot, Type: TypeInt, Aux: 1, Block: block}
+	next := &Instr{ID: 5, Op: OpAddInt, Type: TypeInt, Args: []*Value{old.Value(), step.Value()}, Block: block}
+	store := &Instr{ID: 6, Op: OpFieldStore, Type: TypeUnknown, Args: []*Value{svals.Value(), next.Value()}, Aux: 0, Block: block}
+	again := &Instr{ID: 7, Op: OpFieldLoad, Type: TypeInt, Args: []*Value{svals.Value()}, Aux: 0, Block: block}
+	ret := &Instr{ID: 8, Op: OpReturn, Args: []*Value{again.Value()}, Block: block}
+	block.Instrs = []*Instr{arg, svals, old, step, next, store, again, ret}
+	fn.Entry = block
+	fn.Blocks = []*Block{block}
+	fn.Analysis.NumericFacts().RecordIntNonNegative(step.ID)
+
+	out, err := FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
+		ArgFacts: map[int]FixedShapeTableFact{
+			0: {
+				ShapeID:    shapeID,
+				FieldNames: append([]string(nil), shapeFields...),
+				FieldTypes: map[string]Type{"total": TypeInt},
+				FieldRanges: map[string]intRange{
+					"total": {min: 5, max: 9, known: true},
+				},
+				Guarded: true,
+			},
+		},
+	})(fn)
+	if err != nil {
+		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
+	}
+	if !out.Analysis.NumericFacts().IsIntNonNegative(next.ID) {
+		t.Fatalf("self-add store result should carry non-negative fact:\n%s", Print(out))
+	}
+	if r, ok := out.Analysis.ProfiledIntRanges[again.ID]; !ok || !r.known || r.min != 0 {
+		t.Fatalf("mutable self-add field load range = %#v ok=%v\nIR:\n%s", r, ok, Print(out))
+	}
+}
+
 func TestFixedShapeTableFactsPass_FixedConstructorCarriesIntRanges(t *testing.T) {
 	top := compileProto(t, `
 result := {count: 0, qty: 3}

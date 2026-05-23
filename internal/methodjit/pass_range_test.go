@@ -408,10 +408,12 @@ func TestRangePass_IntNonNegativeMarksConstantsAndRanges(t *testing.T) {
 	three := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 3, Block: b}
 	add := &Instr{ID: fn.newValueID(), Op: OpAddInt, Type: TypeInt,
 		Args: []*Value{two.Value(), three.Value()}, Block: b}
+	div := &Instr{ID: fn.newValueID(), Op: OpDivIntExact, Type: TypeInt,
+		Args: []*Value{add.Value(), two.Value()}, Block: b}
 	neg := &Instr{ID: fn.newValueID(), Op: OpNegInt, Type: TypeInt,
 		Args: []*Value{three.Value()}, Block: b}
-	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{add.Value()}, Block: b}
-	b.Instrs = []*Instr{negConst, zero, two, three, add, neg, ret}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{div.Value()}, Block: b}
+	b.Instrs = []*Instr{negConst, zero, two, three, add, div, neg, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
 
@@ -419,7 +421,7 @@ func TestRangePass_IntNonNegativeMarksConstantsAndRanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	for _, instr := range []*Instr{zero, two, three, add} {
+	for _, instr := range []*Instr{zero, two, three, add, div} {
 		if !result.Analysis.IntNonNegative[instr.ID] {
 			t.Fatalf("v%d %s should be marked non-negative\nfacts=%v", instr.ID, instr.Op, result.Analysis.IntNonNegative)
 		}

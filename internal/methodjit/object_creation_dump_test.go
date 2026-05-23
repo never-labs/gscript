@@ -101,8 +101,13 @@ func TestObjectCreationDump(t *testing.T) {
 	// still scalar-replaced, but the compiled function includes the call-exit
 	// resume machinery for that cold branch. new_vec3 shrank after the native
 	// loop-driver <main> gate cleanup removed unrelated entry bookkeeping.
+	//
+	// SinglePredRawRegSeed: direct single-predecessor raw register propagation
+	// keeps hot loop values live across block boundaries without changing VM
+	// home-slot write-through. create_and_sum grows slightly because more raw
+	// values stay visible to downstream field/exit bookkeeping.
 	baselines := []baseline{
-		{"create_and_sum", 1110, 583, tolerance},  // cold remember_object call branch retained
+		{"create_and_sum", 1127, 595, tolerance},  // cold remember_object call branch retained
 		{"transform_chain", 1169, 607, tolerance}, // cold remember_object call branch retained
 		{"new_vec3", 196, 98, 0.04},               // escaping fixed N-field constructor; 190/202 by package order
 	}

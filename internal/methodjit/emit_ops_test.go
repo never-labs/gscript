@@ -557,6 +557,51 @@ func TestEmit_ModZeroIntPowerOfTwoUsesBitTest(t *testing.T) {
 	}
 }
 
+func TestEmit_FusedModZeroIntByTwoUsesBitBranch(t *testing.T) {
+	src := `func f(n) {
+		total := 0
+		for i := 1; i <= n; i++ {
+			if i % 2 == 0 {
+				total = total + 3
+			} else {
+				total = total + 1
+			}
+		}
+		return total
+	}`
+	proto := compileFunction(t, src)
+	fn, _, err := RunTier2Pipeline(BuildGraph(proto), nil)
+	if err != nil {
+		t.Fatalf("RunTier2Pipeline: %v", err)
+	}
+	cf, err := Compile(fn, AllocateRegisters(fn))
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	defer cf.Code.Free()
+
+	for _, arg := range []int64{0, 1, 2, 11, 100} {
+		args := []runtime.Value{runtime.IntValue(arg)}
+		result, err := cf.Execute(args)
+		if err != nil {
+			t.Fatalf("Execute f(%d): %v", arg, err)
+		}
+		vmResult := runVM(t, src, args)
+		if len(result) == 0 || len(vmResult) == 0 {
+			t.Fatalf("empty result for f(%d): JIT=%v VM=%v", arg, result, vmResult)
+		}
+		assertValuesEqual(t, fmt.Sprintf("f(%d)", arg), result[0], vmResult[0])
+	}
+
+	asm := disasmARM64(unsafeCodeSlice(cf))
+	if !strings.Contains(asm, "TBZ") {
+		t.Fatalf("expected fused %%2 zero branch to emit TBZ:\n%s", asm)
+	}
+	if strings.Contains(asm, "AND") && strings.Contains(asm, "CMP $0") {
+		t.Fatalf("fused %%2 zero branch should skip mask+compare path:\n%s", asm)
+	}
+}
+
 func TestEmit_ModZeroIntNonNegativeConstUsesMagic(t *testing.T) {
 	src := `func f(n) {
 		q := n % 211

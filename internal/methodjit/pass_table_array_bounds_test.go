@@ -175,6 +175,63 @@ func TestTableArrayStaticBounds_MarksDominatingLenGuardWithRangedKey(t *testing.
 	}
 }
 
+func TestTableArrayStaticBounds_UsesProfiledTableLenRange(t *testing.T) {
+	fn := &Function{Proto: &vm.FuncProto{Name: "profiled_table_len_bounds"}, NumRegs: 1, Analysis: NewAnalysisResult()}
+	entry := &Block{ID: 0}
+	fn.Entry = entry
+	fn.Blocks = []*Block{entry}
+	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: entry}
+	header := &Instr{ID: fn.newValueID(), Op: OpTableArrayHeader, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{tbl.Value()}, Block: entry}
+	length := &Instr{ID: fn.newValueID(), Op: OpTableArrayLen, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{header.Value()}, Block: entry}
+	data := &Instr{ID: fn.newValueID(), Op: OpTableArrayData, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{header.Value()}, Block: entry}
+	key := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 8, Block: entry}
+	load := &Instr{ID: fn.newValueID(), Op: OpTableArrayLoad, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{data.Value(), length.Value(), key.Value()}, Block: entry}
+	store := &Instr{ID: fn.newValueID(), Op: OpTableArrayStore, Type: TypeUnknown, Aux: int64(vm.FBKindInt), Args: []*Value{tbl.Value(), data.Value(), length.Value(), key.Value(), load.Value(), header.Value()}, Block: entry}
+	entry.Instrs = []*Instr{tbl, header, length, data, key, load, store}
+	fn.Analysis.ProfiledLenRanges = map[int]intRange{tbl.ID: {min: 8, max: 8, known: true}}
+
+	out, err := TableArrayStaticBoundsPass(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
+		t.Fatalf("expected profiled table length to prove upper bound:\n%s", Print(out))
+	}
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
+		t.Fatalf("expected key range to prove lower bound:\n%s", Print(out))
+	}
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[store.ID] {
+		t.Fatalf("expected profiled table length to prove store upper bound:\n%s", Print(out))
+	}
+}
+
+func TestTableArrayStaticBounds_UsesProfiledAccessTableLenRange(t *testing.T) {
+	proto := &vm.FuncProto{Name: "profiled_access_table_len_bounds", TableKeyFeedback: vm.NewTableKeyFeedbackVector(8)}
+	fn := &Function{Proto: proto, NumRegs: 1, Analysis: NewAnalysisResult()}
+	entry := &Block{ID: 0}
+	fn.Entry = entry
+	fn.Blocks = []*Block{entry}
+	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: entry}
+	header := &Instr{ID: fn.newValueID(), Op: OpTableArrayHeader, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{tbl.Value()}, Block: entry}
+	length := &Instr{ID: fn.newValueID(), Op: OpTableArrayLen, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{header.Value()}, Block: entry}
+	data := &Instr{ID: fn.newValueID(), Op: OpTableArrayData, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{header.Value()}, Block: entry}
+	key := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 8, Block: entry}
+	load := &Instr{ID: fn.newValueID(), Op: OpTableArrayLoad, Type: TypeInt, Aux: int64(vm.FBKindInt), Args: []*Value{data.Value(), length.Value(), key.Value()}, Block: entry, HasSource: true, SourcePC: 3}
+	entry.Instrs = []*Instr{tbl, header, length, data, key, load}
+	proto.TableKeyFeedback[3].TableLenRange.Observe(runtime.IntValue(8))
+
+	out, err := TableArrayStaticBoundsPass(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Analysis.TableArrayUpperBoundSafe == nil || !out.Analysis.TableArrayUpperBoundSafe[load.ID] {
+		t.Fatalf("expected profiled access table length to prove upper bound:\n%s", Print(out))
+	}
+	if out.Analysis.TableArrayLowerBoundSafe == nil || !out.Analysis.TableArrayLowerBoundSafe[load.ID] {
+		t.Fatalf("expected key range to prove lower bound:\n%s", Print(out))
+	}
+}
+
 func TestTableArrayStaticBounds_UsesDominatingTrueBranchKeyUpper(t *testing.T) {
 	fn := &Function{Proto: &vm.FuncProto{Name: "guarded_branch_key_bounds"}, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}

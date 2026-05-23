@@ -65,6 +65,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	if rawIntBlockCarry {
 		rawIntCarryNoStore = computeSinglePredRawIntStoreElision(fn, alloc, blockLiveIn)
 	}
+	rawFloatCarryNoStore := computeSinglePredRawFloatStoreElision(fn, alloc, blockLiveIn)
 	defs := make(map[int]*Instr)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -313,6 +314,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		valueDefs:                  valueDefs,
 		rawIntBlockCarry:           rawIntBlockCarry,
 		rawIntCarryNoStore:         rawIntCarryNoStore,
+		rawFloatCarryNoStore:       rawFloatCarryNoStore,
 		crossBlockLive:             crossBlockLive,
 		globalCacheConsts:          make([]int, 0),
 		useFPR:                     hasFPR,
@@ -932,6 +934,10 @@ type emitContext struct {
 	// materialized only on deopt/fallback while live.
 	rawIntCarryNoStore map[int]bool
 
+	// rawFloatCarryNoStore marks raw-float values whose cross-block uses are
+	// covered by predecessor-edge FPR carry.
+	rawFloatCarryNoStore map[int]bool
+
 	// activeFPRegs tracks which value IDs have their FPR allocation active
 	// in the current block. Mirrors activeRegs for FPR-allocated values.
 	// Reset at the start of each block.
@@ -1117,6 +1123,13 @@ type emitContext struct {
 	// fusedActive is true when the preceding comparison was fused and
 	// emitBranch should use fusedCond + B.cc instead of TBNZ.
 	fusedActive bool
+
+	// fusedBitTestActive is true when the preceding boolean producer can be
+	// consumed by the immediately-following Branch as a direct bit test.
+	fusedBitTestActive bool
+	fusedBitTestReg    jit.Reg
+	fusedBitTestBit    int
+	fusedBitTestZero   bool
 
 	// instrCodeRanges records the machine-code byte range emitted for each IR
 	// instruction. It is diagnostic metadata only; offsets are relative to the
@@ -2280,6 +2293,7 @@ func (ec *emitContext) emitBlock(block *Block) {
 	ec.invalidateFieldSvalsCache()
 
 	if isLoopBlock && !isHeader && ec.safeHeaderRegs != nil {
+		ec.activateDirectLoopHeaderGPRs(block)
 		// Non-header loop block: activate SAFE registers from the innermost
 		// enclosing loop header. Only registers that are NOT clobbered by
 		// any non-header block in the loop body are activated. This prevents
@@ -2311,7 +2325,7 @@ func (ec *emitContext) emitBlock(block *Block) {
 		// global register allocator.
 		ec.activateLoopHeaderFPRs(block.ID)
 	}
-	if ec.rawIntBlockCarry && !isHeader && len(block.Preds) == 1 {
+	if !isHeader && len(block.Preds) == 1 {
 		ec.seedSinglePredRawIntRegs(block)
 		ec.seedSinglePredRawFloatRegs(block)
 	}
@@ -2448,6 +2462,45 @@ func (ec *emitContext) seedSinglePredRawIntRegs(block *Block) {
 	for _, reg := range regs {
 		entry := predOut[reg]
 		if (!entry.IsRawInt && !entry.IsRawTablePtr && !entry.IsRawDataPtr && !entry.IsRawSvalsPtr) || !liveIn[entry.ValueID] {
+			continue
+		}
+		pr, ok := ec.alloc.ValueRegs[entry.ValueID]
+		if !ok || pr.IsFloat || pr.Reg != reg {
+			continue
+		}
+		ec.invalidateReg(reg, entry.ValueID)
+		ec.activeRegs[entry.ValueID] = true
+		if entry.IsRawInt {
+			ec.setValueRepr(entry.ValueID, valueReprRawInt)
+		}
+		if entry.IsRawTablePtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawTablePtr)
+		}
+		if entry.IsRawDataPtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawDataPtr)
+		}
+		if entry.IsRawSvalsPtr {
+			ec.setValueRepr(entry.ValueID, valueReprRawFieldSvalsPtr)
+		}
+	}
+}
+
+func (ec *emitContext) activateDirectLoopHeaderGPRs(block *Block) {
+	if ec == nil || block == nil || len(block.Preds) != 1 || ec.loop == nil || ec.loopHeaderRegs == nil {
+		return
+	}
+	headerID, ok := ec.loop.blockInnerHeader[block.ID]
+	if !ok || block.Preds[0] == nil || block.Preds[0].ID != headerID {
+		return
+	}
+	hdrRegs := ec.loopHeaderRegs[headerID]
+	if len(hdrRegs) == 0 {
+		return
+	}
+	regs := sortedLoopRegEntryIDs(hdrRegs)
+	for _, reg := range regs {
+		entry := hdrRegs[reg]
+		if entry.ValueID == 0 || !ec.blockLiveIn[block.ID][entry.ValueID] {
 			continue
 		}
 		pr, ok := ec.alloc.ValueRegs[entry.ValueID]

@@ -439,14 +439,9 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 	doneLabel := ec.uniqueLabel("tarr_load_done")
 
 	dataReg := ec.resolveRawDataPtr(instr.Args[0].ID, jit.X2)
-	lenReg := ec.resolveRawInt(instr.Args[1].ID, jit.X3)
 	if tableArrayLoadScratchClobbers(dataReg) {
 		asm.MOVreg(jit.X16, dataReg)
 		dataReg = jit.X16
-	}
-	if tableArrayLoadScratchClobbers(lenReg) || lenReg == dataReg {
-		asm.MOVreg(jit.X17, lenReg)
-		lenReg = jit.X17
 	}
 	keyID := instr.Args[2].ID
 	if kv, isConst := ec.constInts[keyID]; isConst {
@@ -478,6 +473,11 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		asm.BCond(jit.CondLT, deoptLabel)
 	}
 	if !ec.tableArrayUpperBoundSafe(instr.ID) {
+		lenReg := ec.resolveRawInt(instr.Args[1].ID, jit.X3)
+		if tableArrayLoadScratchClobbers(lenReg) || lenReg == dataReg {
+			asm.MOVreg(jit.X17, lenReg)
+			lenReg = jit.X17
+		}
 		asm.CMPreg(jit.X1, lenReg)
 		asm.BCond(jit.CondGE, deoptLabel)
 	}
@@ -622,6 +622,7 @@ func (ec *emitContext) emitTableArrayStore(instr *Instr) {
 
 	dataReg := ec.resolveRawDataPtr(instr.Args[1].ID, jit.X2)
 	lenReg := ec.resolveRawInt(instr.Args[2].ID, jit.X3)
+	upperBoundSafe := !allowGrow && ec.tableArrayUpperBoundSafe(instr.ID)
 	// The key helper materializes the key in X1. If the store value currently
 	// lives in X1, preserve it before clobbering the register; the raw-store
 	// helper may need to resolve the value after key materialization.
@@ -635,6 +636,7 @@ func (ec *emitContext) emitTableArrayStore(instr *Instr) {
 		asm.CMPimm(jit.X1, 0)
 		asm.BCond(jit.CondLT, missLabel)
 	}
+	priorLoadBounds := ec.tableArrayKeyBounded(instr.Args[0].ID, keyID)
 
 	if !ec.emitTableArrayRawStore(tableArrayRawStoreConfig{
 		labelPrefix:             "tarr_store",
@@ -646,7 +648,8 @@ func (ec *emitContext) emitTableArrayStore(instr *Instr) {
 		lenReg:                  lenReg,
 		missLabel:               missLabel,
 		successLabel:            successLabel,
-		upperBoundSafe:          !allowGrow && ec.tableArrayUpperBoundSafe(instr.ID),
+		priorLoadBounds:         priorLoadBounds,
+		upperBoundSafe:          upperBoundSafe,
 		allowGrowWithinCapacity: allowGrow,
 		carryLenOnGrow:          allowGrow,
 		fallthroughOnSuccess:    !allowGrow,

@@ -380,6 +380,10 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 		nArgs = rawB - 1
 	}
 
+	if handled, err := e.tryFuseCreateResumeLeafCoroutine(ctx, regs, base, proto, fnVal, absSlot, nArgs, rawC); handled {
+		return err
+	}
+
 	if proto != nil && proto.CallSiteFeedback != nil {
 		// BaselinePC is the resume PC (the instruction after OP_CALL).
 		// Callsite feedback is indexed by the current bytecode PC.
@@ -393,10 +397,6 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 				proto.CallSiteFeedback[pc].ObserveCall(fnVal, nil, nArgs, rawC)
 			}
 		}
-	}
-
-	if handled, err := e.tryFuseCreateResumeLeafCoroutine(ctx, regs, base, proto, fnVal, absSlot, nArgs, rawC); handled {
-		return err
 	}
 
 	if handled, err := e.callVM.TryFastCoroutineCallValue(fnVal, absSlot, nArgs, rawC); handled {

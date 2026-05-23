@@ -2196,13 +2196,9 @@ func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeT
 		return out
 	}
 	numeric := functionNumericFacts(fn)
-	unknown := make(map[uint32]map[int]bool)
 
 	merge := func(shapeID uint32, fieldIdx int, r intRange) {
 		if shapeID == 0 || fieldIdx < 0 || !r.known || !fixedShapeFieldMayMutate(mutable, shapeID, fieldIdx) {
-			return
-		}
-		if unknown[shapeID] != nil && unknown[shapeID][fieldIdx] {
 			return
 		}
 		if out[shapeID] == nil {
@@ -2214,17 +2210,25 @@ func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeT
 			out[shapeID][fieldIdx] = r
 		}
 	}
-	markUnknown := func(shapeID uint32, fieldIdx int) {
+
+	type mutableFieldStore struct {
+		shapeID  uint32
+		fieldIdx int
+		value    *Value
+	}
+	stores := make(map[uint32]map[int][]mutableFieldStore)
+	addStore := func(shapeID uint32, fieldIdx int, value *Value) {
 		if shapeID == 0 || fieldIdx < 0 || !fixedShapeFieldMayMutate(mutable, shapeID, fieldIdx) {
 			return
 		}
-		if unknown[shapeID] == nil {
-			unknown[shapeID] = make(map[int]bool)
+		if stores[shapeID] == nil {
+			stores[shapeID] = make(map[int][]mutableFieldStore)
 		}
-		unknown[shapeID][fieldIdx] = true
-		if out[shapeID] != nil {
-			delete(out[shapeID], fieldIdx)
-		}
+		stores[shapeID][fieldIdx] = append(stores[shapeID][fieldIdx], mutableFieldStore{
+			shapeID:  shapeID,
+			fieldIdx: fieldIdx,
+			value:    value,
+		})
 	}
 
 	for _, fact := range facts {
@@ -2236,6 +2240,19 @@ func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeT
 				merge(fact.ShapeID, fieldIdx, r)
 			}
 		}
+	}
+	if fn.Analysis != nil {
+		fn.Analysis.TableShapeFacts().ForEachFieldPolyShapeCatalogFact(func(_ uint32, fact FixedShapeTableFact) bool {
+			if fact.ShapeID == 0 {
+				return true
+			}
+			for fieldIdx, name := range fact.FieldNames {
+				if r, ok := fact.FieldRanges[name]; ok {
+					merge(fact.ShapeID, fieldIdx, r)
+				}
+			}
+			return true
+		})
 	}
 
 	for _, block := range fn.Blocks {
@@ -2252,15 +2269,69 @@ func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeT
 			}
 			shapeID := uint32(svals.Aux)
 			fieldIdx := int(instr.Aux)
-			if r, ok := rangeForMutableFieldStoreValue(numeric, instr.Args[1]); ok {
-				merge(shapeID, fieldIdx, r)
-			} else {
-				markUnknown(shapeID, fieldIdx)
-			}
+			addStore(shapeID, fieldIdx, instr.Args[1])
 		}
 	}
-	for shapeID, fields := range unknown {
+	closed := make(map[uint32]map[int]bool)
+	markClosed := func(shapeID uint32, fieldIdx int) {
+		if closed[shapeID] == nil {
+			closed[shapeID] = make(map[int]bool)
+		}
+		closed[shapeID][fieldIdx] = true
+	}
+	for iter := 0; iter < 4; iter++ {
+		changed := false
+		for shapeID, fields := range stores {
+			for fieldIdx, fieldStores := range fields {
+				before, hadBefore := out[shapeID][fieldIdx]
+				next := before
+				hadNext := hadBefore
+				okAll := true
+				for _, store := range fieldStores {
+					r, selfDep, ok := rangeForMutableFieldStoreValue(numeric, store.value, out, shapeID, fieldIdx)
+					if !ok {
+						okAll = false
+						break
+					}
+					if selfDep {
+						if !hadBefore || r.min < before.min {
+							okAll = false
+							break
+						}
+						r = intRange{min: before.min, max: MaxInt48, known: true}
+					}
+					if r.nonNegative() && store.value != nil {
+						numeric.RecordIntNonNegative(store.value.ID)
+					}
+					if hadNext {
+						next = joinRange(next, r)
+					} else {
+						next = r
+						hadNext = true
+					}
+				}
+				if !okAll || !hadNext {
+					continue
+				}
+				markClosed(shapeID, fieldIdx)
+				if !hadBefore || !rangeEqual(before, next) {
+					if out[shapeID] == nil {
+						out[shapeID] = make(map[int]intRange)
+					}
+					out[shapeID][fieldIdx] = next
+					changed = true
+				}
+			}
+		}
+		if !changed {
+			break
+		}
+	}
+	for shapeID, fields := range stores {
 		for fieldIdx := range fields {
+			if closed[shapeID] != nil && closed[shapeID][fieldIdx] {
+				continue
+			}
 			if out[shapeID] != nil {
 				delete(out[shapeID], fieldIdx)
 			}
@@ -2290,25 +2361,129 @@ func fixedShapeMutableRangeFactsSafeFunction(fn *Function) bool {
 	return true
 }
 
-func rangeForMutableFieldStoreValue(numeric *NumericFacts, v *Value) (intRange, bool) {
+func rangeForMutableFieldStoreValue(numeric *NumericFacts, v *Value, mutableRanges map[uint32]map[int]intRange, targetShape uint32, targetField int) (intRange, bool, bool) {
 	if c, ok := constIntFromValue(v); ok {
-		return pointRange(c), true
+		return pointRange(c), false, true
 	}
 	if v == nil {
-		return intRange{}, false
+		return intRange{}, false, false
 	}
 	if numeric != nil {
 		if r, ok := numeric.IntRange(v.ID); ok && r.known {
-			return r, true
+			return r, false, true
 		}
 		if r, ok := numeric.ProfiledIntRange(v.ID); ok && r.known {
-			return r, true
+			return r, false, true
+		}
+		if numeric.IsIntNonNegative(v.ID) {
+			return intRange{min: 0, max: MaxInt48, known: true}, false, true
 		}
 	}
+	if r, ok := simpleForwardInductionValueRange(v); ok {
+		return r, false, true
+	}
 	if v.Def == nil || !v.Def.Type.isIntegerLike() {
+		return intRange{}, false, false
+	}
+	return rangeForMutableFieldStoreInstr(numeric, v.Def, mutableRanges, targetShape, targetField)
+}
+
+func simpleForwardInductionValueRange(v *Value) (intRange, bool) {
+	if v == nil || v.Def == nil || v.Def.Op != OpAddInt {
 		return intRange{}, false
 	}
-	return intRange{}, false
+	step, phi := tableArrayForwardStepWithPhi(v.Def)
+	if step < 0 || phi == nil {
+		return intRange{}, false
+	}
+	initKnown := false
+	minValue := int64(0)
+	for _, arg := range phi.Args {
+		if arg == nil {
+			return intRange{}, false
+		}
+		if arg.ID == v.ID {
+			continue
+		}
+		init, ok := constIntFromValue(arg)
+		if !ok || init < 0 {
+			return intRange{}, false
+		}
+		candidate := satAdd(init, step)
+		if !initKnown || candidate < minValue {
+			minValue = candidate
+			initKnown = true
+		}
+	}
+	if !initKnown {
+		return intRange{}, false
+	}
+	return intRange{min: minValue, max: MaxInt48, known: true}, true
+}
+
+func rangeForMutableFieldStoreInstr(numeric *NumericFacts, instr *Instr, mutableRanges map[uint32]map[int]intRange, targetShape uint32, targetField int) (intRange, bool, bool) {
+	if instr == nil {
+		return intRange{}, false, false
+	}
+	switch instr.Op {
+	case OpFieldLoad:
+		if len(instr.Args) == 0 || instr.Args[0] == nil || instr.Args[0].Def == nil {
+			return intRange{}, false, false
+		}
+		svals := instr.Args[0].Def
+		if svals.Op != OpFieldSvals || svals.Aux == 0 {
+			return intRange{}, false, false
+		}
+		shapeID := uint32(svals.Aux)
+		fieldIdx := int(instr.Aux)
+		fields := mutableRanges[shapeID]
+		r, ok := fields[fieldIdx]
+		if !ok || !r.known {
+			return intRange{}, false, false
+		}
+		return r, shapeID == targetShape && fieldIdx == targetField, true
+	case OpAddInt, OpSubInt, OpMulInt:
+		if len(instr.Args) < 2 {
+			return intRange{}, false, false
+		}
+		left, leftSelf, leftOK := rangeForMutableFieldStoreValue(numeric, instr.Args[0], mutableRanges, targetShape, targetField)
+		right, rightSelf, rightOK := rangeForMutableFieldStoreValue(numeric, instr.Args[1], mutableRanges, targetShape, targetField)
+		if !leftOK || !rightOK {
+			return intRange{}, false, false
+		}
+		switch instr.Op {
+		case OpAddInt:
+			if leftSelf != rightSelf {
+				selfRange, otherRange := left, right
+				if rightSelf {
+					selfRange, otherRange = right, left
+				}
+				if selfRange.known && otherRange.nonNegative() {
+					return intRange{min: satAdd(selfRange.min, otherRange.min), max: MaxInt48, known: true}, true, true
+				}
+			}
+			return addRange(left, right), leftSelf || rightSelf, true
+		case OpSubInt:
+			return subRange(left, right), leftSelf || rightSelf, true
+		default:
+			return mulRange(left, right), leftSelf || rightSelf, true
+		}
+	case OpModInt:
+		if len(instr.Args) < 2 {
+			return intRange{}, false, false
+		}
+		divisor, ok := constIntFromValue(instr.Args[1])
+		if !ok || divisor <= 0 {
+			return intRange{}, false, false
+		}
+		_, selfDep, lhsOK := rangeForMutableFieldStoreValue(numeric, instr.Args[0], mutableRanges, targetShape, targetField)
+		if !lhsOK {
+			return intRange{}, false, false
+		}
+		return intRange{min: 0, max: divisor - 1, known: true}, selfDep, true
+	default:
+		return intRange{}, false, false
+	}
 }
 
 func fixedShapeFieldLoadRange(fact FixedShapeTableFact, name string, fieldIdx int, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) (intRange, bool) {

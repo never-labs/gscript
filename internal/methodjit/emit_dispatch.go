@@ -44,6 +44,7 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	// runs between them (shouldn't happen per our pre-scan), clear it.
 	if instr.Op != OpBranch {
 		ec.fusedActive = false
+		ec.fusedBitTestActive = false
 	}
 	if ec.emitConstInstr(instr, block) {
 		goto done
@@ -811,7 +812,14 @@ func (ec *emitContext) emitBranch(instr *Instr, block *Block) {
 
 	// Fused compare+branch: the preceding CMP/FCMP already set NZCV flags.
 	// Emit B.cc directly instead of materializing a bool and testing bit 0.
-	if ec.fusedActive {
+	if ec.fusedBitTestActive {
+		if ec.fusedBitTestZero {
+			ec.asm.TBZ(ec.fusedBitTestReg, ec.fusedBitTestBit, trueTrampolineLabel)
+		} else {
+			ec.asm.TBNZ(ec.fusedBitTestReg, ec.fusedBitTestBit, trueTrampolineLabel)
+		}
+		ec.fusedBitTestActive = false
+	} else if ec.fusedActive {
 		cond := ec.fusedCond
 		ec.fusedActive = false
 		ec.asm.BCond(cond, trueTrampolineLabel)

@@ -927,8 +927,8 @@ func read_then_set(arr, key, val) {
 		t.Fatalf("Compile: %v", err)
 	}
 	defer cf.Code.Free()
-	if got := countMatchingIRInstr(cf, storeID, isARM64CBZX17); got != 0 {
-		t.Fatalf("checked TableArrayStore should use its typed len operand instead of X17 success flag")
+	if got := countMatchingIRInstr(cf, storeID, isARM64CBZX17); got == 0 {
+		t.Fatalf("checked TableArrayStore should consume the prior TableArrayLoad X17 success flag")
 	}
 	if got := countMatchingIRInstr(cf, storeID, isARM64MOVZX17One); got == 0 {
 		t.Fatalf("load feeding same-key store should publish X17 success flag")

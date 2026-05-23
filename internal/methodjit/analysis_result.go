@@ -440,6 +440,17 @@ func (n *NumericFacts) SetIntNonNegative(facts map[int]bool) {
 	n.bindOwner()
 }
 
+func (n *NumericFacts) RecordIntNonNegative(id int) {
+	if n == nil {
+		return
+	}
+	if n.IntNonNegative == nil {
+		n.IntNonNegative = make(map[int]bool)
+	}
+	n.IntNonNegative[id] = true
+	n.bindOwner()
+}
+
 func (n *NumericFacts) IsIntNonNegative(id int) bool {
 	return n != nil && n.IntNonNegative != nil && n.IntNonNegative[id]
 }

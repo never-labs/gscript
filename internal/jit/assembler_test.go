@@ -78,6 +78,16 @@ func TestSDIV(t *testing.T) {
 	}
 }
 
+func TestUDIV(t *testing.T) {
+	a := NewAssembler()
+	a.UDIV(X0, X1, X2)
+	got := getInst(a, 0)
+	// 0x9AC00800 | (2<<16) | (1<<5) | 0 = 0x9AC20820
+	if got != 0x9AC20820 {
+		t.Fatalf("UDIV: got 0x%08X, want 0x9AC20820", got)
+	}
+}
+
 func TestMSUB(t *testing.T) {
 	a := NewAssembler()
 	a.MSUB(X0, X1, X2, X3) // MSUB X0, X1, X2, X3 = X3 - X1*X2

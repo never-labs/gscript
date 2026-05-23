@@ -361,7 +361,11 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 	}
 	markConvergingInductionSafe(fn, safe)
 	markGuardedForwardInductionUpdatesSafe(fn, ranges, safe)
-	numeric.SetComputedRanges(safe, ranges, collectIntNonNegativeFacts(intInstrs, ranges))
+	nonNegative := collectIntNonNegativeFacts(intInstrs, ranges)
+	for id := range numeric.IntNonNegative {
+		nonNegative[id] = true
+	}
+	numeric.SetComputedRanges(safe, ranges, nonNegative)
 	populateIntModFacts(fn, ranges)
 	return fn, nil
 }
@@ -618,6 +622,18 @@ func computeRange(instr *Instr, ranges map[int]intRange, staticLens, profiledRan
 			}
 		}
 		return topRange()
+	case OpTableArrayLen:
+		if len(instr.Args) >= 1 && instr.Args[0] != nil {
+			if r, ok := profiledLenRanges[instr.Args[0].ID]; ok && r.known {
+				return r
+			}
+			if table := tableArrayHeaderSourceTableValue(instr.Args[0]); table != nil {
+				if r, ok := profiledLenRanges[table.ID]; ok && r.known {
+					return r
+				}
+			}
+		}
+		return topRange()
 
 	case OpAddInt:
 		if len(instr.Args) < 2 {
@@ -809,7 +825,7 @@ func opCanDeriveNonNegative(instr *Instr) bool {
 	}
 	switch instr.Op {
 	case OpConstInt, OpLen, OpTableArrayLen, OpGuardIntRange,
-		OpAddInt, OpMulInt, OpModInt, OpPhi, OpBoxInt, OpUnboxInt:
+		OpAddInt, OpMulInt, OpModInt, OpDivIntExact, OpPhi, OpBoxInt, OpUnboxInt:
 		return true
 	default:
 		return false
@@ -833,6 +849,10 @@ func instrDerivesNonNegative(instr *Instr, facts map[int]bool, ranges map[int]in
 			valueNonNegative(instr.Args[1], facts, ranges)
 	case OpModInt:
 		return len(instr.Args) >= 2 && valueNonNegative(instr.Args[1], facts, ranges)
+	case OpDivIntExact:
+		return len(instr.Args) >= 2 &&
+			valueNonNegative(instr.Args[0], facts, ranges) &&
+			valueStrictlyPositive(instr.Args[1], ranges)
 	case OpPhi:
 		if len(instr.Args) == 0 {
 			return false

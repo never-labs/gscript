@@ -64,6 +64,12 @@ func (a *Assembler) SDIV(rd, rn, rm Reg) {
 	a.emit(0x9AC00C00 | uint32(rm)<<16 | uint32(rn)<<5 | uint32(rd))
 }
 
+// UDIV: Xd = Xn / Xm (unsigned 64-bit)
+func (a *Assembler) UDIV(rd, rn, rm Reg) {
+	// 1|00|11010110|Rm|00001|0|Rn|Rd
+	a.emit(0x9AC00800 | uint32(rm)<<16 | uint32(rn)<<5 | uint32(rd))
+}
+
 // MSUB: Xd = Xa - Xn*Xm (64-bit). Used for modulo: a%b = a - (a/b)*b.
 func (a *Assembler) MSUB(rd, rn, rm, ra Reg) {
 	// 1|00|11011|000|Rm|1|Ra|Rn|Rd
