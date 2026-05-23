@@ -76,3 +76,48 @@ func TestMatrixMultiplyRuntimeSpecializationRecordsHit(t *testing.T) {
 		t.Fatal("matrix_multiply structural hit count = 0, want at least 1")
 	}
 }
+
+func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testing.T) {
+	top := compileProto(t, matrixMultiplySource(t, "matmul_dense_tb.gs"))
+	matmul := findTestProtoByName(top, "matmul")
+	if matmul == nil {
+		t.Fatal("missing dense transposed matmul proto")
+	}
+
+	requireKernelInfo(t, WholeCallKernelCatalog(), "dense_matrix_multiply_transposed")
+	requireKernelInfo(t, RecognizedWholeCallKernels(matmul), "dense_matrix_multiply_transposed")
+	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(matmul, wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed) {
+		t.Fatal("dense_matrix_multiply_transposed rejected by no-result runtime specialization cache")
+	}
+	if matmul.DenseMatrixMultiplyTBKernel == nil || matmul.DenseMatrixMultiplyTBKernel.spec == nil {
+		t.Fatal("dense transposed matrix multiply proto-local spec was not generated")
+	}
+	if got := cachedWholeCallKernelBits(matmul); got != 0 {
+		t.Fatalf("dense_matrix_multiply_transposed still recognized by legacy whole-call kernel bits: %#x", got)
+	}
+
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(matmul), "dense_matrix_multiply_transposed")
+	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
+		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
+	}
+	if diag.Kernel.Route != KernelRouteWholeCallNoResult ||
+		diag.Kernel.Arity != 4 ||
+		diag.Kernel.Results != kernelWholeCallInPlaceResultCount {
+		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Kernel)
+	}
+}
+
+func TestDenseMatrixMultiplyTransposedRuntimeSpecializationRecordsHit(t *testing.T) {
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	src := matrixMultiplySource(t, "matmul_dense_tb.gs")
+	src = strings.Replace(src, "N := 300", "N := 12", 1)
+	globals := compileAndRun(t, src)
+	if v := globals["c"]; !v.IsTable() {
+		t.Fatalf("c = %s (%v), want table", v.TypeName(), v)
+	}
+	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallNoResult, "dense_matrix_multiply_transposed"); got != 1 {
+		t.Fatalf("dense_matrix_multiply_transposed structural hit count = %d, want 1", got)
+	}
+}

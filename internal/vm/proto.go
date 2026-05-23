@@ -38,6 +38,7 @@ type FuncProto struct {
 	WholeCallKernel              *wholeCallKernelProtoCache         // structural whole-call kernel recognizer cache, nil until first probe
 	IntGridAggregateKernel       *intGridAggregateKernelCache       // guarded runtime-generated integer grid aggregate kernel cache
 	MatrixMultiplyKernel         *matrixMultiplyKernelCache         // guarded runtime-generated matrix multiply kernel cache
+	DenseMatrixMultiplyTBKernel  *denseMatrixMultiplyTBKernelCache  // guarded runtime-generated dense transposed matrix multiply kernel cache
 	RecordWalkFoldKernel         *recordWalkFoldKernelCache         // guarded runtime-generated record walk/fold kernel cache
 	BoolTableStrikeCountKernel   *boolTableStrikeCountKernelCache   // guarded runtime-generated bool table strike-count kernel cache
 	RecordPairwiseNumericKernel  *recordPairwiseNumericKernelCache  // guarded runtime-generated pairwise record numeric kernel cache

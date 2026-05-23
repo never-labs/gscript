@@ -20,6 +20,13 @@ type matrixMultiplyKernelSpec struct {
 	kind matrixMultiplyKernelKind
 }
 
+type denseMatrixMultiplyTBKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *denseMatrixMultiplyTBKernelSpec
+}
+
+type denseMatrixMultiplyTBKernelSpec struct{}
+
 func (vm *VM) tryRunMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationMatrixMultiply) {
 		return false, nil, nil
@@ -631,15 +638,38 @@ func hasDenseMatrixMultiplyConstants(p *FuncProto, maxStack, codeLen int) bool {
 }
 
 func isDenseMatrixMultiplyTransposedProto(p *FuncProto) bool {
+	_, ok := denseMatrixMultiplyTBKernelSpecForProto(p)
+	return ok
+}
+
+func denseMatrixMultiplyTBKernelSpecForProto(p *FuncProto) (*denseMatrixMultiplyTBKernelSpec, bool) {
+	if p == nil {
+		return nil, false
+	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.DenseMatrixMultiplyTBKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzeDenseMatrixMultiplyTBKernelSpec(p)
+	if !ok {
+		p.DenseMatrixMultiplyTBKernel = &denseMatrixMultiplyTBKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.DenseMatrixMultiplyTBKernel = &denseMatrixMultiplyTBKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzeDenseMatrixMultiplyTBKernelSpec(p *FuncProto) (*denseMatrixMultiplyTBKernelSpec, bool) {
 	if p == nil || p.NumParams != 4 || p.IsVarArg || p.MaxStack != 26 || len(p.Code) != 45 ||
 		len(p.Constants) != 4 ||
 		!numberConst(p.Constants[0], 0.0) ||
 		!p.Constants[1].IsString() ||
 		!p.Constants[2].IsString() ||
 		!p.Constants[3].IsString() {
-		return false
+		return nil, false
 	}
-	return codeEquals(p.Code, []uint32{
+	if !codeEquals(p.Code, []uint32{
 		EncodeAsBx(OP_LOADINT, 4, 0),
 		EncodeABC(OP_MOVE, 8, 3, 0),
 		EncodeAsBx(OP_LOADINT, 9, 1),
@@ -685,5 +715,8 @@ func isDenseMatrixMultiplyTransposedProto(p *FuncProto) bool {
 		EncodeAsBx(OP_FORLOOP, 8, -31),
 		EncodeAsBx(OP_FORLOOP, 4, -38),
 		EncodeABC(OP_RETURN, 0, 1, 0),
-	})
+	}) {
+		return nil, false
+	}
+	return &denseMatrixMultiplyTBKernelSpec{}, true
 }

@@ -109,7 +109,6 @@ const (
 	wholeCallKernelCoefficientMatrixTransposeVector
 	wholeCallKernelCoefficientMatrixAtAVector
 	wholeCallKernelDenseCoefficientMatrixAtAVector
-	wholeCallKernelDenseMatrixMultiplyTransposed
 	wholeCallKernelCount
 )
 
@@ -198,17 +197,6 @@ var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecogni
 		},
 		recognize:   isDenseSpectralAtAvProto,
 		runNoResult: (*VM).runSpectralWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "dense_matrix_multiply_transposed",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         4,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   isDenseMatrixMultiplyTransposedProto,
-		runNoResult: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
 	},
 }
 

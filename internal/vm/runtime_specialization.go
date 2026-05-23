@@ -16,6 +16,7 @@ const (
 const (
 	wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric = iota
 	wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort
+	wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed
 	wholeCallNoResultRuntimeSpecializationCount
 )
 
@@ -184,6 +185,19 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			Recognize: isNumericArrayRegionSortProto,
 		},
 		Run: (*VM).runNumericArrayRegionSortWholeCallKernel,
+	},
+	wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "dense_matrix_multiply_transposed",
+				Route:         KernelRouteWholeCallNoResult,
+				Arity:         4,
+				Results:       kernelWholeCallInPlaceResultCount,
+				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+			},
+			Recognize: isDenseMatrixMultiplyTransposedProto,
+		},
+		Run: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
 	},
 }
 
