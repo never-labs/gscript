@@ -4,6 +4,8 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/gscript/gscript/internal/runtime"
 )
 
 func TestRecordWalkFoldKernelDerivesFieldsFromBytecode(t *testing.T) {
@@ -65,6 +67,15 @@ func fold_rows(rows, n, passes) {
 	if !ok {
 		t.Fatal("record fold spec not derived")
 	}
+	if !cachedRuntimeSpecializationRecognized(fold, runtimeSpecializationRecordWalkFold) {
+		t.Fatal("record_walk_fold rejected by runtime specialization cache")
+	}
+	if fold.RecordWalkFoldKernel == nil || fold.RecordWalkFoldKernel.spec == nil {
+		t.Fatal("record_walk_fold proto-local spec was not generated")
+	}
+	if got := cachedWholeCallKernelBits(fold); got != 0 {
+		t.Fatalf("record_walk_fold still recognized by legacy whole-call bits: %#x", got)
+	}
 	if spec.recordFields != [6]string{"ident", "flavor", "live", "account", "counters", "labels"} ||
 		spec.metricFields != [3]string{"seen", "taps", "faults"} ||
 		spec.userFields != [2]string{"level", "zone"} ||
@@ -72,11 +83,16 @@ func fold_rows(rows, n, passes) {
 		t.Fatalf("unexpected spec: %+v", spec)
 	}
 
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
 	kernelGlobals := compileAndRun(t, src+`
 rows := build(64)
 result := fold_rows(rows, 64, 5)
 seen1 := rows[1].counters.seen
 `)
+	if got := runtimeStructuralKernelHitCount(stats, KernelRouteWholeCallValue, "record_walk_fold"); got != 1 {
+		t.Fatalf("record_walk_fold structural hit count = %d, want 1", got)
+	}
 	fallbackSrc := strings.Replace(src, `
     return checksum
 }`, `

@@ -10,6 +10,11 @@ type recordWalkFoldSpec struct {
 	modulus      int64
 }
 
+type recordWalkFoldKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *recordWalkFoldSpec
+}
+
 type recordWalkFoldRow struct {
 	metrics *runtime.Table
 	id      int64
@@ -138,6 +143,21 @@ func recordWalkFoldSpecForProto(p *FuncProto) (*recordWalkFoldSpec, bool) {
 		len(p.Code) != 83 || len(p.Constants) != 15 || len(p.Protos) != 0 {
 		return nil, false
 	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.RecordWalkFoldKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzeRecordWalkFoldSpec(p)
+	if !ok {
+		p.RecordWalkFoldKernel = &recordWalkFoldKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.RecordWalkFoldKernel = &recordWalkFoldKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzeRecordWalkFoldSpec(p *FuncProto) (*recordWalkFoldSpec, bool) {
 	for _, idx := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14} {
 		if !p.Constants[idx].IsString() {
 			return nil, false

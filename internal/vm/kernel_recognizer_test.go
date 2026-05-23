@@ -12,13 +12,13 @@ func TestCachedWholeCallKernelRecognizedUsesHotCache(t *testing.T) {
 	proto := &FuncProto{
 		WholeCallKernel: &wholeCallKernelProtoCache{
 			fingerprint: wholeCallKernelFingerprint{codeLen: 123},
-			recognized:  uint64(1) << uint(wholeCallKernelRecordWalkFold),
+			recognized:  uint64(1) << uint(wholeCallKernelIntGridAggregate),
 		},
 	}
-	if !cachedWholeCallKernelRecognized(proto, wholeCallKernelRecordWalkFold) {
+	if !cachedWholeCallKernelRecognized(proto, wholeCallKernelIntGridAggregate) {
 		t.Fatal("cached hot dispatch guard recomputed structure instead of using cached bits")
 	}
-	if cachedWholeCallKernelRecognized(proto, wholeCallKernelIntGridAggregate) {
+	if cachedWholeCallKernelRecognized(proto, wholeCallKernelPermutationFlipChecksum) {
 		t.Fatal("cached hot dispatch guard reported an uncached kernel bit")
 	}
 }

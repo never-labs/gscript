@@ -104,8 +104,7 @@ const (
 )
 
 const (
-	wholeCallKernelRecordWalkFold = iota
-	wholeCallKernelIntGridAggregate
+	wholeCallKernelIntGridAggregate = iota
 	wholeCallKernelPermutationFlipChecksum
 	wholeCallKernelMatrixMultiply
 	wholeCallKernelCoefficientMatrixVector
@@ -147,17 +146,6 @@ type wholeCallKernelRecognizer struct {
 // not yet been lifted into runtime-discovered shape specializations. New
 // whole-call fast paths should not be added here.
 var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
-	{
-		info: KernelInfo{
-			Name:          "record_walk_fold",
-			Route:         KernelRouteWholeCallValue,
-			Arity:         3,
-			Results:       kernelWholeCallSingleResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize: isRecordWalkFoldProto,
-		runValue:  (*VM).runRecordWalkFoldWholeCallKernel,
-	},
 	{
 		info: KernelInfo{
 			Name:          "int_grid_aggregate",
