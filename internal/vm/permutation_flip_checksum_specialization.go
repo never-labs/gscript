@@ -101,40 +101,20 @@ func matchPermutationTableSeeds(p bytecodePattern) bool {
 }
 
 func matchPermutationLoopSkeleton(p bytecodePattern) bool {
-	initLoop, ok := findNumericForLoopWithBodyLen(p, 0, 6)
+	initLoop, ok := p.findNumericForLoopWithBodyLen(0, 6)
 	if !ok || !matchPermutationSeedLoopBody(p, initLoop.bodyPC) {
 		return false
 	}
-	copyLoop, ok := findNumericForLoopWithBodyLen(p, initLoop.loopPC+1, 4)
+	copyLoop, ok := p.findNumericForLoopWithBodyLen(initLoop.loopPC+1, 4)
 	if !ok || !matchPermutationCopyLoopBody(p, copyLoop.bodyPC) {
 		return false
 	}
-	rotateLoop, ok := findNumericForLoopWithBodyLen(p, copyLoop.loopPC+1, 34)
+	rotateLoop, ok := p.findNumericForLoopWithBodyLen(copyLoop.loopPC+1, 34)
 	if !ok {
 		return false
 	}
-	innerRotateLoop, ok := findNumericForLoopWithBodyLen(p, rotateLoop.bodyPC, 5)
+	innerRotateLoop, ok := p.findNumericForLoopWithBodyLen(rotateLoop.bodyPC, 5)
 	return ok && innerRotateLoop.loopPC < rotateLoop.loopPC
-}
-
-type numericForLoopShape struct {
-	forPrepPC int
-	bodyPC    int
-	loopPC    int
-}
-
-func findNumericForLoopWithBodyLen(p bytecodePattern, startPC int, bodyLen int) (numericForLoopShape, bool) {
-	for pc := startPC; pc < len(p.code); pc++ {
-		inst, ok := p.op(pc, OP_FORPREP)
-		if !ok {
-			continue
-		}
-		bodyPC, loopPC, ok := p.numericForLoop(pc, DecodeA(inst))
-		if ok && loopPC-bodyPC == bodyLen {
-			return numericForLoopShape{forPrepPC: pc, bodyPC: bodyPC, loopPC: loopPC}, true
-		}
-	}
-	return numericForLoopShape{}, false
 }
 
 func matchPermutationSeedLoopBody(p bytecodePattern, bodyPC int) bool {

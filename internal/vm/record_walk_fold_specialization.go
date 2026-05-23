@@ -233,11 +233,11 @@ func matchRecordWalkFoldLoopShape(code []uint32) bool {
 	if !p.loadInt(0, 3, 0) {
 		return false
 	}
-	outer, ok := findNumericForLoopWithBodyLen(p, 1, 75)
+	outer, ok := p.findNumericForLoopWithBodyLen(1, 75)
 	if !ok {
 		return false
 	}
-	inner, ok := findNumericForLoopWithBodyLen(p, outer.bodyPC, 70)
+	inner, ok := p.findNumericForLoopWithBodyLen(outer.bodyPC, 70)
 	if !ok || inner.loopPC >= outer.loopPC {
 		return false
 	}

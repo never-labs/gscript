@@ -4,6 +4,12 @@ type bytecodePattern struct {
 	code []uint32
 }
 
+type numericForLoopShape struct {
+	forPrepPC int
+	bodyPC    int
+	loopPC    int
+}
+
 func newBytecodePattern(code []uint32) bytecodePattern {
 	return bytecodePattern{code: code}
 }
@@ -75,4 +81,18 @@ func (p bytecodePattern) numericForLoop(forprepPC, a int) (bodyPC, loopPC int, o
 		return 0, 0, false
 	}
 	return bodyPC, loopPC, true
+}
+
+func (p bytecodePattern) findNumericForLoopWithBodyLen(startPC int, bodyLen int) (numericForLoopShape, bool) {
+	for pc := startPC; pc < len(p.code); pc++ {
+		inst, ok := p.op(pc, OP_FORPREP)
+		if !ok {
+			continue
+		}
+		bodyPC, loopPC, ok := p.numericForLoop(pc, DecodeA(inst))
+		if ok && loopPC-bodyPC == bodyLen {
+			return numericForLoopShape{forPrepPC: pc, bodyPC: bodyPC, loopPC: loopPC}, true
+		}
+	}
+	return numericForLoopShape{}, false
 }
