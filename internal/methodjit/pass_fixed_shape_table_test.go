@@ -872,6 +872,47 @@ result := walk({}, 0)
 	}
 }
 
+func TestFixedShapeTableFactsPass_MutableFieldKeepsRangeWhenStoresStayRanged(t *testing.T) {
+	shapeFields := []string{"count"}
+	shapeID := runtime.GetShapeID(shapeFields)
+	fn := &Function{Proto: &vm.FuncProto{NumParams: 1}, Analysis: NewAnalysisResult()}
+	block := &Block{ID: 0}
+	arg := &Instr{ID: 1, Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: block}
+	svals := &Instr{ID: 2, Op: OpFieldSvals, Type: TypeInt, Args: []*Value{arg.Value()}, Aux: int64(shapeID), Block: block}
+	first := &Instr{ID: 3, Op: OpFieldLoad, Type: TypeInt, Args: []*Value{svals.Value()}, Aux: 0, Block: block}
+	divisor := &Instr{ID: 4, Op: OpConstInt, Type: TypeInt, Aux: 7, Block: block}
+	next := &Instr{ID: 5, Op: OpModInt, Type: TypeInt, Args: []*Value{first.Value(), divisor.Value()}, Block: block}
+	store := &Instr{ID: 6, Op: OpFieldStore, Type: TypeUnknown, Args: []*Value{svals.Value(), next.Value()}, Aux: 0, Block: block}
+	second := &Instr{ID: 7, Op: OpFieldLoad, Type: TypeInt, Args: []*Value{svals.Value()}, Aux: 0, Block: block}
+	ret := &Instr{ID: 8, Op: OpReturn, Args: []*Value{second.Value()}, Block: block}
+	block.Instrs = []*Instr{arg, svals, first, divisor, next, store, second, ret}
+	fn.Entry = block
+	fn.Blocks = []*Block{block}
+	fn.Analysis.NumericFacts().RecordProfiledIntRange(next.ID, intRange{min: 0, max: 6, known: true})
+
+	out, err := FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
+		ArgFacts: map[int]FixedShapeTableFact{
+			0: {
+				ShapeID:    shapeID,
+				FieldNames: append([]string(nil), shapeFields...),
+				FieldTypes: map[string]Type{
+					"count": TypeInt,
+				},
+				FieldRanges: map[string]intRange{
+					"count": {min: 0, max: 10, known: true},
+				},
+				Guarded: true,
+			},
+		},
+	})(fn)
+	if err != nil {
+		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
+	}
+	if r, ok := out.Analysis.ProfiledIntRanges[second.ID]; !ok || !r.known || r.min != 0 || r.max != 10 {
+		t.Fatalf("mutable ranged field load lost safe joined range, got %#v ok=%v\nIR:\n%s", r, ok, Print(out))
+	}
+}
+
 func TestFixedShapeTableFactsPass_FieldSvalsLoadCarriesNestedArrayFact(t *testing.T) {
 	shapeFields := []string{"lines"}
 	shapeID := runtime.GetShapeID(shapeFields)

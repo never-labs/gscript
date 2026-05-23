@@ -160,6 +160,9 @@ func pow2Reciprocal(v *Value) (float64, bool) {
 	if v == nil || v.Def == nil {
 		return 0, false
 	}
+	if v.Def.Op == OpNumToFloat && len(v.Def.Args) >= 1 {
+		return pow2Reciprocal(v.Def.Args[0])
+	}
 	switch v.Def.Op {
 	case OpConstInt:
 		d := v.Def.Aux
@@ -195,6 +198,9 @@ func pow2Reciprocal(v *Value) (float64, bool) {
 func exactGuardedIntReciprocal(v *Value) (float64, bool) {
 	if v == nil || v.Def == nil {
 		return 0, false
+	}
+	if v.Def.Op == OpNumToFloat && len(v.Def.Args) >= 1 {
+		return exactGuardedIntReciprocal(v.Def.Args[0])
 	}
 	switch v.Def.Op {
 	case OpGuardIntRange:

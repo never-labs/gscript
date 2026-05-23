@@ -1957,9 +1957,10 @@ func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes m
 
 func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact) {
 	mutableFields := collectFixedShapeMutableFields(fn)
+	mutableRanges := collectFixedShapeMutableFieldRanges(fn, facts, mutableFields)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if annotateFixedShapeFieldLoad(fn, block, instr, facts, mutableFields) {
+			if annotateFixedShapeFieldLoad(fn, block, instr, facts, mutableFields, mutableRanges) {
 				continue
 			}
 			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
@@ -1990,7 +1991,7 @@ func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact
 			if typ, ok := fact.FieldTypes[name]; ok && typ != TypeUnknown && typ != TypeAny {
 				instr.Type = typ
 			}
-			if r, ok := fact.FieldRanges[name]; ok && r.known && !fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, idx) {
+			if r, ok := fixedShapeFieldLoadRange(fact, name, idx, mutableFields, mutableRanges); ok {
 				fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeInt
@@ -2071,7 +2072,7 @@ func tableKeyProvenString(fn *Function, instr *Instr, key *Value) bool {
 	return instr.SourcePC < len(proto.Feedback) && proto.Feedback[instr.SourcePC].Right == vm.FBString
 }
 
-func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool) bool {
+func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) bool {
 	if instr == nil || (instr.Op != OpFieldLoad && instr.Op != OpFieldLoadNumToFloat) || len(instr.Args) == 0 || instr.Args[0] == nil {
 		return false
 	}
@@ -2097,7 +2098,7 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 		numeric.DeleteProfiledIntRange(instr.ID)
 		numeric.DeleteProfiledLenRange(instr.ID)
 	}
-	if r, ok := fact.FieldRanges[name]; ok && r.known && !fieldMayMutate {
+	if r, ok := fixedShapeFieldLoadRange(fact, name, fieldIdx, mutableFields, mutableRanges); ok {
 		fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
 		if instr.Op == OpFieldLoad && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = TypeInt
@@ -2155,6 +2156,139 @@ func collectFixedShapeMutableFields(fn *Function) map[uint32]map[int]bool {
 		}
 	}
 	return mutable
+}
+
+func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeTableFact, mutable map[uint32]map[int]bool) map[uint32]map[int]intRange {
+	out := make(map[uint32]map[int]intRange)
+	if fn == nil || len(mutable) == 0 || !fixedShapeMutableRangeFactsSafeFunction(fn) {
+		return out
+	}
+	numeric := functionNumericFacts(fn)
+	unknown := make(map[uint32]map[int]bool)
+
+	merge := func(shapeID uint32, fieldIdx int, r intRange) {
+		if shapeID == 0 || fieldIdx < 0 || !r.known || !fixedShapeFieldMayMutate(mutable, shapeID, fieldIdx) {
+			return
+		}
+		if unknown[shapeID] != nil && unknown[shapeID][fieldIdx] {
+			return
+		}
+		if out[shapeID] == nil {
+			out[shapeID] = make(map[int]intRange)
+		}
+		if old, ok := out[shapeID][fieldIdx]; ok {
+			out[shapeID][fieldIdx] = joinRange(old, r)
+		} else {
+			out[shapeID][fieldIdx] = r
+		}
+	}
+	markUnknown := func(shapeID uint32, fieldIdx int) {
+		if shapeID == 0 || fieldIdx < 0 || !fixedShapeFieldMayMutate(mutable, shapeID, fieldIdx) {
+			return
+		}
+		if unknown[shapeID] == nil {
+			unknown[shapeID] = make(map[int]bool)
+		}
+		unknown[shapeID][fieldIdx] = true
+		if out[shapeID] != nil {
+			delete(out[shapeID], fieldIdx)
+		}
+	}
+
+	for _, fact := range facts {
+		if fact.ShapeID == 0 {
+			continue
+		}
+		for fieldIdx, name := range fact.FieldNames {
+			if r, ok := fact.FieldRanges[name]; ok {
+				merge(fact.ShapeID, fieldIdx, r)
+			}
+		}
+	}
+
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpFieldStore || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil {
+				continue
+			}
+			svals := instr.Args[0].Def
+			if svals == nil || svals.Op != OpFieldSvals || svals.Aux == 0 {
+				continue
+			}
+			shapeID := uint32(svals.Aux)
+			fieldIdx := int(instr.Aux)
+			if r, ok := rangeForMutableFieldStoreValue(numeric, instr.Args[1]); ok {
+				merge(shapeID, fieldIdx, r)
+			} else {
+				markUnknown(shapeID, fieldIdx)
+			}
+		}
+	}
+	for shapeID, fields := range unknown {
+		for fieldIdx := range fields {
+			if out[shapeID] != nil {
+				delete(out[shapeID], fieldIdx)
+			}
+		}
+	}
+	return out
+}
+
+func fixedShapeMutableRangeFactsSafeFunction(fn *Function) bool {
+	if fn == nil {
+		return false
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				continue
+			}
+			switch instr.Op {
+			case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpTForCall:
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func rangeForMutableFieldStoreValue(numeric *NumericFacts, v *Value) (intRange, bool) {
+	if c, ok := constIntFromValue(v); ok {
+		return pointRange(c), true
+	}
+	if v == nil {
+		return intRange{}, false
+	}
+	if numeric != nil {
+		if r, ok := numeric.IntRange(v.ID); ok && r.known {
+			return r, true
+		}
+		if r, ok := numeric.ProfiledIntRange(v.ID); ok && r.known {
+			return r, true
+		}
+	}
+	if v.Def == nil || !v.Def.Type.isIntegerLike() {
+		return intRange{}, false
+	}
+	return intRange{}, false
+}
+
+func fixedShapeFieldLoadRange(fact FixedShapeTableFact, name string, fieldIdx int, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) (intRange, bool) {
+	if fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, fieldIdx) {
+		if fields := mutableRanges[fact.ShapeID]; fields != nil {
+			r, ok := fields[fieldIdx]
+			return r, ok && r.known
+		}
+		return intRange{}, false
+	}
+	r, ok := fact.FieldRanges[name]
+	return r, ok && r.known
 }
 
 func fixedShapeFieldMayMutate(mutable map[uint32]map[int]bool, shapeID uint32, fieldIdx int) bool {
