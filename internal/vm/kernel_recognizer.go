@@ -109,7 +109,6 @@ const (
 	wholeCallKernelPermutationFlipChecksum
 	wholeCallKernelBoolTableStrikeCount
 	wholeCallKernelMatrixMultiply
-	wholeCallKernelNumericArrayRegionSort
 	wholeCallKernelCoefficientMatrixVector
 	wholeCallKernelCoefficientMatrixTransposeVector
 	wholeCallKernelCoefficientMatrixAtAVector
@@ -200,17 +199,6 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 		},
 		recognize: isMatrixMultiplyProto,
 		runValue:  (*VM).runMatrixMultiplyWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "numeric_array_region_sort",
-			Route:         KernelRouteWholeCallNoResult,
-			Arity:         3,
-			Results:       kernelWholeCallInPlaceResultCount,
-			TieringPolicy: kernelTieringStructuralWithFloatConstant,
-		},
-		recognize:   isNumericArrayRegionSortProto,
-		runNoResult: (*VM).runNumericArrayRegionSortWholeCallKernel,
 	},
 	{
 		info: KernelInfo{

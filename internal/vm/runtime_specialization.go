@@ -11,6 +11,7 @@ const (
 
 const (
 	wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric = iota
+	wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort
 	wholeCallNoResultRuntimeSpecializationCount
 )
 
@@ -114,6 +115,19 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			Recognize: isRecordPairwiseNumericProto,
 		},
 		Run: (*VM).runRecordPairwiseNumericKernel,
+	},
+	wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "numeric_array_region_sort",
+				Route:         KernelRouteWholeCallNoResult,
+				Arity:         3,
+				Results:       kernelWholeCallInPlaceResultCount,
+				TieringPolicy: kernelTieringStructuralWithFloatConstant,
+			},
+			Recognize: isNumericArrayRegionSortProto,
+		},
+		Run: (*VM).runNumericArrayRegionSortWholeCallKernel,
 	},
 }
 

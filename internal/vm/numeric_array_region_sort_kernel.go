@@ -8,7 +8,8 @@ import (
 )
 
 func (vm *VM) tryRunNumericArrayRegionSortWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelNumericArrayRegionSort) {
+	if cl == nil || cl.Proto == nil ||
+		!hotWholeCallNoResultRuntimeSpecializationRecognized(cl.Proto, wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort) {
 		return false, nil
 	}
 	return vm.runNumericArrayRegionSortWholeCallKernel(cl, args)
