@@ -621,7 +621,6 @@ func (ec *emitContext) emitTableArrayStore(instr *Instr) {
 	}
 
 	dataReg := ec.resolveRawDataPtr(instr.Args[1].ID, jit.X2)
-	lenReg := ec.resolveRawInt(instr.Args[2].ID, jit.X3)
 	upperBoundSafe := !allowGrow && ec.tableArrayUpperBoundSafe(instr.ID)
 	// The key helper materializes the key in X1. If the store value currently
 	// lives in X1, preserve it before clobbering the register; the raw-store
@@ -637,6 +636,10 @@ func (ec *emitContext) emitTableArrayStore(instr *Instr) {
 		asm.BCond(jit.CondLT, missLabel)
 	}
 	priorLoadBounds := ec.tableArrayKeyBounded(instr.Args[0].ID, keyID)
+	lenReg := jit.X3
+	if !upperBoundSafe && !priorLoadBounds {
+		lenReg = ec.resolveRawInt(instr.Args[2].ID, jit.X3)
+	}
 
 	if !ec.emitTableArrayRawStore(tableArrayRawStoreConfig{
 		labelPrefix:             "tarr_store",
