@@ -4,6 +4,8 @@ import "github.com/gscript/gscript/internal/runtime"
 
 const (
 	runtimeSpecializationRawIntNested = iota
+	runtimeSpecializationLazyRecursiveTableBuilder
+	runtimeSpecializationLazyRecursiveTableFold
 	runtimeSpecializationCount
 )
 
@@ -29,7 +31,8 @@ type RuntimeSpecialization struct {
 // WholeCallValueSpecialization handles OP_CALL sites that return values.
 type WholeCallValueSpecialization struct {
 	RuntimeSpecialization
-	Run wholeCallValueKernelRunner
+	Run            wholeCallValueKernelRunner
+	RecursiveTable bool
 }
 
 type driverLoopRuntimeSpecializationRunner func(*VM, *CallFrame, int, []uint32, []runtime.Value, int, int) (bool, error)
@@ -43,7 +46,7 @@ type DriverLoopRuntimeSpecialization struct {
 }
 
 var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]WholeCallValueSpecialization{
-	{
+	runtimeSpecializationRawIntNested: {
 		RuntimeSpecialization: RuntimeSpecialization{
 			Info: KernelInfo{
 				Name:          "nested_int_recurrence",
@@ -55,6 +58,34 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			Recognize: IsRawIntNestedKernelProto,
 		},
 		Run: (*VM).runRawIntNestedValueKernel,
+	},
+	runtimeSpecializationLazyRecursiveTableBuilder: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "lazy_recursive_table_builder",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         1,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
+			},
+			Recognize: IsLazyRecursiveTableBuilderKernelProto,
+		},
+		Run:            (*VM).tryRunRecursiveTableValueKernel,
+		RecursiveTable: true,
+	},
+	runtimeSpecializationLazyRecursiveTableFold: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "lazy_recursive_table_fold",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         1,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
+			},
+			Recognize: IsLazyRecursiveTableFoldKernelProto,
+		},
+		Run:            (*VM).tryRunRecursiveTableValueKernel,
+		RecursiveTable: true,
 	},
 }
 
@@ -83,11 +114,11 @@ var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCo
 	},
 }
 
-func (vm *VM) tryRunWholeCallValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunWholeCallValueRuntimeSpecialization(cl *Closure, args []runtime.Value, includeRecursiveTable bool) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil {
 		return false, nil, nil
 	}
-	if !mayHaveWholeCallValueRuntimeSpecializationCandidate(cl.Proto, len(args)) {
+	if !mayHaveWholeCallValueRuntimeSpecializationCandidate(cl.Proto, len(args), includeRecursiveTable) {
 		return false, nil, nil
 	}
 	recognized := cachedRuntimeSpecializationBits(cl.Proto)
@@ -96,6 +127,9 @@ func (vm *VM) tryRunWholeCallValueRuntimeSpecialization(cl *Closure, args []runt
 	}
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if recognized&(uint64(1)<<uint(i)) == 0 || entry.Run == nil {
+			continue
+		}
+		if entry.RecursiveTable && !includeRecursiveTable {
 			continue
 		}
 		handled, results, err := entry.Run(vm, cl, args)
@@ -128,11 +162,14 @@ func (vm *VM) tryRunDriverLoopRuntimeSpecialization(frame *CallFrame, base int, 
 	return false, nil
 }
 
-func mayHaveWholeCallValueRuntimeSpecializationCandidate(proto *FuncProto, argc int) bool {
+func mayHaveWholeCallValueRuntimeSpecializationCandidate(proto *FuncProto, argc int, includeRecursiveTable bool) bool {
 	if proto == nil || proto.IsVarArg {
 		return false
 	}
 	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
+		if entry.RecursiveTable && !includeRecursiveTable {
+			continue
+		}
 		if entry.Info.Arity == argc && proto.NumParams == argc {
 			return true
 		}

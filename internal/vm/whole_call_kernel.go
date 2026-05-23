@@ -18,14 +18,17 @@ func (vm *VM) tryValueWholeCallKernel(cl *Closure, args []runtime.Value, c int, 
 }
 
 func (vm *VM) tryRunValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args); handled || err != nil {
+	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, true); handled || err != nil {
 		return handled, results, err
 	}
-	return vm.tryRunCachedValueWholeCallKernel(cl, args, true)
+	return vm.tryRunCachedValueWholeCallKernel(cl, args)
 }
 
 func (vm *VM) tryRunNonRecursiveTableValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	return vm.tryRunCachedValueWholeCallKernel(cl, args, false)
+	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, false); handled || err != nil {
+		return handled, results, err
+	}
+	return vm.tryRunCachedValueWholeCallKernel(cl, args)
 }
 
 // tryWholeCallKernel executes a guarded whole-call numeric kernel and writes
@@ -54,11 +57,11 @@ func (vm *VM) TryRunNoResultWholeCallKernelForJIT(fn runtime.Value, args []runti
 	return vm.tryRunWholeCallKernel(cl, args)
 }
 
-func (vm *VM) tryRunCachedValueWholeCallKernel(cl *Closure, args []runtime.Value, includeRecursiveTable bool) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunCachedValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil {
 		return false, nil, nil
 	}
-	if !mayHaveWholeCallValueKernelCandidate(cl.Proto, len(args), includeRecursiveTable) {
+	if !mayHaveWholeCallValueKernelCandidate(cl.Proto, len(args)) {
 		return false, nil, nil
 	}
 	recognized := cachedWholeCallKernelBits(cl.Proto)
@@ -67,9 +70,6 @@ func (vm *VM) tryRunCachedValueWholeCallKernel(cl *Closure, args []runtime.Value
 	}
 	for i, entry := range wholeCallKernelRegistry {
 		if recognized&(uint64(1)<<uint(i)) == 0 || entry.info.Route != KernelRouteWholeCallValue || entry.runValue == nil {
-			continue
-		}
-		if entry.recursiveTable && !includeRecursiveTable {
 			continue
 		}
 		handled, results, err := entry.runValue(vm, cl, args)
@@ -109,7 +109,7 @@ func (vm *VM) tryRunCachedNoResultWholeCallKernel(cl *Closure, args []runtime.Va
 	return false, nil
 }
 
-func mayHaveWholeCallValueKernelCandidate(proto *FuncProto, argc int, includeRecursiveTable bool) bool {
+func mayHaveWholeCallValueKernelCandidate(proto *FuncProto, argc int) bool {
 	if proto == nil || proto.IsVarArg {
 		return false
 	}
@@ -117,9 +117,6 @@ func mayHaveWholeCallValueKernelCandidate(proto *FuncProto, argc int, includeRec
 	case 1:
 		if proto.NumParams != 1 {
 			return false
-		}
-		if includeRecursiveTable {
-			return true
 		}
 		return (proto.MaxStack == 30 && len(proto.Constants) == 2 && len(proto.Protos) == 0) ||
 			(proto.MaxStack >= 13 && len(proto.Constants) == 0 && len(proto.Protos) == 0 && len(proto.Code) == 45) ||

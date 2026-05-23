@@ -71,7 +71,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	if !isPermutationFlipChecksumKernelProto(child) {
 		t.Fatalf("permutation flip checksum recognizer rejected current benchmark shape: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
 	}
-	if !mayHaveWholeCallValueKernelCandidate(child, 1, false) {
+	if !mayHaveWholeCallValueKernelCandidate(child, 1) {
 		t.Fatal("permutation flip checksum rejected by value-kernel candidate gate")
 	}
 	if !cachedWholeCallKernelRecognized(child, wholeCallKernelPermutationFlipChecksum) {

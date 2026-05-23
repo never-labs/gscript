@@ -109,8 +109,6 @@ const (
 	wholeCallKernelPermutationFlipChecksum
 	wholeCallKernelBoolTableStrikeCount
 	wholeCallKernelMatrixMultiply
-	wholeCallKernelLazyRecursiveTableBuilder
-	wholeCallKernelLazyRecursiveTableFold
 	wholeCallKernelRecordPairwiseNumeric
 	wholeCallKernelNumericArrayRegionSort
 	wholeCallKernelCoefficientMatrixVector
@@ -142,11 +140,10 @@ type wholeCallValueKernelRunner func(*VM, *Closure, []runtime.Value) (bool, []ru
 type wholeCallNoResultKernelRunner func(*VM, *Closure, []runtime.Value) (bool, error)
 
 type wholeCallKernelRecognizer struct {
-	info           KernelInfo
-	recognize      func(*FuncProto) bool
-	runValue       wholeCallValueKernelRunner
-	runNoResult    wholeCallNoResultKernelRunner
-	recursiveTable bool
+	info        KernelInfo
+	recognize   func(*FuncProto) bool
+	runValue    wholeCallValueKernelRunner
+	runNoResult wholeCallNoResultKernelRunner
 }
 
 var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
@@ -204,30 +201,6 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 		},
 		recognize: isMatrixMultiplyProto,
 		runValue:  (*VM).runMatrixMultiplyWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "lazy_recursive_table_builder",
-			Route:         KernelRouteWholeCallValue,
-			Arity:         1,
-			Results:       kernelWholeCallSingleResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize:      IsLazyRecursiveTableBuilderKernelProto,
-		runValue:       (*VM).tryRunRecursiveTableValueKernel,
-		recursiveTable: true,
-	},
-	{
-		info: KernelInfo{
-			Name:          "lazy_recursive_table_fold",
-			Route:         KernelRouteWholeCallValue,
-			Arity:         1,
-			Results:       kernelWholeCallSingleResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize:      IsLazyRecursiveTableFoldKernelProto,
-		runValue:       (*VM).tryRunRecursiveTableValueKernel,
-		recursiveTable: true,
 	},
 	{
 		info: KernelInfo{
