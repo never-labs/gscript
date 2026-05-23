@@ -11,6 +11,11 @@ type boolTableMarkCountSpecializationSpec struct {
 	minValue int
 }
 
+type boolTableMarkCountShape struct {
+	nReg     int
+	flagsReg int
+}
+
 func (vm *VM) tryRunBoolTableMarkCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationBoolTableMarkCount) {
 		return false, nil, nil
@@ -100,51 +105,64 @@ func boolTableMarkCountSpecializationSpecForProto(p *FuncProto) (*boolTableMarkC
 }
 
 func analyzeBoolTableMarkCountSpecializationSpec(code []uint32) (*boolTableMarkCountSpecializationSpec, bool) {
-	if len(code) != 45 {
+	if len(code) < 40 {
 		return nil, false
 	}
 	p := newBytecodePattern(code)
-	if !matchBoolTableInitFill(p) ||
-		!matchBoolTableMarkMultiples(p) ||
-		!matchBoolTableCountTruthy(p) {
+	shape, ok := matchBoolTableInitFill(p)
+	if !ok ||
+		!matchBoolTableMarkMultiples(p, shape) ||
+		!matchBoolTableCountTruthy(p, shape) {
 		return nil, false
 	}
 	return &boolTableMarkCountSpecializationSpec{minValue: 2}, true
 }
 
-func matchBoolTableInitFill(p bytecodePattern) bool {
-	const (
-		nReg        = 0
-		flagsReg    = 1
-		fillBase    = 2
-		fillLoopVar = fillBase + 3
-		trueReg     = 6
-		fillKeyReg  = 7
-		fillForPrep = 4
-		fillBodyPC  = 5
-		fillForLoop = 8
-	)
-	bodyPC, loopPC, ok := p.numericForLoop(fillForPrep, fillBase)
-	if !ok || bodyPC != fillBodyPC || loopPC != fillForLoop {
-		return false
+func matchBoolTableInitFill(p bytecodePattern) (boolTableMarkCountShape, bool) {
+	for fillForPrep := 4; fillForPrep < len(p.code); fillForPrep++ {
+		prep, ok := p.op(fillForPrep, OP_FORPREP)
+		if !ok {
+			continue
+		}
+		fillBase := DecodeA(prep)
+		bodyPC, loopPC, ok := p.numericForLoop(fillForPrep, fillBase)
+		if !ok || loopPC != bodyPC+3 {
+			continue
+		}
+		newTable, ok := p.op(fillForPrep-4, OP_NEWTABLE)
+		if !ok || DecodeB(newTable) != 0 || DecodeC(newTable) != 0 {
+			continue
+		}
+		flagsReg := DecodeA(newTable)
+		if !p.loadInt(fillForPrep-3, fillBase, 2) ||
+			!p.move(fillForPrep-2, fillBase+1, 0) ||
+			!p.loadInt(fillForPrep-1, fillBase+2, 1) {
+			continue
+		}
+		loadTrue, ok := p.op(bodyPC, OP_LOADBOOL)
+		if !ok || DecodeB(loadTrue) != 1 {
+			continue
+		}
+		trueReg := DecodeA(loadTrue)
+		moveKey, ok := p.op(bodyPC+1, OP_MOVE)
+		if !ok || DecodeB(moveKey) != fillBase+3 {
+			continue
+		}
+		keyReg := DecodeA(moveKey)
+		if !p.abc(bodyPC+2, OP_SETTABLE, flagsReg, keyReg, trueReg) {
+			continue
+		}
+		return boolTableMarkCountShape{nReg: 0, flagsReg: flagsReg}, true
 	}
-	return p.abc(0, OP_NEWTABLE, flagsReg, 0, 0) &&
-		p.loadInt(1, fillBase, 2) &&
-		p.move(2, fillBase+1, nReg) &&
-		p.loadInt(3, fillBase+2, 1) &&
-		p.loadBool(5, trueReg, true) &&
-		p.move(6, fillKeyReg, fillLoopVar) &&
-		p.abc(7, OP_SETTABLE, flagsReg, fillKeyReg, trueReg)
+	return boolTableMarkCountShape{}, false
 }
 
-func matchBoolTableMarkMultiples(p bytecodePattern) bool {
+func matchBoolTableMarkMultiples(p bytecodePattern, shape boolTableMarkCountShape) bool {
 	const (
-		nReg     = 0
-		flagsReg = 1
-		iReg     = 5
-		tmpReg   = 6
-		auxReg   = 7
-		keyReg   = 8
+		iReg   = 5
+		tmpReg = 6
+		auxReg = 7
+		keyReg = 8
 
 		markStartPC = 10
 		countStart  = 30
@@ -153,18 +171,18 @@ func matchBoolTableMarkMultiples(p bytecodePattern) bool {
 	)
 	return p.loadInt(9, iReg, 2) &&
 		p.abc(10, OP_MUL, tmpReg, iReg, iReg) &&
-		p.abc(11, OP_LE, 0, tmpReg, nReg) &&
+		p.abc(11, OP_LE, 0, tmpReg, shape.nReg) &&
 		p.jumpTo(12, countStart) &&
 		p.move(13, auxReg, iReg) &&
-		p.abc(14, OP_GETTABLE, tmpReg, flagsReg, auxReg) &&
+		p.abc(14, OP_GETTABLE, tmpReg, shape.flagsReg, auxReg) &&
 		p.abc(15, OP_TEST, tmpReg, 0, 0) &&
 		p.jumpTo(16, afterInner) &&
 		p.abc(17, OP_MUL, tmpReg, iReg, iReg) &&
-		p.abc(18, OP_LE, 0, tmpReg, nReg) &&
+		p.abc(18, OP_LE, 0, tmpReg, shape.nReg) &&
 		p.jumpTo(19, afterInner) &&
 		p.loadBool(20, auxReg, false) &&
 		p.move(21, keyReg, tmpReg) &&
-		p.abc(22, OP_SETTABLE, flagsReg, keyReg, auxReg) &&
+		p.abc(22, OP_SETTABLE, shape.flagsReg, keyReg, auxReg) &&
 		p.abc(23, OP_ADD, auxReg, tmpReg, iReg) &&
 		p.move(24, tmpReg, auxReg) &&
 		p.jumpTo(25, innerStart) &&
@@ -174,37 +192,58 @@ func matchBoolTableMarkMultiples(p bytecodePattern) bool {
 		p.jumpTo(29, markStartPC)
 }
 
-func matchBoolTableCountTruthy(p bytecodePattern) bool {
-	const (
-		nReg      = 0
-		flagsReg  = 1
-		countReg  = 6
-		countBase = 7
-		countVar  = countBase + 3
-		flagReg   = 11
-		oneReg    = 12
-		keyReg    = 12
-		countPrep = 34
-		countBody = 35
-		countLoop = 42
-		returnReg = 10
-		returnPC  = 44
-	)
-	bodyPC, loopPC, ok := p.numericForLoop(countPrep, countBase)
-	if !ok || bodyPC != countBody || loopPC != countLoop {
-		return false
+func matchBoolTableCountTruthy(p bytecodePattern, shape boolTableMarkCountShape) bool {
+	for countPrep := 4; countPrep < len(p.code); countPrep++ {
+		prep, ok := p.op(countPrep, OP_FORPREP)
+		if !ok {
+			continue
+		}
+		countBase := DecodeA(prep)
+		bodyPC, loopPC, ok := p.numericForLoop(countPrep, countBase)
+		if !ok || loopPC != bodyPC+7 {
+			continue
+		}
+		countInit, ok := p.op(countPrep-4, OP_LOADINT)
+		if !ok || DecodesBx(countInit) != 0 {
+			continue
+		}
+		countReg := DecodeA(countInit)
+		if !p.loadInt(countPrep-3, countBase, 2) ||
+			!p.move(countPrep-2, countBase+1, shape.nReg) ||
+			!p.loadInt(countPrep-1, countBase+2, 1) {
+			continue
+		}
+		moveKey, ok := p.op(bodyPC, OP_MOVE)
+		if !ok || DecodeB(moveKey) != countBase+3 {
+			continue
+		}
+		keyReg := DecodeA(moveKey)
+		getFlag, ok := p.op(bodyPC+1, OP_GETTABLE)
+		if !ok || DecodeB(getFlag) != shape.flagsReg || DecodeC(getFlag) != keyReg {
+			continue
+		}
+		flagReg := DecodeA(getFlag)
+		if !p.abc(bodyPC+2, OP_TEST, flagReg, 0, 0) ||
+			!p.jumpTo(bodyPC+3, loopPC) {
+			continue
+		}
+		loadOne, ok := p.op(bodyPC+4, OP_LOADINT)
+		if !ok || DecodesBx(loadOne) != 1 {
+			continue
+		}
+		oneReg := DecodeA(loadOne)
+		if !p.abc(bodyPC+5, OP_ADD, flagReg, countReg, oneReg) ||
+			!p.move(bodyPC+6, countReg, flagReg) {
+			continue
+		}
+		moveRet, ok := p.op(loopPC+1, OP_MOVE)
+		if !ok || DecodeB(moveRet) != countReg {
+			continue
+		}
+		returnReg := DecodeA(moveRet)
+		if p.returnFixed(loopPC+2, returnReg, 2) {
+			return true
+		}
 	}
-	return p.loadInt(30, countReg, 0) &&
-		p.loadInt(31, countBase, 2) &&
-		p.move(32, countBase+1, nReg) &&
-		p.loadInt(33, countBase+2, 1) &&
-		p.move(35, keyReg, countVar) &&
-		p.abc(36, OP_GETTABLE, flagReg, flagsReg, keyReg) &&
-		p.abc(37, OP_TEST, flagReg, 0, 0) &&
-		p.jumpTo(38, countLoop) &&
-		p.loadInt(39, oneReg, 1) &&
-		p.abc(40, OP_ADD, flagReg, countReg, oneReg) &&
-		p.move(41, countReg, flagReg) &&
-		p.move(43, returnReg, countReg) &&
-		p.returnFixed(returnPC, returnReg, 2)
+	return false
 }
