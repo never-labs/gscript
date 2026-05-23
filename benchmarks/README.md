@@ -223,6 +223,7 @@ cases against the hot-loop benchmark suite:
 
 ```bash
 python3 benchmarks/official_perf_coverage.py \
+  --check \
   --markdown /tmp/official_perf_coverage.md \
   --json /tmp/official_perf_coverage.json
 ```
@@ -235,6 +236,12 @@ benchmarks, and lists official cases that look like candidates for extracting a
 future hot benchmark. Use it together with `strict_guard.py`: the former tells
 whether performance coverage is broad enough, while the latter proves that the
 covered hot regions are not slower than LuaJIT.
+
+For local pre-submit checks, the shell wrapper keeps the default gate explicit:
+
+```bash
+bash benchmarks/coverage_guard.sh
+```
 
 | Mode | Meaning |
 |------|---------|

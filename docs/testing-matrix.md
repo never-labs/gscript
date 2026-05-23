@@ -72,6 +72,7 @@ families to hot performance coverage:
 
 ```bash
 python3 benchmarks/official_perf_coverage.py \
+  --check \
   --markdown /tmp/official_perf_coverage.md \
   --json /tmp/official_perf_coverage.json
 ```
@@ -83,3 +84,10 @@ Current interpretation:
 - `semantic_only`: the family is mostly cold semantics, host integration, IO,
   diagnostics, or other behavior that should remain a correctness test unless
   a real hot workload appears.
+
+For a guard-style invocation that fails on unclassified official families or
+broken benchmark references:
+
+```bash
+bash benchmarks/coverage_guard.sh
+```
