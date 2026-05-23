@@ -69,6 +69,15 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if ec.emitFieldInstr(instr) {
 		goto done
 	}
+	if ec.emitGuardInstr(instr) {
+		goto done
+	}
+	if ec.emitCallInstr(instr) {
+		goto done
+	}
+	if ec.emitGlobalInstr(instr) {
+		goto done
+	}
 	switch instr.Op {
 	case OpComplexEscapeInSet:
 		ec.emitComplexEscapeInSet(instr)
@@ -92,61 +101,8 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	case OpNop:
 		// nothing
 
-	// --- Call: native BLR with spill/reload, slow path falls to exit-resume ---
-	case OpCall:
-		ec.emitOpCall(instr)
-		ec.clearTableArrayBoundedKeys()
-	case OpCallFloor:
-		ec.emitOpCallFloor(instr)
-		ec.clearTableArrayBoundedKeys()
-	case OpFieldCallFloor:
-		ec.emitOpFieldCallFloor(instr)
-		ec.clearTableArrayBoundedKeys()
-	case OpResume:
-		ec.emitResumeExit(instr)
-		ec.clearTableArrayBoundedKeys()
-
-	// --- Global-exit: load globals via VM and resume JIT ---
-	case OpGetGlobal:
-		ec.emitGetGlobalNative(instr)
-		ec.clearTableArrayBoundedKeys()
-	case OpSetGlobal:
-		ec.emitSetGlobalNative(instr)
-		ec.clearTableArrayBoundedKeys()
-
-	// --- Guards ---
-	case OpGuardType:
-		ec.emitGuardType(instr)
-	case OpGuardIntRange:
-		ec.emitGuardIntRange(instr)
-	case OpGuardGlobalConst:
-		ec.emitGuardGlobalConst(instr)
-	case OpGuardConstString:
-		ec.emitGuardConstString(instr)
-	case OpGuardTableKind:
-		ec.emitGuardTableKind(instr)
-	case OpGuardCalleeProto:
-		ec.emitGuardCalleeProto(instr)
-	case OpGuardFieldCalleeProto:
-		ec.emitGuardFieldCalleeProto(instr)
-	case OpGuardShapeFieldType:
-		ec.emitGuardShapeFieldType(instr)
-	case OpGuardShapeFieldTypeMask:
-		ec.emitGuardShapeFieldTypeMask(instr)
 	case OpNumToFloat:
 		ec.emitNumToFloat(instr)
-	case OpGuardTruthy:
-		ec.emitGuardTruthy(instr)
-
-	// --- Op-exit: OpSelf exits to Go and may modify table shapes ---
-	case OpSelf:
-		ec.emitOpExit(instr)
-		ec.shapeVerified = make(map[int]uint32)
-		ec.tableVerified = make(map[int]bool)
-		ec.kindVerified = make(map[int]uint16)
-		ec.keysDirtyWritten = make(map[int]bool)
-		ec.clearTableArrayBoundedKeys()
-		ec.dmVerified = make(map[int]bool)
 
 	// --- Op-exit: unsupported ops exit to Go, execute there, resume JIT ---
 	case OpGetUpval:
@@ -168,8 +124,7 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 		OpForPrep, OpForLoop,
 		OpTForCall, OpTForLoop,
 		OpVararg, OpTestSet,
-		OpGo, OpMakeChan, OpSend, OpRecv,
-		OpGuardNonNil:
+		OpGo, OpMakeChan, OpSend, OpRecv:
 		ec.emitOpExit(instr)
 		ec.clearTableArrayBoundedKeys()
 	default:

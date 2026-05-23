@@ -101,6 +101,9 @@ func emitterFamilyDelegateRegistry() []emitterFamilyDelegate {
 		{filename: "emit_string.go", funcName: "emitStringInstr", family: OpEmitterString},
 		{filename: "emit_table_field_instr.go", funcName: "emitTableInstr", family: OpEmitterTable},
 		{filename: "emit_table_field_instr.go", funcName: "emitFieldInstr", family: OpEmitterField},
+		{filename: "emit_guard_instr.go", funcName: "emitGuardInstr", family: OpEmitterGuard},
+		{filename: "emit_call_instr.go", funcName: "emitCallInstr", family: OpEmitterCall},
+		{filename: "emit_global_instr.go", funcName: "emitGlobalInstr", family: OpEmitterGlobal},
 	}
 }
 
