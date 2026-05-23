@@ -112,7 +112,7 @@ type MethodJITCallableDecision struct {
 // for API compatibility while never reading them; in that case extra arguments
 // are ignored exactly as compiled fixed-arity Tier 1 code would do.
 func (p *FuncProto) MethodJITTier1Callable() bool {
-	return p != nil && (!p.IsVarArg || !p.UsesVarargBytecode)
+	return p != nil
 }
 
 // MethodJITTier1CallableDecision explains the Tier 1 callable policy without
@@ -162,7 +162,8 @@ func methodJITCallableDecision(p *FuncProto, tier MethodJITCallableTier) MethodJ
 			return d
 		}
 		if p.UsesVarargBytecode {
-			d.Reason = MethodJITCallableReasonOPVarargNeedsVMFrame
+			d.Allowed = true
+			d.Reason = MethodJITCallableReasonOPVarargTier1
 			return d
 		}
 	case MethodJITTier2:

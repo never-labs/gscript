@@ -509,10 +509,14 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 					currentRegs[calleeBase+i] = runtime.NilValue()
 				}
 
-				// Push a VM frame so CurrentClosure() returns the callee's
-				// closure (needed for GETUPVAL/SETUPVAL) and CloseUpvalues
-				// works correctly on return.
-				if !e.callVM.PushFrame(cl, calleeBase) {
+				var varargs []runtime.Value
+				if calleeProto.IsVarArg && nArgs > nParams {
+					varargs = currentRegs[srcStart+nParams : srcStart+nArgs]
+				}
+
+				// Push a VM frame so CurrentClosure()/CurrentVarargs() return
+				// the callee state and CloseUpvalues works correctly on return.
+				if !e.callVM.PushFrameWithVarargs(cl, calleeBase, varargs) {
 					// Stack overflow — fall through to generic path.
 					goto slowPath
 				}

@@ -246,7 +246,62 @@ func (e *BaselineJITEngine) handleSelf(ctx *ExecContext, regs []runtime.Value, b
 
 // handleVararg handles OP_VARARG exit.
 func (e *BaselineJITEngine) handleVararg(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto) error {
-	return fmt.Errorf("VARARG not supported in baseline JIT")
+	if e.callVM == nil {
+		return fmt.Errorf("no callVM for VARARG")
+	}
+	a := int(ctx.BaselineA)
+	b := int(ctx.BaselineB)
+	varargs := e.callVM.CurrentVarargs()
+
+	if b == 0 && proto != nil {
+		pc := int(ctx.BaselinePC) - 1
+		if pc+1 < len(proto.Code) {
+			next := proto.Code[pc+1]
+			if vm.DecodeOp(next) == vm.OP_CALL && vm.DecodeB(next) == 0 {
+				callA := vm.DecodeA(next)
+				if callA+2 == a {
+					absSlot := base + callA
+					if absSlot+1 < len(regs) {
+						if gf := regs[absSlot].GoFunction(); gf != nil &&
+							gf.NativeKind == runtime.NativeKindStdSelect &&
+							gf.NativeData == runtime.StdSelectIdentityPtr() {
+							if err := e.callVM.ExecuteStdSelectVarargCall(absSlot, vm.DecodeC(next), regs[absSlot+1], varargs, gf); err != nil {
+								return err
+							}
+							ctx.BaselinePC++
+							return nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	absA := base + a
+	if b == 0 {
+		for i, v := range varargs {
+			idx := absA + i
+			if idx < len(regs) {
+				regs[idx] = v
+			}
+		}
+		e.callVM.SetTop(absA + len(varargs))
+		return nil
+	}
+
+	n := b - 1
+	for i := 0; i < n; i++ {
+		idx := absA + i
+		if idx >= len(regs) {
+			continue
+		}
+		if i < len(varargs) {
+			regs[idx] = varargs[i]
+		} else {
+			regs[idx] = runtime.NilValue()
+		}
+	}
+	return nil
 }
 
 // handleTForCall handles OP_TFORCALL exit.

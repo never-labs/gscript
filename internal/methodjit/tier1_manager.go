@@ -269,6 +269,9 @@ func nativeBLRReplaySafe(proto *vm.FuncProto) bool {
 	if proto == nil {
 		return true
 	}
+	if proto.UsesVarargBytecode {
+		return false
+	}
 	if baselineHasStaticSelfAndNonSelfCall(proto) {
 		return false
 	}

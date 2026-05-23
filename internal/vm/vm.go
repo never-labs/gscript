@@ -156,6 +156,12 @@ func (vm *VM) CurrentVarargs() []runtime.Value {
 // CloseUpvalues() work correctly for the callee.
 // Returns false if the call stack would overflow.
 func (vm *VM) PushFrame(cl *Closure, base int) bool {
+	return vm.PushFrameWithVarargs(cl, base, nil)
+}
+
+// PushFrameWithVarargs pushes a minimal call frame and attaches the callee's
+// vararg tail. Used by JIT call paths that still need VM-owned vararg state.
+func (vm *VM) PushFrameWithVarargs(cl *Closure, base int, varargs []runtime.Value) bool {
 	if !vm.ensureFrameSlot() {
 		return false
 	}
@@ -164,7 +170,7 @@ func (vm *VM) PushFrame(cl *Closure, base int) bool {
 	frame.pc = 0
 	frame.base = base
 	frame.numResults = -1
-	frame.varargs = nil
+	setFrameVarargs(frame, varargs)
 	frame.callSitePC = -1
 	frame.defers = nil
 	vm.frameCount++
@@ -561,7 +567,7 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunct
 	return nil
 }
 
-func (vm *VM) executeStdSelectVarargCall(absSlot, rawC int, selector runtime.Value, varargs []runtime.Value, gf *runtime.GoFunction) error {
+func (vm *VM) ExecuteStdSelectVarargCall(absSlot, rawC int, selector runtime.Value, varargs []runtime.Value, gf *runtime.GoFunction) error {
 	if rawC == 2 {
 		if selector.IsString() && selector.Str() == "#" {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)
@@ -623,7 +629,7 @@ func (vm *VM) tryExecuteStdSelectVarargPeephole(frame *CallFrame, base, varargA 
 	if gf == nil || gf.NativeKind != runtime.NativeKindStdSelect || gf.NativeData != runtime.StdSelectIdentityPtr() {
 		return false, nil
 	}
-	if err := vm.executeStdSelectVarargCall(absSlot, DecodeC(callInst), vm.regs[absSlot+1], varargs, gf); err != nil {
+	if err := vm.ExecuteStdSelectVarargCall(absSlot, DecodeC(callInst), vm.regs[absSlot+1], varargs, gf); err != nil {
 		return true, err
 	}
 	frame.pc++
