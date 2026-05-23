@@ -184,3 +184,24 @@ func TestMathTointeger_extra(t *testing.T) {
 		t.Errorf("expected 42, got %v", interp.GetGlobal("c"))
 	}
 }
+
+func TestMathHotBuiltinsExposeFastArgPaths(t *testing.T) {
+	lib := buildMathLib()
+	tointeger := lib.RawGetString("tointeger").GoFunction()
+	if tointeger == nil || tointeger.Fast1 == nil || tointeger.FastArg1 == nil {
+		t.Fatalf("math.tointeger missing fast paths: %#v", tointeger)
+	}
+	got, err := tointeger.FastArg1(FloatValue(42))
+	if err != nil || !got.IsInt() || got.Int() != 42 {
+		t.Fatalf("math.tointeger FastArg1 got=%s err=%v", got.String(), err)
+	}
+
+	fmod := lib.RawGetString("fmod").GoFunction()
+	if fmod == nil || fmod.Fast1 == nil || fmod.FastArg2 == nil {
+		t.Fatalf("math.fmod missing fast paths: %#v", fmod)
+	}
+	got, err = fmod.FastArg2(IntValue(17), IntValue(5))
+	if err != nil || !got.IsInt() || got.Int() != 2 {
+		t.Fatalf("math.fmod FastArg2 got=%s err=%v", got.String(), err)
+	}
+}

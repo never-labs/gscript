@@ -480,6 +480,23 @@ func (vm *VM) RegisterToStringLib() {
 			}
 			return []runtime.Value{runtime.StringValue(s)}, nil
 		},
+		FastArg1: func(arg runtime.Value) (runtime.Value, error) {
+			s, err := vm.luaToString(arg)
+			if err != nil {
+				return runtime.NilValue(), err
+			}
+			return runtime.StringValue(s), nil
+		},
+		Fast1: func(args []runtime.Value) (runtime.Value, error) {
+			if len(args) == 0 {
+				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
+			}
+			s, err := vm.luaToString(args[0])
+			if err != nil {
+				return runtime.NilValue(), err
+			}
+			return runtime.StringValue(s), nil
+		},
 	}))
 }
 

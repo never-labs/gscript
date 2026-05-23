@@ -215,6 +215,23 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return []Value{StringValue(s)}, nil
 		},
+		FastArg1: func(arg Value) (Value, error) {
+			s, err := interp.luaToString(arg)
+			if err != nil {
+				return NilValue(), err
+			}
+			return StringValue(s), nil
+		},
+		Fast1: func(args []Value) (Value, error) {
+			if len(args) == 0 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
+			}
+			s, err := interp.luaToString(args[0])
+			if err != nil {
+				return NilValue(), err
+			}
+			return StringValue(s), nil
+		},
 	}))
 
 	interp.globals.Define("tonumber", FunctionValue(&GoFunction{

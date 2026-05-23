@@ -316,7 +316,7 @@ func (s *RuntimePathStats) loadOrCreateBuiltin(gf *GoFunction) *nativeCallBuilti
 }
 
 func (s *RuntimePathStats) snapshotNativeCallPerBuiltin() []RuntimePathNativeCallBuiltinEntry {
-	var out []RuntimePathNativeCallBuiltinEntry
+	byName := make(map[string]*nativeCallBuiltinCounters)
 	s.nativeCallByBuiltin.Range(func(k, v any) bool {
 		gf, _ := k.(*GoFunction)
 		c, _ := v.(*nativeCallBuiltinCounters)
@@ -327,13 +327,23 @@ func (s *RuntimePathStats) snapshotNativeCallPerBuiltin() []RuntimePathNativeCal
 		if name == "" {
 			name = fmt.Sprintf("<unnamed:%p>", gf)
 		}
+		total := byName[name]
+		if total == nil {
+			total = &nativeCallBuiltinCounters{}
+			byName[name] = total
+		}
+		total.fast.Add(c.fast.Load())
+		total.fallback.Add(c.fallback.Load())
+		return true
+	})
+	out := make([]RuntimePathNativeCallBuiltinEntry, 0, len(byName))
+	for name, c := range byName {
 		out = append(out, RuntimePathNativeCallBuiltinEntry{
 			Name:     name,
 			Fast:     c.fast.Load(),
 			Fallback: c.fallback.Load(),
 		})
-		return true
-	})
+	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Fallback != out[j].Fallback {
 			return out[i].Fallback > out[j].Fallback

@@ -219,14 +219,22 @@ func buildMathLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'math.fmod'")
 		}
-		if (args[1].IsInt() && args[1].Int() == 0) || (args[1].IsFloat() && args[1].Float() == 0) {
-			return nil, fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
+		v, err := mathFmodValue(args[0], args[1])
+		if err != nil {
+			return nil, err
 		}
-		if args[0].IsInt() && args[1].IsInt() {
-			return []Value{IntValue(args[0].Int() % args[1].Int())}, nil
-		}
-		return []Value{FloatValue(math.Mod(toFloat(args[0]), toFloat(args[1])))}, nil
+		return []Value{v}, nil
 	})
+	if v := t.RawGetString("fmod"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg2 = mathFmodValue
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 2 {
+				return NilValue(), fmt.Errorf("bad argument to 'math.fmod'")
+			}
+			return mathFmodValue(args[0], args[1])
+		}
+	}
 
 	// math.ult(m, n) -> unsigned integer comparison
 	set("ult", func(args []Value) ([]Value, error) {
@@ -327,25 +335,20 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return []Value{NilValue()}, nil
 		}
-		v := args[0]
-		if v.IsInt() {
-			return []Value{v}, nil
-		}
-		if v.IsString() {
-			if n, ok := v.ToNumber(); ok {
-				v = n
-			} else {
-				return []Value{NilValue()}, nil
-			}
-		}
-		if v.IsFloat() {
-			f := v.Float()
-			if floatIsInt(f) {
-				return []Value{IntValue(int64(f))}, nil
-			}
-		}
-		return []Value{NilValue()}, nil
+		return []Value{mathToIntegerValue(args[0])}, nil
 	})
+	if v := t.RawGetString("tointeger"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = func(arg Value) (Value, error) {
+			return mathToIntegerValue(arg), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), nil
+			}
+			return mathToIntegerValue(args[0]), nil
+		}
+	}
 
 	// math.clamp(x, min, max) -- clamp x to [min, max] range
 	set("clamp", func(args []Value) ([]Value, error) {
@@ -445,6 +448,36 @@ func buildMathLib() *Table {
 	})
 
 	return t
+}
+
+func mathFmodValue(a, b Value) (Value, error) {
+	if (b.IsInt() && b.Int() == 0) || (b.IsFloat() && b.Float() == 0) {
+		return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
+	}
+	if a.IsInt() && b.IsInt() {
+		return IntValue(a.Int() % b.Int()), nil
+	}
+	return FloatValue(math.Mod(toFloat(a), toFloat(b))), nil
+}
+
+func mathToIntegerValue(v Value) Value {
+	if v.IsInt() {
+		return v
+	}
+	if v.IsString() {
+		n, ok := v.ToNumber()
+		if !ok {
+			return NilValue()
+		}
+		v = n
+	}
+	if v.IsFloat() {
+		f := v.Float()
+		if floatIsInt(f) {
+			return IntValue(int64(f))
+		}
+	}
+	return NilValue()
 }
 
 func mathFloorValue(arg Value) Value {

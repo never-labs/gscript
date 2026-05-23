@@ -238,3 +238,47 @@ func TestBit32ToHex(t *testing.T) {
 		t.Errorf("expected '0x000000FF', got '%s'", b.Str())
 	}
 }
+
+func TestBit32HotBuiltinsExposeFastArgPaths(t *testing.T) {
+	lib := buildBit32Lib()
+	for _, name := range []string{"band", "bor", "bxor"} {
+		gf := lib.RawGetString(name).GoFunction()
+		if gf == nil || gf.Fast1 == nil || gf.FastArg1 == nil || gf.FastArg2 == nil || gf.FastArg3 == nil || gf.FastArg4 == nil {
+			t.Fatalf("bit32.%s missing fold fast paths: %#v", name, gf)
+		}
+		got, err := gf.FastArg3(IntValue(255), IntValue(15), IntValue(7))
+		if err != nil {
+			t.Fatalf("bit32.%s FastArg3: %v", name, err)
+		}
+		results, err := gf.Fn([]Value{IntValue(255), IntValue(15), IntValue(7)})
+		if err != nil {
+			t.Fatalf("bit32.%s Fn: %v", name, err)
+		}
+		if len(results) != 1 || got != results[0] {
+			t.Fatalf("bit32.%s FastArg3=%s Fn=%v", name, got.String(), results)
+		}
+	}
+	for _, name := range []string{"lshift", "rshift", "arshift", "lrotate", "rrotate"} {
+		gf := lib.RawGetString(name).GoFunction()
+		if gf == nil || gf.Fast1 == nil || gf.FastArg2 == nil {
+			t.Fatalf("bit32.%s missing binary fast paths: %#v", name, gf)
+		}
+		got, err := gf.FastArg2(IntValue(305419896), IntValue(7))
+		if err != nil {
+			t.Fatalf("bit32.%s FastArg2: %v", name, err)
+		}
+		results, err := gf.Fn([]Value{IntValue(305419896), IntValue(7)})
+		if err != nil {
+			t.Fatalf("bit32.%s Fn: %v", name, err)
+		}
+		if len(results) != 1 || got != results[0] {
+			t.Fatalf("bit32.%s FastArg2=%s Fn=%v", name, got.String(), results)
+		}
+	}
+	for _, name := range []string{"extract", "replace"} {
+		gf := lib.RawGetString(name).GoFunction()
+		if gf == nil || gf.Fast1 == nil || gf.FastArg3 == nil {
+			t.Fatalf("bit32.%s missing variable-arity fast paths: %#v", name, gf)
+		}
+	}
+}

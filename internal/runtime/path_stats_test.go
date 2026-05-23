@@ -197,3 +197,28 @@ func TestRuntimePathStatsPerBuiltinAttribution(t *testing.T) {
 			snap.NativeCall.PerBuiltin[0].Name)
 	}
 }
+
+func TestRuntimePathStatsPerBuiltinAggregatesByName(t *testing.T) {
+	stats := EnableRuntimePathStats()
+	defer DisableRuntimePathStats()
+
+	RecordRuntimePathNativeCallFallbackFor(&GoFunction{Name: "iter"})
+	RecordRuntimePathNativeCallFallbackFor(&GoFunction{Name: "iter"})
+	RecordRuntimePathNativeCallFastFor(&GoFunction{Name: "iter"})
+
+	snap := stats.Snapshot()
+	count := 0
+	var row RuntimePathNativeCallBuiltinEntry
+	for _, entry := range snap.NativeCall.PerBuiltin {
+		if entry.Name == "iter" {
+			count++
+			row = entry
+		}
+	}
+	if count != 1 {
+		t.Fatalf("iter entry count = %d, want 1: %#v", count, snap.NativeCall.PerBuiltin)
+	}
+	if row.Fast != 1 || row.Fallback != 2 {
+		t.Fatalf("iter row = %+v, want fast=1 fallback=2", row)
+	}
+}

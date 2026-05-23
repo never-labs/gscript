@@ -78,65 +78,33 @@ func buildUTF8Lib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'utf8.codepoint'")
 		}
-		s := args[0].Str()
-		i := int64(1)
-		if len(args) >= 2 {
-			i = toInt(args[1])
-		}
-		j := i
-		if len(args) >= 3 {
-			j = toInt(args[2])
-		}
-		if i < 0 {
-			i = int64(len(s)) + i + 1
-		}
-		if j < 0 {
-			j = int64(len(s)) + j + 1
-		}
-		if i < 1 || i > int64(len(s)+1) || j > int64(len(s)) {
-			return nil, fmt.Errorf("out of bounds")
-		}
-		if j < i {
-			return []Value{}, nil
-		}
-
-		var results []Value
-		for pos := int(i) - 1; pos < len(s) && pos <= int(j)-1; {
-			r, size := utf8.DecodeRuneInString(s[pos:])
-			if r == utf8.RuneError && size == 1 {
-				return nil, fmt.Errorf("invalid UTF-8 code")
-			}
-			results = append(results, IntValue(int64(r)))
-			pos += size
-		}
-		return results, nil
+		return utf8CodepointValues(args)
 	})
+	if gf := t.RawGetString("codepoint").GoFunction(); gf != nil {
+		gf.FastArg1 = func(s Value) (Value, error) {
+			return utf8SingleCodepointValue(s, IntValue(1))
+		}
+		gf.FastArg2 = utf8SingleCodepointValue
+	}
 
 	// utf8.codes(s) -> iterator returning byte position and codepoint.
 	set("codes", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'utf8.codes'")
 		}
-		s := args[0].Str()
-		bytePos := -1
-		iter := &GoFunction{
-			Name: "utf8.codes_iterator",
-			Fn: func(_ []Value) ([]Value, error) {
-				bytePos++
-				if bytePos >= len(s) {
-					return []Value{NilValue()}, nil
-				}
-				r, size := utf8.DecodeRuneInString(s[bytePos:])
-				if r == utf8.RuneError && size == 1 {
-					return nil, fmt.Errorf("invalid UTF-8 code")
-				}
-				pos := bytePos + 1
-				bytePos += size - 1
-				return []Value{IntValue(int64(pos)), IntValue(int64(r))}, nil
-			},
-		}
-		return []Value{FunctionValue(iter)}, nil
+		return []Value{utf8CodesIteratorValue(args[0])}, nil
 	})
+	if gf := t.RawGetString("codes").GoFunction(); gf != nil {
+		gf.FastArg1 = func(s Value) (Value, error) {
+			return utf8CodesIteratorValue(s), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'utf8.codes'")
+			}
+			return utf8CodesIteratorValue(args[0]), nil
+		}
+	}
 
 	// utf8.offset(s, n [, i]) → int (byte position of nth codepoint, 1-based)
 	set("offset", func(args []Value) ([]Value, error) {
@@ -316,6 +284,87 @@ func buildUTF8Lib() *Table {
 	})
 
 	return t
+}
+
+func utf8CodepointValues(args []Value) ([]Value, error) {
+	s := args[0].Str()
+	i := int64(1)
+	if len(args) >= 2 {
+		i = toInt(args[1])
+	}
+	j := i
+	if len(args) >= 3 {
+		j = toInt(args[2])
+	}
+	if i < 0 {
+		i = int64(len(s)) + i + 1
+	}
+	if j < 0 {
+		j = int64(len(s)) + j + 1
+	}
+	if i < 1 || i > int64(len(s)+1) || j > int64(len(s)) {
+		return nil, fmt.Errorf("out of bounds")
+	}
+	if j < i {
+		return []Value{}, nil
+	}
+
+	var results []Value
+	for pos := int(i) - 1; pos < len(s) && pos <= int(j)-1; {
+		r, size := utf8.DecodeRuneInString(s[pos:])
+		if r == utf8.RuneError && size == 1 {
+			return nil, fmt.Errorf("invalid UTF-8 code")
+		}
+		results = append(results, IntValue(int64(r)))
+		pos += size
+	}
+	return results, nil
+}
+
+func utf8SingleCodepointValue(sv, iv Value) (Value, error) {
+	results, err := utf8CodepointValues([]Value{sv, iv})
+	if err != nil {
+		return NilValue(), err
+	}
+	if len(results) == 0 {
+		return NilValue(), nil
+	}
+	return results[0], nil
+}
+
+func utf8CodesIteratorValue(sv Value) Value {
+	s := sv.Str()
+	bytePos := -1
+	iter := &GoFunction{
+		Name: "utf8.codes_iterator",
+	}
+	next := func() (Value, Value, int, error) {
+		bytePos++
+		if bytePos >= len(s) {
+			return NilValue(), NilValue(), 0, nil
+		}
+		r, size := utf8.DecodeRuneInString(s[bytePos:])
+		if r == utf8.RuneError && size == 1 {
+			return NilValue(), NilValue(), 0, fmt.Errorf("invalid UTF-8 code")
+		}
+		pos := bytePos + 1
+		bytePos += size - 1
+		return IntValue(int64(pos)), IntValue(int64(r)), 2, nil
+	}
+	iter.FastArg2Ret2 = func(_, _ Value) (Value, Value, int, error) {
+		return next()
+	}
+	iter.Fn = func(_ []Value) ([]Value, error) {
+		pos, cp, n, err := next()
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			return []Value{NilValue()}, nil
+		}
+		return []Value{pos, cp}, nil
+	}
+	return FunctionValue(iter)
 }
 
 func utf8CodepointStarts(s string) []int {
