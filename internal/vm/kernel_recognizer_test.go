@@ -79,7 +79,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	}
 }
 
-func TestKernelTieringPolicyCatalogCoversRuntimeAndLegacySources(t *testing.T) {
+func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		infos []KernelInfo

@@ -308,24 +308,6 @@ var wholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
 	},
 }
 
-type driverLoopKernelRecognizer struct {
-	info      KernelInfo
-	recognize func(*FuncProto, map[string]*FuncProto) bool
-}
-
-var driverLoopKernelRegistry = [...]driverLoopKernelRecognizer{
-	{
-		info: KernelInfo{
-			Name:          "record_pairwise_numeric_loop",
-			Route:         KernelRouteDriverLoop,
-			Arity:         kernelUnknownDriverLoopArity,
-			Results:       kernelUnknownDriverLoopResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize: HasRecordPairwiseNumericDriverLoopKernel,
-	},
-}
-
 // WholeCallKernelCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.
 func WholeCallKernelCatalog() []KernelInfo {
@@ -348,18 +330,12 @@ func WholeCallKernelCatalog() []KernelInfo {
 // DriverLoopKernelCatalog returns diagnostic metadata for OP_FORPREP driver
 // loop kernels without probing any particular prototype.
 func DriverLoopKernelCatalog() []KernelInfo {
-	out := make([]KernelInfo, 0, len(driverLoopRuntimeSpecializationRegistry)+len(driverLoopKernelRegistry))
+	out := make([]KernelInfo, 0, len(driverLoopRuntimeSpecializationRegistry))
 	for _, entry := range driverLoopRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		out = append(out, entry.Info)
-	}
-	for _, entry := range driverLoopKernelRegistry {
-		if entry.info.Name == "" {
-			continue
-		}
-		out = append(out, entry.info)
 	}
 	return out
 }
@@ -567,7 +543,7 @@ func fnvMixUint64(h uint64, v uint64) uint64 {
 // RecognizedDriverLoopKernels returns every registered driver-loop kernel whose
 // structural recognizer accepts proto with the supplied global callee map.
 func RecognizedDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) []KernelInfo {
-	out := make([]KernelInfo, 0, len(driverLoopRuntimeSpecializationRegistry)+len(driverLoopKernelRegistry))
+	out := make([]KernelInfo, 0, len(driverLoopRuntimeSpecializationRegistry))
 	for _, entry := range driverLoopRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" || entry.Recognize == nil {
 			continue
@@ -576,21 +552,13 @@ func RecognizedDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto
 			out = append(out, entry.Info)
 		}
 	}
-	for _, entry := range driverLoopKernelRegistry {
-		if entry.info.Name == "" || entry.recognize == nil {
-			continue
-		}
-		if entry.recognize(proto, globals) {
-			out = append(out, entry.info)
-		}
-	}
 	return out
 }
 
 // DiagnoseDriverLoopKernels reports structural driver-loop recognizer results.
 // The globals map should contain compile-time global function protos by name.
 func DiagnoseDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) []KernelDiagnostic {
-	out := make([]KernelDiagnostic, 0, len(driverLoopRuntimeSpecializationRegistry)+len(driverLoopKernelRegistry))
+	out := make([]KernelDiagnostic, 0, len(driverLoopRuntimeSpecializationRegistry))
 	for _, entry := range driverLoopRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
@@ -598,17 +566,6 @@ func DiagnoseDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) 
 		recognized := proto != nil && entry.Recognize != nil && entry.Recognize(proto, globals)
 		out = append(out, KernelDiagnostic{
 			Kernel:     entry.Info,
-			Recognized: recognized,
-			Reason:     driverLoopKernelReason(proto, globals, recognized),
-		})
-	}
-	for _, entry := range driverLoopKernelRegistry {
-		if entry.info.Name == "" {
-			continue
-		}
-		recognized := proto != nil && entry.recognize != nil && entry.recognize(proto, globals)
-		out = append(out, KernelDiagnostic{
-			Kernel:     entry.info,
 			Recognized: recognized,
 			Reason:     driverLoopKernelReason(proto, globals, recognized),
 		})

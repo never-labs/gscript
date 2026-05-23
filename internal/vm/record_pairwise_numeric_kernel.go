@@ -314,7 +314,6 @@ func (vm *VM) tryRecordPairwiseNumericForLoopKernel(frame *CallFrame, base int, 
 	if !handled || err != nil {
 		return handled, err
 	}
-	runtime.RecordRuntimePathStructuralKernelHit(string(KernelRouteDriverLoop), "record_pairwise_numeric_loop")
 	vm.regs[base+a] = limitV
 	vm.regs[base+a+3] = limitV
 	frame.pc = shape.loopPC + 1

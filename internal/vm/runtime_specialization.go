@@ -9,6 +9,7 @@ const (
 
 const (
 	driverLoopRuntimeSpecializationGenericRecordArrayLoop = iota
+	driverLoopRuntimeSpecializationRecordPairwiseNumericLoop
 	driverLoopRuntimeSpecializationCount
 )
 
@@ -58,7 +59,7 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 }
 
 var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCount]DriverLoopRuntimeSpecialization{
-	{
+	driverLoopRuntimeSpecializationGenericRecordArrayLoop: {
 		Info: KernelInfo{
 			Name:          "generic_record_array_loop",
 			Route:         KernelRouteDriverLoop,
@@ -68,6 +69,17 @@ var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCo
 		},
 		Recognize: HasGenericRecordArrayDriverLoopKernel,
 		Run:       (*VM).tryGenericRecordArrayForLoopKernel,
+	},
+	driverLoopRuntimeSpecializationRecordPairwiseNumericLoop: {
+		Info: KernelInfo{
+			Name:          "record_pairwise_numeric_loop",
+			Route:         KernelRouteDriverLoop,
+			Arity:         kernelUnknownDriverLoopArity,
+			Results:       kernelUnknownDriverLoopResultCount,
+			TieringPolicy: kernelTieringStructural,
+		},
+		Recognize: HasRecordPairwiseNumericDriverLoopKernel,
+		Run:       (*VM).tryRecordPairwiseNumericForLoopKernel,
 	},
 }
 
