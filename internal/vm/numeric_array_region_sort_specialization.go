@@ -80,7 +80,7 @@ func runNumericArrayRegionSortWithScratch(args []runtime.Value, intScratch func(
 		return true
 	}
 	if region, ok := tbl.PlainNumericValueArrayRegionForNumericSpecialization(int(lo64), int(hi64)); ok {
-		runNumericValueRegionSortWithScratch(region, valueScratch)
+		runNumericValueRegionSortWithScratch(region, intScratch, valueScratch)
 		tbl.MarkArrayMutationForNumericSpecialization()
 		return true
 	}
@@ -105,6 +105,9 @@ func sortPlainIntRegionWithScratch(values []int64, scratch func(int) []int64) {
 		return
 	}
 	if radixSortNonNegative32WithScratch(values, scratch) {
+		return
+	}
+	if radixSortSigned32WithScratch(values, scratch) {
 		return
 	}
 	radixSortInt64WithScratch(values, scratch)
@@ -155,6 +158,40 @@ func radixSortNonNegative32WithScratch(values []int64, scratch func(int) []int64
 
 func radixSortInt64(values []int64) {
 	radixSortInt64WithScratch(values, nil)
+}
+
+func radixSortSigned32WithScratch(values []int64, scratch func(int) []int64) bool {
+	for _, v := range values {
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return false
+		}
+	}
+	tmp := makeIntScratch(len(values), scratch)
+	src := values
+	dst := tmp
+	for shift := uint(0); shift < 32; shift += 8 {
+		var count [256]int
+		for _, v := range src {
+			key := uint32(int32(v)) ^ (1 << 31)
+			count[byte(key>>shift)]++
+		}
+		sum := 0
+		for i, n := range count {
+			count[i] = sum
+			sum += n
+		}
+		for _, v := range src {
+			key := uint32(int32(v)) ^ (1 << 31)
+			b := byte(key >> shift)
+			dst[count[b]] = v
+			count[b]++
+		}
+		src, dst = dst, src
+	}
+	if &src[0] != &values[0] {
+		copy(values, src)
+	}
+	return true
 }
 
 func radixSortInt64WithScratch(values []int64, scratch func(int) []int64) {
@@ -212,11 +249,11 @@ func integralSpecializationArg(v runtime.Value) (int64, bool) {
 }
 
 func runNumericValueRegionSort(values []runtime.Value) {
-	runNumericValueRegionSortWithScratch(values, nil)
+	runNumericValueRegionSortWithScratch(values, nil, nil)
 }
 
-func runNumericValueRegionSortWithScratch(values []runtime.Value, scratch func(int) []runtime.Value) {
-	if len(values) >= 2048 && radixSortIntegralNumericValuesWithScratch(values, scratch) {
+func runNumericValueRegionSortWithScratch(values []runtime.Value, intScratch func(int) []int64, valueScratch func(int) []runtime.Value) {
+	if len(values) >= 2048 && radixSortIntegralNumericValuesWithScratch(values, intScratch, valueScratch) {
 		return
 	}
 
@@ -267,39 +304,48 @@ func runNumericValueRegionSortWithScratch(values []runtime.Value, scratch func(i
 }
 
 func radixSortIntegralNumericValues(values []runtime.Value) bool {
-	return radixSortIntegralNumericValuesWithScratch(values, nil)
+	return radixSortIntegralNumericValuesWithScratch(values, nil, nil)
 }
 
-func radixSortIntegralNumericValuesWithScratch(values []runtime.Value, scratch func(int) []runtime.Value) bool {
-	for _, v := range values {
-		if _, ok := numericValueInt32SortKey(v); !ok {
+func radixSortIntegralNumericValuesWithScratch(values []runtime.Value, intScratch func(int) []int64, valueScratch func(int) []runtime.Value) bool {
+	keys64 := makeIntScratch(len(values), intScratch)
+	keys := keys64[:len(values)]
+	for i, v := range values {
+		key, ok := numericValueInt32SortKey(v)
+		if !ok {
 			return false
 		}
+		keys[i] = int64(key)
 	}
-	tmp := makeValueScratch(len(values), scratch)
-	src := values
-	dst := tmp
+	tmpValues := makeValueScratch(len(values), valueScratch)
+	tmpKeys := make([]int64, len(values))
+	srcValues := values
+	dstValues := tmpValues
+	srcKeys := keys
+	dstKeys := tmpKeys
 	for shift := uint(0); shift < 32; shift += 8 {
 		var count [256]int
-		for _, v := range src {
-			key, _ := numericValueInt32SortKey(v)
-			count[byte(key>>shift)]++
+		for _, key := range srcKeys {
+			count[byte(uint32(key)>>shift)]++
 		}
 		sum := 0
 		for i, n := range count {
 			count[i] = sum
 			sum += n
 		}
-		for _, v := range src {
-			key, _ := numericValueInt32SortKey(v)
+		for i, v := range srcValues {
+			key := uint32(srcKeys[i])
 			b := byte(key >> shift)
-			dst[count[b]] = v
+			pos := count[b]
+			dstValues[pos] = v
+			dstKeys[pos] = int64(key)
 			count[b]++
 		}
-		src, dst = dst, src
+		srcValues, dstValues = dstValues, srcValues
+		srcKeys, dstKeys = dstKeys, srcKeys
 	}
-	if &src[0] != &values[0] {
-		copy(values, src)
+	if &srcValues[0] != &values[0] {
+		copy(values, srcValues)
 	}
 	return true
 }
