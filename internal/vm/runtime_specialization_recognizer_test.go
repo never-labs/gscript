@@ -64,6 +64,24 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	}
 }
 
+func TestPermutationFlipChecksumIgnoresBenchmarkMetadata(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "fannkuch.gs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proto, vm := compileSpectralSpecializationTestProgram(t, string(src))
+	defer vm.Close()
+	child := findTestProtoByName(proto, "fannkuch")
+	if child == nil {
+		t.Fatal("missing fannkuch proto")
+	}
+	child.Name = "shape_only_permutation_stats"
+	child.Source = "host/generated/not-a-benchmark.gs"
+	if !isPermutationFlipChecksumSpecializationProto(child) {
+		t.Fatalf("permutation flip checksum should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
+	}
+}
+
 func TestRuntimeSpecializationTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
