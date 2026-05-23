@@ -608,7 +608,7 @@ func tier2LoopCallCalleeIsNativeCandidate(callee *vm.FuncProto, globals map[stri
 	if callee != nil && tier2LoopCallCalleeIsLeafNativeCandidate(callee) {
 		return true
 	}
-	if callee != nil && shouldStayTier1ForBoxedRawIntKernel(callee, analyzeFuncProfile(callee)) {
+	if callee != nil && shouldStayTier1ForBoxedRawIntSpecialization(callee, analyzeFuncProfile(callee)) {
 		return true
 	}
 	return false

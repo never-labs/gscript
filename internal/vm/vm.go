@@ -60,44 +60,44 @@ type methodJITEngineWithCoroutineChild interface {
 
 // VM is the bytecode virtual machine.
 type VM struct {
-	regs               []runtime.Value          // register file (shared across frames via base offset)
-	frames             []CallFrame              // call stack
-	frameCount         int                      // current number of active frames
-	globals            map[string]runtime.Value // legacy map (kept for interop)
-	globalArray        []runtime.Value          // indexed globals (fast path)
-	globalIndex        map[string]int           // name → index in globalArray
-	globalVer          uint32                   // bumped on structural changes (new globals added)
-	globalValueVer     uint64                   // bumped whenever indexed global values may have changed
-	globalOverrides    map[string]runtime.Value // per-VM global overrides for coroutine-local builtins
-	globalOverrideIdx  map[int]runtime.Value    // indexed mirror of globalOverrides for GETGLOBAL cache hits
-	globalOverrideFast int                      // single indexed override fast path (-1 = disabled)
-	globalOverrideVal  runtime.Value
-	readOnlyGlobals    map[string]bool
-	globalsMu          *sync.RWMutex  // protects globals for goroutine safety (shared across VMs)
-	noGlobalLock       bool           // skip globals mutex (single-threaded mode)
-	openUpvals         []*Upvalue     // list of open upvalues (sorted by regIdx descending)
-	top                int            // top of used registers (for variable returns)
-	stringMeta         *runtime.Table // string metatable
-	methodJIT          MethodJITEngine
-	argBuf             [16]runtime.Value // pre-allocated arg buffer for OP_CALL
-	retBuf             [8]runtime.Value  // pre-allocated return buffer for OP_RETURN
-	coroutineResultBuf [8]runtime.Value  // pre-allocated coroutine.resume result buffer
-	callSiteFloatBuf   []float64         // reusable non-pointer scratch for guarded call-site runtime specializations
-	callSiteIntBuf     []int64           // reusable non-pointer scratch for guarded call-site runtime specializations
-	callSiteValueBuf   []runtime.Value   // reusable Value scratch; scanned as GC roots below
-	spectralKernel     spectralKernelCache
-	currentCoroutine   *VMCoroutine // coroutine currently running on this VM, if any
-	coroutineYielded   bool         // current coroutine VM paused through coroutine.yield
-	coroutineStats     *coroutineStats
-	coroutineCreateFn  *runtime.GoFunction
-	coroutineResumeFn  *runtime.GoFunction
-	coroutineYieldFn   *runtime.GoFunction
-	ipairsIteratorFn   *runtime.GoFunction
-	debugHook          runtime.Value
-	debugOpts          runtime.DebugHookOptions
-	debugSink          runtime.Value
-	debugBusy          bool
-	scriptDir          string
+	regs                 []runtime.Value          // register file (shared across frames via base offset)
+	frames               []CallFrame              // call stack
+	frameCount           int                      // current number of active frames
+	globals              map[string]runtime.Value // legacy map (kept for interop)
+	globalArray          []runtime.Value          // indexed globals (fast path)
+	globalIndex          map[string]int           // name → index in globalArray
+	globalVer            uint32                   // bumped on structural changes (new globals added)
+	globalValueVer       uint64                   // bumped whenever indexed global values may have changed
+	globalOverrides      map[string]runtime.Value // per-VM global overrides for coroutine-local builtins
+	globalOverrideIdx    map[int]runtime.Value    // indexed mirror of globalOverrides for GETGLOBAL cache hits
+	globalOverrideFast   int                      // single indexed override fast path (-1 = disabled)
+	globalOverrideVal    runtime.Value
+	readOnlyGlobals      map[string]bool
+	globalsMu            *sync.RWMutex  // protects globals for goroutine safety (shared across VMs)
+	noGlobalLock         bool           // skip globals mutex (single-threaded mode)
+	openUpvals           []*Upvalue     // list of open upvalues (sorted by regIdx descending)
+	top                  int            // top of used registers (for variable returns)
+	stringMeta           *runtime.Table // string metatable
+	methodJIT            MethodJITEngine
+	argBuf               [16]runtime.Value // pre-allocated arg buffer for OP_CALL
+	retBuf               [8]runtime.Value  // pre-allocated return buffer for OP_RETURN
+	coroutineResultBuf   [8]runtime.Value  // pre-allocated coroutine.resume result buffer
+	callSiteFloatBuf     []float64         // reusable non-pointer scratch for guarded call-site runtime specializations
+	callSiteIntBuf       []int64           // reusable non-pointer scratch for guarded call-site runtime specializations
+	callSiteValueBuf     []runtime.Value   // reusable Value scratch; scanned as GC roots below
+	spectralCoefficients spectralCoefficientCache
+	currentCoroutine     *VMCoroutine // coroutine currently running on this VM, if any
+	coroutineYielded     bool         // current coroutine VM paused through coroutine.yield
+	coroutineStats       *coroutineStats
+	coroutineCreateFn    *runtime.GoFunction
+	coroutineResumeFn    *runtime.GoFunction
+	coroutineYieldFn     *runtime.GoFunction
+	ipairsIteratorFn     *runtime.GoFunction
+	debugHook            runtime.Value
+	debugOpts            runtime.DebugHookOptions
+	debugSink            runtime.Value
+	debugBusy            bool
+	scriptDir            string
 }
 
 // SetMethodJIT sets the Method JIT engine for this VM.

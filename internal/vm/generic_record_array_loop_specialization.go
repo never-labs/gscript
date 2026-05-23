@@ -9,7 +9,7 @@ import (
 
 type genericRecordArrayLoopSpecializationCache struct {
 	eligible bool
-	spec     *genericRecordArrayLoopKernelSpec
+	spec     *genericRecordArrayLoopSpecializationSpec
 	shapeID  uint32
 	fields   []int
 	native   genericRecordArrayNativePlan
@@ -21,7 +21,7 @@ type genericRecordArrayDriverLoopShape struct {
 	argConsts []int
 }
 
-type genericRecordArrayLoopKernelSpec struct {
+type genericRecordArrayLoopSpecializationSpec struct {
 	tableParam int
 	limitParam int
 	rowReg     int
@@ -201,7 +201,7 @@ func IsGenericRecordArrayDriverLoopAt(p *FuncProto, forprepPC int, globals map[s
 	if callee == nil || len(shape.argConsts) != callee.NumParams {
 		return false
 	}
-	_, ok = genericRecordArrayLoopKernelSpecForProto(callee)
+	_, ok = genericRecordArrayLoopSpecializationSpecForProto(callee)
 	return ok
 }
 
@@ -220,7 +220,7 @@ func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []
 	spec := cache.spec
 	if spec == nil {
 		var ok bool
-		spec, ok = genericRecordArrayLoopKernelSpecForProto(proto)
+		spec, ok = genericRecordArrayLoopSpecializationSpecForProto(proto)
 		if !ok {
 			cache.eligible = false
 			return false, nil
@@ -274,10 +274,10 @@ func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []
 		}
 	}
 	if len(spec.affine) > 0 {
-		if handled, err := vm.runGenericRecordArrayNativeKernelN(tableVal.Table(), array, limit, steps, spec, cache, paramNums); handled || err != nil {
+		if handled, err := vm.runGenericRecordArrayNativeSpecializationN(tableVal.Table(), array, limit, steps, spec, cache, paramNums); handled || err != nil {
 			return handled, err
 		}
-		return vm.runGenericRecordArrayAffineKernelN(tableVal.Table(), array, limit, steps, spec, cache.fields, cache.shapeID, paramNums)
+		return vm.runGenericRecordArrayAffineSpecializationN(tableVal.Table(), array, limit, steps, spec, cache.fields, cache.shapeID, paramNums)
 	}
 	var regs [256]float64
 	var valid [256]bool
@@ -362,7 +362,7 @@ func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []
 	return true, nil
 }
 
-func (vm *VM) runGenericRecordArrayAffineKernelN(table *runtime.Table, array []runtime.Value, limit int, steps int64, spec *genericRecordArrayLoopKernelSpec, fields []int, shapeID uint32, params []float64) (bool, error) {
+func (vm *VM) runGenericRecordArrayAffineSpecializationN(table *runtime.Table, array []runtime.Value, limit int, steps int64, spec *genericRecordArrayLoopSpecializationSpec, fields []int, shapeID uint32, params []float64) (bool, error) {
 	for step := int64(0); step < steps; step++ {
 		for i := 1; i <= limit; i++ {
 			rowVal := array[i]
@@ -401,7 +401,7 @@ func (vm *VM) runGenericRecordArrayAffineKernelN(table *runtime.Table, array []r
 	return true, nil
 }
 
-func (vm *VM) runGenericRecordArrayNativeKernelN(table *runtime.Table, array []runtime.Value, limit int, steps int64, spec *genericRecordArrayLoopKernelSpec, cache *genericRecordArrayLoopSpecializationCache, params []float64) (bool, error) {
+func (vm *VM) runGenericRecordArrayNativeSpecializationN(table *runtime.Table, array []runtime.Value, limit int, steps int64, spec *genericRecordArrayLoopSpecializationSpec, cache *genericRecordArrayLoopSpecializationCache, params []float64) (bool, error) {
 	if table == nil || spec == nil || cache == nil || len(spec.affine) == 0 || len(spec.fieldNames) > genericRecordArrayNativeMaxFields {
 		return false, nil
 	}
@@ -434,7 +434,7 @@ func (vm *VM) runGenericRecordArrayNativeKernelN(table *runtime.Table, array []r
 		}
 	}
 	if !cache.native.ok || cache.native.shapeID != cache.shapeID || cache.native.fields != fieldSig {
-		code, ok := compileGenericRecordArrayNativeKernel(spec, fieldBytes, scalarSlots)
+		code, ok := compileGenericRecordArrayNativeSpecialization(spec, fieldBytes, scalarSlots)
 		if !ok {
 			return false, nil
 		}
@@ -468,7 +468,7 @@ func (vm *VM) runGenericRecordArrayNativeKernelN(table *runtime.Table, array []r
 	return true, nil
 }
 
-func genericRecordArrayNativeScalarSlots(spec *genericRecordArrayLoopKernelSpec) (map[genericRecordArrayScalar]int, bool) {
+func genericRecordArrayNativeScalarSlots(spec *genericRecordArrayLoopSpecializationSpec) (map[genericRecordArrayScalar]int, bool) {
 	out := make(map[genericRecordArrayScalar]int)
 	for _, upd := range spec.affine {
 		if _, ok := out[upd.scalar]; ok {
@@ -482,7 +482,7 @@ func genericRecordArrayNativeScalarSlots(spec *genericRecordArrayLoopKernelSpec)
 	return out, true
 }
 
-func compileGenericRecordArrayNativeKernel(spec *genericRecordArrayLoopKernelSpec, fieldBytes [genericRecordArrayNativeMaxFields]int, scalarSlots map[genericRecordArrayScalar]int) (*jit.CodeBlock, bool) {
+func compileGenericRecordArrayNativeSpecialization(spec *genericRecordArrayLoopSpecializationSpec, fieldBytes [genericRecordArrayNativeMaxFields]int, scalarSlots map[genericRecordArrayScalar]int) (*jit.CodeBlock, bool) {
 	asm := jit.NewAssembler()
 	done := "generic_record_array_native_done"
 	outer := "generic_record_array_native_outer"
@@ -577,7 +577,7 @@ func genericRecordArrayOperandNumber(encoded int, constants []runtime.Value, reg
 	return regs[encoded], true
 }
 
-func genericRecordArrayLoopKernelSpecForProto(proto *FuncProto) (*genericRecordArrayLoopKernelSpec, bool) {
+func genericRecordArrayLoopSpecializationSpecForProto(proto *FuncProto) (*genericRecordArrayLoopSpecializationSpec, bool) {
 	if proto == nil || proto.NumParams < 2 || proto.IsVarArg || len(proto.Code) < 7 {
 		return nil, false
 	}
@@ -616,7 +616,7 @@ func genericRecordArrayLoopKernelSpecForProto(proto *FuncProto) (*genericRecordA
 	if tableParam < 0 || tableParam >= proto.NumParams || keyReg != DecodeA(code[bodyPC]) {
 		return nil, false
 	}
-	spec := &genericRecordArrayLoopKernelSpec{
+	spec := &genericRecordArrayLoopSpecializationSpec{
 		tableParam: tableParam,
 		limitParam: limitParam,
 		rowReg:     rowReg,
@@ -661,7 +661,7 @@ func genericRecordArrayLoopKernelSpecForProto(proto *FuncProto) (*genericRecordA
 	return spec, true
 }
 
-func buildGenericRecordArrayAffineUpdates(spec *genericRecordArrayLoopKernelSpec, constants []runtime.Value) []genericRecordArrayAffineUpdate {
+func buildGenericRecordArrayAffineUpdates(spec *genericRecordArrayLoopSpecializationSpec, constants []runtime.Value) []genericRecordArrayAffineUpdate {
 	if spec == nil || len(spec.ops) == 0 {
 		return nil
 	}
@@ -754,7 +754,7 @@ func affineScalarFromLoad(load genericRecordArrayLoopOp, constants []runtime.Val
 	}
 }
 
-func (s *genericRecordArrayLoopKernelSpec) internField(name string) (int, bool) {
+func (s *genericRecordArrayLoopSpecializationSpec) internField(name string) (int, bool) {
 	if s == nil || name == "" {
 		return 0, false
 	}

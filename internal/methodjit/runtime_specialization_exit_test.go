@@ -128,7 +128,7 @@ for i := 0; i < 3; i++ {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
 	if len(fn.Analysis.CallSiteNoResultRuntimeSpecializations) != 0 {
-		t.Fatalf("stable non-kernel runtime call should not be annotated: %#v", fn.Analysis.CallSiteNoResultRuntimeSpecializations)
+		t.Fatalf("stable non-specialization runtime call should not be annotated: %#v", fn.Analysis.CallSiteNoResultRuntimeSpecializations)
 	}
 }
 

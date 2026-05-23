@@ -279,7 +279,7 @@ func (tm *TieringManager) ensureRawIntLoopCallees(proto *vm.FuncProto) {
 		if _, ok := tm.tier2CompiledFor(callee); ok {
 			continue
 		}
-		if !shouldStayTier1ForBoxedRawIntKernel(callee, analyzeFuncProfile(callee)) {
+		if !shouldStayTier1ForBoxedRawIntSpecialization(callee, analyzeFuncProfile(callee)) {
 			continue
 		}
 		cf, err := tm.compileTier2(callee)
@@ -387,13 +387,13 @@ func rawIntLoopCallCallees(fn *Function, globals map[string]*vm.FuncProto) []*vm
 				continue
 			}
 			_, callee := resolveCallee(instr, fn, InlineConfig{Globals: globals})
-			if callee != nil && !seen[callee] && shouldStayTier1ForBoxedRawIntKernel(callee, analyzeFuncProfile(callee)) {
+			if callee != nil && !seen[callee] && shouldStayTier1ForBoxedRawIntSpecialization(callee, analyzeFuncProfile(callee)) {
 				seen[callee] = true
 				out = append(out, callee)
 			}
 			if feedbackCallee, ok := callABIFeedbackCalleeProto(fn, instr); ok &&
 				feedbackCallee != nil && !seen[feedbackCallee] &&
-				shouldStayTier1ForBoxedRawIntKernel(feedbackCallee, analyzeFuncProfile(feedbackCallee)) {
+				shouldStayTier1ForBoxedRawIntSpecialization(feedbackCallee, analyzeFuncProfile(feedbackCallee)) {
 				seen[feedbackCallee] = true
 				out = append(out, feedbackCallee)
 			}

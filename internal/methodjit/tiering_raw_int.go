@@ -2,7 +2,7 @@
 
 package methodjit
 
-func forceRawIntKernelIR(fn *Function) {
+func forceRawIntSpecializationIR(fn *Function) {
 	if fn == nil || fn.Proto == nil {
 		return
 	}
@@ -65,24 +65,24 @@ func forceRawIntKernelIR(fn *Function) {
 	}
 }
 
-func firstResidualRawIntKernelGenericNumeric(fn *Function) (Op, bool) {
-	gate := firstResidualRawIntKernelGenericNumericGate(fn)
+func firstResidualRawIntSpecializationGenericNumeric(fn *Function) (Op, bool) {
+	gate := firstResidualRawIntSpecializationGenericNumericGate(fn)
 	return gate.Op, !gate.Allowed
 }
 
-func firstResidualRawIntKernelGenericNumericGate(fn *Function) GateResult {
+func firstResidualRawIntSpecializationGenericNumericGate(fn *Function) GateResult {
 	if fn == nil {
-		return allowGate("RawIntKernelIR", "no function")
+		return allowGate("RawIntSpecializationIR", "no function")
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			switch instr.Op {
 			case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm:
-				return blockGateOp("RawIntKernelIR", "raw-int kernel has residual generic numeric op", instr.Op)
+				return blockGateOp("RawIntSpecializationIR", "raw-int kernel has residual generic numeric op", instr.Op)
 			}
 		}
 	}
-	return allowGate("RawIntKernelIR", "no residual generic numeric op")
+	return allowGate("RawIntSpecializationIR", "no residual generic numeric op")
 }
 
 func allInstrArgsType(instr *Instr, typ Type) bool {

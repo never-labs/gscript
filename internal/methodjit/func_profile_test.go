@@ -661,7 +661,7 @@ func test_compare() {
 	}
 }
 
-func TestShouldStayTier1ForBoxedRawIntKernel(t *testing.T) {
+func TestShouldStayTier1ForBoxedRawIntSpecialization(t *testing.T) {
 	src := `
 func gcd(a, b) {
     for b != 0 {
@@ -685,14 +685,14 @@ func sum(n) {
 	if gcd == nil {
 		t.Fatal("gcd proto not found")
 	}
-	if !shouldStayTier1ForBoxedRawIntKernel(gcd, analyzeFuncProfile(gcd)) {
+	if !shouldStayTier1ForBoxedRawIntSpecialization(gcd, analyzeFuncProfile(gcd)) {
 		t.Fatal("gcd-shaped raw-int while kernel should stay Tier 1 for boxed cross-calls")
 	}
 	sum := findProtoByName(proto, "sum")
 	if sum == nil {
 		t.Fatal("sum proto not found")
 	}
-	if shouldStayTier1ForBoxedRawIntKernel(sum, analyzeFuncProfile(sum)) {
+	if shouldStayTier1ForBoxedRawIntSpecialization(sum, analyzeFuncProfile(sum)) {
 		t.Fatal("numeric for-loop reductions should remain eligible for Tier 2 OSR")
 	}
 }

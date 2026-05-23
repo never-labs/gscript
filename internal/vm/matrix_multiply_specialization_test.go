@@ -33,7 +33,7 @@ func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
 	if matmul.MatrixMultiplySpecialization == nil || matmul.MatrixMultiplySpecialization.spec == nil {
 		t.Fatal("matrix_multiply proto-local spec was not generated")
 	}
-	if matmul.MatrixMultiplySpecialization.spec.kind != matrixMultiplyKernelPlain {
+	if matmul.MatrixMultiplySpecialization.spec.kind != matrixMultiplySpecializationPlain {
 		t.Fatalf("matrix_multiply kind = %d, want plain", matmul.MatrixMultiplySpecialization.spec.kind)
 	}
 
@@ -49,11 +49,11 @@ func TestMatrixMultiplyRuntimeSpecializationDenseVariant(t *testing.T) {
 	if matmul == nil {
 		t.Fatal("missing dense matmul proto")
 	}
-	spec, ok := matrixMultiplyKernelSpecForProto(matmul)
+	spec, ok := matrixMultiplySpecializationSpecForProto(matmul)
 	if !ok {
 		t.Fatal("dense matrix_multiply spec not generated")
 	}
-	if spec.kind != matrixMultiplyKernelDense {
+	if spec.kind != matrixMultiplySpecializationDense {
 		t.Fatalf("dense matrix_multiply kind = %d, want dense", spec.kind)
 	}
 }

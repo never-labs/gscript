@@ -9,7 +9,7 @@ import (
 )
 
 func TestCallSiteRuntimeSpecializationDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
-	proto, vm := compileSpectralKernelTestProgram(t, `
+	proto, vm := compileSpectralSpecializationTestProgram(t, `
 func fannkuch(n) { return n }
 func sieve(n) { return n }
 func product(left, right, size) { return left }
@@ -47,7 +47,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	proto, vm := compileSpectralKernelTestProgram(t, string(src))
+	proto, vm := compileSpectralSpecializationTestProgram(t, string(src))
 	defer vm.Close()
 	child := findTestProtoByName(proto, "fannkuch")
 	if child == nil {

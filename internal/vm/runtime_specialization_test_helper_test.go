@@ -8,7 +8,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func compileSpectralKernelTestProgram(t *testing.T, src string) (*FuncProto, *VM) {
+func compileSpectralSpecializationTestProgram(t *testing.T, src string) (*FuncProto, *VM) {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {

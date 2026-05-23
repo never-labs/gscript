@@ -69,36 +69,36 @@ type StringSplitSubSpec struct {
 	SecondHasEnd bool
 }
 
-type RecordArrayKernelSourceKind uint8
+type RecordArraySpecializationSourceKind uint8
 
 const (
-	RecordArrayKernelSourceField RecordArrayKernelSourceKind = iota
-	RecordArrayKernelSourceScalar
-	RecordArrayKernelSourceOp
+	RecordArraySpecializationSourceField RecordArraySpecializationSourceKind = iota
+	RecordArraySpecializationSourceScalar
+	RecordArraySpecializationSourceOp
 )
 
-type RecordArrayKernelFloatOpKind uint8
+type RecordArraySpecializationFloatOpKind uint8
 
 const (
-	RecordArrayKernelFloatOpMul RecordArrayKernelFloatOpKind = iota
-	RecordArrayKernelFloatOpFMA
+	RecordArraySpecializationFloatOpMul RecordArraySpecializationFloatOpKind = iota
+	RecordArraySpecializationFloatOpFMA
 )
 
-type RecordArrayKernelSource struct {
-	Kind  RecordArrayKernelSourceKind
+type RecordArraySpecializationSource struct {
+	Kind  RecordArraySpecializationSourceKind
 	Index int
 }
 
-type RecordArrayKernelFloatOp struct {
-	Kind RecordArrayKernelFloatOpKind
-	A    RecordArrayKernelSource
-	B    RecordArrayKernelSource
-	C    RecordArrayKernelSource
+type RecordArraySpecializationFloatOp struct {
+	Kind RecordArraySpecializationFloatOpKind
+	A    RecordArraySpecializationSource
+	B    RecordArraySpecializationSource
+	C    RecordArraySpecializationSource
 }
 
-type RecordArrayKernelStore struct {
+type RecordArraySpecializationStore struct {
 	Field int
-	Value RecordArrayKernelSource
+	Value RecordArraySpecializationSource
 }
 
 // RecordArrayLoopSpecializationSpec is a compact dataflow graph for a generated native
@@ -110,8 +110,8 @@ type RecordArrayLoopSpecializationSpec struct {
 	ShapeID     uint32
 	FieldLoads  []int
 	ScalarCount int
-	Ops         []RecordArrayKernelFloatOp
-	Stores      []RecordArrayKernelStore
+	Ops         []RecordArraySpecializationFloatOp
+	Stores      []RecordArraySpecializationStore
 	MaxField    int
 	Cache       *RecordArrayLoopSpecializationCache
 }

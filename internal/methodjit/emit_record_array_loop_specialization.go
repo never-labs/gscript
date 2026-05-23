@@ -130,13 +130,13 @@ func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 
 	fieldRegs := []jit.FReg{jit.D0, jit.D1, jit.D2, jit.D3, jit.D4, jit.D5}
 	opRegs := []jit.FReg{jit.D8, jit.D9, jit.D10, jit.D11, jit.D12, jit.D13, jit.D14, jit.D15, jit.D16, jit.D17}
-	sourceReg := func(src RecordArrayKernelSource) jit.FReg {
+	sourceReg := func(src RecordArraySpecializationSource) jit.FReg {
 		switch src.Kind {
-		case RecordArrayKernelSourceField:
+		case RecordArraySpecializationSourceField:
 			return fieldRegs[src.Index]
-		case RecordArrayKernelSourceScalar:
+		case RecordArraySpecializationSourceScalar:
 			return scalarRegs[src.Index]
-		case RecordArrayKernelSourceOp:
+		case RecordArraySpecializationSourceOp:
 			return opRegs[src.Index]
 		default:
 			return jit.D0
@@ -150,9 +150,9 @@ func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 		for i, op := range spec.Ops {
 			dst := opRegs[i]
 			switch op.Kind {
-			case RecordArrayKernelFloatOpMul:
+			case RecordArraySpecializationFloatOpMul:
 				asm.FMULd(dst, sourceReg(op.A), sourceReg(op.B))
-			case RecordArrayKernelFloatOpFMA:
+			case RecordArraySpecializationFloatOpFMA:
 				asm.FMADDd(dst, sourceReg(op.A), sourceReg(op.B), sourceReg(op.C))
 			default:
 				ec.emitPreciseDeopt(instr)
@@ -226,13 +226,13 @@ func validRecordArrayLoopSpecializationSpec(spec RecordArrayLoopSpecializationSp
 			return false
 		}
 	}
-	checkSource := func(src RecordArrayKernelSource, opLimit int) bool {
+	checkSource := func(src RecordArraySpecializationSource, opLimit int) bool {
 		switch src.Kind {
-		case RecordArrayKernelSourceField:
+		case RecordArraySpecializationSourceField:
 			return src.Index >= 0 && src.Index < len(spec.FieldLoads)
-		case RecordArrayKernelSourceScalar:
+		case RecordArraySpecializationSourceScalar:
 			return src.Index >= 0 && src.Index < spec.ScalarCount
-		case RecordArrayKernelSourceOp:
+		case RecordArraySpecializationSourceOp:
 			return src.Index >= 0 && src.Index < opLimit
 		default:
 			return false
@@ -242,7 +242,7 @@ func validRecordArrayLoopSpecializationSpec(spec RecordArrayLoopSpecializationSp
 		if !checkSource(op.A, i) || !checkSource(op.B, i) {
 			return false
 		}
-		if op.Kind == RecordArrayKernelFloatOpFMA && !checkSource(op.C, i) {
+		if op.Kind == RecordArraySpecializationFloatOpFMA && !checkSource(op.C, i) {
 			return false
 		}
 	}

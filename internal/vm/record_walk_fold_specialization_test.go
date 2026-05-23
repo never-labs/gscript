@@ -54,7 +54,7 @@ func fold_rows(rows, n, passes) {
     return checksum
 }
 `
-	proto, vm := compileSpectralKernelTestProgram(t, src)
+	proto, vm := compileSpectralSpecializationTestProgram(t, src)
 	defer vm.Close()
 	if _, err := vm.Execute(proto); err != nil {
 		t.Fatalf("execute definitions: %v", err)

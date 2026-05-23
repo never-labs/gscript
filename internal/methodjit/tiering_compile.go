@@ -317,9 +317,9 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 		if len(intrinsicNotes) > 0 {
 			proto.NeedsTier2 = true
 		}
-		if shouldStayTier1ForBoxedRawIntKernel(proto, analyzeFuncProfile(proto)) {
-			forceRawIntKernelIR(fn)
-			if gate := firstResidualRawIntKernelGenericNumericGate(fn); !gate.Allowed {
+		if shouldStayTier1ForBoxedRawIntSpecialization(proto, analyzeFuncProfile(proto)) {
+			forceRawIntSpecializationIR(fn)
+			if gate := firstResidualRawIntSpecializationGenericNumericGate(fn); !gate.Allowed {
 				remarks.Add("Tier2Gate", "blocked", 0, 0, gate.Op,
 					fmt.Sprintf("%s %s", gate.Reason, gate.Op))
 				return fmt.Errorf("tier2: %s %s, staying at Tier 1", gate.Reason, gate.Op)
@@ -345,7 +345,7 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 			return fmt.Errorf("tier2: %s %s (exit-storm blocked), staying at Tier 1", gate.Reason, gate.Op)
 		}
 		if gate := firstTier2ModBlockerInLoopGate(fn); !gate.Allowed {
-			if !shouldStayTier1ForBoxedRawIntKernel(proto, analyzeFuncProfile(proto)) {
+			if !shouldStayTier1ForBoxedRawIntSpecialization(proto, analyzeFuncProfile(proto)) {
 				remarks.Add("Tier2Gate", "blocked", 0, 0, OpMod,
 					gate.Reason+" remains inside loop")
 				return fmt.Errorf("tier2: has %s (performance-blocked), staying at Tier 1", gate.Reason)

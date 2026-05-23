@@ -30,7 +30,7 @@ const (
 // the precomputed matrix-vector path without allowing unbounded O(n^2) memory.
 const maxSpectralCoefficientFloats = 1 << 23
 
-type spectralKernelCache struct {
+type spectralCoefficientCache struct {
 	n  int
 	a  []float64
 	at []float64
@@ -106,12 +106,12 @@ func (vm *VM) runSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value
 }
 
 func (vm *VM) runSpectralAtAv(args []runtime.Value) bool {
-	n, v, atav, ok := spectralKernelArgs(args)
+	n, v, atav, ok := spectralSpecializationArgs(args)
 	if !ok {
 		return false
 	}
 	tmp := vm.callSiteFloatScratch(n)
-	a, at, ok := vm.spectralKernel.coefficients(n)
+	a, at, ok := vm.spectralCoefficients.coefficients(n)
 	if ok {
 		spectralMatrixVector(a, n, v, tmp)
 	} else {
@@ -127,11 +127,11 @@ func (vm *VM) runSpectralAtAv(args []runtime.Value) bool {
 }
 
 func (vm *VM) runDenseSpectralAtAv(args []runtime.Value) bool {
-	n, v, tmp, atav, ok := denseSpectralAtAvKernelArgs(args)
+	n, v, tmp, atav, ok := denseSpectralAtAvSpecializationArgs(args)
 	if !ok {
 		return false
 	}
-	a, at, cached := vm.spectralKernel.coefficients(n)
+	a, at, cached := vm.spectralCoefficients.coefficients(n)
 	if cached {
 		spectralMatrixVector(a, n, v, tmp)
 		spectralMatrixVector(at, n, tmp, atav)
@@ -143,12 +143,12 @@ func (vm *VM) runDenseSpectralAtAv(args []runtime.Value) bool {
 }
 
 func (vm *VM) runSpectralMultiply(args []runtime.Value, kind spectralMultiplyKind) bool {
-	n, v, out, ok := spectralKernelArgs(args)
+	n, v, out, ok := spectralSpecializationArgs(args)
 	if !ok {
 		return false
 	}
 	args[2].Table().MarkArrayMutationForNumericKernel()
-	a, at, ok := vm.spectralKernel.cached(n)
+	a, at, ok := vm.spectralCoefficients.cached(n)
 	if ok {
 		if kind == spectralAtv {
 			spectralMatrixVector(at, n, v, out)
@@ -273,7 +273,7 @@ func floatSlicesOverlap(a, b []float64) bool {
 		uintptr(unsafe.Pointer(b0)) <= uintptr(unsafe.Pointer(aN))
 }
 
-func (c *spectralKernelCache) coefficients(n int) ([]float64, []float64, bool) {
+func (c *spectralCoefficientCache) coefficients(n int) ([]float64, []float64, bool) {
 	if n == 0 {
 		return nil, nil, true
 	}
@@ -305,7 +305,7 @@ func (c *spectralKernelCache) coefficients(n int) ([]float64, []float64, bool) {
 	return a, at, true
 }
 
-func (c *spectralKernelCache) cached(n int) ([]float64, []float64, bool) {
+func (c *spectralCoefficientCache) cached(n int) ([]float64, []float64, bool) {
 	if n < 0 || c.n != n {
 		return nil, nil, false
 	}
@@ -316,7 +316,7 @@ func (c *spectralKernelCache) cached(n int) ([]float64, []float64, bool) {
 	return c.a, c.at, true
 }
 
-func spectralKernelArgs(args []runtime.Value) (int, []float64, []float64, bool) {
+func spectralSpecializationArgs(args []runtime.Value) (int, []float64, []float64, bool) {
 	if len(args) != 3 || !args[0].IsNumber() || !args[1].IsTable() || !args[2].IsTable() {
 		return 0, nil, nil, false
 	}
@@ -340,7 +340,7 @@ func spectralKernelArgs(args []runtime.Value) (int, []float64, []float64, bool) 
 	return n, v, out, true
 }
 
-func denseSpectralAtAvKernelArgs(args []runtime.Value) (int, []float64, []float64, []float64, bool) {
+func denseSpectralAtAvSpecializationArgs(args []runtime.Value) (int, []float64, []float64, []float64, bool) {
 	if len(args) != 4 || !args[0].IsNumber() || !args[1].IsTable() || !args[2].IsTable() || !args[3].IsTable() {
 		return 0, nil, nil, nil, false
 	}

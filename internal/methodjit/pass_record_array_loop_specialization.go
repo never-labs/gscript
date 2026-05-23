@@ -197,25 +197,25 @@ func buildRecordArraySpecializationFromFieldPairs(shapeID uint32, pairs []tableF
 		}
 		return idx
 	}
-	fieldSrc := func(field int) RecordArrayKernelSource {
-		return RecordArrayKernelSource{Kind: RecordArrayKernelSourceField, Index: addField(field)}
+	fieldSrc := func(field int) RecordArraySpecializationSource {
+		return RecordArraySpecializationSource{Kind: RecordArraySpecializationSourceField, Index: addField(field)}
 	}
-	scalarSrc := func(index int) RecordArrayKernelSource {
-		return RecordArrayKernelSource{Kind: RecordArrayKernelSourceScalar, Index: index}
+	scalarSrc := func(index int) RecordArraySpecializationSource {
+		return RecordArraySpecializationSource{Kind: RecordArraySpecializationSourceScalar, Index: index}
 	}
-	opSrc := func(index int) RecordArrayKernelSource {
-		return RecordArrayKernelSource{Kind: RecordArrayKernelSourceOp, Index: index}
+	opSrc := func(index int) RecordArraySpecializationSource {
+		return RecordArraySpecializationSource{Kind: RecordArraySpecializationSourceOp, Index: index}
 	}
 	for _, pair := range pairs {
 		pos := fieldSrc(pair.pos)
 		vel := fieldSrc(pair.vel)
 		fmaIdx := len(spec.Ops)
-		spec.Ops = append(spec.Ops, RecordArrayKernelFloatOp{Kind: RecordArrayKernelFloatOpFMA, A: vel, B: scalarSrc(0), C: pos})
+		spec.Ops = append(spec.Ops, RecordArraySpecializationFloatOp{Kind: RecordArraySpecializationFloatOpFMA, A: vel, B: scalarSrc(0), C: pos})
 		mulIdx := len(spec.Ops)
-		spec.Ops = append(spec.Ops, RecordArrayKernelFloatOp{Kind: RecordArrayKernelFloatOpMul, A: vel, B: scalarSrc(1)})
+		spec.Ops = append(spec.Ops, RecordArraySpecializationFloatOp{Kind: RecordArraySpecializationFloatOpMul, A: vel, B: scalarSrc(1)})
 		spec.Stores = append(spec.Stores,
-			RecordArrayKernelStore{Field: pair.pos, Value: opSrc(fmaIdx)},
-			RecordArrayKernelStore{Field: pair.vel, Value: opSrc(mulIdx)},
+			RecordArraySpecializationStore{Field: pair.pos, Value: opSrc(fmaIdx)},
+			RecordArraySpecializationStore{Field: pair.vel, Value: opSrc(mulIdx)},
 		)
 	}
 	return spec

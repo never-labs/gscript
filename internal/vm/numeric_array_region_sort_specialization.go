@@ -56,11 +56,11 @@ func runNumericArrayRegionSortWithScratch(args []runtime.Value, intScratch func(
 	if len(args) != 3 || !args[1].IsNumber() || !args[2].IsNumber() {
 		return false
 	}
-	lo64, ok := integralKernelArg(args[1])
+	lo64, ok := integralSpecializationArg(args[1])
 	if !ok {
 		return false
 	}
-	hi64, ok := integralKernelArg(args[2])
+	hi64, ok := integralSpecializationArg(args[2])
 	if !ok {
 		return false
 	}
@@ -194,7 +194,7 @@ func makeIntScratch(n int, scratch func(int) []int64) []int64 {
 	return make([]int64, n)
 }
 
-func integralKernelArg(v runtime.Value) (int64, bool) {
+func integralSpecializationArg(v runtime.Value) (int64, bool) {
 	if v.IsInt() {
 		return v.Int(), true
 	}
@@ -237,7 +237,7 @@ func runNumericValueRegionSortWithScratch(values []runtime.Value, scratch func(i
 			if pivot.IsInt() {
 				pivotInt := pivot.Int()
 				for j := f.lo; j < f.hi; j++ {
-					if numericKernelLEIntPivot(values[j], pivotInt) {
+					if numericSpecializationLEIntPivot(values[j], pivotInt) {
 						if i != j {
 							values[i], values[j] = values[j], values[i]
 						}
@@ -247,7 +247,7 @@ func runNumericValueRegionSortWithScratch(values []runtime.Value, scratch func(i
 			} else {
 				pivotFloat := pivot.Float()
 				for j := f.lo; j < f.hi; j++ {
-					if numericKernelLEFloatPivot(values[j], pivotFloat) {
+					if numericSpecializationLEFloatPivot(values[j], pivotFloat) {
 						if i != j {
 							values[i], values[j] = values[j], values[i]
 						}
@@ -335,14 +335,14 @@ func numericValueInt32SortKey(v runtime.Value) (uint32, bool) {
 	return uint32(i) ^ (1 << 31), true
 }
 
-func numericKernelLEIntPivot(a runtime.Value, pivot int64) bool {
+func numericSpecializationLEIntPivot(a runtime.Value, pivot int64) bool {
 	if a.IsInt() {
 		return a.Int() <= pivot
 	}
 	return a.Float() <= float64(pivot)
 }
 
-func numericKernelLEFloatPivot(a runtime.Value, pivot float64) bool {
+func numericSpecializationLEFloatPivot(a runtime.Value, pivot float64) bool {
 	if a.IsInt() {
 		return float64(a.Int()) <= pivot
 	}

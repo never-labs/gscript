@@ -484,7 +484,7 @@ func (v *validator) checkOpContracts() {
 				}
 			case OpRecordArrayLoopSpecialization:
 				if _, ok := functionLoopSpecializationFacts(v.fn).RecordArrayLoopSpecialization(instr.ID); !ok {
-					v.errorf("B%d: RecordArrayLoopSpecialization (v%d) must have a kernel spec", blk.ID, instr.ID)
+					v.errorf("B%d: RecordArrayLoopSpecialization (v%d) must have a specialization spec", blk.ID, instr.ID)
 				}
 			}
 		}

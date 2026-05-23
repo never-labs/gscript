@@ -2,30 +2,30 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
-type matrixMultiplyKernelKind uint8
+type matrixMultiplySpecializationKind uint8
 
 const (
-	matrixMultiplyKernelPlain matrixMultiplyKernelKind = iota + 1
-	matrixMultiplyKernelDense
-	matrixMultiplyKernelDenseUnroll2
-	matrixMultiplyKernelDenseSplit2
+	matrixMultiplySpecializationPlain matrixMultiplySpecializationKind = iota + 1
+	matrixMultiplySpecializationDense
+	matrixMultiplySpecializationDenseUnroll2
+	matrixMultiplySpecializationDenseSplit2
 )
 
 type matrixMultiplySpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
-	spec        *matrixMultiplyKernelSpec
+	spec        *matrixMultiplySpecializationSpec
 }
 
-type matrixMultiplyKernelSpec struct {
-	kind matrixMultiplyKernelKind
+type matrixMultiplySpecializationSpec struct {
+	kind matrixMultiplySpecializationKind
 }
 
 type denseMatrixMultiplyTBSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
-	spec        *denseMatrixMultiplyTBKernelSpec
+	spec        *denseMatrixMultiplyTBSpecializationSpec
 }
 
-type denseMatrixMultiplyTBKernelSpec struct{}
+type denseMatrixMultiplyTBSpecializationSpec struct{}
 
 func (vm *VM) tryRunMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationMatrixMultiply) {
@@ -38,7 +38,7 @@ func (vm *VM) runMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime
 	if cl == nil || cl.Proto == nil || len(args) != 3 || !vm.noGlobalLock {
 		return false, nil, nil
 	}
-	if _, ok := matrixMultiplyKernelSpecForProto(cl.Proto); !ok {
+	if _, ok := matrixMultiplySpecializationSpecForProto(cl.Proto); !ok {
 		return false, nil, nil
 	}
 	if !args[0].IsTable() || !args[1].IsTable() || !args[2].IsNumber() {
@@ -280,11 +280,11 @@ func IsMatrixMultiplySpecializationProto(p *FuncProto) bool {
 }
 
 func isMatrixMultiplyProto(p *FuncProto) bool {
-	_, ok := matrixMultiplyKernelSpecForProto(p)
+	_, ok := matrixMultiplySpecializationSpecForProto(p)
 	return ok
 }
 
-func matrixMultiplyKernelSpecForProto(p *FuncProto) (*matrixMultiplyKernelSpec, bool) {
+func matrixMultiplySpecializationSpecForProto(p *FuncProto) (*matrixMultiplySpecializationSpec, bool) {
 	if p == nil {
 		return nil, false
 	}
@@ -302,16 +302,16 @@ func matrixMultiplyKernelSpecForProto(p *FuncProto) (*matrixMultiplyKernelSpec, 
 	return spec, true
 }
 
-func analyzeMatrixMultiplySpecializationSpec(p *FuncProto) (*matrixMultiplyKernelSpec, bool) {
+func analyzeMatrixMultiplySpecializationSpec(p *FuncProto) (*matrixMultiplySpecializationSpec, bool) {
 	switch {
 	case isDenseMatrixMultiplyProto(p):
-		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDense}, true
+		return &matrixMultiplySpecializationSpec{kind: matrixMultiplySpecializationDense}, true
 	case isDenseUnroll2MatrixMultiplyProto(p):
-		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDenseUnroll2}, true
+		return &matrixMultiplySpecializationSpec{kind: matrixMultiplySpecializationDenseUnroll2}, true
 	case isDenseSplit2MatrixMultiplyProto(p):
-		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDenseSplit2}, true
+		return &matrixMultiplySpecializationSpec{kind: matrixMultiplySpecializationDenseSplit2}, true
 	case isPlainMatrixMultiplyProto(p):
-		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelPlain}, true
+		return &matrixMultiplySpecializationSpec{kind: matrixMultiplySpecializationPlain}, true
 	default:
 		return nil, false
 	}
@@ -638,11 +638,11 @@ func hasDenseMatrixMultiplyConstants(p *FuncProto, maxStack, codeLen int) bool {
 }
 
 func isDenseMatrixMultiplyTransposedProto(p *FuncProto) bool {
-	_, ok := denseMatrixMultiplyTBKernelSpecForProto(p)
+	_, ok := denseMatrixMultiplyTBSpecializationSpecForProto(p)
 	return ok
 }
 
-func denseMatrixMultiplyTBKernelSpecForProto(p *FuncProto) (*denseMatrixMultiplyTBKernelSpec, bool) {
+func denseMatrixMultiplyTBSpecializationSpecForProto(p *FuncProto) (*denseMatrixMultiplyTBSpecializationSpec, bool) {
 	if p == nil {
 		return nil, false
 	}
@@ -660,7 +660,7 @@ func denseMatrixMultiplyTBKernelSpecForProto(p *FuncProto) (*denseMatrixMultiply
 	return spec, true
 }
 
-func analyzeDenseMatrixMultiplyTBSpecializationSpec(p *FuncProto) (*denseMatrixMultiplyTBKernelSpec, bool) {
+func analyzeDenseMatrixMultiplyTBSpecializationSpec(p *FuncProto) (*denseMatrixMultiplyTBSpecializationSpec, bool) {
 	if p == nil || p.NumParams != 4 || p.IsVarArg || p.MaxStack != 26 || len(p.Code) != 45 ||
 		len(p.Constants) != 4 ||
 		!numberConst(p.Constants[0], 0.0) ||
@@ -718,5 +718,5 @@ func analyzeDenseMatrixMultiplyTBSpecializationSpec(p *FuncProto) (*denseMatrixM
 	}) {
 		return nil, false
 	}
-	return &denseMatrixMultiplyTBKernelSpec{}, true
+	return &denseMatrixMultiplyTBSpecializationSpec{}, true
 }

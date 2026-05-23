@@ -147,7 +147,7 @@ result := gcd(20, 8)
 	}
 }
 
-func TestOSR_AllowsStableRawIntKernelCallInLoop(t *testing.T) {
+func TestOSR_AllowsStableRawIntSpecializationCallInLoop(t *testing.T) {
 	src := `
 func gcd(a, b) {
     for b != 0 {

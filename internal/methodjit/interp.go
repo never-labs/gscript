@@ -547,7 +547,7 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		limit := s.val(instr.Args[3]).Int()
 		spec, ok := functionLoopSpecializationFacts(s.fn).RecordArrayLoopSpecialization(instr.ID)
 		if !ok || !validRecordArrayLoopSpecializationSpec(spec, len(instr.Args)-4) {
-			return nil, false, fmt.Errorf("OpRecordArrayLoopSpecialization: missing or invalid kernel spec")
+			return nil, false, fmt.Errorf("OpRecordArrayLoopSpecialization: missing or invalid specialization spec")
 		}
 		if !tbl.IsTable() {
 			return nil, false, fmt.Errorf("OpRecordArrayLoopSpecialization: arg 0 not a table")
@@ -569,13 +569,13 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 				fields[j] = row.SvalsGet(field).Number()
 			}
 			ops := make([]float64, len(spec.Ops))
-			eval := func(src RecordArrayKernelSource) float64 {
+			eval := func(src RecordArraySpecializationSource) float64 {
 				switch src.Kind {
-				case RecordArrayKernelSourceField:
+				case RecordArraySpecializationSourceField:
 					return fields[src.Index]
-				case RecordArrayKernelSourceScalar:
+				case RecordArraySpecializationSourceScalar:
 					return scalars[src.Index]
-				case RecordArrayKernelSourceOp:
+				case RecordArraySpecializationSourceOp:
 					return ops[src.Index]
 				default:
 					return 0
@@ -583,9 +583,9 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 			}
 			for j, op := range spec.Ops {
 				switch op.Kind {
-				case RecordArrayKernelFloatOpMul:
+				case RecordArraySpecializationFloatOpMul:
 					ops[j] = eval(op.A) * eval(op.B)
-				case RecordArrayKernelFloatOpFMA:
+				case RecordArraySpecializationFloatOpFMA:
 					ops[j] = eval(op.A)*eval(op.B) + eval(op.C)
 				}
 			}

@@ -21,18 +21,18 @@ type recordPairwiseNumericSpecializationCache struct {
 	eligible  bool
 	shapeID   uint32
 	idxs      [pairwiseFieldCount]int
-	spec      *recordPairwiseNumericKernelSpec
-	denseSpec *denseRecordMatrixAdvanceKernelSpec
+	spec      *recordPairwiseNumericSpecializationSpec
+	denseSpec *denseRecordMatrixAdvanceSpecializationSpec
 }
 
-type recordPairwiseNumericKernelSpec struct {
+type recordPairwiseNumericSpecializationSpec struct {
 	tableName     string
 	sqrtTableName string
 	sqrtFieldName string
 	fieldNames    [pairwiseFieldCount]string
 }
 
-type denseRecordMatrixAdvanceKernelSpec struct {
+type denseRecordMatrixAdvanceSpecializationSpec struct {
 	countName      string
 	matrixName     string
 	matrixGetName  string
@@ -90,19 +90,19 @@ func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtim
 		spec := cache.denseSpec
 		if spec == nil {
 			var ok bool
-			spec, ok = denseRecordMatrixAdvanceKernelSpecForProto(proto)
+			spec, ok = denseRecordMatrixAdvanceSpecializationSpecForProto(proto)
 			if !ok {
 				cache.eligible = false
 				return false, nil
 			}
 			cache.denseSpec = spec
 		}
-		return vm.runDenseRecordMatrixAdvanceKernelN(args, steps, spec)
+		return vm.runDenseRecordMatrixAdvanceSpecializationN(args, steps, spec)
 	}
 	spec := cache.spec
 	if spec == nil {
 		var ok bool
-		spec, ok = recordPairwiseNumericKernelSpecForProto(proto)
+		spec, ok = recordPairwiseNumericSpecializationSpecForProto(proto)
 		if !ok {
 			cache.eligible = false
 			return false, nil
@@ -207,7 +207,7 @@ func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtim
 	return true, nil
 }
 
-func (vm *VM) runDenseRecordMatrixAdvanceKernelN(args []runtime.Value, steps int64, spec *denseRecordMatrixAdvanceKernelSpec) (bool, error) {
+func (vm *VM) runDenseRecordMatrixAdvanceSpecializationN(args []runtime.Value, steps int64, spec *denseRecordMatrixAdvanceSpecializationSpec) (bool, error) {
 	if len(args) != 1 || !args[0].IsNumber() || !vm.guardDenseRecordMatrixSqrt(spec) || !vm.guardDenseRecordMatrixLib(spec) {
 		return false, nil
 	}
@@ -354,7 +354,7 @@ func matchRecordPairwiseNumericDriverLoopShape(code []uint32, constants []runtim
 	}, true
 }
 
-func recordPairwiseFieldIndexesForShape(proto *FuncProto, spec *recordPairwiseNumericKernelSpec, t *runtime.Table) ([pairwiseFieldCount]int, bool) {
+func recordPairwiseFieldIndexesForShape(proto *FuncProto, spec *recordPairwiseNumericSpecializationSpec, t *runtime.Table) ([pairwiseFieldCount]int, bool) {
 	var idxs [pairwiseFieldCount]int
 	if proto == nil || spec == nil || t == nil {
 		return idxs, false
@@ -372,14 +372,14 @@ func recordPairwiseFieldIndexesForShape(proto *FuncProto, spec *recordPairwiseNu
 	return idxs, true
 }
 
-func (vm *VM) guardRecordPairwiseSqrt(spec *recordPairwiseNumericKernelSpec) bool {
+func (vm *VM) guardRecordPairwiseSqrt(spec *recordPairwiseNumericSpecializationSpec) bool {
 	if spec == nil || spec.sqrtTableName == "" || spec.sqrtFieldName == "" {
 		return false
 	}
 	return vm.guardGoFunctionField(spec.sqrtTableName, spec.sqrtFieldName, "math.sqrt")
 }
 
-func (vm *VM) guardDenseRecordMatrixSqrt(spec *denseRecordMatrixAdvanceKernelSpec) bool {
+func (vm *VM) guardDenseRecordMatrixSqrt(spec *denseRecordMatrixAdvanceSpecializationSpec) bool {
 	if spec == nil {
 		return false
 	}
@@ -400,7 +400,7 @@ func (vm *VM) guardGoFunctionField(tableName, fieldName, goName string) bool {
 	return gf != nil && gf.Name == goName
 }
 
-func (vm *VM) guardDenseRecordMatrixLib(spec *denseRecordMatrixAdvanceKernelSpec) bool {
+func (vm *VM) guardDenseRecordMatrixLib(spec *denseRecordMatrixAdvanceSpecializationSpec) bool {
 	if spec == nil {
 		return false
 	}
@@ -418,7 +418,7 @@ func (vm *VM) guardDenseRecordMatrixLib(spec *denseRecordMatrixAdvanceKernelSpec
 		setf != nil && setf.Name == "matrix.setf"
 }
 
-func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceKernelSpec) (int, [pairwiseFieldCount]int, bool) {
+func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceSpecializationSpec) (int, [pairwiseFieldCount]int, bool) {
 	var fields [pairwiseFieldCount]int
 	if spec == nil {
 		return 0, fields, false
@@ -444,7 +444,7 @@ func (vm *VM) guardDenseRecordMatrixGlobals(spec *denseRecordMatrixAdvanceKernel
 	return int(count.Int()), fields, true
 }
 
-func (vm *VM) recordPairwiseTableValue(spec *recordPairwiseNumericKernelSpec) (runtime.Value, bool) {
+func (vm *VM) recordPairwiseTableValue(spec *recordPairwiseNumericSpecializationSpec) (runtime.Value, bool) {
 	if spec == nil || spec.tableName == "" {
 		return runtime.NilValue(), false
 	}
@@ -455,7 +455,7 @@ func (vm *VM) recordPairwiseTableValue(spec *recordPairwiseNumericKernelSpec) (r
 	return v, true
 }
 
-func recordPairwiseNumericKernelSpecForProto(proto *FuncProto) (*recordPairwiseNumericKernelSpec, bool) {
+func recordPairwiseNumericSpecializationSpecForProto(proto *FuncProto) (*recordPairwiseNumericSpecializationSpec, bool) {
 	if proto == nil || isDenseRecordMatrixAdvanceProto(proto) {
 		return nil, false
 	}
@@ -465,7 +465,7 @@ func recordPairwiseNumericKernelSpecForProto(proto *FuncProto) (*recordPairwiseN
 	return nil, false
 }
 
-func denseRecordMatrixAdvanceKernelSpecForProto(proto *FuncProto) (*denseRecordMatrixAdvanceKernelSpec, bool) {
+func denseRecordMatrixAdvanceSpecializationSpecForProto(proto *FuncProto) (*denseRecordMatrixAdvanceSpecializationSpec, bool) {
 	if !isDenseRecordMatrixAdvanceProto(proto) {
 		return nil, false
 	}
@@ -488,7 +488,7 @@ func denseRecordMatrixAdvanceKernelSpecForProto(proto *FuncProto) (*denseRecordM
 	if !ok {
 		return nil, false
 	}
-	spec := &denseRecordMatrixAdvanceKernelSpec{
+	spec := &denseRecordMatrixAdvanceSpecializationSpec{
 		countName:     vals[0],
 		matrixName:    vals[1],
 		matrixGetName: vals[2],
@@ -503,7 +503,7 @@ func denseRecordMatrixAdvanceKernelSpecForProto(proto *FuncProto) (*denseRecordM
 	return spec, true
 }
 
-func analyzeRecordPairwiseNumericSpecializationSpec(proto *FuncProto) (*recordPairwiseNumericKernelSpec, bool) {
+func analyzeRecordPairwiseNumericSpecializationSpec(proto *FuncProto) (*recordPairwiseNumericSpecializationSpec, bool) {
 	tableConst, biReg, bjReg, ok := findRecordPairwiseTableAndRecordRegs(proto.Code)
 	if !ok {
 		return nil, false
@@ -541,7 +541,7 @@ func analyzeRecordPairwiseNumericSpecializationSpec(proto *FuncProto) (*recordPa
 	if !ok {
 		return nil, false
 	}
-	spec := &recordPairwiseNumericKernelSpec{
+	spec := &recordPairwiseNumericSpecializationSpec{
 		tableName:     tableName,
 		sqrtTableName: sqrtTableName,
 		sqrtFieldName: sqrtFieldName,

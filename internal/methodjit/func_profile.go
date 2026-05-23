@@ -319,7 +319,7 @@ func hasStringSplitScalarFusionCandidate(proto *vm.FuncProto) bool {
 // shouldPromoteTier2 decides whether a function should be promoted to Tier 2
 // based on its static profile and runtime call count.
 func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCount int) bool {
-	if shouldStayTier1ForBoxedRawIntKernel(proto, profile) {
+	if shouldStayTier1ForBoxedRawIntSpecialization(proto, profile) {
 		return false
 	}
 	if proto != nil && !proto.MethodJITTier2Callable() {
@@ -460,7 +460,7 @@ func protoHasMatrixIntrinsicConstants(proto *vm.FuncProto) bool {
 	return hasMatrix && hasGetSet
 }
 
-// shouldStayTier1ForBoxedRawIntKernel keeps small non-recursive raw-int while
+// shouldStayTier1ForBoxedRawIntSpecialization keeps small non-recursive raw-int while
 // kernels on the Tier 1 BLR path. Tier 2 can compile these bodies well, but a
 // boxed cross-function call pays the full Tier 2 direct-entry frame on every
 // invocation. In hot loop-call patterns (math_intensive.gcd_bench), that call
@@ -469,7 +469,7 @@ func protoHasMatrixIntrinsicConstants(proto *vm.FuncProto) bool {
 //
 // Self-recursive numeric protos are excluded: they use Tier 2's specialized
 // raw-int self ABI and are a known win.
-func shouldStayTier1ForBoxedRawIntKernel(proto *vm.FuncProto, profile FuncProfile) bool {
+func shouldStayTier1ForBoxedRawIntSpecialization(proto *vm.FuncProto, profile FuncProfile) bool {
 	if proto == nil || !profile.HasLoop || profile.CallCount != 0 {
 		return false
 	}

@@ -4,10 +4,10 @@ import "github.com/gscript/gscript/internal/runtime"
 
 type boolTableStrikeCountSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
-	spec        *boolTableStrikeCountKernelSpec
+	spec        *boolTableStrikeCountSpecializationSpec
 }
 
-type boolTableStrikeCountKernelSpec struct {
+type boolTableStrikeCountSpecializationSpec struct {
 	minValue int
 }
 
@@ -22,7 +22,7 @@ func (vm *VM) runBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []r
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil, nil
 	}
-	spec, ok := boolTableStrikeCountKernelSpecForProto(cl.Proto)
+	spec, ok := boolTableStrikeCountSpecializationSpecForProto(cl.Proto)
 	if !ok {
 		return false, nil, nil
 	}
@@ -37,7 +37,7 @@ func (vm *VM) runBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []r
 	return true, []runtime.Value{runtime.IntValue(spec.run(int(n64)))}, nil
 }
 
-func (spec *boolTableStrikeCountKernelSpec) run(n int) int64 {
+func (spec *boolTableStrikeCountSpecializationSpec) run(n int) int64 {
 	if spec == nil || n < spec.minValue {
 		return 0
 	}
@@ -76,11 +76,11 @@ func IsBoolTableStrikeCountSpecializationProto(p *FuncProto) bool {
 }
 
 func isBoolTableStrikeCountProto(p *FuncProto) bool {
-	_, ok := boolTableStrikeCountKernelSpecForProto(p)
+	_, ok := boolTableStrikeCountSpecializationSpecForProto(p)
 	return ok
 }
 
-func boolTableStrikeCountKernelSpecForProto(p *FuncProto) (*boolTableStrikeCountKernelSpec, bool) {
+func boolTableStrikeCountSpecializationSpecForProto(p *FuncProto) (*boolTableStrikeCountSpecializationSpec, bool) {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack < 13 ||
 		len(p.Constants) != 0 || len(p.Protos) != 0 {
 		return nil, false
@@ -99,7 +99,7 @@ func boolTableStrikeCountKernelSpecForProto(p *FuncProto) (*boolTableStrikeCount
 	return spec, true
 }
 
-func analyzeBoolTableStrikeCountSpecializationSpec(code []uint32) (*boolTableStrikeCountKernelSpec, bool) {
+func analyzeBoolTableStrikeCountSpecializationSpec(code []uint32) (*boolTableStrikeCountSpecializationSpec, bool) {
 	if len(code) != 45 {
 		return nil, false
 	}
@@ -109,7 +109,7 @@ func analyzeBoolTableStrikeCountSpecializationSpec(code []uint32) (*boolTableStr
 		!matchBoolTableCountTruthy(p) {
 		return nil, false
 	}
-	return &boolTableStrikeCountKernelSpec{minValue: 2}, true
+	return &boolTableStrikeCountSpecializationSpec{minValue: 2}, true
 }
 
 func matchBoolTableInitFill(p bytecodePattern) bool {

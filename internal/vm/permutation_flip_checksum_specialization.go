@@ -4,10 +4,10 @@ import "github.com/gscript/gscript/internal/runtime"
 
 type permutationFlipChecksumSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
-	spec        *permutationFlipChecksumKernelSpec
+	spec        *permutationFlipChecksumSpecializationSpec
 }
 
-type permutationFlipChecksumKernelSpec struct {
+type permutationFlipChecksumSpecializationSpec struct {
 	resultCtor *runtime.SmallTableCtor2
 }
 
@@ -50,7 +50,7 @@ func (vm *VM) runPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args 
 	if float64(n64) != nn || n64 < 1 || int64(int(n64)) != n64 {
 		return false, nil, nil
 	}
-	spec, ok := permutationFlipChecksumKernelSpecForProto(cl.Proto)
+	spec, ok := permutationFlipChecksumSpecializationSpecForProto(cl.Proto)
 	if !ok {
 		return false, nil, nil
 	}
@@ -67,11 +67,11 @@ func IsPermutationFlipChecksumSpecializationProto(p *FuncProto) bool {
 }
 
 func isPermutationFlipChecksumSpecializationProto(p *FuncProto) bool {
-	_, ok := permutationFlipChecksumKernelSpecForProto(p)
+	_, ok := permutationFlipChecksumSpecializationSpecForProto(p)
 	return ok
 }
 
-func permutationFlipChecksumKernelSpecForProto(p *FuncProto) (*permutationFlipChecksumKernelSpec, bool) {
+func permutationFlipChecksumSpecializationSpecForProto(p *FuncProto) (*permutationFlipChecksumSpecializationSpec, bool) {
 	if p == nil {
 		return nil, false
 	}
@@ -89,7 +89,7 @@ func permutationFlipChecksumKernelSpecForProto(p *FuncProto) (*permutationFlipCh
 	return spec, true
 }
 
-func analyzePermutationFlipChecksumSpecializationSpec(p *FuncProto) (*permutationFlipChecksumKernelSpec, bool) {
+func analyzePermutationFlipChecksumSpecializationSpec(p *FuncProto) (*permutationFlipChecksumSpecializationSpec, bool) {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack != 30 || len(p.Protos) != 0 || len(p.Constants) != 2 {
 		return nil, false
 	}
@@ -100,7 +100,7 @@ func analyzePermutationFlipChecksumSpecializationSpec(p *FuncProto) (*permutatio
 	if !matchPermutationFlipChecksumBytecode(p.Code) {
 		return nil, false
 	}
-	return &permutationFlipChecksumKernelSpec{resultCtor: ctor}, true
+	return &permutationFlipChecksumSpecializationSpec{resultCtor: ctor}, true
 }
 
 func matchPermutationFlipChecksumBytecode(code []uint32) bool {
