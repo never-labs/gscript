@@ -31,10 +31,24 @@ const (
 const maxSpectralCoefficientFloats = 1 << 23
 
 type spectralCoefficientCache struct {
-	n  int
-	a  []float64
-	at []float64
+	n           int
+	fingerprint runtimeSpecializationFingerprint
+	a           []float64
+	at          []float64
 }
+
+type spectralCoefficientExpr struct {
+	proto       *FuncProto
+	fingerprint runtimeSpecializationFingerprint
+	kind        coefficientExprKind
+}
+
+type coefficientExprKind uint8
+
+const (
+	coefficientExprBytecode coefficientExprKind = iota
+	coefficientExprReciprocalTriangularIndex
+)
 
 type spectralRuntimeSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
@@ -66,10 +80,11 @@ func (vm *VM) runSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value
 		if len(args) != 3 {
 			return false, nil
 		}
-		if !vm.guardSpectralMultiplyCallee(proto) {
+		coeff, ok := vm.spectralMultiplyCoefficient(proto)
+		if !ok {
 			return false, nil
 		}
-		if !vm.runSpectralMultiply(args, spectralAv) {
+		if !vm.runSpectralMultiply(args, spectralAv, coeff) {
 			return false, nil
 		}
 		return true, nil
@@ -77,26 +92,29 @@ func (vm *VM) runSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value
 		if len(args) != 3 {
 			return false, nil
 		}
-		if !vm.guardSpectralMultiplyCallee(proto) {
+		coeff, ok := vm.spectralMultiplyCoefficient(proto)
+		if !ok {
 			return false, nil
 		}
-		if !vm.runSpectralMultiply(args, spectralAtv) {
+		if !vm.runSpectralMultiply(args, spectralAtv, coeff) {
 			return false, nil
 		}
 		return true, nil
 	case spectralRuntimeSpecializationDenseAtAv:
-		if len(args) != 4 || !vm.guardDenseSpectralAtAvCallees(proto) {
+		coeff, ok := vm.denseSpectralAtAvCoefficient(proto)
+		if len(args) != 4 || !ok {
 			return false, nil
 		}
-		if !vm.runDenseSpectralAtAv(args) {
+		if !vm.runDenseSpectralAtAv(args, coeff) {
 			return false, nil
 		}
 		return true, nil
 	case spectralRuntimeSpecializationAtAv:
-		if len(args) != 3 || !vm.guardSpectralAtAvCallees(proto) {
+		coeff, ok := vm.spectralAtAvCoefficient(proto)
+		if len(args) != 3 || !ok {
 			return false, nil
 		}
-		if !vm.runSpectralAtAv(args) {
+		if !vm.runSpectralAtAv(args, coeff) {
 			return false, nil
 		}
 		return true, nil
@@ -105,50 +123,49 @@ func (vm *VM) runSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value
 	}
 }
 
-func (vm *VM) runSpectralAtAv(args []runtime.Value) bool {
+func (vm *VM) runSpectralAtAv(args []runtime.Value, coeff spectralCoefficientExpr) bool {
 	n, v, atav, ok := spectralSpecializationArgs(args)
 	if !ok {
 		return false
 	}
 	tmp := vm.callSiteFloatScratch(n)
-	a, at, ok := vm.spectralCoefficients.coefficients(n)
+	a, at, ok := vm.spectralCoefficients.coefficients(n, coeff)
 	if ok {
 		spectralMatrixVector(a, n, v, tmp)
-	} else {
-		spectralAvInto(n, v, tmp)
+	} else if !coefficientMatrixVectorInto(n, v, tmp, coeff, false) {
+		return false
 	}
 	args[2].Table().MarkArrayMutationForNumericSpecialization()
 	if ok {
 		spectralMatrixVector(at, n, tmp, atav)
-	} else {
-		spectralAtvInto(n, tmp, atav)
+	} else if !coefficientMatrixVectorInto(n, tmp, atav, coeff, true) {
+		return false
 	}
 	return true
 }
 
-func (vm *VM) runDenseSpectralAtAv(args []runtime.Value) bool {
+func (vm *VM) runDenseSpectralAtAv(args []runtime.Value, coeff spectralCoefficientExpr) bool {
 	n, v, tmp, atav, ok := denseSpectralAtAvSpecializationArgs(args)
 	if !ok {
 		return false
 	}
-	a, at, cached := vm.spectralCoefficients.coefficients(n)
+	a, at, cached := vm.spectralCoefficients.coefficients(n, coeff)
 	if cached {
 		spectralMatrixVector(a, n, v, tmp)
 		spectralMatrixVector(at, n, tmp, atav)
 		return true
 	}
-	spectralAvInto(n, v, tmp)
-	spectralAtvInto(n, tmp, atav)
-	return true
+	return coefficientMatrixVectorInto(n, v, tmp, coeff, false) &&
+		coefficientMatrixVectorInto(n, tmp, atav, coeff, true)
 }
 
-func (vm *VM) runSpectralMultiply(args []runtime.Value, kind spectralMultiplyKind) bool {
+func (vm *VM) runSpectralMultiply(args []runtime.Value, kind spectralMultiplyKind, coeff spectralCoefficientExpr) bool {
 	n, v, out, ok := spectralSpecializationArgs(args)
 	if !ok {
 		return false
 	}
 	args[2].Table().MarkArrayMutationForNumericSpecialization()
-	a, at, ok := vm.spectralCoefficients.cached(n)
+	a, at, ok := vm.spectralCoefficients.cached(n, coeff)
 	if ok {
 		if kind == spectralAtv {
 			spectralMatrixVector(at, n, v, out)
@@ -158,39 +175,28 @@ func (vm *VM) runSpectralMultiply(args []runtime.Value, kind spectralMultiplyKin
 		return true
 	}
 	if kind == spectralAtv {
-		spectralAtvInto(n, v, out)
-		return true
+		return coefficientMatrixVectorInto(n, v, out, coeff, true)
 	}
-	spectralAvInto(n, v, out)
+	return coefficientMatrixVectorInto(n, v, out, coeff, false)
+}
+
+func coefficientMatrixVectorInto(n int, v, out []float64, coeff spectralCoefficientExpr, transpose bool) bool {
+	for i := 0; i < n; i++ {
+		sum := 0.0
+		for j := 0; j < n; j++ {
+			x, y := i, j
+			if transpose {
+				x, y = j, i
+			}
+			c, ok := coeff.eval(x, y)
+			if !ok {
+				return false
+			}
+			sum += c * v[j]
+		}
+		out[i] = sum
+	}
 	return true
-}
-
-func spectralAvInto(n int, v, out []float64) {
-	for i := 0; i < n; i++ {
-		sum := 0.0
-		denom := (i + 1) * (i + 2) / 2
-		step := i + 1
-		for j := 0; j < n; j++ {
-			sum += (1.0 / float64(denom)) * v[j]
-			denom += step
-			step++
-		}
-		out[i] = sum
-	}
-}
-
-func spectralAtvInto(n int, v, out []float64) {
-	for i := 0; i < n; i++ {
-		sum := 0.0
-		denom := i*(i+1)/2 + 1
-		step := i + 2
-		for j := 0; j < n; j++ {
-			sum += (1.0 / float64(denom)) * v[j]
-			denom += step
-			step++
-		}
-		out[i] = sum
-	}
 }
 
 func spectralMatrixVector(coeff []float64, n int, v, out []float64) {
@@ -273,40 +279,43 @@ func floatSlicesOverlap(a, b []float64) bool {
 		uintptr(unsafe.Pointer(b0)) <= uintptr(unsafe.Pointer(aN))
 }
 
-func (c *spectralCoefficientCache) coefficients(n int) ([]float64, []float64, bool) {
+func (c *spectralCoefficientCache) coefficients(n int, coeff spectralCoefficientExpr) ([]float64, []float64, bool) {
 	if n == 0 {
 		return nil, nil, true
+	}
+	if coeff.proto == nil {
+		return nil, nil, false
 	}
 	limit := maxSpectralCoefficientFloats / 2
 	if n < 0 || n > limit/n {
 		return nil, nil, false
 	}
 	total := n * n
-	if c.n == n && len(c.a) == total && len(c.at) == total {
+	if c.n == n && c.fingerprint == coeff.fingerprint && len(c.a) == total && len(c.at) == total {
 		return c.a, c.at, true
 	}
 	a := make([]float64, total)
 	at := make([]float64, total)
 	for i := 0; i < n; i++ {
 		row := a[i*n : (i+1)*n]
-		denom := (i + 1) * (i + 2) / 2
-		step := i + 1
 		for j := 0; j < n; j++ {
-			v := 1.0 / float64(denom)
+			v, ok := coeff.eval(i, j)
+			if !ok {
+				return nil, nil, false
+			}
 			row[j] = v
 			at[j*n+i] = v
-			denom += step
-			step++
 		}
 	}
 	c.n = n
+	c.fingerprint = coeff.fingerprint
 	c.a = a
 	c.at = at
 	return a, at, true
 }
 
-func (c *spectralCoefficientCache) cached(n int) ([]float64, []float64, bool) {
-	if n < 0 || c.n != n {
+func (c *spectralCoefficientCache) cached(n int, coeff spectralCoefficientExpr) ([]float64, []float64, bool) {
+	if n < 0 || c.n != n || c.fingerprint != coeff.fingerprint {
 		return nil, nil, false
 	}
 	total := n * n
@@ -365,67 +374,89 @@ func denseSpectralAtAvSpecializationArgs(args []runtime.Value) (int, []float64, 
 	return n, v, tmp, atav, true
 }
 
-func spectralA(i, j int) float64 {
-	ij := i + j
-	return 1.0 / (float64(ij*(ij+1)/2 + i + 1))
+func (expr spectralCoefficientExpr) eval(i, j int) (float64, bool) {
+	if expr.kind == coefficientExprReciprocalTriangularIndex {
+		ij := i + j
+		return 1.0 / float64(ij*(ij+1)/2+i+1), true
+	}
+	return evalPureNumericBinaryProto(expr.proto, float64(i), float64(j))
 }
 
-func (vm *VM) guardSpectralMultiplyCallee(proto *FuncProto) bool {
+func (vm *VM) spectralMultiplyCoefficient(proto *FuncProto) (spectralCoefficientExpr, bool) {
 	if len(proto.Constants) < 2 || !proto.Constants[1].IsString() {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	v, ok := vm.globalValue(proto.Constants[1].Str())
 	if !ok {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	cl, ok := closureFromValue(v)
-	return ok && isSpectralAProto(cl.Proto)
+	if !ok {
+		return spectralCoefficientExpr{}, false
+	}
+	return spectralCoefficientExprForProto(cl.Proto)
 }
 
-func (vm *VM) guardSpectralAtAvCallees(proto *FuncProto) bool {
+func (vm *VM) spectralAtAvCoefficient(proto *FuncProto) (spectralCoefficientExpr, bool) {
 	if len(proto.Constants) < 3 || !proto.Constants[1].IsString() || !proto.Constants[2].IsString() {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	avVal, ok := vm.globalValue(proto.Constants[1].Str())
 	if !ok {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	atvVal, ok := vm.globalValue(proto.Constants[2].Str())
 	if !ok {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	av, ok := closureFromValue(avVal)
-	if !ok || classifySpectralMultiplyProto(av.Proto) != spectralAv || !vm.guardSpectralMultiplyCallee(av.Proto) {
-		return false
+	if !ok || classifySpectralMultiplyProto(av.Proto) != spectralAv {
+		return spectralCoefficientExpr{}, false
+	}
+	avCoeff, ok := vm.spectralMultiplyCoefficient(av.Proto)
+	if !ok {
+		return spectralCoefficientExpr{}, false
 	}
 	atv, ok := closureFromValue(atvVal)
-	if !ok || classifySpectralMultiplyProto(atv.Proto) != spectralAtv || !vm.guardSpectralMultiplyCallee(atv.Proto) {
-		return false
+	if !ok || classifySpectralMultiplyProto(atv.Proto) != spectralAtv {
+		return spectralCoefficientExpr{}, false
 	}
-	return true
+	atvCoeff, ok := vm.spectralMultiplyCoefficient(atv.Proto)
+	if !ok || atvCoeff.fingerprint != avCoeff.fingerprint {
+		return spectralCoefficientExpr{}, false
+	}
+	return avCoeff, true
 }
 
-func (vm *VM) guardDenseSpectralAtAvCallees(proto *FuncProto) bool {
+func (vm *VM) denseSpectralAtAvCoefficient(proto *FuncProto) (spectralCoefficientExpr, bool) {
 	if len(proto.Constants) < 5 || !proto.Constants[3].IsString() || !proto.Constants[4].IsString() {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	avVal, ok := vm.globalValue(proto.Constants[3].Str())
 	if !ok {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	atvVal, ok := vm.globalValue(proto.Constants[4].Str())
 	if !ok {
-		return false
+		return spectralCoefficientExpr{}, false
 	}
 	av, ok := closureFromValue(avVal)
-	if !ok || classifyDenseSpectralMultiplyProto(av.Proto) != spectralAv || !vm.guardSpectralMultiplyCallee(av.Proto) {
-		return false
+	if !ok || classifyDenseSpectralMultiplyProto(av.Proto) != spectralAv {
+		return spectralCoefficientExpr{}, false
+	}
+	avCoeff, ok := vm.spectralMultiplyCoefficient(av.Proto)
+	if !ok {
+		return spectralCoefficientExpr{}, false
 	}
 	atv, ok := closureFromValue(atvVal)
-	if !ok || classifyDenseSpectralMultiplyProto(atv.Proto) != spectralAtv || !vm.guardSpectralMultiplyCallee(atv.Proto) {
-		return false
+	if !ok || classifyDenseSpectralMultiplyProto(atv.Proto) != spectralAtv {
+		return spectralCoefficientExpr{}, false
 	}
-	return true
+	atvCoeff, ok := vm.spectralMultiplyCoefficient(atv.Proto)
+	if !ok || atvCoeff.fingerprint != avCoeff.fingerprint {
+		return spectralCoefficientExpr{}, false
+	}
+	return avCoeff, true
 }
 
 func classifyDenseSpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
@@ -532,7 +563,33 @@ func analyzeSpectralRuntimeSpecializationSpec(p *FuncProto) (*spectralRuntimeSpe
 	return nil, false
 }
 
-func isSpectralAProto(p *FuncProto) bool {
+func spectralCoefficientExprForProto(p *FuncProto) (spectralCoefficientExpr, bool) {
+	if p == nil || p.NumParams != 2 || p.IsVarArg || p.MaxStack < 2 || p.MaxStack > 64 ||
+		len(p.Protos) != 0 || len(p.Upvalues) != 0 || len(p.Code) == 0 || len(p.Code) > 64 {
+		return spectralCoefficientExpr{}, false
+	}
+	for _, c := range p.Constants {
+		if !c.IsNumber() {
+			return spectralCoefficientExpr{}, false
+		}
+	}
+	expr := spectralCoefficientExpr{
+		proto:       p,
+		fingerprint: runtimeSpecializationFingerprintForProto(p),
+	}
+	if isReciprocalTriangularIndexExprProto(p) {
+		expr.kind = coefficientExprReciprocalTriangularIndex
+	}
+	if _, ok := expr.eval(0, 0); !ok {
+		return spectralCoefficientExpr{}, false
+	}
+	if _, ok := expr.eval(1, 2); !ok {
+		return spectralCoefficientExpr{}, false
+	}
+	return expr, true
+}
+
+func isReciprocalTriangularIndexExprProto(p *FuncProto) bool {
 	if p == nil || p.NumParams != 2 || p.IsVarArg || len(p.Constants) < 1 || !numberConst(p.Constants[0], 1.0) {
 		return false
 	}
@@ -551,6 +608,93 @@ func isSpectralAProto(p *FuncProto) bool {
 		EncodeABC(OP_DIV, 2, 3, 4),
 		EncodeABC(OP_RETURN, 2, 2, 0),
 	})
+}
+
+func evalPureNumericBinaryProto(p *FuncProto, x, y float64) (float64, bool) {
+	if p == nil || p.NumParams != 2 || p.IsVarArg || p.MaxStack < 2 || p.MaxStack > 64 || len(p.Code) > 64 {
+		return 0, false
+	}
+	var regs [64]float64
+	var valid [64]bool
+	stackLen := p.MaxStack
+	regs[0], regs[1] = x, y
+	valid[0], valid[1] = true, true
+	rk := func(idx int) (float64, bool) {
+		if IsRK(idx) {
+			cidx := RKToConstIdx(idx)
+			if cidx < 0 || cidx >= len(p.Constants) || !p.Constants[cidx].IsNumber() {
+				return 0, false
+			}
+			return p.Constants[cidx].Number(), true
+		}
+		if idx < 0 || idx >= stackLen || !valid[idx] {
+			return 0, false
+		}
+		return regs[idx], true
+	}
+	set := func(idx int, v float64) bool {
+		if idx < 0 || idx >= stackLen {
+			return false
+		}
+		regs[idx] = v
+		valid[idx] = true
+		return true
+	}
+	for _, inst := range p.Code {
+		a, b, c := DecodeA(inst), DecodeB(inst), DecodeC(inst)
+		switch DecodeOp(inst) {
+		case OP_LOADINT:
+			if !set(a, float64(DecodesBx(inst))) {
+				return 0, false
+			}
+		case OP_LOADK:
+			idx := DecodeBx(inst)
+			if idx < 0 || idx >= len(p.Constants) || !p.Constants[idx].IsNumber() {
+				return 0, false
+			}
+			if !set(a, p.Constants[idx].Number()) {
+				return 0, false
+			}
+		case OP_MOVE:
+			if b < 0 || b >= stackLen || !valid[b] || !set(a, regs[b]) {
+				return 0, false
+			}
+		case OP_ADD, OP_SUB, OP_MUL, OP_DIV:
+			lhs, ok := rk(b)
+			if !ok {
+				return 0, false
+			}
+			rhs, ok := rk(c)
+			if !ok {
+				return 0, false
+			}
+			var out float64
+			switch DecodeOp(inst) {
+			case OP_ADD:
+				out = lhs + rhs
+			case OP_SUB:
+				out = lhs - rhs
+			case OP_MUL:
+				out = lhs * rhs
+			case OP_DIV:
+				if rhs == 0 {
+					return 0, false
+				}
+				out = lhs / rhs
+			}
+			if !set(a, out) {
+				return 0, false
+			}
+		case OP_RETURN:
+			if DecodeB(inst) != 2 || a < 0 || a >= stackLen || !valid[a] {
+				return 0, false
+			}
+			return regs[a], true
+		default:
+			return 0, false
+		}
+	}
+	return 0, false
 }
 
 func isDenseSpectralAtAvProto(p *FuncProto) bool {
