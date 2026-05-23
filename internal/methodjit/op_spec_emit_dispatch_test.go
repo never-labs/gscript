@@ -112,6 +112,7 @@ func emitterFamilyDelegateRegistry() []emitterFamilyDelegate {
 		{filename: "emit_misc_instr.go", funcName: "emitClosureInstr", family: OpEmitterClosure},
 		{filename: "emit_misc_instr.go", funcName: "emitVarargInstr", family: OpEmitterVararg},
 		{filename: "emit_misc_instr.go", funcName: "emitConcurrencyInstr", family: OpEmitterConcurrency},
+		{filename: "emit_phi_instr.go", funcName: "emitPhiInstr", family: OpEmitterPhi},
 		{filename: "emit_misc_instr.go", funcName: "emitSpecialInstr", family: OpEmitterSpecial},
 	}
 }

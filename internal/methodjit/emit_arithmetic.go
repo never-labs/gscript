@@ -49,6 +49,9 @@ func (ec *emitContext) emitArithmeticInstr(instr *Instr, _ *Block) bool {
 	case OpLen:
 		ec.emitLenNative(instr)
 		ec.clearTableArrayBoundedKeys()
+	case OpPow:
+		ec.emitOpExit(instr)
+		ec.clearTableArrayBoundedKeys()
 	default:
 		return false
 	}

@@ -102,20 +102,13 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if ec.emitConcurrencyInstr(instr, block) {
 		goto done
 	}
+	if ec.emitPhiInstr(instr, block) {
+		goto done
+	}
 	if ec.emitSpecialInstr(instr, block) {
 		goto done
 	}
-	switch instr.Op {
-	// --- Phi ---
-	case OpPhi:
-		// Phi resolution happens at block transitions (emitPhiMoves).
-
-	case OpPow:
-		ec.emitOpExit(instr)
-		ec.clearTableArrayBoundedKeys()
-	default:
-		ec.asm.NOP() // truly unknown op placeholder
-	}
+	ec.asm.NOP() // truly unknown op placeholder
 done:
 	codeEnd := len(ec.asm.Code())
 	if codeEnd > codeStart {
