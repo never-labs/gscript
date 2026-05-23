@@ -11,6 +11,28 @@ type permutationFlipChecksumSpecializationSpec struct {
 	resultCtor *runtime.SmallTableCtor2
 }
 
+type permutationFlipChecksumBytecodeCheck struct {
+	pc   int
+	inst uint32
+}
+
+var permutationFlipChecksumBytecodeChecks = [...]permutationFlipChecksumBytecodeCheck{
+	{pc: 0, inst: EncodeABC(OP_NEWTABLE, 1, 0, 0)},
+	{pc: 1, inst: EncodeABC(OP_NEWTABLE, 2, 0, 0)},
+	{pc: 2, inst: EncodeABC(OP_NEWTABLE, 3, 0, 0)},
+	{pc: 6, inst: EncodeAsBx(OP_FORPREP, 4, 6)},
+	{pc: 13, inst: EncodeAsBx(OP_FORLOOP, 4, -7)},
+	{pc: 20, inst: EncodeAsBx(OP_FORPREP, 10, 4)},
+	{pc: 25, inst: EncodeAsBx(OP_FORLOOP, 10, -5)},
+	{pc: 34, inst: EncodeABC(OP_LT, 0, 15, 16)},
+	{pc: 51, inst: EncodeAsBx(OP_JMP, 0, -18)},
+	{pc: 64, inst: EncodeABC(OP_MOD, 15, 9, 16)},
+	{pc: 80, inst: EncodeAsBx(OP_FORPREP, 16, 34)},
+	{pc: 88, inst: EncodeAsBx(OP_FORPREP, 21, 5)},
+	{pc: 94, inst: EncodeAsBx(OP_FORLOOP, 21, -6)},
+	{pc: 115, inst: EncodeAsBx(OP_FORLOOP, 16, -35)},
+}
+
 func (vm *VM) tryRunPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationPermutationFlipChecksum) {
 		return false, nil, nil
@@ -88,24 +110,8 @@ func matchPermutationFlipChecksumBytecode(code []uint32) bool {
 		return false
 	}
 	p := newBytecodePattern(code)
-	checks := map[int]uint32{
-		0:   EncodeABC(OP_NEWTABLE, 1, 0, 0),
-		1:   EncodeABC(OP_NEWTABLE, 2, 0, 0),
-		2:   EncodeABC(OP_NEWTABLE, 3, 0, 0),
-		6:   EncodeAsBx(OP_FORPREP, 4, 6),
-		13:  EncodeAsBx(OP_FORLOOP, 4, -7),
-		20:  EncodeAsBx(OP_FORPREP, 10, 4),
-		25:  EncodeAsBx(OP_FORLOOP, 10, -5),
-		34:  EncodeABC(OP_LT, 0, 15, 16),
-		51:  EncodeAsBx(OP_JMP, 0, -18),
-		64:  EncodeABC(OP_MOD, 15, 9, 16),
-		80:  EncodeAsBx(OP_FORPREP, 16, 34),
-		88:  EncodeAsBx(OP_FORPREP, 21, 5),
-		94:  EncodeAsBx(OP_FORLOOP, 21, -6),
-		115: EncodeAsBx(OP_FORLOOP, 16, -35),
-	}
-	for pc, want := range checks {
-		if pc >= len(code) || code[pc] != want {
+	for _, check := range permutationFlipChecksumBytecodeChecks {
+		if check.pc >= len(code) || code[check.pc] != check.inst {
 			return false
 		}
 	}
