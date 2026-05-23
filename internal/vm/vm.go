@@ -500,6 +500,56 @@ func (vm *VM) RegisterToStringLib() {
 	}))
 }
 
+func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int) error {
+	if nArgs == 0 || absSlot+1 >= len(vm.regs) {
+		return fmt.Errorf("bad argument #1 to 'select'")
+	}
+	start, countOnly, err := runtime.SelectReturnRange(vm.regs[absSlot+1], nArgs)
+	if err != nil {
+		return err
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if countOnly {
+		vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{runtime.IntValue(int64(start))})
+		return nil
+	}
+	valueStart := absSlot + 1 + start
+	valueEnd := absSlot + 1 + nArgs
+	if start >= nArgs || valueStart >= len(vm.regs) {
+		vm.storeStdSelectResults(absSlot, rawC, nil)
+		return nil
+	}
+	if valueEnd > len(vm.regs) {
+		valueEnd = len(vm.regs)
+	}
+	vm.storeStdSelectResults(absSlot, rawC, vm.regs[valueStart:valueEnd])
+	return nil
+}
+
+func (vm *VM) storeStdSelectResults(absSlot, rawC int, results []runtime.Value) {
+	if rawC == 0 {
+		for i, r := range results {
+			if idx := absSlot + i; idx < len(vm.regs) {
+				vm.regs[idx] = r
+			}
+		}
+		vm.top = absSlot + len(results)
+		return
+	}
+	nr := rawC - 1
+	for i := 0; i < nr; i++ {
+		idx := absSlot + i
+		if idx >= len(vm.regs) {
+			continue
+		}
+		if i < len(results) {
+			vm.regs[idx] = results[i]
+		} else {
+			vm.regs[idx] = runtime.NilValue()
+		}
+	}
+}
+
 func (vm *VM) luaToString(v runtime.Value) (string, error) {
 	if v.IsTable() {
 		if mt := v.Table().GetMetatable(); mt != nil {
@@ -3653,6 +3703,13 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 
 			// ---- Fast path: GoFunction (direct call, skip callValue) ----
 			if fnVal.IsFunction() {
+				if runtime.IsStdSelectFunction(fnVal) {
+					if err := vm.executeStdSelectCall(base+a, nArgs, c); err != nil {
+						return nil, wrapLineErr(frame, err)
+					}
+					observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+					break
+				}
 				if gf := fnVal.GoFunction(); gf != nil {
 					var args []runtime.Value
 					if nArgs <= len(vm.argBuf) {

@@ -17,12 +17,14 @@ const (
 	NativeKindStdStringSplit  uint8 = 100
 	NativeKindStdStringSub    uint8 = 101
 	NativeKindStdToNumber     uint8 = 102
+	NativeKindStdSelect       uint8 = 103
 )
 
 var stdStringFormatIdentity byte
 var stdStringSplitIdentity byte
 var stdStringSubIdentity byte
 var stdToNumberIdentity byte
+var stdSelectIdentity byte
 
 type compiledLuaPatternCacheEntry struct {
 	prog luaPatternProgram
@@ -1078,6 +1080,10 @@ func StdToNumberIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdToNumberIdentity)
 }
 
+func StdSelectIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdSelectIdentity)
+}
+
 func IsStdStringSplitFunction(v Value) bool {
 	gf := v.GoFunction()
 	return gf != nil &&
@@ -1101,6 +1107,51 @@ func IsStdToNumberFunction(v Value) bool {
 		gf.NativeKind == NativeKindStdToNumber &&
 		gf.NativeData == StdToNumberIdentityPtr() &&
 		gf.FastArg1 != nil
+}
+
+func IsStdSelectFunction(v Value) bool {
+	gf := v.GoFunction()
+	return gf != nil &&
+		gf.NativeKind == NativeKindStdSelect &&
+		gf.NativeData == StdSelectIdentityPtr()
+}
+
+func SelectReturnRange(selector Value, argCount int) (start int, countOnly bool, err error) {
+	if argCount == 0 {
+		return 0, false, fmt.Errorf("bad argument #1 to 'select'")
+	}
+	if selector.IsString() && selector.Str() == "#" {
+		return argCount - 1, true, nil
+	}
+	n, ok := selector.ToNumber()
+	if !ok {
+		return 0, false, fmt.Errorf("bad argument #1 to 'select' (number or string expected)")
+	}
+	idx := int(n.Number())
+	if idx < 0 {
+		idx = argCount + idx
+	}
+	if idx < 1 {
+		return 0, false, fmt.Errorf("bad argument #1 to 'select' (index out of range)")
+	}
+	if idx >= argCount {
+		return argCount, false, nil
+	}
+	return idx, false, nil
+}
+
+func SelectResults(args []Value) ([]Value, error) {
+	start, countOnly, err := SelectReturnRange(args[0], len(args))
+	if err != nil {
+		return nil, err
+	}
+	if countOnly {
+		return []Value{IntValue(int64(start))}, nil
+	}
+	if start >= len(args) {
+		return nil, nil
+	}
+	return args[start:], nil
 }
 
 func StringSplitProject(sv, sepv Value, index int64) (Value, error) {

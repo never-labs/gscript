@@ -566,6 +566,9 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 	}
 slowPath:
 	if gf := fnVal.GoFunction(); gf != nil {
+		if runtime.IsStdSelectFunction(fnVal) {
+			return e.executeStdSelectCall(regs, absSlot, nArgs, rawC)
+		}
 		if nArgs == 2 && gf.FastArg2Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)
 			idx0 := absSlot + 1
@@ -799,6 +802,62 @@ func (e *BaselineJITEngine) executeCompiledTier2Call(compiled interface{}, cl *v
 		}
 	}
 	return nil
+}
+
+func (e *BaselineJITEngine) executeStdSelectCall(regs []runtime.Value, absSlot, nArgs, rawC int) error {
+	if nArgs == 0 || absSlot+1 >= len(regs) {
+		return fmt.Errorf("bad argument #1 to 'select'")
+	}
+	start, countOnly, err := runtime.SelectReturnRange(regs[absSlot+1], nArgs)
+	if err != nil {
+		return err
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(regs[absSlot].GoFunction())
+	currentRegs := regs
+	if e != nil && e.callVM != nil {
+		currentRegs = e.callVM.Regs()
+	}
+	if countOnly {
+		storeStdSelectResults(e, currentRegs, absSlot, rawC, []runtime.Value{runtime.IntValue(int64(start))})
+		return nil
+	}
+	valueStart := absSlot + 1 + start
+	valueEnd := absSlot + 1 + nArgs
+	if start >= nArgs || valueStart >= len(currentRegs) {
+		storeStdSelectResults(e, currentRegs, absSlot, rawC, nil)
+		return nil
+	}
+	if valueEnd > len(currentRegs) {
+		valueEnd = len(currentRegs)
+	}
+	storeStdSelectResults(e, currentRegs, absSlot, rawC, currentRegs[valueStart:valueEnd])
+	return nil
+}
+
+func storeStdSelectResults(e *BaselineJITEngine, regs []runtime.Value, absSlot, rawC int, results []runtime.Value) {
+	if rawC == 0 {
+		for i, r := range results {
+			if idx := absSlot + i; idx < len(regs) {
+				regs[idx] = r
+			}
+		}
+		if e != nil && e.callVM != nil {
+			e.callVM.SetTop(absSlot + len(results))
+		}
+		return
+	}
+	nr := rawC - 1
+	for i := 0; i < nr; i++ {
+		idx := absSlot + i
+		if idx >= len(regs) {
+			continue
+		}
+		if i < len(results) {
+			regs[idx] = results[i]
+		} else {
+			regs[idx] = runtime.NilValue()
+		}
+	}
 }
 
 func (e *BaselineJITEngine) tryFuseCreateResumeLeafCoroutine(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto, fnVal runtime.Value, absSlot, nArgs, rawC int) (bool, error) {

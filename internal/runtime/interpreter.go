@@ -693,28 +693,10 @@ func (interp *Interpreter) registerBuiltins() {
 	interp.globals.Define("select", FunctionValue(&GoFunction{
 		Name: "select",
 		Fn: func(args []Value) ([]Value, error) {
-			if len(args) == 0 {
-				return nil, fmt.Errorf("bad argument #1 to 'select'")
-			}
-			if args[0].IsString() && args[0].Str() == "#" {
-				return []Value{IntValue(int64(len(args) - 1))}, nil
-			}
-			n, ok := args[0].ToNumber()
-			if !ok {
-				return nil, fmt.Errorf("bad argument #1 to 'select' (number or string expected)")
-			}
-			idx := int(n.Number())
-			if idx < 0 {
-				idx = len(args) + idx
-			}
-			if idx < 1 {
-				return nil, fmt.Errorf("bad argument #1 to 'select' (index out of range)")
-			}
-			if idx >= len(args) {
-				return nil, nil
-			}
-			return args[idx:], nil
+			return SelectResults(args)
 		},
+		NativeKind: NativeKindStdSelect,
+		NativeData: StdSelectIdentityPtr(),
 	}))
 
 	interp.globals.Define("unpack", FunctionValue(&GoFunction{
