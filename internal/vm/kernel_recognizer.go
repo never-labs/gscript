@@ -104,8 +104,7 @@ const (
 )
 
 const (
-	wholeCallKernelIntGridAggregate = iota
-	wholeCallKernelPermutationFlipChecksum
+	wholeCallKernelPermutationFlipChecksum = iota
 	wholeCallKernelMatrixMultiply
 	wholeCallKernelCoefficientMatrixVector
 	wholeCallKernelCoefficientMatrixTransposeVector
@@ -146,17 +145,6 @@ type wholeCallKernelRecognizer struct {
 // not yet been lifted into runtime-discovered shape specializations. New
 // whole-call fast paths should not be added here.
 var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecognizer{
-	{
-		info: KernelInfo{
-			Name:          "int_grid_aggregate",
-			Route:         KernelRouteWholeCallValue,
-			Arity:         2,
-			Results:       kernelWholeCallSingleResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize: isIntGridAggregateProto,
-		runValue:  (*VM).runIntGridAggregateWholeCallKernel,
-	},
 	{
 		info: KernelInfo{
 			Name:          "permutation_flip_checksum",

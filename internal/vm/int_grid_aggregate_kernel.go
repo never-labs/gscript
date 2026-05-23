@@ -23,6 +23,11 @@ type intGridAggregateSpec struct {
 	finalB      int64
 }
 
+type intGridAggregateKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *intGridAggregateSpec
+}
+
 type intGridAggregateState struct {
 	count   int64
 	qty     int64
@@ -88,6 +93,21 @@ func intGridAggregateSpecForProto(p *FuncProto) (*intGridAggregateSpec, bool) {
 		len(p.Code) != 169 || len(p.Constants) != 24 || len(p.Protos) != 0 {
 		return nil, false
 	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.IntGridAggregateKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzeIntGridAggregateSpec(p)
+	if !ok {
+		p.IntGridAggregateKernel = &intGridAggregateKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.IntGridAggregateKernel = &intGridAggregateKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzeIntGridAggregateSpec(p *FuncProto) (*intGridAggregateSpec, bool) {
 	for i := 0; i < 23; i++ {
 		if i == 16 {
 			continue

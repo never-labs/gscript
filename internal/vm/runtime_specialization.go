@@ -6,6 +6,7 @@ const (
 	runtimeSpecializationRawIntNested = iota
 	runtimeSpecializationLazyRecursiveTableBuilder
 	runtimeSpecializationLazyRecursiveTableFold
+	runtimeSpecializationIntGridAggregate
 	runtimeSpecializationRecordWalkFold
 	runtimeSpecializationBoolTableStrikeCount
 	runtimeSpecializationCount
@@ -101,6 +102,19 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 		},
 		Run:            (*VM).tryRunRecursiveTableValueKernel,
 		RecursiveTable: true,
+	},
+	runtimeSpecializationIntGridAggregate: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "int_grid_aggregate",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         2,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
+			},
+			Recognize: isIntGridAggregateProto,
+		},
+		Run: (*VM).runIntGridAggregateWholeCallKernel,
 	},
 	runtimeSpecializationRecordWalkFold: {
 		RuntimeSpecialization: RuntimeSpecialization{
