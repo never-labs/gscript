@@ -13,22 +13,22 @@ type compiledProtocolKind uint8
 
 const (
 	compiledProtocolNone compiledProtocolKind = iota
-	compiledProtocolFixedRecursiveIntFold
-	compiledProtocolFixedRecursiveNestedIntFold
-	compiledProtocolFixedRecursiveTableBuilder
-	compiledProtocolFixedRecursiveTableFold
+	compiledProtocolRuntimeRecursiveIntFold
+	compiledProtocolRuntimeRecursiveNestedIntFold
+	compiledProtocolRuntimeRecursiveTableBuilder
+	compiledProtocolRuntimeRecursiveTableFold
 	compiledProtocolMutualRecursiveIntSCC
 )
 
 func (k compiledProtocolKind) String() string {
 	switch k {
-	case compiledProtocolFixedRecursiveIntFold:
+	case compiledProtocolRuntimeRecursiveIntFold:
 		return "recursive_int_fold"
-	case compiledProtocolFixedRecursiveNestedIntFold:
+	case compiledProtocolRuntimeRecursiveNestedIntFold:
 		return "nested_recursive_int_fold"
-	case compiledProtocolFixedRecursiveTableBuilder:
+	case compiledProtocolRuntimeRecursiveTableBuilder:
 		return "lazy_recursive_table_builder"
-	case compiledProtocolFixedRecursiveTableFold:
+	case compiledProtocolRuntimeRecursiveTableFold:
 		return "lazy_recursive_table_fold"
 	case compiledProtocolMutualRecursiveIntSCC:
 		return "mutual_recursive_int_scc"
@@ -42,14 +42,14 @@ func (cf *CompiledFunction) ProtocolKind() compiledProtocolKind {
 		return compiledProtocolNone
 	}
 	switch {
-	case cf.FixedRecursiveIntFold != nil:
-		return compiledProtocolFixedRecursiveIntFold
-	case cf.FixedRecursiveNestedIntFold != nil:
-		return compiledProtocolFixedRecursiveNestedIntFold
-	case cf.FixedRecursiveTableBuilder != nil:
-		return compiledProtocolFixedRecursiveTableBuilder
-	case cf.FixedRecursiveTableFold != nil:
-		return compiledProtocolFixedRecursiveTableFold
+	case cf.RuntimeRecursiveIntFold != nil:
+		return compiledProtocolRuntimeRecursiveIntFold
+	case cf.RuntimeRecursiveNestedIntFold != nil:
+		return compiledProtocolRuntimeRecursiveNestedIntFold
+	case cf.RuntimeRecursiveTableBuilder != nil:
+		return compiledProtocolRuntimeRecursiveTableBuilder
+	case cf.RuntimeRecursiveTableFold != nil:
+		return compiledProtocolRuntimeRecursiveTableFold
 	case cf.MutualRecursiveIntSCC != nil:
 		return compiledProtocolMutualRecursiveIntSCC
 	default:
@@ -65,20 +65,20 @@ func (tm *TieringManager) executeCompiledProtocol(cf *CompiledFunction, regs []r
 	mark := tm.tier2PerfStart()
 
 	switch kind {
-	case compiledProtocolFixedRecursiveIntFold:
-		out, err := tm.executeFixedRecursiveIntFold(cf, regs, base, proto, retBuf)
+	case compiledProtocolRuntimeRecursiveIntFold:
+		out, err := tm.executeRuntimeRecursiveIntFold(cf, regs, base, proto, retBuf)
 		tm.tier2PerfStop(perfTier2CompiledProtocol, mark)
 		return out, true, err
-	case compiledProtocolFixedRecursiveNestedIntFold:
-		out, err := tm.executeFixedRecursiveNestedIntFold(cf, regs, base, proto, retBuf)
+	case compiledProtocolRuntimeRecursiveNestedIntFold:
+		out, err := tm.executeRuntimeRecursiveNestedIntFold(cf, regs, base, proto, retBuf)
 		tm.tier2PerfStop(perfTier2CompiledProtocol, mark)
 		return out, true, err
-	case compiledProtocolFixedRecursiveTableBuilder:
-		out, err := tm.executeFixedRecursiveTableBuilder(cf, regs, base, proto, retBuf)
+	case compiledProtocolRuntimeRecursiveTableBuilder:
+		out, err := tm.executeRuntimeRecursiveTableBuilder(cf, regs, base, proto, retBuf)
 		tm.tier2PerfStop(perfTier2CompiledProtocol, mark)
 		return out, true, err
-	case compiledProtocolFixedRecursiveTableFold:
-		out, err := tm.executeFixedRecursiveTableFold(cf, regs, base, proto, retBuf)
+	case compiledProtocolRuntimeRecursiveTableFold:
+		out, err := tm.executeRuntimeRecursiveTableFold(cf, regs, base, proto, retBuf)
 		tm.tier2PerfStop(perfTier2CompiledProtocol, mark)
 		return out, true, err
 	case compiledProtocolMutualRecursiveIntSCC:
@@ -131,29 +131,29 @@ func (tm *TieringManager) TryExecuteCompiledProtocolCall(fnVal runtime.Value, re
 
 func (tm *TieringManager) executeCompiledProtocolCallExitResult(cf *CompiledFunction, proto *vm.FuncProto, regs []runtime.Value, absSlot, nArgs int) (runtime.Value, bool, error) {
 	switch cf.ProtocolKind() {
-	case compiledProtocolFixedRecursiveIntFold:
+	case compiledProtocolRuntimeRecursiveIntFold:
 		if nArgs != 1 || absSlot+1 >= len(regs) {
 			return runtime.NilValue(), false, nil
 		}
-		if !tm.fixedRecursiveSelfGlobalMatches(proto) {
-			tm.disableTier2AfterRuntimeDeopt(proto, "tier2: fixed recursive int fold self global changed")
+		if !tm.runtimeRecursiveSelfGlobalMatches(proto) {
+			tm.disableTier2AfterRuntimeDeopt(proto, "tier2: runtime recursive int fold self global changed")
 			return runtime.NilValue(), false, nil
 		}
-		n, ok := cf.FixedRecursiveIntFold.fold(regs[absSlot+1])
+		n, ok := cf.RuntimeRecursiveIntFold.fold(regs[absSlot+1])
 		if !ok {
 			return runtime.NilValue(), false, nil
 		}
 		proto.EnteredTier2 = 1
 		return runtime.IntValue(n), true, nil
-	case compiledProtocolFixedRecursiveNestedIntFold:
+	case compiledProtocolRuntimeRecursiveNestedIntFold:
 		if nArgs != 2 || absSlot+2 >= len(regs) {
 			return runtime.NilValue(), false, nil
 		}
-		if !tm.fixedRecursiveSelfGlobalMatches(proto) {
-			tm.disableTier2AfterRuntimeDeopt(proto, "tier2: fixed recursive nested int fold self global changed")
+		if !tm.runtimeRecursiveSelfGlobalMatches(proto) {
+			tm.disableTier2AfterRuntimeDeopt(proto, "tier2: runtime recursive nested int fold self global changed")
 			return runtime.NilValue(), false, nil
 		}
-		n, ok := cf.FixedRecursiveNestedIntFold.fold(regs[absSlot+1], regs[absSlot+2])
+		n, ok := cf.RuntimeRecursiveNestedIntFold.fold(regs[absSlot+1], regs[absSlot+2])
 		if !ok {
 			return runtime.NilValue(), false, nil
 		}
@@ -183,8 +183,8 @@ func (tm *TieringManager) executeCompiledProtocolCallExitResult(cf *CompiledFunc
 
 func compiledProtocolCallExitFastPathSupports(kind compiledProtocolKind) bool {
 	switch kind {
-	case compiledProtocolFixedRecursiveIntFold,
-		compiledProtocolFixedRecursiveNestedIntFold,
+	case compiledProtocolRuntimeRecursiveIntFold,
+		compiledProtocolRuntimeRecursiveNestedIntFold,
 		compiledProtocolMutualRecursiveIntSCC:
 		return true
 	default:

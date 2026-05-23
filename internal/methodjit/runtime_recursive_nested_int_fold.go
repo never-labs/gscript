@@ -10,26 +10,26 @@ import (
 )
 
 const (
-	// ack(3,4), the benchmark shape, evaluates in roughly 10k protocol steps.
-	// Keep a generous but bounded envelope so larger inputs fall back before a
-	// speculative whole-call protocol monopolizes the process.
-	maxFixedRecursiveNestedIntFoldIterations = 1_000_000
-	maxFixedRecursiveNestedIntFoldStack      = 65_536
+	// Small nested integer recurrences can expand quickly. Keep a generous but
+	// bounded envelope so larger inputs fall back before a speculative
+	// whole-call protocol monopolizes the process.
+	maxRuntimeRecursiveNestedIntFoldIterations = 1_000_000
+	maxRuntimeRecursiveNestedIntFoldStack      = 65_536
 )
 
-type fixedRecursiveNestedIntFoldProtocol struct {
+type runtimeRecursiveNestedIntFoldProtocol struct {
 	baseAdd int64
 	zeroArg int64
 	mStep   int64
 	nStep   int64
 }
 
-func qualifiesForFixedRecursiveNestedIntFold(proto *vm.FuncProto) bool {
-	_, ok := analyzeFixedRecursiveNestedIntFold(proto)
+func qualifiesForRuntimeRecursiveNestedIntFold(proto *vm.FuncProto) bool {
+	_, ok := analyzeRuntimeRecursiveNestedIntFold(proto)
 	return ok
 }
 
-func analyzeFixedRecursiveNestedIntFold(proto *vm.FuncProto) (*fixedRecursiveNestedIntFoldProtocol, bool) {
+func analyzeRuntimeRecursiveNestedIntFold(proto *vm.FuncProto) (*runtimeRecursiveNestedIntFoldProtocol, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 2 || proto.Name == "" {
 		return nil, false
 	}
@@ -38,22 +38,22 @@ func analyzeFixedRecursiveNestedIntFold(proto *vm.FuncProto) (*fixedRecursiveNes
 	}
 
 	code := proto.Code
-	secondHeader, baseAdd, ok := fixedNestedParseBaseCase(proto, 0, 0, 1)
+	secondHeader, baseAdd, ok := runtimeNestedParseBaseCase(proto, 0, 0, 1)
 	if !ok {
 		return nil, false
 	}
-	generalStart, zeroArg, mStep, ok := fixedNestedParseZeroCase(proto, secondHeader)
+	generalStart, zeroArg, mStep, ok := runtimeNestedParseZeroCase(proto, secondHeader)
 	if !ok {
 		return nil, false
 	}
-	mStep2, nStep, end, ok := fixedNestedParseNestedCase(proto, generalStart)
+	mStep2, nStep, end, ok := runtimeNestedParseNestedCase(proto, generalStart)
 	if !ok || end != len(code) || mStep2 != mStep {
 		return nil, false
 	}
 	if mStep <= 0 || nStep <= 0 || zeroArg < 0 {
 		return nil, false
 	}
-	return &fixedRecursiveNestedIntFoldProtocol{
+	return &runtimeRecursiveNestedIntFoldProtocol{
 		baseAdd: baseAdd,
 		zeroArg: zeroArg,
 		mStep:   mStep,
@@ -61,23 +61,23 @@ func analyzeFixedRecursiveNestedIntFold(proto *vm.FuncProto) (*fixedRecursiveNes
 	}, true
 }
 
-func fixedNestedParseBaseCase(proto *vm.FuncProto, pc, mSlot, nSlot int) (next int, baseAdd int64, ok bool) {
+func runtimeNestedParseBaseCase(proto *vm.FuncProto, pc, mSlot, nSlot int) (next int, baseAdd int64, ok bool) {
 	code := proto.Code
 	if pc+5 >= len(code) {
 		return 0, 0, false
 	}
-	zeroSlot, zero, ok := fixedNestedLoadInt(proto, pc)
+	zeroSlot, zero, ok := runtimeNestedLoadInt(proto, pc)
 	if !ok || zero != 0 {
 		return 0, 0, false
 	}
-	if !fixedNestedEqSlotConstZero(code[pc+1], mSlot, zeroSlot) || vm.DecodeOp(code[pc+2]) != vm.OP_JMP {
+	if !runtimeNestedEqSlotConstZero(code[pc+1], mSlot, zeroSlot) || vm.DecodeOp(code[pc+2]) != vm.OP_JMP {
 		return 0, 0, false
 	}
 	next = pc + 3 + vm.DecodesBx(code[pc+2])
 	if next <= pc+3 || next > len(code) {
 		return 0, 0, false
 	}
-	addSlot, addValue, ok := fixedNestedLoadInt(proto, pc+3)
+	addSlot, addValue, ok := runtimeNestedLoadInt(proto, pc+3)
 	if !ok {
 		return 0, 0, false
 	}
@@ -96,16 +96,16 @@ func fixedNestedParseBaseCase(proto *vm.FuncProto, pc, mSlot, nSlot int) (next i
 	return next, addValue, true
 }
 
-func fixedNestedParseZeroCase(proto *vm.FuncProto, pc int) (next int, zeroArg, mStep int64, ok bool) {
+func runtimeNestedParseZeroCase(proto *vm.FuncProto, pc int) (next int, zeroArg, mStep int64, ok bool) {
 	code := proto.Code
 	if pc+8 >= len(code) {
 		return 0, 0, 0, false
 	}
-	zeroSlot, zero, ok := fixedNestedLoadInt(proto, pc)
+	zeroSlot, zero, ok := runtimeNestedLoadInt(proto, pc)
 	if !ok || zero != 0 {
 		return 0, 0, 0, false
 	}
-	if !fixedNestedEqSlotConstZero(code[pc+1], 1, zeroSlot) || vm.DecodeOp(code[pc+2]) != vm.OP_JMP {
+	if !runtimeNestedEqSlotConstZero(code[pc+1], 1, zeroSlot) || vm.DecodeOp(code[pc+2]) != vm.OP_JMP {
 		return 0, 0, 0, false
 	}
 	next = pc + 3 + vm.DecodesBx(code[pc+2])
@@ -113,49 +113,49 @@ func fixedNestedParseZeroCase(proto *vm.FuncProto, pc int) (next int, zeroArg, m
 		return 0, 0, 0, false
 	}
 	callPC := pc + 3
-	fnSlot, ok := fixedNestedSelfGlobal(proto, callPC)
+	fnSlot, ok := runtimeNestedSelfGlobal(proto, callPC)
 	if !ok {
 		return 0, 0, 0, false
 	}
-	stepSlot, stepValue, ok := fixedNestedLoadInt(proto, callPC+1)
+	stepSlot, stepValue, ok := runtimeNestedLoadInt(proto, callPC+1)
 	if !ok {
 		return 0, 0, 0, false
 	}
-	if !fixedNestedSubParamConst(code[callPC+2], fnSlot+1, 0, stepSlot) {
+	if !runtimeNestedSubParamConst(code[callPC+2], fnSlot+1, 0, stepSlot) {
 		return 0, 0, 0, false
 	}
-	argSlot, argValue, ok := fixedNestedLoadInt(proto, callPC+3)
+	argSlot, argValue, ok := runtimeNestedLoadInt(proto, callPC+3)
 	if !ok || argSlot != fnSlot+2 {
 		return 0, 0, 0, false
 	}
-	if !fixedNestedTailSelfCallReturn(code[callPC+4], code[callPC+5], fnSlot) {
+	if !runtimeNestedTailSelfCallReturn(code[callPC+4], code[callPC+5], fnSlot) {
 		return 0, 0, 0, false
 	}
 	return next, argValue, stepValue, true
 }
 
-func fixedNestedParseNestedCase(proto *vm.FuncProto, pc int) (mStep, nStep int64, next int, ok bool) {
+func runtimeNestedParseNestedCase(proto *vm.FuncProto, pc int) (mStep, nStep int64, next int, ok bool) {
 	code := proto.Code
 	if pc+10 >= len(code) {
 		return 0, 0, 0, false
 	}
-	outerSlot, ok := fixedNestedSelfGlobal(proto, pc)
+	outerSlot, ok := runtimeNestedSelfGlobal(proto, pc)
 	if !ok {
 		return 0, 0, 0, false
 	}
-	mStepSlot, mStepValue, ok := fixedNestedLoadInt(proto, pc+1)
-	if !ok || !fixedNestedSubParamConst(code[pc+2], outerSlot+1, 0, mStepSlot) {
+	mStepSlot, mStepValue, ok := runtimeNestedLoadInt(proto, pc+1)
+	if !ok || !runtimeNestedSubParamConst(code[pc+2], outerSlot+1, 0, mStepSlot) {
 		return 0, 0, 0, false
 	}
-	innerSlot, ok := fixedNestedSelfGlobal(proto, pc+3)
+	innerSlot, ok := runtimeNestedSelfGlobal(proto, pc+3)
 	if !ok {
 		return 0, 0, 0, false
 	}
 	if vm.DecodeOp(code[pc+4]) != vm.OP_MOVE || vm.DecodeA(code[pc+4]) != innerSlot+1 || vm.DecodeB(code[pc+4]) != 0 {
 		return 0, 0, 0, false
 	}
-	nStepSlot, nStepValue, ok := fixedNestedLoadInt(proto, pc+5)
-	if !ok || !fixedNestedSubParamConst(code[pc+6], innerSlot+2, 1, nStepSlot) {
+	nStepSlot, nStepValue, ok := runtimeNestedLoadInt(proto, pc+5)
+	if !ok || !runtimeNestedSubParamConst(code[pc+6], innerSlot+2, 1, nStepSlot) {
 		return 0, 0, 0, false
 	}
 	if vm.DecodeOp(code[pc+7]) != vm.OP_CALL || vm.DecodeA(code[pc+7]) != innerSlot ||
@@ -165,13 +165,13 @@ func fixedNestedParseNestedCase(proto *vm.FuncProto, pc int) (mStep, nStep int64
 	if vm.DecodeOp(code[pc+8]) != vm.OP_MOVE || vm.DecodeA(code[pc+8]) != outerSlot+2 || vm.DecodeB(code[pc+8]) != innerSlot {
 		return 0, 0, 0, false
 	}
-	if !fixedNestedTailSelfCallReturn(code[pc+9], code[pc+10], outerSlot) {
+	if !runtimeNestedTailSelfCallReturn(code[pc+9], code[pc+10], outerSlot) {
 		return 0, 0, 0, false
 	}
 	return mStepValue, nStepValue, pc + 11, true
 }
 
-func fixedNestedLoadInt(proto *vm.FuncProto, pc int) (slot int, value int64, ok bool) {
+func runtimeNestedLoadInt(proto *vm.FuncProto, pc int) (slot int, value int64, ok bool) {
 	if proto == nil || pc < 0 || pc >= len(proto.Code) {
 		return 0, 0, false
 	}
@@ -190,7 +190,7 @@ func fixedNestedLoadInt(proto *vm.FuncProto, pc int) (slot int, value int64, ok 
 	}
 }
 
-func fixedNestedEqSlotConstZero(inst uint32, paramSlot, zeroSlot int) bool {
+func runtimeNestedEqSlotConstZero(inst uint32, paramSlot, zeroSlot int) bool {
 	if vm.DecodeOp(inst) != vm.OP_EQ || vm.DecodeA(inst) != 0 {
 		return false
 	}
@@ -198,14 +198,14 @@ func fixedNestedEqSlotConstZero(inst uint32, paramSlot, zeroSlot int) bool {
 	return (b == paramSlot && c == zeroSlot) || (b == zeroSlot && c == paramSlot)
 }
 
-func fixedNestedSubParamConst(inst uint32, dstSlot, paramSlot, constSlot int) bool {
+func runtimeNestedSubParamConst(inst uint32, dstSlot, paramSlot, constSlot int) bool {
 	return vm.DecodeOp(inst) == vm.OP_SUB &&
 		vm.DecodeA(inst) == dstSlot &&
 		vm.DecodeB(inst) == paramSlot &&
 		vm.DecodeC(inst) == constSlot
 }
 
-func fixedNestedTailSelfCallReturn(callInst, returnInst uint32, fnSlot int) bool {
+func runtimeNestedTailSelfCallReturn(callInst, returnInst uint32, fnSlot int) bool {
 	return vm.DecodeOp(callInst) == vm.OP_CALL &&
 		vm.DecodeA(callInst) == fnSlot &&
 		vm.DecodeB(callInst) == 3 &&
@@ -215,7 +215,7 @@ func fixedNestedTailSelfCallReturn(callInst, returnInst uint32, fnSlot int) bool
 		vm.DecodeB(returnInst) == 0
 }
 
-func fixedNestedSelfGlobal(proto *vm.FuncProto, pc int) (slot int, ok bool) {
+func runtimeNestedSelfGlobal(proto *vm.FuncProto, pc int) (slot int, ok bool) {
 	if proto == nil || pc < 0 || pc >= len(proto.Code) {
 		return 0, false
 	}
@@ -229,20 +229,20 @@ func fixedNestedSelfGlobal(proto *vm.FuncProto, pc int) (slot int, ok bool) {
 	return vm.DecodeA(inst), true
 }
 
-func newFixedRecursiveNestedIntFoldCompiled(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	protocol, ok := analyzeFixedRecursiveNestedIntFold(proto)
+func newRuntimeRecursiveNestedIntFoldCompiled(proto *vm.FuncProto) (*CompiledFunction, bool) {
+	protocol, ok := analyzeRuntimeRecursiveNestedIntFold(proto)
 	if !ok {
 		return nil, false
 	}
 	return &CompiledFunction{
-		Proto:                       proto,
-		numRegs:                     proto.MaxStack,
-		FixedRecursiveNestedIntFold: protocol,
+		Proto:                         proto,
+		numRegs:                       proto.MaxStack,
+		RuntimeRecursiveNestedIntFold: protocol,
 	}, true
 }
 
-func (tm *TieringManager) compileFixedRecursiveNestedIntFoldTier2(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	cf, ok := newFixedRecursiveNestedIntFoldCompiled(proto)
+func (tm *TieringManager) compileRuntimeRecursiveNestedIntFoldTier2(proto *vm.FuncProto) (*CompiledFunction, bool) {
+	cf, ok := newRuntimeRecursiveNestedIntFoldCompiled(proto)
 	if !ok {
 		return nil, false
 	}
@@ -257,29 +257,29 @@ func (tm *TieringManager) compileFixedRecursiveNestedIntFoldTier2(proto *vm.Func
 	return cf, true
 }
 
-func (tm *TieringManager) executeFixedRecursiveNestedIntFold(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
-	if cf == nil || cf.FixedRecursiveNestedIntFold == nil || proto == nil {
-		return nil, fmt.Errorf("tier2: missing fixed recursive nested int fold protocol")
+func (tm *TieringManager) executeRuntimeRecursiveNestedIntFold(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, error) {
+	if cf == nil || cf.RuntimeRecursiveNestedIntFold == nil || proto == nil {
+		return nil, fmt.Errorf("tier2: missing runtime recursive nested int fold protocol")
 	}
 	if base < 0 || base+1 >= len(regs) {
-		return nil, fmt.Errorf("tier2: fixed recursive nested int fold base %d outside regs len %d", base, len(regs))
+		return nil, fmt.Errorf("tier2: runtime recursive nested int fold base %d outside regs len %d", base, len(regs))
 	}
-	if !tm.fixedRecursiveSelfGlobalMatches(proto) {
-		tm.disableTier2AfterRuntimeDeopt(proto, "tier2: fixed recursive nested int fold self global changed")
-		return nil, fmt.Errorf("tier2: fixed recursive nested int fold self global changed")
+	if !tm.runtimeRecursiveSelfGlobalMatches(proto) {
+		tm.disableTier2AfterRuntimeDeopt(proto, "tier2: runtime recursive nested int fold self global changed")
+		return nil, fmt.Errorf("tier2: runtime recursive nested int fold self global changed")
 	}
 	proto.EnteredTier2 = 1
-	n, ok := cf.FixedRecursiveNestedIntFold.fold(regs[base], regs[base+1])
+	n, ok := cf.RuntimeRecursiveNestedIntFold.fold(regs[base], regs[base+1])
 	if !ok {
-		tm.disableTier2AfterRuntimeDeopt(proto, "tier2: fixed recursive nested int fold fallback")
-		return nil, fmt.Errorf("tier2: fixed recursive nested int fold fallback")
+		tm.disableTier2AfterRuntimeDeopt(proto, "tier2: runtime recursive nested int fold fallback")
+		return nil, fmt.Errorf("tier2: runtime recursive nested int fold fallback")
 	}
 	result := runtime.IntValue(n)
 	regs[base] = result
 	return runtime.ReuseValueSlice1(retBuf, result), nil
 }
 
-func (p *fixedRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int64, bool) {
+func (p *runtimeRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int64, bool) {
 	if p == nil || !mv.IsInt() || !nv.IsInt() || p.mStep <= 0 || p.nStep <= 0 {
 		return 0, false
 	}
@@ -291,12 +291,12 @@ func (p *fixedRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int64,
 	if out, ok := p.foldSmallRows(m, n); ok {
 		return out, true
 	}
-	var stackBuf [maxFixedRecursiveNestedIntFoldStack]int64
+	var stackBuf [maxRuntimeRecursiveNestedIntFoldStack]int64
 	stack := stackBuf[:0]
-	for iter := 0; iter < maxFixedRecursiveNestedIntFoldIterations; iter++ {
+	for iter := 0; iter < maxRuntimeRecursiveNestedIntFoldIterations; iter++ {
 		switch {
 		case m == 0:
-			next, ok := fixedFoldCheckedAdd(n, p.baseAdd)
+			next, ok := runtimeFoldCheckedAdd(n, p.baseAdd)
 			if !ok {
 				return 0, false
 			}
@@ -326,7 +326,7 @@ func (p *fixedRecursiveNestedIntFoldProtocol) fold(mv, nv runtime.Value) (int64,
 	return 0, false
 }
 
-func (p *fixedRecursiveNestedIntFoldProtocol) foldSmallRows(m, n int64) (int64, bool) {
+func (p *runtimeRecursiveNestedIntFoldProtocol) foldSmallRows(m, n int64) (int64, bool) {
 	if p.mStep != 1 || p.nStep != 1 {
 		return 0, false
 	}
@@ -334,95 +334,95 @@ func (p *fixedRecursiveNestedIntFoldProtocol) foldSmallRows(m, n int64) (int64, 
 	z := p.zeroArg
 	switch m {
 	case 0:
-		return fixedFoldCheckedAdd(n, a)
+		return runtimeFoldCheckedAdd(n, a)
 	case 1:
-		count, ok := fixedFoldCheckedAdd(n, 1)
+		count, ok := runtimeFoldCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
-		delta, ok := fixedNestedCheckedMul(a, count)
+		delta, ok := runtimeNestedCheckedMul(a, count)
 		if !ok {
 			return 0, false
 		}
-		return fixedFoldCheckedAdd(z, delta)
+		return runtimeFoldCheckedAdd(z, delta)
 	case 2:
-		count, ok := fixedFoldCheckedAdd(n, 1)
+		count, ok := runtimeFoldCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
-		return fixedNestedAffineIterate(a, z+a, z, count)
+		return runtimeNestedAffineIterate(a, z+a, z, count)
 	case 3:
 		if a != 1 {
 			return 0, false
 		}
-		count, ok := fixedFoldCheckedAdd(n, 1)
+		count, ok := runtimeFoldCheckedAdd(n, 1)
 		if !ok {
 			return 0, false
 		}
 		if z == 0 {
 			return count, true
 		}
-		s, ok := fixedFoldCheckedAdd(z, 1)
+		s, ok := runtimeFoldCheckedAdd(z, 1)
 		if !ok {
 			return 0, false
 		}
-		pow, ok := fixedNestedCheckedPow(s, count)
+		pow, ok := runtimeNestedCheckedPow(s, count)
 		if !ok {
 			return 0, false
 		}
-		left, ok := fixedNestedCheckedMul(pow, z)
+		left, ok := runtimeNestedCheckedMul(pow, z)
 		if !ok {
 			return 0, false
 		}
-		c, ok := fixedFoldCheckedAdd(2*z, 1)
+		c, ok := runtimeFoldCheckedAdd(2*z, 1)
 		if !ok {
 			return 0, false
 		}
-		numer, ok := fixedNestedCheckedMul(c, pow-1)
+		numer, ok := runtimeNestedCheckedMul(c, pow-1)
 		if !ok || numer%z != 0 {
 			return 0, false
 		}
-		return fixedFoldCheckedAdd(left, numer/z)
+		return runtimeFoldCheckedAdd(left, numer/z)
 	default:
 		return 0, false
 	}
 }
 
-func fixedNestedCheckedMul(a, b int64) (int64, bool) {
+func runtimeNestedCheckedMul(a, b int64) (int64, bool) {
 	if a < 0 || b < 0 {
 		return 0, false
 	}
 	if a == 0 || b == 0 {
 		return 0, true
 	}
-	if a > fixedFoldMaxInt48/b {
+	if a > runtimeFoldMaxInt48/b {
 		return 0, false
 	}
 	out := a * b
-	if out > fixedFoldMaxInt48 {
+	if out > runtimeFoldMaxInt48 {
 		return 0, false
 	}
 	return out, true
 }
 
-func fixedNestedAffineIterate(scale, bias, x, count int64) (int64, bool) {
+func runtimeNestedAffineIterate(scale, bias, x, count int64) (int64, bool) {
 	if count < 0 {
 		return 0, false
 	}
 	if scale == 1 {
-		delta, ok := fixedNestedCheckedMul(bias, count)
+		delta, ok := runtimeNestedCheckedMul(bias, count)
 		if !ok {
 			return 0, false
 		}
-		return fixedFoldCheckedAdd(x, delta)
+		return runtimeFoldCheckedAdd(x, delta)
 	}
 	result := x
 	for i := int64(0); i < count; i++ {
-		next, ok := fixedNestedCheckedMul(scale, result)
+		next, ok := runtimeNestedCheckedMul(scale, result)
 		if !ok {
 			return 0, false
 		}
-		result, ok = fixedFoldCheckedAdd(next, bias)
+		result, ok = runtimeFoldCheckedAdd(next, bias)
 		if !ok {
 			return 0, false
 		}
@@ -430,7 +430,7 @@ func fixedNestedAffineIterate(scale, bias, x, count int64) (int64, bool) {
 	return result, true
 }
 
-func fixedNestedCheckedPow(base, exp int64) (int64, bool) {
+func runtimeNestedCheckedPow(base, exp int64) (int64, bool) {
 	if exp < 0 {
 		return 0, false
 	}
@@ -438,7 +438,7 @@ func fixedNestedCheckedPow(base, exp int64) (int64, bool) {
 	for exp > 0 {
 		if exp&1 != 0 {
 			var ok bool
-			result, ok = fixedNestedCheckedMul(result, base)
+			result, ok = runtimeNestedCheckedMul(result, base)
 			if !ok {
 				return 0, false
 			}
@@ -448,7 +448,7 @@ func fixedNestedCheckedPow(base, exp int64) (int64, bool) {
 			break
 		}
 		var ok bool
-		base, ok = fixedNestedCheckedMul(base, base)
+		base, ok = runtimeNestedCheckedMul(base, base)
 		if !ok {
 			return 0, false
 		}

@@ -629,7 +629,7 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 		return nil
 
 	case TieringActionFixedTableBuilder:
-		if t2, ok := tm.compileFixedRecursiveTableBuilderTier2(proto); ok {
+		if t2, ok := tm.compileRuntimeRecursiveTableBuilderTier2(proto); ok {
 			tm.markTier2Compiled(proto, t2)
 			return t2
 		}
@@ -768,16 +768,16 @@ func (tm *TieringManager) promoteTier2(proto *vm.FuncProto) interface{} {
 }
 
 func (tm *TieringManager) compileTier2WholeCallProtocol(proto *vm.FuncProto) (*CompiledFunction, bool) {
-	if t2, ok := tm.compileFixedRecursiveTableBuilderTier2(proto); ok {
+	if t2, ok := tm.compileRuntimeRecursiveTableBuilderTier2(proto); ok {
 		return t2, true
 	}
-	if t2, ok := tm.compileFixedRecursiveIntFoldTier2(proto); ok {
+	if t2, ok := tm.compileRuntimeRecursiveIntFoldTier2(proto); ok {
 		return t2, true
 	}
-	if t2, ok := tm.compileFixedRecursiveNestedIntFoldTier2(proto); ok {
+	if t2, ok := tm.compileRuntimeRecursiveNestedIntFoldTier2(proto); ok {
 		return t2, true
 	}
-	if t2, ok := tm.compileFixedRecursiveTableFoldTier2(proto); ok {
+	if t2, ok := tm.compileRuntimeRecursiveTableFoldTier2(proto); ok {
 		return t2, true
 	}
 	return nil, false

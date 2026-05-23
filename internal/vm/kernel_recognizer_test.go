@@ -54,7 +54,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 		t.Fatal("missing fannkuch proto")
 	}
 	if !isPermutationFlipChecksumKernelProto(child) {
-		t.Fatalf("permutation flip checksum recognizer rejected current benchmark shape: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
+		t.Fatalf("permutation flip checksum recognizer rejected current structural shape: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
 	}
 	if !cachedRuntimeSpecializationRecognized(child, runtimeSpecializationPermutationFlipChecksum) {
 		t.Fatal("permutation flip checksum rejected by runtime specialization cache")
