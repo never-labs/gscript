@@ -975,8 +975,8 @@ func pureNumericInlineRejectReason(calleeFn *Function) string {
 	if calleeFn.Unpromotable {
 		return "callee uses unmodeled bytecode"
 	}
-	if calleeFn.Proto.IsVarArg {
-		return "vararg callee"
+	if !calleeFn.Proto.MethodJITTier2Callable() {
+		return "callee requires vararg frame state"
 	}
 	if len(calleeFn.Proto.Upvalues) > 0 {
 		return "callee captures upvalues"
@@ -1054,8 +1054,8 @@ func nativeEffectLoopInlineRejectReason(calleeFn *Function) string {
 	if calleeFn.Unpromotable {
 		return "callee uses unmodeled bytecode"
 	}
-	if calleeFn.Proto.IsVarArg {
-		return "vararg callee"
+	if !calleeFn.Proto.MethodJITTier2Callable() {
+		return "callee requires vararg frame state"
 	}
 	if len(calleeFn.Proto.Upvalues) > 0 {
 		return "callee captures upvalues"

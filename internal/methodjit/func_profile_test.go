@@ -72,7 +72,7 @@ func fib(n) {
 	t.Logf("fib profile: %+v", p)
 }
 
-func TestShouldPromoteTier2RejectsDeclaredVarargWithoutOPVararg(t *testing.T) {
+func TestShouldPromoteTier2AllowsDeclaredVarargWithoutOPVararg(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vararg_loop",
 		IsVarArg: true,
@@ -87,8 +87,8 @@ func TestShouldPromoteTier2RejectsDeclaredVarargWithoutOPVararg(t *testing.T) {
 	if !profile.HasLoop || profile.ArithCount == 0 {
 		t.Fatalf("test profile did not hit Tier 2 promotion shape: %+v", profile)
 	}
-	if shouldPromoteTier2(proto, profile, 100) {
-		t.Fatal("declared vararg without OP_VARARG must stay out of Tier 2 promotion")
+	if !shouldPromoteTier2(proto, profile, 100) {
+		t.Fatal("declared vararg without OP_VARARG should be eligible for Tier 2 promotion")
 	}
 }
 

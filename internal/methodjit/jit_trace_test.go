@@ -126,7 +126,7 @@ func TestTracePromotionDecisionRecordsReasonAndCallablePolicy(t *testing.T) {
 	tm.tracePromotionDecision(proto, PromotionDecision{
 		Action:       TieringActionUseTier1,
 		Reason:       PromotionReasonNotReadyForTier2,
-		Gate:         blockGate("Tier2Callable", vm.MethodJITCallableReasonDeclaredVarargTier2),
+		Gate:         blockGate("FeedbackReadiness", "waiting for feedback"),
 		PromoteTier2: false,
 	})
 	tm.tracePromotionDecision(&vm.FuncProto{Name: "hot", CallCount: 10}, PromotionDecision{
@@ -153,7 +153,7 @@ func TestTracePromotionDecisionRecordsReasonAndCallablePolicy(t *testing.T) {
 	if first["tier1_callable"] != true || first["tier1_callable_reason"] != vm.MethodJITCallableReasonDeclaredVarargTier1 {
 		t.Fatalf("missing Tier 1 callable attrs: %#v", first)
 	}
-	if first["tier2_callable"] != false || first["tier2_callable_reason"] != vm.MethodJITCallableReasonDeclaredVarargTier2 {
+	if first["tier2_callable"] != true || first["tier2_callable_reason"] != vm.MethodJITCallableReasonDeclaredVarargTier2 {
 		t.Fatalf("missing Tier 2 callable attrs: %#v", first)
 	}
 	second := events[1].Attrs

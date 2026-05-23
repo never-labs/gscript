@@ -25,7 +25,7 @@ func TestMethodJITTierCallableVarargBoundary(t *testing.T) {
 			name:        "declared vararg unused",
 			proto:       &FuncProto{IsVarArg: true},
 			wantTier1:   true,
-			wantTier2:   false,
+			wantTier2:   true,
 			wantLegacy:  true,
 			tier1Reason: MethodJITCallableReasonDeclaredVarargTier1,
 			tier2Reason: MethodJITCallableReasonDeclaredVarargTier2,
@@ -37,7 +37,7 @@ func TestMethodJITTierCallableVarargBoundary(t *testing.T) {
 			wantTier2:   false,
 			wantLegacy:  false,
 			tier1Reason: MethodJITCallableReasonOPVarargNeedsVMFrame,
-			tier2Reason: MethodJITCallableReasonDeclaredVarargTier2,
+			tier2Reason: MethodJITCallableReasonOPVarargNeedsVMFrame,
 		},
 		{
 			name:        "vararg bytecode without declaration",

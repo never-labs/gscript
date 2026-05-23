@@ -671,7 +671,7 @@ func tier2LoopCallFeedbackIsNativeCandidate(fn *Function, instr *Instr, globals 
 	}
 	nArgs := len(instr.Args) - 1
 	for _, callee := range protos {
-		if callee == nil || callee.IsVarArg || callee.NumParams != nArgs {
+		if callee == nil || !callee.MethodJITTier2Callable() || callee.NumParams != nArgs {
 			return false
 		}
 		if !tier2LoopCallCalleeIsNativeCandidate(callee, globals) {
@@ -703,7 +703,7 @@ func tier2LoopCallCalleeHasTier2DirectEntry(callee *vm.FuncProto) bool {
 }
 
 func tier2LoopCallCalleeCanTierUp(callee *vm.FuncProto, globals map[string]*vm.FuncProto) bool {
-	if callee == nil || callee.IsVarArg {
+	if callee == nil || !callee.MethodJITTier2Callable() {
 		return false
 	}
 	if hasStaticSelfRecursivePartitionSetTableLoop(callee) {
@@ -759,7 +759,7 @@ func tier2LoopCallCalleePassesLoopDepth1Gate(callee *vm.FuncProto, globals map[s
 }
 
 func tier2LoopCallCalleeIsLeafNativeCandidate(callee *vm.FuncProto) bool {
-	if callee == nil || callee.IsVarArg || len(callee.Code) > inlineMaxCalleeSize {
+	if callee == nil || !callee.MethodJITTier2Callable() || len(callee.Code) > inlineMaxCalleeSize {
 		return false
 	}
 	if !canPromoteToTier2(callee) {

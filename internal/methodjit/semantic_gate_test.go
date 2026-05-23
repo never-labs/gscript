@@ -59,7 +59,7 @@ func TestJITSemanticGateRejectsDynamicOperators(t *testing.T) {
 	}
 }
 
-func TestTier2CallableGateRejectsDeclaredVarargWithoutOPVararg(t *testing.T) {
+func TestTier2CallableGateAllowsDeclaredVarargWithoutOPVararg(t *testing.T) {
 	proto := &vm.FuncProto{
 		Name:     "vararg_unused",
 		IsVarArg: true,
@@ -68,15 +68,15 @@ func TestTier2CallableGateRejectsDeclaredVarargWithoutOPVararg(t *testing.T) {
 	if !proto.MethodJITTier1Callable() {
 		t.Fatal("declared but unread vararg function should remain Tier 1 callable")
 	}
-	if proto.MethodJITTier2Callable() {
-		t.Fatal("declared vararg function should not be Tier 2 callable")
+	if !proto.MethodJITTier2Callable() {
+		t.Fatal("declared but unread vararg function should be Tier 2 callable")
 	}
-	if canPromoteToTier2(proto) {
-		t.Fatal("declared vararg function should not pass Tier 2 bytecode gate")
+	if !canPromoteToTier2(proto) {
+		t.Fatal("declared but unread vararg function should pass Tier 2 bytecode gate")
 	}
 	gate := jitTier2CallableGate(proto)
-	if gate.Allowed {
-		t.Fatal("Tier2Callable gate should reject declared vararg function")
+	if !gate.Allowed {
+		t.Fatal("Tier2Callable gate should allow declared but unread vararg function")
 	}
 	if gate.Reason != vm.MethodJITCallableReasonDeclaredVarargTier2 {
 		t.Fatalf("Tier2Callable reason = %q, want %q", gate.Reason, vm.MethodJITCallableReasonDeclaredVarargTier2)

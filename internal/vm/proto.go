@@ -93,7 +93,7 @@ const (
 	MethodJITCallableReasonNilProto              = "nil_proto"
 	MethodJITCallableReasonFixedArity            = "fixed_arity_callable"
 	MethodJITCallableReasonDeclaredVarargTier1   = "declared_vararg_without_op_vararg_tier1_callable"
-	MethodJITCallableReasonDeclaredVarargTier2   = "declared_vararg_function_is_tier1_only"
+	MethodJITCallableReasonDeclaredVarargTier2   = "declared_vararg_without_op_vararg_tier2_callable"
 	MethodJITCallableReasonOPVarargTier1         = "op_vararg_without_declaration_tier1_callable"
 	MethodJITCallableReasonOPVarargNeedsVMFrame  = "op_vararg_requires_vm_vararg_frame_state"
 	MethodJITCallableReasonUnsupportedVarargForm = "unsupported_vararg_callable_shape"
@@ -122,12 +122,11 @@ func (p *FuncProto) MethodJITTier1CallableDecision() MethodJITCallableDecision {
 }
 
 // MethodJITTier2Callable reports whether Tier 2 may compile and publish direct
-// entries for this proto. Tier 2 keeps a stricter ABI boundary than Tier 1:
-// declared vararg functions stay out of Tier 2 even if the bytecode never
-// executes OP_VARARG, because Tier 2 direct entries and continuations do not
-// own the vararg frame contract.
+// entries for this proto. Declared vararg functions are callable when their
+// bytecode never reads varargs: extra arguments are ignored exactly like a fixed
+// arity function, and no vararg frame state is observable.
 func (p *FuncProto) MethodJITTier2Callable() bool {
-	return p != nil && !p.IsVarArg && !p.UsesVarargBytecode
+	return p != nil && !p.UsesVarargBytecode
 }
 
 // MethodJITTier2CallableDecision explains the Tier 2 callable policy without
@@ -172,7 +171,8 @@ func methodJITCallableDecision(p *FuncProto, tier MethodJITCallableTier) MethodJ
 			d.Reason = MethodJITCallableReasonFixedArity
 			return d
 		}
-		if p.IsVarArg {
+		if p.IsVarArg && !p.UsesVarargBytecode {
+			d.Allowed = true
 			d.Reason = MethodJITCallableReasonDeclaredVarargTier2
 			return d
 		}

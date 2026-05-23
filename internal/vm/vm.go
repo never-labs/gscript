@@ -1599,9 +1599,15 @@ func (vm *VM) newIPairsIteratorFunction() *runtime.GoFunction {
 			}
 			i++
 			key := runtime.IntValue(i)
-			v, err := vm.tableGet(table, key)
-			if err != nil {
-				return runtime.NilValue(), runtime.NilValue(), 0, err
+			var v runtime.Value
+			if tbl := table.Table(); tbl.GetMetatable() == nil {
+				v = tbl.RawGetInt(i)
+			} else {
+				var err error
+				v, err = vm.tableGet(table, key)
+				if err != nil {
+					return runtime.NilValue(), runtime.NilValue(), 0, err
+				}
 			}
 			if v.IsNil() {
 				return runtime.NilValue(), runtime.NilValue(), 1, nil

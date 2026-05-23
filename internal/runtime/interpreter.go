@@ -208,16 +208,37 @@ func (interp *Interpreter) registerBuiltins() {
 		},
 	}))
 
+	typeNames := [TypeChannel + 1]Value{
+		TypeNil:       StringValue("nil"),
+		TypeBool:      StringValue("boolean"),
+		TypeInt:       StringValue("number"),
+		TypeFloat:     StringValue("number"),
+		TypeString:    StringValue("string"),
+		TypeTable:     StringValue("table"),
+		TypeFunction:  StringValue("function"),
+		TypeCoroutine: StringValue("coroutine"),
+		TypeChannel:   StringValue("channel"),
+	}
+	unknownTypeName := StringValue("unknown")
+	typeNameValue := func(v Value) Value {
+		t := v.Type()
+		if int(t) < len(typeNames) {
+			if tv := typeNames[t]; !tv.IsNil() {
+				return tv
+			}
+		}
+		return unknownTypeName
+	}
 	interp.globals.Define("type", FunctionValue(&GoFunction{
 		Name: "type",
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) == 0 {
 				return nil, fmt.Errorf("bad argument #1 to 'type' (value expected)")
 			}
-			return []Value{StringValue(args[0].TypeName())}, nil
+			return []Value{typeNameValue(args[0])}, nil
 		},
 		FastArg1: func(arg Value) (Value, error) {
-			return StringValue(arg.TypeName()), nil
+			return typeNameValue(arg), nil
 		},
 	}))
 
