@@ -2,7 +2,7 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
-type boolTableStrikeCountKernelCache struct {
+type boolTableStrikeCountSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	spec        *boolTableStrikeCountKernelSpec
 }
@@ -71,7 +71,7 @@ func (spec *boolTableStrikeCountKernelSpec) run(n int) int64 {
 	return count
 }
 
-func IsBoolTableStrikeCountKernelProto(p *FuncProto) bool {
+func IsBoolTableStrikeCountSpecializationProto(p *FuncProto) bool {
 	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationBoolTableStrikeCount)
 }
 
@@ -86,20 +86,20 @@ func boolTableStrikeCountKernelSpecForProto(p *FuncProto) (*boolTableStrikeCount
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.BoolTableStrikeCountKernel
+	cache := p.BoolTableStrikeCountSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
-	spec, ok := analyzeBoolTableStrikeCountKernelSpec(p.Code)
+	spec, ok := analyzeBoolTableStrikeCountSpecializationSpec(p.Code)
 	if !ok {
-		p.BoolTableStrikeCountKernel = &boolTableStrikeCountKernelCache{fingerprint: fp}
+		p.BoolTableStrikeCountSpecialization = &boolTableStrikeCountSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.BoolTableStrikeCountKernel = &boolTableStrikeCountKernelCache{fingerprint: fp, spec: spec}
+	p.BoolTableStrikeCountSpecialization = &boolTableStrikeCountSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
-func analyzeBoolTableStrikeCountKernelSpec(code []uint32) (*boolTableStrikeCountKernelSpec, bool) {
+func analyzeBoolTableStrikeCountSpecializationSpec(code []uint32) (*boolTableStrikeCountKernelSpec, bool) {
 	if len(code) != 45 {
 		return nil, false
 	}

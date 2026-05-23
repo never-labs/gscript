@@ -53,13 +53,13 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	if child == nil {
 		t.Fatal("missing fannkuch proto")
 	}
-	if !isPermutationFlipChecksumKernelProto(child) {
+	if !isPermutationFlipChecksumSpecializationProto(child) {
 		t.Fatalf("permutation flip checksum recognizer rejected current structural shape: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
 	}
 	if !cachedRuntimeSpecializationRecognized(child, runtimeSpecializationPermutationFlipChecksum) {
 		t.Fatal("permutation flip checksum rejected by runtime specialization cache")
 	}
-	if child.PermutationFlipChecksumKernel == nil || child.PermutationFlipChecksumKernel.spec == nil {
+	if child.PermutationFlipChecksumSpecialization == nil || child.PermutationFlipChecksumSpecialization.spec == nil {
 		t.Fatal("permutation flip checksum proto-local spec was not generated")
 	}
 }
@@ -97,14 +97,14 @@ func TestRuntimeSpecializationTieringPolicyCatalogCoversRuntimeSources(t *testin
 func requireRuntimeSpecializationInfo(t *testing.T, infos []RuntimeSpecializationInfo, name string) {
 	t.Helper()
 	if !hasRuntimeSpecializationInfo(infos, name) {
-		t.Fatalf("kernel %q not found in %+v", name, infos)
+		t.Fatalf("specialization %q not found in %+v", name, infos)
 	}
 }
 
 func rejectRuntimeSpecializationInfo(t *testing.T, infos []RuntimeSpecializationInfo, name string) {
 	t.Helper()
 	if hasRuntimeSpecializationInfo(infos, name) {
-		t.Fatalf("kernel %q unexpectedly found in %+v", name, infos)
+		t.Fatalf("specialization %q unexpectedly found in %+v", name, infos)
 	}
 }
 
@@ -124,7 +124,7 @@ func findRuntimeSpecializationInfo(t *testing.T, infos []RuntimeSpecializationIn
 			return info
 		}
 	}
-	t.Fatalf("kernel %q not found in %+v", name, infos)
+	t.Fatalf("specialization %q not found in %+v", name, infos)
 	return RuntimeSpecializationInfo{}
 }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-const recursiveTableKernelSource = `
+const recursiveTableSpecializationSource = `
 func makeTree(depth) {
 	if depth == 0 {
 		return {left: nil, right: nil}
@@ -23,7 +23,7 @@ func checkTree(node) {
 `
 
 func TestRecursiveTableCallSiteRunsWithoutTier2Promotion(t *testing.T) {
-	top := compileProto(t, recursiveTableKernelSource+`
+	top := compileProto(t, recursiveTableSpecializationSource+`
 root := makeTree(4)
 result := checkTree(root)
 `)
@@ -47,7 +47,7 @@ result := checkTree(root)
 }
 
 func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *testing.T) {
-	top := compileProto(t, recursiveTableKernelSource)
+	top := compileProto(t, recursiveTableSpecializationSource)
 	builder := findTestProtoByName(top, "makeTree")
 	fold := findTestProtoByName(top, "checkTree")
 	if builder == nil || fold == nil {
@@ -76,7 +76,7 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 }
 
 func TestRecursiveTableRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *testing.T) {
-	top := compileProto(t, recursiveTableKernelSource)
+	top := compileProto(t, recursiveTableSpecializationSource)
 	v := New(runtime.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -147,7 +147,7 @@ func TestRecursiveTableRuntimeSpecializationRecordsHitsOnce(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
-	globals := compileAndRun(t, recursiveTableKernelSource+`
+	globals := compileAndRun(t, recursiveTableSpecializationSource+`
 root := makeTree(4)
 result := checkTree(root)
 `)
@@ -164,7 +164,7 @@ result := checkTree(root)
 }
 
 func TestRecursiveTableNonRecursiveCallSiteEntryDoesNotTrigger(t *testing.T) {
-	top := compileProto(t, recursiveTableKernelSource)
+	top := compileProto(t, recursiveTableSpecializationSource)
 	v := New(runtime.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -189,7 +189,7 @@ func TestRecursiveTableNonRecursiveCallSiteEntryDoesNotTrigger(t *testing.T) {
 	if !ok {
 		t.Fatalf("checkTree global is not a VM closure: %s", foldFn.TypeName())
 	}
-	builderCache := recursiveTableKernelForProto(builderCl.Proto)
+	builderCache := recursiveTableSpecializationForProto(builderCl.Proto)
 	if builderCache.builder == nil {
 		t.Fatal("missing builder cache")
 	}
@@ -204,7 +204,7 @@ func TestRecursiveTableNonRecursiveCallSiteEntryDoesNotTrigger(t *testing.T) {
 }
 
 func TestRecursiveTableBuildFoldRegionStillHandlesCombinedCall(t *testing.T) {
-	globals := compileAndRun(t, recursiveTableKernelSource+`
+	globals := compileAndRun(t, recursiveTableSpecializationSource+`
 result := checkTree(makeTree(4))
 `)
 	expectGlobalInt(t, globals, "result", 31)

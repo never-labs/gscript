@@ -21,7 +21,7 @@ func TestRawIntNestedRuntimeKernelRecognizesShiftedNestedRecurrence(t *testing.T
 	if fn == nil {
 		t.Fatal("nestwave proto not found")
 	}
-	kernel, ok := analyzeRawIntNestedKernel(fn)
+	kernel, ok := analyzeRawIntNestedSpecialization(fn)
 	if !ok {
 		t.Fatalf("nestwave should qualify for raw-int nested recurrence kernel:\n%s", dumpRawIntNestedTestBytecode(fn))
 	}
@@ -49,8 +49,8 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 	if fn.RuntimeSpecialization == nil || fn.RuntimeSpecialization.recognized == 0 {
 		t.Fatal("runtime specialization cache was not populated")
 	}
-	if fn.RawIntNestedKernel == nil || fn.RawIntNestedKernel.kernel == nil {
-		t.Fatal("raw nested int kernel cache was not populated")
+	if fn.RawIntNestedSpecialization == nil || fn.RawIntNestedSpecialization.plan == nil {
+		t.Fatal("raw nested int specialization cache was not populated")
 	}
 	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(fn), "nested_int_recurrence")
 	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {

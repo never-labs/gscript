@@ -254,7 +254,7 @@
       "name": "Dense arrays and matrix helpers",
       "category": "runtime-extension",
       "parser": {"status": "not_applicable", "refs": []},
-      "bytecode": {"status": "partial", "refs": ["internal/vm/matrix_multiply_kernel.go"]},
+      "bytecode": {"status": "partial", "refs": ["internal/vm/matrix_multiply_specialization.go"]},
       "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/runtime/stdlib_vec_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_matrix_codegen_test.go", "internal/methodjit/pass_matrix_lower.go"]},

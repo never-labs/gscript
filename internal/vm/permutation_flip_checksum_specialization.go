@@ -2,7 +2,7 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
-type permutationFlipChecksumKernelCache struct {
+type permutationFlipChecksumSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	spec        *permutationFlipChecksumKernelSpec
 }
@@ -54,7 +54,7 @@ func (vm *VM) runPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args 
 	if !ok {
 		return false, nil, nil
 	}
-	result, ok := runPermutationFlipChecksumKernel(int(n64), spec.resultCtor)
+	result, ok := runPermutationFlipChecksumSpecialization(int(n64), spec.resultCtor)
 	if !ok {
 		return false, nil, nil
 	}
@@ -62,11 +62,11 @@ func (vm *VM) runPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args 
 	return true, []runtime.Value{runtime.FreshTableValue(result)}, nil
 }
 
-func IsPermutationFlipChecksumKernelProto(p *FuncProto) bool {
+func IsPermutationFlipChecksumSpecializationProto(p *FuncProto) bool {
 	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationPermutationFlipChecksum)
 }
 
-func isPermutationFlipChecksumKernelProto(p *FuncProto) bool {
+func isPermutationFlipChecksumSpecializationProto(p *FuncProto) bool {
 	_, ok := permutationFlipChecksumKernelSpecForProto(p)
 	return ok
 }
@@ -76,20 +76,20 @@ func permutationFlipChecksumKernelSpecForProto(p *FuncProto) (*permutationFlipCh
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.PermutationFlipChecksumKernel
+	cache := p.PermutationFlipChecksumSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
-	spec, ok := analyzePermutationFlipChecksumKernelSpec(p)
+	spec, ok := analyzePermutationFlipChecksumSpecializationSpec(p)
 	if !ok {
-		p.PermutationFlipChecksumKernel = &permutationFlipChecksumKernelCache{fingerprint: fp}
+		p.PermutationFlipChecksumSpecialization = &permutationFlipChecksumSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.PermutationFlipChecksumKernel = &permutationFlipChecksumKernelCache{fingerprint: fp, spec: spec}
+	p.PermutationFlipChecksumSpecialization = &permutationFlipChecksumSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
-func analyzePermutationFlipChecksumKernelSpec(p *FuncProto) (*permutationFlipChecksumKernelSpec, bool) {
+func analyzePermutationFlipChecksumSpecializationSpec(p *FuncProto) (*permutationFlipChecksumKernelSpec, bool) {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack != 30 || len(p.Protos) != 0 || len(p.Constants) != 2 {
 		return nil, false
 	}
@@ -160,7 +160,7 @@ func seedPermutationFlipChecksumFeedback(p *FuncProto) {
 	}
 }
 
-func runPermutationFlipChecksumKernel(n int, ctor *runtime.SmallTableCtor2) (*runtime.Table, bool) {
+func runPermutationFlipChecksumSpecialization(n int, ctor *runtime.SmallTableCtor2) (*runtime.Table, bool) {
 	if n < 1 || n > 12 {
 		return nil, false
 	}

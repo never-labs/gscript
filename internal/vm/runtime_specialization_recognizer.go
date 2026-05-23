@@ -44,7 +44,7 @@ func (p RuntimeSpecializationTieringPolicy) AllowsStructuralTiering(proto *FuncP
 	if !p.Capabilities.Has(RuntimeSpecializationCapabilityStructuralTiering) {
 		return false
 	}
-	if p.RequireFloatConstant && !kernelProtoHasFloatConstant(proto) {
+	if p.RequireFloatConstant && !runtimeSpecializationProtoHasFloatConstant(proto) {
 		return false
 	}
 	return true
@@ -267,7 +267,7 @@ func fnvMixRuntimeValue(h uint64, v runtime.Value) uint64 {
 	}
 }
 
-func kernelProtoHasFloatConstant(proto *FuncProto) bool {
+func runtimeSpecializationProtoHasFloatConstant(proto *FuncProto) bool {
 	if proto == nil {
 		return false
 	}
@@ -301,7 +301,7 @@ func fnvMixUint64(h uint64, v uint64) uint64 {
 	return h
 }
 
-// RecognizedDriverLoopRuntimeSpecializations returns every registered driver-loop kernel whose
+// RecognizedDriverLoopRuntimeSpecializations returns every registered driver-loop runtime specialization whose
 // structural recognizer accepts proto with the supplied global callee map.
 func RecognizedDriverLoopRuntimeSpecializations(proto *FuncProto, globals map[string]*FuncProto) []RuntimeSpecializationInfo {
 	out := make([]RuntimeSpecializationInfo, 0, len(driverLoopRuntimeSpecializationRegistry))

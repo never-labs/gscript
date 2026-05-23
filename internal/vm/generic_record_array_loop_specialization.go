@@ -7,7 +7,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-type genericRecordArrayLoopKernelCache struct {
+type genericRecordArrayLoopSpecializationCache struct {
 	eligible bool
 	spec     *genericRecordArrayLoopKernelSpec
 	shapeID  uint32
@@ -71,7 +71,7 @@ type genericRecordArrayNativeContext struct {
 	scalars   [genericRecordArrayNativeMaxScalars]float64
 }
 
-func (vm *VM) tryGenericRecordArrayForLoopKernel(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
+func (vm *VM) tryGenericRecordArrayForLoopRuntimeSpecialization(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
 	if frame == nil || !vm.noGlobalLock {
 		return false, nil
 	}
@@ -111,7 +111,7 @@ func (vm *VM) tryGenericRecordArrayForLoopKernel(frame *CallFrame, base int, cod
 		}
 		args[i] = v
 	}
-	handled, err := vm.runGenericRecordArrayLoopKernelN(cl.Proto, args, steps)
+	handled, err := vm.runGenericRecordArrayLoopSpecializationN(cl.Proto, args, steps)
 	if !handled || err != nil {
 		return handled, err
 	}
@@ -165,9 +165,9 @@ func matchGenericRecordArrayDriverLoopShape(code []uint32, constants []runtime.V
 	return genericRecordArrayDriverLoopShape{loopPC: loopPC, fnConst: fnConst, argConsts: argConsts}, true
 }
 
-// HasGenericRecordArrayDriverLoopKernel reports whether p contains a structural
+// HasGenericRecordArrayDriverLoopRuntimeSpecialization reports whether p contains a structural
 // driver loop that repeatedly calls a generic record-array loop callee.
-func HasGenericRecordArrayDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
+func HasGenericRecordArrayDriverLoopRuntimeSpecialization(p *FuncProto, globals map[string]*FuncProto) bool {
 	if p == nil {
 		return false
 	}
@@ -205,14 +205,14 @@ func IsGenericRecordArrayDriverLoopAt(p *FuncProto, forprepPC int, globals map[s
 	return ok
 }
 
-func (vm *VM) runGenericRecordArrayLoopKernelN(proto *FuncProto, args []runtime.Value, steps int64) (bool, error) {
+func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []runtime.Value, steps int64) (bool, error) {
 	if proto == nil || steps <= 0 || proto.IsVarArg || len(args) != proto.NumParams {
 		return false, nil
 	}
-	cache := proto.GenericRecordArrayLoopKernel
+	cache := proto.GenericRecordArrayLoopSpecialization
 	if cache == nil {
-		cache = &genericRecordArrayLoopKernelCache{eligible: true}
-		proto.GenericRecordArrayLoopKernel = cache
+		cache = &genericRecordArrayLoopSpecializationCache{eligible: true}
+		proto.GenericRecordArrayLoopSpecialization = cache
 	}
 	if !cache.eligible {
 		return false, nil
@@ -401,7 +401,7 @@ func (vm *VM) runGenericRecordArrayAffineKernelN(table *runtime.Table, array []r
 	return true, nil
 }
 
-func (vm *VM) runGenericRecordArrayNativeKernelN(table *runtime.Table, array []runtime.Value, limit int, steps int64, spec *genericRecordArrayLoopKernelSpec, cache *genericRecordArrayLoopKernelCache, params []float64) (bool, error) {
+func (vm *VM) runGenericRecordArrayNativeKernelN(table *runtime.Table, array []runtime.Value, limit int, steps int64, spec *genericRecordArrayLoopKernelSpec, cache *genericRecordArrayLoopSpecializationCache, params []float64) (bool, error) {
 	if table == nil || spec == nil || cache == nil || len(spec.affine) == 0 || len(spec.fieldNames) > genericRecordArrayNativeMaxFields {
 		return false, nil
 	}

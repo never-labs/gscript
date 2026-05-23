@@ -14,18 +14,18 @@ const (
 	recursiveTableMinInt48 = -(1 << 47)
 )
 
-type recursiveTableKernelCache struct {
+type recursiveTableSpecializationCache struct {
 	analyzed bool
-	builder  *recursiveTableBuilderKernel
-	fold     *recursiveTableFoldKernel
+	builder  *recursiveTableBuilderSpecializationPlan
+	fold     *recursiveTableFoldSpecializationPlan
 }
 
-type recursiveTableBuilderKernel struct {
+type recursiveTableBuilderSpecializationPlan struct {
 	selfName string
 	ctor     runtime.SmallTableCtor2
 }
 
-type recursiveTableFoldKernel struct {
+type recursiveTableFoldSpecializationPlan struct {
 	selfName    string
 	nilField    string
 	nilCache    runtime.FieldCacheEntry
@@ -51,22 +51,22 @@ type recursiveTableFoldSlot struct {
 	expr     recursiveTableFoldExpr
 }
 
-func IsLazyRecursiveTableBuilderKernelProto(proto *FuncProto) bool {
-	_, ok := analyzeRecursiveTableBuilderKernel(proto)
+func IsLazyRecursiveTableBuilderRuntimeSpecializationProto(proto *FuncProto) bool {
+	_, ok := analyzeRecursiveTableBuilderSpecialization(proto)
 	return ok
 }
 
-func IsLazyRecursiveTableFoldKernelProto(proto *FuncProto) bool {
-	_, ok := analyzeRecursiveTableFoldKernel(proto)
+func IsLazyRecursiveTableFoldRuntimeSpecializationProto(proto *FuncProto) bool {
+	_, ok := analyzeRecursiveTableFoldSpecialization(proto)
 	return ok
 }
 
-func (vm *VM) tryRunRecursiveTableValueKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunRecursiveTableValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 {
 		return false, nil, nil
 	}
 	proto := cl.Proto
-	cache := recursiveTableKernelForProto(proto)
+	cache := recursiveTableSpecializationForProto(proto)
 	if !cache.analyzed {
 		return false, nil, nil
 	}
@@ -102,7 +102,7 @@ func (vm *VM) tryRecursiveTableBuildFoldRegion(frame *CallFrame, base int, build
 		return false, nil
 	}
 	builderProto := builderCl.Proto
-	builderCache := recursiveTableKernelForProto(builderProto)
+	builderCache := recursiveTableSpecializationForProto(builderProto)
 	if builderCache.builder == nil || !vm.recursiveTableSelfGlobalMatches(builderCl, builderCache.builder.selfName) {
 		return false, nil
 	}
@@ -126,7 +126,7 @@ func (vm *VM) tryRecursiveTableBuildFoldRegion(frame *CallFrame, base int, build
 		return false, nil
 	}
 	foldProto := foldCl.Proto
-	foldCache := recursiveTableKernelForProto(foldProto)
+	foldCache := recursiveTableSpecializationForProto(foldProto)
 	if foldCache.fold == nil {
 		return false, nil
 	}
@@ -155,22 +155,22 @@ func (vm *VM) tryRecursiveTableBuildFoldRegion(frame *CallFrame, base int, build
 	return true, nil
 }
 
-func recursiveTableKernelForProto(proto *FuncProto) *recursiveTableKernelCache {
-	cache := proto.RecursiveTableKernel
+func recursiveTableSpecializationForProto(proto *FuncProto) *recursiveTableSpecializationCache {
+	cache := proto.RecursiveTableSpecialization
 	if cache == nil {
-		cache = analyzeRecursiveTableKernel(proto)
-		proto.RecursiveTableKernel = cache
+		cache = analyzeRecursiveTableSpecialization(proto)
+		proto.RecursiveTableSpecialization = cache
 	}
 	return cache
 }
 
-func analyzeRecursiveTableKernel(proto *FuncProto) *recursiveTableKernelCache {
-	cache := &recursiveTableKernelCache{analyzed: true}
-	if builder, ok := analyzeRecursiveTableBuilderKernel(proto); ok {
+func analyzeRecursiveTableSpecialization(proto *FuncProto) *recursiveTableSpecializationCache {
+	cache := &recursiveTableSpecializationCache{analyzed: true}
+	if builder, ok := analyzeRecursiveTableBuilderSpecialization(proto); ok {
 		cache.builder = builder
 		return cache
 	}
-	if fold, ok := analyzeRecursiveTableFoldKernel(proto); ok {
+	if fold, ok := analyzeRecursiveTableFoldSpecialization(proto); ok {
 		cache.fold = fold
 	}
 	return cache
@@ -184,7 +184,7 @@ func (vm *VM) recursiveTableSelfGlobalMatches(cl *Closure, selfName string) bool
 	return ok && current == cl
 }
 
-func analyzeRecursiveTableBuilderKernel(proto *FuncProto) (*recursiveTableBuilderKernel, bool) {
+func analyzeRecursiveTableBuilderSpecialization(proto *FuncProto) (*recursiveTableBuilderSpecializationPlan, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 1 {
 		return nil, false
 	}
@@ -232,7 +232,7 @@ func analyzeRecursiveTableBuilderKernel(proto *FuncProto) (*recursiveTableBuilde
 	if !recursiveTableCacheableCtor2(&ctor) {
 		return nil, false
 	}
-	return &recursiveTableBuilderKernel{selfName: leftName, ctor: ctor}, true
+	return &recursiveTableBuilderSpecializationPlan{selfName: leftName, ctor: ctor}, true
 }
 
 func recursiveTableBuilderSelfCallName(proto *FuncProto, get, one, sub, call uint32, fnSlot, argSlot int) (string, bool) {
@@ -261,7 +261,7 @@ func recursiveTableCacheableCtor2(ctor *runtime.SmallTableCtor2) bool {
 	return ctor != nil && ctor.Key1 != ctor.Key2 && ctor.Shape != nil
 }
 
-func analyzeRecursiveTableFoldKernel(proto *FuncProto) (*recursiveTableFoldKernel, bool) {
+func analyzeRecursiveTableFoldSpecialization(proto *FuncProto) (*recursiveTableFoldSpecializationPlan, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 1 {
 		return nil, false
 	}
@@ -294,7 +294,7 @@ func analyzeRecursiveTableFoldKernel(proto *FuncProto) (*recursiveTableFoldKerne
 	for i, child := range children {
 		protocolChildren[i] = recursiveTableFoldChild{field: child.field}
 	}
-	return &recursiveTableFoldKernel{
+	return &recursiveTableFoldSpecializationPlan{
 		selfName:    selfName,
 		nilField:    nilField,
 		baseValue:   baseValue,
@@ -458,7 +458,7 @@ func recursiveTableFoldAdd(a, b recursiveTableFoldExpr) (recursiveTableFoldExpr,
 	return out, true
 }
 
-func (p *recursiveTableFoldKernel) fold(v runtime.Value) (int64, bool) {
+func (p *recursiveTableFoldSpecializationPlan) fold(v runtime.Value) (int64, bool) {
 	t := v.Table()
 	if t == nil {
 		return 0, false
@@ -485,7 +485,7 @@ func (p *recursiveTableFoldKernel) fold(v runtime.Value) (int64, bool) {
 	return total, true
 }
 
-func (p *recursiveTableFoldKernel) foldLazy(t *runtime.Table) (int64, bool) {
+func (p *recursiveTableFoldSpecializationPlan) foldLazy(t *runtime.Table) (int64, bool) {
 	depth, key1, key2, ok := t.LazyRecursiveTablePureInfo()
 	if !ok || depth < 0 || p.nilField != key1 || len(p.children) != 2 {
 		return 0, false
@@ -493,7 +493,7 @@ func (p *recursiveTableFoldKernel) foldLazy(t *runtime.Table) (int64, bool) {
 	return p.foldLazyShape(depth, key1, key2)
 }
 
-func (p *recursiveTableFoldKernel) foldLazyShape(depth int64, key1, key2 string) (int64, bool) {
+func (p *recursiveTableFoldSpecializationPlan) foldLazyShape(depth int64, key1, key2 string) (int64, bool) {
 	if depth < 0 || p.nilField != key1 || len(p.children) != 2 {
 		return 0, false
 	}

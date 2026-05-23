@@ -8,7 +8,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func TestRecordWalkFoldKernelDerivesFieldsFromBytecode(t *testing.T) {
+func TestRecordWalkFoldSpecializationDerivesFieldsFromBytecode(t *testing.T) {
 	const src = `
 func make_row(i) {
     return {
@@ -70,7 +70,7 @@ func fold_rows(rows, n, passes) {
 	if !cachedRuntimeSpecializationRecognized(fold, runtimeSpecializationRecordWalkFold) {
 		t.Fatal("record_walk_fold rejected by runtime specialization cache")
 	}
-	if fold.RecordWalkFoldKernel == nil || fold.RecordWalkFoldKernel.spec == nil {
+	if fold.RecordWalkFoldSpecialization == nil || fold.RecordWalkFoldSpecialization.spec == nil {
 		t.Fatal("record_walk_fold proto-local spec was not generated")
 	}
 	if spec.recordFields != [6]string{"ident", "flavor", "live", "account", "counters", "labels"} ||

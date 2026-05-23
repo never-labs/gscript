@@ -32,7 +32,7 @@ func (vm *VM) tryRunNonRecursiveTableValueRuntimeSpecialization(cl *Closure, arg
 }
 
 // tryNoResultRuntimeSpecialization executes a guarded call-site numeric kernel and writes
-// the no-result call convention used by in-place kernels.
+// the no-result call convention used by in-place specializations.
 func (vm *VM) tryNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value, c int, dst int) (bool, error) {
 	handled, err := vm.tryRunNoResultRuntimeSpecialization(cl, args)
 	if !handled || err != nil {
@@ -51,7 +51,7 @@ func (vm *VM) tryRunNoResultRuntimeSpecialization(cl *Closure, args []runtime.Va
 
 // TryRunNoResultCallSiteRuntimeSpecializationForJIT executes a guarded no-result structural
 // call-site runtime specialization for a JIT exit helper. It returns handled=false when the
-// callee or arguments do not satisfy the registered kernel guards.
+// callee or arguments do not satisfy the registered specialization guards.
 func (vm *VM) TryRunNoResultCallSiteRuntimeSpecializationForJIT(fn runtime.Value, args []runtime.Value) (bool, error) {
 	cl, ok := closureFromValue(fn)
 	if !ok {

@@ -52,7 +52,7 @@ type CallSiteValueSpecialization struct {
 }
 
 // CallSiteNoResultSpecialization handles OP_CALL sites using the no-result
-// convention for in-place kernels.
+// convention for in-place specializations.
 type CallSiteNoResultSpecialization struct {
 	RuntimeSpecialization
 	Run callSiteNoResultRuntimeSpecializationRunner
@@ -78,9 +78,9 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: IsRawIntNestedKernelProto,
+			Recognize: IsRawIntNestedSpecializationProto,
 		},
-		Run: (*VM).runRawIntNestedValueKernel,
+		Run: (*VM).runRawIntNestedValueRuntimeSpecialization,
 	},
 	runtimeSpecializationLazyRecursiveTableBuilder: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -91,9 +91,9 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: IsLazyRecursiveTableBuilderKernelProto,
+			Recognize: IsLazyRecursiveTableBuilderRuntimeSpecializationProto,
 		},
-		Run:            (*VM).tryRunRecursiveTableValueKernel,
+		Run:            (*VM).tryRunRecursiveTableValueRuntimeSpecialization,
 		RecursiveTable: true,
 	},
 	runtimeSpecializationLazyRecursiveTableFold: {
@@ -105,9 +105,9 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: IsLazyRecursiveTableFoldKernelProto,
+			Recognize: IsLazyRecursiveTableFoldRuntimeSpecializationProto,
 		},
-		Run:            (*VM).tryRunRecursiveTableValueKernel,
+		Run:            (*VM).tryRunRecursiveTableValueRuntimeSpecialization,
 		RecursiveTable: true,
 	},
 	runtimeSpecializationPermutationFlipChecksum: {
@@ -119,7 +119,7 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: isPermutationFlipChecksumKernelProto,
+			Recognize: isPermutationFlipChecksumSpecializationProto,
 		},
 		Run: (*VM).runPermutationFlipChecksumRuntimeSpecialization,
 	},
@@ -189,7 +189,7 @@ var callSiteNoResultRuntimeSpecializationRegistry = [callSiteNoResultRuntimeSpec
 			},
 			Recognize: isRecordPairwiseNumericProto,
 		},
-		Run: (*VM).runRecordPairwiseNumericKernel,
+		Run: (*VM).runRecordPairwiseNumericSpecialization,
 	},
 	callSiteNoResultRuntimeSpecializationNumericArrayRegionSort: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -280,8 +280,8 @@ var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCo
 			Results:       runtimeSpecializationUnknownDriverLoopResultCount,
 			TieringPolicy: runtimeSpecializationTieringStructural,
 		},
-		Recognize: HasGenericRecordArrayDriverLoopKernel,
-		Run:       (*VM).tryGenericRecordArrayForLoopKernel,
+		Recognize: HasGenericRecordArrayDriverLoopRuntimeSpecialization,
+		Run:       (*VM).tryGenericRecordArrayForLoopRuntimeSpecialization,
 	},
 	driverLoopRuntimeSpecializationRecordPairwiseNumericLoop: {
 		Info: RuntimeSpecializationInfo{
@@ -291,8 +291,8 @@ var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCo
 			Results:       runtimeSpecializationUnknownDriverLoopResultCount,
 			TieringPolicy: runtimeSpecializationTieringStructural,
 		},
-		Recognize: HasRecordPairwiseNumericDriverLoopKernel,
-		Run:       (*VM).tryRecordPairwiseNumericForLoopKernel,
+		Recognize: HasRecordPairwiseNumericDriverLoopRuntimeSpecialization,
+		Run:       (*VM).tryRecordPairwiseNumericForLoopRuntimeSpecialization,
 	},
 }
 

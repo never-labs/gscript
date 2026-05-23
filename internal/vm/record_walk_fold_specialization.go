@@ -10,7 +10,7 @@ type recordWalkFoldSpec struct {
 	modulus      int64
 }
 
-type recordWalkFoldKernelCache struct {
+type recordWalkFoldSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	spec        *recordWalkFoldSpec
 }
@@ -41,11 +41,11 @@ func (vm *VM) runRecordWalkFoldRuntimeSpecialization(cl *Closure, args []runtime
 	if !ok || !args[0].IsTable() {
 		return false, nil, nil
 	}
-	n64, ok := kernelIntArg(args[1])
+	n64, ok := runtimeSpecializationIntArg(args[1])
 	if !ok || n64 < 0 || n64 > int64(int(n64)) {
 		return false, nil, nil
 	}
-	passes, ok := kernelIntArg(args[2])
+	passes, ok := runtimeSpecializationIntArg(args[2])
 	if !ok || passes < 0 {
 		return false, nil, nil
 	}
@@ -144,16 +144,16 @@ func recordWalkFoldSpecForProto(p *FuncProto) (*recordWalkFoldSpec, bool) {
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.RecordWalkFoldKernel
+	cache := p.RecordWalkFoldSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeRecordWalkFoldSpec(p)
 	if !ok {
-		p.RecordWalkFoldKernel = &recordWalkFoldKernelCache{fingerprint: fp}
+		p.RecordWalkFoldSpecialization = &recordWalkFoldSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.RecordWalkFoldKernel = &recordWalkFoldKernelCache{fingerprint: fp, spec: spec}
+	p.RecordWalkFoldSpecialization = &recordWalkFoldSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
@@ -266,7 +266,7 @@ func getFieldConstAt(code []uint32, pc int, baseReg int) int {
 	return DecodeC(code[pc])
 }
 
-func kernelIntArg(v runtime.Value) (int64, bool) {
+func runtimeSpecializationIntArg(v runtime.Value) (int64, bool) {
 	if v.IsInt() {
 		return v.Int(), true
 	}

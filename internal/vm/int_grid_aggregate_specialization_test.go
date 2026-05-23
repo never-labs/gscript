@@ -52,7 +52,7 @@ func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 	if !cachedRuntimeSpecializationRecognized(aggregate, runtimeSpecializationIntGridAggregate) {
 		t.Fatal("int_grid_aggregate rejected by runtime specialization cache")
 	}
-	if aggregate.IntGridAggregateKernel == nil || aggregate.IntGridAggregateKernel.spec == nil {
+	if aggregate.IntGridAggregateSpecialization == nil || aggregate.IntGridAggregateSpecialization.spec == nil {
 		t.Fatal("int_grid_aggregate proto-local spec was not generated")
 	}
 

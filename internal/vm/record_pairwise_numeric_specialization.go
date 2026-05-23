@@ -17,7 +17,7 @@ const (
 	pairwiseFieldCount
 )
 
-type recordPairwiseNumericKernelCache struct {
+type recordPairwiseNumericSpecializationCache struct {
 	eligible  bool
 	shapeID   uint32
 	idxs      [pairwiseFieldCount]int
@@ -49,31 +49,31 @@ type recordPairwiseNumericDriverLoopShape struct {
 	argConst int
 }
 
-func (vm *VM) tryRunRecordPairwiseNumericKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) tryRunRecordPairwiseNumericSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if vm.methodJIT != nil {
 		return false, nil
 	}
 	if cl == nil || cl.Proto == nil || !hotCallSiteNoResultRuntimeSpecializationRecognized(cl.Proto, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		return false, nil
 	}
-	return vm.runRecordPairwiseNumericKernel(cl, args)
+	return vm.runRecordPairwiseNumericSpecialization(cl, args)
 }
 
-func (vm *VM) runRecordPairwiseNumericKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) runRecordPairwiseNumericSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if vm.methodJIT != nil {
 		return false, nil
 	}
-	return vm.runRecordPairwiseNumericKernelN(cl, args, 1)
+	return vm.runRecordPairwiseNumericSpecializationN(cl, args, 1)
 }
 
-func (vm *VM) tryRunRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
+func (vm *VM) tryRunRecordPairwiseNumericSpecializationN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
 	if cl == nil || cl.Proto == nil || !hotCallSiteNoResultRuntimeSpecializationRecognized(cl.Proto, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		return false, nil
 	}
-	return vm.runRecordPairwiseNumericKernelN(cl, args, steps)
+	return vm.runRecordPairwiseNumericSpecializationN(cl, args, steps)
 }
 
-func (vm *VM) runRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
+func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil
 	}
@@ -81,10 +81,10 @@ func (vm *VM) runRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value,
 		return false, nil
 	}
 	proto := cl.Proto
-	cache := proto.RecordPairwiseNumericKernel
+	cache := proto.RecordPairwiseNumericSpecialization
 	if cache == nil {
-		cache = &recordPairwiseNumericKernelCache{eligible: true}
-		proto.RecordPairwiseNumericKernel = cache
+		cache = &recordPairwiseNumericSpecializationCache{eligible: true}
+		proto.RecordPairwiseNumericSpecialization = cache
 	}
 	if isDenseRecordMatrixAdvanceProto(proto) {
 		spec := cache.denseSpec
@@ -274,7 +274,7 @@ func (vm *VM) runDenseRecordMatrixAdvanceKernelN(args []runtime.Value, steps int
 	return true, nil
 }
 
-func (vm *VM) tryRecordPairwiseNumericForLoopKernel(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
+func (vm *VM) tryRecordPairwiseNumericForLoopRuntimeSpecialization(frame *CallFrame, base int, code []uint32, constants []runtime.Value, a int, sbx int) (bool, error) {
 	if frame == nil || !vm.noGlobalLock {
 		return false, nil
 	}
@@ -310,7 +310,7 @@ func (vm *VM) tryRecordPairwiseNumericForLoopKernel(frame *CallFrame, base int, 
 	if !ok || !argVal.IsNumber() {
 		return false, nil
 	}
-	handled, err := vm.tryRunRecordPairwiseNumericKernelN(cl, []runtime.Value{argVal}, steps)
+	handled, err := vm.tryRunRecordPairwiseNumericSpecializationN(cl, []runtime.Value{argVal}, steps)
 	if !handled || err != nil {
 		return handled, err
 	}
@@ -460,7 +460,7 @@ func recordPairwiseNumericKernelSpecForProto(proto *FuncProto) (*recordPairwiseN
 		return nil, false
 	}
 	if isRecordPairwiseNumericProto(proto) {
-		return analyzeRecordPairwiseNumericKernelSpec(proto)
+		return analyzeRecordPairwiseNumericSpecializationSpec(proto)
 	}
 	return nil, false
 }
@@ -503,7 +503,7 @@ func denseRecordMatrixAdvanceKernelSpecForProto(proto *FuncProto) (*denseRecordM
 	return spec, true
 }
 
-func analyzeRecordPairwiseNumericKernelSpec(proto *FuncProto) (*recordPairwiseNumericKernelSpec, bool) {
+func analyzeRecordPairwiseNumericSpecializationSpec(proto *FuncProto) (*recordPairwiseNumericKernelSpec, bool) {
 	tableConst, biReg, bjReg, ok := findRecordPairwiseTableAndRecordRegs(proto.Code)
 	if !ok {
 		return nil, false
@@ -943,10 +943,10 @@ func HasRecordPairwiseNumericCallSiteRuntimeSpecialization(p *FuncProto) bool {
 	return cachedCallSiteNoResultRuntimeSpecializationRecognized(p, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric)
 }
 
-// HasRecordPairwiseNumericDriverLoopKernel reports whether p contains a structural
+// HasRecordPairwiseNumericDriverLoopRuntimeSpecialization reports whether p contains a structural
 // driver loop that repeatedly calls an pairwise numeric call-site
 // runtime-specialization candidate.
-func HasRecordPairwiseNumericDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
+func HasRecordPairwiseNumericDriverLoopRuntimeSpecialization(p *FuncProto, globals map[string]*FuncProto) bool {
 	if p == nil {
 		return false
 	}
@@ -963,7 +963,7 @@ func HasRecordPairwiseNumericDriverLoopKernel(p *FuncProto, globals map[string]*
 
 // IsRecordPairwiseNumericDriverLoopAt checks one FORPREP site for the guarded
 // advance(dt) call-loop shape. Runtime admission still checks trip count,
-// current globals, and argument/table guards before executing the kernel.
+// current globals, and argument/table guards before executing the specialization.
 func IsRecordPairwiseNumericDriverLoopAt(p *FuncProto, forprepPC int, globals map[string]*FuncProto) bool {
 	if p == nil || len(globals) == 0 || forprepPC < 0 || forprepPC >= len(p.Code) {
 		return false

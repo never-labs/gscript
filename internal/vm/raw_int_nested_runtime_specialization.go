@@ -11,13 +11,13 @@ const (
 	rawIntNestedMinInt48      = -(1 << 47)
 )
 
-type rawIntNestedKernelCache struct {
+type rawIntNestedSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	analyzed    bool
-	kernel      *rawIntNestedKernel
+	plan        *rawIntNestedSpecializationPlan
 }
 
-type rawIntNestedKernel struct {
+type rawIntNestedSpecializationPlan struct {
 	selfName string
 	baseAdd  int64
 	zeroArg  int64
@@ -25,24 +25,24 @@ type rawIntNestedKernel struct {
 	nStep    int64
 }
 
-func IsRawIntNestedKernelProto(proto *FuncProto) bool {
-	cache := rawIntNestedKernelForProto(proto)
-	return cache != nil && cache.kernel != nil
+func IsRawIntNestedSpecializationProto(proto *FuncProto) bool {
+	cache := rawIntNestedSpecializationPlanForProto(proto)
+	return cache != nil && cache.plan != nil
 }
 
-func (vm *VM) tryRunRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	return vm.runRawIntNestedValueKernel(cl, args)
+func (vm *VM) tryRunRawIntNestedValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+	return vm.runRawIntNestedValueRuntimeSpecialization(cl, args)
 }
 
-func (vm *VM) runRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runRawIntNestedValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if vm == nil || cl == nil || cl.Proto == nil || len(args) != 2 {
 		return false, nil, nil
 	}
-	cache := rawIntNestedKernelForProto(cl.Proto)
-	if cache.kernel == nil || !vm.rawIntNestedSelfGlobalMatches(cl, cache.kernel.selfName) {
+	cache := rawIntNestedSpecializationPlanForProto(cl.Proto)
+	if cache.plan == nil || !vm.rawIntNestedSelfGlobalMatches(cl, cache.plan.selfName) {
 		return false, nil, nil
 	}
-	n, ok := cache.kernel.fold(args[0], args[1])
+	n, ok := cache.plan.fold(args[0], args[1])
 	if !ok {
 		return false, nil, nil
 	}
@@ -51,20 +51,20 @@ func (vm *VM) runRawIntNestedValueKernel(cl *Closure, args []runtime.Value) (boo
 	return true, runtime.ReuseValueSlice1(vm.retBuf[:0], result), nil
 }
 
-func rawIntNestedKernelForProto(proto *FuncProto) *rawIntNestedKernelCache {
+func rawIntNestedSpecializationPlanForProto(proto *FuncProto) *rawIntNestedSpecializationCache {
 	if proto == nil {
 		return nil
 	}
 	fp := runtimeSpecializationFingerprintForProto(proto)
-	cache := proto.RawIntNestedKernel
+	cache := proto.RawIntNestedSpecialization
 	if cache != nil && cache.analyzed && cache.fingerprint == fp {
 		return cache
 	}
-	cache = &rawIntNestedKernelCache{fingerprint: fp, analyzed: true}
-	if kernel, ok := analyzeRawIntNestedKernel(proto); ok {
-		cache.kernel = kernel
+	cache = &rawIntNestedSpecializationCache{fingerprint: fp, analyzed: true}
+	if plan, ok := analyzeRawIntNestedSpecialization(proto); ok {
+		cache.plan = plan
 	}
-	proto.RawIntNestedKernel = cache
+	proto.RawIntNestedSpecialization = cache
 	return cache
 }
 
@@ -76,7 +76,7 @@ func (vm *VM) rawIntNestedSelfGlobalMatches(cl *Closure, selfName string) bool {
 	return ok && current == cl
 }
 
-func analyzeRawIntNestedKernel(proto *FuncProto) (*rawIntNestedKernel, bool) {
+func analyzeRawIntNestedSpecialization(proto *FuncProto) (*rawIntNestedSpecializationPlan, bool) {
 	if proto == nil || proto.IsVarArg || proto.NumParams != 2 {
 		return nil, false
 	}
@@ -99,7 +99,7 @@ func analyzeRawIntNestedKernel(proto *FuncProto) (*rawIntNestedKernel, bool) {
 	if mStep <= 0 || nStep <= 0 || zeroArg < 0 {
 		return nil, false
 	}
-	return &rawIntNestedKernel{
+	return &rawIntNestedSpecializationPlan{
 		selfName: selfName,
 		baseAdd:  baseAdd,
 		zeroArg:  zeroArg,
@@ -295,7 +295,7 @@ func rawIntNestedSelfGlobal(proto *FuncProto, pc int) (slot int, name string, ok
 	return DecodeA(inst), proto.Constants[idx].Str(), true
 }
 
-func (k *rawIntNestedKernel) fold(mv, nv runtime.Value) (int64, bool) {
+func (k *rawIntNestedSpecializationPlan) fold(mv, nv runtime.Value) (int64, bool) {
 	if k == nil || !mv.IsInt() || !nv.IsInt() || k.mStep <= 0 || k.nStep <= 0 {
 		return 0, false
 	}
@@ -341,7 +341,7 @@ func (k *rawIntNestedKernel) fold(mv, nv runtime.Value) (int64, bool) {
 	return 0, false
 }
 
-func (k *rawIntNestedKernel) foldSmallRows(m, n int64) (int64, bool) {
+func (k *rawIntNestedSpecializationPlan) foldSmallRows(m, n int64) (int64, bool) {
 	if k.mStep != 1 || k.nStep != 1 {
 		return 0, false
 	}

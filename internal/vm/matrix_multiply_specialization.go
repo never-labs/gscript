@@ -11,7 +11,7 @@ const (
 	matrixMultiplyKernelDenseSplit2
 )
 
-type matrixMultiplyKernelCache struct {
+type matrixMultiplySpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	spec        *matrixMultiplyKernelSpec
 }
@@ -20,7 +20,7 @@ type matrixMultiplyKernelSpec struct {
 	kind matrixMultiplyKernelKind
 }
 
-type denseMatrixMultiplyTBKernelCache struct {
+type denseMatrixMultiplyTBSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	spec        *denseMatrixMultiplyTBKernelSpec
 }
@@ -275,7 +275,7 @@ func (vm *VM) runDenseMatrixMultiplyTransposedRuntimeSpecialization(cl *Closure,
 	return true, nil
 }
 
-func IsMatrixMultiplyKernelProto(p *FuncProto) bool {
+func IsMatrixMultiplySpecializationProto(p *FuncProto) bool {
 	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationMatrixMultiply)
 }
 
@@ -289,20 +289,20 @@ func matrixMultiplyKernelSpecForProto(p *FuncProto) (*matrixMultiplyKernelSpec, 
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.MatrixMultiplyKernel
+	cache := p.MatrixMultiplySpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
-	spec, ok := analyzeMatrixMultiplyKernelSpec(p)
+	spec, ok := analyzeMatrixMultiplySpecializationSpec(p)
 	if !ok {
-		p.MatrixMultiplyKernel = &matrixMultiplyKernelCache{fingerprint: fp}
+		p.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.MatrixMultiplyKernel = &matrixMultiplyKernelCache{fingerprint: fp, spec: spec}
+	p.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
-func analyzeMatrixMultiplyKernelSpec(p *FuncProto) (*matrixMultiplyKernelSpec, bool) {
+func analyzeMatrixMultiplySpecializationSpec(p *FuncProto) (*matrixMultiplyKernelSpec, bool) {
 	switch {
 	case isDenseMatrixMultiplyProto(p):
 		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDense}, true
@@ -647,20 +647,20 @@ func denseMatrixMultiplyTBKernelSpecForProto(p *FuncProto) (*denseMatrixMultiply
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.DenseMatrixMultiplyTBKernel
+	cache := p.DenseMatrixMultiplyTBSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
-	spec, ok := analyzeDenseMatrixMultiplyTBKernelSpec(p)
+	spec, ok := analyzeDenseMatrixMultiplyTBSpecializationSpec(p)
 	if !ok {
-		p.DenseMatrixMultiplyTBKernel = &denseMatrixMultiplyTBKernelCache{fingerprint: fp}
+		p.DenseMatrixMultiplyTBSpecialization = &denseMatrixMultiplyTBSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.DenseMatrixMultiplyTBKernel = &denseMatrixMultiplyTBKernelCache{fingerprint: fp, spec: spec}
+	p.DenseMatrixMultiplyTBSpecialization = &denseMatrixMultiplyTBSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
-func analyzeDenseMatrixMultiplyTBKernelSpec(p *FuncProto) (*denseMatrixMultiplyTBKernelSpec, bool) {
+func analyzeDenseMatrixMultiplyTBSpecializationSpec(p *FuncProto) (*denseMatrixMultiplyTBKernelSpec, bool) {
 	if p == nil || p.NumParams != 4 || p.IsVarArg || p.MaxStack != 26 || len(p.Code) != 45 ||
 		len(p.Constants) != 4 ||
 		!numberConst(p.Constants[0], 0.0) ||

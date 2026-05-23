@@ -23,7 +23,7 @@ type intGridAggregateSpec struct {
 	finalB      int64
 }
 
-type intGridAggregateKernelCache struct {
+type intGridAggregateSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
 	spec        *intGridAggregateSpec
 }
@@ -48,11 +48,11 @@ func (vm *VM) runIntGridAggregateRuntimeSpecialization(cl *Closure, args []runti
 	if !ok {
 		return false, nil, nil
 	}
-	n, ok := kernelIntArg(args[0])
+	n, ok := runtimeSpecializationIntArg(args[0])
 	if !ok || n < 0 {
 		return false, nil, nil
 	}
-	passes, ok := kernelIntArg(args[1])
+	passes, ok := runtimeSpecializationIntArg(args[1])
 	if !ok || passes < 0 {
 		return false, nil, nil
 	}
@@ -94,16 +94,16 @@ func intGridAggregateSpecForProto(p *FuncProto) (*intGridAggregateSpec, bool) {
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.IntGridAggregateKernel
+	cache := p.IntGridAggregateSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeIntGridAggregateSpec(p)
 	if !ok {
-		p.IntGridAggregateKernel = &intGridAggregateKernelCache{fingerprint: fp}
+		p.IntGridAggregateSpecialization = &intGridAggregateSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.IntGridAggregateKernel = &intGridAggregateKernelCache{fingerprint: fp, spec: spec}
+	p.IntGridAggregateSpecialization = &intGridAggregateSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

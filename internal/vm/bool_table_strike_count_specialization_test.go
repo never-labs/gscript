@@ -32,7 +32,7 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 	if sieve.RuntimeSpecialization == nil || sieve.RuntimeSpecialization.recognized == 0 {
 		t.Fatal("runtime specialization cache was not populated")
 	}
-	if sieve.BoolTableStrikeCountKernel == nil || sieve.BoolTableStrikeCountKernel.spec == nil {
+	if sieve.BoolTableStrikeCountSpecialization == nil || sieve.BoolTableStrikeCountSpecialization.spec == nil {
 		t.Fatal("bool table strike-count proto-local spec was not generated")
 	}
 
