@@ -546,6 +546,51 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunct
 	return nil
 }
 
+func (vm *VM) executeStdSelectVarargCall(absSlot, rawC int, selector runtime.Value, varargs []runtime.Value, gf *runtime.GoFunction) error {
+	start, countOnly, err := runtime.SelectReturnRange(selector, len(varargs)+1)
+	if err != nil {
+		return err
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(gf)
+	if countOnly {
+		vm.storeStdSelectOne(absSlot, rawC, runtime.IntValue(int64(start)))
+		return nil
+	}
+	if start > len(varargs) {
+		vm.storeStdSelectResults(absSlot, rawC, nil)
+		return nil
+	}
+	vm.storeStdSelectResults(absSlot, rawC, varargs[start-1:])
+	return nil
+}
+
+func (vm *VM) tryExecuteStdSelectVarargPeephole(frame *CallFrame, base, varargA int, varargs []runtime.Value) (bool, error) {
+	if frame.pc >= len(frame.closure.Proto.Code) || varargA < 2 {
+		return false, nil
+	}
+	callInst := frame.closure.Proto.Code[frame.pc]
+	if DecodeOp(callInst) != OP_CALL || DecodeB(callInst) != 0 {
+		return false, nil
+	}
+	callA := DecodeA(callInst)
+	if callA+2 != varargA {
+		return false, nil
+	}
+	absSlot := base + callA
+	if absSlot+1 >= len(vm.regs) {
+		return false, nil
+	}
+	gf := vm.regs[absSlot].GoFunction()
+	if gf == nil || gf.NativeKind != runtime.NativeKindStdSelect || gf.NativeData != runtime.StdSelectIdentityPtr() {
+		return false, nil
+	}
+	if err := vm.executeStdSelectVarargCall(absSlot, DecodeC(callInst), vm.regs[absSlot+1], varargs, gf); err != nil {
+		return true, err
+	}
+	frame.pc++
+	return true, nil
+}
+
 func (vm *VM) storeStdSelectOne(absSlot, rawC int, value runtime.Value) {
 	if rawC == 0 {
 		if absSlot < len(vm.regs) {
@@ -4139,6 +4184,13 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			b := DecodeB(inst)
 			va := frame.varargs
 			if b == 0 {
+				handled, err := vm.tryExecuteStdSelectVarargPeephole(frame, base, a, va)
+				if err != nil {
+					return nil, wrapLineErr(frame, err)
+				}
+				if handled {
+					continue
+				}
 				for i, v := range va {
 					vm.regs[base+a+i] = v
 				}

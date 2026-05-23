@@ -1307,6 +1307,32 @@ ok2, v2 := coroutine.resume(co)
 	expectGlobalInt(t, g, "v2", 24)
 }
 
+func TestSelectVarargPeepholePreservesSemantics(t *testing.T) {
+	g := compileAndRun(t, `
+func pick(...) {
+	return select("#", ...), select(1, ...), select(2, ...), select(-1, ...)
+}
+n, a, b, z := pick(10, 20, 30)
+`)
+	expectGlobalInt(t, g, "n", 3)
+	expectGlobalInt(t, g, "a", 10)
+	expectGlobalInt(t, g, "b", 20)
+	expectGlobalInt(t, g, "z", 30)
+}
+
+func TestSelectVarargPeepholeHonorsOverriddenSelect(t *testing.T) {
+	g := compileAndRun(t, `
+select := func(...) {
+	return 99
+}
+func pick(...) {
+	return select(1, ...)
+}
+result := pick(10, 20, 30)
+`)
+	expectGlobalInt(t, g, "result", 99)
+}
+
 func TestRecursiveMultiReturnTableConstructorsAndTailVarargs(t *testing.T) {
 	g := compileAndRun(t, `
 		func down(n) {
