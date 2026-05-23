@@ -82,6 +82,38 @@ func TestRegAlloc_LastUseEvictionKeepsRegisterAssignment(t *testing.T) {
 	assertValidRegisters(t, alloc)
 }
 
+func TestComputeSinglePredRawFloatStoreElisionUsesFPRClobbers(t *testing.T) {
+	fn := &Function{NumRegs: 2}
+	b0 := &Block{ID: 0, defs: make(map[int]*Value)}
+	b1 := &Block{ID: 1, defs: make(map[int]*Value)}
+	b0.Succs = []*Block{b1}
+	b1.Preds = []*Block{b0}
+	fn.Entry = b0
+	fn.Blocks = []*Block{b0, b1}
+
+	one := &Instr{ID: fn.newValueID(), Op: OpConstFloat, Type: TypeFloat, Block: b0}
+	two := &Instr{ID: fn.newValueID(), Op: OpConstFloat, Type: TypeFloat, Block: b0}
+	carried := &Instr{ID: fn.newValueID(), Op: OpAddFloat, Type: TypeFloat, Args: []*Value{one.Value(), two.Value()}, Block: b0}
+	jump := &Instr{ID: fn.newValueID(), Op: OpJump, Block: b0}
+	b0.Instrs = []*Instr{one, two, carried, jump}
+
+	intClobber := &Instr{ID: fn.newValueID(), Op: OpAddInt, Type: TypeInt, Block: b1}
+	use := &Instr{ID: fn.newValueID(), Op: OpMulFloat, Type: TypeFloat, Args: []*Value{carried.Value(), two.Value()}, Block: b1}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{use.Value()}, Block: b1}
+	b1.Instrs = []*Instr{intClobber, use, ret}
+
+	alloc := &RegAllocation{ValueRegs: map[int]PhysReg{
+		carried.ID:    {Reg: 11, IsFloat: true},
+		intClobber.ID: {Reg: 11, IsFloat: false},
+		use.ID:        {Reg: 12, IsFloat: true},
+	}}
+	blockLiveIn, _ := computeBlockLiveness(fn)
+	elide := computeSinglePredRawFloatStoreElision(fn, alloc, blockLiveIn)
+	if !elide[carried.ID] {
+		t.Fatalf("raw-float carry should use FPR clobber rules; elide=%v", elide)
+	}
+}
+
 // TestRegAlloc_ForLoop: loop with phis — phi values get registers.
 func TestRegAlloc_ForLoop(t *testing.T) {
 	proto := compileFunction(t, `

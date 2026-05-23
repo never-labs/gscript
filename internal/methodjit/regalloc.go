@@ -1860,7 +1860,7 @@ func computeSinglePredRawStoreElision(fn *Function, alloc *RegAllocation, blockL
 						continue
 					}
 					hasCrossUse = true
-					if !singlePredRawCarryPathEligible(blockByID, db, block.ID, i, valueID, pr.Reg, false, defIndex[valueID], alloc, blockLiveIn) {
+					if !singlePredRawCarryPathEligible(blockByID, db, block.ID, i, valueID, pr.Reg, wantFloat, defIndex[valueID], alloc, blockLiveIn) {
 						eligible = false
 						break
 					}
