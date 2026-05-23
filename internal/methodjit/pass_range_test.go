@@ -1039,6 +1039,58 @@ func TestRangePass_ModIntFactsStayConservative(t *testing.T) {
 	}
 }
 
+func TestRangePass_InlinedPositiveEuclidModSkipsSignAdjust(t *testing.T) {
+	src := `
+func gcd(a, b) {
+    for b != 0 {
+        t := b
+        b = a % b
+        a = t
+    }
+    return a
+}
+
+func run(n) {
+    total := 0
+    for i := 1; i <= n; i++ {
+        for j := 1; j <= 10; j++ {
+            total = total + gcd(i * 7 + 13, j * 11 + 3)
+        }
+    }
+    return total
+}
+`
+	top := compileTop(t, src)
+	proto := findProtoByName(top, "run")
+	fn := BuildGraph(proto)
+	optimized, _, err := RunTier2Pipeline(fn, &Tier2PipelineOpts{
+		InlineGlobals: buildProtoInlineGlobals(top),
+		InlineMaxSize: 80,
+	})
+	if err != nil {
+		t.Fatalf("RunTier2Pipeline: %v", err)
+	}
+
+	modCount := 0
+	for _, block := range optimized.Blocks {
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpModInt {
+				continue
+			}
+			modCount++
+			if !optimized.Analysis.IntModNonZeroDivisor[instr.ID] {
+				t.Fatalf("inlined positive Euclid ModInt v%d should have non-zero divisor fact\nIR:\n%s", instr.ID, Print(optimized))
+			}
+			if !optimized.Analysis.IntModNoSignAdjust[instr.ID] {
+				t.Fatalf("inlined positive Euclid ModInt v%d should skip sign adjust\nIR:\n%s", instr.ID, Print(optimized))
+			}
+		}
+	}
+	if modCount == 0 {
+		t.Fatalf("expected inlined Euclid ModInt in optimized IR:\n%s", Print(optimized))
+	}
+}
+
 func TestRangePass_StaticSetListLenFeedsModuloRange(t *testing.T) {
 	fn := &Function{
 		Proto:   &vm.FuncProto{Name: "static_setlist_len"},

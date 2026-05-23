@@ -832,7 +832,7 @@ func instrDerivesNonNegative(instr *Instr, facts map[int]bool, ranges map[int]in
 			valueNonNegative(instr.Args[0], facts, ranges) &&
 			valueNonNegative(instr.Args[1], facts, ranges)
 	case OpModInt:
-		return len(instr.Args) >= 2 && valueStrictlyPositive(instr.Args[1], ranges)
+		return len(instr.Args) >= 2 && valueNonNegative(instr.Args[1], facts, ranges)
 	case OpPhi:
 		if len(instr.Args) == 0 {
 			return false
@@ -879,9 +879,67 @@ func valueStrictlyPositive(v *Value, ranges map[int]intRange) bool {
 	return false
 }
 
+func valueNonNegativeInEnv(v *Value, facts map[int]bool, env, baseRanges map[int]intRange) bool {
+	if v == nil {
+		return false
+	}
+	if c, ok := constIntFromValue(v); ok {
+		return c >= 0
+	}
+	if facts[v.ID] {
+		return true
+	}
+	r := argRangeInEnv(v, env, baseRanges)
+	return r.known && r.min >= 0
+}
+
+func valueStrictlyPositiveInEnv(v *Value, facts map[int]bool, env, baseRanges map[int]intRange) bool {
+	if v == nil {
+		return false
+	}
+	if c, ok := constIntFromValue(v); ok {
+		return c > 0
+	}
+	r := argRangeInEnv(v, env, baseRanges)
+	if r.known && r.min > 0 {
+		return true
+	}
+	return facts[v.ID] && rangeExcludesZero(r)
+}
+
+func blockEntryExcludesZero(block *Block, valueID int) bool {
+	if block == nil || len(block.Preds) != 1 {
+		return false
+	}
+	pred := block.Preds[0]
+	if pred == nil || len(pred.Succs) < 2 || pred.Succs[1] != block || len(pred.Instrs) == 0 {
+		return false
+	}
+	term := pred.Instrs[len(pred.Instrs)-1]
+	if term == nil || term.Op != OpBranch || len(term.Args) == 0 || term.Args[0] == nil || term.Args[0].Def == nil {
+		return false
+	}
+	cond := term.Args[0].Def
+	if cond.Op != OpEqInt || len(cond.Args) < 2 {
+		return false
+	}
+	if cond.Args[0] != nil && cond.Args[0].ID == valueID {
+		if c, ok := constIntFromValue(cond.Args[1]); ok && c == 0 {
+			return true
+		}
+	}
+	if cond.Args[1] != nil && cond.Args[1].ID == valueID {
+		if c, ok := constIntFromValue(cond.Args[0]); ok && c == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func populateIntModFacts(fn *Function, baseRanges map[int]intRange) {
 	nonZeroDivisor := make(map[int]bool)
 	noSignAdjust := make(map[int]bool)
+	nonNegative := functionNumericFacts(fn).IntNonNegative
 	blockEntries := computeBlockEntryRanges(fn, baseRanges)
 
 	for _, block := range fn.Blocks {
@@ -890,10 +948,19 @@ func populateIntModFacts(fn *Function, baseRanges map[int]intRange) {
 			if instr.Op == OpModInt && len(instr.Args) >= 2 {
 				lhs := argRangeInEnv(instr.Args[0], env, baseRanges)
 				rhs := argRangeInEnv(instr.Args[1], env, baseRanges)
-				if rangeExcludesZero(rhs) {
+				divisorNonZero := rangeExcludesZero(rhs)
+				if !divisorNonZero && (valueStrictlyPositiveInEnv(instr.Args[1], nonNegative, env, baseRanges) ||
+					blockEntryExcludesZero(block, instr.Args[1].ID)) {
+					divisorNonZero = true
+				}
+				if divisorNonZero {
 					nonZeroDivisor[instr.ID] = true
 				}
-				if rangesHaveSameKnownModuloSign(lhs, rhs) {
+				divisorPositive := valueStrictlyPositiveInEnv(instr.Args[1], nonNegative, env, baseRanges) ||
+					(divisorNonZero && valueNonNegativeInEnv(instr.Args[1], nonNegative, env, baseRanges))
+				if rangesHaveSameKnownModuloSign(lhs, rhs) ||
+					(valueNonNegativeInEnv(instr.Args[0], nonNegative, env, baseRanges) &&
+						divisorPositive) {
 					noSignAdjust[instr.ID] = true
 				}
 			}
