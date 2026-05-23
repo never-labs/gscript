@@ -615,6 +615,48 @@ func map_array(a, f) {
 	}
 }
 
+func TestLoopCallPrefilterSuppressesResumeLoopWithCallBoundary(t *testing.T) {
+	src := `
+func consume(co, n) {
+    total := 0
+    for i := 1; i <= n; i++ {
+        ok, value := coroutine.resume(co)
+        if !ok { error(value) }
+        total = total + value
+    }
+    return total
+}
+`
+	top := compileProto(t, src)
+	consume := findProtoByName(top, "consume")
+	if consume == nil {
+		t.Fatal("consume proto not found")
+	}
+	tm := NewTieringManager()
+	profile := tm.getProfile(consume)
+	consume.CallCount = 1
+	if tm.shouldPromoteNativeLoopDriver(consume, profile) {
+		t.Fatal("resume loop with an in-loop call boundary should not force native-loop Tier2 promotion")
+	}
+	if !shouldPromoteTier2(consume, profile, 2) {
+		t.Fatal("resume loop with arithmetic should still reach the generic Tier2 candidate threshold")
+	}
+	if !tm.shouldSuppressLoopCallTier2(consume, profile) {
+		t.Fatal("resume loop with an in-loop call boundary should be suppressed before a futile Tier2 attempt")
+	}
+
+	consume.CallCount = 2
+	if compiled := tm.TryCompile(consume); compiled == nil {
+		t.Fatal("expected suppressed consume to fall back to Tier1")
+	}
+	if tm.Tier2Attempted() != 0 {
+		t.Fatalf("expected no Tier2 attempt for suppressed consume, got %d", tm.Tier2Attempted())
+	}
+	if counter := tm.tier1.OSRCounter(consume); counter > 0 {
+		t.Fatalf("expected OSR not armed for suppressed resume loop, got counter %d", counter)
+	}
+}
+
 func TestLoopCallPrefilterAllowsPrefixFormatBeforeHotCallFreeLoop(t *testing.T) {
 	src := `
 func test_compare() {

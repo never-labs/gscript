@@ -547,6 +547,30 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunct
 }
 
 func (vm *VM) executeStdSelectVarargCall(absSlot, rawC int, selector runtime.Value, varargs []runtime.Value, gf *runtime.GoFunction) error {
+	if rawC == 2 {
+		if selector.IsString() && selector.Str() == "#" {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			vm.regs[absSlot] = runtime.IntValue(int64(len(varargs)))
+			return nil
+		}
+		if selector.RawType() == runtime.TypeInt {
+			idx := int(selector.RawInt())
+			argCount := len(varargs) + 1
+			if idx < 0 {
+				idx = argCount + idx
+			}
+			if idx < 1 {
+				return fmt.Errorf("bad argument #1 to 'select' (index out of range)")
+			}
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			if idx > len(varargs) {
+				vm.regs[absSlot] = runtime.NilValue()
+			} else {
+				vm.regs[absSlot] = varargs[idx-1]
+			}
+			return nil
+		}
+	}
 	start, countOnly, err := runtime.SelectReturnRange(selector, len(varargs)+1)
 	if err != nil {
 		return err

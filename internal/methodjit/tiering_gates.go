@@ -278,6 +278,9 @@ func (tm *TieringManager) shouldPromoteNativeLoopDriver(proto *vm.FuncProto, pro
 	if proto.Name != "<main>" && (profile.HasClosure || profile.HasUpval || profile.HasVararg) {
 		return false
 	}
+	if hasStaticCallInLoop(proto) && hasStaticOpInLoop(proto, vm.OP_RESUME) {
+		return false
+	}
 	globals := tm.buildLoopCallGlobals(proto)
 	if proto.Name == "<main>" && !mainNativeLoopDriverCallsTableLoopCallee(proto, globals) {
 		return false
@@ -425,6 +428,9 @@ func (tm *TieringManager) shouldSuppressLoopCallTier2(proto *vm.FuncProto, profi
 	}
 	if hasStringSplitScalarFusionCandidate(proto) {
 		return false
+	}
+	if hasStaticOpInLoop(proto, vm.OP_RESUME) {
+		return true
 	}
 	globals := tm.buildLoopCallGlobals(proto)
 	return !canPromoteWithInlining(proto, globals) && !canPromoteWithNativeLoopCalls(proto, globals)

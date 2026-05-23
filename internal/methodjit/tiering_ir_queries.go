@@ -105,12 +105,16 @@ func hasCallInLoop(fn *Function) bool {
 // still uses SSA loopInfo after inline; this helper only avoids known-futile
 // OSR restarts before the expensive path runs.
 func hasStaticCallInLoop(proto *vm.FuncProto) bool {
+	return hasStaticOpInLoop(proto, vm.OP_CALL)
+}
+
+func hasStaticOpInLoop(proto *vm.FuncProto, target vm.Opcode) bool {
 	if proto == nil || len(proto.Code) == 0 {
 		return false
 	}
 	inLoop := staticLoopPCs(proto)
 	for pc, inst := range proto.Code {
-		if inLoop[pc] && vm.DecodeOp(inst) == vm.OP_CALL {
+		if inLoop[pc] && vm.DecodeOp(inst) == target {
 			return true
 		}
 	}

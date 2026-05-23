@@ -698,6 +698,10 @@ func (e *BaselineJITEngine) SetOSRCounter(proto *vm.FuncProto, counter int64) {
 	e.osrCounters[proto] = counter
 }
 
+func (e *BaselineJITEngine) OSRCounter(proto *vm.FuncProto) int64 {
+	return e.osrCounters[proto]
+}
+
 // DisableFeedbackCollection stops Tier 1 native feedback writes for protos that
 // will no longer attempt Tier 2 promotion. Field/global/call caches remain live;
 // this only disables type/kind profiling writes through ExecContext.

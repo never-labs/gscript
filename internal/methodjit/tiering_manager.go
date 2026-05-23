@@ -683,6 +683,9 @@ func (tm *TieringManager) applyPromotionDecision(proto *vm.FuncProto, profile Fu
 			if profile.LoopDepth < 2 || hasFieldDispatchCallInLoop(proto) {
 				osrGate = tm.osrRestartSafetyGate(proto, profile)
 			}
+			if osrGate.Allowed && profile.LoopDepth < 2 && hasStaticCallInLoop(proto) && hasStaticOpInLoop(proto, vm.OP_RESUME) {
+				osrGate = blockGate("OSRResumeCallLoop", "shallow resume loop contains a call-boundary blocker")
+			}
 			if osrGate.Allowed && profile.LoopDepth >= 2 && protoHasAllocationBytecodeInLoop(proto) {
 				osrGate = blockGate("OSRLoopAllocation", "static loop allocation would hit Tier 2 allocation gate")
 			}
