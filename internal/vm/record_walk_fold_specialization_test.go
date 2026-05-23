@@ -60,6 +60,10 @@ func fold_rows(rows, n, passes) {
 		t.Fatalf("execute definitions: %v", err)
 	}
 	fold := findTestProtoByName(proto, "fold_rows")
+	if fold != nil {
+		fold.Name = "shape_only_record_fold"
+		fold.Source = "host/generated/not-a-benchmark.gs"
+	}
 	if fold == nil || !isRecordWalkFoldProto(fold) {
 		t.Fatal("renamed record fold proto not recognized")
 	}

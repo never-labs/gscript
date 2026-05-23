@@ -62,6 +62,15 @@ func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 }
 
+func TestIntGridAggregateIgnoresBenchmarkMetadata(t *testing.T) {
+	aggregate := intGridAggregateTestProto()
+	aggregate.Name = "shape_only_grid_fold"
+	aggregate.Source = "host/generated/not-a-benchmark.gs"
+	if !isIntGridAggregateProto(aggregate) {
+		t.Fatalf("int_grid_aggregate should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(aggregate.Code), len(aggregate.Constants), aggregate.MaxStack)
+	}
+}
+
 func TestIntGridAggregateRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
