@@ -41,9 +41,9 @@ func (spec *boolTableStrikeCountSpecializationSpec) run(n int) int64 {
 	if spec == nil || n < spec.minValue {
 		return 0
 	}
-	// Track only odd numbers. Index i represents 2*i+1, so index 1 is 3.
+	// Track only odd table positions. Index i represents 2*i+1, so index 1 is 3.
 	// A zero byte means "not marked composite", avoiding a full initialization
-	// pass over the sieve.
+	// pass over the source table shape.
 	maxOddIndex := n / 2
 	composite := make([]byte, maxOddIndex+1)
 	for i := 1; ; i++ {
@@ -59,7 +59,7 @@ func (spec *boolTableStrikeCountSpecializationSpec) run(n int) int64 {
 			composite[j/2] = 1
 		}
 	}
-	count := int64(1) // prime 2
+	count := int64(1) // the even seed value remains unmarked by the odd-position table.
 	for i := 1; i <= maxOddIndex; i++ {
 		if 2*i+1 > n {
 			continue

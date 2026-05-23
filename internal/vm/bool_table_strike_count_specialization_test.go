@@ -47,6 +47,19 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 }
 
+func TestBoolTableStrikeCountIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, boolTableStrikeCountSource(t))
+	sieve := findTestProtoByName(top, "sieve")
+	if sieve == nil {
+		t.Fatal("missing sieve proto")
+	}
+	sieve.Name = "shape_only_bool_table_count"
+	sieve.Source = "host/generated/not-a-benchmark.gs"
+	if !isBoolTableStrikeCountProto(sieve) {
+		t.Fatalf("bool table strike count should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(sieve.Code), len(sieve.Constants), sieve.MaxStack)
+	}
+}
+
 func TestBoolTableStrikeCountRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
