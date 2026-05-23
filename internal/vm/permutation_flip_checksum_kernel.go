@@ -3,7 +3,7 @@ package vm
 import "github.com/gscript/gscript/internal/runtime"
 
 type permutationFlipChecksumKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	spec        *permutationFlipChecksumKernelSpec
 }
 
@@ -31,14 +31,14 @@ var permutationFlipChecksumCode = [...]uint32{
 	2140602400, 463876, 529668, 335549194, 135970,
 }
 
-func (vm *VM) tryRunPermutationFlipChecksumWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationPermutationFlipChecksum) {
 		return false, nil, nil
 	}
-	return vm.runPermutationFlipChecksumWholeCallKernel(cl, args)
+	return vm.runPermutationFlipChecksumRuntimeSpecialization(cl, args)
 }
 
-func (vm *VM) runPermutationFlipChecksumWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil, nil
 	}
@@ -75,7 +75,7 @@ func permutationFlipChecksumKernelSpecForProto(p *FuncProto) (*permutationFlipCh
 	if p == nil {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
+	fp := runtimeSpecializationFingerprintForProto(p)
 	cache := p.PermutationFlipChecksumKernel
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil

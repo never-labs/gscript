@@ -106,7 +106,7 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Owner:       "call",
 		Description: "Call sites have ABI annotations for native lowering and call folds.",
 		Producers:   []string{"CallABI"},
-		Consumers:   []string{"ProtocolConstCallFold", "WholeCallKernelExit", "GuardFieldCallee", "RecordArrayLoopKernel", "TableIntArrayKernel"},
+		Consumers:   []string{"ProtocolConstCallFold", "WholeCallRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopKernel", "TableIntArrayKernel"},
 	},
 	AnalysisFactProtocolConstCallFolds: {
 		Owner:       "call",
@@ -117,13 +117,13 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 	AnalysisFactWholeCallNoResultKernels: {
 		Owner:       "call",
 		Description: "Whole-call no-result kernel exits are annotated.",
-		Producers:   []string{"WholeCallKernelExit"},
+		Producers:   []string{"WholeCallRuntimeSpecializationExit"},
 		Consumers:   []string{"codegen"},
 	},
 	AnalysisFactWholeCallNoResultBatches: {
 		Owner:       "call",
 		Description: "Whole-call no-result kernel batches are annotated.",
-		Producers:   []string{"WholeCallKernelExit"},
+		Producers:   []string{"WholeCallRuntimeSpecializationExit"},
 		Consumers:   []string{"codegen"},
 	},
 	AnalysisFactStringConstTables: {

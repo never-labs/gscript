@@ -4,12 +4,12 @@ import "github.com/gscript/gscript/internal/runtime"
 
 const maxWholeCallScalarScratch = 1 << 20
 
-func wholeCallKernelArity(n int) bool {
+func wholeCallRuntimeSpecializationArity(n int) bool {
 	return n == 1 || n == 2 || n == 3 || n == 4
 }
 
-func (vm *VM) tryValueWholeCallKernel(cl *Closure, args []runtime.Value, c int, dst int) (bool, error) {
-	handled, results, err := vm.tryRunValueWholeCallKernel(cl, args)
+func (vm *VM) tryValueRuntimeSpecialization(cl *Closure, args []runtime.Value, c int, dst int) (bool, error) {
+	handled, results, err := vm.tryRunValueRuntimeSpecialization(cl, args)
 	if !handled || err != nil {
 		return handled, err
 	}
@@ -17,24 +17,24 @@ func (vm *VM) tryValueWholeCallKernel(cl *Closure, args []runtime.Value, c int, 
 	return true, nil
 }
 
-func (vm *VM) tryRunValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, true); handled || err != nil {
 		return handled, results, err
 	}
 	return false, nil, nil
 }
 
-func (vm *VM) tryRunNonRecursiveTableValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunNonRecursiveTableValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, false); handled || err != nil {
 		return handled, results, err
 	}
 	return false, nil, nil
 }
 
-// tryWholeCallKernel executes a guarded whole-call numeric kernel and writes
+// tryNoResultRuntimeSpecialization executes a guarded whole-call numeric kernel and writes
 // the no-result call convention used by in-place kernels.
-func (vm *VM) tryWholeCallKernel(cl *Closure, args []runtime.Value, c int, dst int) (bool, error) {
-	handled, err := vm.tryRunWholeCallKernel(cl, args)
+func (vm *VM) tryNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value, c int, dst int) (bool, error) {
+	handled, err := vm.tryRunNoResultRuntimeSpecialization(cl, args)
 	if !handled || err != nil {
 		return handled, err
 	}
@@ -42,22 +42,22 @@ func (vm *VM) tryWholeCallKernel(cl *Closure, args []runtime.Value, c int, dst i
 	return true, nil
 }
 
-func (vm *VM) tryRunWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) tryRunNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if handled, err := vm.tryRunWholeCallNoResultRuntimeSpecialization(cl, args); handled || err != nil {
 		return handled, err
 	}
 	return false, nil
 }
 
-// TryRunNoResultWholeCallKernelForJIT executes a guarded no-result structural
-// whole-call kernel for a JIT exit helper. It returns handled=false when the
+// TryRunNoResultWholeCallRuntimeSpecializationForJIT executes a guarded no-result structural
+// whole-call runtime specialization for a JIT exit helper. It returns handled=false when the
 // callee or arguments do not satisfy the registered kernel guards.
-func (vm *VM) TryRunNoResultWholeCallKernelForJIT(fn runtime.Value, args []runtime.Value) (bool, error) {
+func (vm *VM) TryRunNoResultWholeCallRuntimeSpecializationForJIT(fn runtime.Value, args []runtime.Value) (bool, error) {
 	cl, ok := closureFromValue(fn)
 	if !ok {
 		return false, nil
 	}
-	return vm.tryRunWholeCallKernel(cl, args)
+	return vm.tryRunNoResultRuntimeSpecialization(cl, args)
 }
 
 func (vm *VM) writeNoResults(dst, c int) {

@@ -103,7 +103,7 @@ const (
 	kernelWholeCallSingleResultCount   = 1
 )
 
-type wholeCallKernelFingerprint struct {
+type runtimeSpecializationFingerprint struct {
 	numParams    int
 	isVarArg     bool
 	maxStack     int
@@ -118,9 +118,9 @@ type wholeCallKernelFingerprint struct {
 type wholeCallValueKernelRunner func(*VM, *Closure, []runtime.Value) (bool, []runtime.Value, error)
 type wholeCallNoResultKernelRunner func(*VM, *Closure, []runtime.Value) (bool, error)
 
-// WholeCallKernelCatalog returns diagnostic metadata for OP_CALL structural
+// WholeCallRuntimeSpecializationCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.
-func WholeCallKernelCatalog() []KernelInfo {
+func WholeCallRuntimeSpecializationCatalog() []KernelInfo {
 	out := make([]KernelInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
 	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
@@ -150,9 +150,9 @@ func DriverLoopKernelCatalog() []KernelInfo {
 	return out
 }
 
-// RecognizedWholeCallKernels returns every registered whole-call kernel whose
+// RecognizedWholeCallRuntimeSpecializations returns every registered whole-call runtime specialization whose
 // structural recognizer accepts p. It does not inspect FuncProto.Name or Source.
-func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
+func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []KernelInfo {
 	out := make([]KernelInfo, 0, 1)
 	runtimeRecognized := recognizedRuntimeSpecializationBits(p)
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
@@ -175,10 +175,10 @@ func RecognizedWholeCallKernels(p *FuncProto) []KernelInfo {
 	return out
 }
 
-// DiagnoseWholeCallKernelProto reports structural recognizer results for every
-// registered whole-call kernel. It is intended for tests and diagnostics, not
+// DiagnoseWholeCallRuntimeSpecializationProto reports structural recognizer results for every
+// registered whole-call runtime specialization. It is intended for tests and diagnostics, not
 // hot dispatch.
-func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
+func DiagnoseWholeCallRuntimeSpecializationProto(p *FuncProto) []KernelDiagnostic {
 	out := make([]KernelDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
 	runtimeRecognizedBits := recognizedRuntimeSpecializationBits(p)
 	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
@@ -189,7 +189,7 @@ func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
 		out = append(out, KernelDiagnostic{
 			Kernel:     entry.Info,
 			Recognized: recognized,
-			Reason:     wholeCallKernelReason(p, recognized),
+			Reason:     runtimeSpecializationReason(p, recognized),
 		})
 	}
 	noResultRuntimeRecognizedBits := recognizedWholeCallNoResultRuntimeSpecializationBits(p)
@@ -201,14 +201,14 @@ func DiagnoseWholeCallKernelProto(p *FuncProto) []KernelDiagnostic {
 		out = append(out, KernelDiagnostic{
 			Kernel:     entry.Info,
 			Recognized: recognized,
-			Reason:     wholeCallKernelReason(p, recognized),
+			Reason:     runtimeSpecializationReason(p, recognized),
 		})
 	}
 	return out
 }
 
-func wholeCallKernelFingerprintForProto(proto *FuncProto) wholeCallKernelFingerprint {
-	var fp wholeCallKernelFingerprint
+func runtimeSpecializationFingerprintForProto(proto *FuncProto) runtimeSpecializationFingerprint {
+	var fp runtimeSpecializationFingerprint
 	if proto == nil {
 		return fp
 	}
@@ -330,7 +330,7 @@ func DiagnoseDriverLoopKernels(proto *FuncProto, globals map[string]*FuncProto) 
 	return out
 }
 
-func wholeCallKernelReason(proto *FuncProto, recognized bool) string {
+func runtimeSpecializationReason(proto *FuncProto, recognized bool) string {
 	if proto == nil {
 		return kernelReasonNilProto
 	}

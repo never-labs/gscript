@@ -41,8 +41,8 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 		t.Fatal("nestwave proto not found")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "nested_int_recurrence")
-	requireKernelInfo(t, RecognizedWholeCallKernels(fn), "nested_int_recurrence")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "nested_int_recurrence")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(fn), "nested_int_recurrence")
 	if !cachedRuntimeSpecializationRecognized(fn, runtimeSpecializationRawIntNested) {
 		t.Fatal("raw nested int runtime specialization rejected by hot cache")
 	}
@@ -52,7 +52,7 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 	if fn.RawIntNestedKernel == nil || fn.RawIntNestedKernel.kernel == nil {
 		t.Fatal("raw nested int kernel cache was not populated")
 	}
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(fn), "nested_int_recurrence")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(fn), "nested_int_recurrence")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}
@@ -62,8 +62,8 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 
 	mutated := *fn
 	mutated.Code = nil
-	rejectKernelInfo(t, RecognizedWholeCallKernels(&mutated), "nested_int_recurrence")
-	diag = requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(&mutated), "nested_int_recurrence")
+	rejectKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(&mutated), "nested_int_recurrence")
+	diag = requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(&mutated), "nested_int_recurrence")
 	if diag.Recognized || diag.Reason != kernelReasonShapeMismatch {
 		t.Fatalf("mutated diagnostic = %+v, want shape mismatch", diag)
 	}
@@ -103,7 +103,7 @@ func TestRawIntNestedRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *test
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
-	handled, _, err := v.tryRunValueWholeCallKernel(cl, []runtime.Value{runtime.IntValue(1), runtime.IntValue(0)})
+	handled, _, err := v.tryRunValueRuntimeSpecialization(cl, []runtime.Value{runtime.IntValue(1), runtime.IntValue(0)})
 	if err != nil {
 		t.Fatalf("runtime specialization returned error: %v", err)
 	}

@@ -12,7 +12,7 @@ const (
 )
 
 type rawIntNestedKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	analyzed    bool
 	kernel      *rawIntNestedKernel
 }
@@ -55,7 +55,7 @@ func rawIntNestedKernelForProto(proto *FuncProto) *rawIntNestedKernelCache {
 	if proto == nil {
 		return nil
 	}
-	fp := wholeCallKernelFingerprintForProto(proto)
+	fp := runtimeSpecializationFingerprintForProto(proto)
 	cache := proto.RawIntNestedKernel
 	if cache != nil && cache.analyzed && cache.fingerprint == fp {
 		return cache

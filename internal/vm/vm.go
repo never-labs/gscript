@@ -82,8 +82,8 @@ type VM struct {
 	argBuf             [16]runtime.Value // pre-allocated arg buffer for OP_CALL
 	retBuf             [8]runtime.Value  // pre-allocated return buffer for OP_RETURN
 	coroutineResultBuf [8]runtime.Value  // pre-allocated coroutine.resume result buffer
-	wholeCallFloatBuf  []float64         // reusable non-pointer scratch for guarded whole-call kernels
-	wholeCallIntBuf    []int64           // reusable non-pointer scratch for guarded whole-call kernels
+	wholeCallFloatBuf  []float64         // reusable non-pointer scratch for guarded whole-call runtime specializations
+	wholeCallIntBuf    []int64           // reusable non-pointer scratch for guarded whole-call runtime specializations
 	wholeCallValueBuf  []runtime.Value   // reusable Value scratch; scanned as GC roots below
 	spectralKernel     spectralKernelCache
 	currentCoroutine   *VMCoroutine // coroutine currently running on this VM, if any
@@ -3498,9 +3498,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						break
 					}
 				}
-				if b != 0 && wholeCallKernelArity(nArgs) {
+				if b != 0 && wholeCallRuntimeSpecializationArity(nArgs) {
 					args := vm.regs[base+a+1 : base+a+1+nArgs]
-					handled, err := vm.tryValueWholeCallKernel(cl, args, c, base+a)
+					handled, err := vm.tryValueRuntimeSpecialization(cl, args, c, base+a)
 					if handled {
 						if err != nil {
 							return nil, wrapLineErr(frame, err)
@@ -3508,7 +3508,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
 						break
 					}
-					handled, err = vm.tryWholeCallKernel(cl, args, c, base+a)
+					handled, err = vm.tryNoResultRuntimeSpecialization(cl, args, c, base+a)
 					if handled {
 						if err != nil {
 							return nil, wrapLineErr(frame, err)
@@ -4477,11 +4477,11 @@ func (vm *VM) writeCallResults(dst, c int, results []runtime.Value) {
 func (vm *VM) callValue(fnVal runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
 	if fnVal.IsFunction() {
 		if cl, ok := closureFromValue(fnVal); ok {
-			if wholeCallKernelArity(len(args)) {
-				if handled, results, err := vm.tryRunNonRecursiveTableValueWholeCallKernel(cl, args); handled {
+			if wholeCallRuntimeSpecializationArity(len(args)) {
+				if handled, results, err := vm.tryRunNonRecursiveTableValueRuntimeSpecialization(cl, args); handled {
 					return results, err
 				}
-				if handled, err := vm.tryRunWholeCallKernel(cl, args); handled {
+				if handled, err := vm.tryRunNoResultRuntimeSpecialization(cl, args); handled {
 					return nil, err
 				}
 			}

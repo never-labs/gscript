@@ -38,8 +38,8 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 		t.Fatal("missing quicksort proto")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "numeric_array_region_sort")
-	requireKernelInfo(t, RecognizedWholeCallKernels(quicksort), "numeric_array_region_sort")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "numeric_array_region_sort")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(quicksort), "numeric_array_region_sort")
 	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(quicksort, wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort) {
 		t.Fatal("numeric_array_region_sort rejected by no-result runtime specialization cache")
 	}
@@ -47,7 +47,7 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(quicksort), "numeric_array_region_sort")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(quicksort), "numeric_array_region_sort")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}

@@ -14,18 +14,18 @@ const (
 	spectralAtv
 )
 
-type spectralWholeCallKind uint8
+type spectralRuntimeSpecializationKind uint8
 
 const (
-	spectralWholeCallInvalid spectralWholeCallKind = iota
-	spectralWholeCallAv
-	spectralWholeCallAtv
-	spectralWholeCallAtAv
-	spectralWholeCallDenseAtAv
+	spectralRuntimeSpecializationInvalid spectralRuntimeSpecializationKind = iota
+	spectralRuntimeSpecializationAv
+	spectralRuntimeSpecializationAtv
+	spectralRuntimeSpecializationAtAv
+	spectralRuntimeSpecializationDenseAtAv
 )
 
 // maxSpectralCoefficientFloats caps the combined A and A^T coefficient cache.
-// The spectral whole-call kernel is dominated by repeated coefficient division
+// The spectral whole-call runtime specialization is dominated by repeated coefficient division
 // when the cache is disabled; a 64 MiB budget keeps the hot benchmark sizes on
 // the precomputed matrix-vector path without allowing unbounded O(n^2) memory.
 const maxSpectralCoefficientFloats = 1 << 23
@@ -36,33 +36,33 @@ type spectralKernelCache struct {
 	at []float64
 }
 
-type spectralWholeCallKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
-	spec        *spectralWholeCallKernelSpec
+type spectralRuntimeSpecializationCache struct {
+	fingerprint runtimeSpecializationFingerprint
+	spec        *spectralRuntimeSpecializationSpec
 }
 
-type spectralWholeCallKernelSpec struct {
-	kind spectralWholeCallKind
+type spectralRuntimeSpecializationSpec struct {
+	kind spectralRuntimeSpecializationKind
 }
 
-func (vm *VM) tryRunSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) tryRunSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil {
 		return false, nil
 	}
-	return vm.runSpectralWholeCallKernel(cl, args)
+	return vm.runSpectralRuntimeSpecialization(cl, args)
 }
 
-func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) runSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil || !vm.noGlobalLock {
 		return false, nil
 	}
 	proto := cl.Proto
-	spec, ok := spectralWholeCallKernelSpecForProto(proto)
+	spec, ok := spectralRuntimeSpecializationSpecForProto(proto)
 	if !ok {
 		return false, nil
 	}
 	switch spec.kind {
-	case spectralWholeCallAv:
+	case spectralRuntimeSpecializationAv:
 		if len(args) != 3 {
 			return false, nil
 		}
@@ -73,7 +73,7 @@ func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 			return false, nil
 		}
 		return true, nil
-	case spectralWholeCallAtv:
+	case spectralRuntimeSpecializationAtv:
 		if len(args) != 3 {
 			return false, nil
 		}
@@ -84,7 +84,7 @@ func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 			return false, nil
 		}
 		return true, nil
-	case spectralWholeCallDenseAtAv:
+	case spectralRuntimeSpecializationDenseAtAv:
 		if len(args) != 4 || !vm.guardDenseSpectralAtAvCallees(proto) {
 			return false, nil
 		}
@@ -92,7 +92,7 @@ func (vm *VM) runSpectralWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 			return false, nil
 		}
 		return true, nil
-	case spectralWholeCallAtAv:
+	case spectralRuntimeSpecializationAtAv:
 		if len(args) != 3 || !vm.guardSpectralAtAvCallees(proto) {
 			return false, nil
 		}
@@ -489,45 +489,45 @@ func classifyDenseSpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
 }
 
 func isSpectralAvProto(p *FuncProto) bool {
-	spec, ok := spectralWholeCallKernelSpecForProto(p)
-	return ok && spec.kind == spectralWholeCallAv
+	spec, ok := spectralRuntimeSpecializationSpecForProto(p)
+	return ok && spec.kind == spectralRuntimeSpecializationAv
 }
 
 func isSpectralAtvProto(p *FuncProto) bool {
-	spec, ok := spectralWholeCallKernelSpecForProto(p)
-	return ok && spec.kind == spectralWholeCallAtv
+	spec, ok := spectralRuntimeSpecializationSpecForProto(p)
+	return ok && spec.kind == spectralRuntimeSpecializationAtv
 }
 
-func spectralWholeCallKernelSpecForProto(p *FuncProto) (*spectralWholeCallKernelSpec, bool) {
+func spectralRuntimeSpecializationSpecForProto(p *FuncProto) (*spectralRuntimeSpecializationSpec, bool) {
 	if p == nil {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
-	cache := p.SpectralWholeCallKernel
+	fp := runtimeSpecializationFingerprintForProto(p)
+	cache := p.SpectralRuntimeSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
-	spec, ok := analyzeSpectralWholeCallKernelSpec(p)
+	spec, ok := analyzeSpectralRuntimeSpecializationSpec(p)
 	if !ok {
-		p.SpectralWholeCallKernel = &spectralWholeCallKernelCache{fingerprint: fp}
+		p.SpectralRuntimeSpecialization = &spectralRuntimeSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.SpectralWholeCallKernel = &spectralWholeCallKernelCache{fingerprint: fp, spec: spec}
+	p.SpectralRuntimeSpecialization = &spectralRuntimeSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
-func analyzeSpectralWholeCallKernelSpec(p *FuncProto) (*spectralWholeCallKernelSpec, bool) {
+func analyzeSpectralRuntimeSpecializationSpec(p *FuncProto) (*spectralRuntimeSpecializationSpec, bool) {
 	switch classifySpectralMultiplyBytecode(p) {
 	case spectralAv:
-		return &spectralWholeCallKernelSpec{kind: spectralWholeCallAv}, true
+		return &spectralRuntimeSpecializationSpec{kind: spectralRuntimeSpecializationAv}, true
 	case spectralAtv:
-		return &spectralWholeCallKernelSpec{kind: spectralWholeCallAtv}, true
+		return &spectralRuntimeSpecializationSpec{kind: spectralRuntimeSpecializationAtv}, true
 	}
 	if isSpectralAtAvBytecode(p) {
-		return &spectralWholeCallKernelSpec{kind: spectralWholeCallAtAv}, true
+		return &spectralRuntimeSpecializationSpec{kind: spectralRuntimeSpecializationAtAv}, true
 	}
 	if isDenseSpectralAtAvBytecode(p) {
-		return &spectralWholeCallKernelSpec{kind: spectralWholeCallDenseAtAv}, true
+		return &spectralRuntimeSpecializationSpec{kind: spectralRuntimeSpecializationDenseAtAv}, true
 	}
 	return nil, false
 }
@@ -554,8 +554,8 @@ func isSpectralAProto(p *FuncProto) bool {
 }
 
 func isDenseSpectralAtAvProto(p *FuncProto) bool {
-	spec, ok := spectralWholeCallKernelSpecForProto(p)
-	return ok && spec.kind == spectralWholeCallDenseAtAv
+	spec, ok := spectralRuntimeSpecializationSpecForProto(p)
+	return ok && spec.kind == spectralRuntimeSpecializationDenseAtAv
 }
 
 func isDenseSpectralAtAvBytecode(p *FuncProto) bool {
@@ -601,14 +601,14 @@ func valueStringConst(v runtime.Value, want string) bool {
 }
 
 func classifySpectralMultiplyProto(p *FuncProto) spectralMultiplyKind {
-	spec, ok := spectralWholeCallKernelSpecForProto(p)
+	spec, ok := spectralRuntimeSpecializationSpecForProto(p)
 	if !ok {
 		return spectralNotMultiply
 	}
 	switch spec.kind {
-	case spectralWholeCallAv:
+	case spectralRuntimeSpecializationAv:
 		return spectralAv
-	case spectralWholeCallAtv:
+	case spectralRuntimeSpecializationAtv:
 		return spectralAtv
 	default:
 		return spectralNotMultiply
@@ -664,8 +664,8 @@ func classifySpectralMultiplyBytecode(p *FuncProto) spectralMultiplyKind {
 }
 
 func isSpectralAtAvProto(p *FuncProto) bool {
-	spec, ok := spectralWholeCallKernelSpecForProto(p)
-	return ok && spec.kind == spectralWholeCallAtAv
+	spec, ok := spectralRuntimeSpecializationSpecForProto(p)
+	return ok && spec.kind == spectralRuntimeSpecializationAtAv
 }
 
 func isSpectralAtAvBytecode(p *FuncProto) bool {

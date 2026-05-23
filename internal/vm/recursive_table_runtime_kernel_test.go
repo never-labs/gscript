@@ -54,10 +54,10 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 		t.Fatalf("missing recursive table protos: builder=%v fold=%v", builder != nil, fold != nil)
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "lazy_recursive_table_builder")
-	requireKernelInfo(t, WholeCallKernelCatalog(), "lazy_recursive_table_fold")
-	requireKernelInfo(t, RecognizedWholeCallKernels(builder), "lazy_recursive_table_builder")
-	requireKernelInfo(t, RecognizedWholeCallKernels(fold), "lazy_recursive_table_fold")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "lazy_recursive_table_builder")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "lazy_recursive_table_fold")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(builder), "lazy_recursive_table_builder")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(fold), "lazy_recursive_table_fold")
 	if !cachedRuntimeSpecializationRecognized(builder, runtimeSpecializationLazyRecursiveTableBuilder) {
 		t.Fatal("lazy recursive table builder rejected by runtime specialization cache")
 	}
@@ -65,11 +65,11 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 		t.Fatal("lazy recursive table fold rejected by runtime specialization cache")
 	}
 
-	builderDiag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(builder), "lazy_recursive_table_builder")
+	builderDiag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(builder), "lazy_recursive_table_builder")
 	if !builderDiag.Recognized || builderDiag.Reason != kernelReasonRecognized {
 		t.Fatalf("builder diagnostic = %+v, want recognized %q", builderDiag, kernelReasonRecognized)
 	}
-	foldDiag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(fold), "lazy_recursive_table_fold")
+	foldDiag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(fold), "lazy_recursive_table_fold")
 	if !foldDiag.Recognized || foldDiag.Reason != kernelReasonRecognized {
 		t.Fatalf("fold diagnostic = %+v, want recognized %q", foldDiag, kernelReasonRecognized)
 	}
@@ -94,7 +94,7 @@ func TestRecursiveTableRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *te
 			return []runtime.Value{runtime.IntValue(41)}, nil
 		},
 	}))
-	handled, _, err := v.tryRunValueWholeCallKernel(builderCl, []runtime.Value{runtime.IntValue(1)})
+	handled, _, err := v.tryRunValueRuntimeSpecialization(builderCl, []runtime.Value{runtime.IntValue(1)})
 	if err != nil {
 		t.Fatalf("builder runtime specialization returned error: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestRecursiveTableRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *te
 	node := runtime.NewTable()
 	node.RawSetString("left", runtime.TableValue(runtime.NewTable()))
 	node.RawSetString("right", runtime.TableValue(runtime.NewTable()))
-	handled, _, err = v.tryRunValueWholeCallKernel(foldCl, []runtime.Value{runtime.TableValue(node)})
+	handled, _, err = v.tryRunValueRuntimeSpecialization(foldCl, []runtime.Value{runtime.TableValue(node)})
 	if err != nil {
 		t.Fatalf("fold runtime specialization returned error: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestRecursiveTableNonRecursiveWholeCallEntryDoesNotTrigger(t *testing.T) {
 	if !ok {
 		t.Fatalf("makeTree global is not a VM closure: %s", builderFn.TypeName())
 	}
-	handled, _, err := v.tryRunNonRecursiveTableValueWholeCallKernel(builderCl, []runtime.Value{runtime.IntValue(2)})
+	handled, _, err := v.tryRunNonRecursiveTableValueRuntimeSpecialization(builderCl, []runtime.Value{runtime.IntValue(2)})
 	if err != nil {
 		t.Fatalf("non-recursive builder dispatch returned error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestRecursiveTableNonRecursiveWholeCallEntryDoesNotTrigger(t *testing.T) {
 		t.Fatal("missing builder cache")
 	}
 	root := runtime.FreshTableValue(runtime.NewLazyRecursiveTable(&builderCache.builder.ctor, 2))
-	handled, _, err = v.tryRunNonRecursiveTableValueWholeCallKernel(foldCl, []runtime.Value{root})
+	handled, _, err = v.tryRunNonRecursiveTableValueRuntimeSpecialization(foldCl, []runtime.Value{root})
 	if err != nil {
 		t.Fatalf("non-recursive fold dispatch returned error: %v", err)
 	}

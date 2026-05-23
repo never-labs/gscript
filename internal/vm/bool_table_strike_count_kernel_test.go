@@ -24,8 +24,8 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("missing sieve proto")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "bool_table_strike_count")
-	requireKernelInfo(t, RecognizedWholeCallKernels(sieve), "bool_table_strike_count")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "bool_table_strike_count")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(sieve), "bool_table_strike_count")
 	if !cachedRuntimeSpecializationRecognized(sieve, runtimeSpecializationBoolTableStrikeCount) {
 		t.Fatal("bool_table_strike_count rejected by runtime specialization cache")
 	}
@@ -36,7 +36,7 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("bool table strike-count proto-local spec was not generated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(sieve), "bool_table_strike_count")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(sieve), "bool_table_strike_count")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}

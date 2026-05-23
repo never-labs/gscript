@@ -303,7 +303,7 @@ func (vm *VM) tryRecordPairwiseNumericForLoopKernel(frame *CallFrame, base int, 
 		return false, nil
 	}
 	cl, ok := closureFromValue(fnVal)
-	if !ok || !HasRecordPairwiseNumericWholeCallKernel(cl.Proto) {
+	if !ok || !HasRecordPairwiseNumericWholeCallRuntimeSpecialization(cl.Proto) {
 		return false, nil
 	}
 	argVal, ok := vm.globalValue(constants[shape.argConst].Str())
@@ -936,10 +936,10 @@ func isRecordPairwiseNumericProtoWithGlobalCount(p *FuncProto) bool {
 	})
 }
 
-// HasRecordPairwiseNumericWholeCallKernel reports whether p matches the guarded
+// HasRecordPairwiseNumericWholeCallRuntimeSpecialization reports whether p matches the guarded
 // record-field pairwise numeric advance(dt) kernel shape. MethodJIT uses this to
-// keep driver loops on the VM route where the whole-call kernel can fire.
-func HasRecordPairwiseNumericWholeCallKernel(p *FuncProto) bool {
+// keep driver loops on the VM route where the whole-call runtime specialization can fire.
+func HasRecordPairwiseNumericWholeCallRuntimeSpecialization(p *FuncProto) bool {
 	return cachedWholeCallNoResultRuntimeSpecializationRecognized(p, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric)
 }
 
@@ -979,5 +979,5 @@ func IsRecordPairwiseNumericDriverLoopAt(p *FuncProto, forprepPC int, globals ma
 	if shape.fnConst < 0 || shape.fnConst >= len(p.Constants) || !p.Constants[shape.fnConst].IsString() {
 		return false
 	}
-	return HasRecordPairwiseNumericWholeCallKernel(globals[p.Constants[shape.fnConst].Str()])
+	return HasRecordPairwiseNumericWholeCallRuntimeSpecialization(globals[p.Constants[shape.fnConst].Str()])
 }

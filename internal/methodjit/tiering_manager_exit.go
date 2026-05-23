@@ -975,17 +975,17 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 		nArgs := int(ctx.OpExitArg1)
 		nRets := int(ctx.OpExitArg2)
 		if nRets != 0 {
-			return fmt.Errorf("call op-exit only supports no-result whole-call kernels")
+			return fmt.Errorf("call op-exit only supports no-result whole-call runtime specializations")
 		}
 		if tm.callVM == nil {
-			return fmt.Errorf("no callVM set for whole-call kernel op-exit")
+			return fmt.Errorf("no callVM set for whole-call runtime specialization op-exit")
 		}
 		if absSlot < 0 || nArgs < 0 || absSlot+nArgs >= len(regs) {
-			return fmt.Errorf("whole-call kernel op-exit out of register range")
+			return fmt.Errorf("whole-call runtime specialization op-exit out of register range")
 		}
 		fnVal := regs[absSlot]
 		args := regs[absSlot+1 : absSlot+1+nArgs]
-		handled, err := tm.callVM.TryRunNoResultWholeCallKernelForJIT(fnVal, args)
+		handled, err := tm.callVM.TryRunNoResultWholeCallRuntimeSpecializationForJIT(fnVal, args)
 		if err != nil {
 			return err
 		}
@@ -1603,7 +1603,7 @@ func (tm *TieringManager) executeWholeCallNoResultBatchCall(proto *vm.FuncProto,
 		}
 		args = append(args, val)
 	}
-	handled, err := tm.callVM.TryRunNoResultWholeCallKernelForJIT(fnVal, args)
+	handled, err := tm.callVM.TryRunNoResultWholeCallRuntimeSpecializationForJIT(fnVal, args)
 	if handled || err != nil {
 		return handled, err
 	}

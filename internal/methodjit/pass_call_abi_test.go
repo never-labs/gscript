@@ -166,7 +166,7 @@ func apply(f) {
 		t.Fatalf("call has no source metadata: %+v", call)
 	}
 	apply.EnsureFeedback()
-	apply.CallSiteFeedback[callPC].Count = wholeCallKernelMinStableObservations
+	apply.CallSiteFeedback[callPC].Count = wholeCallRuntimeSpecializationMinStableObservations
 	apply.CallSiteFeedback[callPC].NArgs = 1
 	apply.CallSiteFeedback[callPC].ResultArity = uint8(call.Aux2)
 	apply.CallSiteFeedback[callPC].CalleeVMProto = inc
@@ -197,7 +197,7 @@ func TestStaticNoDepthCalleeUsesStableFeedbackCallee(t *testing.T) {
 	}}
 	proto := &vm.FuncProto{Name: "caller", Code: make([]uint32, 2)}
 	proto.EnsureFeedback()
-	proto.CallSiteFeedback[1].Count = wholeCallKernelMinStableObservations
+	proto.CallSiteFeedback[1].Count = wholeCallRuntimeSpecializationMinStableObservations
 	proto.CallSiteFeedback[1].NArgs = 1
 	proto.CallSiteFeedback[1].ResultArity = 2
 	proto.CallSiteFeedback[1].CalleeVMProto = callee
@@ -224,7 +224,7 @@ func TestCallCalleeFlagSpecUsesPolymorphicFeedback(t *testing.T) {
 	calleeB := &vm.FuncProto{Name: "b", LeafNoCall: true, NoGlobalOps: true}
 	proto := &vm.FuncProto{Name: "caller", Code: make([]uint32, 2)}
 	proto.EnsureFeedback()
-	proto.CallSiteFeedback[1].Count = wholeCallKernelMinStableObservations
+	proto.CallSiteFeedback[1].Count = wholeCallRuntimeSpecializationMinStableObservations
 	proto.CallSiteFeedback[1].Flags = vm.CallSiteCalleePolymorphic
 	proto.CallSiteFeedback[1].NArgs = 1
 	proto.CallSiteFeedback[1].ResultArity = 2
@@ -256,7 +256,7 @@ func TestCallCalleeFlagSpecKeepsMixedNoGlobalDynamic(t *testing.T) {
 	calleeB := &vm.FuncProto{Name: "b", LeafNoCall: true, NoGlobalOps: false}
 	proto := &vm.FuncProto{Name: "caller", Code: make([]uint32, 2)}
 	proto.EnsureFeedback()
-	proto.CallSiteFeedback[1].Count = wholeCallKernelMinStableObservations
+	proto.CallSiteFeedback[1].Count = wholeCallRuntimeSpecializationMinStableObservations
 	proto.CallSiteFeedback[1].Flags = vm.CallSiteCalleePolymorphic
 	proto.CallSiteFeedback[1].NArgs = 1
 	proto.CallSiteFeedback[1].ResultArity = 2
@@ -662,7 +662,7 @@ func apply(f) {
 	fn := BuildGraph(apply)
 	call := firstCall(t, fn)
 	apply.EnsureFeedback()
-	apply.CallSiteFeedback[call.SourcePC].Count = wholeCallKernelMinStableObservations
+	apply.CallSiteFeedback[call.SourcePC].Count = wholeCallRuntimeSpecializationMinStableObservations
 	apply.CallSiteFeedback[call.SourcePC].NArgs = 1
 	apply.CallSiteFeedback[call.SourcePC].ResultArity = uint8(call.Aux2)
 	apply.CallSiteFeedback[call.SourcePC].CalleeVMProto = inc
@@ -698,7 +698,7 @@ func apply(f) {
 	fn := BuildGraph(apply)
 	call := firstCall(t, fn)
 	apply.EnsureFeedback()
-	apply.CallSiteFeedback[call.SourcePC].Count = wholeCallKernelMinStableObservations
+	apply.CallSiteFeedback[call.SourcePC].Count = wholeCallRuntimeSpecializationMinStableObservations
 	apply.CallSiteFeedback[call.SourcePC].NArgs = 1
 	apply.CallSiteFeedback[call.SourcePC].ResultArity = uint8(call.Aux2)
 	apply.CallSiteFeedback[call.SourcePC].CalleeVMProto = inc

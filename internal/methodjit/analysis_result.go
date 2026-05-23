@@ -139,7 +139,7 @@ type AnalysisResult struct {
 	// precise op-exit rather than the generic CallExit path.
 	WholeCallNoResultKernels map[int]bool
 
-	// WholeCallNoResultBatches records loop-tail no-result whole-call kernel
+	// WholeCallNoResultBatches records loop-tail no-result whole-call runtime specialization
 	// sites that can safely batch future complete loop iterations after the
 	// current iteration's final kernel call has run.
 	WholeCallNoResultBatches map[int]WholeCallNoResultBatchFact
@@ -556,7 +556,7 @@ type CallFacts struct {
 	// precise op-exit rather than the generic CallExit path.
 	WholeCallNoResultKernels map[int]bool
 
-	// WholeCallNoResultBatches records loop-tail no-result whole-call kernel
+	// WholeCallNoResultBatches records loop-tail no-result whole-call runtime specialization
 	// sites that can safely batch future complete loop iterations after the
 	// current iteration's final kernel call has run.
 	WholeCallNoResultBatches map[int]WholeCallNoResultBatchFact

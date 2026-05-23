@@ -8,7 +8,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func TestWholeCallKernelDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
+func TestWholeCallRuntimeSpecializationDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
 	proto, vm := compileSpectralKernelTestProgram(t, `
 func fannkuch(n) { return n }
 func sieve(n) { return n }
@@ -28,10 +28,10 @@ func advance(dt) { return dt }
 	}
 	for i, child := range proto.Protos {
 		child.Source = sources[i]
-		if infos := RecognizedWholeCallKernels(child); len(infos) != 0 {
+		if infos := RecognizedWholeCallRuntimeSpecializations(child); len(infos) != 0 {
 			t.Fatalf("metadata-only proto %q/%q recognized as %+v", child.Name, child.Source, infos)
 		}
-		for _, diag := range DiagnoseWholeCallKernelProto(child) {
+		for _, diag := range DiagnoseWholeCallRuntimeSpecializationProto(child) {
 			if diag.Recognized {
 				t.Fatalf("metadata-only proto %q/%q recognized by diagnostic %+v", child.Name, child.Source, diag)
 			}
@@ -69,7 +69,7 @@ func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 		name  string
 		infos []KernelInfo
 	}{
-		{name: "nested_int_recurrence", infos: WholeCallKernelCatalog()},
+		{name: "nested_int_recurrence", infos: WholeCallRuntimeSpecializationCatalog()},
 		{name: "generic_record_array_loop", infos: DriverLoopKernelCatalog()},
 		{name: "record_pairwise_numeric_loop", infos: DriverLoopKernelCatalog()},
 	} {
@@ -82,7 +82,7 @@ func TestKernelTieringPolicyCatalogCoversRuntimeSources(t *testing.T) {
 		}
 	}
 
-	info := findKernelInfo(t, WholeCallKernelCatalog(), "record_pairwise_numeric")
+	info := findKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
 	if !info.HasCapability(KernelCapabilityStructuralTiering) {
 		t.Fatalf("record_pairwise_numeric missing structural tiering capability: %+v", info)
 	}

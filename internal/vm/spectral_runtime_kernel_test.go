@@ -31,24 +31,24 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		name  string
 		proto *FuncProto
 		id    int
-		kind  spectralWholeCallKind
+		kind  spectralRuntimeSpecializationKind
 	}{
-		{name: "coefficient_matrix_vector", proto: multiplyAv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector, kind: spectralWholeCallAv},
-		{name: "coefficient_matrix_transpose_vector", proto: multiplyAtv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector, kind: spectralWholeCallAtv},
-		{name: "coefficient_matrix_ata_vector", proto: multiplyAtAv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector, kind: spectralWholeCallAtAv},
+		{name: "coefficient_matrix_vector", proto: multiplyAv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector, kind: spectralRuntimeSpecializationAv},
+		{name: "coefficient_matrix_transpose_vector", proto: multiplyAtv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector, kind: spectralRuntimeSpecializationAtv},
+		{name: "coefficient_matrix_ata_vector", proto: multiplyAtAv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector, kind: spectralRuntimeSpecializationAtAv},
 	} {
-		requireKernelInfo(t, WholeCallKernelCatalog(), tc.name)
-		requireKernelInfo(t, RecognizedWholeCallKernels(tc.proto), tc.name)
+		requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), tc.name)
+		requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(tc.proto), tc.name)
 		if !cachedWholeCallNoResultRuntimeSpecializationRecognized(tc.proto, tc.id) {
 			t.Fatalf("%s rejected by no-result runtime specialization cache", tc.name)
 		}
-		if tc.proto.SpectralWholeCallKernel == nil || tc.proto.SpectralWholeCallKernel.spec == nil {
+		if tc.proto.SpectralRuntimeSpecialization == nil || tc.proto.SpectralRuntimeSpecialization.spec == nil {
 			t.Fatalf("%s proto-local spec was not generated", tc.name)
 		}
-		if got := tc.proto.SpectralWholeCallKernel.spec.kind; got != tc.kind {
+		if got := tc.proto.SpectralRuntimeSpecialization.spec.kind; got != tc.kind {
 			t.Fatalf("%s kind = %d, want %d", tc.name, got, tc.kind)
 		}
-		diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(tc.proto), tc.name)
+		diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(tc.proto), tc.name)
 		if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 			t.Fatalf("%s diagnostic = %+v, want recognized %q", tc.name, diag, kernelReasonRecognized)
 		}
@@ -62,16 +62,16 @@ func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("missing dense multiplyAtAv proto")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "dense_coefficient_matrix_ata_vector")
-	requireKernelInfo(t, RecognizedWholeCallKernels(multiplyAtAv), "dense_coefficient_matrix_ata_vector")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "dense_coefficient_matrix_ata_vector")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(multiplyAtAv), "dense_coefficient_matrix_ata_vector")
 	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(multiplyAtAv, wholeCallNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector) {
 		t.Fatal("dense_coefficient_matrix_ata_vector rejected by no-result runtime specialization cache")
 	}
-	if multiplyAtAv.SpectralWholeCallKernel == nil || multiplyAtAv.SpectralWholeCallKernel.spec == nil {
+	if multiplyAtAv.SpectralRuntimeSpecialization == nil || multiplyAtAv.SpectralRuntimeSpecialization.spec == nil {
 		t.Fatal("dense spectral proto-local spec was not generated")
 	}
-	if got := multiplyAtAv.SpectralWholeCallKernel.spec.kind; got != spectralWholeCallDenseAtAv {
-		t.Fatalf("dense spectral kind = %d, want %d", got, spectralWholeCallDenseAtAv)
+	if got := multiplyAtAv.SpectralRuntimeSpecialization.spec.kind; got != spectralRuntimeSpecializationDenseAtAv {
+		t.Fatalf("dense spectral kind = %d, want %d", got, spectralRuntimeSpecializationDenseAtAv)
 	}
 }
 

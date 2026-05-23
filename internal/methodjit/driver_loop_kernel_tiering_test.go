@@ -48,12 +48,12 @@ func TestWholeCallRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 	if fn == nil {
 		t.Fatal("nestwave proto not found")
 	}
-	info, ok := recognizedWholeCallKernelForTiering(fn)
+	info, ok := recognizedWholeCallRuntimeSpecializationForTiering(fn)
 	if !ok {
 		t.Fatal("nested_int_recurrence should expose a whole-call structural tiering kernel")
 	}
 	if info.Name != "nested_int_recurrence" {
-		t.Fatalf("whole-call kernel=%q, want nested_int_recurrence", info.Name)
+		t.Fatalf("whole-call runtime specialization=%q, want nested_int_recurrence", info.Name)
 	}
 	if !info.HasCapability(vm.KernelCapabilityStructuralTiering) {
 		t.Fatalf("nested_int_recurrence missing structural tiering capability: %+v", info)

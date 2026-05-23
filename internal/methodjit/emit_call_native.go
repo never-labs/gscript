@@ -2658,7 +2658,7 @@ func (ec *emitContext) callCalleeFeedbackProtos(instr *Instr) []*vm.FuncProto {
 		return nil
 	}
 	fb := ec.fn.Proto.CallSiteFeedback[instr.SourcePC]
-	if fb.Count < wholeCallKernelMinStableObservations ||
+	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations ||
 		fb.Flags&vm.CallSiteArityPolymorphic != 0 ||
 		int(fb.NArgs) != len(instr.Args)-1 ||
 		fb.ResultArity != uint8(instr.Aux2) {
@@ -2670,7 +2670,7 @@ func (ec *emitContext) callCalleeFeedbackProtos(instr *Instr) []*vm.FuncProto {
 		}
 		return nil
 	}
-	return fb.MaturePolymorphicVMProtos(wholeCallKernelMinStableObservations, len(instr.Args)-1, uint8(instr.Aux2))
+	return fb.MaturePolymorphicVMProtos(wholeCallRuntimeSpecializationMinStableObservations, len(instr.Args)-1, uint8(instr.Aux2))
 }
 
 func (ec *emitContext) callCalleeFieldShapeProtos(instr *Instr) []*vm.FuncProto {
@@ -3106,7 +3106,7 @@ func (ec *emitContext) emitOpCall(instr *Instr) {
 	} else if !ec.tailCallInstrs[instr.ID] && ec.isNumericStaticSelfCall(instr) {
 		ec.emitCallNativeRawIntSelf(instr)
 	} else if ec.emitProtocolConstCallIfEligible(instr) {
-	} else if ec.emitWholeCallKernelOpExitIfEligible(instr) {
+	} else if ec.emitWholeCallRuntimeSpecializationOpExitIfEligible(instr) {
 	} else if ec.emitCallNativeRawIntPeerIfEligible(instr) {
 	} else if ec.emitCallNativeFieldShapeTypedPeerIfEligible(instr) {
 	} else if ec.emitCallNativeTypedPeerIfEligible(instr) {

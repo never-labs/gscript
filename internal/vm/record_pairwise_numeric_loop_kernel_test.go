@@ -46,8 +46,8 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationDiagnostics(t *test
 		t.Fatal("missing advance proto")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "record_pairwise_numeric")
-	requireKernelInfo(t, RecognizedWholeCallKernels(advance), "record_pairwise_numeric")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(advance), "record_pairwise_numeric")
 	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(advance, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		t.Fatal("record_pairwise_numeric rejected by no-result runtime specialization cache")
 	}
@@ -55,7 +55,7 @@ func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationDiagnostics(t *test
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(advance), "record_pairwise_numeric")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(advance), "record_pairwise_numeric")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}

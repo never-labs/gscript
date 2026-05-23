@@ -11,7 +11,7 @@ type recordWalkFoldSpec struct {
 }
 
 type recordWalkFoldKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	spec        *recordWalkFoldSpec
 }
 
@@ -33,7 +33,7 @@ func isRecordWalkFoldProto(p *FuncProto) bool {
 	return ok
 }
 
-func (vm *VM) runRecordWalkFoldWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runRecordWalkFoldRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 3 {
 		return false, nil, nil
 	}
@@ -143,7 +143,7 @@ func recordWalkFoldSpecForProto(p *FuncProto) (*recordWalkFoldSpec, bool) {
 		len(p.Code) != 83 || len(p.Constants) != 15 || len(p.Protos) != 0 {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
+	fp := runtimeSpecializationFingerprintForProto(p)
 	cache := p.RecordWalkFoldKernel
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil

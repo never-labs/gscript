@@ -25,8 +25,8 @@ func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("missing matmul proto")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "matrix_multiply")
-	requireKernelInfo(t, RecognizedWholeCallKernels(matmul), "matrix_multiply")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "matrix_multiply")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(matmul), "matrix_multiply")
 	if !cachedRuntimeSpecializationRecognized(matmul, runtimeSpecializationMatrixMultiply) {
 		t.Fatal("matrix_multiply rejected by runtime specialization cache")
 	}
@@ -37,7 +37,7 @@ func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatalf("matrix_multiply kind = %d, want plain", matmul.MatrixMultiplyKernel.spec.kind)
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(matmul), "matrix_multiply")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(matmul), "matrix_multiply")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}
@@ -81,8 +81,8 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testin
 		t.Fatal("missing dense transposed matmul proto")
 	}
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "dense_matrix_multiply_transposed")
-	requireKernelInfo(t, RecognizedWholeCallKernels(matmul), "dense_matrix_multiply_transposed")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "dense_matrix_multiply_transposed")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(matmul), "dense_matrix_multiply_transposed")
 	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(matmul, wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed) {
 		t.Fatal("dense_matrix_multiply_transposed rejected by no-result runtime specialization cache")
 	}
@@ -90,7 +90,7 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testin
 		t.Fatal("dense transposed matrix multiply proto-local spec was not generated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(matmul), "dense_matrix_multiply_transposed")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(matmul), "dense_matrix_multiply_transposed")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}

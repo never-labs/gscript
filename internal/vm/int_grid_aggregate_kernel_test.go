@@ -47,8 +47,8 @@ func intGridAggregateTestProto() *FuncProto {
 func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 	aggregate := intGridAggregateTestProto()
 
-	requireKernelInfo(t, WholeCallKernelCatalog(), "int_grid_aggregate")
-	requireKernelInfo(t, RecognizedWholeCallKernels(aggregate), "int_grid_aggregate")
+	requireKernelInfo(t, WholeCallRuntimeSpecializationCatalog(), "int_grid_aggregate")
+	requireKernelInfo(t, RecognizedWholeCallRuntimeSpecializations(aggregate), "int_grid_aggregate")
 	if !cachedRuntimeSpecializationRecognized(aggregate, runtimeSpecializationIntGridAggregate) {
 		t.Fatal("int_grid_aggregate rejected by runtime specialization cache")
 	}
@@ -56,7 +56,7 @@ func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("int_grid_aggregate proto-local spec was not generated")
 	}
 
-	diag := requireKernelDiagnostic(t, DiagnoseWholeCallKernelProto(aggregate), "int_grid_aggregate")
+	diag := requireKernelDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(aggregate), "int_grid_aggregate")
 	if !diag.Recognized || diag.Reason != kernelReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, kernelReasonRecognized)
 	}

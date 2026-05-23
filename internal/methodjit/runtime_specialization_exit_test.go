@@ -9,7 +9,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-const spectralWholeCallKernelExitSrc = `
+const spectralRuntimeSpecializationRuntimeSpecializationExitSrc = `
 func A(i, j) {
 	return 1.0 / ((i + j) * (i + j + 1) / 2 + i + 1)
 }
@@ -57,9 +57,9 @@ for iter := 0; iter < 10; iter++ {
 result := u[0] + v[0]
 `
 
-func TestWholeCallKernelExitLowersStableNoResultCall(t *testing.T) {
+func TestWholeCallRuntimeSpecializationExitLowersStableNoResultCall(t *testing.T) {
 	t.Skip("spectral whole-call no-result lowering is disabled until its fallback contract preserves VM semantics")
-	top := compileProto(t, spectralWholeCallKernelExitSrc)
+	top := compileProto(t, spectralRuntimeSpecializationRuntimeSpecializationExitSrc)
 	globals := runtime.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
@@ -79,23 +79,23 @@ func TestWholeCallKernelExitLowersStableNoResultCall(t *testing.T) {
 		t.Fatalf("missing whole-call batch metadata: cf=%#v", cf)
 	}
 	if got := snap.ByExitCode["ExitOpExit"]; got == 0 {
-		t.Fatalf("stable whole-call kernel did not execute through op-exit path: %#v", snap)
+		t.Fatalf("stable whole-call runtime specialization did not execute through op-exit path: %#v", snap)
 	}
 	hotCallOpExits := uint64(0)
 	for _, site := range snap.Sites {
 		if site.Proto == "<main>" && site.Reason == "Call" && site.ExitName == "ExitCallExit" && site.Count >= 10 {
-			t.Fatalf("hot no-result whole-call kernel still used CallExit: site=%#v all=%#v", site, snap.Sites)
+			t.Fatalf("hot no-result whole-call runtime specialization still used CallExit: site=%#v all=%#v", site, snap.Sites)
 		}
 		if site.Proto == "<main>" && site.Reason == "Call" && site.ExitName == "ExitOpExit" {
 			hotCallOpExits += site.Count
 		}
 	}
 	if hotCallOpExits > 3 {
-		t.Fatalf("whole-call kernel loop was not batched: Call OpExit=%d sites=%#v", hotCallOpExits, snap.Sites)
+		t.Fatalf("whole-call runtime specialization loop was not batched: Call OpExit=%d sites=%#v", hotCallOpExits, snap.Sites)
 	}
 }
 
-func TestWholeCallKernelExitRejectsStableNonKernelRuntimeFeedback(t *testing.T) {
+func TestWholeCallRuntimeSpecializationExitRejectsStableNonKernelRuntimeFeedback(t *testing.T) {
 	top := compileProto(t, `
 total := 0
 
@@ -132,7 +132,7 @@ for i := 0; i < 3; i++ {
 	}
 }
 
-func TestWholeCallKernelExitRejectsPolymorphicRuntimeFeedback(t *testing.T) {
+func TestWholeCallRuntimeSpecializationExitRejectsPolymorphicRuntimeFeedback(t *testing.T) {
 	top := compileProto(t, `
 total := 0
 
@@ -172,7 +172,7 @@ caller(sinkB, 1)
 	}
 }
 
-func TestWholeCallKernelOpExitGuardMissFallsBackToGenericCall(t *testing.T) {
+func TestWholeCallRuntimeSpecializationOpExitGuardMissFallsBackToGenericCall(t *testing.T) {
 	top := compileProto(t, `
 total := 0
 

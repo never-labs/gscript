@@ -24,7 +24,7 @@ type intGridAggregateSpec struct {
 }
 
 type intGridAggregateKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	spec        *intGridAggregateSpec
 }
 
@@ -40,7 +40,7 @@ func isIntGridAggregateProto(p *FuncProto) bool {
 	return ok
 }
 
-func (vm *VM) runIntGridAggregateWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runIntGridAggregateRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 2 {
 		return false, nil, nil
 	}
@@ -93,7 +93,7 @@ func intGridAggregateSpecForProto(p *FuncProto) (*intGridAggregateSpec, bool) {
 		len(p.Code) != 169 || len(p.Constants) != 24 || len(p.Protos) != 0 {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
+	fp := runtimeSpecializationFingerprintForProto(p)
 	cache := p.IntGridAggregateKernel
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil

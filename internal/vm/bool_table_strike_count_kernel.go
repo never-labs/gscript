@@ -3,7 +3,7 @@ package vm
 import "github.com/gscript/gscript/internal/runtime"
 
 type boolTableStrikeCountKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	spec        *boolTableStrikeCountKernelSpec
 }
 
@@ -11,14 +11,14 @@ type boolTableStrikeCountKernelSpec struct {
 	minValue int
 }
 
-func (vm *VM) tryRunBoolTableStrikeCountWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationBoolTableStrikeCount) {
 		return false, nil, nil
 	}
-	return vm.runBoolTableStrikeCountWholeCallKernel(cl, args)
+	return vm.runBoolTableStrikeCountRuntimeSpecialization(cl, args)
 }
 
-func (vm *VM) runBoolTableStrikeCountWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil, nil
 	}
@@ -85,7 +85,7 @@ func boolTableStrikeCountKernelSpecForProto(p *FuncProto) (*boolTableStrikeCount
 		len(p.Constants) != 0 || len(p.Protos) != 0 {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
+	fp := runtimeSpecializationFingerprintForProto(p)
 	cache := p.BoolTableStrikeCountKernel
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil

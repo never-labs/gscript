@@ -12,7 +12,7 @@ const (
 )
 
 type matrixMultiplyKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	spec        *matrixMultiplyKernelSpec
 }
 
@@ -21,20 +21,20 @@ type matrixMultiplyKernelSpec struct {
 }
 
 type denseMatrixMultiplyTBKernelCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	spec        *denseMatrixMultiplyTBKernelSpec
 }
 
 type denseMatrixMultiplyTBKernelSpec struct{}
 
-func (vm *VM) tryRunMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) tryRunMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationMatrixMultiply) {
 		return false, nil, nil
 	}
-	return vm.runMatrixMultiplyWholeCallKernel(cl, args)
+	return vm.runMatrixMultiplyRuntimeSpecialization(cl, args)
 }
 
-func (vm *VM) runMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 3 || !vm.noGlobalLock {
 		return false, nil, nil
 	}
@@ -53,7 +53,7 @@ func (vm *VM) runMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value
 	if n == 0 {
 		return true, []runtime.Value{runtime.TableValue(runtime.NewTable())}, nil
 	}
-	if handled, results := vm.runDenseMatrixMultiplyWholeCallKernel(args[0].Table(), args[1].Table(), n); handled {
+	if handled, results := vm.runDenseMatrixMultiplyRuntimeSpecialization(args[0].Table(), args[1].Table(), n); handled {
 		return true, results, nil
 	}
 	aRows, ok := args[0].Table().PlainFloatMatrixRowsForNumericKernel(n, n)
@@ -132,7 +132,7 @@ func (vm *VM) runMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value
 	return true, []runtime.Value{runtime.TableValue(c)}, nil
 }
 
-func (vm *VM) runDenseMatrixMultiplyWholeCallKernel(aTable, bTable *runtime.Table, n int) (bool, []runtime.Value) {
+func (vm *VM) runDenseMatrixMultiplyRuntimeSpecialization(aTable, bTable *runtime.Table, n int) (bool, []runtime.Value) {
 	aFlat, aStride, ok := aTable.DenseFloatMatrixForNumericKernel(n, n)
 	if !ok {
 		return false, nil
@@ -206,7 +206,7 @@ func (vm *VM) runDenseMatrixMultiplyWholeCallKernel(aTable, bTable *runtime.Tabl
 	return true, []runtime.Value{runtime.TableValue(c)}
 }
 
-func (vm *VM) runDenseMatrixMultiplyTransposedWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
+func (vm *VM) runDenseMatrixMultiplyTransposedRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 4 || !vm.noGlobalLock {
 		return false, nil
 	}
@@ -288,7 +288,7 @@ func matrixMultiplyKernelSpecForProto(p *FuncProto) (*matrixMultiplyKernelSpec, 
 	if p == nil {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
+	fp := runtimeSpecializationFingerprintForProto(p)
 	cache := p.MatrixMultiplyKernel
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
@@ -646,7 +646,7 @@ func denseMatrixMultiplyTBKernelSpecForProto(p *FuncProto) (*denseMatrixMultiply
 	if p == nil {
 		return nil, false
 	}
-	fp := wholeCallKernelFingerprintForProto(p)
+	fp := runtimeSpecializationFingerprintForProto(p)
 	cache := p.DenseMatrixMultiplyTBKernel
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil

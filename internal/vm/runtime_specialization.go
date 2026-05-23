@@ -32,7 +32,7 @@ const (
 )
 
 type runtimeSpecializationProtoCache struct {
-	fingerprint wholeCallKernelFingerprint
+	fingerprint runtimeSpecializationFingerprint
 	recognized  uint64
 }
 
@@ -121,7 +121,7 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			},
 			Recognize: isPermutationFlipChecksumKernelProto,
 		},
-		Run: (*VM).runPermutationFlipChecksumWholeCallKernel,
+		Run: (*VM).runPermutationFlipChecksumRuntimeSpecialization,
 	},
 	runtimeSpecializationIntGridAggregate: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -134,7 +134,7 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			},
 			Recognize: isIntGridAggregateProto,
 		},
-		Run: (*VM).runIntGridAggregateWholeCallKernel,
+		Run: (*VM).runIntGridAggregateRuntimeSpecialization,
 	},
 	runtimeSpecializationMatrixMultiply: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -147,7 +147,7 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			},
 			Recognize: isMatrixMultiplyProto,
 		},
-		Run: (*VM).runMatrixMultiplyWholeCallKernel,
+		Run: (*VM).runMatrixMultiplyRuntimeSpecialization,
 	},
 	runtimeSpecializationRecordWalkFold: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -160,7 +160,7 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			},
 			Recognize: isRecordWalkFoldProto,
 		},
-		Run: (*VM).runRecordWalkFoldWholeCallKernel,
+		Run: (*VM).runRecordWalkFoldRuntimeSpecialization,
 	},
 	runtimeSpecializationBoolTableStrikeCount: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -173,7 +173,7 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			},
 			Recognize: isBoolTableStrikeCountProto,
 		},
-		Run: (*VM).runBoolTableStrikeCountWholeCallKernel,
+		Run: (*VM).runBoolTableStrikeCountRuntimeSpecialization,
 	},
 }
 
@@ -202,7 +202,7 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			},
 			Recognize: isNumericArrayRegionSortProto,
 		},
-		Run: (*VM).runNumericArrayRegionSortWholeCallKernel,
+		Run: (*VM).runNumericArrayRegionSortRuntimeSpecialization,
 	},
 	wholeCallNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -215,7 +215,7 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			},
 			Recognize: isDenseMatrixMultiplyTransposedProto,
 		},
-		Run: (*VM).runDenseMatrixMultiplyTransposedWholeCallKernel,
+		Run: (*VM).runDenseMatrixMultiplyTransposedRuntimeSpecialization,
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -228,7 +228,7 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			},
 			Recognize: isSpectralAvProto,
 		},
-		Run: (*VM).runSpectralWholeCallKernel,
+		Run: (*VM).runSpectralRuntimeSpecialization,
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -241,7 +241,7 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			},
 			Recognize: isSpectralAtvProto,
 		},
-		Run: (*VM).runSpectralWholeCallKernel,
+		Run: (*VM).runSpectralRuntimeSpecialization,
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -254,7 +254,7 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			},
 			Recognize: isSpectralAtAvProto,
 		},
-		Run: (*VM).runSpectralWholeCallKernel,
+		Run: (*VM).runSpectralRuntimeSpecialization,
 	},
 	wholeCallNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -267,7 +267,7 @@ var wholeCallNoResultRuntimeSpecializationRegistry = [wholeCallNoResultRuntimeSp
 			},
 			Recognize: isDenseSpectralAtAvProto,
 		},
-		Run: (*VM).runSpectralWholeCallKernel,
+		Run: (*VM).runSpectralRuntimeSpecialization,
 	},
 }
 
@@ -453,7 +453,7 @@ func hotWholeCallNoResultRuntimeSpecializationRecognized(proto *FuncProto, id in
 }
 
 func runtimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecializationProtoCache {
-	fp := wholeCallKernelFingerprintForProto(proto)
+	fp := runtimeSpecializationFingerprintForProto(proto)
 	cache := proto.RuntimeSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache
@@ -472,7 +472,7 @@ func runtimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecialization
 }
 
 func wholeCallNoResultRuntimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecializationProtoCache {
-	fp := wholeCallKernelFingerprintForProto(proto)
+	fp := runtimeSpecializationFingerprintForProto(proto)
 	cache := proto.WholeCallNoResultRuntime
 	if cache != nil && cache.fingerprint == fp {
 		return cache

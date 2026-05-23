@@ -12,14 +12,14 @@ type tieringKernelDecision struct {
 }
 
 func (tm *TieringManager) structuralKernelTieringDecision(proto *vm.FuncProto) (tieringKernelDecision, bool) {
-	if info, ok := recognizedWholeCallKernelForTiering(proto); ok {
+	if info, ok := recognizedWholeCallRuntimeSpecializationForTiering(proto); ok {
 		return tieringKernelDecision{
 			reason: "whole_call_structural_kernel",
 			kernel: info.Name,
 			route:  string(info.Route),
 		}, true
 	}
-	if callee, info, ok := tm.wholeCallKernelCalleeForTiering(proto); ok {
+	if callee, info, ok := tm.wholeCallRuntimeSpecializationCalleeForTiering(proto); ok {
 		return tieringKernelDecision{
 			reason: "whole_call_kernel_callee",
 			kernel: info.Name,
@@ -72,8 +72,8 @@ func (tm *TieringManager) disableForStructuralKernelTiering(proto *vm.FuncProto,
 	tm.traceEvent("fallback", "tier0", proto, fallbackFields)
 }
 
-func recognizedWholeCallKernelForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
-	for _, info := range vm.RecognizedWholeCallKernels(proto) {
+func recognizedWholeCallRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm.KernelInfo, bool) {
+	for _, info := range vm.RecognizedWholeCallRuntimeSpecializations(proto) {
 		if info.AllowsStructuralTiering(proto) {
 			return info, true
 		}
@@ -81,7 +81,7 @@ func recognizedWholeCallKernelForTiering(proto *vm.FuncProto) (vm.KernelInfo, bo
 	return vm.KernelInfo{}, false
 }
 
-func (tm *TieringManager) wholeCallKernelCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.KernelInfo, bool) {
+func (tm *TieringManager) wholeCallRuntimeSpecializationCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.KernelInfo, bool) {
 	if tm == nil || tm.envTier2NoFilter || proto == nil {
 		return nil, vm.KernelInfo{}, false
 	}
@@ -97,7 +97,7 @@ func (tm *TieringManager) wholeCallKernelCalleeForTiering(proto *vm.FuncProto) (
 		if !ok || callee == nil {
 			continue
 		}
-		if info, ok := recognizedWholeCallKernelForTiering(callee); ok {
+		if info, ok := recognizedWholeCallRuntimeSpecializationForTiering(callee); ok {
 			return callee, info, true
 		}
 	}

@@ -366,7 +366,7 @@ func callABIRefineTypedPeerParamsFromFeedback(fn *Function, instr *Instr, params
 		return out
 	}
 	fb := fn.Proto.CallSiteFeedback[instr.SourcePC]
-	if fb.Count < wholeCallKernelMinStableObservations ||
+	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations ||
 		fb.Flags&(vm.CallSiteCalleePolymorphic|vm.CallSiteArityPolymorphic) != 0 ||
 		int(fb.NArgs) != len(instr.Args)-1 ||
 		fb.ResultArity != uint8(instr.Aux2) {
@@ -600,7 +600,7 @@ func callABIFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool
 		return nil, false
 	}
 	fb := fn.Proto.CallSiteFeedback[instr.SourcePC]
-	if fb.Count < wholeCallKernelMinStableObservations ||
+	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations ||
 		fb.Flags&(vm.CallSiteCalleePolymorphic|vm.CallSiteArityPolymorphic) != 0 ||
 		int(fb.NArgs) != len(instr.Args)-1 ||
 		fb.ResultArity != uint8(instr.Aux2) {

@@ -122,8 +122,8 @@ func TestMergeTier2CallCacheFeedbackRecordsPolymorphicVMProtos(t *testing.T) {
 	mergeTier2CallCacheFeedback(caller, cf)
 
 	fb := caller.CallSiteFeedback[0]
-	if fb.Count < wholeCallKernelMinStableObservations {
-		t.Fatalf("feedback count=%d, want at least %d", fb.Count, wholeCallKernelMinStableObservations)
+	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations {
+		t.Fatalf("feedback count=%d, want at least %d", fb.Count, wholeCallRuntimeSpecializationMinStableObservations)
 	}
 	if fb.NArgs != 1 || fb.ResultArity != 2 {
 		t.Fatalf("arity feedback nArgs=%d result=%d", fb.NArgs, fb.ResultArity)
@@ -153,8 +153,8 @@ func TestMergeBaselineCallCacheFeedbackRecordsStableVMClosure(t *testing.T) {
 	mergeBaselineCallCacheFeedback(caller, bf)
 
 	fb := caller.CallSiteFeedback[0]
-	if fb.Count < wholeCallKernelMinStableObservations {
-		t.Fatalf("feedback count=%d, want at least %d", fb.Count, wholeCallKernelMinStableObservations)
+	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations {
+		t.Fatalf("feedback count=%d, want at least %d", fb.Count, wholeCallRuntimeSpecializationMinStableObservations)
 	}
 	if fb.NArgs != 0 || fb.ResultArity != 2 {
 		t.Fatalf("arity feedback nArgs=%d result=%d", fb.NArgs, fb.ResultArity)

@@ -290,7 +290,7 @@ func TestTier2SpecializationProfileRequiresMaturePolymorphicCallFeedback(t *test
 	if profile.Summary().GuardKinds[string(SpecGuardCallPolymorphic)] != 0 {
 		t.Fatalf("immature polymorphic call produced guard: %+v", profile.Summary())
 	}
-	fb.Count = wholeCallKernelMinStableObservations
+	fb.Count = wholeCallRuntimeSpecializationMinStableObservations
 	profile = BuildTier2SpecializationProfile(proto)
 	if profile.Summary().GuardKinds[string(SpecGuardCallPolymorphic)] != 1 {
 		t.Fatalf("mature polymorphic call guard count mismatch: %+v", profile.Summary())

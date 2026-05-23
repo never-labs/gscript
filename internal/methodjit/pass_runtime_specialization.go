@@ -4,15 +4,15 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
-const wholeCallKernelMinStableObservations = 2
+const wholeCallRuntimeSpecializationMinStableObservations = 2
 
-func WholeCallKernelExitPass(globals map[string]*vm.FuncProto) PassFunc {
+func WholeCallRuntimeSpecializationExitPass(globals map[string]*vm.FuncProto) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return AnnotateWholeCallKernelExits(fn, globals), nil
+		return AnnotateWholeCallRuntimeSpecializationExits(fn, globals), nil
 	}
 }
 
-func AnnotateWholeCallKernelExits(fn *Function, globals map[string]*vm.FuncProto) *Function {
+func AnnotateWholeCallRuntimeSpecializationExits(fn *Function, globals map[string]*vm.FuncProto) *Function {
 	if fn == nil {
 		return fn
 	}
@@ -24,7 +24,7 @@ func AnnotateWholeCallKernelExits(fn *Function, globals map[string]*vm.FuncProto
 				continue
 			}
 			nArgs := len(instr.Args) - 1
-			if !vmWholeCallKernelArity(nArgs) {
+			if !vmWholeCallRuntimeSpecializationArity(nArgs) {
 				continue
 			}
 			if !stableNoResultWholeCallCandidate(fn, instr, globals, nArgs) {
@@ -43,7 +43,7 @@ func AnnotateWholeCallKernelExits(fn *Function, globals map[string]*vm.FuncProto
 	return fn
 }
 
-func vmWholeCallKernelArity(n int) bool {
+func vmWholeCallRuntimeSpecializationArity(n int) bool {
 	return n == 1 || n == 2 || n == 3 || n == 4
 }
 
@@ -52,10 +52,10 @@ func stableNoResultWholeCallCandidate(fn *Function, instr *Instr, globals map[st
 		return false
 	}
 	if proto, ok := stableFeedbackCalleeProto(fn, instr, nArgs); ok {
-		return protoHasNoResultWholeCallKernel(proto) || protoReturnsNoValuesWithArity(proto, nArgs)
+		return protoHasNoResultWholeCallRuntimeSpecialization(proto) || protoReturnsNoValuesWithArity(proto, nArgs)
 	}
 	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: globals})
-	return protoHasNoResultWholeCallKernel(callee) || protoReturnsNoValuesWithArity(callee, nArgs)
+	return protoHasNoResultWholeCallRuntimeSpecialization(callee) || protoReturnsNoValuesWithArity(callee, nArgs)
 }
 
 func stableFeedbackCalleeProto(fn *Function, instr *Instr, nArgs int) (*vm.FuncProto, bool) {
@@ -64,15 +64,15 @@ func stableFeedbackCalleeProto(fn *Function, instr *Instr, nArgs int) (*vm.FuncP
 		return nil, false
 	}
 	fb := fn.Proto.CallSiteFeedback[instr.SourcePC]
-	if fb.Count < wholeCallKernelMinStableObservations || fb.Flags&vm.CallSiteArityPolymorphic != 0 ||
+	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations || fb.Flags&vm.CallSiteArityPolymorphic != 0 ||
 		int(fb.NArgs) != nArgs || fb.ResultArity != 1 {
 		return nil, false
 	}
 	return fb.StableCalleeVMProto()
 }
 
-func protoHasNoResultWholeCallKernel(proto *vm.FuncProto) bool {
-	for _, info := range vm.RecognizedWholeCallKernels(proto) {
+func protoHasNoResultWholeCallRuntimeSpecialization(proto *vm.FuncProto) bool {
+	for _, info := range vm.RecognizedWholeCallRuntimeSpecializations(proto) {
 		if info.Route == vm.KernelRouteWholeCallNoResult && info.Results == 0 {
 			return true
 		}
@@ -172,7 +172,7 @@ func wholeCallNoResultGlobalCallRecipe(proto *vm.FuncProto, code []uint32, loopS
 		if slot == a {
 			name := protoConstString(proto, constIdx)
 			callee := globals[name]
-			if name == "" || (!protoHasNoResultWholeCallKernel(callee) && !protoReturnsNoValuesWithArity(callee, b-1)) {
+			if name == "" || (!protoHasNoResultWholeCallRuntimeSpecialization(callee) && !protoReturnsNoValuesWithArity(callee, b-1)) {
 				return WholeCallNoResultBatchCall{}, false
 			}
 			call.FuncConst = constIdx

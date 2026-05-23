@@ -8,7 +8,7 @@ import (
 	"github.com/gscript/gscript/internal/jit"
 )
 
-func (ec *emitContext) emitWholeCallKernelOpExitIfEligible(instr *Instr) bool {
+func (ec *emitContext) emitWholeCallRuntimeSpecializationOpExitIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
@@ -19,7 +19,7 @@ func (ec *emitContext) emitWholeCallKernelOpExitIfEligible(instr *Instr) bool {
 	funcSlot := int(instr.Aux)
 	nArgs := len(instr.Args) - 1
 	nRets := callResultCountFromAux2(instr.Aux2)
-	if nRets != 0 || !vmWholeCallKernelArity(nArgs) {
+	if nRets != 0 || !vmWholeCallRuntimeSpecializationArity(nArgs) {
 		return false
 	}
 

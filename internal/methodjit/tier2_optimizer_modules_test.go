@@ -657,7 +657,7 @@ func TestTier2CallLoweringModuleOrder(t *testing.T) {
 		"CallResultRangeGuard",
 		"ConstProp",
 		"ProtocolConstCallFold",
-		"WholeCallKernelExit",
+		"WholeCallRuntimeSpecializationExit",
 	})
 }
 
@@ -788,7 +788,7 @@ func TestTier2LoopPostModuleOrder(t *testing.T) {
 func TestTier2FinalCallModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
-		"WholeCallKernelExit (final)",
+		"WholeCallRuntimeSpecializationExit (final)",
 		"CallReturnProjection (final)",
 		"ModularCallFloorReduce (final)",
 		"CallResultRangeGuard (final)",
@@ -801,7 +801,7 @@ func TestTier2FinalCallModuleOrderExperimentalFieldShapeSplit(t *testing.T) {
 	t.Setenv("GSCRIPT_FIELD_SHAPE_SPLIT", "1")
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
-		"WholeCallKernelExit (final)",
+		"WholeCallRuntimeSpecializationExit (final)",
 		"CallReturnProjection (final)",
 		"ModularCallFloorReduce (final)",
 		"CallResultRangeGuard (final)",
@@ -815,7 +815,7 @@ func TestTier2FinalCallModuleOrderIgnoresOtherFieldShapeSplitValues(t *testing.T
 	t.Setenv("GSCRIPT_FIELD_SHAPE_SPLIT", "0")
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
-		"WholeCallKernelExit (final)",
+		"WholeCallRuntimeSpecializationExit (final)",
 		"CallReturnProjection (final)",
 		"ModularCallFloorReduce (final)",
 		"CallResultRangeGuard (final)",
@@ -847,7 +847,7 @@ func TestTier2RepeatedAnalysisModulesDeclareUpdates(t *testing.T) {
 	}
 
 	assertAnalysisFacts(t, findTier2Module(t, plan, "CallABI (final)").Updates, AnalysisFactCallABIs)
-	assertAnalysisFacts(t, findTier2Module(t, plan, "WholeCallKernelExit (final)").Updates,
+	assertAnalysisFacts(t, findTier2Module(t, plan, "WholeCallRuntimeSpecializationExit (final)").Updates,
 		AnalysisFactWholeCallNoResultKernels,
 		AnalysisFactWholeCallNoResultBatches,
 	)
