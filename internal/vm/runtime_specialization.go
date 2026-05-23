@@ -1,6 +1,11 @@
 package vm
 
-import "github.com/gscript/gscript/internal/runtime"
+import (
+	"os"
+	"strings"
+
+	"github.com/gscript/gscript/internal/runtime"
+)
 
 const (
 	runtimeSpecializationRawIntNested = iota
@@ -163,6 +168,8 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 	},
 }
 
+var disabledCallSiteValueRuntimeSpecializations = disabledRuntimeSpecializationMask(callSiteValueRuntimeSpecializationRegistry[:])
+
 var callSiteNoResultRuntimeSpecializationRegistry = [callSiteNoResultRuntimeSpecializationCount]CallSiteNoResultSpecialization{
 	callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric: {
 		RuntimeSpecialization: RuntimeSpecialization{
@@ -257,6 +264,8 @@ var callSiteNoResultRuntimeSpecializationRegistry = [callSiteNoResultRuntimeSpec
 	},
 }
 
+var disabledCallSiteNoResultRuntimeSpecializations = disabledRuntimeSpecializationMask(callSiteNoResultRuntimeSpecializationRegistry[:])
+
 var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCount]DriverLoopRuntimeSpecialization{
 	driverLoopRuntimeSpecializationGenericRecordArrayLoop: {
 		Info: RuntimeSpecializationInfo{
@@ -282,6 +291,61 @@ var driverLoopRuntimeSpecializationRegistry = [driverLoopRuntimeSpecializationCo
 	},
 }
 
+var disabledDriverLoopRuntimeSpecializations = disabledDriverLoopRuntimeSpecializationMask(driverLoopRuntimeSpecializationRegistry[:])
+
+func runtimeSpecializationDisabledNames() map[string]bool {
+	raw := os.Getenv("GSCRIPT_DISABLE_RUNTIME_SPECIALIZATIONS")
+	if raw == "" {
+		return nil
+	}
+	out := make(map[string]bool)
+	for _, part := range strings.Split(raw, ",") {
+		name := strings.TrimSpace(part)
+		if name != "" {
+			out[name] = true
+		}
+	}
+	return out
+}
+
+func disabledRuntimeSpecializationMask[T interface {
+	specializationInfo() RuntimeSpecializationInfo
+}](entries []T) uint64 {
+	names := runtimeSpecializationDisabledNames()
+	if len(names) == 0 {
+		return 0
+	}
+	var mask uint64
+	for i, entry := range entries {
+		if names[entry.specializationInfo().Name] {
+			mask |= uint64(1) << uint(i)
+		}
+	}
+	return mask
+}
+
+func disabledDriverLoopRuntimeSpecializationMask(entries []DriverLoopRuntimeSpecialization) uint64 {
+	names := runtimeSpecializationDisabledNames()
+	if len(names) == 0 {
+		return 0
+	}
+	var mask uint64
+	for i, entry := range entries {
+		if names[entry.Info.Name] {
+			mask |= uint64(1) << uint(i)
+		}
+	}
+	return mask
+}
+
+func (s CallSiteValueSpecialization) specializationInfo() RuntimeSpecializationInfo {
+	return s.Info
+}
+
+func (s CallSiteNoResultSpecialization) specializationInfo() RuntimeSpecializationInfo {
+	return s.Info
+}
+
 func (vm *VM) tryRunCallSiteValueRuntimeSpecialization(cl *Closure, args []runtime.Value, includeRecursiveTable bool) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil {
 		return false, nil, nil
@@ -294,7 +358,8 @@ func (vm *VM) tryRunCallSiteValueRuntimeSpecialization(cl *Closure, args []runti
 		return false, nil, nil
 	}
 	for i, entry := range callSiteValueRuntimeSpecializationRegistry {
-		if recognized&(uint64(1)<<uint(i)) == 0 || entry.Run == nil {
+		bit := uint64(1) << uint(i)
+		if recognized&bit == 0 || disabledCallSiteValueRuntimeSpecializations&bit != 0 || entry.Run == nil {
 			continue
 		}
 		if entry.RecursiveTable && !includeRecursiveTable {
@@ -323,7 +388,8 @@ func (vm *VM) tryRunCallSiteNoResultRuntimeSpecialization(cl *Closure, args []ru
 		return false, nil
 	}
 	for i, entry := range callSiteNoResultRuntimeSpecializationRegistry {
-		if recognized&(uint64(1)<<uint(i)) == 0 || entry.Run == nil {
+		bit := uint64(1) << uint(i)
+		if recognized&bit == 0 || disabledCallSiteNoResultRuntimeSpecializations&bit != 0 || entry.Run == nil {
 			continue
 		}
 		handled, err := entry.Run(vm, cl, args)
@@ -341,7 +407,10 @@ func (vm *VM) tryRunDriverLoopRuntimeSpecialization(frame *CallFrame, base int, 
 	if frame == nil || frame.closure == nil || frame.closure.Proto == nil {
 		return false, nil
 	}
-	for _, entry := range driverLoopRuntimeSpecializationRegistry {
+	for i, entry := range driverLoopRuntimeSpecializationRegistry {
+		if disabledDriverLoopRuntimeSpecializations&(uint64(1)<<uint(i)) != 0 {
+			continue
+		}
 		if entry.Info.Name == "" || entry.Run == nil {
 			continue
 		}
