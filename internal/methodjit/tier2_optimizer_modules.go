@@ -131,9 +131,9 @@ const (
 	// Tier2PhaseFloatNumeric runs FMA fusion and float strength reduction.
 	Tier2PhaseFloatNumeric Tier2OptimizerPhase = "float_numeric"
 
-	// Tier2PhaseLoopKernel runs LICM, loop-global store sinking, table loop
+	// Tier2PhaseLoopSpecialization runs LICM, loop-global store sinking, table loop
 	// kernels, and post-LICM load elimination.
-	Tier2PhaseLoopKernel Tier2OptimizerPhase = "loop_kernel"
+	Tier2PhaseLoopSpecialization Tier2OptimizerPhase = "loop_specialization"
 
 	// Tier2PhaseLoopPost runs loop unrolling, quadratic strength reduction,
 	// and scalar promotion.

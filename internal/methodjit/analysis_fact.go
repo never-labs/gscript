@@ -106,7 +106,7 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Owner:       "call",
 		Description: "Call sites have ABI annotations for native lowering and call folds.",
 		Producers:   []string{"CallABI"},
-		Consumers:   []string{"RuntimeSpecializationConstCallFold", "CallSiteRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopKernel", "TableIntArrayKernel"},
+		Consumers:   []string{"RuntimeSpecializationConstCallFold", "CallSiteRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopSpecialization", "TableIntArraySpecialization"},
 	},
 	AnalysisFactRuntimeSpecializationConstCallFolds: {
 		Owner:       "call",
@@ -189,13 +189,13 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 	AnalysisFactRecordArrayLoopSpecialization: {
 		Owner:       "table",
 		Description: "Record-array loop specializations have been identified.",
-		Producers:   []string{"RecordArrayLoopKernel"},
+		Producers:   []string{"RecordArrayLoopSpecialization"},
 		Consumers:   []string{"codegen"},
 	},
 	AnalysisFactRecordArrayLoopCaches: {
 		Owner:       "table",
 		Description: "Record-array loop cache facts are available.",
-		Producers:   []string{"RecordArrayLoopKernel"},
+		Producers:   []string{"RecordArrayLoopSpecialization"},
 		Consumers:   []string{"codegen"},
 	},
 }

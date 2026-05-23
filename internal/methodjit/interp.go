@@ -542,20 +542,20 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 			return nil, false, fmt.Errorf("IR interpreter: cannot mod %s and int", a.TypeName())
 		}
 
-	case OpRecordArrayLoopKernel:
+	case OpRecordArrayLoopSpecialization:
 		tbl := s.val(instr.Args[0])
 		limit := s.val(instr.Args[3]).Int()
 		spec, ok := functionLoopSpecializationFacts(s.fn).RecordArrayLoopSpecialization(instr.ID)
-		if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
-			return nil, false, fmt.Errorf("OpRecordArrayLoopKernel: missing or invalid kernel spec")
+		if !ok || !validRecordArrayLoopSpecializationSpec(spec, len(instr.Args)-4) {
+			return nil, false, fmt.Errorf("OpRecordArrayLoopSpecialization: missing or invalid kernel spec")
 		}
 		if !tbl.IsTable() {
-			return nil, false, fmt.Errorf("OpRecordArrayLoopKernel: arg 0 not a table")
+			return nil, false, fmt.Errorf("OpRecordArrayLoopSpecialization: arg 0 not a table")
 		}
 		for i := int64(1); i <= limit; i++ {
 			row := tbl.Table().RawGetInt(i)
 			if !row.IsTable() || row.Table().ShapeID() != spec.ShapeID {
-				return nil, false, fmt.Errorf("OpRecordArrayLoopKernel: row shape mismatch")
+				return nil, false, fmt.Errorf("OpRecordArrayLoopSpecialization: row shape mismatch")
 			}
 		}
 		scalars := make([]float64, spec.ScalarCount)

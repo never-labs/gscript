@@ -101,35 +101,35 @@ type RecordArrayKernelStore struct {
 	Value RecordArrayKernelSource
 }
 
-// RecordArrayLoopKernelSpec is a compact dataflow graph for a generated native
+// RecordArrayLoopSpecializationSpec is a compact dataflow graph for a generated native
 // loop over a table array whose elements are fixed-shape records. Args on the
 // IR op are [arrayData, arrayLen, limit, scalar...]. The spec supplies record
 // shape validation, per-record field loads, scalar float operands, float ops,
 // and field stores.
-type RecordArrayLoopKernelSpec struct {
+type RecordArrayLoopSpecializationSpec struct {
 	ShapeID     uint32
 	FieldLoads  []int
 	ScalarCount int
 	Ops         []RecordArrayKernelFloatOp
 	Stores      []RecordArrayKernelStore
 	MaxField    int
-	Cache       *RecordArrayLoopKernelCache
+	Cache       *RecordArrayLoopSpecializationCache
 }
 
-const RecordArrayLoopKernelMaxCachedSvals = 8192
+const RecordArrayLoopSpecializationMaxCachedSvals = 8192
 
-// RecordArrayLoopKernelCache memoizes a successful full-shape validation for a
+// RecordArrayLoopSpecializationCache memoizes a successful full-shape validation for a
 // native record-array loop. It is guarded by the outer table's array version
 // and the record shape's layout epoch, so value-only field writes do not force
 // the next call to re-scan every element. Svals caches the record payload
 // pointers discovered during validation so the hot update loop can avoid
 // re-decoding every boxed table element on subsequent calls.
-type RecordArrayLoopKernelCache struct {
+type RecordArrayLoopSpecializationCache struct {
 	Table            uintptr
 	ArrayVersion     uint64
 	ShapeLayoutEpoch uint64
 	Limit            int64
-	Svals            [RecordArrayLoopKernelMaxCachedSvals + 1]uintptr
+	Svals            [RecordArrayLoopSpecializationMaxCachedSvals + 1]uintptr
 }
 
 // Function is the complete IR for one compiled function.
@@ -158,7 +158,7 @@ type Function struct {
 	// RecordArrayLoopCaches tracks record-array loop specialization cache objects.
 	// This slice must stay in Function because it owns the cached data
 	// lifetime, not analysis results.
-	RecordArrayLoopCaches []*RecordArrayLoopKernelCache
+	RecordArrayLoopCaches []*RecordArrayLoopSpecializationCache
 
 	// Unpromotable, when true, signals that this function cannot be safely
 	// compiled at Tier 2 because BuildGraph encountered bytecode patterns

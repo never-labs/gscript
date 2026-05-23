@@ -179,8 +179,8 @@ func TestAnalysisResultLoopSpecializationFactsBindsCompatibilityFields(t *testin
 		t.Fatalf("LoopSpecializationFacts.SetLoopTableArrayFacts did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 
-	spec := RecordArrayLoopKernelSpec{ShapeID: 99, ScalarCount: 1}
-	kernels.SetRecordArrayLoopSpecializations(map[int]RecordArrayLoopKernelSpec{14: spec})
+	spec := RecordArrayLoopSpecializationSpec{ShapeID: 99, ScalarCount: 1}
+	kernels.SetRecordArrayLoopSpecializations(map[int]RecordArrayLoopSpecializationSpec{14: spec})
 	if got, ok := a.RecordArrayLoopSpecializations[14]; !ok || got.ShapeID != 99 || got.ScalarCount != 1 {
 		t.Fatalf("LoopSpecializationFacts.SetRecordArrayLoopSpecializations did not update compatibility field: got %#v ok=%v", got, ok)
 	}
@@ -188,12 +188,12 @@ func TestAnalysisResultLoopSpecializationFactsBindsCompatibilityFields(t *testin
 
 func TestAnalysisResultLoopSpecializationFactsAdoptsLegacyFields(t *testing.T) {
 	loopFact := LoopTableArrayFact{HeaderBlockID: 3, PreheaderBlockID: 4, AccessOp: OpTableArrayStore}
-	spec := RecordArrayLoopKernelSpec{ShapeID: 77}
+	spec := RecordArrayLoopSpecializationSpec{ShapeID: 77}
 	a := &AnalysisResult{
 		TableArrayUpperBoundSafe:       map[int]bool{21: true},
 		TableArrayLowerBoundSafe:       map[int]bool{22: true},
 		LoopTableArrayFacts:            map[int]LoopTableArrayFact{23: loopFact},
-		RecordArrayLoopSpecializations: map[int]RecordArrayLoopKernelSpec{24: spec},
+		RecordArrayLoopSpecializations: map[int]RecordArrayLoopSpecializationSpec{24: spec},
 	}
 
 	kernels := a.LoopSpecializationFacts()

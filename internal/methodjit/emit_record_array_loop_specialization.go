@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	recordArrayLoopCacheOffTable            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Table))
-	recordArrayLoopCacheOffArrayVersion     = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.ArrayVersion))
-	recordArrayLoopCacheOffShapeLayoutEpoch = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.ShapeLayoutEpoch))
-	recordArrayLoopCacheOffLimit            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Limit))
-	recordArrayLoopCacheOffSvals            = int(unsafe.Offsetof(RecordArrayLoopKernelCache{}.Svals))
+	recordArrayLoopCacheOffTable            = int(unsafe.Offsetof(RecordArrayLoopSpecializationCache{}.Table))
+	recordArrayLoopCacheOffArrayVersion     = int(unsafe.Offsetof(RecordArrayLoopSpecializationCache{}.ArrayVersion))
+	recordArrayLoopCacheOffShapeLayoutEpoch = int(unsafe.Offsetof(RecordArrayLoopSpecializationCache{}.ShapeLayoutEpoch))
+	recordArrayLoopCacheOffLimit            = int(unsafe.Offsetof(RecordArrayLoopSpecializationCache{}.Limit))
+	recordArrayLoopCacheOffSvals            = int(unsafe.Offsetof(RecordArrayLoopSpecializationCache{}.Svals))
 )
 
 func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
@@ -22,7 +22,7 @@ func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 		return
 	}
 	spec, ok := functionLoopSpecializationFacts(ec.fn).RecordArrayLoopSpecialization(instr.ID)
-	if !ok || !validRecordArrayLoopKernelSpec(spec, len(instr.Args)-4) {
+	if !ok || !validRecordArrayLoopSpecializationSpec(spec, len(instr.Args)-4) {
 		ec.emitPreciseDeopt(instr)
 		return
 	}
@@ -52,17 +52,17 @@ func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 		}
 	}
 
-	deoptLabel := ec.uniqueLabel("record_array_kernel_deopt")
-	doneLabel := ec.uniqueLabel("record_array_kernel_done")
-	validateLoop := ec.uniqueLabel("record_array_kernel_validate")
-	validateDone := ec.uniqueLabel("record_array_kernel_validate_done")
-	updateLoop := ec.uniqueLabel("record_array_kernel_loop")
-	updateCachedLoop := ec.uniqueLabel("record_array_kernel_cached_loop")
-	updateCachedTail := ec.uniqueLabel("record_array_kernel_cached_tail")
-	updateCachedTailLoop := ec.uniqueLabel("record_array_kernel_cached_tail_loop")
-	cacheMiss := ec.uniqueLabel("record_array_kernel_cache_miss")
-	cacheStore := ec.uniqueLabel("record_array_kernel_cache_store")
-	cacheBaseReady := ec.uniqueLabel("record_array_kernel_cache_base_ready")
+	deoptLabel := ec.uniqueLabel("record_array_specialization_deopt")
+	doneLabel := ec.uniqueLabel("record_array_specialization_done")
+	validateLoop := ec.uniqueLabel("record_array_specialization_validate")
+	validateDone := ec.uniqueLabel("record_array_specialization_validate_done")
+	updateLoop := ec.uniqueLabel("record_array_specialization_loop")
+	updateCachedLoop := ec.uniqueLabel("record_array_specialization_cached_loop")
+	updateCachedTail := ec.uniqueLabel("record_array_specialization_cached_tail")
+	updateCachedTailLoop := ec.uniqueLabel("record_array_specialization_cached_tail_loop")
+	cacheMiss := ec.uniqueLabel("record_array_specialization_cache_miss")
+	cacheStore := ec.uniqueLabel("record_array_specialization_cache_store")
+	cacheBaseReady := ec.uniqueLabel("record_array_specialization_cache_base_ready")
 
 	asm.CMPimm(jit.X11, 0)
 	asm.BCond(jit.CondLE, doneLabel)
@@ -71,7 +71,7 @@ func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 	shapeEpochPtr := gruntime.ShapeLayoutMutationCountPtr(spec.ShapeID)
 	useSvalsCache := spec.Cache != nil && shapeEpochPtr != nil
 	if useSvalsCache {
-		asm.LoadImm64(jit.X14, RecordArrayLoopKernelMaxCachedSvals)
+		asm.LoadImm64(jit.X14, RecordArrayLoopSpecializationMaxCachedSvals)
 		asm.CMPreg(jit.X11, jit.X14)
 		asm.BCond(jit.CondGT, deoptLabel)
 		asm.LoadImm64(jit.X14, int64(uintptr(unsafe.Pointer(spec.Cache))))
@@ -214,7 +214,7 @@ func (ec *emitContext) emitRecordArrayLoopSpecialization(instr *Instr) {
 	asm.Label(doneLabel)
 }
 
-func validRecordArrayLoopKernelSpec(spec RecordArrayLoopKernelSpec, scalarArgs int) bool {
+func validRecordArrayLoopSpecializationSpec(spec RecordArrayLoopSpecializationSpec, scalarArgs int) bool {
 	if spec.ShapeID == 0 || spec.ScalarCount < 0 || spec.ScalarCount > 2 || spec.ScalarCount > scalarArgs {
 		return false
 	}

@@ -109,7 +109,7 @@ func TestTier2OptimizerPlanPhaseOrder(t *testing.T) {
 		Tier2PhaseMatrixNative,
 		Tier2PhaseTableFieldLower,
 		Tier2PhaseFloatNumeric,
-		Tier2PhaseLoopKernel,
+		Tier2PhaseLoopSpecialization,
 		Tier2PhaseLoopPost,
 		Tier2PhaseFinalCall,
 	}
@@ -724,10 +724,10 @@ func TestTier2TableNativeLoweringModuleOrder(t *testing.T) {
 			"TableArrayStaticBounds",
 			"DCE (post-TableArrayStoreLower)",
 		})
-	assertTier2ModuleOrder(t, tier2TableLoopKernelModules(), Tier2PhaseLoopKernel,
-		[]string{"BoolTableFillLoop", "TableArrayStoreLoopVersion", "RecordArrayLoopKernel", "TableIntArrayKernel", "BoolTableCountLoop"})
-	assertTier2ModuleOrder(t, tier2TableLoopPostLoadElimModules(), Tier2PhaseLoopKernel,
-		[]string{"TableArraySwapFusion", "TableIntArrayKernel (post-swap-fusion)"})
+	assertTier2ModuleOrder(t, tier2TableLoopSpecializationModules(), Tier2PhaseLoopSpecialization,
+		[]string{"BoolTableFillLoop", "TableArrayStoreLoopVersion", "RecordArrayLoopSpecialization", "TableIntArraySpecialization", "BoolTableCountLoop"})
+	assertTier2ModuleOrder(t, tier2TableLoopPostLoadElimModules(), Tier2PhaseLoopSpecialization,
+		[]string{"TableArraySwapFusion", "TableIntArraySpecialization (post-swap-fusion)"})
 }
 
 func TestTier2MatrixNativeLoweringModuleOrder(t *testing.T) {
@@ -749,20 +749,20 @@ func TestTier2FloatNumericModuleOrder(t *testing.T) {
 	})
 }
 
-func TestTier2LoopKernelModuleOrder(t *testing.T) {
-	assertTier2ModuleOrder(t, tier2LoopKernelModules(), Tier2PhaseLoopKernel, []string{
+func TestTier2LoopSpecializationModuleOrder(t *testing.T) {
+	assertTier2ModuleOrder(t, tier2LoopSpecializationModules(), Tier2PhaseLoopSpecialization, []string{
 		"LICM",
 		"LoopGlobalStoreSink",
 		"BoolTableFillLoop",
 		"TableArrayStoreLoopVersion",
-		"RecordArrayLoopKernel",
-		"TableIntArrayKernel",
+		"RecordArrayLoopSpecialization",
+		"TableIntArraySpecialization",
 		"BoolTableCountLoop",
 		"FieldNumToFloatFusion (post-LICM)",
 		"ClosureUpvalueScalar",
 		"LoadElimination (post-LICM)",
 		"TableArraySwapFusion",
-		"TableIntArrayKernel (post-swap-fusion)",
+		"TableIntArraySpecialization (post-swap-fusion)",
 		"DCE (post-LICM LoadElim)",
 	})
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func TestTableIntArrayKernel_DiagnosticsRecognizesPrefixReverseLoop(t *testing.T) {
+func TestTableIntArraySpecialization_DiagnosticsRecognizesPrefixReverseLoop(t *testing.T) {
 	src := `
 func reverse_prefix(a, k) {
     lo := 1
@@ -117,7 +117,7 @@ result := run()
 	}
 }
 
-func TestTableIntArrayKernel_ExecutionFallbacksAndAliasVisibility(t *testing.T) {
+func TestTableIntArraySpecialization_ExecutionFallbacksAndAliasVisibility(t *testing.T) {
 	src := `
 func reverse_prefix(a, k) {
     lo := 1

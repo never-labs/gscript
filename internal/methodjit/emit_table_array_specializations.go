@@ -417,7 +417,7 @@ func (ec *emitContext) emitTableIntArrayReversePrefix(instr *Instr) {
 	if tblReg != jit.X0 {
 		asm.MOVreg(jit.X0, tblReg)
 	}
-	ec.emitTableIntArrayKernelKeyToReg(instr.Args[1], jit.X1, failLabel)
+	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[1], jit.X1, failLabel)
 	jit.EmitCheckIsTableFull(asm, jit.X0, jit.X2, jit.X3, failLabel)
 	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.CBZ(jit.X0, failLabel)
@@ -483,7 +483,7 @@ func (ec *emitContext) emitTableIntArrayCopyPrefix(instr *Instr) {
 	if srcReg != jit.X9 {
 		asm.MOVreg(jit.X9, srcReg)
 	}
-	ec.emitTableIntArrayKernelKeyToReg(instr.Args[2], jit.X1, failLabel)
+	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[2], jit.X1, failLabel)
 
 	jit.EmitCheckIsTableFull(asm, jit.X0, jit.X2, jit.X3, failLabel)
 	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
@@ -542,7 +542,7 @@ func (ec *emitContext) emitTableIntArrayCopyPrefix(instr *Instr) {
 	asm.Label(doneLabel)
 }
 
-func (ec *emitContext) emitTableIntArrayKernelKeyToReg(key *Value, dst jit.Reg, failLabel string) {
+func (ec *emitContext) emitTableIntArraySpecializationKeyToReg(key *Value, dst jit.Reg, failLabel string) {
 	if key == nil {
 		ec.asm.B(failLabel)
 		return

@@ -10,8 +10,8 @@ func init() {
 	RegisterModuleBuilder(Tier2PhaseFloatNumeric, 110, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
 		return tier2FloatNumericModules()
 	})
-	RegisterModuleBuilder(Tier2PhaseLoopKernel, 120, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
-		return tier2LoopKernelModules()
+	RegisterModuleBuilder(Tier2PhaseLoopSpecialization, 120, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
+		return tier2LoopSpecializationModules()
 	})
 	RegisterModuleBuilder(Tier2PhaseLoopPost, 130, func(ctx *Tier2OptimizerContext) []Tier2OptimizerModule {
 		return tier2LoopPostModules()
@@ -127,19 +127,19 @@ func tier2FloatNumericModules() []Tier2OptimizerModule {
 	}
 }
 
-func tier2LoopKernelModules() []Tier2OptimizerModule {
+func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
-		tier2PassModuleWith("LICM", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactInt48Safe), nil, LICMPass),
-		tier2PassModuleWith("LoopGlobalStoreSink", Tier2PhaseLoopKernel, nil, nil, LoopGlobalStoreSinkPass),
+		tier2PassModuleWith("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe), nil, LICMPass),
+		tier2PassModuleWith("LoopGlobalStoreSink", Tier2PhaseLoopSpecialization, nil, nil, LoopGlobalStoreSinkPass),
 	}
-	modules = append(modules, tier2TableLoopKernelModules()...)
+	modules = append(modules, tier2TableLoopSpecializationModules()...)
 	modules = append(modules,
-		tier2PassModuleWith("FieldNumToFloatFusion (post-LICM)", Tier2PhaseLoopKernel, nil, nil, FieldNumToFloatFusionPass),
-		tier2PassModuleWith("ClosureUpvalueScalar", Tier2PhaseLoopKernel, nil, nil, ClosureUpvalueScalarPass),
-		tier2PassModuleWith("LoadElimination (post-LICM)", Tier2PhaseLoopKernel, nil, nil, LoadEliminationPass),
+		tier2PassModuleWith("FieldNumToFloatFusion (post-LICM)", Tier2PhaseLoopSpecialization, nil, nil, FieldNumToFloatFusionPass),
+		tier2PassModuleWith("ClosureUpvalueScalar", Tier2PhaseLoopSpecialization, nil, nil, ClosureUpvalueScalarPass),
+		tier2PassModuleWith("LoadElimination (post-LICM)", Tier2PhaseLoopSpecialization, nil, nil, LoadEliminationPass),
 	)
 	modules = append(modules, tier2TableLoopPostLoadElimModules()...)
-	modules = append(modules, tier2PassModuleWith("DCE (post-LICM LoadElim)", Tier2PhaseLoopKernel, nil, nil, DCEPass))
+	modules = append(modules, tier2PassModuleWith("DCE (post-LICM LoadElim)", Tier2PhaseLoopSpecialization, nil, nil, DCEPass))
 	return modules
 }
 

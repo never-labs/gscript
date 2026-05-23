@@ -94,7 +94,7 @@ const (
 	// Runtime-generated loop specialization for fixed-shape record arrays.
 	// Args = [arrayData, arrayLen, limit, scalar...]; dataflow lives in
 	// Function.RecordArrayLoopSpecializations[instr.ID].
-	OpRecordArrayLoopKernel
+	OpRecordArrayLoopSpecialization
 
 	// Comparison (type-generic)
 	OpEq // Args[0] == Args[1]

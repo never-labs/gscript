@@ -104,7 +104,7 @@ var validatorOpContracts = func() [OpMax]validatorOpContract {
 	contracts[OpFieldLoadNumToFloat].Args = fixedOpArgs(1)
 	contracts[OpFieldStore].Args = fixedOpArgs(2)
 	contracts[OpFieldPolyLen].Args = fixedOpArgs(1)
-	contracts[OpRecordArrayLoopKernel].Args = rangedOpArgs(3, 16)
+	contracts[OpRecordArrayLoopSpecialization].Args = rangedOpArgs(3, 16)
 
 	return contracts
 }()
@@ -482,9 +482,9 @@ func (v *validator) checkOpContracts() {
 					v.errorf("B%d: FieldPolyLen (v%d) must carry a non-negative constant index in Aux, got %d",
 						blk.ID, instr.ID, instr.Aux)
 				}
-			case OpRecordArrayLoopKernel:
+			case OpRecordArrayLoopSpecialization:
 				if _, ok := functionLoopSpecializationFacts(v.fn).RecordArrayLoopSpecialization(instr.ID); !ok {
-					v.errorf("B%d: RecordArrayLoopKernel (v%d) must have a kernel spec", blk.ID, instr.ID)
+					v.errorf("B%d: RecordArrayLoopSpecialization (v%d) must have a kernel spec", blk.ID, instr.ID)
 				}
 			}
 		}

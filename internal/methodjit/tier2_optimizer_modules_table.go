@@ -120,19 +120,19 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 	}
 }
 
-func tier2TableLoopKernelModules() []Tier2OptimizerModule {
+func tier2TableLoopSpecializationModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("BoolTableFillLoop", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableFillLoopPass),
-		tier2PassModuleWith("TableArrayStoreLoopVersion", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStoreLoopVersionPass),
-		tier2PassModuleWith("RecordArrayLoopKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), analysisFacts(AnalysisFactRecordArrayLoopSpecialization, AnalysisFactRecordArrayLoopCaches), RecordArrayLoopKernelPass),
-		tier2PassModuleWith("TableIntArrayKernel", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), nil, TableIntArrayKernelPass),
-		tier2PassModuleWith("BoolTableCountLoop", Tier2PhaseLoopKernel, analysisFacts(AnalysisFactFixedShapeTables), nil, BoolTableCountLoopPass),
+		tier2PassModuleWith("BoolTableFillLoop", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableFillLoopPass),
+		tier2PassModuleWith("TableArrayStoreLoopVersion", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStoreLoopVersionPass),
+		tier2PassModuleWith("RecordArrayLoopSpecialization", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), analysisFacts(AnalysisFactRecordArrayLoopSpecialization, AnalysisFactRecordArrayLoopCaches), RecordArrayLoopSpecializationPass),
+		tier2PassModuleWith("TableIntArraySpecialization", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), nil, TableIntArraySpecializationPass),
+		tier2PassModuleWith("BoolTableCountLoop", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables), nil, BoolTableCountLoopPass),
 	}
 }
 
 func tier2TableLoopPostLoadElimModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("TableArraySwapFusion", Tier2PhaseLoopKernel, nil, nil, TableArraySwapFusionPass),
-		tier2PassModuleWith("TableIntArrayKernel (post-swap-fusion)", Tier2PhaseLoopKernel, nil, nil, TableIntArrayKernelPass),
+		tier2PassModuleWith("TableArraySwapFusion", Tier2PhaseLoopSpecialization, nil, nil, TableArraySwapFusionPass),
+		tier2PassModuleWith("TableIntArraySpecialization (post-swap-fusion)", Tier2PhaseLoopSpecialization, nil, nil, TableIntArraySpecializationPass),
 	}
 }

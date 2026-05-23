@@ -82,8 +82,8 @@ type AnalysisResult struct {
 	TableArrayDataPtrs map[int]TableArrayDataPtrFact
 
 	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
-	// by OpRecordArrayLoopKernel instruction ID.
-	RecordArrayLoopSpecializations map[int]RecordArrayLoopKernelSpec
+	// by OpRecordArrayLoopSpecialization instruction ID.
+	RecordArrayLoopSpecializations map[int]RecordArrayLoopSpecializationSpec
 
 	// CallABIs records stable callsite ABI facts keyed by OpCall instruction
 	// ID. A descriptor is required before codegen may use a specialized
@@ -756,8 +756,8 @@ type LoopSpecializationFacts struct {
 	LoopTableArrayFacts map[int]LoopTableArrayFact
 
 	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
-	// by OpRecordArrayLoopKernel instruction ID.
-	RecordArrayLoopSpecializations map[int]RecordArrayLoopKernelSpec
+	// by OpRecordArrayLoopSpecialization instruction ID.
+	RecordArrayLoopSpecializations map[int]RecordArrayLoopSpecializationSpec
 }
 
 func NewLoopSpecializationFacts() *LoopSpecializationFacts {
@@ -777,7 +777,7 @@ func (k *LoopSpecializationFacts) Initialize() {
 		k.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
 	}
 	if k.RecordArrayLoopSpecializations == nil {
-		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopKernelSpec)
+		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
 	}
 }
 
@@ -859,25 +859,25 @@ func (k *LoopSpecializationFacts) RecordLoopTableArrayFact(id int, fact LoopTabl
 	k.bindOwner()
 }
 
-func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecializations(facts map[int]RecordArrayLoopKernelSpec) {
+func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecializations(facts map[int]RecordArrayLoopSpecializationSpec) {
 	k.RecordArrayLoopSpecializations = facts
 	k.bindOwner()
 }
 
-func (k *LoopSpecializationFacts) RecordArrayLoopSpecialization(id int) (RecordArrayLoopKernelSpec, bool) {
+func (k *LoopSpecializationFacts) RecordArrayLoopSpecialization(id int) (RecordArrayLoopSpecializationSpec, bool) {
 	if k == nil || k.RecordArrayLoopSpecializations == nil {
-		return RecordArrayLoopKernelSpec{}, false
+		return RecordArrayLoopSpecializationSpec{}, false
 	}
 	spec, ok := k.RecordArrayLoopSpecializations[id]
 	return spec, ok
 }
 
-func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecialization(id int, spec RecordArrayLoopKernelSpec) {
+func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecialization(id int, spec RecordArrayLoopSpecializationSpec) {
 	if k == nil {
 		return
 	}
 	if k.RecordArrayLoopSpecializations == nil {
-		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopKernelSpec)
+		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
 	}
 	k.RecordArrayLoopSpecializations[id] = spec
 	k.bindOwner()
@@ -1346,7 +1346,7 @@ func NewAnalysisResult() *AnalysisResult {
 		LoopTableArrayFacts:            make(map[int]LoopTableArrayFact),
 		ShapeFieldTypeElidedLoads:      make(map[int]bool),
 		TableArrayDataPtrs:             make(map[int]TableArrayDataPtrFact),
-		RecordArrayLoopSpecializations: make(map[int]RecordArrayLoopKernelSpec),
+		RecordArrayLoopSpecializations: make(map[int]RecordArrayLoopSpecializationSpec),
 		Call:                           NewCallFacts(),
 		Speculation:                    NewSpeculationFacts(),
 		TableShape:                     NewTableShapeFacts(),

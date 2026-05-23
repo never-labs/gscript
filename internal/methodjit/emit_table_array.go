@@ -714,13 +714,13 @@ func (ec *emitContext) emitTableArraySwap(instr *Instr) {
 	deoptLabel := ec.uniqueLabel("tarr_swap_deopt")
 	doneLabel := ec.uniqueLabel("tarr_swap_done")
 
-	ec.emitTableIntArrayKernelKeyToReg(instr.Args[3], jit.X1, deoptLabel)
+	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[3], jit.X1, deoptLabel)
 	keyAID := instr.Args[3].ID
 	if kv, isConst := ec.constInts[keyAID]; (!isConst || kv < 0) && !ec.intNonNegative(keyAID) {
 		asm.CMPimm(jit.X1, 0)
 		asm.BCond(jit.CondLT, deoptLabel)
 	}
-	ec.emitTableIntArrayKernelKeyToReg(instr.Args[4], jit.X4, deoptLabel)
+	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[4], jit.X4, deoptLabel)
 	keyBID := instr.Args[4].ID
 	if kv, isConst := ec.constInts[keyBID]; (!isConst || kv < 0) && !ec.intNonNegative(keyBID) {
 		asm.CMPimm(jit.X4, 0)
@@ -765,8 +765,8 @@ func (ec *emitContext) emitTableArraySwapPairs(instr *Instr) {
 	if tblReg != jit.X0 {
 		asm.MOVreg(jit.X0, tblReg)
 	}
-	ec.emitTableIntArrayKernelKeyToReg(instr.Args[1], jit.X1, failLabel)
-	ec.emitTableIntArrayKernelKeyToReg(instr.Args[2], jit.X4, failLabel)
+	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[1], jit.X1, failLabel)
+	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[2], jit.X4, failLabel)
 	jit.EmitCheckIsTableFull(asm, jit.X0, jit.X2, jit.X3, failLabel)
 	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.CBZ(jit.X0, failLabel)

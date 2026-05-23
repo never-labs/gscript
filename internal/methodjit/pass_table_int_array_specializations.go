@@ -2,7 +2,7 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
-// TableIntArrayKernelPass recognizes small whole-region int-array kernels
+// TableIntArraySpecializationPass recognizes small whole-region int-array kernels
 // whose scalar fallback remains present in the CFG. It handles the
 // prefix-reversal loop:
 //
@@ -25,7 +25,7 @@ import "github.com/gscript/gscript/internal/vm"
 // loop header. Prefix reversal accepts general int-array-shaped loops; prefix
 // copy is limited to local work tables so its scalar fallback cannot be asked
 // to recover arbitrary external-table copy semantics.
-func TableIntArrayKernelPass(fn *Function) (*Function, error) {
+func TableIntArraySpecializationPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
@@ -46,12 +46,12 @@ func TableIntArrayKernelPass(fn *Function) (*Function, error) {
 				Block: cand.preheader,
 			}
 			kernel.copySourceFrom(cand.source)
-			insertKernelBranch(cand.preheader, cand.exit, cand.header, kernel)
-			functionRemarks(fn).Add("TableIntArrayKernel", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
+			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, kernel)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
 				"guarded prefix-reversal loop with scalar fallback")
 			continue
 		} else if reason != "" {
-			functionRemarks(fn).Add("TableIntArrayKernel", "missed", header.ID, 0, OpTableIntArrayReversePrefix, reason)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "missed", header.ID, 0, OpTableIntArrayReversePrefix, reason)
 		}
 		if cand, ok := tableIntArrayCopyPrefixCandidate(header, li.headerBlocks[header.ID]); ok {
 			kernel := &Instr{
@@ -62,8 +62,8 @@ func TableIntArrayKernelPass(fn *Function) (*Function, error) {
 				Block: cand.preheader,
 			}
 			kernel.copySourceFrom(cand.source)
-			insertKernelBranch(cand.preheader, cand.exit, cand.header, kernel)
-			functionRemarks(fn).Add("TableIntArrayKernel", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
+			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, kernel)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
 				"guarded prefix-copy loop with scalar fallback")
 			continue
 		}
@@ -77,11 +77,11 @@ func TableIntArrayKernelPass(fn *Function) (*Function, error) {
 				Block: cand.preheader,
 			}
 			kernel.copySourceFrom(cand.source)
-			insertKernelBranch(cand.preheader, cand.exit, cand.header, kernel)
-			functionRemarks(fn).Add("TableIntArrayKernel", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
+			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, kernel)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
 				"guarded adjacent pair-swap loop with scalar fallback")
 		} else if reason != "" && loopBodyHasOp(li.headerBlocks[header.ID], fn, OpTableArraySwap) {
-			functionRemarks(fn).Add("TableIntArrayKernel", "missed", header.ID, 0, OpTableArraySwapPairs, reason)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "missed", header.ID, 0, OpTableArraySwapPairs, reason)
 		}
 	}
 	return fn, nil
@@ -104,7 +104,7 @@ func loopBodyHasOp(bodySet map[int]bool, fn *Function, op Op) bool {
 	return false
 }
 
-func insertKernelBranch(preheader, success, fallback *Block, kernel *Instr) {
+func insertSpecializationBranch(preheader, success, fallback *Block, kernel *Instr) {
 	term := blockTerminator(preheader)
 	insertAt := len(preheader.Instrs) - 1
 	preheader.Instrs = append(preheader.Instrs[:insertAt], append([]*Instr{kernel}, preheader.Instrs[insertAt:]...)...)

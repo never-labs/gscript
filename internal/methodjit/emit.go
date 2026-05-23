@@ -642,8 +642,8 @@ type CompiledFunction struct {
 	CallSiteNoResultRuntimeSpecializationBatches map[int]CallSiteNoResultRuntimeSpecializationBatchFact
 
 	// RecordArrayLoopCaches keeps native validation-cache backing storage alive
-	// for RecordArrayLoopKernel code that embeds raw pointers to these cells.
-	RecordArrayLoopCaches []*RecordArrayLoopKernelCache
+	// for RecordArrayLoopSpecialization code that embeds raw pointers to these cells.
+	RecordArrayLoopCaches []*RecordArrayLoopSpecializationCache
 
 	// InstrCodeRanges maps IR instruction IDs to emitted machine-code byte
 	// ranges. Diagnostic metadata only; execution never consults it.
