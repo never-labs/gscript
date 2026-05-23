@@ -11,13 +11,6 @@ type permutationFlipChecksumSpecializationSpec struct {
 	resultCtor *runtime.SmallTableCtor2
 }
 
-func (vm *VM) tryRunPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationPermutationFlipChecksum) {
-		return false, nil, nil
-	}
-	return vm.runPermutationFlipChecksumRuntimeSpecialization(cl, args)
-}
-
 func (vm *VM) runPermutationFlipChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil, nil

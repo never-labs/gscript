@@ -30,10 +30,6 @@ func IsRawIntNestedSpecializationProto(proto *FuncProto) bool {
 	return cache != nil && cache.plan != nil
 }
 
-func (vm *VM) tryRunRawIntNestedValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	return vm.runRawIntNestedValueRuntimeSpecialization(cl, args)
-}
-
 func (vm *VM) runRawIntNestedValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if vm == nil || cl == nil || cl.Proto == nil || len(args) != 2 {
 		return false, nil, nil

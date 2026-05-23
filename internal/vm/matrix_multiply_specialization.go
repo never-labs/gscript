@@ -27,13 +27,6 @@ type denseMatrixMultiplyTBSpecializationCache struct {
 
 type denseMatrixMultiplyTBSpecializationSpec struct{}
 
-func (vm *VM) tryRunMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationMatrixMultiply) {
-		return false, nil, nil
-	}
-	return vm.runMatrixMultiplyRuntimeSpecialization(cl, args)
-}
-
 func (vm *VM) runMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 3 || !vm.noGlobalLock {
 		return false, nil, nil

@@ -7,14 +7,6 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func (vm *VM) tryRunNumericArrayRegionSortRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
-	if cl == nil || cl.Proto == nil ||
-		!hotCallSiteNoResultRuntimeSpecializationRecognized(cl.Proto, callSiteNoResultRuntimeSpecializationNumericArrayRegionSort) {
-		return false, nil
-	}
-	return vm.runNumericArrayRegionSortRuntimeSpecialization(cl, args)
-}
-
 func (vm *VM) runNumericArrayRegionSortRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 3 {
 		return false, nil

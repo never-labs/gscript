@@ -60,13 +60,6 @@ type spectralRuntimeSpecializationSpec struct {
 	kind spectralRuntimeSpecializationKind
 }
 
-func (vm *VM) tryRunSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
-	if cl == nil || cl.Proto == nil {
-		return false, nil
-	}
-	return vm.runSpectralRuntimeSpecialization(cl, args)
-}
-
 func (vm *VM) runSpectralRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil || !vm.noGlobalLock {
 		return false, nil
