@@ -24,7 +24,6 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
-
 // blockForID returns the block with the given ID, or nil.
 // Block IDs may not match fn.Blocks slice indices after inlining.
 func blockForID(fn *Function, id int) *Block {
@@ -35,7 +34,6 @@ func blockForID(fn *Function, id int) *Block {
 	}
 	return nil
 }
-
 
 // virtualAllocInfo describes a table allocation that passed
 // R158's MVP escape predicate. Populated by the analysis phase of
@@ -339,7 +337,7 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 		return
 	}
 	phiBlock := phiInstr.Block
-if phiInstr == nil {
+	if phiInstr == nil {
 		return
 	}
 
@@ -367,7 +365,7 @@ if phiInstr == nil {
 				ins.Args[0].ID == allocID {
 				name := fieldNameFromAux(fn, ins.Aux)
 				if name == "" {
-						return
+					return
 				}
 				fm[name] = ins.Args[1].ID
 			}

@@ -657,7 +657,7 @@ func TestTier2CallLoweringModuleOrder(t *testing.T) {
 		"CallResultRangeGuard",
 		"ConstProp",
 		"RuntimeSpecializationConstCallFold",
-		"WholeCallRuntimeSpecializationExit",
+		"CallSiteRuntimeSpecializationExit",
 	})
 }
 
@@ -788,7 +788,7 @@ func TestTier2LoopPostModuleOrder(t *testing.T) {
 func TestTier2FinalCallModuleOrder(t *testing.T) {
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
-		"WholeCallRuntimeSpecializationExit (final)",
+		"CallSiteRuntimeSpecializationExit (final)",
 		"CallReturnProjection (final)",
 		"ModularCallFloorReduce (final)",
 		"CallResultRangeGuard (final)",
@@ -801,7 +801,7 @@ func TestTier2FinalCallModuleOrderExperimentalFieldShapeSplit(t *testing.T) {
 	t.Setenv("GSCRIPT_FIELD_SHAPE_SPLIT", "1")
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
-		"WholeCallRuntimeSpecializationExit (final)",
+		"CallSiteRuntimeSpecializationExit (final)",
 		"CallReturnProjection (final)",
 		"ModularCallFloorReduce (final)",
 		"CallResultRangeGuard (final)",
@@ -815,7 +815,7 @@ func TestTier2FinalCallModuleOrderIgnoresOtherFieldShapeSplitValues(t *testing.T
 	t.Setenv("GSCRIPT_FIELD_SHAPE_SPLIT", "0")
 	assertTier2ModuleOrder(t, tier2FinalCallModules(nil), Tier2PhaseFinalCall, []string{
 		"CallABI (final)",
-		"WholeCallRuntimeSpecializationExit (final)",
+		"CallSiteRuntimeSpecializationExit (final)",
 		"CallReturnProjection (final)",
 		"ModularCallFloorReduce (final)",
 		"CallResultRangeGuard (final)",
@@ -847,9 +847,9 @@ func TestTier2RepeatedAnalysisModulesDeclareUpdates(t *testing.T) {
 	}
 
 	assertAnalysisFacts(t, findTier2Module(t, plan, "CallABI (final)").Updates, AnalysisFactCallABIs)
-	assertAnalysisFacts(t, findTier2Module(t, plan, "WholeCallRuntimeSpecializationExit (final)").Updates,
-		AnalysisFactWholeCallNoResultRuntimeSpecializations,
-		AnalysisFactWholeCallNoResultRuntimeSpecializationBatches,
+	assertAnalysisFacts(t, findTier2Module(t, plan, "CallSiteRuntimeSpecializationExit (final)").Updates,
+		AnalysisFactCallSiteNoResultRuntimeSpecializations,
+		AnalysisFactCallSiteNoResultRuntimeSpecializationBatches,
 	)
 	for _, name := range []string{
 		"RangeAnalysis (post-IntExactDivision)",

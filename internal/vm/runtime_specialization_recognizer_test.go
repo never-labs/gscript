@@ -8,7 +8,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func TestWholeCallRuntimeSpecializationDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
+func TestCallSiteRuntimeSpecializationDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
 	proto, vm := compileSpectralKernelTestProgram(t, `
 func fannkuch(n) { return n }
 func sieve(n) { return n }
@@ -28,10 +28,10 @@ func advance(dt) { return dt }
 	}
 	for i, child := range proto.Protos {
 		child.Source = sources[i]
-		if infos := RecognizedWholeCallRuntimeSpecializations(child); len(infos) != 0 {
+		if infos := RecognizedCallSiteRuntimeSpecializations(child); len(infos) != 0 {
 			t.Fatalf("metadata-only proto %q/%q recognized as %+v", child.Name, child.Source, infos)
 		}
-		for _, diag := range DiagnoseWholeCallRuntimeSpecializationProto(child) {
+		for _, diag := range DiagnoseCallSiteRuntimeSpecializationProto(child) {
 			if diag.Recognized {
 				t.Fatalf("metadata-only proto %q/%q recognized by diagnostic %+v", child.Name, child.Source, diag)
 			}
@@ -69,7 +69,7 @@ func TestRuntimeSpecializationTieringPolicyCatalogCoversRuntimeSources(t *testin
 		name  string
 		infos []RuntimeSpecializationInfo
 	}{
-		{name: "nested_int_recurrence", infos: WholeCallRuntimeSpecializationCatalog()},
+		{name: "nested_int_recurrence", infos: CallSiteRuntimeSpecializationCatalog()},
 		{name: "generic_record_array_loop", infos: DriverLoopRuntimeSpecializationCatalog()},
 		{name: "record_pairwise_numeric_loop", infos: DriverLoopRuntimeSpecializationCatalog()},
 	} {
@@ -82,7 +82,7 @@ func TestRuntimeSpecializationTieringPolicyCatalogCoversRuntimeSources(t *testin
 		}
 	}
 
-	info := findRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
+	info := findRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "record_pairwise_numeric")
 	if !info.HasCapability(RuntimeSpecializationCapabilityStructuralTiering) {
 		t.Fatalf("record_pairwise_numeric missing structural tiering capability: %+v", info)
 	}

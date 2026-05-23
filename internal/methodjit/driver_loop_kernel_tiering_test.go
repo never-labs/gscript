@@ -42,18 +42,18 @@ for pass := 1; pass <= 128; pass++ {
 }
 `
 
-func TestWholeCallRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
+func TestCallSiteRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 	top := compileProto(t, rawIntNestedTieringSource)
 	fn := findProtoByName(top, "nestwave")
 	if fn == nil {
 		t.Fatal("nestwave proto not found")
 	}
-	info, ok := recognizedWholeCallRuntimeSpecializationForTiering(fn)
+	info, ok := recognizedCallSiteRuntimeSpecializationForTiering(fn)
 	if !ok {
-		t.Fatal("nested_int_recurrence should expose a whole-call runtime specialization")
+		t.Fatal("nested_int_recurrence should expose a call-site runtime specialization")
 	}
 	if info.Name != "nested_int_recurrence" {
-		t.Fatalf("whole-call runtime specialization=%q, want nested_int_recurrence", info.Name)
+		t.Fatalf("call-site runtime specialization=%q, want nested_int_recurrence", info.Name)
 	}
 	if !info.HasCapability(vm.RuntimeSpecializationCapabilityStructuralTiering) {
 		t.Fatalf("nested_int_recurrence missing structural tiering capability: %+v", info)

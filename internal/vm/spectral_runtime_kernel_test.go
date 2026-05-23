@@ -33,13 +33,13 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		id    int
 		kind  spectralRuntimeSpecializationKind
 	}{
-		{name: "coefficient_matrix_vector", proto: multiplyAv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixVector, kind: spectralRuntimeSpecializationAv},
-		{name: "coefficient_matrix_transpose_vector", proto: multiplyAtv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector, kind: spectralRuntimeSpecializationAtv},
-		{name: "coefficient_matrix_ata_vector", proto: multiplyAtAv, id: wholeCallNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector, kind: spectralRuntimeSpecializationAtAv},
+		{name: "coefficient_matrix_vector", proto: multiplyAv, id: callSiteNoResultRuntimeSpecializationSpectralCoefficientMatrixVector, kind: spectralRuntimeSpecializationAv},
+		{name: "coefficient_matrix_transpose_vector", proto: multiplyAtv, id: callSiteNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector, kind: spectralRuntimeSpecializationAtv},
+		{name: "coefficient_matrix_ata_vector", proto: multiplyAtAv, id: callSiteNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector, kind: spectralRuntimeSpecializationAtAv},
 	} {
-		requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), tc.name)
-		requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(tc.proto), tc.name)
-		if !cachedWholeCallNoResultRuntimeSpecializationRecognized(tc.proto, tc.id) {
+		requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), tc.name)
+		requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(tc.proto), tc.name)
+		if !cachedCallSiteNoResultRuntimeSpecializationRecognized(tc.proto, tc.id) {
 			t.Fatalf("%s rejected by no-result runtime specialization cache", tc.name)
 		}
 		if tc.proto.SpectralRuntimeSpecialization == nil || tc.proto.SpectralRuntimeSpecialization.spec == nil {
@@ -48,7 +48,7 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		if got := tc.proto.SpectralRuntimeSpecialization.spec.kind; got != tc.kind {
 			t.Fatalf("%s kind = %d, want %d", tc.name, got, tc.kind)
 		}
-		diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(tc.proto), tc.name)
+		diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(tc.proto), tc.name)
 		if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
 			t.Fatalf("%s diagnostic = %+v, want recognized %q", tc.name, diag, runtimeSpecializationReasonRecognized)
 		}
@@ -62,9 +62,9 @@ func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("missing dense multiplyAtAv proto")
 	}
 
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "dense_coefficient_matrix_ata_vector")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(multiplyAtAv), "dense_coefficient_matrix_ata_vector")
-	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(multiplyAtAv, wholeCallNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector) {
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "dense_coefficient_matrix_ata_vector")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(multiplyAtAv), "dense_coefficient_matrix_ata_vector")
+	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(multiplyAtAv, callSiteNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector) {
 		t.Fatal("dense_coefficient_matrix_ata_vector rejected by no-result runtime specialization cache")
 	}
 	if multiplyAtAv.SpectralRuntimeSpecialization == nil || multiplyAtAv.SpectralRuntimeSpecialization.spec == nil {
@@ -85,7 +85,7 @@ func TestSpectralRuntimeSpecializationRecordsHit(t *testing.T) {
 	if v := globals["result"]; !v.IsNumber() {
 		t.Fatalf("result = %s (%v), want number", v.TypeName(), v)
 	}
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "coefficient_matrix_ata_vector"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteNoResult, "coefficient_matrix_ata_vector"); got == 0 {
 		t.Fatal("coefficient_matrix_ata_vector structural hit count = 0, want at least 1")
 	}
 }
@@ -101,7 +101,7 @@ func TestDenseSpectralRuntimeSpecializationRecordsHit(t *testing.T) {
 	if v := globals["result"]; !v.IsNumber() {
 		t.Fatalf("result = %s (%v), want number", v.TypeName(), v)
 	}
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "dense_coefficient_matrix_ata_vector"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteNoResult, "dense_coefficient_matrix_ata_vector"); got == 0 {
 		t.Fatal("dense_coefficient_matrix_ata_vector structural hit count = 0, want at least 1")
 	}
 }

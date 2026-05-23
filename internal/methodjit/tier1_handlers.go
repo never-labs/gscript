@@ -403,11 +403,11 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 		return err
 	}
 
-	if vmWholeCallRuntimeSpecializationArity(nArgs) && fnVal.IsFunction() {
+	if vmCallSiteRuntimeSpecializationArity(nArgs) && fnVal.IsFunction() {
 		argsStart := absSlot + 1
 		argsEnd := argsStart + nArgs
 		if argsStart >= 0 && argsEnd >= argsStart && argsEnd <= len(regs) {
-			if handled, err := e.callVM.TryRunNoResultWholeCallRuntimeSpecializationForJIT(fnVal, regs[argsStart:argsEnd]); handled {
+			if handled, err := e.callVM.TryRunNoResultCallSiteRuntimeSpecializationForJIT(fnVal, regs[argsStart:argsEnd]); handled {
 				if err != nil {
 					return err
 				}

@@ -532,25 +532,25 @@ type CompiledFunction struct {
 	// be allowed.
 	TypedPeerFramePlan Tier2TypedPeerFramePlan
 
-	// RuntimeRecursiveTableFold is a whole-call Tier 2 runtime specialization for pure
+	// RuntimeRecursiveTableFold is a call-site Tier 2 runtime specialization for pure
 	// recursive table folds recognized from bytecode shape at runtime.
 	RuntimeRecursiveTableFold *runtimeRecursiveTableFoldProtocol
 
-	// RuntimeRecursiveTableBuilder is a whole-call Tier 2 runtime specialization for pure
+	// RuntimeRecursiveTableBuilder is a call-site Tier 2 runtime specialization for pure
 	// recursive table builders recognized from bytecode shape at runtime.
 	RuntimeRecursiveTableBuilder *runtimeRecursiveTableBuilderProtocol
 
-	// RuntimeRecursiveIntFold is a whole-call Tier 2 runtime specialization for pure integer
+	// RuntimeRecursiveIntFold is a call-site Tier 2 runtime specialization for pure integer
 	// self-recursive folds recognized from bytecode shape at runtime.
 	RuntimeRecursiveIntFold *runtimeRecursiveIntFoldProtocol
 
-	// MutualRecursiveIntSCC is a whole-call Tier 2 runtime specialization for small pure
+	// MutualRecursiveIntSCC is a call-site Tier 2 runtime specialization for small pure
 	// integer mutual-recursive SCCs. It memoizes bounded recurrence evaluation
 	// after guarding that all global function closures still match the analyzed
 	// SCC members.
 	MutualRecursiveIntSCC *mutualRecursiveIntSCCProtocol
 
-	// RuntimeRecursiveNestedIntFold is a whole-call Tier 2 runtime specialization for bounded
+	// RuntimeRecursiveNestedIntFold is a call-site Tier 2 runtime specialization for bounded
 	// nested integer recurrences recognized from bytecode shape at runtime.
 	RuntimeRecursiveNestedIntFold *runtimeRecursiveNestedIntFoldProtocol
 
@@ -636,10 +636,10 @@ type CompiledFunction struct {
 	// precise Tier 2 op-exit handling.
 	StringSplitSubSpecs []StringSplitSubSpec
 
-	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result whole-call runtime specialization
+	// CallSiteNoResultRuntimeSpecializationBatches records loop-tail no-result call-site runtime specialization
 	// sites whose future complete loop iterations can be executed in one
 	// guarded Go-side batch before resuming Tier 2.
-	WholeCallNoResultRuntimeSpecializationBatches map[int]WholeCallNoResultRuntimeSpecializationBatchFact
+	CallSiteNoResultRuntimeSpecializationBatches map[int]CallSiteNoResultRuntimeSpecializationBatchFact
 
 	// RecordArrayLoopCaches keeps native validation-cache backing storage alive
 	// for RecordArrayLoopKernel code that embeds raw pointers to these cells.

@@ -82,9 +82,9 @@ type VM struct {
 	argBuf             [16]runtime.Value // pre-allocated arg buffer for OP_CALL
 	retBuf             [8]runtime.Value  // pre-allocated return buffer for OP_RETURN
 	coroutineResultBuf [8]runtime.Value  // pre-allocated coroutine.resume result buffer
-	wholeCallFloatBuf  []float64         // reusable non-pointer scratch for guarded whole-call runtime specializations
-	wholeCallIntBuf    []int64           // reusable non-pointer scratch for guarded whole-call runtime specializations
-	wholeCallValueBuf  []runtime.Value   // reusable Value scratch; scanned as GC roots below
+	callSiteFloatBuf   []float64         // reusable non-pointer scratch for guarded call-site runtime specializations
+	callSiteIntBuf     []int64           // reusable non-pointer scratch for guarded call-site runtime specializations
+	callSiteValueBuf   []runtime.Value   // reusable Value scratch; scanned as GC roots below
 	spectralKernel     spectralKernelCache
 	currentCoroutine   *VMCoroutine // coroutine currently running on this VM, if any
 	coroutineYielded   bool         // current coroutine VM paused through coroutine.yield
@@ -1574,7 +1574,7 @@ func (vm *VM) ScanGCRoots(visitor func(unsafe.Pointer)) {
 	for _, v := range vm.coroutineResultBuf {
 		runtime.ScanValueRoots(v, visitor, seen)
 	}
-	for _, v := range vm.wholeCallValueBuf {
+	for _, v := range vm.callSiteValueBuf {
 		runtime.ScanValueRoots(v, visitor, seen)
 	}
 
@@ -3498,7 +3498,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						break
 					}
 				}
-				if b != 0 && wholeCallRuntimeSpecializationArity(nArgs) {
+				if b != 0 && callSiteRuntimeSpecializationArity(nArgs) {
 					args := vm.regs[base+a+1 : base+a+1+nArgs]
 					handled, err := vm.tryValueRuntimeSpecialization(cl, args, c, base+a)
 					if handled {
@@ -4477,7 +4477,7 @@ func (vm *VM) writeCallResults(dst, c int, results []runtime.Value) {
 func (vm *VM) callValue(fnVal runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
 	if fnVal.IsFunction() {
 		if cl, ok := closureFromValue(fnVal); ok {
-			if wholeCallRuntimeSpecializationArity(len(args)) {
+			if callSiteRuntimeSpecializationArity(len(args)) {
 				if handled, results, err := vm.tryRunNonRecursiveTableValueRuntimeSpecialization(cl, args); handled {
 					return results, err
 				}

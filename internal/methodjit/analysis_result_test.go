@@ -148,14 +148,14 @@ func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
 		t.Fatalf("CallFacts.SetRuntimeSpecializationConstCallFolds did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 
-	calls.SetWholeCallNoResultRuntimeSpecializations(map[int]bool{13: true})
-	if !a.WholeCallNoResultRuntimeSpecializations[13] {
-		t.Fatalf("CallFacts.SetWholeCallNoResultRuntimeSpecializations did not update compatibility field")
+	calls.SetCallSiteNoResultRuntimeSpecializations(map[int]bool{13: true})
+	if !a.CallSiteNoResultRuntimeSpecializations[13] {
+		t.Fatalf("CallFacts.SetCallSiteNoResultRuntimeSpecializations did not update compatibility field")
 	}
 
-	calls.SetWholeCallNoResultRuntimeSpecializationBatches(map[int]WholeCallNoResultRuntimeSpecializationBatchFact{13: {ExitPC: 44}})
-	if got, ok := a.WholeCallNoResultRuntimeSpecializationBatches[13]; !ok || got.ExitPC != 44 {
-		t.Fatalf("CallFacts.SetWholeCallNoResultRuntimeSpecializationBatches did not update compatibility field: got %#v ok=%v", got, ok)
+	calls.SetCallSiteNoResultRuntimeSpecializationBatches(map[int]CallSiteNoResultRuntimeSpecializationBatchFact{13: {ExitPC: 44}})
+	if got, ok := a.CallSiteNoResultRuntimeSpecializationBatches[13]; !ok || got.ExitPC != 44 {
+		t.Fatalf("CallFacts.SetCallSiteNoResultRuntimeSpecializationBatches did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -214,10 +214,10 @@ func TestAnalysisResultKernelFactsAdoptsLegacyFields(t *testing.T) {
 func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	desc := CallABIDescriptor{NumArgs: 3, NumRets: 1}
 	a := &AnalysisResult{
-		CallABIs:                                      map[int]CallABIDescriptor{21: desc},
-		RuntimeSpecializationConstCallFolds:           map[int]RuntimeSpecializationConstCallFoldFact{22: {Result: 7}},
-		WholeCallNoResultRuntimeSpecializations:       map[int]bool{23: true},
-		WholeCallNoResultRuntimeSpecializationBatches: map[int]WholeCallNoResultRuntimeSpecializationBatchFact{23: {ExitPC: 8}},
+		CallABIs:                                     map[int]CallABIDescriptor{21: desc},
+		RuntimeSpecializationConstCallFolds:          map[int]RuntimeSpecializationConstCallFoldFact{22: {Result: 7}},
+		CallSiteNoResultRuntimeSpecializations:       map[int]bool{23: true},
+		CallSiteNoResultRuntimeSpecializationBatches: map[int]CallSiteNoResultRuntimeSpecializationBatchFact{23: {ExitPC: 8}},
 	}
 
 	calls := a.CallFacts()
@@ -227,11 +227,11 @@ func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	if got, ok := calls.RuntimeSpecializationConstCallFold(22); !ok || got.Result != 7 {
 		t.Fatalf("CallFacts did not adopt legacy RuntimeSpecializationConstCallFolds: got %#v ok=%v", got, ok)
 	}
-	if !calls.WholeCallNoResultRuntimeSpecialization(23) {
-		t.Fatalf("CallFacts did not adopt compatibility WholeCallNoResultRuntimeSpecializations")
+	if !calls.CallSiteNoResultRuntimeSpecialization(23) {
+		t.Fatalf("CallFacts did not adopt compatibility CallSiteNoResultRuntimeSpecializations")
 	}
-	if got, ok := calls.WholeCallNoResultRuntimeSpecializationBatch(23); !ok || got.ExitPC != 8 {
-		t.Fatalf("CallFacts did not adopt compatibility WholeCallNoResultRuntimeSpecializationBatches: got %#v ok=%v", got, ok)
+	if got, ok := calls.CallSiteNoResultRuntimeSpecializationBatch(23); !ok || got.ExitPC != 8 {
+		t.Fatalf("CallFacts did not adopt compatibility CallSiteNoResultRuntimeSpecializationBatches: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -243,8 +243,8 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 	if calls.RuntimeSpecializationConstCallFoldCount() != 0 {
 		t.Fatalf("nil CallFacts reported runtime specialization const call facts")
 	}
-	if calls.WholeCallNoResultRuntimeSpecializationBatchMap() != nil {
-		t.Fatalf("nil CallFacts returned whole-call no-result batches")
+	if calls.CallSiteNoResultRuntimeSpecializationBatchMap() != nil {
+		t.Fatalf("nil CallFacts returned call-site no-result batches")
 	}
 
 	visitedCallABI := false
@@ -271,8 +271,8 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 	calls := a.CallFacts()
 	a.CallABIs = map[int]CallABIDescriptor{31: {NumArgs: 4}}
 	a.RuntimeSpecializationConstCallFolds = map[int]RuntimeSpecializationConstCallFoldFact{32: {Result: 12}}
-	a.WholeCallNoResultRuntimeSpecializations = map[int]bool{33: true}
-	a.WholeCallNoResultRuntimeSpecializationBatches = map[int]WholeCallNoResultRuntimeSpecializationBatchFact{34: {ExitPC: 55}}
+	a.CallSiteNoResultRuntimeSpecializations = map[int]bool{33: true}
+	a.CallSiteNoResultRuntimeSpecializationBatches = map[int]CallSiteNoResultRuntimeSpecializationBatchFact{34: {ExitPC: 55}}
 
 	calls = a.CallFacts()
 	if got, ok := calls.CallABI(31); !ok || got.NumArgs != 4 {
@@ -281,11 +281,11 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 	if got, ok := calls.RuntimeSpecializationConstCallFold(32); !ok || got.Result != 12 {
 		t.Fatalf("CallFacts did not rebind legacy RuntimeSpecializationConstCallFolds: got %#v ok=%v", got, ok)
 	}
-	if !calls.WholeCallNoResultRuntimeSpecialization(33) {
-		t.Fatalf("CallFacts did not rebind compatibility WholeCallNoResultRuntimeSpecializations")
+	if !calls.CallSiteNoResultRuntimeSpecialization(33) {
+		t.Fatalf("CallFacts did not rebind compatibility CallSiteNoResultRuntimeSpecializations")
 	}
-	if got, ok := calls.WholeCallNoResultRuntimeSpecializationBatch(34); !ok || got.ExitPC != 55 {
-		t.Fatalf("CallFacts did not rebind compatibility WholeCallNoResultRuntimeSpecializationBatches: got %#v ok=%v", got, ok)
+	if got, ok := calls.CallSiteNoResultRuntimeSpecializationBatch(34); !ok || got.ExitPC != 55 {
+		t.Fatalf("CallFacts did not rebind compatibility CallSiteNoResultRuntimeSpecializationBatches: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -293,8 +293,8 @@ func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testin
 	a := &AnalysisResult{Call: NewCallFacts()}
 	a.Call.CallABIs[41] = CallABIDescriptor{NumArgs: 5}
 	a.Call.RuntimeSpecializationConstCallFolds[42] = RuntimeSpecializationConstCallFoldFact{Result: 13}
-	a.Call.WholeCallNoResultRuntimeSpecializations[43] = true
-	a.Call.WholeCallNoResultRuntimeSpecializationBatches[44] = WholeCallNoResultRuntimeSpecializationBatchFact{ExitPC: 66}
+	a.Call.CallSiteNoResultRuntimeSpecializations[43] = true
+	a.Call.CallSiteNoResultRuntimeSpecializationBatches[44] = CallSiteNoResultRuntimeSpecializationBatchFact{ExitPC: 66}
 
 	calls := a.CallFacts()
 	if got, ok := calls.CallABI(41); !ok || got.NumArgs != 5 {
@@ -303,11 +303,11 @@ func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testin
 	if got, ok := calls.RuntimeSpecializationConstCallFold(42); !ok || got.Result != 13 {
 		t.Fatalf("CallFacts lost domain RuntimeSpecializationConstCallFolds with nil legacy field: got %#v ok=%v", got, ok)
 	}
-	if !calls.WholeCallNoResultRuntimeSpecialization(43) {
-		t.Fatalf("CallFacts lost domain WholeCallNoResultRuntimeSpecializations with nil legacy field")
+	if !calls.CallSiteNoResultRuntimeSpecialization(43) {
+		t.Fatalf("CallFacts lost domain CallSiteNoResultRuntimeSpecializations with nil legacy field")
 	}
-	if got, ok := calls.WholeCallNoResultRuntimeSpecializationBatch(44); !ok || got.ExitPC != 66 {
-		t.Fatalf("CallFacts lost domain WholeCallNoResultRuntimeSpecializationBatches with nil legacy field: got %#v ok=%v", got, ok)
+	if got, ok := calls.CallSiteNoResultRuntimeSpecializationBatch(44); !ok || got.ExitPC != 66 {
+		t.Fatalf("CallFacts lost domain CallSiteNoResultRuntimeSpecializationBatches with nil legacy field: got %#v ok=%v", got, ok)
 	}
 }
 

@@ -71,7 +71,7 @@ func (vm *VM) runMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime
 		return false, nil, nil
 	}
 
-	bTransposed := vm.wholeCallFloatScratch(n * n)
+	bTransposed := vm.callSiteFloatScratch(n * n)
 	for j := 0; j < n; j++ {
 		col := bTransposed[j*n : (j+1)*n]
 		for k := 0; k < n; k++ {
@@ -146,7 +146,7 @@ func (vm *VM) runDenseMatrixMultiplyRuntimeSpecialization(aTable, bTable *runtim
 	if !ok {
 		return false, nil
 	}
-	bTransposed := vm.wholeCallFloatScratch(n * n)
+	bTransposed := vm.callSiteFloatScratch(n * n)
 	for j := 0; j < n; j++ {
 		col := bTransposed[j*n : (j+1)*n]
 		for k := 0; k < n; k++ {

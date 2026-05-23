@@ -44,15 +44,15 @@ type RuntimeSpecializationConstCallFoldFact struct {
 	IntGuardValues []int64
 }
 
-type WholeCallNoResultRuntimeSpecializationBatchCall struct {
+type CallSiteNoResultRuntimeSpecializationBatchCall struct {
 	FuncConst int
 	ArgConsts []int
 }
 
-type WholeCallNoResultRuntimeSpecializationBatchFact struct {
+type CallSiteNoResultRuntimeSpecializationBatchFact struct {
 	LoopBase int
 	ExitPC   int
-	Calls    []WholeCallNoResultRuntimeSpecializationBatchCall
+	Calls    []CallSiteNoResultRuntimeSpecializationBatchCall
 }
 
 type StringSplitSubSpec struct {

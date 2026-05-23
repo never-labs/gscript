@@ -24,8 +24,8 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("missing sieve proto")
 	}
 
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "bool_table_strike_count")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(sieve), "bool_table_strike_count")
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "bool_table_strike_count")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(sieve), "bool_table_strike_count")
 	if !cachedRuntimeSpecializationRecognized(sieve, runtimeSpecializationBoolTableStrikeCount) {
 		t.Fatal("bool_table_strike_count rejected by runtime specialization cache")
 	}
@@ -36,13 +36,13 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("bool table strike-count proto-local spec was not generated")
 	}
 
-	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(sieve), "bool_table_strike_count")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(sieve), "bool_table_strike_count")
 	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallValue ||
+	if diag.Specialization.Route != RuntimeSpecializationRouteCallSiteValue ||
 		diag.Specialization.Arity != 1 ||
-		diag.Specialization.Results != runtimeSpecializationWholeCallSingleResultCount {
+		diag.Specialization.Results != runtimeSpecializationCallSiteSingleResultCount {
 		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
@@ -77,7 +77,7 @@ func sieve(n) {
 result := sieve(100)
 `)
 	expectGlobalInt(t, globals, "result", 25)
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "bool_table_strike_count"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "bool_table_strike_count"); got != 1 {
 		t.Fatalf("bool_table_strike_count structural hit count = %d, want 1", got)
 	}
 }

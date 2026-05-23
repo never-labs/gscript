@@ -9,7 +9,7 @@ import (
 
 func (vm *VM) tryRunNumericArrayRegionSortRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
 	if cl == nil || cl.Proto == nil ||
-		!hotWholeCallNoResultRuntimeSpecializationRecognized(cl.Proto, wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort) {
+		!hotCallSiteNoResultRuntimeSpecializationRecognized(cl.Proto, callSiteNoResultRuntimeSpecializationNumericArrayRegionSort) {
 		return false, nil
 	}
 	return vm.runNumericArrayRegionSortRuntimeSpecialization(cl, args)
@@ -46,9 +46,9 @@ func runNumericArrayRegionSort(args []runtime.Value) bool {
 
 func (vm *VM) runNumericArrayRegionSort(args []runtime.Value) bool {
 	return runNumericArrayRegionSortWithScratch(args, func(n int) []int64 {
-		return vm.wholeCallIntScratch(n)
+		return vm.callSiteIntScratch(n)
 	}, func(n int) []runtime.Value {
-		return vm.wholeCallValueScratch(n)
+		return vm.callSiteValueScratch(n)
 	})
 }
 

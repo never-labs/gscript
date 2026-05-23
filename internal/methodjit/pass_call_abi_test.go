@@ -166,7 +166,7 @@ func apply(f) {
 		t.Fatalf("call has no source metadata: %+v", call)
 	}
 	apply.EnsureFeedback()
-	apply.CallSiteFeedback[callPC].Count = wholeCallRuntimeSpecializationMinStableObservations
+	apply.CallSiteFeedback[callPC].Count = callSiteRuntimeSpecializationMinStableObservations
 	apply.CallSiteFeedback[callPC].NArgs = 1
 	apply.CallSiteFeedback[callPC].ResultArity = uint8(call.Aux2)
 	apply.CallSiteFeedback[callPC].CalleeVMProto = inc
@@ -197,7 +197,7 @@ func TestStaticNoDepthCalleeUsesStableFeedbackCallee(t *testing.T) {
 	}}
 	proto := &vm.FuncProto{Name: "caller", Code: make([]uint32, 2)}
 	proto.EnsureFeedback()
-	proto.CallSiteFeedback[1].Count = wholeCallRuntimeSpecializationMinStableObservations
+	proto.CallSiteFeedback[1].Count = callSiteRuntimeSpecializationMinStableObservations
 	proto.CallSiteFeedback[1].NArgs = 1
 	proto.CallSiteFeedback[1].ResultArity = 2
 	proto.CallSiteFeedback[1].CalleeVMProto = callee
@@ -224,7 +224,7 @@ func TestCallCalleeFlagSpecUsesPolymorphicFeedback(t *testing.T) {
 	calleeB := &vm.FuncProto{Name: "b", LeafNoCall: true, NoGlobalOps: true}
 	proto := &vm.FuncProto{Name: "caller", Code: make([]uint32, 2)}
 	proto.EnsureFeedback()
-	proto.CallSiteFeedback[1].Count = wholeCallRuntimeSpecializationMinStableObservations
+	proto.CallSiteFeedback[1].Count = callSiteRuntimeSpecializationMinStableObservations
 	proto.CallSiteFeedback[1].Flags = vm.CallSiteCalleePolymorphic
 	proto.CallSiteFeedback[1].NArgs = 1
 	proto.CallSiteFeedback[1].ResultArity = 2
@@ -256,7 +256,7 @@ func TestCallCalleeFlagSpecKeepsMixedNoGlobalDynamic(t *testing.T) {
 	calleeB := &vm.FuncProto{Name: "b", LeafNoCall: true, NoGlobalOps: false}
 	proto := &vm.FuncProto{Name: "caller", Code: make([]uint32, 2)}
 	proto.EnsureFeedback()
-	proto.CallSiteFeedback[1].Count = wholeCallRuntimeSpecializationMinStableObservations
+	proto.CallSiteFeedback[1].Count = callSiteRuntimeSpecializationMinStableObservations
 	proto.CallSiteFeedback[1].Flags = vm.CallSiteCalleePolymorphic
 	proto.CallSiteFeedback[1].NArgs = 1
 	proto.CallSiteFeedback[1].ResultArity = 2
@@ -292,13 +292,13 @@ func TestFieldShapeCalleeProtosDeduplicatesShapeCases(t *testing.T) {
 	}
 	fn := &Function{
 		Analysis: &AnalysisResult{
-				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-					calleeLoad.ID: {
-						{ShapeID: 11, FieldIdx: 0, VMProto: calleeA},
-						{ShapeID: 12, FieldIdx: 0, VMProto: calleeA},
-						{ShapeID: 13, FieldIdx: 0, VMProto: calleeB},
-					},
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				calleeLoad.ID: {
+					{ShapeID: 11, FieldIdx: 0, VMProto: calleeA},
+					{ShapeID: 12, FieldIdx: 0, VMProto: calleeA},
+					{ShapeID: 13, FieldIdx: 0, VMProto: calleeB},
 				},
+			},
 		},
 	}
 
@@ -334,26 +334,26 @@ func TestFieldShapeCalleeABISummaryUsesReceiverFacts(t *testing.T) {
 	}
 	fn := &Function{
 		Analysis: &AnalysisResult{
-				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-					calleeLoad.ID: {
-						{
-							ShapeID:  316,
-							FieldIdx: 5,
-							VMProto:  stepIO,
-							ReceiverFact: FixedShapeTableFact{
-								ShapeID:    316,
-								FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
-								FieldTypes: map[string]Type{
-									"id":    TypeInt,
-									"queue": TypeInt,
-									"bytes": TypeInt,
-									"state": TypeString,
-									"step":  TypeFunction,
-								},
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				calleeLoad.ID: {
+					{
+						ShapeID:  316,
+						FieldIdx: 5,
+						VMProto:  stepIO,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    316,
+							FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
+							FieldTypes: map[string]Type{
+								"id":    TypeInt,
+								"queue": TypeInt,
+								"bytes": TypeInt,
+								"state": TypeString,
+								"step":  TypeFunction,
 							},
 						},
 					},
 				},
+			},
 		},
 	}
 	summary := fieldShapeCalleeABISummary(fn, call)
@@ -388,28 +388,28 @@ func TestCallABIAnnotate_FieldShapeTypedPeerDescriptor(t *testing.T) {
 	fn := &Function{
 		Proto:  &vm.FuncProto{Name: "caller", Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 3, 2)}},
 		Blocks: []*Block{block},
-	Analysis: &AnalysisResult{
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			calleeLoad.ID: {
-				{
-					ShapeID:  316,
-					FieldIdx: 5,
-					VMProto:  stepIO,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    316,
-						FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
-						FieldTypes: map[string]Type{
-							"id":    TypeInt,
-							"queue": TypeInt,
-							"bytes": TypeInt,
-							"state": TypeString,
-							"step":  TypeFunction,
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				calleeLoad.ID: {
+					{
+						ShapeID:  316,
+						FieldIdx: 5,
+						VMProto:  stepIO,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    316,
+							FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
+							FieldTypes: map[string]Type{
+								"id":    TypeInt,
+								"queue": TypeInt,
+								"bytes": TypeInt,
+								"state": TypeString,
+								"step":  TypeFunction,
+							},
 						},
 					},
 				},
 			},
 		},
-	},
 	}
 
 	fn = AnnotateCallABIs(fn, CallABIAnnotationConfig{})
@@ -455,26 +455,26 @@ func TestCallABIAnnotate_TypedPeerNoResultLeavesCallUntyped(t *testing.T) {
 	fn := &Function{
 		Proto:  &vm.FuncProto{Name: "caller", Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 3, 1)}},
 		Blocks: []*Block{block},
-	Analysis: &AnalysisResult{
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			calleeLoad.ID: {
-				{
-					ShapeID:  316,
-					FieldIdx: 2,
-					VMProto:  stepIO,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    316,
-						FieldNames: []string{"id", "queue", "step"},
-						FieldTypes: map[string]Type{
-							"id":    TypeInt,
-							"queue": TypeInt,
-							"step":  TypeFunction,
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				calleeLoad.ID: {
+					{
+						ShapeID:  316,
+						FieldIdx: 2,
+						VMProto:  stepIO,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    316,
+							FieldNames: []string{"id", "queue", "step"},
+							FieldTypes: map[string]Type{
+								"id":    TypeInt,
+								"queue": TypeInt,
+								"step":  TypeFunction,
+							},
 						},
 					},
 				},
 			},
 		},
-	},
 	}
 
 	fn = AnnotateCallABIs(fn, CallABIAnnotationConfig{})
@@ -519,34 +519,34 @@ func step_float(a, tick) {
 	}
 	fn := &Function{
 		Proto: &vm.FuncProto{Name: "caller"},
-	Analysis: &AnalysisResult{
-		FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-			calleeLoad.ID: {
-				{
-					ShapeID:   101,
-					FieldIdx:  2,
-					VMProto:   stepInt,
-					VMClosure: 0x1010,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    101,
-						FieldNames: []string{"count", "step"},
-						FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+		Analysis: &AnalysisResult{
+			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+				calleeLoad.ID: {
+					{
+						ShapeID:   101,
+						FieldIdx:  2,
+						VMProto:   stepInt,
+						VMClosure: 0x1010,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    101,
+							FieldNames: []string{"count", "step"},
+							FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+						},
 					},
-				},
-				{
-					ShapeID:   102,
-					FieldIdx:  3,
-					VMProto:   stepFloat,
-					VMClosure: 0x2020,
-					ReceiverFact: FixedShapeTableFact{
-						ShapeID:    102,
-						FieldNames: []string{"x", "vx", "step"},
-						FieldTypes: map[string]Type{"x": TypeFloat, "vx": TypeFloat, "step": TypeFunction},
+					{
+						ShapeID:   102,
+						FieldIdx:  3,
+						VMProto:   stepFloat,
+						VMClosure: 0x2020,
+						ReceiverFact: FixedShapeTableFact{
+							ShapeID:    102,
+							FieldNames: []string{"x", "vx", "step"},
+							FieldTypes: map[string]Type{"x": TypeFloat, "vx": TypeFloat, "step": TypeFunction},
+						},
 					},
 				},
 			},
 		},
-	},
 	}
 	cases := (&emitContext{fn: fn}).fieldShapeTypedPeerCallCases(call)
 	if len(cases) != 2 {
@@ -662,7 +662,7 @@ func apply(f) {
 	fn := BuildGraph(apply)
 	call := firstCall(t, fn)
 	apply.EnsureFeedback()
-	apply.CallSiteFeedback[call.SourcePC].Count = wholeCallRuntimeSpecializationMinStableObservations
+	apply.CallSiteFeedback[call.SourcePC].Count = callSiteRuntimeSpecializationMinStableObservations
 	apply.CallSiteFeedback[call.SourcePC].NArgs = 1
 	apply.CallSiteFeedback[call.SourcePC].ResultArity = uint8(call.Aux2)
 	apply.CallSiteFeedback[call.SourcePC].CalleeVMProto = inc
@@ -698,7 +698,7 @@ func apply(f) {
 	fn := BuildGraph(apply)
 	call := firstCall(t, fn)
 	apply.EnsureFeedback()
-	apply.CallSiteFeedback[call.SourcePC].Count = wholeCallRuntimeSpecializationMinStableObservations
+	apply.CallSiteFeedback[call.SourcePC].Count = callSiteRuntimeSpecializationMinStableObservations
 	apply.CallSiteFeedback[call.SourcePC].NArgs = 1
 	apply.CallSiteFeedback[call.SourcePC].ResultArity = uint8(call.Aux2)
 	apply.CallSiteFeedback[call.SourcePC].CalleeVMProto = inc

@@ -221,8 +221,8 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 		Proto: proto,
 		Analysis: &AnalysisResult{
 			SuppressedSpecGuardKinds: map[int]map[string]bool{
-					0: {"GuardIntRange": true},
-				},
+				0: {"GuardIntRange": true},
+			},
 		},
 	}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}

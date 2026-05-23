@@ -2,9 +2,9 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
-const maxWholeCallScalarScratch = 1 << 20
+const maxCallSiteScalarScratch = 1 << 20
 
-func wholeCallRuntimeSpecializationArity(n int) bool {
+func callSiteRuntimeSpecializationArity(n int) bool {
 	return n == 1 || n == 2 || n == 3 || n == 4
 }
 
@@ -18,20 +18,20 @@ func (vm *VM) tryValueRuntimeSpecialization(cl *Closure, args []runtime.Value, c
 }
 
 func (vm *VM) tryRunValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, true); handled || err != nil {
+	if handled, results, err := vm.tryRunCallSiteValueRuntimeSpecialization(cl, args, true); handled || err != nil {
 		return handled, results, err
 	}
 	return false, nil, nil
 }
 
 func (vm *VM) tryRunNonRecursiveTableValueRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, false); handled || err != nil {
+	if handled, results, err := vm.tryRunCallSiteValueRuntimeSpecialization(cl, args, false); handled || err != nil {
 		return handled, results, err
 	}
 	return false, nil, nil
 }
 
-// tryNoResultRuntimeSpecialization executes a guarded whole-call numeric kernel and writes
+// tryNoResultRuntimeSpecialization executes a guarded call-site numeric kernel and writes
 // the no-result call convention used by in-place kernels.
 func (vm *VM) tryNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value, c int, dst int) (bool, error) {
 	handled, err := vm.tryRunNoResultRuntimeSpecialization(cl, args)
@@ -43,16 +43,16 @@ func (vm *VM) tryNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value
 }
 
 func (vm *VM) tryRunNoResultRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, error) {
-	if handled, err := vm.tryRunWholeCallNoResultRuntimeSpecialization(cl, args); handled || err != nil {
+	if handled, err := vm.tryRunCallSiteNoResultRuntimeSpecialization(cl, args); handled || err != nil {
 		return handled, err
 	}
 	return false, nil
 }
 
-// TryRunNoResultWholeCallRuntimeSpecializationForJIT executes a guarded no-result structural
-// whole-call runtime specialization for a JIT exit helper. It returns handled=false when the
+// TryRunNoResultCallSiteRuntimeSpecializationForJIT executes a guarded no-result structural
+// call-site runtime specialization for a JIT exit helper. It returns handled=false when the
 // callee or arguments do not satisfy the registered kernel guards.
-func (vm *VM) TryRunNoResultWholeCallRuntimeSpecializationForJIT(fn runtime.Value, args []runtime.Value) (bool, error) {
+func (vm *VM) TryRunNoResultCallSiteRuntimeSpecializationForJIT(fn runtime.Value, args []runtime.Value) (bool, error) {
 	cl, ok := closureFromValue(fn)
 	if !ok {
 		return false, nil
@@ -70,38 +70,38 @@ func (vm *VM) writeNoResults(dst, c int) {
 	}
 }
 
-func (vm *VM) wholeCallFloatScratch(n int) []float64 {
+func (vm *VM) callSiteFloatScratch(n int) []float64 {
 	if n <= 0 {
 		return nil
 	}
-	if n > maxWholeCallScalarScratch {
+	if n > maxCallSiteScalarScratch {
 		return make([]float64, n)
 	}
-	if cap(vm.wholeCallFloatBuf) < n {
-		vm.wholeCallFloatBuf = make([]float64, n)
+	if cap(vm.callSiteFloatBuf) < n {
+		vm.callSiteFloatBuf = make([]float64, n)
 	}
-	return vm.wholeCallFloatBuf[:n]
+	return vm.callSiteFloatBuf[:n]
 }
 
-func (vm *VM) wholeCallIntScratch(n int) []int64 {
+func (vm *VM) callSiteIntScratch(n int) []int64 {
 	if n <= 0 {
 		return nil
 	}
-	if n > maxWholeCallScalarScratch {
+	if n > maxCallSiteScalarScratch {
 		return make([]int64, n)
 	}
-	if cap(vm.wholeCallIntBuf) < n {
-		vm.wholeCallIntBuf = make([]int64, n)
+	if cap(vm.callSiteIntBuf) < n {
+		vm.callSiteIntBuf = make([]int64, n)
 	}
-	return vm.wholeCallIntBuf[:n]
+	return vm.callSiteIntBuf[:n]
 }
 
-func (vm *VM) wholeCallValueScratch(n int) []runtime.Value {
+func (vm *VM) callSiteValueScratch(n int) []runtime.Value {
 	if n <= 0 {
 		return nil
 	}
-	if cap(vm.wholeCallValueBuf) < n {
-		vm.wholeCallValueBuf = make([]runtime.Value, n)
+	if cap(vm.callSiteValueBuf) < n {
+		vm.callSiteValueBuf = make([]runtime.Value, n)
 	}
-	return vm.wholeCallValueBuf[:n]
+	return vm.callSiteValueBuf[:n]
 }

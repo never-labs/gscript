@@ -8,18 +8,18 @@ import (
 	"github.com/gscript/gscript/internal/jit"
 )
 
-func (ec *emitContext) emitWholeCallRuntimeSpecializationOpExitIfEligible(instr *Instr) bool {
+func (ec *emitContext) emitCallSiteRuntimeSpecializationOpExitIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
 	callFacts := functionCallFacts(ec.fn)
-	if !callFacts.WholeCallNoResultRuntimeSpecialization(instr.ID) {
+	if !callFacts.CallSiteNoResultRuntimeSpecialization(instr.ID) {
 		return false
 	}
 	funcSlot := int(instr.Aux)
 	nArgs := len(instr.Args) - 1
 	nRets := callResultCountFromAux2(instr.Aux2)
-	if nRets != 0 || !vmWholeCallRuntimeSpecializationArity(nArgs) {
+	if nRets != 0 || !vmCallSiteRuntimeSpecializationArity(nArgs) {
 		return false
 	}
 
@@ -61,7 +61,7 @@ func (ec *emitContext) emitWholeCallRuntimeSpecializationOpExitIfEligible(instr 
 	asm.Label(continueLabel)
 	ec.emitReloadAllActiveRegs()
 	ec.invalidateCallClobberedFactsAfterResume()
-	if fact, ok := callFacts.WholeCallNoResultRuntimeSpecializationBatch(instr.ID); ok && fact.ExitPC > 0 {
+	if fact, ok := callFacts.CallSiteNoResultRuntimeSpecializationBatch(instr.ID); ok && fact.ExitPC > 0 {
 		if target := ec.blockLabelAtOrAfterSourcePC(fact.ExitPC); target != "" {
 			noBatchLabel := ec.uniqueLabel("wholecall_no_batch")
 			asm.LDR(jit.X0, mRegCtx, execCtxOffOpExitAux)

@@ -131,8 +131,8 @@ func TestFieldLenFold_DoesNotLowerProfiledPolyLenForMutatedField(t *testing.T) {
 
 func TestFieldLenFold_FoldsProfiledExactLen(t *testing.T) {
 	fn := &Function{
-		Proto:             &vm.FuncProto{Name: "profiled_len"},
-		NumRegs:           1,
+		Proto:   &vm.FuncProto{Name: "profiled_len"},
+		NumRegs: 1,
 		Analysis: &AnalysisResult{
 			ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
 		},
@@ -156,8 +156,8 @@ func TestFieldLenFold_FoldsProfiledExactLen(t *testing.T) {
 
 func TestProfiledStringLenFold_FoldsAfterFieldLowering(t *testing.T) {
 	fn := &Function{
-		Proto:             &vm.FuncProto{Name: "profiled_len_after_lower"},
-		NumRegs:           1,
+		Proto:   &vm.FuncProto{Name: "profiled_len_after_lower"},
+		NumRegs: 1,
 		Analysis: &AnalysisResult{
 			ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
 		},

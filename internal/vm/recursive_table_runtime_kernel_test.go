@@ -22,7 +22,7 @@ func checkTree(node) {
 }
 `
 
-func TestRecursiveTableWholeCallRunsWithoutTier2Promotion(t *testing.T) {
+func TestRecursiveTableCallSiteRunsWithoutTier2Promotion(t *testing.T) {
 	top := compileProto(t, recursiveTableKernelSource+`
 root := makeTree(4)
 result := checkTree(root)
@@ -54,10 +54,10 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 		t.Fatalf("missing recursive table protos: builder=%v fold=%v", builder != nil, fold != nil)
 	}
 
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "lazy_recursive_table_builder")
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "lazy_recursive_table_fold")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(builder), "lazy_recursive_table_builder")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(fold), "lazy_recursive_table_fold")
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "lazy_recursive_table_builder")
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "lazy_recursive_table_fold")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(builder), "lazy_recursive_table_builder")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(fold), "lazy_recursive_table_fold")
 	if !cachedRuntimeSpecializationRecognized(builder, runtimeSpecializationLazyRecursiveTableBuilder) {
 		t.Fatal("lazy recursive table builder rejected by runtime specialization cache")
 	}
@@ -65,11 +65,11 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 		t.Fatal("lazy recursive table fold rejected by runtime specialization cache")
 	}
 
-	builderDiag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(builder), "lazy_recursive_table_builder")
+	builderDiag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(builder), "lazy_recursive_table_builder")
 	if !builderDiag.Recognized || builderDiag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("builder diagnostic = %+v, want recognized %q", builderDiag, runtimeSpecializationReasonRecognized)
 	}
-	foldDiag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(fold), "lazy_recursive_table_fold")
+	foldDiag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(fold), "lazy_recursive_table_fold")
 	if !foldDiag.Recognized || foldDiag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("fold diagnostic = %+v, want recognized %q", foldDiag, runtimeSpecializationReasonRecognized)
 	}
@@ -152,10 +152,10 @@ root := makeTree(4)
 result := checkTree(root)
 `)
 	expectGlobalInt(t, globals, "result", 31)
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "lazy_recursive_table_builder"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "lazy_recursive_table_builder"); got != 1 {
 		t.Fatalf("builder structural hit count = %d, want 1", got)
 	}
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "lazy_recursive_table_fold"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "lazy_recursive_table_fold"); got != 1 {
 		t.Fatalf("fold structural hit count = %d, want 1", got)
 	}
 	if got := stats.Snapshot().RuntimeSpecialization.Total; got != 2 {
@@ -163,7 +163,7 @@ result := checkTree(root)
 	}
 }
 
-func TestRecursiveTableNonRecursiveWholeCallEntryDoesNotTrigger(t *testing.T) {
+func TestRecursiveTableNonRecursiveCallSiteEntryDoesNotTrigger(t *testing.T) {
 	top := compileProto(t, recursiveTableKernelSource)
 	v := New(runtime.NewInterpreterGlobals())
 	defer v.Close()

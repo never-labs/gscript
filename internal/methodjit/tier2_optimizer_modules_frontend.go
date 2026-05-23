@@ -216,12 +216,12 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 			},
 		},
 		{
-			Name:     "WholeCallRuntimeSpecializationExit",
+			Name:     "CallSiteRuntimeSpecializationExit",
 			Phase:    Tier2PhaseCallLower,
 			Requires: analysisFacts(AnalysisFactCallABIs),
-			Provides: analysisFacts(AnalysisFactWholeCallNoResultRuntimeSpecializations, AnalysisFactWholeCallNoResultRuntimeSpecializationBatches),
+			Provides: analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return WholeCallRuntimeSpecializationExitPass(protocolGlobals)(fn)
+				return CallSiteRuntimeSpecializationExitPass(protocolGlobals)(fn)
 			},
 		},
 	}
@@ -285,12 +285,12 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 			},
 		},
 		{
-			Name:     "WholeCallRuntimeSpecializationExit (final)",
+			Name:     "CallSiteRuntimeSpecializationExit (final)",
 			Phase:    Tier2PhaseFinalCall,
 			Requires: analysisFacts(AnalysisFactCallABIs),
-			Updates:  analysisFacts(AnalysisFactWholeCallNoResultRuntimeSpecializations, AnalysisFactWholeCallNoResultRuntimeSpecializationBatches),
+			Updates:  analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return WholeCallRuntimeSpecializationExitPass(protocolGlobals)(fn)
+				return CallSiteRuntimeSpecializationExitPass(protocolGlobals)(fn)
 			},
 		},
 		tier2PassModuleWith("CallReturnProjection (final)", Tier2PhaseFinalCall, nil, nil, CallReturnProjectionPass),

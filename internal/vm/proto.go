@@ -34,12 +34,12 @@ type FuncProto struct {
 	FieldPolyCache                []runtime.FieldPolyCacheEntry       // lazily-initialized 4-way static field cache, indexed by PC
 	ResumePayloadCache            []int8                              // per-PC cache for ResumePayloadIsFieldOnly: 0 unknown, 1 false, 2 true
 	RuntimeSpecialization         *runtimeSpecializationProtoCache    // guarded runtime specialization recognizer cache, nil until first probe
-	WholeCallNoResultRuntime      *runtimeSpecializationProtoCache    // guarded no-result whole-call runtime specialization cache, nil until first probe
+	CallSiteNoResultRuntime       *runtimeSpecializationProtoCache    // guarded no-result call-site runtime specialization cache, nil until first probe
 	PermutationFlipChecksumKernel *permutationFlipChecksumKernelCache // guarded runtime-generated permutation checksum kernel cache
 	IntGridAggregateKernel        *intGridAggregateKernelCache        // guarded runtime-generated integer grid aggregate kernel cache
 	MatrixMultiplyKernel          *matrixMultiplyKernelCache          // guarded runtime-generated matrix multiply kernel cache
 	DenseMatrixMultiplyTBKernel   *denseMatrixMultiplyTBKernelCache   // guarded runtime-generated dense transposed matrix multiply kernel cache
-	SpectralRuntimeSpecialization *spectralRuntimeSpecializationCache // guarded runtime-generated spectral whole-call runtime specialization cache
+	SpectralRuntimeSpecialization *spectralRuntimeSpecializationCache // guarded runtime-generated spectral call-site runtime specialization cache
 	RecordWalkFoldKernel          *recordWalkFoldKernelCache          // guarded runtime-generated record walk/fold kernel cache
 	BoolTableStrikeCountKernel    *boolTableStrikeCountKernelCache    // guarded runtime-generated bool table strike-count kernel cache
 	RecordPairwiseNumericKernel   *recordPairwiseNumericKernelCache   // guarded runtime-generated pairwise record numeric kernel cache

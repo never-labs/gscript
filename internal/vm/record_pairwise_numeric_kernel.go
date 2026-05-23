@@ -53,7 +53,7 @@ func (vm *VM) tryRunRecordPairwiseNumericKernel(cl *Closure, args []runtime.Valu
 	if vm.methodJIT != nil {
 		return false, nil
 	}
-	if cl == nil || cl.Proto == nil || !hotWholeCallNoResultRuntimeSpecializationRecognized(cl.Proto, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
+	if cl == nil || cl.Proto == nil || !hotCallSiteNoResultRuntimeSpecializationRecognized(cl.Proto, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		return false, nil
 	}
 	return vm.runRecordPairwiseNumericKernel(cl, args)
@@ -67,7 +67,7 @@ func (vm *VM) runRecordPairwiseNumericKernel(cl *Closure, args []runtime.Value) 
 }
 
 func (vm *VM) tryRunRecordPairwiseNumericKernelN(cl *Closure, args []runtime.Value, steps int64) (bool, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallNoResultRuntimeSpecializationRecognized(cl.Proto, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
+	if cl == nil || cl.Proto == nil || !hotCallSiteNoResultRuntimeSpecializationRecognized(cl.Proto, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		return false, nil
 	}
 	return vm.runRecordPairwiseNumericKernelN(cl, args, steps)
@@ -303,7 +303,7 @@ func (vm *VM) tryRecordPairwiseNumericForLoopKernel(frame *CallFrame, base int, 
 		return false, nil
 	}
 	cl, ok := closureFromValue(fnVal)
-	if !ok || !HasRecordPairwiseNumericWholeCallRuntimeSpecialization(cl.Proto) {
+	if !ok || !HasRecordPairwiseNumericCallSiteRuntimeSpecialization(cl.Proto) {
 		return false, nil
 	}
 	argVal, ok := vm.globalValue(constants[shape.argConst].Str())
@@ -936,15 +936,15 @@ func isRecordPairwiseNumericProtoWithGlobalCount(p *FuncProto) bool {
 	})
 }
 
-// HasRecordPairwiseNumericWholeCallRuntimeSpecialization reports whether p matches the guarded
+// HasRecordPairwiseNumericCallSiteRuntimeSpecialization reports whether p matches the guarded
 // record-field pairwise numeric advance(dt) runtime-specialization shape. MethodJIT uses this to
-// keep driver loops on the VM route where the whole-call runtime specialization can fire.
-func HasRecordPairwiseNumericWholeCallRuntimeSpecialization(p *FuncProto) bool {
-	return cachedWholeCallNoResultRuntimeSpecializationRecognized(p, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric)
+// keep driver loops on the VM route where the call-site runtime specialization can fire.
+func HasRecordPairwiseNumericCallSiteRuntimeSpecialization(p *FuncProto) bool {
+	return cachedCallSiteNoResultRuntimeSpecializationRecognized(p, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric)
 }
 
 // HasRecordPairwiseNumericDriverLoopKernel reports whether p contains a structural
-// driver loop that repeatedly calls an pairwise numeric whole-call
+// driver loop that repeatedly calls an pairwise numeric call-site
 // runtime-specialization candidate.
 func HasRecordPairwiseNumericDriverLoopKernel(p *FuncProto, globals map[string]*FuncProto) bool {
 	if p == nil {
@@ -979,5 +979,5 @@ func IsRecordPairwiseNumericDriverLoopAt(p *FuncProto, forprepPC int, globals ma
 	if shape.fnConst < 0 || shape.fnConst >= len(p.Constants) || !p.Constants[shape.fnConst].IsString() {
 		return false
 	}
-	return HasRecordPairwiseNumericWholeCallRuntimeSpecialization(globals[p.Constants[shape.fnConst].Str()])
+	return HasRecordPairwiseNumericCallSiteRuntimeSpecialization(globals[p.Constants[shape.fnConst].Str()])
 }

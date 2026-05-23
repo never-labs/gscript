@@ -19,7 +19,7 @@ func TableArrayLowerPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
 	for _, block := range fn.Blocks {
 		needsRewrite := false
 		for _, instr := range block.Instrs {

@@ -39,29 +39,29 @@ func TestRecordPairwiseDriverLoopRuntimeSpecializationDiagnostics(t *testing.T) 
 	}
 }
 
-func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationDiagnostics(t *testing.T) {
+func TestRecordPairwiseCallSiteNoResultRuntimeSpecializationDiagnostics(t *testing.T) {
 	top := compileProto(t, recordPairwiseDriverLoopSource(t, "1"))
 	advance := findTestProtoByName(top, "advance")
 	if advance == nil {
 		t.Fatal("missing advance proto")
 	}
 
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "record_pairwise_numeric")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(advance), "record_pairwise_numeric")
-	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(advance, wholeCallNoResultRuntimeSpecializationRecordPairwiseNumeric) {
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "record_pairwise_numeric")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(advance), "record_pairwise_numeric")
+	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(advance, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		t.Fatal("record_pairwise_numeric rejected by no-result runtime specialization cache")
 	}
-	if advance.WholeCallNoResultRuntime == nil || advance.WholeCallNoResultRuntime.recognized == 0 {
+	if advance.CallSiteNoResultRuntime == nil || advance.CallSiteNoResultRuntime.recognized == 0 {
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 
-	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(advance), "record_pairwise_numeric")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(advance), "record_pairwise_numeric")
 	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallNoResult ||
+	if diag.Specialization.Route != RuntimeSpecializationRouteCallSiteNoResult ||
 		diag.Specialization.Arity != 1 ||
-		diag.Specialization.Results != runtimeSpecializationWholeCallInPlaceResultCount {
+		diag.Specialization.Results != runtimeSpecializationCallSiteInPlaceResultCount {
 		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
@@ -87,13 +87,13 @@ func TestRecordPairwiseDriverLoopRuntimeSpecializationRecordsSingleHit(t *testin
 	}
 }
 
-func TestRecordPairwiseWholeCallNoResultRuntimeSpecializationRecordsSingleHit(t *testing.T) {
+func TestRecordPairwiseCallSiteNoResultRuntimeSpecializationRecordsSingleHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
 	globals := compileAndRun(t, recordPairwiseDriverLoopSource(t, "1"))
 	expectGlobalInt(t, globals, "N", 1)
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "record_pairwise_numeric"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteNoResult, "record_pairwise_numeric"); got != 1 {
 		t.Fatalf("record_pairwise_numeric structural hit count = %d, want 1", got)
 	}
 }

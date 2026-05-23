@@ -638,13 +638,13 @@ func tier2LoopCallFeedbackVMProtos(fn *Function, instr *Instr) []*vm.FuncProto {
 		return nil
 	}
 	fb := fn.Proto.CallSiteFeedback[instr.SourcePC]
-	if fb.Count < wholeCallRuntimeSpecializationMinStableObservations ||
+	if fb.Count < callSiteRuntimeSpecializationMinStableObservations ||
 		fb.Flags&vm.CallSiteArityPolymorphic != 0 ||
 		int(fb.NArgs) != len(instr.Args)-1 ||
 		fb.ResultArity != uint8(instr.Aux2) {
 		return nil
 	}
-	return fb.MaturePolymorphicVMProtos(wholeCallRuntimeSpecializationMinStableObservations, len(instr.Args)-1, uint8(instr.Aux2))
+	return fb.MaturePolymorphicVMProtos(callSiteRuntimeSpecializationMinStableObservations, len(instr.Args)-1, uint8(instr.Aux2))
 }
 
 func tier2LoopCallCalleeHasTier2DirectEntry(callee *vm.FuncProto) bool {

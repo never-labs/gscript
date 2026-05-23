@@ -38,22 +38,22 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 		t.Fatal("missing quicksort proto")
 	}
 
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "numeric_array_region_sort")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(quicksort), "numeric_array_region_sort")
-	if !cachedWholeCallNoResultRuntimeSpecializationRecognized(quicksort, wholeCallNoResultRuntimeSpecializationNumericArrayRegionSort) {
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "numeric_array_region_sort")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(quicksort), "numeric_array_region_sort")
+	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(quicksort, callSiteNoResultRuntimeSpecializationNumericArrayRegionSort) {
 		t.Fatal("numeric_array_region_sort rejected by no-result runtime specialization cache")
 	}
-	if quicksort.WholeCallNoResultRuntime == nil || quicksort.WholeCallNoResultRuntime.recognized == 0 {
+	if quicksort.CallSiteNoResultRuntime == nil || quicksort.CallSiteNoResultRuntime.recognized == 0 {
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 
-	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(quicksort), "numeric_array_region_sort")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(quicksort), "numeric_array_region_sort")
 	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
-	if diag.Specialization.Route != RuntimeSpecializationRouteWholeCallNoResult ||
+	if diag.Specialization.Route != RuntimeSpecializationRouteCallSiteNoResult ||
 		diag.Specialization.Arity != 3 ||
-		diag.Specialization.Results != runtimeSpecializationWholeCallInPlaceResultCount {
+		diag.Specialization.Results != runtimeSpecializationCallSiteInPlaceResultCount {
 		t.Fatalf("unexpected diagnostic metadata: %+v", diag.Specialization)
 	}
 }
@@ -64,7 +64,7 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationRecordsHits(t *testi
 
 	globals := compileAndRun(t, numericArrayRegionSortSource)
 	expectGlobalBool(t, globals, "sorted", true)
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallNoResult, "numeric_array_region_sort"); got == 0 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteNoResult, "numeric_array_region_sort"); got == 0 {
 		t.Fatal("numeric_array_region_sort structural hit count = 0, want at least 1")
 	}
 }

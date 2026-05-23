@@ -26,10 +26,10 @@ const (
 
 	AnalysisFactSpecDependencyProtos AnalysisFact = "SpecDependencyProtos"
 
-	AnalysisFactCallABIs                                      AnalysisFact = "CallABIs"
-	AnalysisFactRuntimeSpecializationConstCallFolds           AnalysisFact = "RuntimeSpecializationConstCallFolds"
-	AnalysisFactWholeCallNoResultRuntimeSpecializations       AnalysisFact = "WholeCallNoResultRuntimeSpecializations"
-	AnalysisFactWholeCallNoResultRuntimeSpecializationBatches AnalysisFact = "WholeCallNoResultRuntimeSpecializationBatches"
+	AnalysisFactCallABIs                                     AnalysisFact = "CallABIs"
+	AnalysisFactRuntimeSpecializationConstCallFolds          AnalysisFact = "RuntimeSpecializationConstCallFolds"
+	AnalysisFactCallSiteNoResultRuntimeSpecializations       AnalysisFact = "CallSiteNoResultRuntimeSpecializations"
+	AnalysisFactCallSiteNoResultRuntimeSpecializationBatches AnalysisFact = "CallSiteNoResultRuntimeSpecializationBatches"
 
 	AnalysisFactStringConstTables    AnalysisFact = "StringConstTables"
 	AnalysisFactStringFormatPatterns AnalysisFact = "StringFormatPatterns"
@@ -106,7 +106,7 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Owner:       "call",
 		Description: "Call sites have ABI annotations for native lowering and call folds.",
 		Producers:   []string{"CallABI"},
-		Consumers:   []string{"RuntimeSpecializationConstCallFold", "WholeCallRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopKernel", "TableIntArrayKernel"},
+		Consumers:   []string{"RuntimeSpecializationConstCallFold", "CallSiteRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopKernel", "TableIntArrayKernel"},
 	},
 	AnalysisFactRuntimeSpecializationConstCallFolds: {
 		Owner:       "call",
@@ -114,16 +114,16 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Producers:   []string{"RuntimeSpecializationConstCallFold"},
 		Consumers:   []string{"codegen", "diagnostics"},
 	},
-	AnalysisFactWholeCallNoResultRuntimeSpecializations: {
+	AnalysisFactCallSiteNoResultRuntimeSpecializations: {
 		Owner:       "call",
 		Description: "Whole-call no-result runtime specialization exits are annotated.",
-		Producers:   []string{"WholeCallRuntimeSpecializationExit"},
+		Producers:   []string{"CallSiteRuntimeSpecializationExit"},
 		Consumers:   []string{"codegen"},
 	},
-	AnalysisFactWholeCallNoResultRuntimeSpecializationBatches: {
+	AnalysisFactCallSiteNoResultRuntimeSpecializationBatches: {
 		Owner:       "call",
 		Description: "Whole-call no-result runtime specialization batches are annotated.",
-		Producers:   []string{"WholeCallRuntimeSpecializationExit"},
+		Producers:   []string{"CallSiteRuntimeSpecializationExit"},
 		Consumers:   []string{"codegen"},
 	},
 	AnalysisFactStringConstTables: {

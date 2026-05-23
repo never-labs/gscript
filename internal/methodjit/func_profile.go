@@ -498,7 +498,7 @@ func mainProtoHasRecursiveChild(proto *vm.FuncProto) bool {
 		if child == nil {
 			continue
 		}
-		if childHasWholeCallRecursiveProtocol(child) {
+		if childHasCallSiteRecursiveProtocol(child) {
 			hasProtocolChild = true
 			continue
 		}
@@ -533,7 +533,7 @@ func mainProtoHasRecursiveChild(proto *vm.FuncProto) bool {
 	return false
 }
 
-func childHasWholeCallRecursiveProtocol(child *vm.FuncProto) bool {
+func childHasCallSiteRecursiveProtocol(child *vm.FuncProto) bool {
 	return false
 }
 

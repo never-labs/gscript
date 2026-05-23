@@ -12,14 +12,14 @@ type tieringRuntimeSpecializationDecision struct {
 }
 
 func (tm *TieringManager) runtimeSpecializationTieringDecision(proto *vm.FuncProto) (tieringRuntimeSpecializationDecision, bool) {
-	if info, ok := recognizedWholeCallRuntimeSpecializationForTiering(proto); ok {
+	if info, ok := recognizedCallSiteRuntimeSpecializationForTiering(proto); ok {
 		return tieringRuntimeSpecializationDecision{
 			reason:         "whole_call_runtime_specialization",
 			specialization: info.Name,
 			route:          string(info.Route),
 		}, true
 	}
-	if callee, info, ok := tm.wholeCallRuntimeSpecializationCalleeForTiering(proto); ok {
+	if callee, info, ok := tm.callSiteRuntimeSpecializationCalleeForTiering(proto); ok {
 		return tieringRuntimeSpecializationDecision{
 			reason:         "whole_call_runtime_specialization_callee",
 			specialization: info.Name,
@@ -72,8 +72,8 @@ func (tm *TieringManager) disableForRuntimeSpecializationTiering(proto *vm.FuncP
 	tm.traceEvent("fallback", "tier0", proto, fallbackFields)
 }
 
-func recognizedWholeCallRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm.RuntimeSpecializationInfo, bool) {
-	for _, info := range vm.RecognizedWholeCallRuntimeSpecializations(proto) {
+func recognizedCallSiteRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm.RuntimeSpecializationInfo, bool) {
+	for _, info := range vm.RecognizedCallSiteRuntimeSpecializations(proto) {
 		if info.AllowsStructuralTiering(proto) {
 			return info, true
 		}
@@ -81,7 +81,7 @@ func recognizedWholeCallRuntimeSpecializationForTiering(proto *vm.FuncProto) (vm
 	return vm.RuntimeSpecializationInfo{}, false
 }
 
-func (tm *TieringManager) wholeCallRuntimeSpecializationCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.RuntimeSpecializationInfo, bool) {
+func (tm *TieringManager) callSiteRuntimeSpecializationCalleeForTiering(proto *vm.FuncProto) (*vm.FuncProto, vm.RuntimeSpecializationInfo, bool) {
 	if tm == nil || tm.envTier2NoFilter || proto == nil {
 		return nil, vm.RuntimeSpecializationInfo{}, false
 	}
@@ -97,7 +97,7 @@ func (tm *TieringManager) wholeCallRuntimeSpecializationCalleeForTiering(proto *
 		if !ok || callee == nil {
 			continue
 		}
-		if info, ok := recognizedWholeCallRuntimeSpecializationForTiering(callee); ok {
+		if info, ok := recognizedCallSiteRuntimeSpecializationForTiering(callee); ok {
 			return callee, info, true
 		}
 	}

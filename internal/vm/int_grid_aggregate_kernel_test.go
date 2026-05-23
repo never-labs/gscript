@@ -47,8 +47,8 @@ func intGridAggregateTestProto() *FuncProto {
 func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 	aggregate := intGridAggregateTestProto()
 
-	requireRuntimeSpecializationInfo(t, WholeCallRuntimeSpecializationCatalog(), "int_grid_aggregate")
-	requireRuntimeSpecializationInfo(t, RecognizedWholeCallRuntimeSpecializations(aggregate), "int_grid_aggregate")
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "int_grid_aggregate")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(aggregate), "int_grid_aggregate")
 	if !cachedRuntimeSpecializationRecognized(aggregate, runtimeSpecializationIntGridAggregate) {
 		t.Fatal("int_grid_aggregate rejected by runtime specialization cache")
 	}
@@ -56,7 +56,7 @@ func TestIntGridAggregateRuntimeSpecializationDiagnostics(t *testing.T) {
 		t.Fatal("int_grid_aggregate proto-local spec was not generated")
 	}
 
-	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseWholeCallRuntimeSpecializationProto(aggregate), "int_grid_aggregate")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(aggregate), "int_grid_aggregate")
 	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
@@ -67,7 +67,7 @@ func TestIntGridAggregateRuntimeSpecializationRecordsHit(t *testing.T) {
 	defer runtime.DisableRuntimePathStats()
 
 	vm := New(runtime.NewInterpreterGlobals())
-	handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(
+	handled, results, err := vm.tryRunCallSiteValueRuntimeSpecialization(
 		NewClosure(intGridAggregateTestProto()),
 		[]runtime.Value{runtime.IntValue(64), runtime.IntValue(3)},
 		true,
@@ -78,7 +78,7 @@ func TestIntGridAggregateRuntimeSpecializationRecordsHit(t *testing.T) {
 	if !handled || len(results) != 1 || !results[0].IsInt() {
 		t.Fatalf("handled=%v results=%v, want one int result", handled, results)
 	}
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteWholeCallValue, "int_grid_aggregate"); got != 1 {
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "int_grid_aggregate"); got != 1 {
 		t.Fatalf("int_grid_aggregate structural hit count = %d, want 1", got)
 	}
 }

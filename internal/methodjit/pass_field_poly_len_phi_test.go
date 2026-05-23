@@ -9,7 +9,7 @@ import (
 
 func TestFieldPolyLenPhi_ReplacesJoinWithShapeControlledPhi(t *testing.T) {
 	fn := &Function{
-		Proto:               &vm.FuncProto{Name: "field_poly_len_phi", Constants: []runtime.Value{runtime.StringValue("kind")}},
+		Proto: &vm.FuncProto{Name: "field_poly_len_phi", Constants: []runtime.Value{runtime.StringValue("kind")}},
 		Analysis: &AnalysisResult{
 			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{},
 		},

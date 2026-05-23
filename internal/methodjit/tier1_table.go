@@ -634,7 +634,7 @@ func emitBaselineSetTable(asm *jit.Assembler, inst uint32, pc int, feedbackEnabl
 	loadRK(asm, jit.X4, cidx) // X4 = value (NaN-boxed)
 	// Float check: if top bits indicate tagged (int/bool/nil/ptr), not a float → slow.
 	jit.EmitIsTaggedPinned(asm, jit.X4, jit.X5, mRegTagInt) // sets flags: EQ = tagged, NE = float
-	asm.BCond(jit.CondEQ, slowLabel)      // tagged → slow (not a float)
+	asm.BCond(jit.CondEQ, slowLabel)                        // tagged → slow (not a float)
 	// Float64 bits ARE the NaN-boxed representation — store directly.
 	asm.LDR(jit.X2, jit.X0, jit.TableOffFloatArray) // floatArray data pointer
 	asm.STRreg(jit.X4, jit.X2, jit.X1)              // floatArray[key] = float64

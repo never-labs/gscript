@@ -25,7 +25,7 @@ const (
 )
 
 // maxSpectralCoefficientFloats caps the combined A and A^T coefficient cache.
-// The spectral whole-call runtime specialization is dominated by repeated coefficient division
+// The spectral call-site runtime specialization is dominated by repeated coefficient division
 // when the cache is disabled; a 64 MiB budget keeps the hot benchmark sizes on
 // the precomputed matrix-vector path without allowing unbounded O(n^2) memory.
 const maxSpectralCoefficientFloats = 1 << 23
@@ -110,7 +110,7 @@ func (vm *VM) runSpectralAtAv(args []runtime.Value) bool {
 	if !ok {
 		return false
 	}
-	tmp := vm.wholeCallFloatScratch(n)
+	tmp := vm.callSiteFloatScratch(n)
 	a, at, ok := vm.spectralKernel.coefficients(n)
 	if ok {
 		spectralMatrixVector(a, n, v, tmp)

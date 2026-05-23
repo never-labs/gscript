@@ -7,14 +7,14 @@ import (
 )
 
 // RuntimeSpecializationRoute identifies how a structural runtime specialization
-// is reached. Whole-call routes are probed at OP_CALL; driver-loop routes are
+// is reached. Call-site routes are probed at OP_CALL; driver-loop routes are
 // probed at OP_FORPREP.
 type RuntimeSpecializationRoute string
 
 const (
-	RuntimeSpecializationRouteWholeCallValue    RuntimeSpecializationRoute = "whole_call_value"
-	RuntimeSpecializationRouteWholeCallNoResult RuntimeSpecializationRoute = "whole_call_no_result"
-	RuntimeSpecializationRouteDriverLoop        RuntimeSpecializationRoute = "driver_loop"
+	RuntimeSpecializationRouteCallSiteValue    RuntimeSpecializationRoute = "call_site_value"
+	RuntimeSpecializationRouteCallSiteNoResult RuntimeSpecializationRoute = "call_site_no_result"
+	RuntimeSpecializationRouteDriverLoop       RuntimeSpecializationRoute = "driver_loop"
 )
 
 // RuntimeSpecializationCapability identifies cross-package behavior exposed by
@@ -89,8 +89,8 @@ func (info RuntimeSpecializationInfo) AllowsStructuralTiering(proto *FuncProto) 
 // reason.
 type RuntimeSpecializationDiagnostic struct {
 	Specialization RuntimeSpecializationInfo
-	Recognized bool
-	Reason     string
+	Recognized     bool
+	Reason         string
 }
 
 const (
@@ -102,8 +102,8 @@ const (
 	runtimeSpecializationReasonMissingGlobalProtoMap  = "missing_global_proto_map"
 	runtimeSpecializationUnknownDriverLoopArity       = -1
 	runtimeSpecializationUnknownDriverLoopResultCount = -1
-	runtimeSpecializationWholeCallInPlaceResultCount  = 0
-	runtimeSpecializationWholeCallSingleResultCount   = 1
+	runtimeSpecializationCallSiteInPlaceResultCount   = 0
+	runtimeSpecializationCallSiteSingleResultCount    = 1
 )
 
 type runtimeSpecializationFingerprint struct {
@@ -118,20 +118,20 @@ type runtimeSpecializationFingerprint struct {
 	hash         uint64
 }
 
-type wholeCallValueRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, []runtime.Value, error)
-type wholeCallNoResultRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, error)
+type callSiteValueRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, []runtime.Value, error)
+type callSiteNoResultRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, error)
 
-// WholeCallRuntimeSpecializationCatalog returns diagnostic metadata for OP_CALL
+// CallSiteRuntimeSpecializationCatalog returns diagnostic metadata for OP_CALL
 // structural runtime specializations without probing any particular prototype.
-func WholeCallRuntimeSpecializationCatalog() []RuntimeSpecializationInfo {
-	out := make([]RuntimeSpecializationInfo, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
-	for _, entry := range wholeCallValueRuntimeSpecializationRegistry {
+func CallSiteRuntimeSpecializationCatalog() []RuntimeSpecializationInfo {
+	out := make([]RuntimeSpecializationInfo, 0, len(callSiteValueRuntimeSpecializationRegistry)+len(callSiteNoResultRuntimeSpecializationRegistry))
+	for _, entry := range callSiteValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		out = append(out, entry.Info)
 	}
-	for _, entry := range wholeCallNoResultRuntimeSpecializationRegistry {
+	for _, entry := range callSiteNoResultRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
@@ -154,12 +154,12 @@ func DriverLoopRuntimeSpecializationCatalog() []RuntimeSpecializationInfo {
 	return out
 }
 
-// RecognizedWholeCallRuntimeSpecializations returns every registered whole-call runtime specialization whose
+// RecognizedCallSiteRuntimeSpecializations returns every registered call-site runtime specialization whose
 // structural recognizer accepts p. It does not inspect FuncProto.Name or Source.
-func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []RuntimeSpecializationInfo {
+func RecognizedCallSiteRuntimeSpecializations(p *FuncProto) []RuntimeSpecializationInfo {
 	out := make([]RuntimeSpecializationInfo, 0, 1)
 	runtimeRecognized := recognizedRuntimeSpecializationBits(p)
-	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
+	for i, entry := range callSiteValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
@@ -167,8 +167,8 @@ func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []RuntimeSpecializa
 			out = append(out, entry.Info)
 		}
 	}
-	noResultRuntimeRecognized := recognizedWholeCallNoResultRuntimeSpecializationBits(p)
-	for i, entry := range wholeCallNoResultRuntimeSpecializationRegistry {
+	noResultRuntimeRecognized := recognizedCallSiteNoResultRuntimeSpecializationBits(p)
+	for i, entry := range callSiteNoResultRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
@@ -179,33 +179,33 @@ func RecognizedWholeCallRuntimeSpecializations(p *FuncProto) []RuntimeSpecializa
 	return out
 }
 
-// DiagnoseWholeCallRuntimeSpecializationProto reports structural recognizer results for every
-// registered whole-call runtime specialization. It is intended for tests and diagnostics, not
+// DiagnoseCallSiteRuntimeSpecializationProto reports structural recognizer results for every
+// registered call-site runtime specialization. It is intended for tests and diagnostics, not
 // hot dispatch.
-func DiagnoseWholeCallRuntimeSpecializationProto(p *FuncProto) []RuntimeSpecializationDiagnostic {
-	out := make([]RuntimeSpecializationDiagnostic, 0, len(wholeCallValueRuntimeSpecializationRegistry)+len(wholeCallNoResultRuntimeSpecializationRegistry))
+func DiagnoseCallSiteRuntimeSpecializationProto(p *FuncProto) []RuntimeSpecializationDiagnostic {
+	out := make([]RuntimeSpecializationDiagnostic, 0, len(callSiteValueRuntimeSpecializationRegistry)+len(callSiteNoResultRuntimeSpecializationRegistry))
 	runtimeRecognizedBits := recognizedRuntimeSpecializationBits(p)
-	for i, entry := range wholeCallValueRuntimeSpecializationRegistry {
+	for i, entry := range callSiteValueRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		recognized := runtimeRecognizedBits&(uint64(1)<<uint(i)) != 0
 		out = append(out, RuntimeSpecializationDiagnostic{
-			Specialization:     entry.Info,
-			Recognized: recognized,
-			Reason:     runtimeSpecializationReason(p, recognized),
+			Specialization: entry.Info,
+			Recognized:     recognized,
+			Reason:         runtimeSpecializationReason(p, recognized),
 		})
 	}
-	noResultRuntimeRecognizedBits := recognizedWholeCallNoResultRuntimeSpecializationBits(p)
-	for i, entry := range wholeCallNoResultRuntimeSpecializationRegistry {
+	noResultRuntimeRecognizedBits := recognizedCallSiteNoResultRuntimeSpecializationBits(p)
+	for i, entry := range callSiteNoResultRuntimeSpecializationRegistry {
 		if entry.Info.Name == "" {
 			continue
 		}
 		recognized := noResultRuntimeRecognizedBits&(uint64(1)<<uint(i)) != 0
 		out = append(out, RuntimeSpecializationDiagnostic{
-			Specialization:     entry.Info,
-			Recognized: recognized,
-			Reason:     runtimeSpecializationReason(p, recognized),
+			Specialization: entry.Info,
+			Recognized:     recognized,
+			Reason:         runtimeSpecializationReason(p, recognized),
 		})
 	}
 	return out
@@ -326,9 +326,9 @@ func DiagnoseDriverLoopRuntimeSpecializations(proto *FuncProto, globals map[stri
 		}
 		recognized := proto != nil && entry.Recognize != nil && entry.Recognize(proto, globals)
 		out = append(out, RuntimeSpecializationDiagnostic{
-			Specialization:     entry.Info,
-			Recognized: recognized,
-			Reason:     driverLoopRuntimeSpecializationReason(proto, globals, recognized),
+			Specialization: entry.Info,
+			Recognized:     recognized,
+			Reason:         driverLoopRuntimeSpecializationReason(proto, globals, recognized),
 		})
 	}
 	return out

@@ -90,7 +90,7 @@ type BaselineJITEngine struct {
 	// go through the tiering pipeline instead of being locked to Tier 1.
 	outerCompiler func(*vm.FuncProto) interface{}
 	// protocolCallExecutor: when set by TieringManager, handleCall can dispatch
-	// already-compiled whole-call runtime-specialization entries without
+	// already-compiled call-site runtime-specialization entries without
 	// building a VM callee frame.
 	protocolCallExecutor func(runtime.Value, []runtime.Value, int, int, int) (bool, error)
 	// compiledTier2Executor: when set by TieringManager, handleCall can dispatch

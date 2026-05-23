@@ -15,7 +15,7 @@ func TableArrayDataPtrFactPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
-fn.ensureAnalysis()
+	fn.ensureAnalysis()
 	facts := collectTableArrayDataPtrFacts(fn)
 	if len(facts) == 0 {
 		fn.Analysis.TableArrayDataPtrs = nil

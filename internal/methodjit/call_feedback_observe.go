@@ -142,8 +142,8 @@ func mergeTier2CallCacheFeedback(proto *vm.FuncProto, cf *CompiledFunction) {
 			continue
 		}
 		fb.CalleeType.Observe(runtime.TypeFunction)
-		if fb.Count < wholeCallRuntimeSpecializationMinStableObservations {
-			fb.Count = wholeCallRuntimeSpecializationMinStableObservations
+		if fb.Count < callSiteRuntimeSpecializationMinStableObservations {
+			fb.Count = callSiteRuntimeSpecializationMinStableObservations
 		} else {
 			fb.Count += uint32(observed)
 		}
@@ -187,8 +187,8 @@ func mergeBaselineCallCacheFeedback(proto *vm.FuncProto, bf *BaselineFunc) {
 		closure := uintptr(fn.VMClosurePointer())
 		mergeCallFeedbackVMIdentity(fb, callee, closure)
 		fb.CalleeType.Observe(runtime.TypeFunction)
-		if fb.Count < wholeCallRuntimeSpecializationMinStableObservations {
-			fb.Count = wholeCallRuntimeSpecializationMinStableObservations
+		if fb.Count < callSiteRuntimeSpecializationMinStableObservations {
+			fb.Count = callSiteRuntimeSpecializationMinStableObservations
 		} else {
 			fb.Count++
 		}
