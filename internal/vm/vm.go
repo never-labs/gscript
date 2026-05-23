@@ -784,6 +784,21 @@ func (vm *VM) ExecuteStdStringMatchCall(absSlot, nArgs, rawC int) (bool, error) 
 	return true, nil
 }
 
+// ExecuteStdRawGetCall handles rawget(table, key) without allocating the
+// generic native result slice.
+func (vm *VM) ExecuteStdRawGetCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs != 2 || absSlot+2 >= len(vm.regs) {
+		return false, nil
+	}
+	table := vm.regs[absSlot+1]
+	if !table.IsTable() {
+		return true, fmt.Errorf("bad argument #1 to 'rawget' (table expected, got %s)", table.TypeName())
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.writeSingleCallResult(absSlot, rawC, table.Table().RawGet(vm.regs[absSlot+2]))
+	return true, nil
+}
+
 func (vm *VM) luaToString(v runtime.Value) (string, error) {
 	if v.IsTable() {
 		if mt := v.Table().GetMetatable(); mt != nil {
@@ -4073,6 +4088,17 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 								handledSpecial = true
 							}
 						}
+					case runtime.NativeKindStdRawGet:
+						if gf.NativeData == runtime.StdRawGetIdentityPtr() {
+							handled, err := vm.ExecuteStdRawGetCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
 					}
 					if handledSpecial {
 						break
@@ -5030,7 +5056,7 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 	if mt == nil {
 		return runtime.NilValue(), nil
 	}
-	idx := mt.RawGet(runtime.StringValue("__index"))
+	idx := mt.RawGetString("__index")
 	if idx.IsNil() {
 		return runtime.NilValue(), nil
 	}
@@ -5062,7 +5088,7 @@ func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) er
 	if existing.IsNil() {
 		mt := tbl.GetMetatable()
 		if mt != nil {
-			ni := mt.RawGet(runtime.StringValue("__newindex"))
+			ni := mt.RawGetString("__newindex")
 			if !ni.IsNil() {
 				if ni.IsFunction() {
 					args := [3]runtime.Value{t, key, val}
@@ -5272,7 +5298,7 @@ func (vm *VM) length(v runtime.Value) (runtime.Value, error) {
 	if v.IsTable() {
 		mt := v.Table().GetMetatable()
 		if mt != nil {
-			mm := mt.RawGet(runtime.StringValue("__len"))
+			mm := mt.RawGetString("__len")
 			if !mm.IsNil() {
 				args := [1]runtime.Value{v}
 				results, err := vm.callValue(mm, args[:])

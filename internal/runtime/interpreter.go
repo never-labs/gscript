@@ -449,6 +449,8 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return table.Table().RawGet(key), nil
 		},
+		NativeKind: NativeKindStdRawGet,
+		NativeData: StdRawGetIdentityPtr(),
 	}))
 
 	interp.globals.Define("rawset", FunctionValue(&GoFunction{
@@ -1152,7 +1154,7 @@ func (interp *Interpreter) tableGetDepth(t Value, key Value, depth int) (Value, 
 		return NilValue(), nil
 	}
 
-	index := mt.RawGet(StringValue("__index"))
+	index := mt.RawGetString("__index")
 	if index.IsNil() {
 		return NilValue(), nil
 	}
@@ -1200,7 +1202,7 @@ func (interp *Interpreter) tableSetDepth(t Value, key, val Value, depth int) err
 	// Check __newindex
 	mt := tbl.GetMetatable()
 	if mt != nil {
-		newindex := mt.RawGet(StringValue("__newindex"))
+		newindex := mt.RawGetString("__newindex")
 		if newindex.IsFunction() {
 			_, err := interp.callFunction(newindex, []Value{t, key, val})
 			return err
