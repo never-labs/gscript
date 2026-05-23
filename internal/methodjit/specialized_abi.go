@@ -358,7 +358,7 @@ func AnalyzeRawIntSelfABI(proto *vm.FuncProto) RawIntSelfABI {
 }
 
 // AnalyzeTypedSelfABI recognizes fixed-type recursive kernels that can use a
-// private typed self-call ABI. It deliberately excludes pure raw-int kernels,
+// private typed self-call ABI. It deliberately excludes pure raw-int specializations,
 // which are handled by the older numeric ABI. This keeps the first typed-table
 // contract narrow: it is for recursive functions with at least one table
 // parameter or a table return, such as makeTree(int)->table and

@@ -2569,7 +2569,7 @@ func rawIntPeerLeafCallee(proto *vm.FuncProto) bool {
 	if proto == nil {
 		return false
 	}
-	// Leaf raw-int kernels cannot recursively grow the native BLR chain. They
+	// Leaf raw-int specializations cannot recursively grow the native BLR chain. They
 	// still use one numeric entry frame, but repeated loop calls do not stack,
 	// so the per-call NativeCallDepth load/store traffic is unnecessary.
 	for _, inst := range proto.Code {

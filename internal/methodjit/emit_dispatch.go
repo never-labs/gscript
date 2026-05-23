@@ -78,7 +78,7 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if ec.emitGlobalInstr(instr) {
 		goto done
 	}
-	if ec.emitKernelInstr(instr, block) {
+	if ec.emitSpecializationInstr(instr, block) {
 		goto done
 	}
 	if ec.emitControlInstr(instr, block) {

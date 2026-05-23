@@ -74,14 +74,14 @@ func runNumericArrayRegionSortWithScratch(args []runtime.Value, intScratch func(
 		return false
 	}
 	tbl := args[0].Table()
-	if region, ok := tbl.PlainIntArrayRegionForNumericKernel(int(lo64), int(hi64)); ok {
+	if region, ok := tbl.PlainIntArrayRegionForNumericSpecialization(int(lo64), int(hi64)); ok {
 		sortPlainIntRegionWithScratch(region, intScratch)
-		tbl.MarkArrayMutationForNumericKernel()
+		tbl.MarkArrayMutationForNumericSpecialization()
 		return true
 	}
-	if region, ok := tbl.PlainNumericValueArrayRegionForNumericKernel(int(lo64), int(hi64)); ok {
+	if region, ok := tbl.PlainNumericValueArrayRegionForNumericSpecialization(int(lo64), int(hi64)); ok {
 		runNumericValueRegionSortWithScratch(region, valueScratch)
-		tbl.MarkArrayMutationForNumericKernel()
+		tbl.MarkArrayMutationForNumericSpecialization()
 		return true
 	}
 	return false

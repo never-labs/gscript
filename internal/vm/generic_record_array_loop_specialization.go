@@ -239,7 +239,7 @@ func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []
 	if limit < 0 {
 		return false, nil
 	}
-	array, ok := tableVal.Table().PlainArrayValuesForRecordKernel(limit)
+	array, ok := tableVal.Table().PlainArrayValuesForRecordSpecialization(limit)
 	if !ok {
 		return false, nil
 	}
@@ -358,7 +358,7 @@ func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []
 			}
 		}
 	}
-	tableVal.Table().MarkArrayMutationForNumericKernel()
+	tableVal.Table().MarkArrayMutationForNumericSpecialization()
 	return true, nil
 }
 
@@ -369,7 +369,7 @@ func (vm *VM) runGenericRecordArrayAffineSpecializationN(table *runtime.Table, a
 			if !rowVal.IsTable() {
 				return false, nil
 			}
-			svals, ok := rowVal.Table().NumericSvalsForRecordKernel(shapeID)
+			svals, ok := rowVal.Table().NumericSvalsForRecordSpecialization(shapeID)
 			if !ok {
 				return false, nil
 			}
@@ -397,7 +397,7 @@ func (vm *VM) runGenericRecordArrayAffineSpecializationN(table *runtime.Table, a
 			}
 		}
 	}
-	table.MarkArrayMutationForNumericKernel()
+	table.MarkArrayMutationForNumericSpecialization()
 	return true, nil
 }
 
@@ -423,7 +423,7 @@ func (vm *VM) runGenericRecordArrayNativeSpecializationN(table *runtime.Table, a
 		if !rowVal.IsTable() {
 			return false, nil
 		}
-		svals, ok := rowVal.Table().NumericSvalsForRecordKernel(cache.shapeID)
+		svals, ok := rowVal.Table().NumericSvalsForRecordSpecialization(cache.shapeID)
 		if !ok {
 			return false, nil
 		}
@@ -463,7 +463,7 @@ func (vm *VM) runGenericRecordArrayNativeSpecializationN(table *runtime.Table, a
 		}
 	}
 	jit.CallJIT(uintptr(cache.native.code.Ptr()), uintptr(unsafe.Pointer(&ctx)))
-	table.MarkArrayMutationForNumericKernel()
+	table.MarkArrayMutationForNumericSpecialization()
 	runtime.RecordRuntimePathRuntimeSpecializationHit(string(RuntimeSpecializationRouteDriverLoop), "generic_record_array_native_loop")
 	return true, nil
 }

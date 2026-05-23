@@ -24,7 +24,7 @@ const (
 	OpEmitterSlot
 	OpEmitterArithmetic
 	OpEmitterMatrix
-	OpEmitterKernel
+	OpEmitterSpecialization
 	OpEmitterCompare
 	OpEmitterString
 	OpEmitterTable
@@ -142,9 +142,9 @@ var opSpecs = [...]OpSpec{
 	OpMatrixStoreFRowConst:          opSpec("MatrixStoreFRowConst", OpEmitterMatrix, OpArgFixedAux, OpSideEffectWrite, false),
 	OpFMA:                           opSpec("FMA", OpEmitterArithmetic, OpArgFixed, OpSideEffectNone, false),
 	OpFMSUB:                         opSpec("FMSUB", OpEmitterArithmetic, OpArgFixed, OpSideEffectNone, false),
-	OpComplexEscapeInSet:            opSpec("ComplexEscapeInSet", OpEmitterKernel, OpArgFixedAux, OpSideEffectNone, false),
-	OpComplexEscapeRowCount:         opSpec("ComplexEscapeRowCount", OpEmitterKernel, OpArgFixedAux, OpSideEffectNone, false),
-	OpRecordArrayLoopSpecialization: opSpec("RecordArrayLoopSpecialization", OpEmitterKernel, OpArgVariadicAux, OpSideEffectReadWrite, true),
+	OpComplexEscapeInSet:            opSpec("ComplexEscapeInSet", OpEmitterSpecialization, OpArgFixedAux, OpSideEffectNone, false),
+	OpComplexEscapeRowCount:         opSpec("ComplexEscapeRowCount", OpEmitterSpecialization, OpArgFixedAux, OpSideEffectNone, false),
+	OpRecordArrayLoopSpecialization: opSpec("RecordArrayLoopSpecialization", OpEmitterSpecialization, OpArgVariadicAux, OpSideEffectReadWrite, true),
 	OpEq:                            opSpec("Eq", OpEmitterCompare, OpArgFixed, OpSideEffectNone, true),
 	OpLt:                            opSpec("Lt", OpEmitterCompare, OpArgFixed, OpSideEffectNone, true),
 	OpLe:                            opSpec("Le", OpEmitterCompare, OpArgFixed, OpSideEffectNone, true),

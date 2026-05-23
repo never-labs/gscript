@@ -1083,7 +1083,7 @@ type emitContext struct {
 	rawIntSelfABI RawIntSelfABI
 
 	// typedSelfABI describes the private typed self-recursive entry for
-	// recursive table/int kernels that are not pure raw-int numeric kernels.
+	// recursive table/int specializations that are not pure raw-int numeric kernels.
 	typedSelfABI TypedSelfABI
 
 	// entryShapeGuards are callee-entry table shape guards keyed by parameter

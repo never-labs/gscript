@@ -12,7 +12,7 @@ import (
 // Keep the native call-site builder bounded by a practical allocation limit.
 // depth=20 is already roughly two million nodes; deeper inputs fall back to the
 // interpreter so unusual programs keep normal VM semantics instead of letting a
-// specialized protocol monopolize the process.
+// specialized runtime path monopolize the process.
 const runtimeRecursiveTableBuilderMaxDepth = 20
 
 type runtimeRecursiveTableBuilderProtocol struct {

@@ -2,7 +2,7 @@
 
 package methodjit
 
-func (ec *emitContext) emitKernelInstr(instr *Instr, _ *Block) bool {
+func (ec *emitContext) emitSpecializationInstr(instr *Instr, _ *Block) bool {
 	switch instr.Op {
 	case OpComplexEscapeInSet:
 		ec.emitComplexEscapeInSet(instr)

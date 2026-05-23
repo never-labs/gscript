@@ -1018,7 +1018,7 @@ result = sum(100)
 }
 
 // TestTieringManager_SmartPromotion_GCDStaysTier1 verifies gcd-shaped raw-int
-// while kernels stay on the Tier 1 boxed-call path. This body is not recursive,
+// while specializations stay on the Tier 1 boxed-call path. This body is not recursive,
 // so the recursive raw-int entry/peer-call ABI does not apply.
 func TestTieringManager_SmartPromotion_GCDStaysTier1(t *testing.T) {
 	src := `
@@ -1052,7 +1052,7 @@ result = gcd(12, 8)
 	gcdProto := proto.Protos[0]
 	profile := tm.getProfile(gcdProto)
 	if shouldPromoteTier2(gcdProto, profile, 2) {
-		t.Error("smart tiering should keep gcd-shaped boxed raw-int kernels in Tier 1")
+		t.Error("smart tiering should keep gcd-shaped boxed raw-int specializations in Tier 1")
 	}
 	if tm.tier2Compiled[gcdProto] != nil || tm.tier2Failed[gcdProto] {
 		t.Fatalf("expected gcd to avoid Tier 2 attempt, compiled=%v failed=%v",

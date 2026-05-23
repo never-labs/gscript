@@ -121,7 +121,7 @@ func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtim
 	if n < 0 || n > 64 {
 		return false, nil
 	}
-	bodyArray, ok := bodiesTable.PlainArrayValuesForRecordKernel(n)
+	bodyArray, ok := bodiesTable.PlainArrayValuesForRecordSpecialization(n)
 	if !ok {
 		return false, nil
 	}
@@ -162,7 +162,7 @@ func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtim
 			}
 		}
 		var fields [pairwiseFieldCount]float64
-		if !t.LoadFloatRecordForNumericKernel(cache.shapeID, cache.idxs[:], fields[:]) {
+		if !t.LoadFloatRecordForNumericSpecialization(cache.shapeID, cache.idxs[:], fields[:]) {
 			return false, nil
 		}
 		bodyTables[i] = t
@@ -199,11 +199,11 @@ func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtim
 	storeIdxs := cache.idxs[:pairwiseFieldMass]
 	for i := 0; i < n; i++ {
 		vals := [...]float64{xs[i], ys[i], zs[i], vxs[i], vys[i], vzs[i]}
-		if !bodyTables[i].StoreFloatRecordForNumericKernel(cache.shapeID, storeIdxs, vals[:]) {
+		if !bodyTables[i].StoreFloatRecordForNumericSpecialization(cache.shapeID, storeIdxs, vals[:]) {
 			return false, nil
 		}
 	}
-	bodiesTable.MarkArrayMutationForNumericKernel()
+	bodiesTable.MarkArrayMutationForNumericSpecialization()
 	return true, nil
 }
 
@@ -219,7 +219,7 @@ func (vm *VM) runDenseRecordMatrixAdvanceSpecializationN(args []runtime.Value, s
 	if !ok || !bodiesVal.IsTable() {
 		return false, nil
 	}
-	flat, stride, ok := bodiesVal.Table().DenseFloatMatrixForNumericKernel(n, pairwiseFieldCount)
+	flat, stride, ok := bodiesVal.Table().DenseFloatMatrixForNumericSpecialization(n, pairwiseFieldCount)
 	if !ok || stride < pairwiseFieldCount {
 		return false, nil
 	}
@@ -270,7 +270,7 @@ func (vm *VM) runDenseRecordMatrixAdvanceSpecializationN(args []runtime.Value, s
 			flat[b+fz] += dt * flat[b+fvz]
 		}
 	}
-	bodiesVal.Table().MarkArrayMutationForNumericKernel()
+	bodiesVal.Table().MarkArrayMutationForNumericSpecialization()
 	return true, nil
 }
 

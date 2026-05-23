@@ -78,7 +78,7 @@ func firstResidualRawIntSpecializationGenericNumericGate(fn *Function) GateResul
 		for _, instr := range block.Instrs {
 			switch instr.Op {
 			case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm:
-				return blockGateOp("RawIntSpecializationIR", "raw-int kernel has residual generic numeric op", instr.Op)
+				return blockGateOp("RawIntSpecializationIR", "raw-int specialization has residual generic numeric op", instr.Op)
 			}
 		}
 	}

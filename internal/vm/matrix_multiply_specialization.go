@@ -56,17 +56,17 @@ func (vm *VM) runMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime
 	if handled, results := vm.runDenseMatrixMultiplyRuntimeSpecialization(args[0].Table(), args[1].Table(), n); handled {
 		return true, results, nil
 	}
-	aRows, ok := args[0].Table().PlainFloatMatrixRowsForNumericKernel(n, n)
+	aRows, ok := args[0].Table().PlainFloatMatrixRowsForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil, nil
 	}
-	bRows, ok := args[1].Table().PlainFloatMatrixRowsForNumericKernel(n, n)
+	bRows, ok := args[1].Table().PlainFloatMatrixRowsForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil, nil
 	}
 
 	c := runtime.NewDenseMatrix(n, n)
-	cFlat, cStride, ok := c.DenseFloatMatrixForNumericKernel(n, n)
+	cFlat, cStride, ok := c.DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil, nil
 	}
@@ -133,16 +133,16 @@ func (vm *VM) runMatrixMultiplyRuntimeSpecialization(cl *Closure, args []runtime
 }
 
 func (vm *VM) runDenseMatrixMultiplyRuntimeSpecialization(aTable, bTable *runtime.Table, n int) (bool, []runtime.Value) {
-	aFlat, aStride, ok := aTable.DenseFloatMatrixForNumericKernel(n, n)
+	aFlat, aStride, ok := aTable.DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil
 	}
-	bFlat, bStride, ok := bTable.DenseFloatMatrixForNumericKernel(n, n)
+	bFlat, bStride, ok := bTable.DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil
 	}
 	c := runtime.NewDenseMatrix(n, n)
-	cFlat, cStride, ok := c.DenseFloatMatrixForNumericKernel(n, n)
+	cFlat, cStride, ok := c.DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil
 	}
@@ -219,15 +219,15 @@ func (vm *VM) runDenseMatrixMultiplyTransposedRuntimeSpecialization(cl *Closure,
 		return false, nil
 	}
 	n := int(n64)
-	aFlat, aStride, ok := args[0].Table().DenseFloatMatrixForNumericKernel(n, n)
+	aFlat, aStride, ok := args[0].Table().DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil
 	}
-	btFlat, btStride, ok := args[1].Table().DenseFloatMatrixForNumericKernel(n, n)
+	btFlat, btStride, ok := args[1].Table().DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil
 	}
-	cFlat, cStride, ok := args[2].Table().DenseFloatMatrixForNumericKernel(n, n)
+	cFlat, cStride, ok := args[2].Table().DenseFloatMatrixForNumericSpecialization(n, n)
 	if !ok {
 		return false, nil
 	}

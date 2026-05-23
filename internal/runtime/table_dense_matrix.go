@@ -233,11 +233,11 @@ func NewDenseMatrix(rows, cols int) *Table {
 	return outer
 }
 
-// DenseFloatMatrixForNumericKernel exposes a DenseMatrix flat backing to
+// DenseFloatMatrixForNumericSpecialization exposes a DenseMatrix flat backing to
 // guarded whole-call kernels. The view is valid only when ordinary t[i][j]
 // indexing for the requested rectangle is known to hit the dense backing
 // without metatable, lazy, or concurrent table behavior.
-func (t *Table) DenseFloatMatrixForNumericKernel(rows, cols int) ([]float64, int, bool) {
+func (t *Table) DenseFloatMatrixForNumericSpecialization(rows, cols int) ([]float64, int, bool) {
 	if rows < 0 || cols < 0 || t == nil || t.mu != nil || t.lazyTree != nil ||
 		t.metatable != nil || t.arrayKind != ArrayMixed {
 		return nil, 0, false
@@ -253,10 +253,10 @@ func (t *Table) DenseFloatMatrixForNumericKernel(rows, cols int) ([]float64, int
 	return t.dmMeta.backing, stride, true
 }
 
-// PlainFloatMatrixRowsForNumericKernel exposes row slices for a guarded
+// PlainFloatMatrixRowsForNumericSpecialization exposes row slices for a guarded
 // table-of-float-rows matrix. It deliberately rejects any outer or row shape
 // that could require metamethods, lazy materialization, or table locks.
-func (t *Table) PlainFloatMatrixRowsForNumericKernel(rows, cols int) ([][]float64, bool) {
+func (t *Table) PlainFloatMatrixRowsForNumericSpecialization(rows, cols int) ([][]float64, bool) {
 	if rows < 0 || cols < 0 || t == nil || t.mu != nil || t.lazyTree != nil ||
 		t.metatable != nil || t.arrayKind != ArrayMixed || len(t.array) < rows {
 		return nil, false
@@ -267,7 +267,7 @@ func (t *Table) PlainFloatMatrixRowsForNumericKernel(rows, cols int) ([][]float6
 		if row == nil {
 			return nil, false
 		}
-		vals, ok := row.PlainFloatArrayForNumericKernel(cols)
+		vals, ok := row.PlainFloatArrayForNumericSpecialization(cols)
 		if !ok {
 			return nil, false
 		}

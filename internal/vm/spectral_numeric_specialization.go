@@ -117,7 +117,7 @@ func (vm *VM) runSpectralAtAv(args []runtime.Value) bool {
 	} else {
 		spectralAvInto(n, v, tmp)
 	}
-	args[2].Table().MarkArrayMutationForNumericKernel()
+	args[2].Table().MarkArrayMutationForNumericSpecialization()
 	if ok {
 		spectralMatrixVector(at, n, tmp, atav)
 	} else {
@@ -147,7 +147,7 @@ func (vm *VM) runSpectralMultiply(args []runtime.Value, kind spectralMultiplyKin
 	if !ok {
 		return false
 	}
-	args[2].Table().MarkArrayMutationForNumericKernel()
+	args[2].Table().MarkArrayMutationForNumericSpecialization()
 	a, at, ok := vm.spectralCoefficients.cached(n)
 	if ok {
 		if kind == spectralAtv {
@@ -329,11 +329,11 @@ func spectralSpecializationArgs(args []runtime.Value) (int, []float64, []float64
 		return 0, nil, nil, false
 	}
 	n := int(n64)
-	v, ok := args[1].Table().PlainFloatArrayForNumericKernel(n)
+	v, ok := args[1].Table().PlainFloatArrayForNumericSpecialization(n)
 	if !ok {
 		return 0, nil, nil, false
 	}
-	out, ok := args[2].Table().PlainFloatArrayForNumericKernel(n)
+	out, ok := args[2].Table().PlainFloatArrayForNumericSpecialization(n)
 	if !ok {
 		return 0, nil, nil, false
 	}
@@ -350,15 +350,15 @@ func denseSpectralAtAvSpecializationArgs(args []runtime.Value) (int, []float64, 
 		return 0, nil, nil, nil, false
 	}
 	n := int(n64)
-	v, stride, ok := args[1].Table().DenseFloatMatrixForNumericKernel(n, 1)
+	v, stride, ok := args[1].Table().DenseFloatMatrixForNumericSpecialization(n, 1)
 	if !ok || stride != 1 {
 		return 0, nil, nil, nil, false
 	}
-	tmp, stride, ok := args[2].Table().DenseFloatMatrixForNumericKernel(n, 1)
+	tmp, stride, ok := args[2].Table().DenseFloatMatrixForNumericSpecialization(n, 1)
 	if !ok || stride != 1 {
 		return 0, nil, nil, nil, false
 	}
-	atav, stride, ok := args[3].Table().DenseFloatMatrixForNumericKernel(n, 1)
+	atav, stride, ok := args[3].Table().DenseFloatMatrixForNumericSpecialization(n, 1)
 	if !ok || stride != 1 {
 		return 0, nil, nil, nil, false
 	}

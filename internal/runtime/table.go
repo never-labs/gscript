@@ -1956,12 +1956,12 @@ func (t *Table) GetArrayKind() ArrayKind {
 	return t.arrayKind
 }
 
-// PlainFloatArrayForNumericKernel exposes the backing float array for guarded
-// whole-function numeric kernels. It is intentionally narrower than RawGetInt:
+// PlainFloatArrayForNumericSpecialization exposes the backing float array for guarded
+// whole-function numeric specializations. It is intentionally narrower than RawGetInt:
 // callers may only use the slice when ordinary table indexing for keys
 // 0..n-1 is known to hit a plain, non-concurrent, non-lazy float array without
 // metamethod fallback.
-func (t *Table) PlainFloatArrayForNumericKernel(n int) ([]float64, bool) {
+func (t *Table) PlainFloatArrayForNumericSpecialization(n int) ([]float64, bool) {
 	if n < 0 || t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.arrayKind != ArrayFloat {
 		return nil, false
 	}
@@ -1974,11 +1974,11 @@ func (t *Table) PlainFloatArrayForNumericKernel(n int) ([]float64, bool) {
 	return t.floatArray, true
 }
 
-// PlainArrayValuesForRecordKernel exposes the mixed array prefix for guarded
-// whole-call record kernels. It is intentionally narrow: callers may only use
+// PlainArrayValuesForRecordSpecialization exposes the mixed array prefix for guarded
+// whole-call record specializations. It is intentionally narrow: callers may only use
 // it when ordinary table indexing for keys 1..n is known to hit a plain mixed
 // array without metamethod or concurrent-table fallback.
-func (t *Table) PlainArrayValuesForRecordKernel(n int) ([]Value, bool) {
+func (t *Table) PlainArrayValuesForRecordSpecialization(n int) ([]Value, bool) {
 	if n < 0 || t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.arrayKind != ArrayMixed {
 		return nil, false
 	}
@@ -1988,10 +1988,10 @@ func (t *Table) PlainArrayValuesForRecordKernel(n int) ([]Value, bool) {
 	return t.array, true
 }
 
-// LoadFloatRecordForNumericKernel copies numeric string fields from a stable
+// LoadFloatRecordForNumericSpecialization copies numeric string fields from a stable
 // small-field record into out. Int fields are accepted with normal numeric
 // widening; non-numeric fields make the guard fail.
-func (t *Table) LoadFloatRecordForNumericKernel(shapeID uint32, idxs []int, out []float64) bool {
+func (t *Table) LoadFloatRecordForNumericSpecialization(shapeID uint32, idxs []int, out []float64) bool {
 	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.shapeID == 0 || t.shapeID != shapeID {
 		return false
 	}
@@ -2015,10 +2015,10 @@ func (t *Table) LoadFloatRecordForNumericKernel(shapeID uint32, idxs []int, out 
 	return true
 }
 
-// StoreFloatRecordForNumericKernel writes float fields back to a stable
+// StoreFloatRecordForNumericSpecialization writes float fields back to a stable
 // small-field record. Shape and table-kind guards are repeated so a stale
 // cached plan cannot write through a mutated table layout.
-func (t *Table) StoreFloatRecordForNumericKernel(shapeID uint32, idxs []int, vals []float64) bool {
+func (t *Table) StoreFloatRecordForNumericSpecialization(shapeID uint32, idxs []int, vals []float64) bool {
 	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.shapeID == 0 || t.shapeID != shapeID {
 		return false
 	}
@@ -2035,18 +2035,18 @@ func (t *Table) StoreFloatRecordForNumericKernel(shapeID uint32, idxs []int, val
 	return true
 }
 
-// NumericSvalsForRecordKernel exposes the string-field value slice for guarded
-// runtime-generated numeric record kernels after validating the table shape.
-func (t *Table) NumericSvalsForRecordKernel(shapeID uint32) ([]Value, bool) {
+// NumericSvalsForRecordSpecialization exposes the string-field value slice for guarded
+// runtime-generated numeric record specializations after validating the table shape.
+func (t *Table) NumericSvalsForRecordSpecialization(shapeID uint32) ([]Value, bool) {
 	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.shapeID == 0 || t.shapeID != shapeID {
 		return nil, false
 	}
 	return t.svals, true
 }
 
-// MarkArrayMutationForNumericKernel mirrors RawSetInt's observable iteration
-// invalidation for guarded kernels that overwrite existing array slots.
-func (t *Table) MarkArrayMutationForNumericKernel() {
+// MarkArrayMutationForNumericSpecialization mirrors RawSetInt's observable iteration
+// invalidation for guarded specializations that overwrite existing array slots.
+func (t *Table) MarkArrayMutationForNumericSpecialization() {
 	t.keysDirty = true
 }
 

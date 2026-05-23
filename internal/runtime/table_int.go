@@ -151,12 +151,12 @@ func tableArraySetPath(key int64, val Value, arrLen int64) {
 	RecordRuntimePathTableArraySetFallback()
 }
 
-// PlainIntArrayRegionForNumericKernel exposes an inclusive int-array region for
+// PlainIntArrayRegionForNumericSpecialization exposes an inclusive int-array region for
 // guarded whole-function kernels. It only succeeds when ordinary integer table
 // indexing for every key in [lo, hi] is known to hit the plain typed-array
 // backing without metatable fallback, table materialization, locking, or kind
 // conversion.
-func (t *Table) PlainIntArrayRegionForNumericKernel(lo, hi int) ([]int64, bool) {
+func (t *Table) PlainIntArrayRegionForNumericSpecialization(lo, hi int) ([]int64, bool) {
 	if lo < 0 || hi < lo || t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.arrayKind != ArrayInt {
 		return nil, false
 	}
@@ -169,12 +169,12 @@ func (t *Table) PlainIntArrayRegionForNumericKernel(lo, hi int) ([]int64, bool) 
 	return t.intArray[lo : hi+1], true
 }
 
-// PlainNumericValueArrayRegionForNumericKernel exposes an inclusive mixed-array
-// region for guarded whole-function numeric kernels. It only succeeds when
+// PlainNumericValueArrayRegionForNumericSpecialization exposes an inclusive mixed-array
+// region for guarded whole-function numeric specializations. It only succeeds when
 // every ordinary integer lookup in [lo, hi] hits a present numeric Value in the
 // mixed array backing. Callers that mutate the returned slice must preserve
 // Value boxes exactly.
-func (t *Table) PlainNumericValueArrayRegionForNumericKernel(lo, hi int) ([]Value, bool) {
+func (t *Table) PlainNumericValueArrayRegionForNumericSpecialization(lo, hi int) ([]Value, bool) {
 	if lo < 0 || hi < lo || t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil || t.arrayKind != ArrayMixed {
 		return nil, false
 	}

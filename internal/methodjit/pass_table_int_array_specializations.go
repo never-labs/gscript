@@ -20,7 +20,7 @@ import "github.com/gscript/gscript/internal/vm"
 //	    dst[i] = src[i]
 //	}
 //
-// The rewritten preheader first tries a guarded native kernel. On success it
+// The rewritten preheader first tries a guarded native specialization. On success it
 // branches to the original loop exit; on failure it branches to the original
 // loop header. Prefix reversal accepts general int-array-shaped loops; prefix
 // copy is limited to local work tables so its scalar fallback cannot be asked
