@@ -219,7 +219,7 @@ func tier2CallLoweringModules(protocolGlobals map[string]*vm.FuncProto) []Tier2O
 			Name:     "WholeCallRuntimeSpecializationExit",
 			Phase:    Tier2PhaseCallLower,
 			Requires: analysisFacts(AnalysisFactCallABIs),
-			Provides: analysisFacts(AnalysisFactWholeCallNoResultKernels, AnalysisFactWholeCallNoResultBatches),
+			Provides: analysisFacts(AnalysisFactWholeCallNoResultRuntimeSpecializations, AnalysisFactWholeCallNoResultRuntimeSpecializationBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return WholeCallRuntimeSpecializationExitPass(protocolGlobals)(fn)
 			},
@@ -288,7 +288,7 @@ func tier2FinalCallModules(protocolGlobals map[string]*vm.FuncProto) []Tier2Opti
 			Name:     "WholeCallRuntimeSpecializationExit (final)",
 			Phase:    Tier2PhaseFinalCall,
 			Requires: analysisFacts(AnalysisFactCallABIs),
-			Updates:  analysisFacts(AnalysisFactWholeCallNoResultKernels, AnalysisFactWholeCallNoResultBatches),
+			Updates:  analysisFacts(AnalysisFactWholeCallNoResultRuntimeSpecializations, AnalysisFactWholeCallNoResultRuntimeSpecializationBatches),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				return WholeCallRuntimeSpecializationExitPass(protocolGlobals)(fn)
 			},

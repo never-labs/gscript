@@ -13,7 +13,7 @@ func (ec *emitContext) emitWholeCallRuntimeSpecializationOpExitIfEligible(instr 
 		return false
 	}
 	callFacts := functionCallFacts(ec.fn)
-	if !callFacts.WholeCallNoResultKernel(instr.ID) {
+	if !callFacts.WholeCallNoResultRuntimeSpecialization(instr.ID) {
 		return false
 	}
 	funcSlot := int(instr.Aux)
@@ -61,7 +61,7 @@ func (ec *emitContext) emitWholeCallRuntimeSpecializationOpExitIfEligible(instr 
 	asm.Label(continueLabel)
 	ec.emitReloadAllActiveRegs()
 	ec.invalidateCallClobberedFactsAfterResume()
-	if fact, ok := callFacts.WholeCallNoResultBatch(instr.ID); ok && fact.ExitPC > 0 {
+	if fact, ok := callFacts.WholeCallNoResultRuntimeSpecializationBatch(instr.ID); ok && fact.ExitPC > 0 {
 		if target := ec.blockLabelAtOrAfterSourcePC(fact.ExitPC); target != "" {
 			noBatchLabel := ec.uniqueLabel("wholecall_no_batch")
 			asm.LDR(jit.X0, mRegCtx, execCtxOffOpExitAux)

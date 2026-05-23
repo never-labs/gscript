@@ -26,10 +26,10 @@ const (
 
 	AnalysisFactSpecDependencyProtos AnalysisFact = "SpecDependencyProtos"
 
-	AnalysisFactCallABIs                 AnalysisFact = "CallABIs"
-	AnalysisFactProtocolConstCallFolds   AnalysisFact = "ProtocolConstCallFolds"
-	AnalysisFactWholeCallNoResultKernels AnalysisFact = "WholeCallNoResultKernels"
-	AnalysisFactWholeCallNoResultBatches AnalysisFact = "WholeCallNoResultBatches"
+	AnalysisFactCallABIs                                      AnalysisFact = "CallABIs"
+	AnalysisFactProtocolConstCallFolds                        AnalysisFact = "ProtocolConstCallFolds"
+	AnalysisFactWholeCallNoResultRuntimeSpecializations       AnalysisFact = "WholeCallNoResultRuntimeSpecializations"
+	AnalysisFactWholeCallNoResultRuntimeSpecializationBatches AnalysisFact = "WholeCallNoResultRuntimeSpecializationBatches"
 
 	AnalysisFactStringConstTables    AnalysisFact = "StringConstTables"
 	AnalysisFactStringFormatPatterns AnalysisFact = "StringFormatPatterns"
@@ -114,15 +114,15 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Producers:   []string{"ProtocolConstCallFold"},
 		Consumers:   []string{"codegen", "diagnostics"},
 	},
-	AnalysisFactWholeCallNoResultKernels: {
+	AnalysisFactWholeCallNoResultRuntimeSpecializations: {
 		Owner:       "call",
-		Description: "Whole-call no-result kernel exits are annotated.",
+		Description: "Whole-call no-result runtime specialization exits are annotated.",
 		Producers:   []string{"WholeCallRuntimeSpecializationExit"},
 		Consumers:   []string{"codegen"},
 	},
-	AnalysisFactWholeCallNoResultBatches: {
+	AnalysisFactWholeCallNoResultRuntimeSpecializationBatches: {
 		Owner:       "call",
-		Description: "Whole-call no-result kernel batches are annotated.",
+		Description: "Whole-call no-result runtime specialization batches are annotated.",
 		Producers:   []string{"WholeCallRuntimeSpecializationExit"},
 		Consumers:   []string{"codegen"},
 	},

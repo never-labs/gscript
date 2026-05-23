@@ -34,12 +34,12 @@ func AnnotateWholeCallRuntimeSpecializationExits(fn *Function, globals map[strin
 		}
 	}
 	if len(kernels) == 0 {
-		callFacts.SetWholeCallNoResultKernels(nil)
-		callFacts.SetWholeCallNoResultBatches(nil)
+		callFacts.SetWholeCallNoResultRuntimeSpecializations(nil)
+		callFacts.SetWholeCallNoResultRuntimeSpecializationBatches(nil)
 		return fn
 	}
-	callFacts.SetWholeCallNoResultKernels(kernels)
-	callFacts.SetWholeCallNoResultBatches(buildWholeCallNoResultBatches(fn, globals, kernels))
+	callFacts.SetWholeCallNoResultRuntimeSpecializations(kernels)
+	callFacts.SetWholeCallNoResultRuntimeSpecializationBatches(buildWholeCallNoResultRuntimeSpecializationBatches(fn, globals, kernels))
 	return fn
 }
 
@@ -97,7 +97,7 @@ func protoReturnsNoValuesWithArity(proto *vm.FuncProto, nArgs int) bool {
 	return seenReturn
 }
 
-func buildWholeCallNoResultBatches(fn *Function, globals map[string]*vm.FuncProto, kernels map[int]bool) map[int]WholeCallNoResultBatchFact {
+func buildWholeCallNoResultRuntimeSpecializationBatches(fn *Function, globals map[string]*vm.FuncProto, kernels map[int]bool) map[int]WholeCallNoResultRuntimeSpecializationBatchFact {
 	if fn == nil || fn.Proto == nil || len(kernels) == 0 {
 		return nil
 	}
@@ -109,7 +109,7 @@ func buildWholeCallNoResultBatches(fn *Function, globals map[string]*vm.FuncProt
 			}
 		}
 	}
-	out := make(map[int]WholeCallNoResultBatchFact)
+	out := make(map[int]WholeCallNoResultRuntimeSpecializationBatchFact)
 	code := fn.Proto.Code
 	for pc, inst := range code {
 		if vm.DecodeOp(inst) != vm.OP_FORLOOP {
@@ -120,7 +120,7 @@ func buildWholeCallNoResultBatches(fn *Function, globals map[string]*vm.FuncProt
 			continue
 		}
 		loopBase := vm.DecodeA(inst)
-		var calls []WholeCallNoResultBatchCall
+		var calls []WholeCallNoResultRuntimeSpecializationBatchCall
 		var last *Instr
 		ok := true
 		for callPC := loopStart; callPC < pc; callPC++ {
@@ -144,7 +144,7 @@ func buildWholeCallNoResultBatches(fn *Function, globals map[string]*vm.FuncProt
 		if !ok || last == nil || len(calls) == 0 {
 			continue
 		}
-		out[last.ID] = WholeCallNoResultBatchFact{
+		out[last.ID] = WholeCallNoResultRuntimeSpecializationBatchFact{
 			LoopBase: loopBase,
 			ExitPC:   pc + 1,
 			Calls:    calls,
@@ -156,24 +156,24 @@ func buildWholeCallNoResultBatches(fn *Function, globals map[string]*vm.FuncProt
 	return out
 }
 
-func wholeCallNoResultGlobalCallRecipe(proto *vm.FuncProto, code []uint32, loopStart, callPC int, globals map[string]*vm.FuncProto) (WholeCallNoResultBatchCall, bool) {
+func wholeCallNoResultGlobalCallRecipe(proto *vm.FuncProto, code []uint32, loopStart, callPC int, globals map[string]*vm.FuncProto) (WholeCallNoResultRuntimeSpecializationBatchCall, bool) {
 	inst := code[callPC]
 	a := vm.DecodeA(inst)
 	b := vm.DecodeB(inst)
 	if b <= 0 || b > 4 {
-		return WholeCallNoResultBatchCall{}, false
+		return WholeCallNoResultRuntimeSpecializationBatchCall{}, false
 	}
-	call := WholeCallNoResultBatchCall{FuncConst: -1, ArgConsts: make([]int, 0, b-1)}
+	call := WholeCallNoResultRuntimeSpecializationBatchCall{FuncConst: -1, ArgConsts: make([]int, 0, b-1)}
 	for slot := a; slot < a+b; slot++ {
 		constIdx, ok := lastGlobalWriterBeforeCall(code, loopStart, callPC, slot)
 		if !ok {
-			return WholeCallNoResultBatchCall{}, false
+			return WholeCallNoResultRuntimeSpecializationBatchCall{}, false
 		}
 		if slot == a {
 			name := protoConstString(proto, constIdx)
 			callee := globals[name]
 			if name == "" || (!protoHasNoResultWholeCallRuntimeSpecialization(callee) && !protoReturnsNoValuesWithArity(callee, b-1)) {
-				return WholeCallNoResultBatchCall{}, false
+				return WholeCallNoResultRuntimeSpecializationBatchCall{}, false
 			}
 			call.FuncConst = constIdx
 			continue

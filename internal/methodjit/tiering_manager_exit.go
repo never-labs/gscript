@@ -990,12 +990,12 @@ func (tm *TieringManager) executeOpExit(ctx *ExecContext, regs []runtime.Value, 
 			return err
 		}
 		if handled {
-			return tm.executeWholeCallNoResultBatch(ctx, regs, base, proto)
+			return tm.executeWholeCallNoResultRuntimeSpecializationBatch(ctx, regs, base, proto)
 		}
 		if _, err = tm.callVM.CallValue(fnVal, args); err != nil {
 			return err
 		}
-		return tm.executeWholeCallNoResultBatch(ctx, regs, base, proto)
+		return tm.executeWholeCallNoResultRuntimeSpecializationBatch(ctx, regs, base, proto)
 
 	case OpConstString:
 		if aux >= 0 && aux < len(proto.Constants) {
@@ -1524,15 +1524,15 @@ func (tm *TieringManager) executeClosureOpExit(ctx *ExecContext, regs []runtime.
 	return nil
 }
 
-func (tm *TieringManager) executeWholeCallNoResultBatch(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto) error {
+func (tm *TieringManager) executeWholeCallNoResultRuntimeSpecializationBatch(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto) error {
 	if tm == nil || tm.callVM == nil || ctx == nil || proto == nil {
 		return nil
 	}
 	cf, ok := tm.tier2CompiledFor(proto)
-	if !ok || cf == nil || len(cf.WholeCallNoResultBatches) == 0 {
+	if !ok || cf == nil || len(cf.WholeCallNoResultRuntimeSpecializationBatches) == 0 {
 		return nil
 	}
-	fact, ok := cf.WholeCallNoResultBatches[int(ctx.OpExitID)]
+	fact, ok := cf.WholeCallNoResultRuntimeSpecializationBatches[int(ctx.OpExitID)]
 	if !ok || len(fact.Calls) == 0 {
 		return nil
 	}
@@ -1548,7 +1548,7 @@ func (tm *TieringManager) executeWholeCallNoResultBatch(ctx *ExecContext, regs [
 	for next := cur + step; wholeCallBatchLoopContinues(next, limit, step); next += step {
 		iterComplete := true
 		for _, call := range fact.Calls {
-			handled, err := tm.executeWholeCallNoResultBatchCall(proto, call)
+			handled, err := tm.executeWholeCallNoResultRuntimeSpecializationBatchCall(proto, call)
 			if err != nil {
 				return err
 			}
@@ -1583,7 +1583,7 @@ func wholeCallBatchLoopContinues(next, limit, step int64) bool {
 	return next >= limit
 }
 
-func (tm *TieringManager) executeWholeCallNoResultBatchCall(proto *vm.FuncProto, call WholeCallNoResultBatchCall) (bool, error) {
+func (tm *TieringManager) executeWholeCallNoResultRuntimeSpecializationBatchCall(proto *vm.FuncProto, call WholeCallNoResultRuntimeSpecializationBatchCall) (bool, error) {
 	if tm == nil || tm.callVM == nil || call.FuncConst < 0 {
 		return false, nil
 	}

@@ -75,7 +75,7 @@ func TestWholeCallRuntimeSpecializationExitLowersStableNoResultCall(t *testing.T
 	}
 
 	snap := tm.ExitStats()
-	if cf := tm.tier2Compiled[top]; cf == nil || len(cf.WholeCallNoResultBatches) == 0 {
+	if cf := tm.tier2Compiled[top]; cf == nil || len(cf.WholeCallNoResultRuntimeSpecializationBatches) == 0 {
 		t.Fatalf("missing whole-call batch metadata: cf=%#v", cf)
 	}
 	if got := snap.ByExitCode["ExitOpExit"]; got == 0 {
@@ -127,8 +127,8 @@ for i := 0; i < 3; i++ {
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
-	if len(fn.Analysis.WholeCallNoResultKernels) != 0 {
-		t.Fatalf("stable non-kernel runtime call should not be annotated: %#v", fn.Analysis.WholeCallNoResultKernels)
+	if len(fn.Analysis.WholeCallNoResultRuntimeSpecializations) != 0 {
+		t.Fatalf("stable non-kernel runtime call should not be annotated: %#v", fn.Analysis.WholeCallNoResultRuntimeSpecializations)
 	}
 }
 
@@ -167,8 +167,8 @@ caller(sinkB, 1)
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
-	if len(fn.Analysis.WholeCallNoResultKernels) != 0 {
-		t.Fatalf("polymorphic runtime call should not be annotated: %#v", fn.Analysis.WholeCallNoResultKernels)
+	if len(fn.Analysis.WholeCallNoResultRuntimeSpecializations) != 0 {
+		t.Fatalf("polymorphic runtime call should not be annotated: %#v", fn.Analysis.WholeCallNoResultRuntimeSpecializations)
 	}
 }
 

@@ -148,14 +148,14 @@ func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
 		t.Fatalf("CallFacts.SetProtocolConstCallFolds did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 
-	calls.SetWholeCallNoResultKernels(map[int]bool{13: true})
-	if !a.WholeCallNoResultKernels[13] {
-		t.Fatalf("CallFacts.SetWholeCallNoResultKernels did not update compatibility field")
+	calls.SetWholeCallNoResultRuntimeSpecializations(map[int]bool{13: true})
+	if !a.WholeCallNoResultRuntimeSpecializations[13] {
+		t.Fatalf("CallFacts.SetWholeCallNoResultRuntimeSpecializations did not update compatibility field")
 	}
 
-	calls.SetWholeCallNoResultBatches(map[int]WholeCallNoResultBatchFact{13: {ExitPC: 44}})
-	if got, ok := a.WholeCallNoResultBatches[13]; !ok || got.ExitPC != 44 {
-		t.Fatalf("CallFacts.SetWholeCallNoResultBatches did not update compatibility field: got %#v ok=%v", got, ok)
+	calls.SetWholeCallNoResultRuntimeSpecializationBatches(map[int]WholeCallNoResultRuntimeSpecializationBatchFact{13: {ExitPC: 44}})
+	if got, ok := a.WholeCallNoResultRuntimeSpecializationBatches[13]; !ok || got.ExitPC != 44 {
+		t.Fatalf("CallFacts.SetWholeCallNoResultRuntimeSpecializationBatches did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -214,10 +214,10 @@ func TestAnalysisResultKernelFactsAdoptsLegacyFields(t *testing.T) {
 func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	desc := CallABIDescriptor{NumArgs: 3, NumRets: 1}
 	a := &AnalysisResult{
-		CallABIs:                 map[int]CallABIDescriptor{21: desc},
-		ProtocolConstCallFolds:   map[int]ProtocolConstCallFoldFact{22: {Result: 7}},
-		WholeCallNoResultKernels: map[int]bool{23: true},
-		WholeCallNoResultBatches: map[int]WholeCallNoResultBatchFact{23: {ExitPC: 8}},
+		CallABIs:                                      map[int]CallABIDescriptor{21: desc},
+		ProtocolConstCallFolds:                        map[int]ProtocolConstCallFoldFact{22: {Result: 7}},
+		WholeCallNoResultRuntimeSpecializations:       map[int]bool{23: true},
+		WholeCallNoResultRuntimeSpecializationBatches: map[int]WholeCallNoResultRuntimeSpecializationBatchFact{23: {ExitPC: 8}},
 	}
 
 	calls := a.CallFacts()
@@ -227,11 +227,11 @@ func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	if got, ok := calls.ProtocolConstCallFold(22); !ok || got.Result != 7 {
 		t.Fatalf("CallFacts did not adopt legacy ProtocolConstCallFolds: got %#v ok=%v", got, ok)
 	}
-	if !calls.WholeCallNoResultKernel(23) {
-		t.Fatalf("CallFacts did not adopt legacy WholeCallNoResultKernels")
+	if !calls.WholeCallNoResultRuntimeSpecialization(23) {
+		t.Fatalf("CallFacts did not adopt compatibility WholeCallNoResultRuntimeSpecializations")
 	}
-	if got, ok := calls.WholeCallNoResultBatch(23); !ok || got.ExitPC != 8 {
-		t.Fatalf("CallFacts did not adopt legacy WholeCallNoResultBatches: got %#v ok=%v", got, ok)
+	if got, ok := calls.WholeCallNoResultRuntimeSpecializationBatch(23); !ok || got.ExitPC != 8 {
+		t.Fatalf("CallFacts did not adopt compatibility WholeCallNoResultRuntimeSpecializationBatches: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -243,7 +243,7 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 	if calls.ProtocolConstCallFoldCount() != 0 {
 		t.Fatalf("nil CallFacts reported protocol const call facts")
 	}
-	if calls.WholeCallNoResultBatchMap() != nil {
+	if calls.WholeCallNoResultRuntimeSpecializationBatchMap() != nil {
 		t.Fatalf("nil CallFacts returned whole-call no-result batches")
 	}
 
@@ -271,8 +271,8 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 	calls := a.CallFacts()
 	a.CallABIs = map[int]CallABIDescriptor{31: {NumArgs: 4}}
 	a.ProtocolConstCallFolds = map[int]ProtocolConstCallFoldFact{32: {Result: 12}}
-	a.WholeCallNoResultKernels = map[int]bool{33: true}
-	a.WholeCallNoResultBatches = map[int]WholeCallNoResultBatchFact{34: {ExitPC: 55}}
+	a.WholeCallNoResultRuntimeSpecializations = map[int]bool{33: true}
+	a.WholeCallNoResultRuntimeSpecializationBatches = map[int]WholeCallNoResultRuntimeSpecializationBatchFact{34: {ExitPC: 55}}
 
 	calls = a.CallFacts()
 	if got, ok := calls.CallABI(31); !ok || got.NumArgs != 4 {
@@ -281,11 +281,11 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 	if got, ok := calls.ProtocolConstCallFold(32); !ok || got.Result != 12 {
 		t.Fatalf("CallFacts did not rebind legacy ProtocolConstCallFolds: got %#v ok=%v", got, ok)
 	}
-	if !calls.WholeCallNoResultKernel(33) {
-		t.Fatalf("CallFacts did not rebind legacy WholeCallNoResultKernels")
+	if !calls.WholeCallNoResultRuntimeSpecialization(33) {
+		t.Fatalf("CallFacts did not rebind compatibility WholeCallNoResultRuntimeSpecializations")
 	}
-	if got, ok := calls.WholeCallNoResultBatch(34); !ok || got.ExitPC != 55 {
-		t.Fatalf("CallFacts did not rebind legacy WholeCallNoResultBatches: got %#v ok=%v", got, ok)
+	if got, ok := calls.WholeCallNoResultRuntimeSpecializationBatch(34); !ok || got.ExitPC != 55 {
+		t.Fatalf("CallFacts did not rebind compatibility WholeCallNoResultRuntimeSpecializationBatches: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -293,8 +293,8 @@ func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testin
 	a := &AnalysisResult{Call: NewCallFacts()}
 	a.Call.CallABIs[41] = CallABIDescriptor{NumArgs: 5}
 	a.Call.ProtocolConstCallFolds[42] = ProtocolConstCallFoldFact{Result: 13}
-	a.Call.WholeCallNoResultKernels[43] = true
-	a.Call.WholeCallNoResultBatches[44] = WholeCallNoResultBatchFact{ExitPC: 66}
+	a.Call.WholeCallNoResultRuntimeSpecializations[43] = true
+	a.Call.WholeCallNoResultRuntimeSpecializationBatches[44] = WholeCallNoResultRuntimeSpecializationBatchFact{ExitPC: 66}
 
 	calls := a.CallFacts()
 	if got, ok := calls.CallABI(41); !ok || got.NumArgs != 5 {
@@ -303,11 +303,11 @@ func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testin
 	if got, ok := calls.ProtocolConstCallFold(42); !ok || got.Result != 13 {
 		t.Fatalf("CallFacts lost domain ProtocolConstCallFolds with nil legacy field: got %#v ok=%v", got, ok)
 	}
-	if !calls.WholeCallNoResultKernel(43) {
-		t.Fatalf("CallFacts lost domain WholeCallNoResultKernels with nil legacy field")
+	if !calls.WholeCallNoResultRuntimeSpecialization(43) {
+		t.Fatalf("CallFacts lost domain WholeCallNoResultRuntimeSpecializations with nil legacy field")
 	}
-	if got, ok := calls.WholeCallNoResultBatch(44); !ok || got.ExitPC != 66 {
-		t.Fatalf("CallFacts lost domain WholeCallNoResultBatches with nil legacy field: got %#v ok=%v", got, ok)
+	if got, ok := calls.WholeCallNoResultRuntimeSpecializationBatch(44); !ok || got.ExitPC != 66 {
+		t.Fatalf("CallFacts lost domain WholeCallNoResultRuntimeSpecializationBatches with nil legacy field: got %#v ok=%v", got, ok)
 	}
 }
 

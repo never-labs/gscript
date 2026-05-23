@@ -115,8 +115,8 @@ type runtimeSpecializationFingerprint struct {
 	hash         uint64
 }
 
-type wholeCallValueKernelRunner func(*VM, *Closure, []runtime.Value) (bool, []runtime.Value, error)
-type wholeCallNoResultKernelRunner func(*VM, *Closure, []runtime.Value) (bool, error)
+type wholeCallValueRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, []runtime.Value, error)
+type wholeCallNoResultRuntimeSpecializationRunner func(*VM, *Closure, []runtime.Value) (bool, error)
 
 // WholeCallRuntimeSpecializationCatalog returns diagnostic metadata for OP_CALL structural
 // kernels without probing any particular prototype.

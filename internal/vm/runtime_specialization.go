@@ -47,7 +47,7 @@ type RuntimeSpecialization struct {
 // WholeCallValueSpecialization handles OP_CALL sites that return values.
 type WholeCallValueSpecialization struct {
 	RuntimeSpecialization
-	Run            wholeCallValueKernelRunner
+	Run            wholeCallValueRuntimeSpecializationRunner
 	RecursiveTable bool
 }
 
@@ -55,7 +55,7 @@ type WholeCallValueSpecialization struct {
 // convention for in-place kernels.
 type WholeCallNoResultSpecialization struct {
 	RuntimeSpecialization
-	Run wholeCallNoResultKernelRunner
+	Run wholeCallNoResultRuntimeSpecializationRunner
 }
 
 type driverLoopRuntimeSpecializationRunner func(*VM, *CallFrame, int, []uint32, []runtime.Value, int, int) (bool, error)

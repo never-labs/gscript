@@ -848,8 +848,8 @@ func TestTier2RepeatedAnalysisModulesDeclareUpdates(t *testing.T) {
 
 	assertAnalysisFacts(t, findTier2Module(t, plan, "CallABI (final)").Updates, AnalysisFactCallABIs)
 	assertAnalysisFacts(t, findTier2Module(t, plan, "WholeCallRuntimeSpecializationExit (final)").Updates,
-		AnalysisFactWholeCallNoResultKernels,
-		AnalysisFactWholeCallNoResultBatches,
+		AnalysisFactWholeCallNoResultRuntimeSpecializations,
+		AnalysisFactWholeCallNoResultRuntimeSpecializationBatches,
 	)
 	for _, name := range []string{
 		"RangeAnalysis (post-IntExactDivision)",

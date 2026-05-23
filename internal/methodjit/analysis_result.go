@@ -134,15 +134,16 @@ type AnalysisResult struct {
 	// keyed by OpCall instruction ID.
 	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
 
-	// WholeCallNoResultKernels records stable structural no-result whole-call
-	// kernels keyed by OpCall instruction ID. Codegen routes them through a
-	// precise op-exit rather than the generic CallExit path.
-	WholeCallNoResultKernels map[int]bool
+	// WholeCallNoResultRuntimeSpecializations records stable structural
+	// no-result whole-call runtime specializations keyed by OpCall instruction
+	// ID. Codegen routes them through a precise op-exit rather than the generic
+	// CallExit path.
+	WholeCallNoResultRuntimeSpecializations map[int]bool
 
-	// WholeCallNoResultBatches records loop-tail no-result whole-call runtime specialization
+	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result whole-call runtime specialization
 	// sites that can safely batch future complete loop iterations after the
 	// current iteration's final kernel call has run.
-	WholeCallNoResultBatches map[int]WholeCallNoResultBatchFact
+	WholeCallNoResultRuntimeSpecializationBatches map[int]WholeCallNoResultRuntimeSpecializationBatchFact
 
 	// FixedShapeTables records SSA table values whose field layout is known
 	// without consulting the runtime field cache. The initial producer is a
@@ -551,15 +552,16 @@ type CallFacts struct {
 	// keyed by OpCall instruction ID.
 	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
 
-	// WholeCallNoResultKernels records stable structural no-result whole-call
-	// kernels keyed by OpCall instruction ID. Codegen routes them through a
-	// precise op-exit rather than the generic CallExit path.
-	WholeCallNoResultKernels map[int]bool
+	// WholeCallNoResultRuntimeSpecializations records stable structural
+	// no-result whole-call runtime specializations keyed by OpCall instruction
+	// ID. Codegen routes them through a precise op-exit rather than the generic
+	// CallExit path.
+	WholeCallNoResultRuntimeSpecializations map[int]bool
 
-	// WholeCallNoResultBatches records loop-tail no-result whole-call runtime specialization
+	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result whole-call runtime specialization
 	// sites that can safely batch future complete loop iterations after the
 	// current iteration's final kernel call has run.
-	WholeCallNoResultBatches map[int]WholeCallNoResultBatchFact
+	WholeCallNoResultRuntimeSpecializationBatches map[int]WholeCallNoResultRuntimeSpecializationBatchFact
 }
 
 func NewCallFacts() *CallFacts {
@@ -575,11 +577,11 @@ func (c *CallFacts) Initialize() {
 	if c.ProtocolConstCallFolds == nil {
 		c.ProtocolConstCallFolds = make(map[int]ProtocolConstCallFoldFact)
 	}
-	if c.WholeCallNoResultKernels == nil {
-		c.WholeCallNoResultKernels = make(map[int]bool)
+	if c.WholeCallNoResultRuntimeSpecializations == nil {
+		c.WholeCallNoResultRuntimeSpecializations = make(map[int]bool)
 	}
-	if c.WholeCallNoResultBatches == nil {
-		c.WholeCallNoResultBatches = make(map[int]WholeCallNoResultBatchFact)
+	if c.WholeCallNoResultRuntimeSpecializationBatches == nil {
+		c.WholeCallNoResultRuntimeSpecializationBatches = make(map[int]WholeCallNoResultRuntimeSpecializationBatchFact)
 	}
 }
 
@@ -645,33 +647,33 @@ func (c *CallFacts) ForEachProtocolConstCallFold(visit func(int, ProtocolConstCa
 	}
 }
 
-func (c *CallFacts) SetWholeCallNoResultKernels(facts map[int]bool) {
-	c.WholeCallNoResultKernels = facts
+func (c *CallFacts) SetWholeCallNoResultRuntimeSpecializations(facts map[int]bool) {
+	c.WholeCallNoResultRuntimeSpecializations = facts
 	c.bindOwner()
 }
 
-func (c *CallFacts) WholeCallNoResultKernel(id int) bool {
-	return c != nil && c.WholeCallNoResultKernels != nil && c.WholeCallNoResultKernels[id]
+func (c *CallFacts) WholeCallNoResultRuntimeSpecialization(id int) bool {
+	return c != nil && c.WholeCallNoResultRuntimeSpecializations != nil && c.WholeCallNoResultRuntimeSpecializations[id]
 }
 
-func (c *CallFacts) SetWholeCallNoResultBatches(facts map[int]WholeCallNoResultBatchFact) {
-	c.WholeCallNoResultBatches = facts
+func (c *CallFacts) SetWholeCallNoResultRuntimeSpecializationBatches(facts map[int]WholeCallNoResultRuntimeSpecializationBatchFact) {
+	c.WholeCallNoResultRuntimeSpecializationBatches = facts
 	c.bindOwner()
 }
 
-func (c *CallFacts) WholeCallNoResultBatch(id int) (WholeCallNoResultBatchFact, bool) {
-	if c == nil || c.WholeCallNoResultBatches == nil {
-		return WholeCallNoResultBatchFact{}, false
+func (c *CallFacts) WholeCallNoResultRuntimeSpecializationBatch(id int) (WholeCallNoResultRuntimeSpecializationBatchFact, bool) {
+	if c == nil || c.WholeCallNoResultRuntimeSpecializationBatches == nil {
+		return WholeCallNoResultRuntimeSpecializationBatchFact{}, false
 	}
-	fact, ok := c.WholeCallNoResultBatches[id]
+	fact, ok := c.WholeCallNoResultRuntimeSpecializationBatches[id]
 	return fact, ok
 }
 
-func (c *CallFacts) WholeCallNoResultBatchMap() map[int]WholeCallNoResultBatchFact {
+func (c *CallFacts) WholeCallNoResultRuntimeSpecializationBatchMap() map[int]WholeCallNoResultRuntimeSpecializationBatchFact {
 	if c == nil {
 		return nil
 	}
-	return c.WholeCallNoResultBatches
+	return c.WholeCallNoResultRuntimeSpecializationBatches
 }
 
 func (c *CallFacts) bindOwner() {
@@ -686,10 +688,10 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 	}
 	if a.Call == nil {
 		a.Call = &CallFacts{
-			CallABIs:                 a.CallABIs,
-			ProtocolConstCallFolds:   a.ProtocolConstCallFolds,
-			WholeCallNoResultKernels: a.WholeCallNoResultKernels,
-			WholeCallNoResultBatches: a.WholeCallNoResultBatches,
+			CallABIs:                                      a.CallABIs,
+			ProtocolConstCallFolds:                        a.ProtocolConstCallFolds,
+			WholeCallNoResultRuntimeSpecializations:       a.WholeCallNoResultRuntimeSpecializations,
+			WholeCallNoResultRuntimeSpecializationBatches: a.WholeCallNoResultRuntimeSpecializationBatches,
 		}
 	} else {
 		if a.CallABIs != nil || a.Call.CallABIs == nil {
@@ -698,11 +700,11 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 		if a.ProtocolConstCallFolds != nil || a.Call.ProtocolConstCallFolds == nil {
 			a.Call.ProtocolConstCallFolds = a.ProtocolConstCallFolds
 		}
-		if a.WholeCallNoResultKernels != nil || a.Call.WholeCallNoResultKernels == nil {
-			a.Call.WholeCallNoResultKernels = a.WholeCallNoResultKernels
+		if a.WholeCallNoResultRuntimeSpecializations != nil || a.Call.WholeCallNoResultRuntimeSpecializations == nil {
+			a.Call.WholeCallNoResultRuntimeSpecializations = a.WholeCallNoResultRuntimeSpecializations
 		}
-		if a.WholeCallNoResultBatches != nil || a.Call.WholeCallNoResultBatches == nil {
-			a.Call.WholeCallNoResultBatches = a.WholeCallNoResultBatches
+		if a.WholeCallNoResultRuntimeSpecializationBatches != nil || a.Call.WholeCallNoResultRuntimeSpecializationBatches == nil {
+			a.Call.WholeCallNoResultRuntimeSpecializationBatches = a.WholeCallNoResultRuntimeSpecializationBatches
 		}
 	}
 	a.Call.owner = a
@@ -731,8 +733,8 @@ func (a *AnalysisResult) bindCallCompatibilityFields() {
 	}
 	a.CallABIs = a.Call.CallABIs
 	a.ProtocolConstCallFolds = a.Call.ProtocolConstCallFolds
-	a.WholeCallNoResultKernels = a.Call.WholeCallNoResultKernels
-	a.WholeCallNoResultBatches = a.Call.WholeCallNoResultBatches
+	a.WholeCallNoResultRuntimeSpecializations = a.Call.WholeCallNoResultRuntimeSpecializations
+	a.WholeCallNoResultRuntimeSpecializationBatches = a.Call.WholeCallNoResultRuntimeSpecializationBatches
 }
 
 // KernelFacts groups analysis facts produced and consumed by loop-kernel and
