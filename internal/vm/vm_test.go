@@ -1230,6 +1230,56 @@ func TestTableMovePlainArrayFastPathPreservesZeroSlot(t *testing.T) {
 	expectGlobalInt(t, g, "r2", 20)
 }
 
+func TestTableMoveForwardingProxyFastPathPreservesCounters(t *testing.T) {
+	g := compileAndRun(t, `
+		src := {10, 20, 30, 40}
+		dst := {}
+		reads := 0
+		writes := 0
+		proxySrc := setmetatable({}, {
+			__index: func(_, k) {
+				reads = reads + 1
+				return src[k]
+			},
+		})
+		proxyDst := setmetatable({}, {
+			__newindex: func(_, k, v) {
+				writes = writes + 1
+				dst[k] = v
+			},
+		})
+		table.move(proxySrc, 1, 4, 1, proxyDst)
+		r1 := dst[1]
+		r4 := dst[4]
+	`)
+	expectGlobalInt(t, g, "reads", 4)
+	expectGlobalInt(t, g, "writes", 4)
+	expectGlobalInt(t, g, "r1", 10)
+	expectGlobalInt(t, g, "r4", 40)
+}
+
+func TestTableMoveForwardingProxyFastPathWithoutCounters(t *testing.T) {
+	g := compileAndRun(t, `
+		src := {5, 6, 7}
+		dst := {}
+		proxySrc := setmetatable({}, {
+			__index: func(_, k) {
+				return src[k]
+			},
+		})
+		proxyDst := setmetatable({}, {
+			__newindex: func(_, k, v) {
+				dst[k] = v
+			},
+		})
+		table.move(proxySrc, 1, 3, 2, proxyDst)
+		r2 := dst[2]
+		r4 := dst[4]
+	`)
+	expectGlobalInt(t, g, "r2", 5)
+	expectGlobalInt(t, g, "r4", 7)
+}
+
 func TestExplicitSpreadTableConstructor(t *testing.T) {
 	g := compileAndRun(t, `
 		func pair() { return 2, 3 }

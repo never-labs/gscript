@@ -47,6 +47,24 @@ func New() *Interpreter {
 	return interp
 }
 
+func setMetatableValue(table, metatable Value) (Value, error) {
+	if !table.IsTable() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'setmetatable' (table expected, got %s)", table.TypeName())
+	}
+	tbl := table.Table()
+	if mt := tbl.GetMetatable(); mt != nil && !mt.RawGetString("__metatable").IsNil() {
+		return NilValue(), fmt.Errorf("cannot change a protected metatable")
+	}
+	if metatable.IsNil() {
+		tbl.SetMetatable(nil)
+	} else if metatable.IsTable() {
+		tbl.SetMetatable(metatable.Table())
+	} else {
+		return NilValue(), fmt.Errorf("bad argument #2 to 'setmetatable' (nil or table expected, got %s)", metatable.TypeName())
+	}
+	return table, nil
+}
+
 // Globals returns the global environment.
 func (interp *Interpreter) Globals() *Environment {
 	return interp.globals
@@ -340,21 +358,14 @@ func (interp *Interpreter) registerBuiltins() {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("bad argument to 'setmetatable' (table expected)")
 			}
-			if !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument #1 to 'setmetatable' (table expected, got %s)", args[0].TypeName())
+			v, err := setMetatableValue(args[0], args[1])
+			if err != nil {
+				return nil, err
 			}
-			tbl := args[0].Table()
-			if mt := tbl.GetMetatable(); mt != nil && !mt.RawGetString("__metatable").IsNil() {
-				return nil, fmt.Errorf("cannot change a protected metatable")
-			}
-			if args[1].IsNil() {
-				tbl.SetMetatable(nil)
-			} else if args[1].IsTable() {
-				tbl.SetMetatable(args[1].Table())
-			} else {
-				return nil, fmt.Errorf("bad argument #2 to 'setmetatable' (nil or table expected, got %s)", args[1].TypeName())
-			}
-			return []Value{args[0]}, nil
+			return []Value{v}, nil
+		},
+		FastArg2: func(table, metatable Value) (Value, error) {
+			return setMetatableValue(table, metatable)
 		},
 	}))
 

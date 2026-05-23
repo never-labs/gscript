@@ -813,77 +813,103 @@ func (vm *VM) RegisterTableSortLib() {
 }
 
 func (vm *VM) newTableSortFunction() *runtime.GoFunction {
+	sortTable := func(t runtime.Value, comp runtime.Value, hasComp bool) error {
+		length, err := vm.tableLenInt(t)
+		if err != nil {
+			return err
+		}
+		if length < 0 {
+			length = 0
+		}
+		elems := make([]runtime.Value, int(length))
+		for i := 0; i < len(elems); i++ {
+			v, err := vm.tableGet(t, runtime.IntValue(int64(i+1)))
+			if err != nil {
+				return err
+			}
+			elems[i] = v
+		}
+
+		var sortErr error
+		if hasComp && comp.IsFunction() {
+			sort.SliceStable(elems, func(a, b int) bool {
+				if sortErr != nil {
+					return false
+				}
+				results, err := vm.callValue(comp, []runtime.Value{elems[a], elems[b]})
+				if err != nil {
+					sortErr = err
+					return false
+				}
+				if len(results) > 0 && results[0].Truthy() {
+					reverse, err := vm.callValue(comp, []runtime.Value{elems[b], elems[a]})
+					if err != nil {
+						sortErr = err
+						return false
+					}
+					if len(reverse) > 0 && reverse[0].Truthy() {
+						sortErr = fmt.Errorf("invalid order function for sorting")
+						return false
+					}
+					return true
+				}
+				return false
+			})
+		} else {
+			sort.SliceStable(elems, func(a, b int) bool {
+				if sortErr != nil {
+					return false
+				}
+				less, err := vm.valueLessThan(elems[a], elems[b])
+				if err != nil {
+					sortErr = err
+					return false
+				}
+				return less
+			})
+		}
+		if sortErr != nil {
+			return sortErr
+		}
+		for i, val := range elems {
+			if err := vm.tableSet(t, runtime.IntValue(int64(i+1)), val); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	return &runtime.GoFunction{
 		Name: "table.sort",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
 			if len(args) < 1 || !args[0].IsTable() {
 				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
 			}
-			t := args[0]
-			length, err := vm.tableLenInt(t)
-			if err != nil {
+			comp := runtime.NilValue()
+			if len(args) >= 2 {
+				comp = args[1]
+			}
+			if err := sortTable(args[0], comp, len(args) >= 2); err != nil {
 				return nil, err
 			}
-			if length < 0 {
-				length = 0
-			}
-			elems := make([]runtime.Value, int(length))
-			for i := 0; i < len(elems); i++ {
-				v, err := vm.tableGet(t, runtime.IntValue(int64(i+1)))
-				if err != nil {
-					return nil, err
-				}
-				elems[i] = v
-			}
-
-			var sortErr error
-			if len(args) >= 2 && args[1].IsFunction() {
-				comp := args[1]
-				sort.SliceStable(elems, func(a, b int) bool {
-					if sortErr != nil {
-						return false
-					}
-					results, err := vm.callValue(comp, []runtime.Value{elems[a], elems[b]})
-					if err != nil {
-						sortErr = err
-						return false
-					}
-					if len(results) > 0 && results[0].Truthy() {
-						reverse, err := vm.callValue(comp, []runtime.Value{elems[b], elems[a]})
-						if err != nil {
-							sortErr = err
-							return false
-						}
-						if len(reverse) > 0 && reverse[0].Truthy() {
-							sortErr = fmt.Errorf("invalid order function for sorting")
-							return false
-						}
-						return true
-					}
-					return false
-				})
-			} else {
-				sort.SliceStable(elems, func(a, b int) bool {
-					if sortErr != nil {
-						return false
-					}
-					less, err := vm.valueLessThan(elems[a], elems[b])
-					if err != nil {
-						sortErr = err
-						return false
-					}
-					return less
-				})
-			}
-			if sortErr != nil {
-				return nil, sortErr
-			}
-			for i, val := range elems {
-				if err := vm.tableSet(t, runtime.IntValue(int64(i+1)), val); err != nil {
-					return nil, err
-				}
-			}
 			return nil, nil
+		},
+		FastArg1: func(t runtime.Value) (runtime.Value, error) {
+			if !t.IsTable() {
+				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+			}
+			if err := sortTable(t, runtime.NilValue(), false); err != nil {
+				return runtime.NilValue(), err
+			}
+			return runtime.NilValue(), nil
+		},
+		FastArg2: func(t, comp runtime.Value) (runtime.Value, error) {
+			if !t.IsTable() {
+				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+			}
+			if err := sortTable(t, comp, true); err != nil {
+				return runtime.NilValue(), err
+			}
+			return runtime.NilValue(), nil
 		},
 	}
 }
@@ -1420,51 +1446,73 @@ func (vm *VM) RegisterTableProxyLib() {
 	tbl.RawSet(runtime.StringValue("spread"), runtime.FunctionValue(&runtime.GoFunction{Name: "table.spread", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
 		return tableUnpack("spread", args)
 	}}))
+	tableMove := func(src, first, last, target, dstArg runtime.Value, hasDst bool) (runtime.Value, error) {
+		if !src.IsTable() {
+			return runtime.NilValue(), fmt.Errorf("bad argument to 'table.move'")
+		}
+		f := vmToInt(first)
+		e := vmToInt(last)
+		tPos := vmToInt(target)
+		dst := src
+		if hasDst {
+			if !dstArg.IsTable() {
+				return runtime.NilValue(), fmt.Errorf("bad argument to 'table.move'")
+			}
+			dst = dstArg
+		}
+		if e >= f {
+			if dst.Table().TryPlainArrayMove(src.Table(), f, e, tPos) {
+				return dst, nil
+			}
+			if handled, result, err := vm.tryForwardingProxyTableMove(src, dst, f, e, tPos); handled || err != nil {
+				return result, err
+			}
+			count := e - f + 1
+			if tPos <= f || src.Table() != dst.Table() {
+				for i := int64(0); i < count; i++ {
+					v, err := vm.tableGet(src, runtime.IntValue(f+i))
+					if err != nil {
+						return runtime.NilValue(), err
+					}
+					if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
+						return runtime.NilValue(), err
+					}
+				}
+			} else {
+				for i := count - 1; i >= 0; i-- {
+					v, err := vm.tableGet(src, runtime.IntValue(f+i))
+					if err != nil {
+						return runtime.NilValue(), err
+					}
+					if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
+						return runtime.NilValue(), err
+					}
+				}
+			}
+		}
+		return dst, nil
+	}
 	tbl.RawSet(runtime.StringValue("move"), runtime.FunctionValue(&runtime.GoFunction{
 		Name: "table.move",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) < 4 || !args[0].IsTable() {
+			if len(args) < 4 {
 				return nil, fmt.Errorf("bad argument to 'table.move'")
 			}
-			src := args[0]
-			f := vmToInt(args[1])
-			e := vmToInt(args[2])
-			tPos := vmToInt(args[3])
-			dst := src
+			dstArg := runtime.NilValue()
 			if len(args) >= 5 {
-				if !args[4].IsTable() {
-					return nil, fmt.Errorf("bad argument to 'table.move'")
-				}
-				dst = args[4]
+				dstArg = args[4]
 			}
-			if e >= f {
-				if dst.Table().TryPlainArrayMove(src.Table(), f, e, tPos) {
-					return []runtime.Value{dst}, nil
-				}
-				count := e - f + 1
-				if tPos <= f || src.Table() != dst.Table() {
-					for i := int64(0); i < count; i++ {
-						v, err := vm.tableGet(src, runtime.IntValue(f+i))
-						if err != nil {
-							return nil, err
-						}
-						if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
-							return nil, err
-						}
-					}
-				} else {
-					for i := count - 1; i >= 0; i-- {
-						v, err := vm.tableGet(src, runtime.IntValue(f+i))
-						if err != nil {
-							return nil, err
-						}
-						if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
-							return nil, err
-						}
-					}
-				}
+			dst, err := tableMove(args[0], args[1], args[2], args[3], dstArg, len(args) >= 5)
+			if err != nil {
+				return nil, err
 			}
 			return []runtime.Value{dst}, nil
+		},
+		FastArg4: func(src, first, last, target runtime.Value) (runtime.Value, error) {
+			return tableMove(src, first, last, target, runtime.NilValue(), false)
+		},
+		FastArg5: func(src, first, last, target, dst runtime.Value) (runtime.Value, error) {
+			return tableMove(src, first, last, target, dst, true)
 		},
 	}))
 }

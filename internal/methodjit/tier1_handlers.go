@@ -705,6 +705,40 @@ slowPath:
 			e.storeSingleCallResult(absSlot, rawC, result)
 			return nil
 		}
+		if nArgs == 5 && gf.FastArg5 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			idx0 := absSlot + 1
+			idx1 := absSlot + 2
+			idx2 := absSlot + 3
+			idx3 := absSlot + 4
+			idx4 := absSlot + 5
+			arg0 := runtime.NilValue()
+			arg1 := runtime.NilValue()
+			arg2 := runtime.NilValue()
+			arg3 := runtime.NilValue()
+			arg4 := runtime.NilValue()
+			if idx0 < len(regs) {
+				arg0 = regs[idx0]
+			}
+			if idx1 < len(regs) {
+				arg1 = regs[idx1]
+			}
+			if idx2 < len(regs) {
+				arg2 = regs[idx2]
+			}
+			if idx3 < len(regs) {
+				arg3 = regs[idx3]
+			}
+			if idx4 < len(regs) {
+				arg4 = regs[idx4]
+			}
+			result, err := gf.FastArg5(arg0, arg1, arg2, arg3, arg4)
+			if err != nil {
+				return err
+			}
+			e.storeSingleCallResult(absSlot, rawC, result)
+			return nil
+		}
 		if gf.Fast1 == nil {
 			goto genericNativePath
 		}
