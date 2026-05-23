@@ -167,23 +167,8 @@ func analyzeRecordWalkFoldSpec(p *FuncProto) (*recordWalkFoldSpec, bool) {
 		return nil, false
 	}
 	code := p.Code
-	checks := map[int]uint32{
-		0:  EncodeAsBx(OP_LOADINT, 3, 0),
-		4:  EncodeAsBx(OP_FORPREP, 4, 75),
-		8:  EncodeAsBx(OP_FORPREP, 8, 70),
-		10: EncodeABC(OP_GETTABLE, 12, 0, 13),
-		31: EncodeABC(OP_TEST, 18, 0, 0),
-		54: EncodeABC(OP_MOD, 19, 20, 21),
-		67: EncodeABC(OP_SETFIELD, 13, 7, 19),
-		77: EncodeABC(OP_MOD, 18, 19, 20),
-		79: EncodeAsBx(OP_FORLOOP, 8, -71),
-		80: EncodeAsBx(OP_FORLOOP, 4, -76),
-		82: EncodeABC(OP_RETURN, 10, 2, 0),
-	}
-	for pc, want := range checks {
-		if code[pc] != want {
-			return nil, false
-		}
+	if !matchRecordWalkFoldLoopShape(code) {
+		return nil, false
 	}
 	var ok bool
 	spec := &recordWalkFoldSpec{modulus: int64(p.Constants[13].Number())}
@@ -241,6 +226,29 @@ func analyzeRecordWalkFoldSpec(p *FuncProto) (*recordWalkFoldSpec, bool) {
 		}
 	}
 	return spec, true
+}
+
+func matchRecordWalkFoldLoopShape(code []uint32) bool {
+	p := newBytecodePattern(code)
+	if !p.loadInt(0, 3, 0) {
+		return false
+	}
+	outer, ok := findNumericForLoopWithBodyLen(p, 1, 75)
+	if !ok {
+		return false
+	}
+	inner, ok := findNumericForLoopWithBodyLen(p, outer.bodyPC, 70)
+	if !ok || inner.loopPC >= outer.loopPC {
+		return false
+	}
+	if !p.abc(inner.bodyPC+1, OP_GETTABLE, 12, 0, 13) ||
+		!p.abc(inner.bodyPC+22, OP_TEST, 18, 0, 0) ||
+		!p.abc(inner.bodyPC+45, OP_MOD, 19, 20, 21) ||
+		!p.abc(inner.bodyPC+58, OP_SETFIELD, 13, 7, 19) ||
+		!p.abc(inner.bodyPC+68, OP_MOD, 18, 19, 20) {
+		return false
+	}
+	return p.returnFixed(outer.loopPC+2, 10, 2)
 }
 
 func recordWalkTagFieldConsts(code []uint32, tagsReg int) ([3]int, bool) {
