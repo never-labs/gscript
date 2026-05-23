@@ -16,6 +16,11 @@ type boolTableMarkCountShape struct {
 	flagsReg int
 }
 
+type boolTableMarkCountFillShape struct {
+	boolTableMarkCountShape
+	loopPC int
+}
+
 func (vm *VM) tryRunBoolTableMarkCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationBoolTableMarkCount) {
 		return false, nil, nil
@@ -109,16 +114,16 @@ func analyzeBoolTableMarkCountSpecializationSpec(code []uint32) (*boolTableMarkC
 		return nil, false
 	}
 	p := newBytecodePattern(code)
-	shape, ok := matchBoolTableInitFill(p)
+	fill, ok := matchBoolTableInitFill(p)
 	if !ok ||
-		!matchBoolTableMarkMultiples(p, shape) ||
-		!matchBoolTableCountTruthy(p, shape) {
+		!matchBoolTableMarkMultiples(p, fill) ||
+		!matchBoolTableCountTruthy(p, fill.boolTableMarkCountShape) {
 		return nil, false
 	}
 	return &boolTableMarkCountSpecializationSpec{minValue: 2}, true
 }
 
-func matchBoolTableInitFill(p bytecodePattern) (boolTableMarkCountShape, bool) {
+func matchBoolTableInitFill(p bytecodePattern) (boolTableMarkCountFillShape, bool) {
 	for fillForPrep := 4; fillForPrep < len(p.code); fillForPrep++ {
 		prep, ok := p.op(fillForPrep, OP_FORPREP)
 		if !ok {
@@ -152,44 +157,71 @@ func matchBoolTableInitFill(p bytecodePattern) (boolTableMarkCountShape, bool) {
 		if !p.abc(bodyPC+2, OP_SETTABLE, flagsReg, keyReg, trueReg) {
 			continue
 		}
-		return boolTableMarkCountShape{nReg: 0, flagsReg: flagsReg}, true
+		return boolTableMarkCountFillShape{
+			boolTableMarkCountShape: boolTableMarkCountShape{nReg: 0, flagsReg: flagsReg},
+			loopPC:                  loopPC,
+		}, true
 	}
-	return boolTableMarkCountShape{}, false
+	return boolTableMarkCountFillShape{}, false
 }
 
-func matchBoolTableMarkMultiples(p bytecodePattern, shape boolTableMarkCountShape) bool {
-	const (
-		iReg   = 5
-		tmpReg = 6
-		auxReg = 7
-		keyReg = 8
-
-		markStartPC = 10
-		countStart  = 30
-		innerStart  = 18
-		afterInner  = 26
-	)
-	return p.loadInt(9, iReg, 2) &&
-		p.abc(10, OP_MUL, tmpReg, iReg, iReg) &&
-		p.abc(11, OP_LE, 0, tmpReg, shape.nReg) &&
-		p.jumpTo(12, countStart) &&
-		p.move(13, auxReg, iReg) &&
-		p.abc(14, OP_GETTABLE, tmpReg, shape.flagsReg, auxReg) &&
-		p.abc(15, OP_TEST, tmpReg, 0, 0) &&
-		p.jumpTo(16, afterInner) &&
-		p.abc(17, OP_MUL, tmpReg, iReg, iReg) &&
-		p.abc(18, OP_LE, 0, tmpReg, shape.nReg) &&
-		p.jumpTo(19, afterInner) &&
-		p.loadBool(20, auxReg, false) &&
-		p.move(21, keyReg, tmpReg) &&
-		p.abc(22, OP_SETTABLE, shape.flagsReg, keyReg, auxReg) &&
-		p.abc(23, OP_ADD, auxReg, tmpReg, iReg) &&
-		p.move(24, tmpReg, auxReg) &&
-		p.jumpTo(25, innerStart) &&
-		p.loadInt(26, auxReg, 1) &&
-		p.abc(27, OP_ADD, tmpReg, iReg, auxReg) &&
-		p.move(28, iReg, tmpReg) &&
-		p.jumpTo(29, markStartPC)
+func matchBoolTableMarkMultiples(p bytecodePattern, fill boolTableMarkCountFillShape) bool {
+	for markStartPC := fill.loopPC + 2; markStartPC < len(p.code); markStartPC++ {
+		init, ok := p.op(markStartPC-1, OP_LOADINT)
+		if !ok || DecodesBx(init) != 2 {
+			continue
+		}
+		iReg := DecodeA(init)
+		firstMul, ok := p.op(markStartPC, OP_MUL)
+		if !ok || DecodeB(firstMul) != iReg || DecodeC(firstMul) != iReg {
+			continue
+		}
+		tmpReg := DecodeA(firstMul)
+		if !p.abc(markStartPC+1, OP_LE, 0, tmpReg, fill.nReg) {
+			continue
+		}
+		countStart, ok := p.jumpTarget(markStartPC + 2)
+		if !ok || countStart <= markStartPC+18 || countStart >= len(p.code) {
+			continue
+		}
+		moveProbe, ok := p.op(markStartPC+3, OP_MOVE)
+		if !ok || DecodeB(moveProbe) != iReg {
+			continue
+		}
+		auxReg := DecodeA(moveProbe)
+		if !p.abc(markStartPC+4, OP_GETTABLE, tmpReg, fill.flagsReg, auxReg) ||
+			!p.abc(markStartPC+5, OP_TEST, tmpReg, 0, 0) {
+			continue
+		}
+		afterInner, ok := p.jumpTarget(markStartPC + 6)
+		if !ok || afterInner < markStartPC+16 || afterInner >= countStart {
+			continue
+		}
+		innerStart := markStartPC + 8
+		if !p.abc(markStartPC+7, OP_MUL, tmpReg, iReg, iReg) ||
+			!p.abc(innerStart, OP_LE, 0, tmpReg, fill.nReg) ||
+			!p.jumpTo(markStartPC+9, afterInner) ||
+			!p.loadBool(markStartPC+10, auxReg, false) {
+			continue
+		}
+		moveKey, ok := p.op(markStartPC+11, OP_MOVE)
+		if !ok || DecodeB(moveKey) != tmpReg {
+			continue
+		}
+		keyReg := DecodeA(moveKey)
+		if !p.abc(markStartPC+12, OP_SETTABLE, fill.flagsReg, keyReg, auxReg) ||
+			!p.abc(markStartPC+13, OP_ADD, auxReg, tmpReg, iReg) ||
+			!p.move(markStartPC+14, tmpReg, auxReg) ||
+			!p.jumpTo(markStartPC+15, innerStart) ||
+			!p.loadInt(afterInner, auxReg, 1) ||
+			!p.abc(afterInner+1, OP_ADD, tmpReg, iReg, auxReg) ||
+			!p.move(afterInner+2, iReg, tmpReg) ||
+			!p.jumpTo(afterInner+3, markStartPC) {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func matchBoolTableCountTruthy(p bytecodePattern, shape boolTableMarkCountShape) bool {
