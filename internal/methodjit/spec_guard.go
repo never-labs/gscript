@@ -23,7 +23,7 @@ const (
 	SpecFieldShapeLoad
 )
 
-// SpecGuard is a composable guard atom used by feedback/static specialization
+// SpecGuard is a composable guard atom used by guarded specialization
 // candidates. Native code can inline these guards; fallback uses precise deopt.
 type SpecGuard struct {
 	Kind       SpecGuardKind

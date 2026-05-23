@@ -130,8 +130,8 @@ type AnalysisResult struct {
 	// is available but currently has no suppressed guards.
 	SuppressedSpecGuardKinds map[int]map[string]bool
 
-	// ProtocolConstCallFolds records guarded whole-call runtime-specialization protocol constants
-	// keyed by OpCall instruction ID.
+	// ProtocolConstCallFolds records guarded whole-call runtime-specialization
+	// constants keyed by OpCall instruction ID.
 	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
 
 	// WholeCallNoResultRuntimeSpecializations records stable structural
@@ -140,9 +140,9 @@ type AnalysisResult struct {
 	// CallExit path.
 	WholeCallNoResultRuntimeSpecializations map[int]bool
 
-	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result whole-call runtime specialization
-	// sites that can safely batch future complete loop iterations after the
-	// current iteration's final kernel call has run.
+	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result
+	// whole-call runtime specialization sites that can safely batch future
+	// complete loop iterations after the current iteration's final call has run.
 	WholeCallNoResultRuntimeSpecializationBatches map[int]WholeCallNoResultRuntimeSpecializationBatchFact
 
 	// FixedShapeTables records SSA table values whose field layout is known
@@ -548,8 +548,8 @@ type CallFacts struct {
 	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
 	CallABIs map[int]CallABIDescriptor
 
-	// ProtocolConstCallFolds records guarded whole-call runtime-specialization protocol constants
-	// keyed by OpCall instruction ID.
+	// ProtocolConstCallFolds records guarded whole-call runtime-specialization
+	// constants keyed by OpCall instruction ID.
 	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
 
 	// WholeCallNoResultRuntimeSpecializations records stable structural
@@ -558,9 +558,9 @@ type CallFacts struct {
 	// CallExit path.
 	WholeCallNoResultRuntimeSpecializations map[int]bool
 
-	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result whole-call runtime specialization
-	// sites that can safely batch future complete loop iterations after the
-	// current iteration's final kernel call has run.
+	// WholeCallNoResultRuntimeSpecializationBatches records loop-tail no-result
+	// whole-call runtime specialization sites that can safely batch future
+	// complete loop iterations after the current iteration's final call has run.
 	WholeCallNoResultRuntimeSpecializationBatches map[int]WholeCallNoResultRuntimeSpecializationBatchFact
 }
 
