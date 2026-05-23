@@ -20,6 +20,11 @@ const (
 	compiledSpecializationMutualRecursiveIntSCC
 )
 
+type compiledSpecializationDescriptor struct {
+	Kind                      compiledSpecializationKind
+	CallExitFastPathSupported bool
+}
+
 func (k compiledSpecializationKind) String() string {
 	switch k {
 	case compiledSpecializationRuntimeRecursiveIntFold:
@@ -37,28 +42,46 @@ func (k compiledSpecializationKind) String() string {
 	}
 }
 
-func (cf *CompiledFunction) SpecializationKind() compiledSpecializationKind {
-	if cf == nil {
-		return compiledSpecializationNone
-	}
-	switch {
-	case cf.RuntimeRecursiveIntFold != nil:
-		return compiledSpecializationRuntimeRecursiveIntFold
-	case cf.RuntimeRecursiveNestedIntFold != nil:
-		return compiledSpecializationRuntimeRecursiveNestedIntFold
-	case cf.RuntimeRecursiveTableBuilder != nil:
-		return compiledSpecializationRuntimeRecursiveTableBuilder
-	case cf.RuntimeRecursiveTableFold != nil:
-		return compiledSpecializationRuntimeRecursiveTableFold
-	case cf.MutualRecursiveIntSCC != nil:
-		return compiledSpecializationMutualRecursiveIntSCC
+func (k compiledSpecializationKind) descriptor() compiledSpecializationDescriptor {
+	switch k {
+	case compiledSpecializationRuntimeRecursiveIntFold,
+		compiledSpecializationRuntimeRecursiveNestedIntFold,
+		compiledSpecializationMutualRecursiveIntSCC:
+		return compiledSpecializationDescriptor{Kind: k, CallExitFastPathSupported: true}
+	case compiledSpecializationRuntimeRecursiveTableBuilder,
+		compiledSpecializationRuntimeRecursiveTableFold:
+		return compiledSpecializationDescriptor{Kind: k}
 	default:
-		return compiledSpecializationNone
+		return compiledSpecializationDescriptor{Kind: compiledSpecializationNone}
 	}
 }
 
+func (cf *CompiledFunction) SpecializationDescriptor() compiledSpecializationDescriptor {
+	if cf == nil {
+		return compiledSpecializationNone.descriptor()
+	}
+	switch {
+	case cf.RuntimeRecursiveIntFold != nil:
+		return compiledSpecializationRuntimeRecursiveIntFold.descriptor()
+	case cf.RuntimeRecursiveNestedIntFold != nil:
+		return compiledSpecializationRuntimeRecursiveNestedIntFold.descriptor()
+	case cf.RuntimeRecursiveTableBuilder != nil:
+		return compiledSpecializationRuntimeRecursiveTableBuilder.descriptor()
+	case cf.RuntimeRecursiveTableFold != nil:
+		return compiledSpecializationRuntimeRecursiveTableFold.descriptor()
+	case cf.MutualRecursiveIntSCC != nil:
+		return compiledSpecializationMutualRecursiveIntSCC.descriptor()
+	default:
+		return compiledSpecializationNone.descriptor()
+	}
+}
+
+func (cf *CompiledFunction) SpecializationKind() compiledSpecializationKind {
+	return cf.SpecializationDescriptor().Kind
+}
+
 func (tm *TieringManager) executeCompiledSpecialization(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto, retBuf []runtime.Value) ([]runtime.Value, bool, error) {
-	kind := cf.SpecializationKind()
+	kind := cf.SpecializationDescriptor().Kind
 	if kind == compiledSpecializationNone {
 		return nil, false, nil
 	}
@@ -104,8 +127,8 @@ func (tm *TieringManager) tryCompiledSpecializationCallExit(fnVal runtime.Value,
 	if !ok || cf == nil {
 		return false, nil
 	}
-	kind := cf.SpecializationKind()
-	if kind == compiledSpecializationNone || !compiledSpecializationCallExitFastPathSupports(kind) {
+	desc := cf.SpecializationDescriptor()
+	if desc.Kind == compiledSpecializationNone || !desc.CallExitFastPathSupported {
 		return false, nil
 	}
 
@@ -130,7 +153,7 @@ func (tm *TieringManager) TryExecuteCompiledSpecializationCall(fnVal runtime.Val
 }
 
 func (tm *TieringManager) executeCompiledSpecializationCallExitResult(cf *CompiledFunction, proto *vm.FuncProto, regs []runtime.Value, absSlot, nArgs int) (runtime.Value, bool, error) {
-	switch cf.SpecializationKind() {
+	switch cf.SpecializationDescriptor().Kind {
 	case compiledSpecializationRuntimeRecursiveIntFold:
 		if nArgs != 1 || absSlot+1 >= len(regs) {
 			return runtime.NilValue(), false, nil
@@ -178,16 +201,5 @@ func (tm *TieringManager) executeCompiledSpecializationCallExitResult(cf *Compil
 		return runtime.IntValue(n), true, nil
 	default:
 		return runtime.NilValue(), false, nil
-	}
-}
-
-func compiledSpecializationCallExitFastPathSupports(kind compiledSpecializationKind) bool {
-	switch kind {
-	case compiledSpecializationRuntimeRecursiveIntFold,
-		compiledSpecializationRuntimeRecursiveNestedIntFold,
-		compiledSpecializationMutualRecursiveIntSCC:
-		return true
-	default:
-		return false
 	}
 }
