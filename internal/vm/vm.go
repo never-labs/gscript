@@ -742,6 +742,48 @@ func (vm *VM) ExecuteStdPairsCall(absSlot, nArgs, rawC int) (bool, error) {
 	return true, nil
 }
 
+// ExecuteStdStringFindCall handles string.find when the first two results can
+// be produced without allocating the generic native result slice.
+func (vm *VM) ExecuteStdStringFindCall(absSlot, nArgs, rawC int) (bool, error) {
+	if (nArgs != 2 && nArgs != 3 && nArgs != 4) || absSlot+nArgs >= len(vm.regs) {
+		return false, nil
+	}
+	initv := runtime.NilValue()
+	plainv := runtime.NilValue()
+	if nArgs >= 3 {
+		initv = vm.regs[absSlot+3]
+	}
+	if nArgs >= 4 {
+		plainv = vm.regs[absSlot+4]
+	}
+	r0, r1, n, handled, err := runtime.FastStringFindRet2(vm.regs[absSlot+1], vm.regs[absSlot+2], initv, plainv, nArgs, rawC)
+	if err != nil || !handled {
+		return handled, err
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{r0, r1}[:n])
+	return true, nil
+}
+
+// ExecuteStdStringMatchCall handles string.match when the visible result range
+// fits the fixed two-value native fast protocol.
+func (vm *VM) ExecuteStdStringMatchCall(absSlot, nArgs, rawC int) (bool, error) {
+	if (nArgs != 2 && nArgs != 3) || absSlot+nArgs >= len(vm.regs) {
+		return false, nil
+	}
+	initv := runtime.NilValue()
+	if nArgs >= 3 {
+		initv = vm.regs[absSlot+3]
+	}
+	r0, r1, n, handled, err := runtime.FastStringMatchRet2(vm.regs[absSlot+1], vm.regs[absSlot+2], initv, nArgs, rawC)
+	if err != nil || !handled {
+		return handled, err
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{r0, r1}[:n])
+	return true, nil
+}
+
 func (vm *VM) luaToString(v runtime.Value) (string, error) {
 	if v.IsTable() {
 		if mt := v.Table().GetMetatable(); mt != nil {
@@ -4001,6 +4043,28 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					case runtime.NativeKindStdPairs:
 						if gf.NativeData == runtime.StdPairsIdentityPtr() {
 							handled, err := vm.ExecuteStdPairsCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdStringFind:
+						if gf.NativeData == runtime.StdStringFindIdentityPtr() {
+							handled, err := vm.ExecuteStdStringFindCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdStringMatch:
+						if gf.NativeData == runtime.StdStringMatchIdentityPtr() {
+							handled, err := vm.ExecuteStdStringMatchCall(base+a, nArgs, c)
 							if err != nil {
 								return nil, wrapLineErr(frame, err)
 							}

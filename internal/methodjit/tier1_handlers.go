@@ -585,6 +585,20 @@ slowPath:
 					return err
 				}
 			}
+		case runtime.NativeKindStdStringFind:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdStringFindIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdStringFindCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
+		case runtime.NativeKindStdStringMatch:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdStringMatchIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdStringMatchCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
 		}
 		if nArgs == 1 && gf.FastArg1Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)

@@ -20,6 +20,8 @@ const (
 	NativeKindStdSelect       uint8 = 103
 	NativeKindStdPairs        uint8 = 104
 	NativeKindStdIPairs       uint8 = 105
+	NativeKindStdStringFind   uint8 = 106
+	NativeKindStdStringMatch  uint8 = 107
 )
 
 var stdStringFormatIdentity byte
@@ -29,6 +31,8 @@ var stdToNumberIdentity byte
 var stdSelectIdentity byte
 var stdPairsIdentity byte
 var stdIPairsIdentity byte
+var stdStringFindIdentity byte
+var stdStringMatchIdentity byte
 
 type compiledLuaPatternCacheEntry struct {
 	prog luaPatternProgram
@@ -321,6 +325,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		return result, nil
 	})
+	if v := t.RawGetString("find"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.NativeKind = NativeKindStdStringFind
+		gf.NativeData = StdStringFindIdentityPtr()
+	}
 	// string.match(s, pattern [, init]) -> captures...
 	set("match", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
@@ -377,6 +386,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		return result, nil
 	})
+	if v := t.RawGetString("match"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.NativeKind = NativeKindStdStringMatch
+		gf.NativeData = StdStringMatchIdentityPtr()
+	}
 	// string.gmatch(s, pattern [, init]) -> iterator
 	set("gmatch", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
@@ -411,15 +425,25 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
 			allMatches := findAllBalancedRanges(searchStr, open, close)
 			idx := 0
+			next := func() (Value, Value, int, error) {
+				if idx >= len(allMatches) {
+					return NilValue(), NilValue(), 1, nil
+				}
+				loc := allMatches[idx]
+				idx++
+				return StringValue(searchStr[loc[0]:loc[1]]), NilValue(), 1, nil
+			}
 			iter := &GoFunction{
 				Name: "gmatch_iterator",
 				Fn: func(_ []Value) ([]Value, error) {
-					if idx >= len(allMatches) {
-						return []Value{NilValue()}, nil
+					r0, _, _, err := next()
+					if err != nil {
+						return nil, err
 					}
-					loc := allMatches[idx]
-					idx++
-					return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
+					return []Value{r0}, nil
+				},
+				FastArg2Ret2: func(_, _ Value) (Value, Value, int, error) {
+					return next()
 				},
 			}
 			return []Value{FunctionValue(iter)}, nil
@@ -430,18 +454,55 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		allMatches := prog.findAllSubmatchIndex(re, searchStr)
 		idx := 0
+		next := func() (Value, Value, int, error) {
+			if idx >= len(allMatches) {
+				return NilValue(), NilValue(), 1, nil
+			}
+			loc := allMatches[idx]
+			idx++
+			if len(prog.captureSlots) == 0 {
+				return StringValue(searchStr[loc[0]:loc[1]]), NilValue(), 1, nil
+			}
+			var r0, r1 Value
+			for i, slot := range prog.captureSlots {
+				pos := slot * 2
+				v := NilValue()
+				if pos+1 < len(loc) && loc[pos] >= 0 {
+					if prog.captureKinds[i] == luaPatternCapturePosition {
+						v = IntValue(int64(loc[pos] + init))
+					} else {
+						v = StringValue(searchStr[loc[pos]:loc[pos+1]])
+					}
+				}
+				if i == 0 {
+					r0 = v
+				} else if i == 1 {
+					r1 = v
+				}
+			}
+			switch len(prog.captureSlots) {
+			case 1:
+				return r0, NilValue(), 1, nil
+			default:
+				return r0, r1, 2, nil
+			}
+		}
 		iter := &GoFunction{
 			Name: "gmatch_iterator",
 			Fn: func(_ []Value) ([]Value, error) {
+				if len(prog.captureSlots) == 0 {
+					r0, _, _, err := next()
+					if err != nil {
+						return nil, err
+					}
+					return []Value{r0}, nil
+				}
+				result := make([]Value, 0, len(prog.captureSlots))
 				if idx >= len(allMatches) {
 					return []Value{NilValue()}, nil
 				}
 				loc := allMatches[idx]
 				idx++
-				if len(prog.captureSlots) == 0 {
-					return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
-				}
-				result := make([]Value, 0, len(prog.captureSlots))
 				for i, slot := range prog.captureSlots {
 					pos := slot * 2
 					if pos+1 < len(loc) && loc[pos] >= 0 {
@@ -456,6 +517,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 				}
 				return result, nil
 			},
+		}
+		if len(prog.captureSlots) <= 2 {
+			iter.FastArg2Ret2 = func(_, _ Value) (Value, Value, int, error) {
+				return next()
+			}
 		}
 		return []Value{FunctionValue(iter)}, nil
 	})
@@ -1094,6 +1160,144 @@ func StdPairsIdentityPtr() unsafe.Pointer {
 
 func StdIPairsIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdIPairsIdentity)
+}
+
+func StdStringFindIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdStringFindIdentity)
+}
+
+func StdStringMatchIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdStringMatchIdentity)
+}
+
+// FastStringFindRet2 computes the first two string.find return values without
+// allocating a result slice. It only handles cases where dropping captures is
+// semantically safe for the caller's fixed result count.
+func FastStringFindRet2(sv, pv, initv, plainv Value, nArgs, rawC int) (Value, Value, int, bool, error) {
+	if nArgs != 2 && nArgs != 3 && nArgs != 4 {
+		return NilValue(), NilValue(), 0, false, nil
+	}
+	if !sv.IsString() || !pv.IsString() {
+		return NilValue(), NilValue(), 0, true, fmt.Errorf("bad argument to 'string.find' (string expected)")
+	}
+	s := sv.Str()
+	pattern := pv.Str()
+	init := 1
+	if nArgs >= 3 {
+		init = int(toInt(initv))
+	}
+	if init < 0 {
+		init = len(s) + init + 1
+	}
+	if init < 1 {
+		init = 1
+	}
+	if init > len(s)+1 {
+		return NilValue(), NilValue(), 1, true, nil
+	}
+	searchStr := s[init-1:]
+	if nArgs >= 4 && plainv.Truthy() {
+		idx := strings.Index(searchStr, pattern)
+		if idx < 0 {
+			return NilValue(), NilValue(), 1, true, nil
+		}
+		start := idx + init
+		end := start + len(pattern) - 1
+		return IntValue(int64(start)), IntValue(int64(end)), 2, true, nil
+	}
+
+	if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
+		loc := findBalancedRange(searchStr, open, close, 0)
+		if loc == nil {
+			return NilValue(), NilValue(), 1, true, nil
+		}
+		return IntValue(int64(loc[0] + init)), IntValue(int64(loc[1] + init - 1)), 2, true, nil
+	}
+	prog, re, err := cachedLuaPatternRegexp(pattern)
+	if err != nil {
+		return NilValue(), NilValue(), 0, true, fmt.Errorf("invalid pattern: %s", err)
+	}
+	if len(prog.captureSlots) > 0 && (rawC == 0 || rawC-1 > 2) {
+		return NilValue(), NilValue(), 0, false, nil
+	}
+	loc := prog.findSubmatchIndex(re, searchStr)
+	if loc == nil {
+		return NilValue(), NilValue(), 1, true, nil
+	}
+	return IntValue(int64(loc[0] + init)), IntValue(int64(loc[1] + init - 1)), 2, true, nil
+}
+
+// FastStringMatchRet2 computes string.match results without allocating a result
+// slice when the caller's fixed result count cannot observe later captures.
+func FastStringMatchRet2(sv, pv, initv Value, nArgs, rawC int) (Value, Value, int, bool, error) {
+	if nArgs != 2 && nArgs != 3 {
+		return NilValue(), NilValue(), 0, false, nil
+	}
+	if !sv.IsString() || !pv.IsString() {
+		return NilValue(), NilValue(), 0, true, fmt.Errorf("bad argument to 'string.match' (string expected)")
+	}
+	s := sv.Str()
+	pattern := pv.Str()
+	init := 1
+	if nArgs >= 3 {
+		init = int(toInt(initv))
+	}
+	if init < 0 {
+		init = len(s) + init + 1
+	}
+	if init < 1 {
+		init = 1
+	}
+	if init > len(s)+1 {
+		return NilValue(), NilValue(), 1, true, nil
+	}
+	searchStr := s[init-1:]
+
+	if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
+		loc := findBalancedRange(searchStr, open, close, 0)
+		if loc == nil {
+			return NilValue(), NilValue(), 1, true, nil
+		}
+		return StringValue(searchStr[loc[0]:loc[1]]), NilValue(), 1, true, nil
+	}
+	prog, re, err := cachedLuaPatternRegexp(pattern)
+	if err != nil {
+		return NilValue(), NilValue(), 0, true, fmt.Errorf("invalid pattern: %s", err)
+	}
+	if len(prog.captureSlots) > 2 && (rawC == 0 || rawC-1 > 2) {
+		return NilValue(), NilValue(), 0, false, nil
+	}
+	loc := prog.findSubmatchIndex(re, searchStr)
+	if loc == nil {
+		return NilValue(), NilValue(), 1, true, nil
+	}
+	if len(prog.captureSlots) == 0 {
+		return StringValue(searchStr[loc[0]:loc[1]]), NilValue(), 1, true, nil
+	}
+	var r0, r1 Value
+	for i, slot := range prog.captureSlots {
+		if i >= 2 {
+			break
+		}
+		pos := slot * 2
+		v := NilValue()
+		if pos+1 < len(loc) && loc[pos] >= 0 {
+			if prog.captureKinds[i] == luaPatternCapturePosition {
+				v = IntValue(int64(loc[pos] + init))
+			} else {
+				v = StringValue(searchStr[loc[pos]:loc[pos+1]])
+			}
+		}
+		if i == 0 {
+			r0 = v
+		} else {
+			r1 = v
+		}
+	}
+	if len(prog.captureSlots) == 1 {
+		return r0, NilValue(), 1, true, nil
+	}
+	return r0, r1, 2, true, nil
 }
 
 func IsStdStringSplitFunction(v Value) bool {
