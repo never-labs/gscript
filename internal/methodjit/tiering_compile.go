@@ -99,7 +99,7 @@ func (tm *TieringManager) CompileTier2(proto *vm.FuncProto) error {
 		tm.markTier2Compiled(proto, t2)
 		return nil
 	}
-	if t2, ok := tm.compileTier2WholeCallProtocol(proto); ok {
+	if t2, ok := tm.compileTier2RuntimeSpecializationEntry(proto); ok {
 		tm.markTier2Compiled(proto, t2)
 		return nil
 	}

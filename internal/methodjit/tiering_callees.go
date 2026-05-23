@@ -310,7 +310,7 @@ func (tm *TieringManager) ensureNativeLoopCallees(proto *vm.FuncProto) {
 			tm.markTier2Compiled(callee, cf)
 			continue
 		}
-		if cf, ok := tm.compileTier2WholeCallProtocol(callee); ok {
+		if cf, ok := tm.compileTier2RuntimeSpecializationEntry(callee); ok {
 			tm.markTier2Compiled(callee, cf)
 			continue
 		}

@@ -209,9 +209,9 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 				"preserved self call for specialized recursive entry")
 			continue
 		}
-		if computeLoopInfo(fn).loopBlocks[block.ID] && inlineCalleeHasWholeCallProtocol(calleeProto, config.Globals) {
+		if computeLoopInfo(fn).loopBlocks[block.ID] && inlineCalleeHasRuntimeSpecializationEntry(calleeProto, config.Globals) {
 			functionRemarks(fn).Add("Inline", "missed", block.ID, instr.ID, instr.Op,
-				fmt.Sprintf("preserved %s call for whole-call runtime-specialization protocol", calleeName))
+				fmt.Sprintf("preserved %s call for runtime-specialization entry", calleeName))
 			continue
 		}
 
@@ -645,7 +645,7 @@ func hasInlineFeedbackCallee(fn *Function) bool {
 	return false
 }
 
-func inlineCalleeHasWholeCallProtocol(callee *vm.FuncProto, globals map[string]*vm.FuncProto) bool {
+func inlineCalleeHasRuntimeSpecializationEntry(callee *vm.FuncProto, globals map[string]*vm.FuncProto) bool {
 	if callee == nil || len(globals) == 0 {
 		return false
 	}
@@ -754,7 +754,7 @@ func fieldShapeInlineSplitCaseRejectReason(c FieldPolyShapeCase, callArgs []*Val
 	if len(c.VMProto.Code) > config.MaxSize {
 		return "size"
 	}
-	if inlineCalleeHasWholeCallProtocol(c.VMProto, config.Globals) {
+	if inlineCalleeHasRuntimeSpecializationEntry(c.VMProto, config.Globals) {
 		return "whole-call-protocol"
 	}
 	calleeFn := BuildGraph(c.VMProto)

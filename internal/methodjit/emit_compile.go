@@ -373,7 +373,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 
 	// Emit prologue.
 	ec.emitPrologue()
-	ec.emitProtocolConstCallEntryGuards()
+	ec.emitRuntimeSpecializationConstCallEntryGuards()
 
 	if hasShiftAddVersion {
 		ec.emitShiftAddOverflowVersion(shiftAddVersion)

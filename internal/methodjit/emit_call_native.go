@@ -3105,7 +3105,7 @@ func (ec *emitContext) emitOpCall(instr *Instr) {
 		ec.emitCallNativeNumericTail(instr)
 	} else if !ec.tailCallInstrs[instr.ID] && ec.isNumericStaticSelfCall(instr) {
 		ec.emitCallNativeRawIntSelf(instr)
-	} else if ec.emitProtocolConstCallIfEligible(instr) {
+	} else if ec.emitRuntimeSpecializationConstCallIfEligible(instr) {
 	} else if ec.emitWholeCallRuntimeSpecializationOpExitIfEligible(instr) {
 	} else if ec.emitCallNativeRawIntPeerIfEligible(instr) {
 	} else if ec.emitCallNativeFieldShapeTypedPeerIfEligible(instr) {

@@ -744,7 +744,7 @@ func (tm *TieringManager) promoteTier2(proto *vm.FuncProto) interface{} {
 		proto.EnsureFeedback()
 	}
 
-	if t2, ok := tm.compileTier2WholeCallProtocol(proto); ok {
+	if t2, ok := tm.compileTier2RuntimeSpecializationEntry(proto); ok {
 		tm.markTier2Compiled(proto, t2)
 		return t2
 	}
@@ -767,7 +767,7 @@ func (tm *TieringManager) promoteTier2(proto *vm.FuncProto) interface{} {
 	return t2
 }
 
-func (tm *TieringManager) compileTier2WholeCallProtocol(proto *vm.FuncProto) (*CompiledFunction, bool) {
+func (tm *TieringManager) compileTier2RuntimeSpecializationEntry(proto *vm.FuncProto) (*CompiledFunction, bool) {
 	if t2, ok := tm.compileRuntimeRecursiveTableBuilderTier2(proto); ok {
 		return t2, true
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func baselineProtocolConstCallFolds(proto *vm.FuncProto) map[int]ProtocolConstCallFoldFact {
+func baselineRuntimeSpecializationConstCallFolds(proto *vm.FuncProto) map[int]RuntimeSpecializationConstCallFoldFact {
 	globals := buildProtoInlineGlobals(proto)
 	if len(globals) == 0 {
 		globals = buildProtoStableGlobals(proto)
@@ -15,18 +15,18 @@ func baselineProtocolConstCallFolds(proto *vm.FuncProto) map[int]ProtocolConstCa
 	if len(globals) == 0 {
 		return nil
 	}
-	fn := AnnotateProtocolConstCallFolds(BuildGraph(proto), globals)
+	fn := AnnotateRuntimeSpecializationConstCallFolds(BuildGraph(proto), globals)
 	callFacts := functionCallFacts(fn)
-	if callFacts.ProtocolConstCallFoldCount() == 0 {
+	if callFacts.RuntimeSpecializationConstCallFoldCount() == 0 {
 		return nil
 	}
-	byPC := make(map[int]ProtocolConstCallFoldFact, callFacts.ProtocolConstCallFoldCount())
+	byPC := make(map[int]RuntimeSpecializationConstCallFoldFact, callFacts.RuntimeSpecializationConstCallFoldCount())
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpCall || !instr.HasSource || instr.SourcePC < 0 {
 				continue
 			}
-			if fact, ok := callFacts.ProtocolConstCallFold(instr.ID); ok {
+			if fact, ok := callFacts.RuntimeSpecializationConstCallFold(instr.ID); ok {
 				byPC[instr.SourcePC] = fact
 			}
 		}
@@ -37,7 +37,7 @@ func baselineProtocolConstCallFolds(proto *vm.FuncProto) map[int]ProtocolConstCa
 	return byPC
 }
 
-func emitBaselineProtocolConstCallIfEligible(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, folds map[int]ProtocolConstCallFoldFact) bool {
+func emitBaselineRuntimeSpecializationConstCallIfEligible(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, folds map[int]RuntimeSpecializationConstCallFoldFact) bool {
 	fact, ok := folds[pc]
 	if !ok || fact.CalleeProto == nil || len(fact.GuardConsts) != len(fact.GuardProtos) {
 		return false

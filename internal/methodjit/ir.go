@@ -31,11 +31,11 @@ type LoopTableArrayFact struct {
 	AccessOp         Op
 }
 
-// ProtocolConstCallFoldFact records a callsite whose callee is a guarded
-// whole-call runtime-specialization protocol and whose integer arguments are compile-time constants or
+// RuntimeSpecializationConstCallFoldFact records a callsite whose callee is a guarded
+// runtime-specialization entry and whose integer arguments are compile-time constants or
 // guarded stable globals. Codegen guards dependencies before materializing the
 // folded Result; guard miss falls back to the normal call-exit path.
-type ProtocolConstCallFoldFact struct {
+type RuntimeSpecializationConstCallFoldFact struct {
 	CalleeProto    *vm.FuncProto
 	Result         int64
 	GuardConsts    []int

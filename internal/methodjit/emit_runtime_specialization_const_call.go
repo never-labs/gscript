@@ -10,12 +10,12 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func (ec *emitContext) emitProtocolConstCallIfEligible(instr *Instr) bool {
+func (ec *emitContext) emitRuntimeSpecializationConstCallIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
 	callFacts := functionCallFacts(ec.fn)
-	fact, ok := callFacts.ProtocolConstCallFold(instr.ID)
+	fact, ok := callFacts.RuntimeSpecializationConstCallFold(instr.ID)
 	if !ok || fact.CalleeProto == nil || len(fact.GuardConsts) != len(fact.GuardProtos) ||
 		len(fact.IntGuardConsts) != len(fact.IntGuardValues) || len(instr.Args) == 0 {
 		return false
@@ -43,10 +43,10 @@ func (ec *emitContext) emitProtocolConstCallIfEligible(instr *Instr) bool {
 		asm.STR(jit.X0, mRegRegs, slotOffset(funcSlot+i))
 	}
 
-	if !ec.protocolConstCallEntryGuarded(fact) || len(fact.IntGuardConsts) != 0 {
+	if !ec.runtimeSpecializationConstCallEntryGuarded(fact) || len(fact.IntGuardConsts) != 0 {
 		deoptLabel := ec.uniqueLabel("protocol_const_call_deopt")
 		doneGuardLabel := ec.uniqueLabel("protocol_const_call_guard_done")
-		if !ec.protocolConstCallEntryGuarded(fact) {
+		if !ec.runtimeSpecializationConstCallEntryGuarded(fact) {
 			for i, constIdx := range fact.GuardConsts {
 				ec.emitIndexedGlobalAddress(constIdx, deoptLabel)
 				asm.LDRreg(jit.X0, jit.X16, jit.X17)
@@ -73,7 +73,7 @@ func (ec *emitContext) emitProtocolConstCallIfEligible(instr *Instr) bool {
 	}
 
 	for _, proto := range fact.GuardProtos {
-		ec.emitProtocolConstCallEntryMark(proto)
+		ec.emitRuntimeSpecializationConstCallEntryMark(proto)
 	}
 
 	asm.LoadImm64(jit.X0, fact.Result)
@@ -83,11 +83,11 @@ func (ec *emitContext) emitProtocolConstCallIfEligible(instr *Instr) bool {
 	return true
 }
 
-func (ec *emitContext) protocolConstCallEntryGuarded(fact ProtocolConstCallFoldFact) bool {
-	if ec == nil || ec.fn == nil || functionCallFacts(ec.fn).ProtocolConstCallFoldCount() == 0 {
+func (ec *emitContext) runtimeSpecializationConstCallEntryGuarded(fact RuntimeSpecializationConstCallFoldFact) bool {
+	if ec == nil || ec.fn == nil || functionCallFacts(ec.fn).RuntimeSpecializationConstCallFoldCount() == 0 {
 		return false
 	}
-	writes := protocolConstCallSetGlobalConsts(ec.fn)
+	writes := runtimeSpecializationConstCallSetGlobalConsts(ec.fn)
 	for _, constIdx := range fact.GuardConsts {
 		if writes[constIdx] {
 			return false
@@ -96,17 +96,17 @@ func (ec *emitContext) protocolConstCallEntryGuarded(fact ProtocolConstCallFoldF
 	return true
 }
 
-func (ec *emitContext) emitProtocolConstCallEntryGuards() {
+func (ec *emitContext) emitRuntimeSpecializationConstCallEntryGuards() {
 	var callFacts *CallFacts
 	if ec != nil {
 		callFacts = functionCallFacts(ec.fn)
 	}
-	if callFacts.ProtocolConstCallFoldCount() == 0 {
+	if callFacts.RuntimeSpecializationConstCallFoldCount() == 0 {
 		return
 	}
 	seen := make(map[int]*vm.FuncProto)
-	writes := protocolConstCallSetGlobalConsts(ec.fn)
-	callFacts.ForEachProtocolConstCallFold(func(_ int, fact ProtocolConstCallFoldFact) bool {
+	writes := runtimeSpecializationConstCallSetGlobalConsts(ec.fn)
+	callFacts.ForEachRuntimeSpecializationConstCallFold(func(_ int, fact RuntimeSpecializationConstCallFoldFact) bool {
 		if len(fact.IntGuardConsts) != 0 || len(fact.GuardConsts) != len(fact.GuardProtos) {
 			return true
 		}
@@ -143,7 +143,7 @@ func (ec *emitContext) emitProtocolConstCallEntryGuards() {
 	ec.asm.Label(doneLabel)
 }
 
-func protocolConstCallSetGlobalConsts(fn *Function) map[int]bool {
+func runtimeSpecializationConstCallSetGlobalConsts(fn *Function) map[int]bool {
 	out := make(map[int]bool)
 	if fn == nil {
 		return out
@@ -158,7 +158,7 @@ func protocolConstCallSetGlobalConsts(fn *Function) map[int]bool {
 	return out
 }
 
-func (ec *emitContext) emitProtocolConstCallEntryMark(protoPtr *vm.FuncProto) {
+func (ec *emitContext) emitRuntimeSpecializationConstCallEntryMark(protoPtr *vm.FuncProto) {
 	if protoPtr == nil {
 		return
 	}

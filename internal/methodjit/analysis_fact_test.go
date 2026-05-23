@@ -33,7 +33,7 @@ func knownAnalysisFactsForTest() []AnalysisFact {
 		AnalysisFactFixedTableConstructors,
 		AnalysisFactSpecDependencyProtos,
 		AnalysisFactCallABIs,
-		AnalysisFactProtocolConstCallFolds,
+		AnalysisFactRuntimeSpecializationConstCallFolds,
 		AnalysisFactWholeCallNoResultRuntimeSpecializations,
 		AnalysisFactWholeCallNoResultRuntimeSpecializationBatches,
 		AnalysisFactStringConstTables,

@@ -143,9 +143,9 @@ func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
 		t.Fatalf("CallFacts.SetCallABIs did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 
-	calls.SetProtocolConstCallFolds(map[int]ProtocolConstCallFoldFact{12: {Result: 99}})
-	if got, ok := a.ProtocolConstCallFolds[12]; !ok || got.Result != 99 {
-		t.Fatalf("CallFacts.SetProtocolConstCallFolds did not update compatibility field: got %#v ok=%v", got, ok)
+	calls.SetRuntimeSpecializationConstCallFolds(map[int]RuntimeSpecializationConstCallFoldFact{12: {Result: 99}})
+	if got, ok := a.RuntimeSpecializationConstCallFolds[12]; !ok || got.Result != 99 {
+		t.Fatalf("CallFacts.SetRuntimeSpecializationConstCallFolds did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 
 	calls.SetWholeCallNoResultRuntimeSpecializations(map[int]bool{13: true})
@@ -215,7 +215,7 @@ func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	desc := CallABIDescriptor{NumArgs: 3, NumRets: 1}
 	a := &AnalysisResult{
 		CallABIs:                                      map[int]CallABIDescriptor{21: desc},
-		ProtocolConstCallFolds:                        map[int]ProtocolConstCallFoldFact{22: {Result: 7}},
+		RuntimeSpecializationConstCallFolds:           map[int]RuntimeSpecializationConstCallFoldFact{22: {Result: 7}},
 		WholeCallNoResultRuntimeSpecializations:       map[int]bool{23: true},
 		WholeCallNoResultRuntimeSpecializationBatches: map[int]WholeCallNoResultRuntimeSpecializationBatchFact{23: {ExitPC: 8}},
 	}
@@ -224,8 +224,8 @@ func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
 	if got, ok := calls.CallABI(21); !ok || got.NumArgs != desc.NumArgs {
 		t.Fatalf("CallFacts did not adopt legacy CallABIs: got %#v ok=%v", got, ok)
 	}
-	if got, ok := calls.ProtocolConstCallFold(22); !ok || got.Result != 7 {
-		t.Fatalf("CallFacts did not adopt legacy ProtocolConstCallFolds: got %#v ok=%v", got, ok)
+	if got, ok := calls.RuntimeSpecializationConstCallFold(22); !ok || got.Result != 7 {
+		t.Fatalf("CallFacts did not adopt legacy RuntimeSpecializationConstCallFolds: got %#v ok=%v", got, ok)
 	}
 	if !calls.WholeCallNoResultRuntimeSpecialization(23) {
 		t.Fatalf("CallFacts did not adopt compatibility WholeCallNoResultRuntimeSpecializations")
@@ -240,8 +240,8 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 	if calls.CallABICount() != 0 {
 		t.Fatalf("nil CallFacts reported CallABI facts")
 	}
-	if calls.ProtocolConstCallFoldCount() != 0 {
-		t.Fatalf("nil CallFacts reported protocol const call facts")
+	if calls.RuntimeSpecializationConstCallFoldCount() != 0 {
+		t.Fatalf("nil CallFacts reported runtime specialization const call facts")
 	}
 	if calls.WholeCallNoResultRuntimeSpecializationBatchMap() != nil {
 		t.Fatalf("nil CallFacts returned whole-call no-result batches")
@@ -257,12 +257,12 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 	}
 
 	visitedProtocolFold := false
-	calls.ForEachProtocolConstCallFold(func(int, ProtocolConstCallFoldFact) bool {
+	calls.ForEachRuntimeSpecializationConstCallFold(func(int, RuntimeSpecializationConstCallFoldFact) bool {
 		visitedProtocolFold = true
 		return true
 	})
 	if visitedProtocolFold {
-		t.Fatalf("nil CallFacts visited protocol const call facts")
+		t.Fatalf("nil CallFacts visited runtime specialization const call facts")
 	}
 }
 
@@ -270,7 +270,7 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 	a := NewAnalysisResult()
 	calls := a.CallFacts()
 	a.CallABIs = map[int]CallABIDescriptor{31: {NumArgs: 4}}
-	a.ProtocolConstCallFolds = map[int]ProtocolConstCallFoldFact{32: {Result: 12}}
+	a.RuntimeSpecializationConstCallFolds = map[int]RuntimeSpecializationConstCallFoldFact{32: {Result: 12}}
 	a.WholeCallNoResultRuntimeSpecializations = map[int]bool{33: true}
 	a.WholeCallNoResultRuntimeSpecializationBatches = map[int]WholeCallNoResultRuntimeSpecializationBatchFact{34: {ExitPC: 55}}
 
@@ -278,8 +278,8 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 	if got, ok := calls.CallABI(31); !ok || got.NumArgs != 4 {
 		t.Fatalf("CallFacts did not rebind legacy CallABIs: got %#v ok=%v", got, ok)
 	}
-	if got, ok := calls.ProtocolConstCallFold(32); !ok || got.Result != 12 {
-		t.Fatalf("CallFacts did not rebind legacy ProtocolConstCallFolds: got %#v ok=%v", got, ok)
+	if got, ok := calls.RuntimeSpecializationConstCallFold(32); !ok || got.Result != 12 {
+		t.Fatalf("CallFacts did not rebind legacy RuntimeSpecializationConstCallFolds: got %#v ok=%v", got, ok)
 	}
 	if !calls.WholeCallNoResultRuntimeSpecialization(33) {
 		t.Fatalf("CallFacts did not rebind compatibility WholeCallNoResultRuntimeSpecializations")
@@ -292,7 +292,7 @@ func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
 func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testing.T) {
 	a := &AnalysisResult{Call: NewCallFacts()}
 	a.Call.CallABIs[41] = CallABIDescriptor{NumArgs: 5}
-	a.Call.ProtocolConstCallFolds[42] = ProtocolConstCallFoldFact{Result: 13}
+	a.Call.RuntimeSpecializationConstCallFolds[42] = RuntimeSpecializationConstCallFoldFact{Result: 13}
 	a.Call.WholeCallNoResultRuntimeSpecializations[43] = true
 	a.Call.WholeCallNoResultRuntimeSpecializationBatches[44] = WholeCallNoResultRuntimeSpecializationBatchFact{ExitPC: 66}
 
@@ -300,8 +300,8 @@ func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testin
 	if got, ok := calls.CallABI(41); !ok || got.NumArgs != 5 {
 		t.Fatalf("CallFacts lost domain CallABIs with nil legacy field: got %#v ok=%v", got, ok)
 	}
-	if got, ok := calls.ProtocolConstCallFold(42); !ok || got.Result != 13 {
-		t.Fatalf("CallFacts lost domain ProtocolConstCallFolds with nil legacy field: got %#v ok=%v", got, ok)
+	if got, ok := calls.RuntimeSpecializationConstCallFold(42); !ok || got.Result != 13 {
+		t.Fatalf("CallFacts lost domain RuntimeSpecializationConstCallFolds with nil legacy field: got %#v ok=%v", got, ok)
 	}
 	if !calls.WholeCallNoResultRuntimeSpecialization(43) {
 		t.Fatalf("CallFacts lost domain WholeCallNoResultRuntimeSpecializations with nil legacy field")

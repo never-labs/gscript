@@ -130,9 +130,9 @@ type AnalysisResult struct {
 	// is available but currently has no suppressed guards.
 	SuppressedSpecGuardKinds map[int]map[string]bool
 
-	// ProtocolConstCallFolds records guarded whole-call runtime-specialization
+	// RuntimeSpecializationConstCallFolds records guarded whole-call runtime-specialization
 	// constants keyed by OpCall instruction ID.
-	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
+	RuntimeSpecializationConstCallFolds map[int]RuntimeSpecializationConstCallFoldFact
 
 	// WholeCallNoResultRuntimeSpecializations records stable structural
 	// no-result whole-call runtime specializations keyed by OpCall instruction
@@ -548,9 +548,9 @@ type CallFacts struct {
 	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
 	CallABIs map[int]CallABIDescriptor
 
-	// ProtocolConstCallFolds records guarded whole-call runtime-specialization
+	// RuntimeSpecializationConstCallFolds records guarded whole-call runtime-specialization
 	// constants keyed by OpCall instruction ID.
-	ProtocolConstCallFolds map[int]ProtocolConstCallFoldFact
+	RuntimeSpecializationConstCallFolds map[int]RuntimeSpecializationConstCallFoldFact
 
 	// WholeCallNoResultRuntimeSpecializations records stable structural
 	// no-result whole-call runtime specializations keyed by OpCall instruction
@@ -574,8 +574,8 @@ func (c *CallFacts) Initialize() {
 	if c.CallABIs == nil {
 		c.CallABIs = make(map[int]CallABIDescriptor)
 	}
-	if c.ProtocolConstCallFolds == nil {
-		c.ProtocolConstCallFolds = make(map[int]ProtocolConstCallFoldFact)
+	if c.RuntimeSpecializationConstCallFolds == nil {
+		c.RuntimeSpecializationConstCallFolds = make(map[int]RuntimeSpecializationConstCallFoldFact)
 	}
 	if c.WholeCallNoResultRuntimeSpecializations == nil {
 		c.WholeCallNoResultRuntimeSpecializations = make(map[int]bool)
@@ -616,31 +616,31 @@ func (c *CallFacts) ForEachCallABI(visit func(int, CallABIDescriptor) bool) {
 	}
 }
 
-func (c *CallFacts) SetProtocolConstCallFolds(facts map[int]ProtocolConstCallFoldFact) {
-	c.ProtocolConstCallFolds = facts
+func (c *CallFacts) SetRuntimeSpecializationConstCallFolds(facts map[int]RuntimeSpecializationConstCallFoldFact) {
+	c.RuntimeSpecializationConstCallFolds = facts
 	c.bindOwner()
 }
 
-func (c *CallFacts) ProtocolConstCallFold(id int) (ProtocolConstCallFoldFact, bool) {
-	if c == nil || c.ProtocolConstCallFolds == nil {
-		return ProtocolConstCallFoldFact{}, false
+func (c *CallFacts) RuntimeSpecializationConstCallFold(id int) (RuntimeSpecializationConstCallFoldFact, bool) {
+	if c == nil || c.RuntimeSpecializationConstCallFolds == nil {
+		return RuntimeSpecializationConstCallFoldFact{}, false
 	}
-	fact, ok := c.ProtocolConstCallFolds[id]
+	fact, ok := c.RuntimeSpecializationConstCallFolds[id]
 	return fact, ok
 }
 
-func (c *CallFacts) ProtocolConstCallFoldCount() int {
+func (c *CallFacts) RuntimeSpecializationConstCallFoldCount() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.ProtocolConstCallFolds)
+	return len(c.RuntimeSpecializationConstCallFolds)
 }
 
-func (c *CallFacts) ForEachProtocolConstCallFold(visit func(int, ProtocolConstCallFoldFact) bool) {
+func (c *CallFacts) ForEachRuntimeSpecializationConstCallFold(visit func(int, RuntimeSpecializationConstCallFoldFact) bool) {
 	if c == nil || visit == nil {
 		return
 	}
-	for id, fact := range c.ProtocolConstCallFolds {
+	for id, fact := range c.RuntimeSpecializationConstCallFolds {
 		if !visit(id, fact) {
 			return
 		}
@@ -689,7 +689,7 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 	if a.Call == nil {
 		a.Call = &CallFacts{
 			CallABIs:                                      a.CallABIs,
-			ProtocolConstCallFolds:                        a.ProtocolConstCallFolds,
+			RuntimeSpecializationConstCallFolds:           a.RuntimeSpecializationConstCallFolds,
 			WholeCallNoResultRuntimeSpecializations:       a.WholeCallNoResultRuntimeSpecializations,
 			WholeCallNoResultRuntimeSpecializationBatches: a.WholeCallNoResultRuntimeSpecializationBatches,
 		}
@@ -697,8 +697,8 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 		if a.CallABIs != nil || a.Call.CallABIs == nil {
 			a.Call.CallABIs = a.CallABIs
 		}
-		if a.ProtocolConstCallFolds != nil || a.Call.ProtocolConstCallFolds == nil {
-			a.Call.ProtocolConstCallFolds = a.ProtocolConstCallFolds
+		if a.RuntimeSpecializationConstCallFolds != nil || a.Call.RuntimeSpecializationConstCallFolds == nil {
+			a.Call.RuntimeSpecializationConstCallFolds = a.RuntimeSpecializationConstCallFolds
 		}
 		if a.WholeCallNoResultRuntimeSpecializations != nil || a.Call.WholeCallNoResultRuntimeSpecializations == nil {
 			a.Call.WholeCallNoResultRuntimeSpecializations = a.WholeCallNoResultRuntimeSpecializations
@@ -732,7 +732,7 @@ func (a *AnalysisResult) bindCallCompatibilityFields() {
 		return
 	}
 	a.CallABIs = a.Call.CallABIs
-	a.ProtocolConstCallFolds = a.Call.ProtocolConstCallFolds
+	a.RuntimeSpecializationConstCallFolds = a.Call.RuntimeSpecializationConstCallFolds
 	a.WholeCallNoResultRuntimeSpecializations = a.Call.WholeCallNoResultRuntimeSpecializations
 	a.WholeCallNoResultRuntimeSpecializationBatches = a.Call.WholeCallNoResultRuntimeSpecializationBatches
 }
