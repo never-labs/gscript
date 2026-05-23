@@ -8,7 +8,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func boolTableStrikeCountSource(t *testing.T) string {
+func boolTableMarkCountSource(t *testing.T) string {
 	t.Helper()
 	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "sieve.gs"))
 	if err != nil {
@@ -17,26 +17,26 @@ func boolTableStrikeCountSource(t *testing.T) string {
 	return string(src)
 }
 
-func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
-	top := compileProto(t, boolTableStrikeCountSource(t))
+func TestBoolTableMarkCountRuntimeSpecializationDiagnostics(t *testing.T) {
+	top := compileProto(t, boolTableMarkCountSource(t))
 	sieve := findTestProtoByName(top, "sieve")
 	if sieve == nil {
 		t.Fatal("missing sieve proto")
 	}
 
-	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "bool_table_strike_count")
-	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(sieve), "bool_table_strike_count")
-	if !cachedRuntimeSpecializationRecognized(sieve, runtimeSpecializationBoolTableStrikeCount) {
-		t.Fatal("bool_table_strike_count rejected by runtime specialization cache")
+	requireRuntimeSpecializationInfo(t, CallSiteRuntimeSpecializationCatalog(), "bool_table_mark_count")
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(sieve), "bool_table_mark_count")
+	if !cachedRuntimeSpecializationRecognized(sieve, runtimeSpecializationBoolTableMarkCount) {
+		t.Fatal("bool_table_mark_count rejected by runtime specialization cache")
 	}
 	if sieve.RuntimeSpecialization == nil || sieve.RuntimeSpecialization.recognized == 0 {
 		t.Fatal("runtime specialization cache was not populated")
 	}
-	if sieve.BoolTableStrikeCountSpecialization == nil || sieve.BoolTableStrikeCountSpecialization.spec == nil {
-		t.Fatal("bool table strike-count proto-local spec was not generated")
+	if sieve.BoolTableMarkCountSpecialization == nil || sieve.BoolTableMarkCountSpecialization.spec == nil {
+		t.Fatal("bool table mark-count proto-local spec was not generated")
 	}
 
-	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(sieve), "bool_table_strike_count")
+	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(sieve), "bool_table_mark_count")
 	if !diag.Recognized || diag.Reason != runtimeSpecializationReasonRecognized {
 		t.Fatalf("diagnostic = %+v, want recognized %q", diag, runtimeSpecializationReasonRecognized)
 	}
@@ -47,20 +47,20 @@ func TestBoolTableStrikeCountRuntimeSpecializationDiagnostics(t *testing.T) {
 	}
 }
 
-func TestBoolTableStrikeCountIgnoresBenchmarkMetadata(t *testing.T) {
-	top := compileProto(t, boolTableStrikeCountSource(t))
+func TestBoolTableMarkCountIgnoresBenchmarkMetadata(t *testing.T) {
+	top := compileProto(t, boolTableMarkCountSource(t))
 	sieve := findTestProtoByName(top, "sieve")
 	if sieve == nil {
 		t.Fatal("missing sieve proto")
 	}
 	sieve.Name = "shape_only_bool_table_count"
 	sieve.Source = "host/generated/not-a-benchmark.gs"
-	if !isBoolTableStrikeCountProto(sieve) {
-		t.Fatalf("bool table strike count should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(sieve.Code), len(sieve.Constants), sieve.MaxStack)
+	if !isBoolTableMarkCountProto(sieve) {
+		t.Fatalf("bool table mark count should recognize bytecode shape independent of name/source: code=%d const=%d maxstack=%d", len(sieve.Code), len(sieve.Constants), sieve.MaxStack)
 	}
 }
 
-func TestBoolTableStrikeCountRuntimeSpecializationRecordsHit(t *testing.T) {
+func TestBoolTableMarkCountRuntimeSpecializationRecordsHit(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
@@ -90,7 +90,7 @@ func sieve(n) {
 result := sieve(100)
 `)
 	expectGlobalInt(t, globals, "result", 25)
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "bool_table_strike_count"); got != 1 {
-		t.Fatalf("bool_table_strike_count structural hit count = %d, want 1", got)
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "bool_table_mark_count"); got != 1 {
+		t.Fatalf("bool_table_mark_count structural hit count = %d, want 1", got)
 	}
 }

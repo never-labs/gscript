@@ -78,6 +78,7 @@ T2_ENTERED_RE = re.compile(r"^\s*Tier 2 entered:\s*([0-9]+)\s+functions\b", re.M
 T2_FAILED_RE = re.compile(r"^\s*Tier 2 failed:\s*([0-9]+)\s+functions\b", re.MULTILINE)
 EXIT_TOTAL_RE = re.compile(r"^\s*total exits:\s*([0-9]+)\b", re.MULTILINE)
 GS_ASSIGN_RE_TEMPLATE = r"(?m)^(\s*{name}\s*:=\s*)([^\n]+?)(\s*(?://.*)?)$"
+SCRIPT_SAMPLE_MARGIN = 1.2
 LUA_ASSIGN_RE_TEMPLATE = r"(?m)^(\s*(?:local\s+)?{name}\s*=\s*)([^\n]+?)(\s*(?:--.*)?)$"
 
 
@@ -326,7 +327,7 @@ def sample_big_enough(sample: Sample, min_sample_seconds: float) -> bool:
     if sample.status != "ok":
         return False
     if sample.source == "script_repeat":
-        return (sample.script_total_seconds or 0.0) >= min_sample_seconds
+        return (sample.script_total_seconds or 0.0) >= min_sample_seconds * SCRIPT_SAMPLE_MARGIN
     if sample.source == "wall_repeat":
         if sample.repeat <= 1:
             return False
@@ -356,7 +357,7 @@ def calibrate_repeat(
             and last.source == "wall_repeat"
             and last.script_total_seconds is not None
             and last.script_total_seconds > 0
-            and last.script_total_seconds < min_sample_seconds
+            and last.script_total_seconds <= min_sample_seconds
             and repeat < max_repeat
         ):
             repeat *= 2

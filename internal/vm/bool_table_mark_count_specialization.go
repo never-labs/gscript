@@ -2,27 +2,27 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
-type boolTableStrikeCountSpecializationCache struct {
+type boolTableMarkCountSpecializationCache struct {
 	fingerprint runtimeSpecializationFingerprint
-	spec        *boolTableStrikeCountSpecializationSpec
+	spec        *boolTableMarkCountSpecializationSpec
 }
 
-type boolTableStrikeCountSpecializationSpec struct {
+type boolTableMarkCountSpecializationSpec struct {
 	minValue int
 }
 
-func (vm *VM) tryRunBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationBoolTableStrikeCount) {
+func (vm *VM) tryRunBoolTableMarkCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationBoolTableMarkCount) {
 		return false, nil, nil
 	}
-	return vm.runBoolTableStrikeCountRuntimeSpecialization(cl, args)
+	return vm.runBoolTableMarkCountRuntimeSpecialization(cl, args)
 }
 
-func (vm *VM) runBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runBoolTableMarkCountRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 1 || !vm.noGlobalLock {
 		return false, nil, nil
 	}
-	spec, ok := boolTableStrikeCountSpecializationSpecForProto(cl.Proto)
+	spec, ok := boolTableMarkCountSpecializationSpecForProto(cl.Proto)
 	if !ok {
 		return false, nil, nil
 	}
@@ -37,7 +37,7 @@ func (vm *VM) runBoolTableStrikeCountRuntimeSpecialization(cl *Closure, args []r
 	return true, []runtime.Value{runtime.IntValue(spec.run(int(n64)))}, nil
 }
 
-func (spec *boolTableStrikeCountSpecializationSpec) run(n int) int64 {
+func (spec *boolTableMarkCountSpecializationSpec) run(n int) int64 {
 	if spec == nil || n < spec.minValue {
 		return 0
 	}
@@ -71,45 +71,45 @@ func (spec *boolTableStrikeCountSpecializationSpec) run(n int) int64 {
 	return count
 }
 
-func IsBoolTableStrikeCountSpecializationProto(p *FuncProto) bool {
-	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationBoolTableStrikeCount)
+func IsBoolTableMarkCountSpecializationProto(p *FuncProto) bool {
+	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationBoolTableMarkCount)
 }
 
-func isBoolTableStrikeCountProto(p *FuncProto) bool {
-	_, ok := boolTableStrikeCountSpecializationSpecForProto(p)
+func isBoolTableMarkCountProto(p *FuncProto) bool {
+	_, ok := boolTableMarkCountSpecializationSpecForProto(p)
 	return ok
 }
 
-func boolTableStrikeCountSpecializationSpecForProto(p *FuncProto) (*boolTableStrikeCountSpecializationSpec, bool) {
+func boolTableMarkCountSpecializationSpecForProto(p *FuncProto) (*boolTableMarkCountSpecializationSpec, bool) {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack < 13 ||
 		len(p.Constants) != 0 || len(p.Protos) != 0 {
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.BoolTableStrikeCountSpecialization
+	cache := p.BoolTableMarkCountSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
-	spec, ok := analyzeBoolTableStrikeCountSpecializationSpec(p.Code)
+	spec, ok := analyzeBoolTableMarkCountSpecializationSpec(p.Code)
 	if !ok {
-		p.BoolTableStrikeCountSpecialization = &boolTableStrikeCountSpecializationCache{fingerprint: fp}
+		p.BoolTableMarkCountSpecialization = &boolTableMarkCountSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.BoolTableStrikeCountSpecialization = &boolTableStrikeCountSpecializationCache{fingerprint: fp, spec: spec}
+	p.BoolTableMarkCountSpecialization = &boolTableMarkCountSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
-func analyzeBoolTableStrikeCountSpecializationSpec(code []uint32) (*boolTableStrikeCountSpecializationSpec, bool) {
+func analyzeBoolTableMarkCountSpecializationSpec(code []uint32) (*boolTableMarkCountSpecializationSpec, bool) {
 	if len(code) != 45 {
 		return nil, false
 	}
 	p := newBytecodePattern(code)
 	if !matchBoolTableInitFill(p) ||
-		!matchBoolTableStrikeMultiples(p) ||
+		!matchBoolTableMarkMultiples(p) ||
 		!matchBoolTableCountTruthy(p) {
 		return nil, false
 	}
-	return &boolTableStrikeCountSpecializationSpec{minValue: 2}, true
+	return &boolTableMarkCountSpecializationSpec{minValue: 2}, true
 }
 
 func matchBoolTableInitFill(p bytecodePattern) bool {
@@ -137,7 +137,7 @@ func matchBoolTableInitFill(p bytecodePattern) bool {
 		p.abc(7, OP_SETTABLE, flagsReg, fillKeyReg, trueReg)
 }
 
-func matchBoolTableStrikeMultiples(p bytecodePattern) bool {
+func matchBoolTableMarkMultiples(p bytecodePattern) bool {
 	const (
 		nReg     = 0
 		flagsReg = 1

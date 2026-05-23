@@ -10,7 +10,7 @@ const (
 	runtimeSpecializationIntGridAggregate
 	runtimeSpecializationMatrixMultiply
 	runtimeSpecializationRecordWalkFold
-	runtimeSpecializationBoolTableStrikeCount
+	runtimeSpecializationBoolTableMarkCount
 	runtimeSpecializationCount
 )
 
@@ -162,18 +162,18 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 		},
 		Run: (*VM).runRecordWalkFoldRuntimeSpecialization,
 	},
-	runtimeSpecializationBoolTableStrikeCount: {
+	runtimeSpecializationBoolTableMarkCount: {
 		RuntimeSpecialization: RuntimeSpecialization{
 			Info: RuntimeSpecializationInfo{
-				Name:          "bool_table_strike_count",
+				Name:          "bool_table_mark_count",
 				Route:         RuntimeSpecializationRouteCallSiteValue,
 				Arity:         1,
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: isBoolTableStrikeCountProto,
+			Recognize: isBoolTableMarkCountProto,
 		},
-		Run: (*VM).runBoolTableStrikeCountRuntimeSpecialization,
+		Run: (*VM).runBoolTableMarkCountRuntimeSpecialization,
 	},
 }
 
