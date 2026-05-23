@@ -7,6 +7,7 @@ const (
 	runtimeSpecializationLazyRecursiveTableBuilder
 	runtimeSpecializationLazyRecursiveTableFold
 	runtimeSpecializationIntGridAggregate
+	runtimeSpecializationMatrixMultiply
 	runtimeSpecializationRecordWalkFold
 	runtimeSpecializationBoolTableStrikeCount
 	runtimeSpecializationCount
@@ -115,6 +116,19 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 			Recognize: isIntGridAggregateProto,
 		},
 		Run: (*VM).runIntGridAggregateWholeCallKernel,
+	},
+	runtimeSpecializationMatrixMultiply: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "matrix_multiply",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         3,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
+			},
+			Recognize: isMatrixMultiplyProto,
+		},
+		Run: (*VM).runMatrixMultiplyWholeCallKernel,
 	},
 	runtimeSpecializationRecordWalkFold: {
 		RuntimeSpecialization: RuntimeSpecialization{

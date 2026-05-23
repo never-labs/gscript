@@ -105,7 +105,6 @@ const (
 
 const (
 	wholeCallKernelPermutationFlipChecksum = iota
-	wholeCallKernelMatrixMultiply
 	wholeCallKernelCoefficientMatrixVector
 	wholeCallKernelCoefficientMatrixTransposeVector
 	wholeCallKernelCoefficientMatrixAtAVector
@@ -155,17 +154,6 @@ var legacyWholeCallKernelRegistry = [wholeCallKernelCount]wholeCallKernelRecogni
 		},
 		recognize: isPermutationFlipChecksumKernelProto,
 		runValue:  (*VM).runPermutationFlipChecksumWholeCallKernel,
-	},
-	{
-		info: KernelInfo{
-			Name:          "matrix_multiply",
-			Route:         KernelRouteWholeCallValue,
-			Arity:         3,
-			Results:       kernelWholeCallSingleResultCount,
-			TieringPolicy: kernelTieringStructural,
-		},
-		recognize: isMatrixMultiplyProto,
-		runValue:  (*VM).runMatrixMultiplyWholeCallKernel,
 	},
 	{
 		info: KernelInfo{

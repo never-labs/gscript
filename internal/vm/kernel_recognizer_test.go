@@ -18,7 +18,7 @@ func TestCachedWholeCallKernelRecognizedUsesHotCache(t *testing.T) {
 	if !cachedWholeCallKernelRecognized(proto, wholeCallKernelPermutationFlipChecksum) {
 		t.Fatal("cached hot dispatch guard recomputed structure instead of using cached bits")
 	}
-	if cachedWholeCallKernelRecognized(proto, wholeCallKernelMatrixMultiply) {
+	if cachedWholeCallKernelRecognized(proto, wholeCallKernelCoefficientMatrixVector) {
 		t.Fatal("cached hot dispatch guard reported an uncached kernel bit")
 	}
 }

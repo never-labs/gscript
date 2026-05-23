@@ -2,8 +2,26 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
+type matrixMultiplyKernelKind uint8
+
+const (
+	matrixMultiplyKernelPlain matrixMultiplyKernelKind = iota + 1
+	matrixMultiplyKernelDense
+	matrixMultiplyKernelDenseUnroll2
+	matrixMultiplyKernelDenseSplit2
+)
+
+type matrixMultiplyKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *matrixMultiplyKernelSpec
+}
+
+type matrixMultiplyKernelSpec struct {
+	kind matrixMultiplyKernelKind
+}
+
 func (vm *VM) tryRunMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelMatrixMultiply) {
+	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationMatrixMultiply) {
 		return false, nil, nil
 	}
 	return vm.runMatrixMultiplyWholeCallKernel(cl, args)
@@ -11,6 +29,9 @@ func (vm *VM) tryRunMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Va
 
 func (vm *VM) runMatrixMultiplyWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if cl == nil || cl.Proto == nil || len(args) != 3 || !vm.noGlobalLock {
+		return false, nil, nil
+	}
+	if _, ok := matrixMultiplyKernelSpecForProto(cl.Proto); !ok {
 		return false, nil, nil
 	}
 	if !args[0].IsTable() || !args[1].IsTable() || !args[2].IsNumber() {
@@ -248,13 +269,48 @@ func (vm *VM) runDenseMatrixMultiplyTransposedWholeCallKernel(cl *Closure, args 
 }
 
 func IsMatrixMultiplyKernelProto(p *FuncProto) bool {
-	return cachedWholeCallKernelRecognized(p, wholeCallKernelMatrixMultiply)
+	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationMatrixMultiply)
 }
 
 func isMatrixMultiplyProto(p *FuncProto) bool {
-	if isDenseMatrixMultiplyProto(p) || isDenseUnroll2MatrixMultiplyProto(p) || isDenseSplit2MatrixMultiplyProto(p) {
-		return true
+	_, ok := matrixMultiplyKernelSpecForProto(p)
+	return ok
+}
+
+func matrixMultiplyKernelSpecForProto(p *FuncProto) (*matrixMultiplyKernelSpec, bool) {
+	if p == nil {
+		return nil, false
 	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.MatrixMultiplyKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzeMatrixMultiplyKernelSpec(p)
+	if !ok {
+		p.MatrixMultiplyKernel = &matrixMultiplyKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.MatrixMultiplyKernel = &matrixMultiplyKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzeMatrixMultiplyKernelSpec(p *FuncProto) (*matrixMultiplyKernelSpec, bool) {
+	switch {
+	case isDenseMatrixMultiplyProto(p):
+		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDense}, true
+	case isDenseUnroll2MatrixMultiplyProto(p):
+		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDenseUnroll2}, true
+	case isDenseSplit2MatrixMultiplyProto(p):
+		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelDenseSplit2}, true
+	case isPlainMatrixMultiplyProto(p):
+		return &matrixMultiplyKernelSpec{kind: matrixMultiplyKernelPlain}, true
+	default:
+		return nil, false
+	}
+}
+
+func isPlainMatrixMultiplyProto(p *FuncProto) bool {
 	if p == nil || p.NumParams != 3 || p.IsVarArg || len(p.Constants) != 1 || !numberConst(p.Constants[0], 0.0) {
 		return false
 	}
