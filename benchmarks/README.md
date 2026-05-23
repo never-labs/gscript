@@ -7,8 +7,8 @@
 ```bash
 # Optimization timing: current worktree vs clean HEAD vs LuaJIT.
 # This is the default entry point for deciding whether a local optimization
-# is real. It supports suite/extended/variants, calibrated repeats, confidence
-# intervals, parameter scaling, and explicit timing sources.
+# is real. It supports suite/extended/variants/official, calibrated repeats,
+# confidence intervals, parameter scaling, and explicit timing sources.
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \
@@ -184,14 +184,15 @@ That section calls out suite benchmarks that beat LuaJIT by a large margin but
 are not confirmed by their structural variants. It is intentionally a review
 signal, not a performance patch gate.
 
-Use `--group=suite`, `--group=extended`, or `--group=variants` to narrow the
-run; repeat `--bench=group/name` for a representative subset. `--dry-run`
-prints the exact discovered matrix without building or running anything.
+Use `--group=suite`, `--group=extended`, `--group=variants`, or
+`--group=official` to narrow the run; repeat `--bench=group/name` for a
+representative subset.
 Use `--group=official` to run the extracted official-case hot benchmarks under
 `benchmarks/official_hot` against their LuaJIT references in
-`benchmarks/lua_official_hot`; this group is intentionally excluded from the
-default strict run because it is a broader coverage/profiling surface and may
-contain known gaps while they are being optimized.
+`benchmarks/lua_official_hot`. `timing_compare.py --all-groups` includes this
+group. `strict_guard.py` still excludes it from the default strict run because
+official hot is a broader coverage/profiling surface and may contain known gaps
+while they are being optimized.
 
 `timing_compare.py` is the preferred harness for local before/after timing when
 the current worktree may differ from clean `HEAD`. It exports a clean `HEAD`
