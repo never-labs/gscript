@@ -130,21 +130,6 @@ type AnalysisResult struct {
 	// is available but currently has no suppressed guards.
 	SuppressedSpecGuardKinds map[int]map[string]bool
 
-	// RuntimeSpecializationConstCallFolds records guarded call-site runtime-specialization
-	// constants keyed by OpCall instruction ID.
-	RuntimeSpecializationConstCallFolds map[int]RuntimeSpecializationConstCallFoldFact
-
-	// CallSiteNoResultRuntimeSpecializations records stable structural
-	// no-result call-site runtime specializations keyed by OpCall instruction
-	// ID. Codegen routes them through a precise op-exit rather than the generic
-	// CallExit path.
-	CallSiteNoResultRuntimeSpecializations map[int]bool
-
-	// CallSiteNoResultRuntimeSpecializationBatches records loop-tail no-result
-	// call-site runtime specialization sites that can safely batch future
-	// complete loop iterations after the current iteration's final call has run.
-	CallSiteNoResultRuntimeSpecializationBatches map[int]CallSiteNoResultRuntimeSpecializationBatchFact
-
 	// FixedShapeTables records SSA table values whose field layout is known
 	// without consulting the runtime field cache. The initial producer is a
 	// static table constructor or a call to a function whose every return path
@@ -559,9 +544,9 @@ type CallFacts struct {
 	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
 	CallABIs map[int]CallABIDescriptor
 
-	// RuntimeSpecializationConstCallFolds records guarded call-site runtime-specialization
+	// GuardedConstCallFolds records guarded call-site guarded
 	// constants keyed by OpCall instruction ID.
-	RuntimeSpecializationConstCallFolds map[int]RuntimeSpecializationConstCallFoldFact
+	GuardedConstCallFolds map[int]GuardedConstCallFoldFact
 
 	// CallSiteNoResultRuntimeSpecializations records stable structural
 	// no-result call-site runtime specializations keyed by OpCall instruction
@@ -585,8 +570,8 @@ func (c *CallFacts) Initialize() {
 	if c.CallABIs == nil {
 		c.CallABIs = make(map[int]CallABIDescriptor)
 	}
-	if c.RuntimeSpecializationConstCallFolds == nil {
-		c.RuntimeSpecializationConstCallFolds = make(map[int]RuntimeSpecializationConstCallFoldFact)
+	if c.GuardedConstCallFolds == nil {
+		c.GuardedConstCallFolds = make(map[int]GuardedConstCallFoldFact)
 	}
 	if c.CallSiteNoResultRuntimeSpecializations == nil {
 		c.CallSiteNoResultRuntimeSpecializations = make(map[int]bool)
@@ -627,31 +612,31 @@ func (c *CallFacts) ForEachCallABI(visit func(int, CallABIDescriptor) bool) {
 	}
 }
 
-func (c *CallFacts) SetRuntimeSpecializationConstCallFolds(facts map[int]RuntimeSpecializationConstCallFoldFact) {
-	c.RuntimeSpecializationConstCallFolds = facts
+func (c *CallFacts) SetGuardedConstCallFolds(facts map[int]GuardedConstCallFoldFact) {
+	c.GuardedConstCallFolds = facts
 	c.bindOwner()
 }
 
-func (c *CallFacts) RuntimeSpecializationConstCallFold(id int) (RuntimeSpecializationConstCallFoldFact, bool) {
-	if c == nil || c.RuntimeSpecializationConstCallFolds == nil {
-		return RuntimeSpecializationConstCallFoldFact{}, false
+func (c *CallFacts) GuardedConstCallFold(id int) (GuardedConstCallFoldFact, bool) {
+	if c == nil || c.GuardedConstCallFolds == nil {
+		return GuardedConstCallFoldFact{}, false
 	}
-	fact, ok := c.RuntimeSpecializationConstCallFolds[id]
+	fact, ok := c.GuardedConstCallFolds[id]
 	return fact, ok
 }
 
-func (c *CallFacts) RuntimeSpecializationConstCallFoldCount() int {
+func (c *CallFacts) GuardedConstCallFoldCount() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.RuntimeSpecializationConstCallFolds)
+	return len(c.GuardedConstCallFolds)
 }
 
-func (c *CallFacts) ForEachRuntimeSpecializationConstCallFold(visit func(int, RuntimeSpecializationConstCallFoldFact) bool) {
+func (c *CallFacts) ForEachGuardedConstCallFold(visit func(int, GuardedConstCallFoldFact) bool) {
 	if c == nil || visit == nil {
 		return
 	}
-	for id, fact := range c.RuntimeSpecializationConstCallFolds {
+	for id, fact := range c.GuardedConstCallFolds {
 		if !visit(id, fact) {
 			return
 		}
@@ -699,23 +684,11 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 	}
 	if a.Call == nil {
 		a.Call = &CallFacts{
-			CallABIs:                                     a.CallABIs,
-			RuntimeSpecializationConstCallFolds:          a.RuntimeSpecializationConstCallFolds,
-			CallSiteNoResultRuntimeSpecializations:       a.CallSiteNoResultRuntimeSpecializations,
-			CallSiteNoResultRuntimeSpecializationBatches: a.CallSiteNoResultRuntimeSpecializationBatches,
+			CallABIs: a.CallABIs,
 		}
 	} else {
 		if a.CallABIs != nil || a.Call.CallABIs == nil {
 			a.Call.CallABIs = a.CallABIs
-		}
-		if a.RuntimeSpecializationConstCallFolds != nil || a.Call.RuntimeSpecializationConstCallFolds == nil {
-			a.Call.RuntimeSpecializationConstCallFolds = a.RuntimeSpecializationConstCallFolds
-		}
-		if a.CallSiteNoResultRuntimeSpecializations != nil || a.Call.CallSiteNoResultRuntimeSpecializations == nil {
-			a.Call.CallSiteNoResultRuntimeSpecializations = a.CallSiteNoResultRuntimeSpecializations
-		}
-		if a.CallSiteNoResultRuntimeSpecializationBatches != nil || a.Call.CallSiteNoResultRuntimeSpecializationBatches == nil {
-			a.Call.CallSiteNoResultRuntimeSpecializationBatches = a.CallSiteNoResultRuntimeSpecializationBatches
 		}
 	}
 	a.Call.owner = a
@@ -743,9 +716,6 @@ func (a *AnalysisResult) bindCallCompatibilityFields() {
 		return
 	}
 	a.CallABIs = a.Call.CallABIs
-	a.RuntimeSpecializationConstCallFolds = a.Call.RuntimeSpecializationConstCallFolds
-	a.CallSiteNoResultRuntimeSpecializations = a.Call.CallSiteNoResultRuntimeSpecializations
-	a.CallSiteNoResultRuntimeSpecializationBatches = a.Call.CallSiteNoResultRuntimeSpecializationBatches
 }
 
 // LoopSpecializationFacts groups analysis facts produced and consumed by loop-specialization and

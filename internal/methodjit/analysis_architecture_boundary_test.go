@@ -134,7 +134,7 @@ func legacyTableShapeField(name string) bool {
 
 func legacyCallFactField(name string) bool {
 	switch name {
-	case "CallABIs", "RuntimeSpecializationConstCallFolds", "CallSiteNoResultRuntimeSpecializations", "CallSiteNoResultRuntimeSpecializationBatches":
+	case "CallABIs":
 		return true
 	default:
 		return false

@@ -10,12 +10,12 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func (ec *emitContext) emitRuntimeSpecializationConstCallIfEligible(instr *Instr) bool {
+func (ec *emitContext) emitGuardedConstCallIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil || ec.tailCallInstrs[instr.ID] {
 		return false
 	}
 	callFacts := functionCallFacts(ec.fn)
-	fact, ok := callFacts.RuntimeSpecializationConstCallFold(instr.ID)
+	fact, ok := callFacts.GuardedConstCallFold(instr.ID)
 	if !ok || fact.CalleeProto == nil || len(fact.GuardConsts) != len(fact.GuardProtos) ||
 		len(fact.IntGuardConsts) != len(fact.IntGuardValues) || len(instr.Args) == 0 {
 		return false
@@ -43,10 +43,10 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallIfEligible(instr *Instr
 		asm.STR(jit.X0, mRegRegs, slotOffset(funcSlot+i))
 	}
 
-	if !ec.runtimeSpecializationConstCallEntryGuarded(fact) || len(fact.IntGuardConsts) != 0 {
-		deoptLabel := ec.uniqueLabel("runtime_specialization_const_call_deopt")
-		doneGuardLabel := ec.uniqueLabel("runtime_specialization_const_call_guard_done")
-		if !ec.runtimeSpecializationConstCallEntryGuarded(fact) {
+	if !ec.guardedConstCallEntryGuarded(fact) || len(fact.IntGuardConsts) != 0 {
+		deoptLabel := ec.uniqueLabel("guarded_const_call_deopt")
+		doneGuardLabel := ec.uniqueLabel("guarded_const_call_guard_done")
+		if !ec.guardedConstCallEntryGuarded(fact) {
 			for i, constIdx := range fact.GuardConsts {
 				ec.emitIndexedGlobalAddress(constIdx, deoptLabel)
 				asm.LDRreg(jit.X0, jit.X16, jit.X17)
@@ -73,7 +73,7 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallIfEligible(instr *Instr
 	}
 
 	for _, proto := range fact.GuardProtos {
-		ec.emitRuntimeSpecializationConstCallEntryMark(proto)
+		ec.emitGuardedConstCallEntryMark(proto)
 	}
 
 	asm.LoadImm64(jit.X0, fact.Result)
@@ -83,11 +83,11 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallIfEligible(instr *Instr
 	return true
 }
 
-func (ec *emitContext) runtimeSpecializationConstCallEntryGuarded(fact RuntimeSpecializationConstCallFoldFact) bool {
-	if ec == nil || ec.fn == nil || functionCallFacts(ec.fn).RuntimeSpecializationConstCallFoldCount() == 0 {
+func (ec *emitContext) guardedConstCallEntryGuarded(fact GuardedConstCallFoldFact) bool {
+	if ec == nil || ec.fn == nil || functionCallFacts(ec.fn).GuardedConstCallFoldCount() == 0 {
 		return false
 	}
-	writes := runtimeSpecializationConstCallSetGlobalConsts(ec.fn)
+	writes := guardedConstCallSetGlobalConsts(ec.fn)
 	for _, constIdx := range fact.GuardConsts {
 		if writes[constIdx] {
 			return false
@@ -96,17 +96,17 @@ func (ec *emitContext) runtimeSpecializationConstCallEntryGuarded(fact RuntimeSp
 	return true
 }
 
-func (ec *emitContext) emitRuntimeSpecializationConstCallEntryGuards() {
+func (ec *emitContext) emitGuardedConstCallEntryGuards() {
 	var callFacts *CallFacts
 	if ec != nil {
 		callFacts = functionCallFacts(ec.fn)
 	}
-	if callFacts.RuntimeSpecializationConstCallFoldCount() == 0 {
+	if callFacts.GuardedConstCallFoldCount() == 0 {
 		return
 	}
 	seen := make(map[int]*vm.FuncProto)
-	writes := runtimeSpecializationConstCallSetGlobalConsts(ec.fn)
-	callFacts.ForEachRuntimeSpecializationConstCallFold(func(_ int, fact RuntimeSpecializationConstCallFoldFact) bool {
+	writes := guardedConstCallSetGlobalConsts(ec.fn)
+	callFacts.ForEachGuardedConstCallFold(func(_ int, fact GuardedConstCallFoldFact) bool {
 		if len(fact.IntGuardConsts) != 0 || len(fact.GuardConsts) != len(fact.GuardProtos) {
 			return true
 		}
@@ -123,8 +123,8 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallEntryGuards() {
 	if len(seen) == 0 {
 		return
 	}
-	deoptLabel := ec.uniqueLabel("runtime_specialization_const_entry_deopt")
-	doneLabel := ec.uniqueLabel("runtime_specialization_const_entry_done")
+	deoptLabel := ec.uniqueLabel("guarded_const_entry_deopt")
+	doneLabel := ec.uniqueLabel("guarded_const_entry_done")
 	for constIdx, proto := range seen {
 		ec.globalCacheConsts = append(ec.globalCacheConsts, constIdx)
 		ec.emitIndexedGlobalAddress(constIdx, deoptLabel)
@@ -143,7 +143,7 @@ func (ec *emitContext) emitRuntimeSpecializationConstCallEntryGuards() {
 	ec.asm.Label(doneLabel)
 }
 
-func runtimeSpecializationConstCallSetGlobalConsts(fn *Function) map[int]bool {
+func guardedConstCallSetGlobalConsts(fn *Function) map[int]bool {
 	out := make(map[int]bool)
 	if fn == nil {
 		return out
@@ -158,7 +158,7 @@ func runtimeSpecializationConstCallSetGlobalConsts(fn *Function) map[int]bool {
 	return out
 }
 
-func (ec *emitContext) emitRuntimeSpecializationConstCallEntryMark(protoPtr *vm.FuncProto) {
+func (ec *emitContext) emitGuardedConstCallEntryMark(protoPtr *vm.FuncProto) {
 	if protoPtr == nil {
 		return
 	}

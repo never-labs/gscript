@@ -7,7 +7,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func baselineRuntimeSpecializationConstCallFolds(proto *vm.FuncProto) map[int]RuntimeSpecializationConstCallFoldFact {
+func baselineGuardedConstCallFolds(proto *vm.FuncProto) map[int]GuardedConstCallFoldFact {
 	globals := buildProtoInlineGlobals(proto)
 	if len(globals) == 0 {
 		globals = buildProtoStableGlobals(proto)
@@ -15,18 +15,18 @@ func baselineRuntimeSpecializationConstCallFolds(proto *vm.FuncProto) map[int]Ru
 	if len(globals) == 0 {
 		return nil
 	}
-	fn := AnnotateRuntimeSpecializationConstCallFolds(BuildGraph(proto), globals)
+	fn := AnnotateGuardedConstCallFolds(BuildGraph(proto), globals)
 	callFacts := functionCallFacts(fn)
-	if callFacts.RuntimeSpecializationConstCallFoldCount() == 0 {
+	if callFacts.GuardedConstCallFoldCount() == 0 {
 		return nil
 	}
-	byPC := make(map[int]RuntimeSpecializationConstCallFoldFact, callFacts.RuntimeSpecializationConstCallFoldCount())
+	byPC := make(map[int]GuardedConstCallFoldFact, callFacts.GuardedConstCallFoldCount())
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpCall || !instr.HasSource || instr.SourcePC < 0 {
 				continue
 			}
-			if fact, ok := callFacts.RuntimeSpecializationConstCallFold(instr.ID); ok {
+			if fact, ok := callFacts.GuardedConstCallFold(instr.ID); ok {
 				byPC[instr.SourcePC] = fact
 			}
 		}
@@ -37,7 +37,7 @@ func baselineRuntimeSpecializationConstCallFolds(proto *vm.FuncProto) map[int]Ru
 	return byPC
 }
 
-func emitBaselineRuntimeSpecializationConstCallIfEligible(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, folds map[int]RuntimeSpecializationConstCallFoldFact) bool {
+func emitBaselineGuardedConstCallIfEligible(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, folds map[int]GuardedConstCallFoldFact) bool {
 	fact, ok := folds[pc]
 	if !ok || fact.CalleeProto == nil || len(fact.GuardConsts) != len(fact.GuardProtos) {
 		return false
@@ -49,8 +49,8 @@ func emitBaselineRuntimeSpecializationConstCallIfEligible(asm *jit.Assembler, in
 		return false
 	}
 
-	slowLabel := nextLabel("runtime_specialization_const_call_slow")
-	doneLabel := nextLabel("runtime_specialization_const_call_done")
+	slowLabel := nextLabel("guarded_const_call_slow")
+	doneLabel := nextLabel("guarded_const_call_done")
 
 	asm.LDR(jit.X0, mRegCtx, execCtxOffTier2GlobalVerPtr)
 	asm.CBZ(jit.X0, slowLabel)

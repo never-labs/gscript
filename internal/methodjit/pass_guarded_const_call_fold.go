@@ -7,19 +7,19 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func RuntimeSpecializationConstCallFoldPass(globals map[string]*vm.FuncProto) PassFunc {
+func GuardedConstCallFoldPass(globals map[string]*vm.FuncProto) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return AnnotateRuntimeSpecializationConstCallFolds(fn, globals), nil
+		return AnnotateGuardedConstCallFolds(fn, globals), nil
 	}
 }
 
-func AnnotateRuntimeSpecializationConstCallFolds(fn *Function, globals map[string]*vm.FuncProto) *Function {
+func AnnotateGuardedConstCallFolds(fn *Function, globals map[string]*vm.FuncProto) *Function {
 	if fn == nil || fn.Proto == nil || len(globals) == 0 {
 		return fn
 	}
 	callFacts := fn.Analysis.CallFacts()
 	stableInts := collectProtocolStableIntGlobals(fn)
-	folds := make(map[int]RuntimeSpecializationConstCallFoldFact)
+	folds := make(map[int]GuardedConstCallFoldFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpCall || callResultCountFromAux2(instr.Aux2) != 1 {
@@ -29,11 +29,11 @@ func AnnotateRuntimeSpecializationConstCallFolds(fn *Function, globals map[strin
 			if name == "" || callee == nil || len(instr.Args) < 2 || len(instr.Args)-1 > 4 {
 				continue
 			}
-			args, intGuardConsts, intGuardValues, ok := runtimeSpecializationConstCallArgs(instr, stableInts)
+			args, intGuardConsts, intGuardValues, ok := guardedConstCallArgs(instr, stableInts)
 			if !ok {
 				continue
 			}
-			result, guardNames, guardProtos, ok := foldRuntimeSpecializationConstCall(callee, globals, args)
+			result, guardNames, guardProtos, ok := foldGuardedConstCall(callee, globals, args)
 			if !ok {
 				continue
 			}
@@ -45,7 +45,7 @@ func AnnotateRuntimeSpecializationConstCallFolds(fn *Function, globals map[strin
 			if !ok {
 				continue
 			}
-			folds[instr.ID] = RuntimeSpecializationConstCallFoldFact{
+			folds[instr.ID] = GuardedConstCallFoldFact{
 				CalleeProto:    callee,
 				Result:         result,
 				GuardConsts:    guardConsts,
@@ -56,14 +56,14 @@ func AnnotateRuntimeSpecializationConstCallFolds(fn *Function, globals map[strin
 		}
 	}
 	if len(folds) == 0 {
-		callFacts.SetRuntimeSpecializationConstCallFolds(nil)
+		callFacts.SetGuardedConstCallFolds(nil)
 		return fn
 	}
-	callFacts.SetRuntimeSpecializationConstCallFolds(folds)
+	callFacts.SetGuardedConstCallFolds(folds)
 	return fn
 }
 
-func runtimeSpecializationConstCallArgs(instr *Instr, stableInts map[int]int64) ([]runtime.Value, []int, []int64, bool) {
+func guardedConstCallArgs(instr *Instr, stableInts map[int]int64) ([]runtime.Value, []int, []int64, bool) {
 	n := len(instr.Args) - 1
 	args := make([]runtime.Value, n)
 	var guardConsts []int
@@ -95,7 +95,7 @@ func runtimeSpecializationConstCallArgs(instr *Instr, stableInts map[int]int64) 
 	return args, guardConsts, guardValues, true
 }
 
-func foldRuntimeSpecializationConstCall(callee *vm.FuncProto, globals map[string]*vm.FuncProto, args []runtime.Value) (int64, []string, []*vm.FuncProto, bool) {
+func foldGuardedConstCall(callee *vm.FuncProto, globals map[string]*vm.FuncProto, args []runtime.Value) (int64, []string, []*vm.FuncProto, bool) {
 	if callee == nil || len(args) != callee.NumParams {
 		return 0, nil, nil, false
 	}

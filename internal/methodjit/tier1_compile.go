@@ -109,7 +109,7 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 	feedbackEnabled := !IsFeedbackCollectionDisabled(proto)
 	nativeCoroutineYieldEnabled := baselineProtoMayUseNativeCoroutineSwitch(proto)
 	nativeCoroutineSwitchEnabled := nativeCoroutineYieldEnabled || baselineProtoMayUseNativeCoroutineResume(proto)
-	runtimeSpecializationConstCallFolds := baselineRuntimeSpecializationConstCallFolds(proto)
+	guardedConstCallFolds := baselineGuardedConstCallFolds(proto)
 	for pc := 0; pc < len(code); pc++ {
 		// Label for this PC (used as jump target within JIT code).
 		// Skip pc==0 when we already labeled it for the int-spec guard.
@@ -222,7 +222,7 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 		// ---- Complex ops (exit to Go) ----
 		// All op-exits need a resume stub at pc+1.
 		case vm.OP_CALL:
-			if !emitBaselineRuntimeSpecializationConstCallIfEligible(asm, inst, pc, proto, runtimeSpecializationConstCallFolds) {
+			if !emitBaselineGuardedConstCallIfEligible(asm, inst, pc, proto, guardedConstCallFolds) {
 				emitBaselineNativeCall(asm, inst, pc, proto)
 			}
 			resumePCs = append(resumePCs, pc+1)

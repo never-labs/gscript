@@ -207,12 +207,12 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		tier2PassModuleWith("CallResultRangeGuard", Tier2PhaseCallLower, nil, nil, CallResultRangeGuardPass),
 		tier2PassModuleWith("ConstProp", Tier2PhaseCallLower, nil, nil, ConstPropPass),
 		{
-			Name:     "RuntimeSpecializationConstCallFold",
+			Name:     "GuardedConstCallFold",
 			Phase:    Tier2PhaseCallLower,
 			Requires: analysisFacts(AnalysisFactCallABIs),
-			Provides: analysisFacts(AnalysisFactRuntimeSpecializationConstCallFolds),
+			Provides: analysisFacts(AnalysisFactGuardedConstCallFolds),
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return RuntimeSpecializationConstCallFoldPass(specializationGlobals)(fn)
+				return GuardedConstCallFoldPass(specializationGlobals)(fn)
 			},
 		},
 		{

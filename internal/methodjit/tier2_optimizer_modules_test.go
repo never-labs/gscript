@@ -656,7 +656,7 @@ func TestTier2CallLoweringModuleOrder(t *testing.T) {
 		"ModularCallFloorReduce",
 		"CallResultRangeGuard",
 		"ConstProp",
-		"RuntimeSpecializationConstCallFold",
+		"GuardedConstCallFold",
 		"CallSiteRuntimeSpecializationExit",
 	})
 }

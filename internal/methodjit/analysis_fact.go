@@ -27,7 +27,7 @@ const (
 	AnalysisFactSpecDependencyProtos AnalysisFact = "SpecDependencyProtos"
 
 	AnalysisFactCallABIs                                     AnalysisFact = "CallABIs"
-	AnalysisFactRuntimeSpecializationConstCallFolds          AnalysisFact = "RuntimeSpecializationConstCallFolds"
+	AnalysisFactGuardedConstCallFolds                        AnalysisFact = "GuardedConstCallFolds"
 	AnalysisFactCallSiteNoResultRuntimeSpecializations       AnalysisFact = "CallSiteNoResultRuntimeSpecializations"
 	AnalysisFactCallSiteNoResultRuntimeSpecializationBatches AnalysisFact = "CallSiteNoResultRuntimeSpecializationBatches"
 
@@ -106,12 +106,12 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Owner:       "call",
 		Description: "Call sites have ABI annotations for native lowering and call folds.",
 		Producers:   []string{"CallABI"},
-		Consumers:   []string{"RuntimeSpecializationConstCallFold", "CallSiteRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopSpecialization", "TableIntArraySpecialization"},
+		Consumers:   []string{"GuardedConstCallFold", "CallSiteRuntimeSpecializationExit", "GuardFieldCallee", "RecordArrayLoopSpecialization", "TableIntArraySpecialization"},
 	},
-	AnalysisFactRuntimeSpecializationConstCallFolds: {
+	AnalysisFactGuardedConstCallFolds: {
 		Owner:       "call",
-		Description: "Runtime specialization constant call folds have been applied.",
-		Producers:   []string{"RuntimeSpecializationConstCallFold"},
+		Description: "Guarded const-call folds have been applied.",
+		Producers:   []string{"GuardedConstCallFold"},
 		Consumers:   []string{"codegen", "diagnostics"},
 	},
 	AnalysisFactCallSiteNoResultRuntimeSpecializations: {
