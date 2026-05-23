@@ -2,9 +2,9 @@
 """Collect a reusable benchmark diagnostics bundle.
 
 The script is intentionally benchmark-agnostic. It discovers suite, extended,
-and variant benchmarks with the same selector rules as timing_compare.py, then
-stores per-benchmark artifacts for tiering, exits, runtime paths, speculation,
-and optional CPU/warm JIT mapping.
+variant, and official-hot benchmarks with the same selector rules as
+timing_compare.py, then stores per-benchmark artifacts for tiering, exits,
+runtime paths, speculation, and optional CPU/warm JIT mapping.
 """
 
 from __future__ import annotations
@@ -208,9 +208,12 @@ def summarize_runtime_paths(data: Any) -> dict[str, Any]:
     table_string = data.get("table_string") if isinstance(data.get("table_string"), dict) else {}
     string_format = data.get("string_format") if isinstance(data.get("string_format"), dict) else {}
     string_concat = data.get("string_concat") if isinstance(data.get("string_concat"), dict) else {}
+    native_per_builtin = native.get("per_builtin")
     return {
         "native_fast": native.get("fast", 0),
         "native_fallback": native.get("fallback", 0),
+        "native_top_fallback": format_top_native_builtin(native_per_builtin, "fallback"),
+        "native_top_fast": format_top_native_builtin(native_per_builtin, "fast"),
         "coroutine_resume": coro.get("resume", 0),
         "coroutine_yield": coro.get("yield", 0),
         "table_array_get_hot": table.get("get_hot", 0),
@@ -231,6 +234,24 @@ def summarize_runtime_paths(data: Any) -> dict[str, Any]:
         "string_concat_lazy": string_concat.get("lazy", 0),
         "string_concat_builder": string_concat.get("builder", 0),
     }
+
+
+def format_top_native_builtin(rows: Any, field: str) -> str:
+    if not isinstance(rows, list):
+        return ""
+    entries: list[tuple[int, str]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        value = row.get(field)
+        name = row.get("name")
+        if not isinstance(value, int) or value <= 0 or not isinstance(name, str) or not name:
+            continue
+        entries.append((value, name))
+    if not entries:
+        return ""
+    entries.sort(key=lambda item: (-item[0], item[1]))
+    return ", ".join(f"{name}:{value}" for value, name in entries[:3])
 
 
 def summarize_tier2_calls(data: Any) -> dict[str, Any]:
@@ -481,10 +502,14 @@ def render_summary(rows: list[DiagnosticRow]) -> str:
         runtime_bits = []
         for key in (
             "native_fallback",
+            "native_top_fallback",
+            "native_top_fast",
             "coroutine_resume",
             "coroutine_yield",
             "table_array_get_hot",
+            "table_array_get_fallback",
             "table_array_set_hot",
+            "table_array_set_fallback",
             "table_string_get_cache_hit",
             "table_string_get_scan_hit",
             "table_string_get_map_hit",
@@ -586,7 +611,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
     parser.add_argument("--group", action="append", choices=timing.GROUPS, help="benchmark group; repeatable")
-    parser.add_argument("--all-groups", action="store_true", help="diagnose suite, extended, and variants")
+    parser.add_argument("--all-groups", action="store_true", help="diagnose all benchmark groups")
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--timeout", type=positive_int, default=120)
     parser.add_argument("--runs", type=positive_int, default=5, help="timing_compare measured runs")
