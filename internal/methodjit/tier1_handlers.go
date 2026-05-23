@@ -1031,6 +1031,7 @@ func (e *BaselineJITEngine) handleGetTable(ctx *ExecContext, regs []runtime.Valu
 			pc := int(ctx.BaselinePC) - 1
 			if key.IsString() {
 				ensureTableStringKeyCache(proto)
+				syncTableStringKeyCacheContext(ctx, proto)
 				regs[absA] = tbl.RawGetStringDynamicCached(
 					key.Str(),
 					runtime.TableStringKeyCacheSlot(proto.TableStringKeyCache, pc),
@@ -1108,6 +1109,7 @@ func (e *BaselineJITEngine) handleSetTable(ctx *ExecContext, regs []runtime.Valu
 		}
 		if key.IsString() {
 			ensureTableStringKeyCache(proto)
+			syncTableStringKeyCacheContext(ctx, proto)
 			tbl.RawSetStringDynamicCached(
 				key.Str(),
 				val,
@@ -1204,6 +1206,7 @@ func (e *BaselineJITEngine) handleGetField(ctx *ExecContext, regs []runtime.Valu
 			runtime.FieldPolyCacheSlot(proto.FieldPolyCache, pc),
 		)
 		ensureTableStringKeyCache(proto)
+		syncTableStringKeyCacheContext(ctx, proto)
 		_ = tbl.RawGetStringDynamicCached(fieldName, runtime.TableStringKeyCacheSlot(proto.TableStringKeyCache, pc))
 		// Record type feedback so Tier 2 can specialize.
 		if proto.Feedback != nil && pc < len(proto.Feedback) {

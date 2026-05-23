@@ -6,7 +6,7 @@ import (
 	"unsafe"
 )
 
-const nativeStringArenaSize = 32 << 20
+const nativeStringArenaSize = 128 << 20
 
 var nativeStringArena struct {
 	mu        sync.Mutex

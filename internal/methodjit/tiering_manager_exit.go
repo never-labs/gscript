@@ -747,6 +747,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 				pc := int(ctx.TableAux2)
 				if keyVal.IsString() && proto != nil && pc >= 0 {
 					ensureTableStringKeyCache(proto)
+					syncTableStringKeyCacheContext(ctx, proto)
 					result = tblVal.Table().RawGetStringDynamicCached(
 						keyVal.Str(),
 						runtime.TableStringKeyCacheSlot(proto.TableStringKeyCache, pc),
@@ -798,6 +799,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 				}
 				if keyVal.IsString() && proto != nil && pc >= 0 {
 					ensureTableStringKeyCache(proto)
+					syncTableStringKeyCacheContext(ctx, proto)
 					tbl.RawSetStringDynamicCached(
 						keyVal.Str(),
 						valVal,
@@ -909,6 +911,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 						proto.FieldAccessFeedback[pc].ObserveFieldCache(proto.FieldCache[pc], result, 1)
 					}
 					ensureTableStringKeyCache(proto)
+					syncTableStringKeyCacheContext(ctx, proto)
 					_ = tblVal.Table().RawGetStringDynamicCached(fieldName, runtime.TableStringKeyCacheSlot(proto.TableStringKeyCache, pc))
 				} else {
 					result = tblVal.Table().RawGetString(fieldName)

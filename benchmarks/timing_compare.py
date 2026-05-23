@@ -61,13 +61,14 @@ HOT_SCALE_PROFILE = [
     "suite/matmul_dense_unroll2:N=600",
     "suite/method_dispatch:N=50000000",
     "suite/spectral_norm:N=2000",
-    "suite/table_array_access:REPS=1000",
+    "suite/table_array_access:REPS=4000",
     "suite/coroutine_bench:N1=1000000",
     "suite/coroutine_bench:N2=500000",
     "suite/coroutine_bench:N3=1000000",
     "extended/actors_dispatch_mutation:N=15000",
     "extended/actors_dispatch_mutation:TICKS=3000",
-    "variants/closure_accumulator_variant:INT_REPS=20000000",
+    "extended/log_tokenize_format:PASSES=24",
+    "variants/closure_accumulator_variant:INT_REPS=8000000",
     "variants/closure_accumulator_variant:FLOAT_REPS=8000000",
 ]
 

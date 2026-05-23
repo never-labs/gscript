@@ -74,6 +74,17 @@ func setTier2ProtoCacheContext(ctx *ExecContext, proto *vm.FuncProto) {
 	}
 }
 
+func syncTableStringKeyCacheContext(ctx *ExecContext, proto *vm.FuncProto) {
+	if ctx == nil {
+		return
+	}
+	if proto != nil && len(proto.TableStringKeyCache) > 0 {
+		ctx.BaselineTableStringKeyCache = uintptr(unsafe.Pointer(&proto.TableStringKeyCache[0]))
+	} else {
+		ctx.BaselineTableStringKeyCache = 0
+	}
+}
+
 func (tm *TieringManager) ensureTier2RegisterBudget(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto) []runtime.Value {
 	if cf == nil || proto == nil || tm.callVM == nil {
 		return regs

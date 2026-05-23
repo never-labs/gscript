@@ -533,6 +533,8 @@ const (
 	StringLookupCacheProbeLimit = stringLookupCacheProbeLimit
 
 	NativeStringQueryCacheSize       = 65536
+	NativeStringQueryCacheWays       = 4
+	NativeStringQueryCacheSets       = NativeStringQueryCacheSize / NativeStringQueryCacheWays
 	NativeFormattedIntQueryCacheSize = 65536
 )
 
