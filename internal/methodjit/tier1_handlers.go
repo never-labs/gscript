@@ -566,8 +566,25 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 	}
 slowPath:
 	if gf := fnVal.GoFunction(); gf != nil {
-		if runtime.IsStdSelectFunction(fnVal) {
-			return e.executeStdSelectCall(regs, absSlot, nArgs, rawC)
+		switch gf.NativeKind {
+		case runtime.NativeKindStdSelect:
+			if gf.NativeData == runtime.StdSelectIdentityPtr() {
+				return e.executeStdSelectCall(regs, absSlot, nArgs, rawC)
+			}
+		case runtime.NativeKindStdIPairs:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdIPairsIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdIPairsCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
+		case runtime.NativeKindStdPairs:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdPairsIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdPairsCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
 		}
 		if nArgs == 2 && gf.FastArg2Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)

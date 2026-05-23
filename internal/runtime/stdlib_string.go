@@ -18,6 +18,8 @@ const (
 	NativeKindStdStringSub    uint8 = 101
 	NativeKindStdToNumber     uint8 = 102
 	NativeKindStdSelect       uint8 = 103
+	NativeKindStdPairs        uint8 = 104
+	NativeKindStdIPairs       uint8 = 105
 )
 
 var stdStringFormatIdentity byte
@@ -25,6 +27,8 @@ var stdStringSplitIdentity byte
 var stdStringSubIdentity byte
 var stdToNumberIdentity byte
 var stdSelectIdentity byte
+var stdPairsIdentity byte
+var stdIPairsIdentity byte
 
 type compiledLuaPatternCacheEntry struct {
 	prog luaPatternProgram
@@ -1084,6 +1088,14 @@ func StdSelectIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdSelectIdentity)
 }
 
+func StdPairsIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdPairsIdentity)
+}
+
+func StdIPairsIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdIPairsIdentity)
+}
+
 func IsStdStringSplitFunction(v Value) bool {
 	gf := v.GoFunction()
 	return gf != nil &&
@@ -1114,6 +1126,20 @@ func IsStdSelectFunction(v Value) bool {
 	return gf != nil &&
 		gf.NativeKind == NativeKindStdSelect &&
 		gf.NativeData == StdSelectIdentityPtr()
+}
+
+func IsStdPairsFunction(v Value) bool {
+	gf := v.GoFunction()
+	return gf != nil &&
+		gf.NativeKind == NativeKindStdPairs &&
+		gf.NativeData == StdPairsIdentityPtr()
+}
+
+func IsStdIPairsFunction(v Value) bool {
+	gf := v.GoFunction()
+	return gf != nil &&
+		gf.NativeKind == NativeKindStdIPairs &&
+		gf.NativeData == StdIPairsIdentityPtr()
 }
 
 func SelectReturnRange(selector Value, argCount int) (start int, countOnly bool, err error) {

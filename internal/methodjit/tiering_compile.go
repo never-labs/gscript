@@ -391,6 +391,11 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 					return fmt.Errorf("tier2: has OpCall inside loop (performance-blocked), staying at Tier 1")
 				}
 			}
+			if gate := firstLoopCarriedObjectGraphBlockerGate(fn); !gate.Allowed {
+				remarks.Add("Tier2Gate", "blocked", 0, 0, gate.Op,
+					fmt.Sprintf("candidate has unsupported loop-carried object graph mutation %s", gate.Op))
+				return fmt.Errorf("tier2: has loop-carried object graph mutation %s (unsupported), staying at Tier 1", gate.Op)
+			}
 		}
 
 		// R40: mark Proto.HasSelfCalls so the emitter opts in to the

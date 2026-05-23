@@ -550,6 +550,41 @@ func (vm *VM) storeStdSelectResults(absSlot, rawC int, results []runtime.Value) 
 	}
 }
 
+// ExecuteStdIPairsCall handles the standard multi-return ipairs setup without
+// routing through the generic GoFunction adapter.
+func (vm *VM) ExecuteStdIPairsCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs == 0 || absSlot+1 >= len(vm.regs) || !vm.regs[absSlot+1].IsTable() {
+		return true, fmt.Errorf("bad argument #1 to 'ipairs' (table expected)")
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{
+		runtime.FunctionValue(vm.ipairsIteratorFn),
+		vm.regs[absSlot+1],
+		runtime.IntValue(0),
+	})
+	return true, nil
+}
+
+// ExecuteStdPairsCall handles the ordinary-table standard pairs setup. Tables
+// with a __pairs metamethod deliberately fall back to the GoFunction body so
+// the existing callback/yield diagnostics stay centralized.
+func (vm *VM) ExecuteStdPairsCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs == 0 || absSlot+1 >= len(vm.regs) || !vm.regs[absSlot+1].IsTable() {
+		return true, fmt.Errorf("bad argument #1 to 'pairs' (table expected)")
+	}
+	tbl := vm.regs[absSlot+1].Table()
+	if mt := tbl.GetMetatable(); mt != nil && !mt.RawGetString("__pairs").IsNil() {
+		return false, nil
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{
+		runtime.FunctionValue(vm.newPairsIteratorFunction(tbl)),
+		vm.regs[absSlot+1],
+		runtime.NilValue(),
+	})
+	return true, nil
+}
+
 func (vm *VM) luaToString(v runtime.Value) (string, error) {
 	if v.IsTable() {
 		if mt := v.Table().GetMetatable(); mt != nil {
@@ -1298,6 +1333,8 @@ func (vm *VM) newIPairsFunction() *runtime.GoFunction {
 			}
 			return []runtime.Value{runtime.FunctionValue(vm.ipairsIteratorFn), args[0], runtime.IntValue(0)}, nil
 		},
+		NativeKind: runtime.NativeKindStdIPairs,
+		NativeData: runtime.StdIPairsIdentityPtr(),
 	}
 }
 
@@ -1385,28 +1422,33 @@ func (vm *VM) newPairsFunction() *runtime.GoFunction {
 					return vm.callValue(mm, []runtime.Value{args[0]})
 				}
 			}
-			keys := tbl.PairsKeysSnapshot()
-			idx := 0
-			iter := &runtime.GoFunction{
-				Name: "pairs_iterator",
-				Fn: func(_ []runtime.Value) ([]runtime.Value, error) {
-					if idx >= len(keys) {
-						return []runtime.Value{runtime.NilValue()}, nil
-					}
-					k := keys[idx]
-					idx++
-					return []runtime.Value{k, tbl.RawGet(k)}, nil
-				},
-				FastArg2Ret2: func(_, _ runtime.Value) (runtime.Value, runtime.Value, int, error) {
-					if idx >= len(keys) {
-						return runtime.NilValue(), runtime.NilValue(), 1, nil
-					}
-					k := keys[idx]
-					idx++
-					return k, tbl.RawGet(k), 2, nil
-				},
+			return []runtime.Value{runtime.FunctionValue(vm.newPairsIteratorFunction(tbl)), args[0], runtime.NilValue()}, nil
+		},
+		NativeKind: runtime.NativeKindStdPairs,
+		NativeData: runtime.StdPairsIdentityPtr(),
+	}
+}
+
+func (vm *VM) newPairsIteratorFunction(tbl *runtime.Table) *runtime.GoFunction {
+	keys := tbl.PairsKeysSnapshot()
+	idx := 0
+	return &runtime.GoFunction{
+		Name: "pairs_iterator",
+		Fn: func(_ []runtime.Value) ([]runtime.Value, error) {
+			if idx >= len(keys) {
+				return []runtime.Value{runtime.NilValue()}, nil
 			}
-			return []runtime.Value{runtime.FunctionValue(iter), args[0], runtime.NilValue()}, nil
+			k := keys[idx]
+			idx++
+			return []runtime.Value{k, tbl.RawGet(k)}, nil
+		},
+		FastArg2Ret2: func(_, _ runtime.Value) (runtime.Value, runtime.Value, int, error) {
+			if idx >= len(keys) {
+				return runtime.NilValue(), runtime.NilValue(), 1, nil
+			}
+			k := keys[idx]
+			idx++
+			return k, tbl.RawGet(k), 2, nil
 		},
 	}
 }
@@ -3703,14 +3745,43 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 
 			// ---- Fast path: GoFunction (direct call, skip callValue) ----
 			if fnVal.IsFunction() {
-				if runtime.IsStdSelectFunction(fnVal) {
-					if err := vm.executeStdSelectCall(base+a, nArgs, c); err != nil {
-						return nil, wrapLineErr(frame, err)
-					}
-					observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
-					break
-				}
 				if gf := fnVal.GoFunction(); gf != nil {
+					handledSpecial := false
+					switch gf.NativeKind {
+					case runtime.NativeKindStdSelect:
+						if gf.NativeData == runtime.StdSelectIdentityPtr() {
+							if err := vm.executeStdSelectCall(base+a, nArgs, c); err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+							handledSpecial = true
+						}
+					case runtime.NativeKindStdIPairs:
+						if gf.NativeData == runtime.StdIPairsIdentityPtr() {
+							handled, err := vm.ExecuteStdIPairsCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdPairs:
+						if gf.NativeData == runtime.StdPairsIdentityPtr() {
+							handled, err := vm.ExecuteStdPairsCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					}
+					if handledSpecial {
+						break
+					}
 					var args []runtime.Value
 					if nArgs <= len(vm.argBuf) {
 						args = vm.argBuf[:nArgs]

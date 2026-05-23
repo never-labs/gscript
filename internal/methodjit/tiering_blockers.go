@@ -321,6 +321,9 @@ func firstLoopAllocationBlockerGate(fn *Function) GateResult {
 				}
 				return blockGateOp("LoopAllocation", "table allocation remains inside loop", instr.Op)
 			case OpNewFixedTable:
+				if tier2NewFixedTableLoopCandidateIsSafe(fn, instr) {
+					continue
+				}
 				return blockGateOp("LoopAllocation", "fixed-table allocation remains inside loop", instr.Op)
 			case OpSetList:
 				return blockGateOp("LoopAllocation", "setlist allocation-style initialization remains inside loop", instr.Op)
@@ -328,6 +331,45 @@ func firstLoopAllocationBlockerGate(fn *Function) GateResult {
 		}
 	}
 	return allowGate("LoopAllocation", "no loop allocation blocker")
+}
+
+func firstLoopCarriedObjectGraphBlockerGate(fn *Function) GateResult {
+	li := computeLoopInfo(fn)
+	for _, block := range fn.Blocks {
+		if !li.loopBlocks[block.ID] {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpSetField || len(instr.Args) == 0 || instr.Args[0] == nil {
+				continue
+			}
+			receiver := instr.Args[0].Def
+			if receiver == nil || receiver.Op != OpPhi {
+				continue
+			}
+			hasNilSeed := false
+			hasLoopAllocation := false
+			for _, arg := range receiver.Args {
+				if arg == nil || arg.Def == nil {
+					continue
+				}
+				if arg.Def.Op == OpConstNil {
+					hasNilSeed = true
+					continue
+				}
+				if arg.Def.Block == nil || !li.loopBlocks[arg.Def.Block.ID] {
+					continue
+				}
+				if arg.Def.Op == OpNewTable || arg.Def.Op == OpNewFixedTable {
+					hasLoopAllocation = true
+				}
+			}
+			if hasNilSeed && hasLoopAllocation {
+				return blockGateOp("LoopObjectGraph", "loop-carried object graph mutation remains inside loop", instr.Op)
+			}
+		}
+	}
+	return allowGate("LoopObjectGraph", "no loop-carried object graph mutation")
 }
 
 func hasReadWriteGlobalInSameLoop(fn *Function) bool {
@@ -379,6 +421,14 @@ func tier2NewFixedTableLoopCandidateIsSafe(fn *Function, instr *Instr) bool {
 	// through the table-exit continuation once per cache refill batch.
 	if fn == nil || instr == nil || instr.Op != OpNewFixedTable {
 		return false
+	}
+	for _, arg := range instr.Args {
+		if arg == nil || arg.Def == nil {
+			continue
+		}
+		if arg.Def.Op == OpConstNil {
+			return false
+		}
 	}
 	return fixedTableCtor2Cacheable(fn.Proto, instr) || fixedTableCtorNCacheable(fn.Proto, instr)
 }

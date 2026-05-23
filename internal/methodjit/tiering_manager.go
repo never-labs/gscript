@@ -426,6 +426,9 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 			Reason: PromotionReasonTier1OnlyCached,
 			Gate:   blockGate("Tier1OnlyCache", "proto cached as Tier 1 only"),
 		})
+		if t1 := tm.tier1.compiled[proto]; t1 != nil {
+			return t1
+		}
 		return tm.tier1.TryCompile(proto)
 	}
 	profile := tm.getProfile(proto)
@@ -438,15 +441,22 @@ func (tm *TieringManager) TryCompile(proto *vm.FuncProto) interface{} {
 	tm.tracePromotionDecision(proto, decision)
 	if decision.Action == TieringActionUseTier1 &&
 		proto.CallCount >= 128 &&
-		!profile.HasLoop &&
 		!decision.PromoteTier2 &&
 		!decision.SuppressedRecursivePartition &&
 		!staticallyCallsOnlySelf(proto) &&
 		!qualifiesForNumericCrossRecursiveCandidate(proto) &&
-		!stateCanRecompile(recompileRequested, tm.tier2HasFailed(proto)) {
+		!stateCanRecompile(recompileRequested, tm.tier2HasFailed(proto)) &&
+		tier1OnlyDecisionCacheable(decision, profile) {
 		tm.tier1Only[proto] = true
 	}
 	return tm.applyPromotionDecision(proto, profile, decision)
+}
+
+func tier1OnlyDecisionCacheable(decision PromotionDecision, profile FuncProfile) bool {
+	if !profile.HasLoop {
+		return true
+	}
+	return decision.Reason == PromotionReasonLoopCallSuppressed
 }
 
 func stateCanRecompile(recompileRequested bool, tier2Failed bool) bool {

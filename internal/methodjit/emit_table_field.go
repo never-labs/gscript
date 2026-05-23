@@ -1206,6 +1206,10 @@ func (ec *emitContext) emitSetField(instr *Instr) {
 	}
 
 	// Direct field store: svals[fieldIndex] = value.
+	asm.LDR(jit.X2, jit.X0, jit.TableOffSvalsLen)
+	asm.LoadImm64(jit.X4, int64(fieldIdx))
+	asm.CMPreg(jit.X4, jit.X2)
+	asm.BCond(jit.CondGE, deoptLabel)
 	asm.LDR(jit.X1, jit.X0, jit.TableOffSvals) // X1 = svals data pointer
 	ec.emitPreparedFieldStore(valStore, fieldIdx)
 	ec.rememberFieldSvalsCache(tblValueID, shapeID)

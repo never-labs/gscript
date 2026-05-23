@@ -613,6 +613,8 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return []Value{FunctionValue(iter)}, nil
 		},
+		NativeKind: NativeKindStdIPairs,
+		NativeData: StdIPairsIdentityPtr(),
 	}))
 
 	interp.globals.Define("pairs", FunctionValue(&GoFunction{
@@ -652,6 +654,8 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return []Value{FunctionValue(iter), args[0], NilValue()}, nil
 		},
+		NativeKind: NativeKindStdPairs,
+		NativeData: StdPairsIdentityPtr(),
 	}))
 
 	interp.globals.Define("next", FunctionValue(&GoFunction{
