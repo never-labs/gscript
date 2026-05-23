@@ -51,6 +51,12 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 	if ec.emitSlotInstr(instr, block) {
 		goto done
 	}
+	if ec.emitArithmeticInstr(instr, block) {
+		goto done
+	}
+	if ec.emitCompareInstr(instr, block) {
+		goto done
+	}
 	if ec.emitMatrixInstr(instr) {
 		goto done
 	}
@@ -58,85 +64,6 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 		goto done
 	}
 	switch instr.Op {
-	// --- Type-generic arithmetic (float-aware) ---
-	case OpAdd:
-		ec.emitFloatBinOp(instr, intBinAdd)
-	case OpSub:
-		ec.emitFloatBinOp(instr, intBinSub)
-	case OpMul:
-		ec.emitFloatBinOp(instr, intBinMul)
-	case OpMod:
-		ec.emitFloatBinOp(instr, intBinMod)
-
-	// --- Type-specialized int arithmetic (raw int registers, no unbox/box) ---
-	case OpAddInt:
-		ec.emitRawIntBinOp(instr, intBinAdd)
-	case OpSubInt:
-		ec.emitRawIntBinOp(instr, intBinSub)
-	case OpMulInt:
-		ec.emitRawIntBinOp(instr, intBinMul)
-	case OpModInt:
-		ec.emitRawIntBinOp(instr, intBinMod)
-	case OpDivIntExact:
-		ec.emitRawIntExactDiv(instr)
-
-	// --- Type-specialized float arithmetic ---
-	case OpAddFloat:
-		ec.emitTypedFloatBinOp(instr, intBinAdd)
-	case OpSubFloat:
-		ec.emitTypedFloatBinOp(instr, intBinSub)
-	case OpMulFloat:
-		ec.emitTypedFloatBinOp(instr, intBinMul)
-
-	// --- Division (always returns float) ---
-	case OpDiv, OpDivFloat:
-		ec.emitDiv(instr)
-
-	// --- Unary ---
-	case OpUnm:
-		ec.emitUnm(instr)
-	case OpNegInt:
-		ec.emitNegInt(instr)
-	case OpNegFloat:
-		ec.emitNegFloat(instr)
-	case OpSqrt:
-		ec.emitSqrtFloat(instr)
-	case OpFloor:
-		ec.emitFloor(instr)
-	case OpFMA:
-		ec.emitFMA(instr)
-	case OpFMSUB:
-		ec.emitFMSUB(instr)
-	case OpNot:
-		ec.emitNot(instr)
-
-	// --- Comparison ---
-	case OpLt:
-		if !ec.emitTypedStringCmp(instr, jit.CondLT) {
-			ec.emitGenericNumericCmp(instr, jit.CondLT)
-		}
-	case OpLe:
-		if !ec.emitTypedStringCmp(instr, jit.CondLE) {
-			ec.emitGenericNumericCmp(instr, jit.CondLE)
-		}
-	case OpEq:
-		ec.emitGenericNumericCmp(instr, jit.CondEQ)
-	case OpLtInt:
-		ec.emitIntCmp(instr, jit.CondLT)
-	case OpLeInt:
-		ec.emitIntCmp(instr, jit.CondLE)
-	case OpEqInt:
-		ec.emitIntCmp(instr, jit.CondEQ)
-	case OpEqString:
-		ec.emitStringEqCmp(instr)
-	case OpModZeroInt:
-		ec.emitModZeroInt(instr)
-
-	// --- Float comparison ---
-	case OpLtFloat:
-		ec.emitFloatCmp(instr, jit.CondLT)
-	case OpLeFloat:
-		ec.emitFloatCmp(instr, jit.CondLE)
 	case OpComplexEscapeInSet:
 		ec.emitComplexEscapeInSet(instr)
 	case OpComplexEscapeRowCount:
@@ -304,10 +231,6 @@ func (ec *emitContext) emitInstr(instr *Instr, block *Block) {
 		OpGuardNonNil:
 		ec.emitOpExit(instr)
 		ec.clearTableArrayBoundedKeys()
-	case OpLen:
-		ec.emitLenNative(instr)
-		ec.clearTableArrayBoundedKeys()
-
 	default:
 		ec.asm.NOP() // truly unknown op placeholder
 	}

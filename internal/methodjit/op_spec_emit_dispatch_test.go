@@ -95,6 +95,8 @@ func emitterFamilyDelegateRegistry() []emitterFamilyDelegate {
 	return []emitterFamilyDelegate{
 		{filename: "emit_const.go", funcName: "emitConstInstr", family: OpEmitterConst},
 		{filename: "emit_slot.go", funcName: "emitSlotInstr", family: OpEmitterSlot},
+		{filename: "emit_arithmetic.go", funcName: "emitArithmeticInstr", family: OpEmitterArithmetic},
+		{filename: "emit_compare.go", funcName: "emitCompareInstr", family: OpEmitterCompare},
 		{filename: "emit_matrix.go", funcName: "emitMatrixInstr", family: OpEmitterMatrix},
 		{filename: "emit_string.go", funcName: "emitStringInstr", family: OpEmitterString},
 	}
