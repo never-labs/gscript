@@ -6,6 +6,7 @@ const (
 	runtimeSpecializationRawIntNested = iota
 	runtimeSpecializationLazyRecursiveTableBuilder
 	runtimeSpecializationLazyRecursiveTableFold
+	runtimeSpecializationPermutationFlipChecksum
 	runtimeSpecializationIntGridAggregate
 	runtimeSpecializationMatrixMultiply
 	runtimeSpecializationRecordWalkFold
@@ -108,6 +109,19 @@ var wholeCallValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Wh
 		},
 		Run:            (*VM).tryRunRecursiveTableValueKernel,
 		RecursiveTable: true,
+	},
+	runtimeSpecializationPermutationFlipChecksum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: KernelInfo{
+				Name:          "permutation_flip_checksum",
+				Route:         KernelRouteWholeCallValue,
+				Arity:         1,
+				Results:       kernelWholeCallSingleResultCount,
+				TieringPolicy: kernelTieringStructural,
+			},
+			Recognize: isPermutationFlipChecksumKernelProto,
+		},
+		Run: (*VM).runPermutationFlipChecksumWholeCallKernel,
 	},
 	runtimeSpecializationIntGridAggregate: {
 		RuntimeSpecialization: RuntimeSpecialization{

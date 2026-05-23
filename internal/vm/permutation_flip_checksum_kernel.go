@@ -2,6 +2,15 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
+type permutationFlipChecksumKernelCache struct {
+	fingerprint wholeCallKernelFingerprint
+	spec        *permutationFlipChecksumKernelSpec
+}
+
+type permutationFlipChecksumKernelSpec struct {
+	resultCtor *runtime.SmallTableCtor2
+}
+
 // Encoded bytecode for the structural permutation flip/checksum implementation shape.
 var permutationFlipChecksumCode = [...]uint32{
 	265, 521, 777, 2147484674, 1284, 2147485186, 2147812389, 460804,
@@ -23,7 +32,7 @@ var permutationFlipChecksumCode = [...]uint32{
 }
 
 func (vm *VM) tryRunPermutationFlipChecksumWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil || !hotWholeCallKernelRecognized(cl.Proto, wholeCallKernelPermutationFlipChecksum) {
+	if cl == nil || cl.Proto == nil || !cachedRuntimeSpecializationRecognized(cl.Proto, runtimeSpecializationPermutationFlipChecksum) {
 		return false, nil, nil
 	}
 	return vm.runPermutationFlipChecksumWholeCallKernel(cl, args)
@@ -41,11 +50,11 @@ func (vm *VM) runPermutationFlipChecksumWholeCallKernel(cl *Closure, args []runt
 	if float64(n64) != nn || n64 < 1 || int64(int(n64)) != n64 {
 		return false, nil, nil
 	}
-	ctor, ok := permutationFlipChecksumResultCtor(cl.Proto)
+	spec, ok := permutationFlipChecksumKernelSpecForProto(cl.Proto)
 	if !ok {
 		return false, nil, nil
 	}
-	result, ok := runPermutationFlipChecksumKernel(int(n64), ctor)
+	result, ok := runPermutationFlipChecksumKernel(int(n64), spec.resultCtor)
 	if !ok {
 		return false, nil, nil
 	}
@@ -54,17 +63,44 @@ func (vm *VM) runPermutationFlipChecksumWholeCallKernel(cl *Closure, args []runt
 }
 
 func IsPermutationFlipChecksumKernelProto(p *FuncProto) bool {
-	return cachedWholeCallKernelRecognized(p, wholeCallKernelPermutationFlipChecksum)
+	return cachedRuntimeSpecializationRecognized(p, runtimeSpecializationPermutationFlipChecksum)
 }
 
 func isPermutationFlipChecksumKernelProto(p *FuncProto) bool {
+	_, ok := permutationFlipChecksumKernelSpecForProto(p)
+	return ok
+}
+
+func permutationFlipChecksumKernelSpecForProto(p *FuncProto) (*permutationFlipChecksumKernelSpec, bool) {
+	if p == nil {
+		return nil, false
+	}
+	fp := wholeCallKernelFingerprintForProto(p)
+	cache := p.PermutationFlipChecksumKernel
+	if cache != nil && cache.fingerprint == fp {
+		return cache.spec, cache.spec != nil
+	}
+	spec, ok := analyzePermutationFlipChecksumKernelSpec(p)
+	if !ok {
+		p.PermutationFlipChecksumKernel = &permutationFlipChecksumKernelCache{fingerprint: fp}
+		return nil, false
+	}
+	p.PermutationFlipChecksumKernel = &permutationFlipChecksumKernelCache{fingerprint: fp, spec: spec}
+	return spec, true
+}
+
+func analyzePermutationFlipChecksumKernelSpec(p *FuncProto) (*permutationFlipChecksumKernelSpec, bool) {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || p.MaxStack != 30 || len(p.Protos) != 0 || len(p.Constants) != 2 {
-		return false
+		return nil, false
 	}
-	if _, ok := permutationFlipChecksumResultCtor(p); !ok {
-		return false
+	ctor, ok := permutationFlipChecksumResultCtor(p)
+	if !ok {
+		return nil, false
 	}
-	return matchPermutationFlipChecksumBytecode(p.Code)
+	if !matchPermutationFlipChecksumBytecode(p.Code) {
+		return nil, false
+	}
+	return &permutationFlipChecksumKernelSpec{resultCtor: ctor}, true
 }
 
 func matchPermutationFlipChecksumBytecode(code []uint32) bool {

@@ -21,15 +21,14 @@ func (vm *VM) tryRunValueWholeCallKernel(cl *Closure, args []runtime.Value) (boo
 	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, true); handled || err != nil {
 		return handled, results, err
 	}
-	// Legacy fallback for fixed protocols that have not yet been generalized.
-	return vm.tryRunCachedValueWholeCallKernel(cl, args)
+	return false, nil, nil
 }
 
 func (vm *VM) tryRunNonRecursiveTableValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if handled, results, err := vm.tryRunWholeCallValueRuntimeSpecialization(cl, args, false); handled || err != nil {
 		return handled, results, err
 	}
-	return vm.tryRunCachedValueWholeCallKernel(cl, args)
+	return false, nil, nil
 }
 
 // tryWholeCallKernel executes a guarded whole-call numeric kernel and writes
@@ -47,8 +46,7 @@ func (vm *VM) tryRunWholeCallKernel(cl *Closure, args []runtime.Value) (bool, er
 	if handled, err := vm.tryRunWholeCallNoResultRuntimeSpecialization(cl, args); handled || err != nil {
 		return handled, err
 	}
-	// Legacy fallback for fixed protocols that have not yet been generalized.
-	return vm.tryRunCachedNoResultWholeCallKernel(cl, args)
+	return false, nil
 }
 
 // TryRunNoResultWholeCallKernelForJIT executes a guarded no-result structural
@@ -60,95 +58,6 @@ func (vm *VM) TryRunNoResultWholeCallKernelForJIT(fn runtime.Value, args []runti
 		return false, nil
 	}
 	return vm.tryRunWholeCallKernel(cl, args)
-}
-
-func (vm *VM) tryRunCachedValueWholeCallKernel(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
-	if cl == nil || cl.Proto == nil {
-		return false, nil, nil
-	}
-	if !mayHaveWholeCallValueKernelCandidate(cl.Proto, len(args)) {
-		return false, nil, nil
-	}
-	recognized := cachedWholeCallKernelBits(cl.Proto)
-	if recognized == 0 {
-		return false, nil, nil
-	}
-	for i, entry := range legacyWholeCallKernelRegistry {
-		if recognized&(uint64(1)<<uint(i)) == 0 || entry.info.Route != KernelRouteWholeCallValue || entry.runValue == nil {
-			continue
-		}
-		handled, results, err := entry.runValue(vm, cl, args)
-		if handled || err != nil {
-			if handled {
-				runtime.RecordRuntimePathStructuralKernelHit(string(entry.info.Route), entry.info.Name)
-			}
-			return handled, results, err
-		}
-	}
-	return false, nil, nil
-}
-
-func (vm *VM) tryRunCachedNoResultWholeCallKernel(cl *Closure, args []runtime.Value) (bool, error) {
-	if cl == nil || cl.Proto == nil {
-		return false, nil
-	}
-	if !mayHaveWholeCallNoResultKernelCandidate(cl.Proto, len(args)) {
-		return false, nil
-	}
-	recognized := cachedWholeCallKernelBits(cl.Proto)
-	if recognized == 0 {
-		return false, nil
-	}
-	for i, entry := range legacyWholeCallKernelRegistry {
-		if recognized&(uint64(1)<<uint(i)) == 0 || entry.info.Route != KernelRouteWholeCallNoResult || entry.runNoResult == nil {
-			continue
-		}
-		handled, err := entry.runNoResult(vm, cl, args)
-		if handled || err != nil {
-			if handled {
-				runtime.RecordRuntimePathStructuralKernelHit(string(entry.info.Route), entry.info.Name)
-			}
-			return handled, err
-		}
-	}
-	return false, nil
-}
-
-func mayHaveWholeCallValueKernelCandidate(proto *FuncProto, argc int) bool {
-	if proto == nil || proto.IsVarArg {
-		return false
-	}
-	switch argc {
-	case 1:
-		if proto.NumParams != 1 {
-			return false
-		}
-		return (proto.MaxStack == 30 && len(proto.Constants) == 2 && len(proto.Protos) == 0) ||
-			(proto.MaxStack >= 13 && len(proto.Constants) == 0 && len(proto.Protos) == 0 && len(proto.Code) == 45) ||
-			(len(proto.Protos) == 0 && (len(proto.Code) == 15 || len(proto.Code) >= 20))
-	case 2:
-		return proto.NumParams == 2 && len(proto.Constants) == 24 && len(proto.Code) == 169
-	case 3:
-		return proto.NumParams == 3 &&
-			(len(proto.Constants) == 5 && len(proto.Code) == 32 ||
-				(len(proto.Constants) == 15 && len(proto.Code) == 83) ||
-				len(proto.Constants) == 1 ||
-				(len(proto.Constants) == 5 && (len(proto.Code) == 51 || len(proto.Code) == 91 || len(proto.Code) == 93)))
-	default:
-		return false
-	}
-}
-
-func mayHaveWholeCallNoResultKernelCandidate(proto *FuncProto, argc int) bool {
-	if proto == nil || proto.IsVarArg {
-		return false
-	}
-	return argc == 1 && proto.NumParams == 1 && len(proto.Constants) >= 10 &&
-		(len(proto.Code) == 99 || len(proto.Code) == 98) ||
-		argc == 3 && proto.NumParams == 3 && len(proto.Constants) >= 1 ||
-		argc == 4 && proto.NumParams == 4 &&
-			((len(proto.Constants) == 5 && len(proto.Code) == 25) ||
-				(len(proto.Constants) == 4 && len(proto.Code) == 45))
 }
 
 func (vm *VM) writeNoResults(dst, c int) {

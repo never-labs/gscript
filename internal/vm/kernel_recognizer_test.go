@@ -8,18 +8,6 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func TestCachedWholeCallKernelRecognizedUsesHotCache(t *testing.T) {
-	proto := &FuncProto{
-		WholeCallKernel: &wholeCallKernelProtoCache{
-			fingerprint: wholeCallKernelFingerprint{codeLen: 123},
-			recognized:  uint64(1) << uint(wholeCallKernelPermutationFlipChecksum),
-		},
-	}
-	if !cachedWholeCallKernelRecognized(proto, wholeCallKernelPermutationFlipChecksum) {
-		t.Fatal("cached hot dispatch guard recomputed structure instead of using cached bits")
-	}
-}
-
 func TestWholeCallKernelDiagnosticsRejectBenchmarkMetadataWithoutShape(t *testing.T) {
 	proto, vm := compileSpectralKernelTestProgram(t, `
 func fannkuch(n) { return n }
@@ -68,11 +56,14 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	if !isPermutationFlipChecksumKernelProto(child) {
 		t.Fatalf("permutation flip checksum recognizer rejected current benchmark shape: code=%d const=%d maxstack=%d", len(child.Code), len(child.Constants), child.MaxStack)
 	}
-	if !mayHaveWholeCallValueKernelCandidate(child, 1) {
-		t.Fatal("permutation flip checksum rejected by value-kernel candidate gate")
+	if !cachedRuntimeSpecializationRecognized(child, runtimeSpecializationPermutationFlipChecksum) {
+		t.Fatal("permutation flip checksum rejected by runtime specialization cache")
 	}
-	if !cachedWholeCallKernelRecognized(child, wholeCallKernelPermutationFlipChecksum) {
-		t.Fatal("permutation flip checksum rejected by cached kernel bits")
+	if child.PermutationFlipChecksumKernel == nil || child.PermutationFlipChecksumKernel.spec == nil {
+		t.Fatal("permutation flip checksum proto-local spec was not generated")
+	}
+	if got := cachedWholeCallKernelBits(child); got != 0 {
+		t.Fatalf("permutation flip checksum still recognized by legacy whole-call bits: %#x", got)
 	}
 }
 
