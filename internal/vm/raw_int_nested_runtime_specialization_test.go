@@ -15,22 +15,22 @@ func nestwave(level, width) {
 }
 `
 
-func TestRawIntNestedRuntimeKernelRecognizesShiftedNestedRecurrence(t *testing.T) {
+func TestRawIntNestedRuntimeSpecializationRecognizesShiftedNestedRecurrence(t *testing.T) {
 	top := compileProto(t, rawIntNestedShiftedSource)
 	fn := findTestProtoByName(top, "nestwave")
 	if fn == nil {
 		t.Fatal("nestwave proto not found")
 	}
-	kernel, ok := analyzeRawIntNestedSpecialization(fn)
+	specialization, ok := analyzeRawIntNestedSpecialization(fn)
 	if !ok {
-		t.Fatalf("nestwave should qualify for raw-int nested recurrence kernel:\n%s", dumpRawIntNestedTestBytecode(fn))
+		t.Fatalf("nestwave should qualify for raw-int nested recurrence specialization:\n%s", dumpRawIntNestedTestBytecode(fn))
 	}
-	if kernel.selfName != "nestwave" || kernel.baseAdd != 2 || kernel.zeroArg != 2 || kernel.mStep != 1 || kernel.nStep != 1 {
-		t.Fatalf("unexpected kernel: %#v", kernel)
+	if specialization.selfName != "nestwave" || specialization.baseAdd != 2 || specialization.zeroArg != 2 || specialization.mStep != 1 || specialization.nStep != 1 {
+		t.Fatalf("unexpected specialization: %#v", specialization)
 	}
-	got, ok := kernel.fold(runtime.IntValue(2), runtime.IntValue(6))
+	got, ok := specialization.fold(runtime.IntValue(2), runtime.IntValue(6))
 	if !ok || got != 764 {
-		t.Fatalf("nestwave(2,6) kernel = %d/%v, want 764/true", got, ok)
+		t.Fatalf("nestwave(2,6) specialization = %d/%v, want 764/true", got, ok)
 	}
 }
 

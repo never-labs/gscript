@@ -2,7 +2,7 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
-// TableIntArraySpecializationPass recognizes small whole-region int-array kernels
+// TableIntArraySpecializationPass recognizes small whole-region int-array specializations
 // whose scalar fallback remains present in the CFG. It handles the
 // prefix-reversal loop:
 //
@@ -38,37 +38,37 @@ func TableIntArraySpecializationPass(fn *Function) (*Function, error) {
 			continue
 		}
 		if cand, reason, ok := tableIntArrayReversePrefixCandidate(header, li.headerBlocks[header.ID]); ok {
-			kernel := &Instr{
+			specialization := &Instr{
 				ID:    fn.newValueID(),
 				Op:    OpTableIntArrayReversePrefix,
 				Type:  TypeBool,
 				Args:  []*Value{cand.table, cand.hiSeed},
 				Block: cand.preheader,
 			}
-			kernel.copySourceFrom(cand.source)
-			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, kernel)
-			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
+			specialization.copySourceFrom(cand.source)
+			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, specialization)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, specialization.ID, specialization.Op,
 				"guarded prefix-reversal loop with scalar fallback")
 			continue
 		} else if reason != "" {
 			functionRemarks(fn).Add("TableIntArraySpecialization", "missed", header.ID, 0, OpTableIntArrayReversePrefix, reason)
 		}
 		if cand, ok := tableIntArrayCopyPrefixCandidate(header, li.headerBlocks[header.ID]); ok {
-			kernel := &Instr{
+			specialization := &Instr{
 				ID:    fn.newValueID(),
 				Op:    OpTableIntArrayCopyPrefix,
 				Type:  TypeBool,
 				Args:  []*Value{cand.dst, cand.src, cand.hi},
 				Block: cand.preheader,
 			}
-			kernel.copySourceFrom(cand.source)
-			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, kernel)
-			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
+			specialization.copySourceFrom(cand.source)
+			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, specialization)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, specialization.ID, specialization.Op,
 				"guarded prefix-copy loop with scalar fallback")
 			continue
 		}
 		if cand, reason, ok := tableArraySwapPairsCandidate(fn, header, li.headerBlocks[header.ID]); ok {
-			kernel := &Instr{
+			specialization := &Instr{
 				ID:    fn.newValueID(),
 				Op:    OpTableArraySwapPairs,
 				Type:  TypeBool,
@@ -76,9 +76,9 @@ func TableIntArraySpecializationPass(fn *Function) (*Function, error) {
 				Aux:   cand.kind,
 				Block: cand.preheader,
 			}
-			kernel.copySourceFrom(cand.source)
-			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, kernel)
-			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, kernel.ID, kernel.Op,
+			specialization.copySourceFrom(cand.source)
+			insertSpecializationBranch(cand.preheader, cand.exit, cand.header, specialization)
+			functionRemarks(fn).Add("TableIntArraySpecialization", "changed", cand.preheader.ID, specialization.ID, specialization.Op,
 				"guarded adjacent pair-swap loop with scalar fallback")
 		} else if reason != "" && loopBodyHasOp(li.headerBlocks[header.ID], fn, OpTableArraySwap) {
 			functionRemarks(fn).Add("TableIntArraySpecialization", "missed", header.ID, 0, OpTableArraySwapPairs, reason)
@@ -104,12 +104,12 @@ func loopBodyHasOp(bodySet map[int]bool, fn *Function, op Op) bool {
 	return false
 }
 
-func insertSpecializationBranch(preheader, success, fallback *Block, kernel *Instr) {
+func insertSpecializationBranch(preheader, success, fallback *Block, specialization *Instr) {
 	term := blockTerminator(preheader)
 	insertAt := len(preheader.Instrs) - 1
-	preheader.Instrs = append(preheader.Instrs[:insertAt], append([]*Instr{kernel}, preheader.Instrs[insertAt:]...)...)
+	preheader.Instrs = append(preheader.Instrs[:insertAt], append([]*Instr{specialization}, preheader.Instrs[insertAt:]...)...)
 	term.Op = OpBranch
-	term.Args = []*Value{kernel.Value()}
+	term.Args = []*Value{specialization.Value()}
 	term.Aux = int64(success.ID)
 	term.Aux2 = int64(fallback.ID)
 	preheader.Succs = []*Block{success, fallback}
@@ -392,7 +392,7 @@ func matchCopyPrefixBody(body *Block, bodySet map[int]bool, idx *Value) (copyPre
 	if src == nil {
 		return match, false
 	}
-	if !tableIntArrayKernelLocalTable(store.Args[0], bodySet) || !tableIntArrayKernelLocalTable(src, bodySet) {
+	if !tableIntArraySpecializationLocalTable(store.Args[0], bodySet) || !tableIntArraySpecializationLocalTable(src, bodySet) {
 		return match, false
 	}
 	match.dst = store.Args[0]
@@ -401,7 +401,7 @@ func matchCopyPrefixBody(body *Block, bodySet map[int]bool, idx *Value) (copyPre
 	return match, true
 }
 
-func tableIntArrayKernelLocalTable(table *Value, body map[int]bool) bool {
+func tableIntArraySpecializationLocalTable(table *Value, body map[int]bool) bool {
 	if table == nil || table.Def == nil || table.Def.Op != OpNewTable || table.Def.Block == nil {
 		return false
 	}

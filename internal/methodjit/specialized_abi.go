@@ -123,7 +123,7 @@ type RawIntSelfABI struct {
 }
 
 // TypedSelfABI is the private method-JIT ABI for fixed-shape recursive
-// kernels whose hot recursive edge can avoid the boxed VM CALL convention.
+// specializations whose hot recursive edge can avoid the boxed VM CALL convention.
 // Parameters are passed in X0..X3 as raw int64 or *runtime.Table pointers.
 // The return value is delivered in X0 with the representation named by Return.
 type TypedSelfABI struct {
@@ -357,7 +357,7 @@ func AnalyzeRawIntSelfABI(proto *vm.FuncProto) RawIntSelfABI {
 	}
 }
 
-// AnalyzeTypedSelfABI recognizes fixed-type recursive kernels that can use a
+// AnalyzeTypedSelfABI recognizes fixed-type recursive specializations that can use a
 // private typed self-call ABI. It deliberately excludes pure raw-int specializations,
 // which are handled by the older numeric ABI. This keeps the first typed-table
 // contract narrow: it is for recursive functions with at least one table

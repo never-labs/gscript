@@ -105,7 +105,7 @@ seen1 := rows[1].counters.seen
 	got := kernelGlobals["result"].Number()
 	want := fallbackGlobals["result"].Number()
 	if math.Abs(got-want) > 0 {
-		t.Fatalf("kernel result %.0f, fallback %.0f", got, want)
+		t.Fatalf("specialization result %.0f, fallback %.0f", got, want)
 	}
 	gotSeen := kernelGlobals["seen1"].Number()
 	wantSeen := fallbackGlobals["seen1"].Number()

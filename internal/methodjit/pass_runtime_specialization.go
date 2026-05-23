@@ -17,7 +17,7 @@ func AnnotateCallSiteRuntimeSpecializationExits(fn *Function, globals map[string
 		return fn
 	}
 	callFacts := fn.Analysis.CallFacts()
-	kernels := make(map[int]bool)
+	specializations := make(map[int]bool)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpCall || callResultCountFromAux2(instr.Aux2) != 0 {
@@ -30,16 +30,16 @@ func AnnotateCallSiteRuntimeSpecializationExits(fn *Function, globals map[string
 			if !stableNoResultCallSiteCandidate(fn, instr, globals, nArgs) {
 				continue
 			}
-			kernels[instr.ID] = true
+			specializations[instr.ID] = true
 		}
 	}
-	if len(kernels) == 0 {
+	if len(specializations) == 0 {
 		callFacts.SetCallSiteNoResultRuntimeSpecializations(nil)
 		callFacts.SetCallSiteNoResultRuntimeSpecializationBatches(nil)
 		return fn
 	}
-	callFacts.SetCallSiteNoResultRuntimeSpecializations(kernels)
-	callFacts.SetCallSiteNoResultRuntimeSpecializationBatches(buildCallSiteNoResultRuntimeSpecializationBatches(fn, globals, kernels))
+	callFacts.SetCallSiteNoResultRuntimeSpecializations(specializations)
+	callFacts.SetCallSiteNoResultRuntimeSpecializationBatches(buildCallSiteNoResultRuntimeSpecializationBatches(fn, globals, specializations))
 	return fn
 }
 
@@ -97,14 +97,14 @@ func protoReturnsNoValuesWithArity(proto *vm.FuncProto, nArgs int) bool {
 	return seenReturn
 }
 
-func buildCallSiteNoResultRuntimeSpecializationBatches(fn *Function, globals map[string]*vm.FuncProto, kernels map[int]bool) map[int]CallSiteNoResultRuntimeSpecializationBatchFact {
-	if fn == nil || fn.Proto == nil || len(kernels) == 0 {
+func buildCallSiteNoResultRuntimeSpecializationBatches(fn *Function, globals map[string]*vm.FuncProto, specializations map[int]bool) map[int]CallSiteNoResultRuntimeSpecializationBatchFact {
+	if fn == nil || fn.Proto == nil || len(specializations) == 0 {
 		return nil
 	}
-	byPC := make(map[int]*Instr, len(kernels))
+	byPC := make(map[int]*Instr, len(specializations))
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr != nil && instr.Op == OpCall && instr.HasSource && kernels[instr.ID] {
+			if instr != nil && instr.Op == OpCall && instr.HasSource && specializations[instr.ID] {
 				byPC[instr.SourcePC] = instr
 			}
 		}

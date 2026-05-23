@@ -192,7 +192,7 @@ result := gcd_bench(1200)
 		t.Fatalf("gcd_bench Tier 2 compile failed with %q", tm.tier2FailReason[gcdBench])
 	}
 	if tm.tier2Compiled[gcdBench] == nil {
-		t.Fatal("gcd_bench should promote: loop calls stable raw-int gcd kernel")
+		t.Fatal("gcd_bench should promote: loop calls stable raw-int gcd specialization")
 	}
 	gcd := findProtoByName(proto, "gcd")
 	if gcd == nil {

@@ -9,7 +9,7 @@ const (
 // LoopBoundRangeGuardPass adds a narrow entry range guard for integer
 // parameters used as loop bounds. The guard feeds RangeAnalysis, which can then
 // prove loop-bound-derived arithmetic fits in the int48 payload range and skip
-// per-op overflow checks in hot numeric/table-building kernels. Guard misses
+// per-op overflow checks in hot numeric/table-building specializations. Guard misses
 // deopt to the interpreter, preserving correctness for wider inputs.
 func LoopBoundRangeGuardPass(fn *Function) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {

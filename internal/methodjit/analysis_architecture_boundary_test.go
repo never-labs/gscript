@@ -83,7 +83,7 @@ func TestProductionCodeUsesLoopSpecializationFactsBoundary(t *testing.T) {
 		}
 		ast.Inspect(parsed, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || !legacyKernelFactField(sel.Sel.Name) {
+			if !ok || !legacyLoopSpecializationFactField(sel.Sel.Name) {
 				return true
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
@@ -141,7 +141,7 @@ func legacyCallFactField(name string) bool {
 	}
 }
 
-func legacyKernelFactField(name string) bool {
+func legacyLoopSpecializationFactField(name string) bool {
 	switch name {
 	case "RecordArrayLoopSpecializations", "TableArrayUpperBoundSafe", "TableArrayLowerBoundSafe", "LoopTableArrayFacts":
 		return true

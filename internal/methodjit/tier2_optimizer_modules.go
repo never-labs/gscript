@@ -132,7 +132,7 @@ const (
 	Tier2PhaseFloatNumeric Tier2OptimizerPhase = "float_numeric"
 
 	// Tier2PhaseLoopSpecialization runs LICM, loop-global store sinking, table loop
-	// kernels, and post-LICM load elimination.
+	// specializations, and post-LICM load elimination.
 	Tier2PhaseLoopSpecialization Tier2OptimizerPhase = "loop_specialization"
 
 	// Tier2PhaseLoopPost runs loop unrolling, quadratic strength reduction,

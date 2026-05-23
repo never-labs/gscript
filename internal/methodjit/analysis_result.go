@@ -105,10 +105,10 @@ type AnalysisResult struct {
 	// constructors, Initialize, and domain mutators.
 	TableShape *TableShapeFacts
 
-	// Kernel groups loop-specialization and table-array bound facts. The map fields
+	// LoopSpecialization groups loop-specialization and table-array bound facts. The map fields
 	// above remain for compatibility and are kept pointed at this domain's maps
 	// by constructors, Initialize, and domain mutators.
-	Kernel *LoopSpecializationFacts
+	LoopSpecialization *LoopSpecializationFacts
 
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
@@ -893,30 +893,30 @@ func (a *AnalysisResult) LoopSpecializationFacts() *LoopSpecializationFacts {
 	if a == nil {
 		return nil
 	}
-	if a.Kernel == nil {
-		a.Kernel = &LoopSpecializationFacts{
+	if a.LoopSpecialization == nil {
+		a.LoopSpecialization = &LoopSpecializationFacts{
 			TableArrayUpperBoundSafe:       a.TableArrayUpperBoundSafe,
 			TableArrayLowerBoundSafe:       a.TableArrayLowerBoundSafe,
 			LoopTableArrayFacts:            a.LoopTableArrayFacts,
 			RecordArrayLoopSpecializations: a.RecordArrayLoopSpecializations,
 		}
 	} else {
-		if a.TableArrayUpperBoundSafe != nil || a.Kernel.TableArrayUpperBoundSafe == nil {
-			a.Kernel.TableArrayUpperBoundSafe = a.TableArrayUpperBoundSafe
+		if a.TableArrayUpperBoundSafe != nil || a.LoopSpecialization.TableArrayUpperBoundSafe == nil {
+			a.LoopSpecialization.TableArrayUpperBoundSafe = a.TableArrayUpperBoundSafe
 		}
-		if a.TableArrayLowerBoundSafe != nil || a.Kernel.TableArrayLowerBoundSafe == nil {
-			a.Kernel.TableArrayLowerBoundSafe = a.TableArrayLowerBoundSafe
+		if a.TableArrayLowerBoundSafe != nil || a.LoopSpecialization.TableArrayLowerBoundSafe == nil {
+			a.LoopSpecialization.TableArrayLowerBoundSafe = a.TableArrayLowerBoundSafe
 		}
-		if a.LoopTableArrayFacts != nil || a.Kernel.LoopTableArrayFacts == nil {
-			a.Kernel.LoopTableArrayFacts = a.LoopTableArrayFacts
+		if a.LoopTableArrayFacts != nil || a.LoopSpecialization.LoopTableArrayFacts == nil {
+			a.LoopSpecialization.LoopTableArrayFacts = a.LoopTableArrayFacts
 		}
-		if a.RecordArrayLoopSpecializations != nil || a.Kernel.RecordArrayLoopSpecializations == nil {
-			a.Kernel.RecordArrayLoopSpecializations = a.RecordArrayLoopSpecializations
+		if a.RecordArrayLoopSpecializations != nil || a.LoopSpecialization.RecordArrayLoopSpecializations == nil {
+			a.LoopSpecialization.RecordArrayLoopSpecializations = a.RecordArrayLoopSpecializations
 		}
 	}
-	a.Kernel.owner = a
+	a.LoopSpecialization.owner = a
 	a.bindLoopSpecializationCompatibilityFields()
-	return a.Kernel
+	return a.LoopSpecialization
 }
 
 func functionLoopSpecializationFacts(fn *Function) *LoopSpecializationFacts {
@@ -935,13 +935,13 @@ func (a *AnalysisResult) initializeLoopSpecializationFacts() {
 }
 
 func (a *AnalysisResult) bindLoopSpecializationCompatibilityFields() {
-	if a == nil || a.Kernel == nil {
+	if a == nil || a.LoopSpecialization == nil {
 		return
 	}
-	a.TableArrayUpperBoundSafe = a.Kernel.TableArrayUpperBoundSafe
-	a.TableArrayLowerBoundSafe = a.Kernel.TableArrayLowerBoundSafe
-	a.LoopTableArrayFacts = a.Kernel.LoopTableArrayFacts
-	a.RecordArrayLoopSpecializations = a.Kernel.RecordArrayLoopSpecializations
+	a.TableArrayUpperBoundSafe = a.LoopSpecialization.TableArrayUpperBoundSafe
+	a.TableArrayLowerBoundSafe = a.LoopSpecialization.TableArrayLowerBoundSafe
+	a.LoopTableArrayFacts = a.LoopSpecialization.LoopTableArrayFacts
+	a.RecordArrayLoopSpecializations = a.LoopSpecialization.RecordArrayLoopSpecializations
 }
 
 // SpeculationFacts groups analysis facts produced and consumed by Tier 2
@@ -1350,7 +1350,7 @@ func NewAnalysisResult() *AnalysisResult {
 		Call:                           NewCallFacts(),
 		Speculation:                    NewSpeculationFacts(),
 		TableShape:                     NewTableShapeFacts(),
-		Kernel:                         NewLoopSpecializationFacts(),
+		LoopSpecialization:             NewLoopSpecializationFacts(),
 
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
 		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),

@@ -152,7 +152,7 @@ const (
 	OpTableArraySwapPairs
 	// Bulk bool-array fill. Args = [table, start, end] for contiguous fills or
 	// [table, start, end, step] for bounded stride fills. Aux = byte value
-	// (1=false, 2=true). The stride form uses a guarded bool-array kernel and
+	// (1=false, 2=true). The stride form uses a guarded bool-array specialization and
 	// falls back through RawSetInt when array kind or bounds do not match.
 	OpTableBoolArrayFill
 	// Bulk bool-array truthy count. Args = [table, start, end]. Returns the

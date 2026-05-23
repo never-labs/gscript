@@ -2332,7 +2332,7 @@ func (ec *emitContext) emitCallNativeTypedSelfIfEligible(instr *Instr) bool {
 	if abi.Return == SpecializedABIReturnNone {
 		// Zero-result typed self recursion is side-effect-only. The native BL
 		// path has no return value to validate before restoring the caller
-		// frame, and it is not yet safe for mutating double-recursive kernels
+		// frame, and it is not yet safe for mutating double-recursive specializations
 		// such as quicksort. Keep those calls on the boxed call-exit path.
 		return false
 	}

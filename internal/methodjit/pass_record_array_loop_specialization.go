@@ -63,27 +63,27 @@ func lowerRecordArrayLoopSpecialization(fn *Function, header *Block) bool {
 		Args:  []*Value{spec.header, spec.data, spec.len, limit, spec.scale, spec.damp},
 		Block: header,
 	}
-	spec.kernel.Cache = &RecordArrayLoopSpecializationCache{}
-	fn.RecordArrayLoopCaches = append(fn.RecordArrayLoopCaches, spec.kernel.Cache)
-	functionLoopSpecializationFacts(fn).SetRecordArrayLoopSpecialization(op.ID, spec.kernel)
+	spec.specialization.Cache = &RecordArrayLoopSpecializationCache{}
+	fn.RecordArrayLoopCaches = append(fn.RecordArrayLoopCaches, spec.specialization.Cache)
+	functionLoopSpecializationFacts(fn).SetRecordArrayLoopSpecialization(op.ID, spec.specialization)
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Block: header}
 	header.Instrs = []*Instr{op, ret}
 	header.Preds = []*Block{pre}
 	header.Succs = nil
 	functionRemarks(fn).Add("RecordArrayLoopSpecialization", "changed", header.ID, op.ID, op.Op,
 		fmt.Sprintf("lowered fixed-shape record-array loop shape %d fields %v ops=%d stores=%d",
-			spec.kernel.ShapeID, spec.kernel.FieldLoads, len(spec.kernel.Ops), len(spec.kernel.Stores)))
+			spec.specialization.ShapeID, spec.specialization.FieldLoads, len(spec.specialization.Ops), len(spec.specialization.Stores)))
 	return true
 }
 
 type recordFieldUpdateSpec struct {
-	header *Value
-	data   *Value
-	len    *Value
-	scale  *Value
-	damp   *Value
-	pairs  []tableFieldUpdatePair
-	kernel RecordArrayLoopSpecializationSpec
+	header         *Value
+	data           *Value
+	len            *Value
+	scale          *Value
+	damp           *Value
+	pairs          []tableFieldUpdatePair
+	specialization RecordArrayLoopSpecializationSpec
 }
 
 func parseRecordFieldUpdateBody(body *Block, index *Value) (recordFieldUpdateSpec, bool) {
@@ -178,7 +178,7 @@ func parseRecordFieldUpdateBody(body *Block, index *Value) (recordFieldUpdateSpe
 	if len(spec.pairs) < 2 || spec.scale == nil || spec.damp == nil {
 		return recordFieldUpdateSpec{}, false
 	}
-	spec.kernel = buildRecordArraySpecializationFromFieldPairs(uint32(svals.Aux), spec.pairs)
+	spec.specialization = buildRecordArraySpecializationFromFieldPairs(uint32(svals.Aux), spec.pairs)
 	return spec, true
 }
 

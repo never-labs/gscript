@@ -99,21 +99,21 @@ result := run()
 		t.Fatalf("CompileForDiagnostics(reverse_prefix): %v", err)
 	}
 	if !strings.Contains(art.IRAfter, "TableIntArrayReversePrefix") {
-		t.Fatalf("expected structural prefix-reverse kernel in IR:\n%s", art.IRAfter)
+		t.Fatalf("expected structural prefix-reverse specialization in IR:\n%s", art.IRAfter)
 	}
 	art, err = NewTieringManager().CompileForDiagnostics(findProtoByName(top, "copy_local"))
 	if err != nil {
 		t.Fatalf("CompileForDiagnostics(copy_local): %v", err)
 	}
 	if !strings.Contains(art.IRAfter, "TableIntArrayCopyPrefix") {
-		t.Fatalf("expected structural prefix-copy kernel in IR:\n%s", art.IRAfter)
+		t.Fatalf("expected structural prefix-copy specialization in IR:\n%s", art.IRAfter)
 	}
 	art, err = NewTieringManager().CompileForDiagnostics(findProtoByName(top, "swap_pairs_local"))
 	if err != nil {
 		t.Fatalf("CompileForDiagnostics(swap_pairs_local): %v", err)
 	}
 	if !strings.Contains(art.IRAfter, "TableArraySwapPairs") {
-		t.Fatalf("expected structural adjacent pair-swap kernel in IR:\n%s", art.IRAfter)
+		t.Fatalf("expected structural adjacent pair-swap specialization in IR:\n%s", art.IRAfter)
 	}
 }
 

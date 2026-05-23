@@ -161,26 +161,26 @@ func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
 
 func TestAnalysisResultLoopSpecializationFactsBindsCompatibilityFields(t *testing.T) {
 	a := NewAnalysisResult()
-	kernels := a.LoopSpecializationFacts()
+	specializations := a.LoopSpecializationFacts()
 
-	kernels.SetTableArrayUpperBoundSafe(map[int]bool{11: true})
+	specializations.SetTableArrayUpperBoundSafe(map[int]bool{11: true})
 	if !a.TableArrayUpperBoundSafe[11] {
 		t.Fatalf("LoopSpecializationFacts.SetTableArrayUpperBoundSafe did not update compatibility field")
 	}
 
-	kernels.SetTableArrayLowerBoundSafe(map[int]bool{12: true})
+	specializations.SetTableArrayLowerBoundSafe(map[int]bool{12: true})
 	if !a.TableArrayLowerBoundSafe[12] {
 		t.Fatalf("LoopSpecializationFacts.SetTableArrayLowerBoundSafe did not update compatibility field")
 	}
 
 	loopFact := LoopTableArrayFact{HeaderBlockID: 1, PreheaderBlockID: 2, AccessOp: OpTableArrayLoad}
-	kernels.SetLoopTableArrayFacts(map[int]LoopTableArrayFact{13: loopFact})
+	specializations.SetLoopTableArrayFacts(map[int]LoopTableArrayFact{13: loopFact})
 	if got, ok := a.LoopTableArrayFacts[13]; !ok || got.HeaderBlockID != 1 || got.AccessOp != OpTableArrayLoad {
 		t.Fatalf("LoopSpecializationFacts.SetLoopTableArrayFacts did not update compatibility field: got %#v ok=%v", got, ok)
 	}
 
 	spec := RecordArrayLoopSpecializationSpec{ShapeID: 99, ScalarCount: 1}
-	kernels.SetRecordArrayLoopSpecializations(map[int]RecordArrayLoopSpecializationSpec{14: spec})
+	specializations.SetRecordArrayLoopSpecializations(map[int]RecordArrayLoopSpecializationSpec{14: spec})
 	if got, ok := a.RecordArrayLoopSpecializations[14]; !ok || got.ShapeID != 99 || got.ScalarCount != 1 {
 		t.Fatalf("LoopSpecializationFacts.SetRecordArrayLoopSpecializations did not update compatibility field: got %#v ok=%v", got, ok)
 	}
@@ -196,17 +196,17 @@ func TestAnalysisResultLoopSpecializationFactsAdoptsLegacyFields(t *testing.T) {
 		RecordArrayLoopSpecializations: map[int]RecordArrayLoopSpecializationSpec{24: spec},
 	}
 
-	kernels := a.LoopSpecializationFacts()
-	if !kernels.TableArrayUpperBoundIsSafe(21) {
+	specializations := a.LoopSpecializationFacts()
+	if !specializations.TableArrayUpperBoundIsSafe(21) {
 		t.Fatalf("LoopSpecializationFacts did not adopt legacy TableArrayUpperBoundSafe")
 	}
-	if !kernels.TableArrayLowerBoundIsSafe(22) {
+	if !specializations.TableArrayLowerBoundIsSafe(22) {
 		t.Fatalf("LoopSpecializationFacts did not adopt legacy TableArrayLowerBoundSafe")
 	}
-	if got, ok := kernels.LoopTableArrayFact(23); !ok || got.HeaderBlockID != 3 || got.AccessOp != OpTableArrayStore {
+	if got, ok := specializations.LoopTableArrayFact(23); !ok || got.HeaderBlockID != 3 || got.AccessOp != OpTableArrayStore {
 		t.Fatalf("LoopSpecializationFacts did not adopt legacy LoopTableArrayFacts: got %#v ok=%v", got, ok)
 	}
-	if got, ok := kernels.RecordArrayLoopSpecialization(24); !ok || got.ShapeID != 77 {
+	if got, ok := specializations.RecordArrayLoopSpecialization(24); !ok || got.ShapeID != 77 {
 		t.Fatalf("LoopSpecializationFacts did not adopt legacy RecordArrayLoopSpecializations: got %#v ok=%v", got, ok)
 	}
 }

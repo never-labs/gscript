@@ -461,7 +461,7 @@ func protoHasMatrixIntrinsicConstants(proto *vm.FuncProto) bool {
 }
 
 // shouldStayTier1ForBoxedRawIntSpecialization keeps small non-recursive raw-int while
-// kernels on the Tier 1 BLR path. Tier 2 can compile these bodies well, but a
+// specializations on the Tier 1 BLR path. Tier 2 can compile these bodies well, but a
 // boxed cross-function call pays the full Tier 2 direct-entry frame on every
 // invocation. In hot loop-call patterns (math_intensive.gcd_bench), that call
 // ABI cost dominates the tiny callee body; Tier 1's baseline direct entry is

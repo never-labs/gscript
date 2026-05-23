@@ -234,7 +234,7 @@ func NewDenseMatrix(rows, cols int) *Table {
 }
 
 // DenseFloatMatrixForNumericSpecialization exposes a DenseMatrix flat backing to
-// guarded whole-call kernels. The view is valid only when ordinary t[i][j]
+// guarded whole-call specializations. The view is valid only when ordinary t[i][j]
 // indexing for the requested rectangle is known to hit the dense backing
 // without metatable, lazy, or concurrent table behavior.
 func (t *Table) DenseFloatMatrixForNumericSpecialization(rows, cols int) ([]float64, int, bool) {

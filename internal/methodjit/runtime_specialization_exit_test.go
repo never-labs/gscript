@@ -95,7 +95,7 @@ func TestCallSiteRuntimeSpecializationExitLowersStableNoResultCall(t *testing.T)
 	}
 }
 
-func TestCallSiteRuntimeSpecializationExitRejectsStableNonKernelRuntimeFeedback(t *testing.T) {
+func TestCallSiteRuntimeSpecializationExitRejectsStableNonSpecializationRuntimeFeedback(t *testing.T) {
 	top := compileProto(t, `
 total := 0
 

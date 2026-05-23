@@ -77,7 +77,7 @@ func MatrixLowerPass(fn *Function) (*Function, error) {
 				// R46's RowPtr split added an extra LSL+MOVreg that the
 				// pipeline did NOT absorb, measuring 0.037 vs R45's
 				// 0.035 median. Keep R45 form; RowPtr ops remain
-				// available for future 3D-tensor work or hand-kernels.
+				// available for future 3D-tensor work or hand-specializations.
 				instr.Op = OpMatrixLoadFAt
 				instr.Args = []*Value{flat.Value(), stride.Value(), i, j}
 				newInstrs = append(newInstrs, instr)

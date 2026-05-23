@@ -686,7 +686,7 @@ func sum(n) {
 		t.Fatal("gcd proto not found")
 	}
 	if !shouldStayTier1ForBoxedRawIntSpecialization(gcd, analyzeFuncProfile(gcd)) {
-		t.Fatal("gcd-shaped raw-int while kernel should stay Tier 1 for boxed cross-calls")
+		t.Fatal("gcd-shaped raw-int while specialization should stay Tier 1 for boxed cross-calls")
 	}
 	sum := findProtoByName(proto, "sum")
 	if sum == nil {

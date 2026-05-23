@@ -152,7 +152,7 @@ func tableArraySetPath(key int64, val Value, arrLen int64) {
 }
 
 // PlainIntArrayRegionForNumericSpecialization exposes an inclusive int-array region for
-// guarded whole-function kernels. It only succeeds when ordinary integer table
+// guarded whole-function specializations. It only succeeds when ordinary integer table
 // indexing for every key in [lo, hi] is known to hit the plain typed-array
 // backing without metatable fallback, table materialization, locking, or kind
 // conversion.

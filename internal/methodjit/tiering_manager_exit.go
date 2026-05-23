@@ -1619,7 +1619,7 @@ func (tm *TieringManager) globalValueByConst(proto *vm.FuncProto, constIdx int) 
 	}
 	// Batch metadata only records GETGLOBAL-backed call recipes; the constant
 	// index is resolved through the VM's current globals so normal global
-	// rebinding still guards/falls back through the VM closure/kernel checks.
+	// rebinding still guards/falls back through the VM closure/specialization checks.
 	if proto == nil || constIdx >= len(proto.Constants) {
 		return runtime.NilValue(), false
 	}

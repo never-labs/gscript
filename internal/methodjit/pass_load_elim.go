@@ -432,11 +432,11 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				objID := instr.Args[0].ID
 				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
 					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"typed array pair-swap kernel invalidated dynamic-key table cache")
+						"typed array pair-swap specialization invalidated dynamic-key table cache")
 				}
 				if tableArrayFacts.InvalidateTable(objID) {
 					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"typed array pair-swap kernel invalidated typed array facts")
+						"typed array pair-swap specialization invalidated typed array facts")
 				}
 
 			case OpTableIntArrayReversePrefix:
@@ -446,11 +446,11 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				objID := instr.Args[0].ID
 				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
 					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array prefix kernel invalidated dynamic-key table cache")
+						"int-array prefix specialization invalidated dynamic-key table cache")
 				}
 				if tableArrayFacts.InvalidateTable(objID) {
 					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array prefix kernel invalidated typed array facts")
+						"int-array prefix specialization invalidated typed array facts")
 				}
 
 			case OpTableIntArrayCopyPrefix:
@@ -460,11 +460,11 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				objID := instr.Args[0].ID
 				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
 					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array copy kernel invalidated dynamic-key table cache")
+						"int-array copy specialization invalidated dynamic-key table cache")
 				}
 				if tableArrayFacts.InvalidateTable(objID) {
 					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array copy kernel invalidated typed array facts")
+						"int-array copy specialization invalidated typed array facts")
 				}
 
 			case OpAppend, OpSetList:

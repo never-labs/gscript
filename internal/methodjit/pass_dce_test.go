@@ -415,7 +415,7 @@ func TestDCE_RecordArrayLoopSpecializationNotDropped(t *testing.T) {
 	data := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 1, Block: b}
 	limit := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 10, Block: b}
 	scale := &Instr{ID: fn.newValueID(), Op: OpConstFloat, Type: TypeFloat, Block: b}
-	kernel := &Instr{
+	specialization := &Instr{
 		ID:    fn.newValueID(),
 		Op:    OpRecordArrayLoopSpecialization,
 		Type:  TypeUnknown,
@@ -423,7 +423,7 @@ func TestDCE_RecordArrayLoopSpecializationNotDropped(t *testing.T) {
 		Block: b,
 	}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Block: b}
-	b.Instrs = []*Instr{data, limit, scale, kernel, ret}
+	b.Instrs = []*Instr{data, limit, scale, specialization, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
 
