@@ -451,11 +451,25 @@ func buildMathLib() *Table {
 }
 
 func mathFmodValue(a, b Value) (Value, error) {
-	if (b.IsInt() && b.Int() == 0) || (b.IsFloat() && b.Float() == 0) {
+	if a.IsInt() && b.IsInt() {
+		bi := b.Int()
+		if bi == 0 {
+			return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
+		}
+		return IntValue(a.Int() % bi), nil
+	}
+	if a.IsFloat() && b.IsFloat() {
+		bf := b.Float()
+		if bf == 0 {
+			return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
+		}
+		return FloatValue(math.Mod(a.Float(), bf)), nil
+	}
+	if b.IsInt() && b.Int() == 0 {
 		return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
 	}
-	if a.IsInt() && b.IsInt() {
-		return IntValue(a.Int() % b.Int()), nil
+	if b.IsFloat() && b.Float() == 0 {
+		return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
 	}
 	return FloatValue(math.Mod(toFloat(a), toFloat(b))), nil
 }

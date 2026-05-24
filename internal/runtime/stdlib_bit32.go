@@ -308,6 +308,9 @@ func bit32FoldFixed(name string, zero uint32, op func(uint32, uint32) uint32, ar
 }
 
 func bit32FoldFixed2(name string, op func(uint32, uint32) uint32, a, b Value) (Value, error) {
+	if a.IsInt() && b.IsInt() {
+		return IntValue(int64(op(uint32(a.Int()), uint32(b.Int())))), nil
+	}
 	result, err := bit32FoldFirst(name, a)
 	if err != nil {
 		return NilValue(), err
@@ -316,6 +319,11 @@ func bit32FoldFixed2(name string, op func(uint32, uint32) uint32, a, b Value) (V
 }
 
 func bit32FoldFixed3(name string, op func(uint32, uint32) uint32, a, b, c Value) (Value, error) {
+	if a.IsInt() && b.IsInt() && c.IsInt() {
+		result := op(uint32(a.Int()), uint32(b.Int()))
+		result = op(result, uint32(c.Int()))
+		return IntValue(int64(result)), nil
+	}
 	result, err := bit32FoldFirst(name, a)
 	if err != nil {
 		return NilValue(), err
@@ -328,6 +336,12 @@ func bit32FoldFixed3(name string, op func(uint32, uint32) uint32, a, b, c Value)
 }
 
 func bit32FoldFixed4(name string, op func(uint32, uint32) uint32, a, b, c, d Value) (Value, error) {
+	if a.IsInt() && b.IsInt() && c.IsInt() && d.IsInt() {
+		result := op(uint32(a.Int()), uint32(b.Int()))
+		result = op(result, uint32(c.Int()))
+		result = op(result, uint32(d.Int()))
+		return IntValue(int64(result)), nil
+	}
 	result, err := bit32FoldFirst(name, a)
 	if err != nil {
 		return NilValue(), err
@@ -344,6 +358,16 @@ func bit32FoldFixed4(name string, op func(uint32, uint32) uint32, a, b, c, d Val
 }
 
 func bit32FoldFixed8(name string, op func(uint32, uint32) uint32, a, b, c, d, e, f, g, h Value) (Value, error) {
+	if a.IsInt() && b.IsInt() && c.IsInt() && d.IsInt() && e.IsInt() && f.IsInt() && g.IsInt() && h.IsInt() {
+		result := op(uint32(a.Int()), uint32(b.Int()))
+		result = op(result, uint32(c.Int()))
+		result = op(result, uint32(d.Int()))
+		result = op(result, uint32(e.Int()))
+		result = op(result, uint32(f.Int()))
+		result = op(result, uint32(g.Int()))
+		result = op(result, uint32(h.Int()))
+		return IntValue(int64(result)), nil
+	}
 	result, err := bit32FoldFirst(name, a)
 	if err != nil {
 		return NilValue(), err
