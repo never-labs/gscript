@@ -1383,7 +1383,13 @@ func (v Value) ToNumber() (Value, bool) {
 	if !v.IsString() {
 		return NilValue(), false
 	}
-	raw := v.Str()
+	return ParseNumberString(v.Str())
+}
+
+// ParseNumberString applies the same string-to-number conversion used by
+// tonumber and arithmetic coercions without requiring callers to allocate a
+// transient runtime.StringValue.
+func ParseNumberString(raw string) (Value, bool) {
 	if v, ok := parseFastDecimalInt(raw); ok {
 		return v, true
 	}

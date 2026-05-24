@@ -36,6 +36,44 @@ for i := 1; i <= 10; i = i + 1 {
 	}
 }
 
+func TestStringSubToNumberRuntimeSpecializationRecordsHits(t *testing.T) {
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	globals := compileAndRun(t, `
+text := "ab1234cd"
+sum := 0
+for i := 1; i <= 10; i = i + 1 {
+  sum = sum + tonumber(string.sub(text, 3, 4))
+  sum = sum + tonumber(string.sub(text, -4, -3))
+}
+`)
+	if got := globals["sum"]; !got.IsInt() || got.Int() != 460 {
+		t.Fatalf("sum = %s, want 460", got.String())
+	}
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "string_sub_tonumber"); got != 20 {
+		t.Fatalf("string.sub tonumber specialization hits = %d, want 20", got)
+	}
+}
+
+func TestStringSubToNumberRuntimeSpecializationRespectsOverriddenToNumber(t *testing.T) {
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	globals := compileAndRun(t, `
+tonumber = func(x) {
+  return 99
+}
+result := tonumber(string.sub("1234", 1, 2))
+`)
+	if got := globals["result"]; !got.IsInt() || got.Int() != 99 {
+		t.Fatalf("result = %s, want 99", got.String())
+	}
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "string_sub_tonumber"); got != 0 {
+		t.Fatalf("string.sub tonumber specialization hits = %d, want 0", got)
+	}
+}
+
 func TestUTF8CodepointSumLoopRuntimeSpecializationRecordsHits(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()

@@ -4082,6 +4082,12 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
 						break
 					}
+					if handled, err := vm.tryFuseStringSubToNumber(frame, base, a, nArgs, c, gf); err != nil {
+						return nil, wrapLineErr(frame, err)
+					} else if handled {
+						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+						break
+					}
 					if handled, err := vm.tryFastCoroutineCall(gf, base, a, nArgs, c); handled {
 						if err != nil {
 							if err == errCoroutineYield {
