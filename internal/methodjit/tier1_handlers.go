@@ -610,6 +610,13 @@ slowPath:
 					return err
 				}
 			}
+		case runtime.NativeKindStdNext:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdNextIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdNextCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
 		case runtime.NativeKindStdRawSet:
 			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdRawSetIdentityPtr() {
 				handled, err := e.callVM.ExecuteStdRawSetCall(absSlot, nArgs, rawC)

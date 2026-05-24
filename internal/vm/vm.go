@@ -860,6 +860,34 @@ func (vm *VM) ExecuteStdRawGetCall(absSlot, nArgs, rawC int) (bool, error) {
 	return true, nil
 }
 
+// ExecuteStdNextCall handles next(table, key) without allocating the generic
+// native argument/result slice.
+func (vm *VM) ExecuteStdNextCall(absSlot, nArgs, rawC int) (bool, error) {
+	if (nArgs != 1 && nArgs != 2) || absSlot+nArgs >= len(vm.regs) {
+		return false, nil
+	}
+	table := vm.regs[absSlot+1]
+	if !table.IsTable() {
+		return true, fmt.Errorf("bad argument #1 to 'next' (table expected)")
+	}
+	key := runtime.NilValue()
+	if nArgs == 2 {
+		key = vm.regs[absSlot+2]
+	}
+	tbl := table.Table()
+	nk, nv, ok := tbl.Next(key)
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if !ok {
+		if !key.IsNil() && tbl.RawGet(key).IsNil() {
+			return true, fmt.Errorf("invalid key to 'next'")
+		}
+		vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{runtime.NilValue()})
+		return true, nil
+	}
+	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{nk, nv})
+	return true, nil
+}
+
 // ExecuteStdRawSetCall handles rawset(table, key, value) without allocating a
 // generic native argument/result slice.
 func (vm *VM) ExecuteStdRawSetCall(absSlot, nArgs, rawC int) (bool, error) {
@@ -4216,6 +4244,17 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					case runtime.NativeKindStdRawGet:
 						if gf.NativeData == runtime.StdRawGetIdentityPtr() {
 							handled, err := vm.ExecuteStdRawGetCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
+					case runtime.NativeKindStdNext:
+						if gf.NativeData == runtime.StdNextIdentityPtr() {
+							handled, err := vm.ExecuteStdNextCall(base+a, nArgs, c)
 							if err != nil {
 								return nil, wrapLineErr(frame, err)
 							}

@@ -26,6 +26,7 @@ const (
 	NativeKindStdRawSet       uint8 = 109
 	NativeKindStdRawLen       uint8 = 110
 	NativeKindStdType         uint8 = 111
+	NativeKindStdNext         uint8 = 112
 )
 
 var stdStringFormatIdentity byte
@@ -41,6 +42,7 @@ var stdRawGetIdentity byte
 var stdRawSetIdentity byte
 var stdRawLenIdentity byte
 var stdTypeIdentity byte
+var stdNextIdentity byte
 
 type compiledLuaPatternCacheEntry struct {
 	prog luaPatternProgram
@@ -1235,6 +1237,10 @@ func StdRawLenIdentityPtr() unsafe.Pointer {
 
 func StdTypeIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdTypeIdentity)
+}
+
+func StdNextIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdNextIdentity)
 }
 
 // FastStringFindRet2 computes the first two string.find return values without

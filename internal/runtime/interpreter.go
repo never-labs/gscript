@@ -758,6 +758,8 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return nk, nv, 2, nil
 		},
+		NativeKind: NativeKindStdNext,
+		NativeData: StdNextIdentityPtr(),
 	}))
 
 	interp.globals.Define("select", FunctionValue(&GoFunction{
