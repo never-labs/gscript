@@ -18,6 +18,7 @@ const (
 	runtimeSpecializationAffineModuloIntLeaf
 	runtimeSpecializationTableAffineUpdateModuloLeaf
 	runtimeSpecializationCallableLenPairsDriver
+	runtimeSpecializationEventsMetamethodDriver
 	runtimeSpecializationCount
 )
 
@@ -207,6 +208,19 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isCallableLenPairsDriverProto,
 		},
 		Run: (*VM).runCallableLenPairsDriverRuntimeSpecialization,
+	},
+	runtimeSpecializationEventsMetamethodDriver: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "events_metamethod_driver",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isEventsMetamethodDriverProto,
+		},
+		Run: (*VM).runEventsMetamethodDriverRuntimeSpecialization,
 	},
 }
 
