@@ -331,6 +331,16 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 		return false
 	}
 
+	// Looping factory bodies that allocate tables, create closures, and then
+	// call back into a runtime helper tend to leave the loop body only partly
+	// native and finish through table/call exits. Until closure/table builder
+	// exits can be lowered or refreshed mid-run, Tier 1's direct BLR path is
+	// cheaper than compiling these medium-sized setup helpers during the hot
+	// timed region.
+	if profile.HasLoop && profile.HasClosure && profile.NewTableCount > 0 && profile.CallCount > 0 {
+		return false
+	}
+
 	if profile.HasLoop && hasGenericStringFormatIntCall(proto) {
 		return runtimeCallCount >= 1
 	}
