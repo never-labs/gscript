@@ -20,6 +20,26 @@ func buildMathLib() *Table {
 			Fn:   fn,
 		}))
 	}
+	setUnaryFloat := func(name string, fn func(float64) float64) {
+		set(name, func(args []Value) ([]Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("bad argument #1 to 'math.%s'", name)
+			}
+			return []Value{FloatValue(fn(toFloat(args[0])))}, nil
+		})
+		if v := t.RawGetString(name); v.IsFunction() {
+			gf := v.GoFunction()
+			gf.FastArg1 = func(arg Value) (Value, error) {
+				return FloatValue(fn(toFloat(arg))), nil
+			}
+			gf.Fast1 = func(args []Value) (Value, error) {
+				if len(args) < 1 {
+					return NilValue(), fmt.Errorf("bad argument #1 to 'math.%s'", name)
+				}
+				return FloatValue(fn(toFloat(args[0]))), nil
+			}
+		}
+	}
 
 	// Constants
 	t.RawSet(StringValue("pi"), FloatValue(math.Pi))
@@ -87,64 +107,22 @@ func buildMathLib() *Table {
 	})
 
 	// math.sqrt(x)
-	set("sqrt", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.sqrt'")
-		}
-		return []Value{FloatValue(math.Sqrt(toFloat(args[0])))}, nil
-	})
-	if v := t.RawGetString("sqrt"); v.IsFunction() {
-		gf := v.GoFunction()
-		gf.FastArg1 = func(arg Value) (Value, error) {
-			return FloatValue(math.Sqrt(toFloat(arg))), nil
-		}
-		gf.Fast1 = func(args []Value) (Value, error) {
-			if len(args) < 1 {
-				return NilValue(), fmt.Errorf("bad argument #1 to 'math.sqrt'")
-			}
-			return FloatValue(math.Sqrt(toFloat(args[0]))), nil
-		}
-	}
+	setUnaryFloat("sqrt", math.Sqrt)
 
 	// math.sin(x)
-	set("sin", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.sin'")
-		}
-		return []Value{FloatValue(math.Sin(toFloat(args[0])))}, nil
-	})
+	setUnaryFloat("sin", math.Sin)
 
 	// math.cos(x)
-	set("cos", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.cos'")
-		}
-		return []Value{FloatValue(math.Cos(toFloat(args[0])))}, nil
-	})
+	setUnaryFloat("cos", math.Cos)
 
 	// math.tan(x)
-	set("tan", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.tan'")
-		}
-		return []Value{FloatValue(math.Tan(toFloat(args[0])))}, nil
-	})
+	setUnaryFloat("tan", math.Tan)
 
 	// math.asin(x)
-	set("asin", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.asin'")
-		}
-		return []Value{FloatValue(math.Asin(toFloat(args[0])))}, nil
-	})
+	setUnaryFloat("asin", math.Asin)
 
 	// math.acos(x)
-	set("acos", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.acos'")
-		}
-		return []Value{FloatValue(math.Acos(toFloat(args[0])))}, nil
-	})
+	setUnaryFloat("acos", math.Acos)
 
 	// math.atan(y [, x])
 	set("atan", func(args []Value) ([]Value, error) {
@@ -158,30 +136,30 @@ func buildMathLib() *Table {
 		}
 		return []Value{FloatValue(math.Atan(y))}, nil
 	})
+	if v := t.RawGetString("atan"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = func(arg Value) (Value, error) {
+			return FloatValue(math.Atan(toFloat(arg))), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.atan'")
+			}
+			if len(args) >= 2 {
+				return FloatValue(math.Atan2(toFloat(args[0]), toFloat(args[1]))), nil
+			}
+			return FloatValue(math.Atan(toFloat(args[0]))), nil
+		}
+	}
 
 	// math.deg(x)
-	set("deg", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.deg'")
-		}
-		return []Value{FloatValue(toFloat(args[0]) * 180 / math.Pi)}, nil
-	})
+	setUnaryFloat("deg", func(x float64) float64 { return x * 180 / math.Pi })
 
 	// math.rad(x)
-	set("rad", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.rad'")
-		}
-		return []Value{FloatValue(toFloat(args[0]) * math.Pi / 180)}, nil
-	})
+	setUnaryFloat("rad", func(x float64) float64 { return x * math.Pi / 180 })
 
 	// math.exp(x)
-	set("exp", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'math.exp'")
-		}
-		return []Value{FloatValue(math.Exp(toFloat(args[0])))}, nil
-	})
+	setUnaryFloat("exp", math.Exp)
 
 	// math.log(x [, base])
 	set("log", func(args []Value) ([]Value, error) {
@@ -195,6 +173,22 @@ func buildMathLib() *Table {
 		}
 		return []Value{FloatValue(math.Log(x))}, nil
 	})
+	if v := t.RawGetString("log"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = func(arg Value) (Value, error) {
+			return FloatValue(math.Log(toFloat(arg))), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.log'")
+			}
+			x := toFloat(args[0])
+			if len(args) >= 2 {
+				return FloatValue(math.Log(x) / math.Log(toFloat(args[1]))), nil
+			}
+			return FloatValue(math.Log(x)), nil
+		}
+	}
 
 	// math.max(x, ...)
 	set("max", func(args []Value) ([]Value, error) {

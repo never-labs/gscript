@@ -644,6 +644,50 @@ func TestMathFloorFast1(t *testing.T) {
 	_, _ = gf.Fast1(nil)
 }
 
+func TestMathUnaryFloatFastPaths(t *testing.T) {
+	mathLib := buildMathLib()
+	cases := map[string]struct {
+		in   Value
+		want float64
+	}{
+		"sqrt": {FloatValue(16), 4},
+		"sin":  {FloatValue(0), 0},
+		"cos":  {FloatValue(0), 1},
+		"tan":  {FloatValue(0), 0},
+		"asin": {FloatValue(0), 0},
+		"acos": {FloatValue(1), 0},
+		"atan": {FloatValue(1), math.Atan(1)},
+		"deg":  {FloatValue(math.Pi), 180},
+		"rad":  {FloatValue(180), math.Pi},
+		"exp":  {FloatValue(1), math.E},
+		"log":  {FloatValue(math.E), 1},
+	}
+	for name, tc := range cases {
+		v := mathLib.RawGetString(name)
+		if !v.IsFunction() {
+			t.Fatalf("math.%s not registered as function: %v", name, v)
+		}
+		gf := v.GoFunction()
+		if gf == nil || gf.FastArg1 == nil || gf.Fast1 == nil {
+			t.Fatalf("math.%s missing unary fast paths: %#v", name, gf)
+		}
+		gotArg, err := gf.FastArg1(tc.in)
+		if err != nil {
+			t.Fatalf("math.%s.FastArg1 error: %v", name, err)
+		}
+		gotSlice, err := gf.Fast1([]Value{tc.in})
+		if err != nil {
+			t.Fatalf("math.%s.Fast1 error: %v", name, err)
+		}
+		if math.Abs(gotArg.Number()-tc.want) > 1e-12 {
+			t.Fatalf("math.%s.FastArg1 = %.17g, want %.17g", name, gotArg.Number(), tc.want)
+		}
+		if math.Abs(gotSlice.Number()-tc.want) > 1e-12 {
+			t.Fatalf("math.%s.Fast1 = %.17g, want %.17g", name, gotSlice.Number(), tc.want)
+		}
+	}
+}
+
 func TestMathSqrt(t *testing.T) {
 	interp := runProgram(t, `result := math.sqrt(16)`)
 	v := interp.GetGlobal("result")
