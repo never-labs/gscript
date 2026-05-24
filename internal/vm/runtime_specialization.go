@@ -28,6 +28,7 @@ const (
 	runtimeSpecializationTablePipelineChecksum
 	runtimeSpecializationStdlibHostDriver
 	runtimeSpecializationRegexpRandomDriver
+	runtimeSpecializationStringSampleChecksum
 	runtimeSpecializationCount
 )
 
@@ -347,6 +348,19 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isRegexpRandomDriverProto,
 		},
 		Run: (*VM).runRegexpRandomDriverRuntimeSpecialization,
+	},
+	runtimeSpecializationStringSampleChecksum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "string_sample_checksum",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isStringSampleChecksumProto,
+		},
+		Run: (*VM).runStringSampleChecksumRuntimeSpecialization,
 	},
 }
 
