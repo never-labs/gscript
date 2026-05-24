@@ -192,6 +192,16 @@ func shouldStayTier0ForProto(proto *vm.FuncProto, profile FuncProfile) bool {
 		profile.CallCount > 0
 }
 
+func shouldStayTier0SmallDynamicLeaf(proto *vm.FuncProto, profile FuncProfile) bool {
+	if proto == nil || profile.HasLoop || profile.CallCount != 0 || profile.BytecodeCount > 25 {
+		return false
+	}
+	if staticallyCallsOnlySelf(proto) || qualifiesForNumericCrossRecursiveCandidate(proto) {
+		return false
+	}
+	return profile.HasGlobal && profile.TableOpCount > 0
+}
+
 func shouldStayTier0(profile FuncProfile) bool {
 	return shouldStayTier0ForProto(nil, profile)
 }
@@ -397,7 +407,8 @@ func shouldPromoteTier2(proto *vm.FuncProto, profile FuncProfile, runtimeCallCou
 	if !profile.HasLoop && profile.CallCount == 0 &&
 		profile.TableOpCount > 0 && profile.ArithCount > 0 &&
 		profile.NewTableCount == 0 &&
-		!profile.HasClosure && !profile.HasUpval && !profile.HasVararg {
+		!profile.HasClosure && !profile.HasUpval && !profile.HasVararg &&
+		!profile.HasGlobal {
 		return runtimeCallCount >= 2
 	}
 

@@ -134,6 +134,9 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 	if shouldStayTier0ForProto(proto, profile) {
 		return tier0PolicyDecision("Tier0Profile", "stay_tier0_profile", "jit_disabled")
 	}
+	if shouldStayTier0SmallDynamicLeaf(proto, profile) {
+		return tier0PolicyDecision("Tier0SmallDynamicLeaf", "stay_tier0_small_dynamic_leaf", "jit_disabled")
+	}
 	if shouldStayTier0RecursiveTableWalker(proto, profile) {
 		return tier0PolicyDecision("Tier0RecursiveTableWalker", "stay_tier0_recursive_table_walker", "jit_disabled")
 	}
