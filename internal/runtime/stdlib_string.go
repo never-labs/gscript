@@ -316,6 +316,19 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			end := loc[1] + init - 1
 			return []Value{IntValue(int64(start)), IntValue(int64(end))}, nil
 		}
+		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
+			m, ok := simple.findNext(searchStr, 0)
+			if !ok {
+				return []Value{NilValue()}, nil
+			}
+			start := m.start + init
+			end := m.end + init - 1
+			result := []Value{IntValue(int64(start)), IntValue(int64(end))}
+			if simple.captureCount > 0 {
+				result = append(result, simpleMatchValues(searchStr, m)...)
+			}
+			return result, nil
+		}
 		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
@@ -1292,6 +1305,16 @@ func FastStringFindRet2(sv, pv, initv, plainv Value, nArgs, rawC int) (Value, Va
 		}
 		return IntValue(int64(loc[0] + init)), IntValue(int64(loc[1] + init - 1)), 2, true, nil
 	}
+	if simple, ok := cachedSimpleLuaPattern(pattern); ok {
+		if simple.captureCount > 0 && (rawC == 0 || rawC-1 > 2) {
+			return NilValue(), NilValue(), 0, false, nil
+		}
+		m, ok := simple.findNext(searchStr, 0)
+		if !ok {
+			return NilValue(), NilValue(), 1, true, nil
+		}
+		return IntValue(int64(m.start + init)), IntValue(int64(m.end + init - 1)), 2, true, nil
+	}
 	prog, re, err := cachedLuaPatternRegexp(pattern)
 	if err != nil {
 		return NilValue(), NilValue(), 0, true, fmt.Errorf("invalid pattern: %s", err)
@@ -1338,6 +1361,23 @@ func FastStringMatchRet2(sv, pv, initv Value, nArgs, rawC int) (Value, Value, in
 			return NilValue(), NilValue(), 1, true, nil
 		}
 		return StringValue(searchStr[loc[0]:loc[1]]), NilValue(), 1, true, nil
+	}
+	if simple, ok := cachedSimpleLuaPattern(pattern); ok {
+		if simple.captureCount > 2 && (rawC == 0 || rawC-1 > 2) {
+			return NilValue(), NilValue(), 0, false, nil
+		}
+		m, ok := simple.findNext(searchStr, 0)
+		if !ok {
+			return NilValue(), NilValue(), 1, true, nil
+		}
+		values := simpleMatchValues(searchStr, m)
+		if len(values) == 0 {
+			return StringValue(searchStr[m.start:m.end]), NilValue(), 1, true, nil
+		}
+		if len(values) == 1 {
+			return values[0], NilValue(), 1, true, nil
+		}
+		return values[0], values[1], 2, true, nil
 	}
 	prog, re, err := cachedLuaPatternRegexp(pattern)
 	if err != nil {
@@ -2632,7 +2672,7 @@ func compileSimpleLuaPatternOps(pattern string) ([]simpleLuaPatternOp, int, bool
 		litStart := i
 		for i < len(pattern) && pattern[i] != '%' && pattern[i] != '(' && pattern[i] != ')' &&
 			pattern[i] != '[' && pattern[i] != '.' && pattern[i] != '*' && pattern[i] != '?' &&
-			pattern[i] != '-' && pattern[i] != '^' && pattern[i] != '$' {
+			pattern[i] != '-' && pattern[i] != '+' && pattern[i] != '^' && pattern[i] != '$' {
 			i++
 		}
 		flushLiteral(litStart, i)
