@@ -312,6 +312,7 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 		(len(args) == 3 && gf.FastArg3 != nil) ||
 		(len(args) == 4 && gf.FastArg4 != nil) ||
 		(len(args) == 5 && gf.FastArg5 != nil) ||
+		(len(args) == 6 && gf.FastArg6 != nil) ||
 		(len(args) == 8 && gf.FastArg8 != nil)
 	if !fixedArgFastPath {
 		args = stableGoFunctionArgs(args)
@@ -383,6 +384,13 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 		runtime.RecordRuntimePathNativeCallFastFor(gf)
 		var v runtime.Value
 		v, err = gf.FastArg5(a0, a1, a2, a3, a4)
+		if err == nil {
+			results = []runtime.Value{v}
+		}
+	} else if len(args) == 6 && gf.FastArg6 != nil {
+		runtime.RecordRuntimePathNativeCallFastFor(gf)
+		var v runtime.Value
+		v, err = gf.FastArg6(a0, a1, a2, a3, a4, a5)
 		if err == nil {
 			results = []runtime.Value{v}
 		}

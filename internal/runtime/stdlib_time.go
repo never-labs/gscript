@@ -138,6 +138,13 @@ func buildTimeLib() *Table {
 			FastArg2: fast,
 		}))
 	}
+	setFastArg6 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value, Value, Value, Value, Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "time." + name,
+			Fn:       fn,
+			FastArg6: fast,
+		}))
+	}
 	setFastArg2Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, Value, int, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
 			Name:         "time." + name,
@@ -268,7 +275,17 @@ func buildTimeLib() *Table {
 	})
 
 	// time.date(year, month, day [, hour [, min [, sec]]]) -> time table
-	set("date", func(args []Value) ([]Value, error) {
+	timeDate6 := func(yearVal, monthVal, dayVal, hourVal, minVal, secVal Value) (Value, error) {
+		year := int(toInt(yearVal))
+		month := time.Month(toInt(monthVal))
+		day := int(toInt(dayVal))
+		hour := int(toInt(hourVal))
+		min := int(toInt(minVal))
+		sec := int(toInt(secVal))
+		goTime := time.Date(year, month, day, hour, min, sec, 0, time.UTC)
+		return TableValue(goTimeToTable(goTime)), nil
+	}
+	setFastArg6("date", func(args []Value) ([]Value, error) {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'time.date'")
 		}
@@ -287,7 +304,7 @@ func buildTimeLib() *Table {
 		}
 		goTime := time.Date(year, month, day, hour, min, sec, 0, time.UTC)
 		return []Value{TableValue(goTimeToTable(goTime))}, nil
-	})
+	}, timeDate6)
 
 	// time.weekday(t) -> string (e.g. "Monday")
 	set("weekday", func(args []Value) ([]Value, error) {

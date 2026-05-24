@@ -792,6 +792,24 @@ slowPath:
 			e.storeSingleCallResult(absSlot, rawC, result)
 			return nil
 		}
+		if nArgs == 6 && gf.FastArg6 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			var args [6]runtime.Value
+			for i := range args {
+				idx := absSlot + 1 + i
+				if idx < len(regs) {
+					args[i] = regs[idx]
+				} else {
+					args[i] = runtime.NilValue()
+				}
+			}
+			result, err := gf.FastArg6(args[0], args[1], args[2], args[3], args[4], args[5])
+			if err != nil {
+				return err
+			}
+			e.storeSingleCallResult(absSlot, rawC, result)
+			return nil
+		}
 		if nArgs == 8 && gf.FastArg8 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)
 			var args [8]runtime.Value

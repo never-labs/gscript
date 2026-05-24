@@ -19,44 +19,75 @@ func buildJSONLib() *Table {
 			Fn:   fn,
 		}))
 	}
+	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "json." + name,
+			Fn:       fn,
+			FastArg1: fast,
+		}))
+	}
+	setFastArg1Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, Value, int, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:         "json." + name,
+			Fn:           fn,
+			FastArg1Ret2: fast,
+		}))
+	}
 
 	// json.encode(value) -> JSON string
-	set("encode", func(args []Value) ([]Value, error) {
+	jsonEncode := func(v Value) (Value, error) {
+		goVal := jsonGScriptToGo(v)
+		data, err := json.Marshal(goVal)
+		if err != nil {
+			return NilValue(), fmt.Errorf("json.encode: %v", err)
+		}
+		return StringValue(string(data)), nil
+	}
+	setFastArg1("encode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'json.encode'")
 		}
-		goVal := jsonGScriptToGo(args[0])
-		data, err := json.Marshal(goVal)
+		v, err := jsonEncode(args[0])
 		if err != nil {
-			return nil, fmt.Errorf("json.encode: %v", err)
+			return nil, err
 		}
-		return []Value{StringValue(string(data))}, nil
-	})
+		return []Value{v}, nil
+	}, jsonEncode)
 
 	// json.decode(str) -> GScript value, or nil, "error message"
-	set("decode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'json.decode'")
+	jsonDecode := func(v Value) (Value, Value, int, error) {
+		if !v.IsString() {
+			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'json.decode' (string expected)")
 		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'json.decode' (string expected)")
-		}
-		str := args[0].Str()
+		str := v.Str()
 		var goVal interface{}
 		decoder := json.NewDecoder(strings.NewReader(str))
 		decoder.UseNumber()
 		if err := decoder.Decode(&goVal); err != nil {
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
 		var extra interface{}
 		if err := decoder.Decode(&extra); err != io.EOF {
 			if err == nil {
-				return []Value{NilValue(), StringValue("invalid JSON: trailing data")}, nil
+				return NilValue(), StringValue("invalid JSON: trailing data"), 2, nil
 			}
-			return []Value{NilValue(), StringValue(err.Error())}, nil
+			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return []Value{jsonGoToGScript(goVal)}, nil
-	})
+		return jsonGoToGScript(goVal), NilValue(), 1, nil
+	}
+	setFastArg1Ret2("decode", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'json.decode'")
+		}
+		r0, r1, n, err := jsonDecode(args[0])
+		if err != nil {
+			return nil, err
+		}
+		if n <= 1 {
+			return []Value{r0}, nil
+		}
+		return []Value{r0, r1}, nil
+	}, jsonDecode)
 
 	// json.pretty(value [, indent]) -> pretty-printed JSON string
 	set("pretty", func(args []Value) ([]Value, error) {
