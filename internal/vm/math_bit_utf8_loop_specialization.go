@@ -30,33 +30,40 @@ func mathBitUTF8LoopSpecForProto(p *FuncProto) (mathBitUTF8LoopSpec, bool) {
 		return spec, false
 	}
 	code := p.Code
-	if DecodeOp(code[0]) != OP_LOADINT || DecodeA(code[0]) != 1 || DecodesBx(code[0]) != 0 ||
-		DecodeOp(code[1]) != OP_LOADK || DecodeA(code[1]) != 2 ||
-		DecodeOp(code[2]) != OP_GETGLOBAL || DecodeA(code[2]) != 4 ||
-		DecodeOp(code[3]) != OP_LEN || DecodeA(code[3]) != 3 || DecodeB(code[3]) != 4 ||
-		DecodeOp(code[7]) != OP_FORPREP ||
-		DecodeOp(code[18]) != OP_CALL || DecodeA(code[18]) != 9 || DecodeB(code[18]) != 3 || DecodeC(code[18]) != 2 ||
-		DecodeOp(code[45]) != OP_CALL || DecodeA(code[45]) != 12 || DecodeB(code[45]) != 3 || DecodeC(code[45]) != 2 ||
-		DecodeOp(code[47]) != OP_CALL || DecodeA(code[47]) != 10 || DecodeB(code[47]) != 2 || DecodeC(code[47]) != 2 ||
-		DecodeOp(code[54]) != OP_CALL || DecodeA(code[54]) != 11 || DecodeB(code[54]) != 2 || DecodeC(code[54]) != 2 ||
-		DecodeOp(code[61]) != OP_CALL || DecodeA(code[61]) != 14 || DecodeB(code[61]) != 3 || DecodeC(code[61]) != 2 ||
-		DecodeOp(code[63]) != OP_CALL || DecodeA(code[63]) != 12 || DecodeB(code[63]) != 2 || DecodeC(code[63]) != 2 ||
-		DecodeOp(code[77]) != OP_CALL || DecodeA(code[77]) != 15 || DecodeB(code[77]) != 3 || DecodeC(code[77]) != 2 ||
-		DecodeOp(code[83]) != OP_CALL || DecodeA(code[83]) != 16 || DecodeB(code[83]) != 3 || DecodeC(code[83]) != 2 ||
-		DecodeOp(code[88]) != OP_CALL || DecodeA(code[88]) != 17 || DecodeB(code[88]) != 3 || DecodeC(code[88]) != 2 ||
-		DecodeOp(code[102]) != OP_CALL || DecodeA(code[102]) != 18 || DecodeB(code[102]) != 3 || DecodeC(code[102]) != 2 ||
-		DecodeOp(code[114]) != OP_CALL || DecodeA(code[114]) != 21 || DecodeB(code[114]) != 4 || DecodeC(code[114]) != 2 ||
-		DecodeOp(code[122]) != OP_CALL || DecodeA(code[122]) != 22 || DecodeB(code[122]) != 5 || DecodeC(code[122]) != 2 ||
-		DecodeOp(code[129]) != OP_CALL || DecodeA(code[129]) != 23 || DecodeB(code[129]) != 2 || DecodeC(code[129]) != 2 ||
-		DecodeOp(code[138]) != OP_CALL || DecodeA(code[138]) != 24 || DecodeB(code[138]) != 2 || DecodeC(code[138]) != 2 ||
-		DecodeOp(code[152]) != OP_CALL || DecodeA(code[152]) != 25 || DecodeB(code[152]) != 3 || DecodeC(code[152]) != 2 ||
-		DecodeOp(code[157]) != OP_CALL || DecodeA(code[157]) != 27 || DecodeB(code[157]) != 2 || DecodeC(code[157]) != 4 ||
-		DecodeOp(code[158]) != OP_TFORCALL || DecodeA(code[158]) != 27 || DecodeC(code[158]) != 2 ||
-		DecodeOp(code[175]) != OP_CALL || DecodeA(code[175]) != 30 || DecodeB(code[175]) != 3 || DecodeC(code[175]) != 2 ||
-		DecodeOp(code[188]) != OP_CALL || DecodeA(code[188]) != 33 || DecodeB(code[188]) != 9 || DecodeC(code[188]) != 2 ||
-		DecodeOp(code[191]) != OP_CALL || DecodeA(code[191]) != 31 || DecodeB(code[191]) != 3 || DecodeC(code[191]) != 2 ||
-		DecodeOp(code[204]) != OP_FORLOOP ||
-		DecodeOp(code[206]) != OP_RETURN {
+	pat := newBytecodePattern(code)
+	if !pat.hasASBxs(asbxAt{pc: 0, op: OP_LOADINT, a: 1, sbx: 0}) ||
+		!pat.hasAs(
+			aAt{pc: 1, op: OP_LOADK, a: 2},
+			aAt{pc: 2, op: OP_GETGLOBAL, a: 4},
+		) ||
+		!pat.hasABs(abAt{pc: 3, op: OP_LEN, a: 3, b: 4}) ||
+		!pat.hasOps(
+			opcodeAt{pc: 7, op: OP_FORPREP},
+			opcodeAt{pc: 204, op: OP_FORLOOP},
+			opcodeAt{pc: 206, op: OP_RETURN},
+		) ||
+		!pat.hasABCs(
+			abcAt{pc: 18, op: OP_CALL, a: 9, b: 3, c: 2},
+			abcAt{pc: 45, op: OP_CALL, a: 12, b: 3, c: 2},
+			abcAt{pc: 47, op: OP_CALL, a: 10, b: 2, c: 2},
+			abcAt{pc: 54, op: OP_CALL, a: 11, b: 2, c: 2},
+			abcAt{pc: 61, op: OP_CALL, a: 14, b: 3, c: 2},
+			abcAt{pc: 63, op: OP_CALL, a: 12, b: 2, c: 2},
+			abcAt{pc: 77, op: OP_CALL, a: 15, b: 3, c: 2},
+			abcAt{pc: 83, op: OP_CALL, a: 16, b: 3, c: 2},
+			abcAt{pc: 88, op: OP_CALL, a: 17, b: 3, c: 2},
+			abcAt{pc: 102, op: OP_CALL, a: 18, b: 3, c: 2},
+			abcAt{pc: 114, op: OP_CALL, a: 21, b: 4, c: 2},
+			abcAt{pc: 122, op: OP_CALL, a: 22, b: 5, c: 2},
+			abcAt{pc: 129, op: OP_CALL, a: 23, b: 2, c: 2},
+			abcAt{pc: 138, op: OP_CALL, a: 24, b: 2, c: 2},
+			abcAt{pc: 152, op: OP_CALL, a: 25, b: 3, c: 2},
+			abcAt{pc: 157, op: OP_CALL, a: 27, b: 2, c: 4},
+			abcAt{pc: 175, op: OP_CALL, a: 30, b: 3, c: 2},
+			abcAt{pc: 188, op: OP_CALL, a: 33, b: 9, c: 2},
+			abcAt{pc: 191, op: OP_CALL, a: 31, b: 3, c: 2},
+		) ||
+		!pat.hasACs(acAt{pc: 158, op: OP_TFORCALL, a: 27, c: 2}) {
 		return spec, false
 	}
 	var ok bool

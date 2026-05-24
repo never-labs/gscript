@@ -15,6 +15,36 @@ type opcodeAt struct {
 	op Opcode
 }
 
+type abcAt struct {
+	pc      int
+	op      Opcode
+	a, b, c int
+}
+
+type aAt struct {
+	pc int
+	op Opcode
+	a  int
+}
+
+type abAt struct {
+	pc   int
+	op   Opcode
+	a, b int
+}
+
+type acAt struct {
+	pc   int
+	op   Opcode
+	a, c int
+}
+
+type asbxAt struct {
+	pc     int
+	op     Opcode
+	a, sbx int
+}
+
 func newBytecodePattern(code []uint32) bytecodePattern {
 	return bytecodePattern{code: code}
 }
@@ -45,9 +75,69 @@ func (p bytecodePattern) abc(pc int, op Opcode, a, b, c int) bool {
 	return ok && DecodeA(inst) == a && DecodeB(inst) == b && DecodeC(inst) == c
 }
 
+func (p bytecodePattern) hasABCs(ops ...abcAt) bool {
+	for _, want := range ops {
+		if !p.abc(want.pc, want.op, want.a, want.b, want.c) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p bytecodePattern) a(pc int, op Opcode, a int) bool {
+	inst, ok := p.op(pc, op)
+	return ok && DecodeA(inst) == a
+}
+
+func (p bytecodePattern) hasAs(ops ...aAt) bool {
+	for _, want := range ops {
+		if !p.a(want.pc, want.op, want.a) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p bytecodePattern) ab(pc int, op Opcode, a, b int) bool {
+	inst, ok := p.op(pc, op)
+	return ok && DecodeA(inst) == a && DecodeB(inst) == b
+}
+
+func (p bytecodePattern) hasABs(ops ...abAt) bool {
+	for _, want := range ops {
+		if !p.ab(want.pc, want.op, want.a, want.b) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p bytecodePattern) ac(pc int, op Opcode, a, c int) bool {
+	inst, ok := p.op(pc, op)
+	return ok && DecodeA(inst) == a && DecodeC(inst) == c
+}
+
+func (p bytecodePattern) hasACs(ops ...acAt) bool {
+	for _, want := range ops {
+		if !p.ac(want.pc, want.op, want.a, want.c) {
+			return false
+		}
+	}
+	return true
+}
+
 func (p bytecodePattern) asbx(pc int, op Opcode, a, sbx int) bool {
 	inst, ok := p.op(pc, op)
 	return ok && DecodeA(inst) == a && DecodesBx(inst) == sbx
+}
+
+func (p bytecodePattern) hasASBxs(ops ...asbxAt) bool {
+	for _, want := range ops {
+		if !p.asbx(want.pc, want.op, want.a, want.sbx) {
+			return false
+		}
+	}
+	return true
 }
 
 func (p bytecodePattern) move(pc int, dst, src int) bool {
