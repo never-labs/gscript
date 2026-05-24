@@ -5809,18 +5809,24 @@ func (vm *VM) fastIndexRawSlotFallback(receiver, key runtime.Value, code []uint3
 	}
 
 	receiverTable := receiver.Table()
-	slotTable := receiverTable.RawGet(runtime.StringValue(constants[slotKeyConst].Str()))
+	slotTable := receiverTable.RawGetString(constants[slotKeyConst].Str())
 	if !slotTable.IsTable() {
 		return runtime.NilValue(), true, fmt.Errorf("attempt to index a %s value", slotTable.TypeName())
 	}
-	slotValue, err := vm.tableGet(slotTable, key)
-	if err != nil {
-		return runtime.NilValue(), true, err
+	var slotValue runtime.Value
+	if tbl := slotTable.Table(); tbl.GetMetatable() == nil && key.IsString() {
+		slotValue = tbl.RawGetString(key.Str())
+	} else {
+		var err error
+		slotValue, err = vm.tableGet(slotTable, key)
+		if err != nil {
+			return runtime.NilValue(), true, err
+		}
 	}
 	if !slotValue.IsNil() {
 		return slotValue, true, nil
 	}
-	baseValue := receiverTable.RawGet(runtime.StringValue(constants[baseKeyConst].Str()))
+	baseValue := receiverTable.RawGetString(constants[baseKeyConst].Str())
 	keyLen, err := vm.length(key)
 	if err != nil {
 		return runtime.NilValue(), true, err
