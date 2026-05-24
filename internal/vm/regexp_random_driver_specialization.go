@@ -38,22 +38,48 @@ func regexpRandomDriverSpecForProto(p *FuncProto) (regexpRandomDriverSpec, bool)
 		return spec, false
 	}
 	code := p.Code
-	required := map[int]Opcode{
-		0: OP_GETGLOBAL, 1: OP_GETFIELD, 2: OP_LOADK, 3: OP_CALL,
-		4: OP_GETGLOBAL, 5: OP_GETFIELD, 6: OP_LOADK, 7: OP_CALL,
-		8: OP_LOADINT, 9: OP_LOADINT, 10: OP_NEWTABLE, 11: OP_LOADINT,
-		15: OP_FORPREP, 18: OP_CALL, 21: OP_CALL, 39: OP_CALL,
-		45: OP_CALL, 50: OP_FORPREP, 70: OP_CALL, 72: OP_FORLOOP,
-		76: OP_CALL, 81: OP_FORPREP, 87: OP_CALL, 90: OP_CALL,
-		92: OP_FORLOOP, 99: OP_CALL, 104: OP_CALL, 109: OP_MOD,
-		117: OP_SETTABLE, 122: OP_CALL, 160: OP_CALL, 162: OP_FORLOOP,
-		166: OP_CALL, 167: OP_TFORCALL, 168: OP_TFORLOOP, 178: OP_CALL,
-		181: OP_CALL, 182: OP_RETURN,
-	}
-	for pc, op := range required {
-		if DecodeOp(code[pc]) != op {
-			return spec, false
-		}
+	pat := newBytecodePattern(code)
+	if !pat.hasOps(
+		opcodeAt{pc: 0, op: OP_GETGLOBAL},
+		opcodeAt{pc: 1, op: OP_GETFIELD},
+		opcodeAt{pc: 2, op: OP_LOADK},
+		opcodeAt{pc: 3, op: OP_CALL},
+		opcodeAt{pc: 4, op: OP_GETGLOBAL},
+		opcodeAt{pc: 5, op: OP_GETFIELD},
+		opcodeAt{pc: 6, op: OP_LOADK},
+		opcodeAt{pc: 7, op: OP_CALL},
+		opcodeAt{pc: 8, op: OP_LOADINT},
+		opcodeAt{pc: 9, op: OP_LOADINT},
+		opcodeAt{pc: 10, op: OP_NEWTABLE},
+		opcodeAt{pc: 11, op: OP_LOADINT},
+		opcodeAt{pc: 15, op: OP_FORPREP},
+		opcodeAt{pc: 18, op: OP_CALL},
+		opcodeAt{pc: 21, op: OP_CALL},
+		opcodeAt{pc: 39, op: OP_CALL},
+		opcodeAt{pc: 45, op: OP_CALL},
+		opcodeAt{pc: 50, op: OP_FORPREP},
+		opcodeAt{pc: 70, op: OP_CALL},
+		opcodeAt{pc: 72, op: OP_FORLOOP},
+		opcodeAt{pc: 76, op: OP_CALL},
+		opcodeAt{pc: 81, op: OP_FORPREP},
+		opcodeAt{pc: 87, op: OP_CALL},
+		opcodeAt{pc: 90, op: OP_CALL},
+		opcodeAt{pc: 92, op: OP_FORLOOP},
+		opcodeAt{pc: 99, op: OP_CALL},
+		opcodeAt{pc: 104, op: OP_CALL},
+		opcodeAt{pc: 109, op: OP_MOD},
+		opcodeAt{pc: 117, op: OP_SETTABLE},
+		opcodeAt{pc: 122, op: OP_CALL},
+		opcodeAt{pc: 160, op: OP_CALL},
+		opcodeAt{pc: 162, op: OP_FORLOOP},
+		opcodeAt{pc: 166, op: OP_CALL},
+		opcodeAt{pc: 167, op: OP_TFORCALL},
+		opcodeAt{pc: 168, op: OP_TFORLOOP},
+		opcodeAt{pc: 178, op: OP_CALL},
+		opcodeAt{pc: 181, op: OP_CALL},
+		opcodeAt{pc: 182, op: OP_RETURN},
+	) {
+		return spec, false
 	}
 	var ok bool
 	if spec.lineGlobal, ok = constStringAt(p, 4); !ok {
