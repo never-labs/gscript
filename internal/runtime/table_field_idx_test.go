@@ -357,7 +357,7 @@ func TestDynamicStringKeyCacheShapeGuardAfterDelete(t *testing.T) {
 	}
 }
 
-func TestStringMapSetRefreshesValueLookupCache(t *testing.T) {
+func TestStringMapLookupCacheIsReadLazyAndWriteRefreshed(t *testing.T) {
 	tbl := NewTable()
 	for i := 0; i < smallFieldCap+4; i++ {
 		tbl.RawSetString(string(rune('a'+i)), IntValue(int64(i)))
@@ -367,11 +367,14 @@ func TestStringMapSetRefreshesValueLookupCache(t *testing.T) {
 	}
 
 	key := string(rune('a' + smallFieldCap + 3))
-	if tbl.stringLookupCache == nil {
-		t.Fatal("string map set should create/update lookup cache")
+	if tbl.stringLookupCache != nil {
+		t.Fatal("string map writes should not eagerly create lookup cache")
 	}
 	if got := tbl.RawGetString(key); !got.IsInt() || got.Int() != int64(smallFieldCap+3) {
 		t.Fatalf("RawGetString(%q)=%v, want %d", key, got, smallFieldCap+3)
+	}
+	if tbl.stringLookupCache == nil {
+		t.Fatal("string map read should create lookup cache")
 	}
 
 	tbl.RawSetString(key, IntValue(99))

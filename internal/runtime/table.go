@@ -712,6 +712,14 @@ func (t *Table) rememberStringMapValueCacheLocked(key string, data uintptr, keyL
 	rememberStringMapValueCacheEntry(c, key, data, keyLen, val)
 }
 
+func (t *Table) rememberStringMapValueCacheIfPresentLocked(key string, data uintptr, keyLen int, val Value) {
+	c := t.stringLookupCache
+	if c == nil || len(c.Entries) == 0 {
+		return
+	}
+	rememberStringMapValueCacheEntry(c, key, data, keyLen, val)
+}
+
 func rememberStringMapValueCacheEntry(c *StringLookupCache, key string, data uintptr, keyLen int, val Value) {
 	if c == nil || len(c.Entries) == 0 {
 		return
@@ -1270,7 +1278,7 @@ func (t *Table) RawSetStringCached(key string, val Value, cache *FieldCacheEntry
 		} else {
 			t.smap[key] = val
 			data, keyLen := stringCacheKey(key)
-			t.rememberStringMapValueCacheLocked(key, data, keyLen, val)
+			t.rememberStringMapValueCacheIfPresentLocked(key, data, keyLen, val)
 		}
 		return
 	}
@@ -1346,7 +1354,7 @@ func (t *Table) RawSetStringDynamicCached(key string, val Value, cache []TableSt
 			delete(t.smap, key)
 		} else {
 			t.smap[key] = val
-			t.rememberStringMapValueCacheLocked(key, data, keyLen, val)
+			t.rememberStringMapValueCacheIfPresentLocked(key, data, keyLen, val)
 		}
 		RecordRuntimePathTableStringSetMap()
 		return
@@ -1594,7 +1602,7 @@ func (t *Table) RawSetString(key string, val Value) {
 		} else {
 			t.smap[key] = val
 			data, keyLen := stringCacheKey(key)
-			t.rememberStringMapValueCacheLocked(key, data, keyLen, val)
+			t.rememberStringMapValueCacheIfPresentLocked(key, data, keyLen, val)
 		}
 		return
 	}
