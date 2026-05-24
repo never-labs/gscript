@@ -192,7 +192,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 }
 
 func regexpStringSliceTable(values []string) Value {
-	tbl := NewTableSized(len(values), 0)
+	tbl := NewSequentialArrayTable(len(values))
 	for i, s := range values {
 		tbl.RawSetInt(int64(i+1), StringValue(s))
 	}
@@ -200,9 +200,9 @@ func regexpStringSliceTable(values []string) Value {
 }
 
 func regexpStringMatrixTable(values [][]string) Value {
-	tbl := NewTableSized(len(values), 0)
+	tbl := NewSequentialArrayTable(len(values))
 	for i, matches := range values {
-		sub := NewTableSized(len(matches), 0)
+		sub := NewSequentialArrayTable(len(matches))
 		for j, m := range matches {
 			sub.RawSetInt(int64(j+1), StringValue(m))
 		}
