@@ -77,6 +77,55 @@ func calls_leaf(x) {
 	}
 }
 
+func TestCompileTypeNumberComparisonUsesIsNumberOpcode(t *testing.T) {
+	tokens, err := lexer.New(`
+flagA := type(12) == "number"
+flagB := type("x") != "number"
+result := 0
+if type(3.5) == "number" {
+    result = 7
+}
+`).Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	proto, err := Compile(prog)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	if got := countOpcode(proto, OP_ISNUMBER); got < 3 {
+		t.Fatalf("OP_ISNUMBER count = %d, want at least 3\n%s", got, Disassemble(proto))
+	}
+
+	globals := runtime.NewInterpreterGlobals()
+	if _, err := New(globals).Execute(proto); err != nil {
+		t.Fatalf("runtime error: %v", err)
+	}
+	expectGlobalBool(t, globals, "flagA", true)
+	expectGlobalBool(t, globals, "flagB", true)
+	expectGlobalInt(t, globals, "result", 7)
+}
+
+func countOpcode(proto *FuncProto, op Opcode) int {
+	if proto == nil {
+		return 0
+	}
+	count := 0
+	for _, inst := range proto.Code {
+		if DecodeOp(inst) == op {
+			count++
+		}
+	}
+	for _, child := range proto.Protos {
+		count += countOpcode(child, op)
+	}
+	return count
+}
+
 func TestVMGotoLabels(t *testing.T) {
 	g := compileAndRun(t, `
 		i := 0

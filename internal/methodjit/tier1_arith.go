@@ -467,6 +467,33 @@ func emitBaselineNot(asm *jit.Assembler, inst uint32) {
 	asm.Label(doneLabel)
 }
 
+func emitBaselineIsNumber(asm *jit.Assembler, inst uint32) {
+	a := vm.DecodeA(inst)
+	b := vm.DecodeB(inst)
+
+	loadSlot(asm, jit.X0, b)
+	asm.LSRimm(jit.X1, jit.X0, 48)
+	trueLabel := nextLabel("isnumber_true")
+	doneLabel := nextLabel("isnumber_done")
+
+	// Floats have top bits below the NaN-box tag range; ints use the int tag.
+	asm.MOVimm16(jit.X2, uint16(jit.NB_TagNilShr48))
+	asm.CMPreg(jit.X1, jit.X2)
+	asm.BCond(jit.CondLT, trueLabel)
+	asm.MOVimm16(jit.X2, uint16(jit.NB_TagIntShr48))
+	asm.CMPreg(jit.X1, jit.X2)
+	asm.BCond(jit.CondEQ, trueLabel)
+
+	asm.LoadImm64(jit.X0, nb64(jit.NB_ValFalse))
+	storeSlot(asm, a, jit.X0)
+	asm.B(doneLabel)
+
+	asm.Label(trueLabel)
+	asm.LoadImm64(jit.X0, nb64(jit.NB_TagBool|1))
+	storeSlot(asm, a, jit.X0)
+	asm.Label(doneLabel)
+}
+
 // ---------------------------------------------------------------------------
 // Comparison: EQ, LT, LE
 // ---------------------------------------------------------------------------

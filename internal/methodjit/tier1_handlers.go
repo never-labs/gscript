@@ -185,7 +185,7 @@ func baselineCoroutineFastContinuationSafe(proto *vm.FuncProto, resumePC int) bo
 		case vm.OP_LOADNIL, vm.OP_LOADBOOL, vm.OP_LOADINT, vm.OP_LOADK,
 			vm.OP_MOVE,
 			vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_DIV, vm.OP_MOD,
-			vm.OP_UNM, vm.OP_NOT,
+			vm.OP_UNM, vm.OP_NOT, vm.OP_ISNUMBER,
 			vm.OP_EQ, vm.OP_LT, vm.OP_LE, vm.OP_TEST, vm.OP_TESTSET,
 			vm.OP_JMP, vm.OP_FORPREP, vm.OP_FORLOOP:
 			continue

@@ -2413,7 +2413,12 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 // Used by OP_GO goroutines for lock-free reads. Shared heap objects (tables,
 // channels) remain shared via pointers; globals array and index are copied.
 func newIsolatedChildVM(parent *VM) *VM {
-	// Copy both globalArray and globalIndex for full isolation
+	if parent.globalsMu != nil && !parent.noGlobalLock {
+		parent.globalsMu.RLock()
+		defer parent.globalsMu.RUnlock()
+	}
+
+	// Copy both globalArray and globalIndex for full isolation.
 	ga := make([]runtime.Value, len(parent.globalArray))
 	copy(ga, parent.globalArray)
 	ge := make([]uint64, len(parent.globalValueEpoch))
@@ -2426,6 +2431,9 @@ func newIsolatedChildVM(parent *VM) *VM {
 
 	childGlobals := make(map[string]runtime.Value, len(gi))
 	for name, idx := range gi {
+		if idx < 0 || idx >= len(ga) {
+			continue
+		}
 		childGlobals[name] = ga[idx]
 	}
 
@@ -3936,6 +3944,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			bv := vm.regs[base+DecodeB(inst)]
 			vm.regs[base+a] = runtime.BoolValue(!bv.Truthy())
 
+		case OP_ISNUMBER:
+			a := DecodeA(inst)
+			bv := vm.regs[base+DecodeB(inst)]
+			vm.regs[base+a] = runtime.BoolValue(bv.IsNumber())
+
 		case OP_LEN:
 			a := DecodeA(inst)
 			bv := vm.regs[base+DecodeB(inst)]
@@ -5382,7 +5395,7 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if DecodesBx(inst) < 0 {
 				return true
 			}
-		case OP_MOVE, OP_UNM, OP_BNOT, OP_NOT, OP_LEN:
+		case OP_MOVE, OP_UNM, OP_BNOT, OP_NOT, OP_ISNUMBER, OP_LEN:
 			if b == payloadReg {
 				return false
 			}

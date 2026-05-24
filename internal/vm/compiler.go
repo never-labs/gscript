@@ -1988,8 +1988,14 @@ func (c *compiler) compileBinaryExpr(e *ast.BinaryExpr, dest int) error {
 
 	switch e.Op {
 	case "==":
+		if arg, ok := typeNumberComparisonArg(e); ok {
+			return c.compileIsNumberComparison(arg, dest, false, line)
+		}
 		return c.compileComparison(e, dest, OP_EQ, 0, false)
 	case "!=":
+		if arg, ok := typeNumberComparisonArg(e); ok {
+			return c.compileIsNumberComparison(arg, dest, true, line)
+		}
 		return c.compileComparison(e, dest, OP_EQ, 1, false)
 	case "<":
 		return c.compileComparison(e, dest, OP_LT, 0, false)
@@ -2099,8 +2105,14 @@ func (c *compiler) compileCondJump(expr ast.Expr, line int) (int, error) {
 		case ">=":
 			return c.compileCondCmp(binExpr, OP_LE, 0, true)
 		case "==":
+			if arg, ok := typeNumberComparisonArg(binExpr); ok {
+				return c.compileIsNumberCondJump(arg, false, false, line)
+			}
 			return c.compileCondCmp(binExpr, OP_EQ, 0, false)
 		case "!=":
+			if arg, ok := typeNumberComparisonArg(binExpr); ok {
+				return c.compileIsNumberCondJump(arg, true, false, line)
+			}
 			return c.compileCondCmp(binExpr, OP_EQ, 1, false)
 		}
 	}
@@ -2131,8 +2143,14 @@ func (c *compiler) compileCondJumpInv(expr ast.Expr, line int) (int, error) {
 		case ">=":
 			return c.compileCondCmp(binExpr, OP_LE, 1, true)
 		case "==":
+			if arg, ok := typeNumberComparisonArg(binExpr); ok {
+				return c.compileIsNumberCondJump(arg, false, true, line)
+			}
 			return c.compileCondCmp(binExpr, OP_EQ, 1, false)
 		case "!=":
+			if arg, ok := typeNumberComparisonArg(binExpr); ok {
+				return c.compileIsNumberCondJump(arg, true, true, line)
+			}
 			return c.compileCondCmp(binExpr, OP_EQ, 0, false)
 		}
 	}
@@ -2191,6 +2209,78 @@ func smallIntLit(expr ast.Expr) (int, bool) {
 		return 0, false
 	}
 	return int(i), true
+}
+
+func (c *compiler) compileIsNumberComparison(arg ast.Expr, dest int, invert bool, line int) error {
+	argReg, argIsTemp, err := c.compileExprReg(arg)
+	if err != nil {
+		return err
+	}
+	c.emitABC(OP_ISNUMBER, dest, argReg, 0, line)
+	if invert {
+		c.emitABC(OP_NOT, dest, dest, 0, line)
+	}
+	if argIsTemp {
+		c.freeReg()
+	}
+	return nil
+}
+
+func (c *compiler) compileIsNumberCondJump(arg ast.Expr, invert bool, jumpWhenTrue bool, line int) (int, error) {
+	condReg := c.allocReg()
+	if err := c.compileExprTo(arg, condReg); err != nil {
+		return 0, err
+	}
+	c.emitABC(OP_ISNUMBER, condReg, condReg, 0, line)
+	c.freeReg()
+
+	testC := 0
+	if jumpWhenTrue {
+		testC = 1
+	}
+	if invert {
+		testC ^= 1
+	}
+	c.emitABC(OP_TEST, condReg, 0, testC, line)
+	return c.emitJump(line), nil
+}
+
+func typeNumberComparisonArg(e *ast.BinaryExpr) (ast.Expr, bool) {
+	if arg, ok := typeNumberCallArg(e.Left); ok && isStringLiteral(e.Right, "number") {
+		return arg, true
+	}
+	if arg, ok := typeNumberCallArg(e.Right); ok && isStringLiteral(e.Left, "number") {
+		return arg, true
+	}
+	return nil, false
+}
+
+func typeNumberCallArg(expr ast.Expr) (ast.Expr, bool) {
+	expr = unwrapParenExpr(expr)
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return nil, false
+	}
+	fn, ok := unwrapParenExpr(call.Func).(*ast.IdentExpr)
+	if !ok || fn.Name != "type" {
+		return nil, false
+	}
+	return call.Args[0], true
+}
+
+func isStringLiteral(expr ast.Expr, value string) bool {
+	lit, ok := unwrapParenExpr(expr).(*ast.StringLit)
+	return ok && lit.Value == value
+}
+
+func unwrapParenExpr(expr ast.Expr) ast.Expr {
+	for {
+		p, ok := expr.(*ast.ParenExpr)
+		if !ok {
+			return expr
+		}
+		expr = p.Inner
+	}
 }
 
 func (c *compiler) compileComparison(e *ast.BinaryExpr, dest int, op Opcode, a int, swap bool) error {
@@ -3478,6 +3568,8 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("BNOT       R%d R%d", a, b)
 		case OP_NOT:
 			desc = fmt.Sprintf("NOT        R%d R%d", a, b)
+		case OP_ISNUMBER:
+			desc = fmt.Sprintf("ISNUMBER   R%d R%d", a, b)
 		case OP_LEN:
 			desc = fmt.Sprintf("LEN        R%d R%d", a, b)
 		case OP_CONCAT:

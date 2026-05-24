@@ -847,6 +847,7 @@ var opcodeNames = [...]string{
 	vm.OP_POW:        "POW",
 	vm.OP_UNM:        "UNM",
 	vm.OP_NOT:        "NOT",
+	vm.OP_ISNUMBER:   "ISNUMBER",
 	vm.OP_LEN:        "LEN",
 	vm.OP_CONCAT:     "CONCAT",
 	vm.OP_EQ:         "EQ",

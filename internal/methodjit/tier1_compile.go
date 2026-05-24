@@ -166,6 +166,8 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 			emitBaselineUnm(asm, inst)
 		case vm.OP_NOT:
 			emitBaselineNot(asm, inst)
+		case vm.OP_ISNUMBER:
+			emitBaselineIsNumber(asm, inst)
 
 		// ---- Comparison (native) ----
 		case vm.OP_EQ:

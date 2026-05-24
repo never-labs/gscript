@@ -97,6 +97,7 @@ const (
 	OP_DEFER       // A B   : defer R(A)(R(A+1)..R(A+B-1)); B=0 use top
 	OP_SETGLOBALRO // A Bx : Globals[Constants[Bx]] = R(A), then mark binding read-only
 	OP_CHECKCONST  // A Bx  : fail if local R(A) binding named Constants[Bx] is read-only
+	OP_ISNUMBER    // A B   : R(A) = type(R(B)) == "number"
 
 	OP_MAX // sentinel
 )
@@ -244,6 +245,7 @@ var opNames = [...]string{
 	OP_DEFER:       "DEFER",
 	OP_SETGLOBALRO: "SETGLOBALRO",
 	OP_CHECKCONST:  "CHECKCONST",
+	OP_ISNUMBER:    "ISNUMBER",
 }
 
 // OpName returns the name of an opcode.
