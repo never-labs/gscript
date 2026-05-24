@@ -4631,6 +4631,17 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 								handledSpecial = true
 							}
 						}
+					case runtime.NativeKindStdStringGSub:
+						if gf.NativeData == runtime.StdStringGSubIdentityPtr() {
+							handled, err := vm.ExecuteStdStringGSubCall(base+a, nArgs, c)
+							if err != nil {
+								return nil, wrapLineErr(frame, err)
+							}
+							if handled {
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								handledSpecial = true
+							}
+						}
 					case runtime.NativeKindStdRawGet:
 						if gf.NativeData == runtime.StdRawGetIdentityPtr() {
 							handled, err := vm.ExecuteStdRawGetCall(base+a, nArgs, c)

@@ -28,6 +28,7 @@ const (
 	NativeKindStdType         uint8 = 111
 	NativeKindStdNext         uint8 = 112
 	NativeKindStdGetMetatable uint8 = 113
+	NativeKindStdStringGSub   uint8 = 114
 )
 
 var stdStringFormatIdentity byte
@@ -39,6 +40,7 @@ var stdPairsIdentity byte
 var stdIPairsIdentity byte
 var stdStringFindIdentity byte
 var stdStringMatchIdentity byte
+var stdStringGSubIdentity byte
 var stdRawGetIdentity byte
 var stdRawSetIdentity byte
 var stdRawLenIdentity byte
@@ -99,13 +101,6 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			Fn:   fn,
 		}))
 	}
-	setFast1 := func(name string, fn func([]Value) ([]Value, error), fast func([]Value) (Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
-			Name:  "string." + name,
-			Fn:    fn,
-			Fast1: fast,
-		}))
-	}
 	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func([]Value) (Value, error), fast2 func(Value, Value) (Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
 			Name:     "string." + name,
@@ -121,6 +116,17 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			Fast1:    fast,
 			FastArg2: fast2,
 			FastArg3: fast3,
+		}))
+	}
+	setFastArg2345 := func(name string, fn func([]Value) ([]Value, error), fast func([]Value) (Value, error), fast2 func(Value, Value) (Value, error), fast3 func(Value, Value, Value) (Value, error), fast4 func(Value, Value, Value, Value) (Value, error), fast5 func(Value, Value, Value, Value, Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "string." + name,
+			Fn:       fn,
+			Fast1:    fast,
+			FastArg2: fast2,
+			FastArg3: fast3,
+			FastArg4: fast4,
+			FastArg5: fast5,
 		}))
 	}
 
@@ -701,20 +707,22 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		}
 		return []Value{StringValue(result), IntValue(int64(count))}, nil
 	})
+	if v := t.RawGetString("gsub"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.NativeKind = NativeKindStdStringGSub
+		gf.NativeData = StdStringGSubIdentityPtr()
+	}
 
 	// string.format(fmt, ...) -> string
-	setFast1("format", func(args []Value) ([]Value, error) {
+	setFastArg2345("format", func(args []Value) ([]Value, error) {
 		v, err := stringFormatValue(args)
 		if err != nil {
 			return nil, err
 		}
 		return []Value{v}, nil
-	}, stringFormatValue)
+	}, stringFormatValue, stringFormat2Value, stringFormat3Value, stringFormat4Value, stringFormat5Value)
 	if v := t.RawGetString("format"); v.IsFunction() {
 		gf := v.GoFunction()
-		gf.FastArg2 = stringFormat2Value
-		gf.FastArg3 = stringFormat3Value
-		gf.FastArg4 = stringFormat4Value
 		gf.NativeKind = NativeKindStdStringFormat
 		gf.NativeData = StdStringFormatIdentityPtr()
 	}
@@ -1264,6 +1272,10 @@ func StdStringMatchIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdStringMatchIdentity)
 }
 
+func StdStringGSubIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdStringGSubIdentity)
+}
+
 func StdRawGetIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdRawGetIdentity)
 }
@@ -1396,14 +1408,14 @@ func FastStringMatchRet2(sv, pv, initv Value, nArgs, rawC int) (Value, Value, in
 		if !ok {
 			return NilValue(), NilValue(), 1, true, nil
 		}
-		values := simpleMatchValues(searchStr, m)
-		if len(values) == 0 {
+		if m.ncap == 0 {
 			return StringValue(searchStr[m.start:m.end]), NilValue(), 1, true, nil
 		}
-		if len(values) == 1 {
-			return values[0], NilValue(), 1, true, nil
+		r0 := StringValue(searchStr[m.caps[0][0]:m.caps[0][1]])
+		if m.ncap == 1 {
+			return r0, NilValue(), 1, true, nil
 		}
-		return values[0], values[1], 2, true, nil
+		return r0, StringValue(searchStr[m.caps[1][0]:m.caps[1][1]]), 2, true, nil
 	}
 	prog, re, err := cachedLuaPatternRegexp(pattern)
 	if err != nil {
@@ -1945,6 +1957,27 @@ func stringFormat4Value(format, arg0, arg1, arg2 Value) (Value, error) {
 	}
 	RecordRuntimePathStringFormatFallback()
 	args := [4]Value{format, arg0, arg1, arg2}
+	return stringFormatValue(args[:])
+}
+
+func stringFormat5Value(format, arg0, arg1, arg2, arg3 Value) (Value, error) {
+	if !format.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'string.format' (string expected)")
+	}
+	formatStr := format.Str()
+	if prog, ok, err := cachedSimpleFormat(formatStr); err != nil {
+		return NilValue(), err
+	} else if ok && prog.minArgs == 5 {
+		RecordRuntimePathStringFormatFast()
+		args := [4]Value{arg0, arg1, arg2, arg3}
+		s, err := prog.formatFixedArgs(args[:])
+		if err != nil {
+			return NilValue(), err
+		}
+		return StringValue(s), nil
+	}
+	RecordRuntimePathStringFormatFallback()
+	args := [5]Value{format, arg0, arg1, arg2, arg3}
 	return stringFormatValue(args[:])
 }
 
@@ -2642,6 +2675,22 @@ type simpleLuaPattern struct {
 	ops          []simpleLuaPatternOp
 	captureCount int
 	firstLiteral string
+	fast         simpleLuaPatternFast
+}
+
+type simpleLuaPatternFastKind uint8
+
+const (
+	simpleLuaPatternFastNone simpleLuaPatternFastKind = iota
+	simpleLuaPatternFastTwoDigitRuns
+)
+
+type simpleLuaPatternFast struct {
+	kind               simpleLuaPatternFastKind
+	prefix             string
+	middle             string
+	suffix             string
+	firstCapturePrefix bool
 }
 
 type simpleLuaPatternCacheEntry struct {
@@ -2683,7 +2732,7 @@ func compileSimpleLuaPattern(pattern string) (*simpleLuaPattern, bool) {
 			break
 		}
 	}
-	return &simpleLuaPattern{ops: ops, captureCount: captures, firstLiteral: firstLiteral}, true
+	return &simpleLuaPattern{ops: ops, captureCount: captures, firstLiteral: firstLiteral, fast: simpleLuaPatternFastForOps(ops, captures)}, true
 }
 
 func compileSimpleLuaPatternOps(pattern string) ([]simpleLuaPatternOp, int, bool) {
@@ -2743,6 +2792,9 @@ func compileSimpleLuaPatternOps(pattern string) ([]simpleLuaPatternOp, int, bool
 }
 
 func (p *simpleLuaPattern) findNext(s string, start int) (simpleLuaPatternMatch, bool) {
+	if p.fast.kind == simpleLuaPatternFastTwoDigitRuns {
+		return p.findNextTwoDigitRuns(s, start)
+	}
 	if start < 0 {
 		start = 0
 	}
@@ -2762,6 +2814,118 @@ func (p *simpleLuaPattern) findNext(s string, start int) (simpleLuaPatternMatch,
 		}
 	}
 	return simpleLuaPatternMatch{}, false
+}
+
+func simpleLuaPatternFastForOps(ops []simpleLuaPatternOp, captures int) simpleLuaPatternFast {
+	if captures != 2 {
+		return simpleLuaPatternFast{}
+	}
+	// Shape A: prefix(%d+)middle%d%dsuffix(%d+)
+	if len(ops) == 11 &&
+		ops[0].kind == simpleLuaPatternLiteral &&
+		ops[1].kind == simpleLuaPatternCaptureStart &&
+		ops[2].kind == simpleLuaPatternDigitPlus &&
+		ops[3].kind == simpleLuaPatternCaptureEnd &&
+		ops[4].kind == simpleLuaPatternLiteral &&
+		ops[5].kind == simpleLuaPatternDigit &&
+		ops[6].kind == simpleLuaPatternDigit &&
+		ops[7].kind == simpleLuaPatternLiteral &&
+		ops[8].kind == simpleLuaPatternCaptureStart &&
+		ops[9].kind == simpleLuaPatternDigitPlus &&
+		ops[10].kind == simpleLuaPatternCaptureEnd {
+		return simpleLuaPatternFast{
+			kind:   simpleLuaPatternFastTwoDigitRuns,
+			prefix: ops[0].text,
+			middle: ops[4].text,
+			suffix: ops[7].text,
+		}
+	}
+	// Shape B: (prefix%d+)middle%d%dsuffix(%d+)
+	if len(ops) == 11 &&
+		ops[0].kind == simpleLuaPatternCaptureStart &&
+		ops[1].kind == simpleLuaPatternLiteral &&
+		ops[2].kind == simpleLuaPatternDigitPlus &&
+		ops[3].kind == simpleLuaPatternCaptureEnd &&
+		ops[4].kind == simpleLuaPatternLiteral &&
+		ops[5].kind == simpleLuaPatternDigit &&
+		ops[6].kind == simpleLuaPatternDigit &&
+		ops[7].kind == simpleLuaPatternLiteral &&
+		ops[8].kind == simpleLuaPatternCaptureStart &&
+		ops[9].kind == simpleLuaPatternDigitPlus &&
+		ops[10].kind == simpleLuaPatternCaptureEnd {
+		return simpleLuaPatternFast{
+			kind:               simpleLuaPatternFastTwoDigitRuns,
+			prefix:             ops[1].text,
+			middle:             ops[4].text,
+			suffix:             ops[7].text,
+			firstCapturePrefix: true,
+		}
+	}
+	return simpleLuaPatternFast{}
+}
+
+func (p *simpleLuaPattern) findNextTwoDigitRuns(s string, start int) (simpleLuaPatternMatch, bool) {
+	if start < 0 {
+		start = 0
+	}
+	if start > len(s) {
+		return simpleLuaPatternMatch{}, false
+	}
+	f := p.fast
+	for search := start; search <= len(s); {
+		idx := strings.Index(s[search:], f.prefix)
+		if idx < 0 {
+			return simpleLuaPatternMatch{}, false
+		}
+		pos := search + idx
+		digits1Start := pos + len(f.prefix)
+		digits1End := scanASCIIDigits(s, digits1Start)
+		if digits1End == digits1Start || !hasStringAt(s, digits1End, f.middle) {
+			search = pos + 1
+			continue
+		}
+		tagStart := digits1End + len(f.middle)
+		if tagStart+2 > len(s) || !isASCIIDigit(s[tagStart]) || !isASCIIDigit(s[tagStart+1]) {
+			search = pos + 1
+			continue
+		}
+		suffixStart := tagStart + 2
+		if !hasStringAt(s, suffixStart, f.suffix) {
+			search = pos + 1
+			continue
+		}
+		digits2Start := suffixStart + len(f.suffix)
+		digits2End := scanASCIIDigits(s, digits2Start)
+		if digits2End == digits2Start {
+			search = pos + 1
+			continue
+		}
+		cap0Start := digits1Start
+		if f.firstCapturePrefix {
+			cap0Start = pos
+		}
+		return simpleLuaPatternMatch{
+			start: pos,
+			end:   digits2End,
+			ncap:  2,
+			caps: [4][2]int{
+				{cap0Start, digits1End},
+				{digits2Start, digits2End},
+			},
+		}, true
+	}
+	return simpleLuaPatternMatch{}, false
+}
+
+func scanASCIIDigits(s string, pos int) int {
+	for pos < len(s) && isASCIIDigit(s[pos]) {
+		pos++
+	}
+	return pos
+}
+
+func hasStringAt(s string, pos int, needle string) bool {
+	return pos <= len(s) && len(needle) <= len(s)-pos && s[pos:pos+len(needle)] == needle
 }
 
 func (p *simpleLuaPattern) matchAt(s string, pos int) (simpleLuaPatternMatch, bool) {
@@ -3644,7 +3808,8 @@ func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string
 }
 
 func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, caller FunctionCaller) (string, error) {
-	results, err := callGScriptFunction(fn, simpleReplacementFunctionArgs(s, m), caller)
+	args := simpleReplacementFunctionArgsStack(s, m)
+	results, err := callGScriptFunction(fn, args, caller)
 	if err != nil {
 		return "", err
 	}
@@ -3660,6 +3825,22 @@ func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, 
 		return val.String(), nil
 	}
 	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
+}
+
+func simpleReplacementFunctionArgsStack(s string, m simpleLuaPatternMatch) []Value {
+	var args [4]Value
+	if m.ncap == 0 {
+		args[0] = StringValue(s[m.start:m.end])
+		return args[:1]
+	}
+	n := m.ncap
+	if n > len(args) {
+		n = len(args)
+	}
+	for i := 0; i < n; i++ {
+		args[i] = StringValue(s[m.caps[i][0]:m.caps[i][1]])
+	}
+	return args[:n]
 }
 
 func simpleReplacementFunctionArgs(s string, m simpleLuaPatternMatch) []Value {
