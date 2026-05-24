@@ -5493,6 +5493,9 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 		return vm.tableGetDepth(runtime.TableValue(idx.Table()), key, depth+1)
 	}
 	if idx.IsFunction() {
+		if result, ok, err := vm.fastIndexStringDispatch(idx, key); ok || err != nil {
+			return result, err
+		}
 		args := [2]runtime.Value{t, key}
 		results, err := vm.callValue(idx, args[:])
 		if err != nil {
@@ -5504,6 +5507,58 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 		return runtime.NilValue(), nil
 	}
 	return runtime.NilValue(), nil
+}
+
+func (vm *VM) fastIndexStringDispatch(fn, key runtime.Value) (runtime.Value, bool, error) {
+	if !key.IsString() {
+		return runtime.NilValue(), false, nil
+	}
+	cl, ok := closureFromValue(fn)
+	if !ok || cl == nil || cl.Proto == nil || cl.Proto.NumParams < 2 {
+		return runtime.NilValue(), false, nil
+	}
+	code := cl.Proto.Code
+	constants := cl.Proto.Constants
+	want := key.Str()
+	for pc := 0; pc+5 < len(code); pc += 6 {
+		loadKey := code[pc]
+		eq := code[pc+1]
+		jmp := code[pc+2]
+		getGlobal := code[pc+3]
+		getField := code[pc+4]
+		ret := code[pc+5]
+		if DecodeOp(loadKey) != OP_LOADK || DecodeOp(eq) != OP_EQ || DecodeOp(jmp) != OP_JMP ||
+			DecodeOp(getGlobal) != OP_GETGLOBAL || DecodeOp(getField) != OP_GETFIELD || DecodeOp(ret) != OP_RETURN {
+			return runtime.NilValue(), false, nil
+		}
+		keyConstReg := DecodeA(loadKey)
+		keyConstIdx := DecodeBx(loadKey)
+		if keyConstIdx < 0 || keyConstIdx >= len(constants) || !constants[keyConstIdx].IsString() {
+			return runtime.NilValue(), false, nil
+		}
+		if DecodeB(eq) != 1 || DecodeC(eq) != keyConstReg || DecodesBx(jmp) != 3 {
+			return runtime.NilValue(), false, nil
+		}
+		globalReg := DecodeA(getGlobal)
+		globalIdx := DecodeBx(getGlobal)
+		resultReg := DecodeA(getField)
+		fieldIdx := DecodeC(getField)
+		if DecodeB(getField) != globalReg || DecodeA(ret) != resultReg || DecodeB(ret) != 2 ||
+			globalIdx < 0 || globalIdx >= len(constants) || fieldIdx < 0 || fieldIdx >= len(constants) ||
+			!constants[globalIdx].IsString() || !constants[fieldIdx].IsString() {
+			return runtime.NilValue(), false, nil
+		}
+		if constants[keyConstIdx].Str() != want {
+			continue
+		}
+		global := vm.GetGlobal(constants[globalIdx].Str())
+		if !global.IsTable() {
+			return runtime.NilValue(), true, nil
+		}
+		result, err := vm.tableGet(global, runtime.StringValue(constants[fieldIdx].Str()))
+		return result, true, err
+	}
+	return runtime.NilValue(), false, nil
 }
 
 // tableSet performs table assignment with __newindex metamethod support.

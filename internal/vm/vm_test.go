@@ -371,6 +371,27 @@ func TestMetatableLenReturnsCurrentCapturedValue(t *testing.T) {
 	expectGlobalInt(t, g, "b", 11)
 }
 
+func TestMetatableIndexDispatchReadsCurrentMethodTable(t *testing.T) {
+	g := compileAndRun(t, `
+		methods := {}
+		methods.mix = func(self, x) { return x + 1 }
+		mt := {__index: func(obj, key) {
+			if key == "mix" {
+				return methods.mix
+			}
+			return 99
+		}}
+		obj := setmetatable({}, mt)
+		a := obj:mix(4)
+		methods.mix = func(self, x) { return x + 7 }
+		b := obj:mix(4)
+		c := obj.other
+	`)
+	expectGlobalInt(t, g, "a", 5)
+	expectGlobalInt(t, g, "b", 11)
+	expectGlobalInt(t, g, "c", 99)
+}
+
 // ============================================================================
 // Phase 2: Comparison & Logic
 // ============================================================================
