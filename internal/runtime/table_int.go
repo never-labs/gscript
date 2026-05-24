@@ -3,6 +3,8 @@
 
 package runtime
 
+import "sort"
+
 // sparseArrayMax is the maximum array size for auto-expansion of sparse keys.
 // Keys like board[col*100+row] (range 101-910) will use array instead of imap.
 const sparseArrayMax = 1024
@@ -264,6 +266,38 @@ func (dst *Table) TryPlainArrayMove(src *Table, first, last, target int64) bool 
 	}
 	dst.keysDirty = true
 	dst.bumpArrayVersionLocked()
+	return true
+}
+
+// TryPlainArraySort sorts a dense 1-based typed numeric array in place. It is a
+// guarded stdlib fast path for table.sort without a comparator; callers must
+// fall back to ordinary table access when it returns false.
+func (t *Table) TryPlainArraySort(length int64) bool {
+	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil ||
+		t.dmMeta != nil || t.dmStride != 0 || length < 0 {
+		return false
+	}
+	n := int(length)
+	switch t.arrayKind {
+	case ArrayInt:
+		if len(t.intArray) != n+1 || (len(t.intArray) > 0 && t.arrayZeroValid) {
+			return false
+		}
+		sort.SliceStable(t.intArray[1:], func(i, j int) bool {
+			return t.intArray[i+1] < t.intArray[j+1]
+		})
+	case ArrayFloat:
+		if len(t.floatArray) != n+1 || (len(t.floatArray) > 0 && t.arrayZeroValid) {
+			return false
+		}
+		sort.SliceStable(t.floatArray[1:], func(i, j int) bool {
+			return t.floatArray[i+1] < t.floatArray[j+1]
+		})
+	default:
+		return false
+	}
+	t.keysDirty = true
+	t.bumpArrayVersionLocked()
 	return true
 }
 

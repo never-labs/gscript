@@ -425,6 +425,44 @@ func TestPlainArrayInsertRemoveFastPath(t *testing.T) {
 	}
 }
 
+func TestPlainArraySortFastPath(t *testing.T) {
+	ints := NewTableSizedKind(5, 0, ArrayInt)
+	for i, v := range []int64{5, 1, 4, 2, 3} {
+		ints.RawSetInt(int64(i+1), IntValue(v))
+	}
+	if !ints.TryPlainArraySort(5) {
+		t.Fatal("TryPlainArraySort did not handle dense int array")
+	}
+	for i, want := range []int64{1, 2, 3, 4, 5} {
+		got := ints.RawGetInt(int64(i + 1))
+		if !got.IsInt() || got.Int() != want {
+			t.Fatalf("sorted int index %d = %v, want %d", i+1, got, want)
+		}
+	}
+
+	floats := NewTableSizedKind(3, 0, ArrayFloat)
+	for i, v := range []float64{2.5, -1.0, 1.25} {
+		floats.RawSetInt(int64(i+1), FloatValue(v))
+	}
+	if !floats.TryPlainArraySort(3) {
+		t.Fatal("TryPlainArraySort did not handle dense float array")
+	}
+	for i, want := range []float64{-1.0, 1.25, 2.5} {
+		got := floats.RawGetInt(int64(i + 1))
+		if !got.IsFloat() || got.Float() != want {
+			t.Fatalf("sorted float index %d = %v, want %g", i+1, got, want)
+		}
+	}
+
+	withMeta := NewTableSizedKind(2, 0, ArrayInt)
+	withMeta.RawSetInt(1, IntValue(2))
+	withMeta.RawSetInt(2, IntValue(1))
+	withMeta.SetMetatable(NewTable())
+	if withMeta.TryPlainArraySort(2) {
+		t.Fatal("TryPlainArraySort should not bypass metatable-bearing tables")
+	}
+}
+
 // --- Table with function values ---
 
 func TestTableWithFunctions(t *testing.T) {

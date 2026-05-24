@@ -1056,6 +1056,11 @@ func (vm *VM) newTableSortFunction() *runtime.GoFunction {
 		if length < 0 {
 			length = 0
 		}
+		if !hasComp {
+			if tbl := t.Table(); tbl != nil && tbl.TryPlainArraySort(length) {
+				return nil
+			}
+		}
 		elems := make([]runtime.Value, int(length))
 		for i := 0; i < len(elems); i++ {
 			v, err := vm.tableGet(t, runtime.IntValue(int64(i+1)))
