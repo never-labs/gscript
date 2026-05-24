@@ -48,6 +48,7 @@ type compiledLuaPatternCacheEntry struct {
 }
 
 var compiledLuaPatternCache sync.Map
+var simpleLuaPatternCache sync.Map
 
 // NativeStringFormatIntCacheSize is the direct-mapped entry count used by the
 // Tier 2 native string.format(pattern, int) path.
@@ -370,6 +371,13 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			}
 			return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 		}
+		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
+			m, ok := simple.findNext(searchStr, 0)
+			if !ok {
+				return []Value{NilValue()}, nil
+			}
+			return simpleMatchValues(searchStr, m), nil
+		}
 		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid pattern: %s", err)
@@ -453,6 +461,41 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 				FastArg2Ret2: func(_, _ Value) (Value, Value, int, error) {
 					return next()
 				},
+			}
+			return []Value{FunctionValue(iter)}, nil
+		}
+		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
+			nextStart := 0
+			next := func() (Value, Value, int, error) {
+				m, ok := simple.findNext(searchStr, nextStart)
+				if !ok {
+					return NilValue(), NilValue(), 1, nil
+				}
+				nextStart = simpleNextPatternSearchStart(searchStr, m.start, m.end)
+				if m.ncap == 0 {
+					return StringValue(searchStr[m.start:m.end]), NilValue(), 1, nil
+				}
+				r0 := StringValue(searchStr[m.caps[0][0]:m.caps[0][1]])
+				if m.ncap == 1 {
+					return r0, NilValue(), 1, nil
+				}
+				return r0, StringValue(searchStr[m.caps[1][0]:m.caps[1][1]]), 2, nil
+			}
+			iter := &GoFunction{
+				Name: "gmatch_iterator",
+				Fn: func(_ []Value) ([]Value, error) {
+					m, ok := simple.findNext(searchStr, nextStart)
+					if !ok {
+						return []Value{NilValue()}, nil
+					}
+					nextStart = simpleNextPatternSearchStart(searchStr, m.start, m.end)
+					return simpleMatchValues(searchStr, m), nil
+				},
+			}
+			if simple.captureCount <= 2 {
+				iter.FastArg2Ret2 = func(_, _ Value) (Value, Value, int, error) {
+					return next()
+				}
 			}
 			return []Value{FunctionValue(iter)}, nil
 		}
@@ -2501,6 +2544,205 @@ const (
 	luaPatternCaptureText luaPatternCaptureKind = iota
 	luaPatternCapturePosition
 )
+
+type simpleLuaPatternOpKind uint8
+
+const (
+	simpleLuaPatternLiteral simpleLuaPatternOpKind = iota
+	simpleLuaPatternDigit
+	simpleLuaPatternDigitPlus
+	simpleLuaPatternCaptureStart
+	simpleLuaPatternCaptureEnd
+)
+
+type simpleLuaPatternOp struct {
+	kind simpleLuaPatternOpKind
+	text string
+}
+
+type simpleLuaPattern struct {
+	ops          []simpleLuaPatternOp
+	captureCount int
+	firstLiteral string
+}
+
+type simpleLuaPatternCacheEntry struct {
+	pattern *simpleLuaPattern
+	ok      bool
+}
+
+type simpleLuaPatternMatch struct {
+	start int
+	end   int
+	ncap  int
+	caps  [4][2]int
+}
+
+func cachedSimpleLuaPattern(pattern string) (*simpleLuaPattern, bool) {
+	if cached, ok := simpleLuaPatternCache.Load(pattern); ok {
+		entry := cached.(simpleLuaPatternCacheEntry)
+		return entry.pattern, entry.ok
+	}
+	compiled, ok := compileSimpleLuaPattern(pattern)
+	entry := simpleLuaPatternCacheEntry{pattern: compiled, ok: ok}
+	actual, _ := simpleLuaPatternCache.LoadOrStore(pattern, entry)
+	entry = actual.(simpleLuaPatternCacheEntry)
+	return entry.pattern, entry.ok
+}
+
+func compileSimpleLuaPattern(pattern string) (*simpleLuaPattern, bool) {
+	ops, captures, ok := compileSimpleLuaPatternOps(pattern)
+	if !ok || len(ops) == 0 || captures > 4 {
+		return nil, false
+	}
+	firstLiteral := ""
+	for _, op := range ops {
+		if op.kind == simpleLuaPatternLiteral && op.text != "" {
+			firstLiteral = op.text
+			break
+		}
+		if op.kind != simpleLuaPatternCaptureStart {
+			break
+		}
+	}
+	return &simpleLuaPattern{ops: ops, captureCount: captures, firstLiteral: firstLiteral}, true
+}
+
+func compileSimpleLuaPatternOps(pattern string) ([]simpleLuaPatternOp, int, bool) {
+	ops := make([]simpleLuaPatternOp, 0, 8)
+	captures := 0
+	flushLiteral := func(start, end int) {
+		if end > start {
+			ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternLiteral, text: pattern[start:end]})
+		}
+	}
+	for i := 0; i < len(pattern); {
+		litStart := i
+		for i < len(pattern) && pattern[i] != '%' && pattern[i] != '(' && pattern[i] != ')' &&
+			pattern[i] != '[' && pattern[i] != '.' && pattern[i] != '*' && pattern[i] != '?' &&
+			pattern[i] != '-' && pattern[i] != '^' && pattern[i] != '$' {
+			i++
+		}
+		flushLiteral(litStart, i)
+		if i >= len(pattern) {
+			break
+		}
+		switch pattern[i] {
+		case '%':
+			if i+1 >= len(pattern) || pattern[i+1] != 'd' {
+				return nil, 0, false
+			}
+			if i+2 < len(pattern) && pattern[i+2] == '+' {
+				ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternDigitPlus})
+				i += 3
+			} else {
+				ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternDigit})
+				i += 2
+			}
+		case '(':
+			end := strings.IndexByte(pattern[i+1:], ')')
+			if end < 0 {
+				return nil, 0, false
+			}
+			inner := pattern[i+1 : i+1+end]
+			if inner == "" || strings.ContainsAny(inner, "()[]^$.*?-") {
+				return nil, 0, false
+			}
+			innerOps, innerCaptures, ok := compileSimpleLuaPatternOps(inner)
+			if !ok || innerCaptures != 0 {
+				return nil, 0, false
+			}
+			ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternCaptureStart})
+			ops = append(ops, innerOps...)
+			ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternCaptureEnd})
+			captures++
+			i += end + 2
+		default:
+			return nil, 0, false
+		}
+	}
+	return ops, captures, true
+}
+
+func (p *simpleLuaPattern) findNext(s string, start int) (simpleLuaPatternMatch, bool) {
+	if start < 0 {
+		start = 0
+	}
+	if start > len(s) {
+		return simpleLuaPatternMatch{}, false
+	}
+	for pos := start; pos <= len(s); pos++ {
+		if p.firstLiteral != "" {
+			idx := strings.Index(s[pos:], p.firstLiteral)
+			if idx < 0 {
+				return simpleLuaPatternMatch{}, false
+			}
+			pos += idx
+		}
+		if m, ok := p.matchAt(s, pos); ok {
+			return m, true
+		}
+	}
+	return simpleLuaPatternMatch{}, false
+}
+
+func (p *simpleLuaPattern) matchAt(s string, pos int) (simpleLuaPatternMatch, bool) {
+	m := simpleLuaPatternMatch{start: pos}
+	capStack := [4]int{}
+	for _, op := range p.ops {
+		switch op.kind {
+		case simpleLuaPatternLiteral:
+			if !strings.HasPrefix(s[pos:], op.text) {
+				return simpleLuaPatternMatch{}, false
+			}
+			pos += len(op.text)
+		case simpleLuaPatternDigit:
+			if pos >= len(s) || s[pos] < '0' || s[pos] > '9' {
+				return simpleLuaPatternMatch{}, false
+			}
+			pos++
+		case simpleLuaPatternDigitPlus:
+			start := pos
+			for pos < len(s) && s[pos] >= '0' && s[pos] <= '9' {
+				pos++
+			}
+			if pos == start {
+				return simpleLuaPatternMatch{}, false
+			}
+		case simpleLuaPatternCaptureStart:
+			if m.ncap >= len(m.caps) {
+				return simpleLuaPatternMatch{}, false
+			}
+			capStack[m.ncap] = pos
+		case simpleLuaPatternCaptureEnd:
+			m.caps[m.ncap] = [2]int{capStack[m.ncap], pos}
+			m.ncap++
+		}
+	}
+	m.end = pos
+	return m, true
+}
+
+func simpleMatchValues(s string, m simpleLuaPatternMatch) []Value {
+	if m.ncap == 0 {
+		return []Value{StringValue(s[m.start:m.end])}
+	}
+	out := make([]Value, 0, m.ncap)
+	for i := 0; i < m.ncap; i++ {
+		out = append(out, StringValue(s[m.caps[i][0]:m.caps[i][1]]))
+	}
+	return out
+}
+
+func simpleNextPatternSearchStart(s string, start, end int) int {
+	if end != start {
+		return end
+	}
+	if end >= len(s) {
+		return len(s) + 1
+	}
+	return end + 1
+}
 
 type luaPatternFrontier struct {
 	slot  int
