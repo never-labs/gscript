@@ -2104,6 +2104,7 @@ var simpleFormatCache = struct {
 }
 
 var simpleFormatFastCache [simpleFormatFastCacheSize]atomic.Pointer[simpleFormatProgram]
+var simpleFormatPtrFastCache [simpleFormatFastCacheSize]atomic.Pointer[simpleFormatProgram]
 
 func cachedSimpleFormat(formatStr string) (*simpleFormatProgram, bool, error) {
 	if prog := lookupSimpleFormatFast(formatStr); prog != nil {
@@ -2144,9 +2145,15 @@ func cachedSimpleFormat(formatStr string) (*simpleFormatProgram, bool, error) {
 }
 
 func lookupSimpleFormatFast(formatStr string) *simpleFormatProgram {
-	slot := simpleFormatFastSlot(formatStr)
-	prog := simpleFormatFastCache[slot].Load()
+	ptrSlot := simpleFormatPtrFastSlot(formatStr)
+	prog := simpleFormatPtrFastCache[ptrSlot].Load()
 	if prog != nil && prog.formatStr == formatStr {
+		return prog
+	}
+	slot := simpleFormatFastSlot(formatStr)
+	prog = simpleFormatFastCache[slot].Load()
+	if prog != nil && prog.formatStr == formatStr {
+		simpleFormatPtrFastCache[ptrSlot].Store(prog)
 		return prog
 	}
 	return nil
@@ -2157,6 +2164,11 @@ func storeSimpleFormatFast(formatStr string, prog *simpleFormatProgram) {
 		return
 	}
 	simpleFormatFastCache[simpleFormatFastSlot(formatStr)].Store(prog)
+	simpleFormatPtrFastCache[simpleFormatPtrFastSlot(formatStr)].Store(prog)
+}
+
+func simpleFormatPtrFastSlot(s string) uint64 {
+	return uint64((stringDataPtr(s) >> 4) ^ uintptr(len(s))) & (simpleFormatFastCacheSize - 1)
 }
 
 func simpleFormatFastSlot(s string) uint64 {
