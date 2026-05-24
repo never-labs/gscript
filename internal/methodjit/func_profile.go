@@ -384,6 +384,8 @@ func shouldStayTier0StdlibFieldCallLoop(proto *vm.FuncProto, profile FuncProfile
 	}
 	inLoop := staticLoopPCs(proto)
 	count := 0
+	hostModuleCount := 0
+	seenHostModules := make(map[string]struct{}, 8)
 	for pc, inst := range proto.Code {
 		if !inLoop[pc] || vm.DecodeOp(inst) != vm.OP_CALL {
 			continue
@@ -391,46 +393,68 @@ func shouldStayTier0StdlibFieldCallLoop(proto *vm.FuncProto, profile FuncProfile
 		if isStdlibFieldCalleeCall(proto, pc, vm.DecodeA(inst)) {
 			count++
 		}
+		if module, ok := stdlibFieldCalleeModule(proto, pc, vm.DecodeA(inst)); ok && isHostStdlibModule(module) {
+			if _, seen := seenHostModules[module]; !seen {
+				seenHostModules[module] = struct{}{}
+				hostModuleCount++
+			}
+		}
 	}
-	return count >= 6
+	return count >= 6 || (hostModuleCount >= 4 && profile.CallCount >= 16)
 }
 
 func isStdlibFieldCalleeCall(proto *vm.FuncProto, callPC, targetReg int) bool {
-	if proto == nil {
+	module, ok := stdlibFieldCalleeModule(proto, callPC, targetReg)
+	if !ok {
 		return false
+	}
+	switch module {
+	case "bit32", "utf8":
+		return true
+	}
+	return false
+}
+
+func stdlibFieldCalleeModule(proto *vm.FuncProto, callPC, targetReg int) (string, bool) {
+	if proto == nil {
+		return "", false
 	}
 	for pc := callPC - 1; pc >= 0; pc-- {
 		inst := proto.Code[pc]
 		op := vm.DecodeOp(inst)
 		a := vm.DecodeA(inst)
 		if op == vm.OP_GETFIELD && a == targetReg {
-			return getFieldReceiverIsStdlibGlobal(proto, pc, vm.DecodeB(inst))
+			return getFieldReceiverGlobal(proto, pc, vm.DecodeB(inst))
 		}
 		if op != vm.OP_GETFIELD && op != vm.OP_GETGLOBAL && a == targetReg {
-			return false
+			return "", false
 		}
 	}
-	return false
+	return "", false
 }
 
-func getFieldReceiverIsStdlibGlobal(proto *vm.FuncProto, beforePC, receiverReg int) bool {
+func getFieldReceiverGlobal(proto *vm.FuncProto, beforePC, receiverReg int) (string, bool) {
 	for pc := beforePC - 1; pc >= 0; pc-- {
 		inst := proto.Code[pc]
 		op := vm.DecodeOp(inst)
 		a := vm.DecodeA(inst)
 		if op == vm.OP_GETGLOBAL && a == receiverReg {
-			name := protoConstString(proto, vm.DecodeBx(inst))
-			switch name {
-			case "bit32", "utf8":
-				return true
-			}
-			return false
+			return protoConstString(proto, vm.DecodeBx(inst)), true
 		}
 		if op != vm.OP_GETGLOBAL && a == receiverReg {
-			return false
+			return "", false
 		}
 	}
-	return false
+	return "", false
+}
+
+func isHostStdlibModule(name string) bool {
+	switch name {
+	case "json", "csv", "base64", "url", "time", "os", "regexp", "compress":
+		return true
+	default:
+		return false
+	}
 }
 
 func hasStringSplitScalarFusionCandidate(proto *vm.FuncProto) bool {
