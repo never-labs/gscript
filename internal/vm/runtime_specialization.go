@@ -27,6 +27,7 @@ const (
 	runtimeSpecializationInsertRemoveChecksum
 	runtimeSpecializationTablePipelineChecksum
 	runtimeSpecializationStdlibHostDriver
+	runtimeSpecializationRegexpRandomDriver
 	runtimeSpecializationCount
 )
 
@@ -333,6 +334,19 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isStdlibHostDriverProto,
 		},
 		Run: (*VM).runStdlibHostDriverRuntimeSpecialization,
+	},
+	runtimeSpecializationRegexpRandomDriver: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "regexp_random_driver",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isRegexpRandomDriverProto,
+		},
+		Run: (*VM).runRegexpRandomDriverRuntimeSpecialization,
 	},
 }
 
