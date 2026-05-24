@@ -11,6 +11,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/gscript/gscript/internal/runtime"
 	"github.com/gscript/gscript/internal/vm"
 )
 
@@ -108,6 +109,51 @@ func TestSelfCall_ConstantsStrMoved(t *testing.T) {
 			wantRestoreSTRs, normalCallRestoreSTRs)
 	} else {
 		t.Logf("STR X27,[X19,#8] in normal-call restore block: %d/%d ✓", normalCallRestoreSTRs, wantRestoreSTRs)
+	}
+}
+
+func TestTier1VarargModAddOpenReturnRegression(t *testing.T) {
+	src := `
+MOD := 1000000007
+func addmod(a, b, ...) { return (a + b) % MOD }
+func id(x, ...) { return x }
+func run(n, ...) {
+  s := 0
+  for i := 1; i <= n; i++ {
+    s = addmod(s, id(i))
+  }
+  return s
+}
+checksum := run(20000, 1)
+`
+	top := compileTop(t, src)
+	addmod := findProtoByName(top, "addmod")
+	if addmod == nil {
+		t.Fatal("addmod proto not found")
+	}
+	if !isModAddGlobalConstLeaf(addmod) {
+		t.Fatal("addmod should match modular-add global-const leaf shape")
+	}
+	if nativeBLRReplaySafe(addmod) {
+		t.Fatal("declared-vararg addmod must not publish Tier 1 direct-entry BLR")
+	}
+
+	vmOnly := vm.New(runtime.NewInterpreterGlobals())
+	defer vmOnly.Close()
+	if _, err := vmOnly.Execute(top); err != nil {
+		t.Fatalf("VM execute: %v", err)
+	}
+	want := vmOnly.GetGlobal("checksum")
+
+	jitVM := vm.New(runtime.NewInterpreterGlobals())
+	defer jitVM.Close()
+	jitVM.SetMethodJIT(NewTieringManager())
+	if _, err := jitVM.Execute(top); err != nil {
+		t.Fatalf("JIT execute: %v", err)
+	}
+	got := jitVM.GetGlobal("checksum")
+	if got != want {
+		t.Fatalf("checksum mismatch: JIT=%v VM=%v", got, want)
 	}
 }
 

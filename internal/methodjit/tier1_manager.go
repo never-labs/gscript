@@ -81,6 +81,7 @@ type BaselineJITEngine struct {
 	ctxTop          int            // next free index in ctxPool
 	globalCacheGen  uint64         // incremented only when a broad invalidation is required
 	globalCacheRefs map[string][]baselineGlobalCacheRef
+	modAddGlobalIdx map[*vm.FuncProto]int
 	// tierUpThreshold: when > 0, handleCall falls to slow path (callVM.CallValue)
 	// for callees whose CallCount >= this threshold. This allows the TieringManager
 	// to intercept calls and trigger Tier 2 compilation via the VM's TryCompile.
@@ -137,6 +138,7 @@ func NewBaselineJITEngine() *BaselineJITEngine {
 		feedbackOff:     make(map[*vm.FuncProto]bool),
 		osrCounters:     make(map[*vm.FuncProto]int64),
 		globalCacheRefs: make(map[string][]baselineGlobalCacheRef),
+		modAddGlobalIdx: make(map[*vm.FuncProto]int),
 	}
 	// Pre-allocate pool of ExecContexts (heap-allocated, safe for uintptr).
 	const poolSize = 32
@@ -269,7 +271,7 @@ func nativeBLRReplaySafe(proto *vm.FuncProto) bool {
 	if proto == nil {
 		return true
 	}
-	if proto.UsesVarargBytecode {
+	if proto.IsVarArg || proto.UsesVarargBytecode {
 		return false
 	}
 	if baselineHasStaticSelfAndNonSelfCall(proto) {
@@ -638,19 +640,29 @@ func (e *BaselineJITEngine) executeInnerAtPC(compiled interface{}, regs []runtim
 			e.globalCacheGen++
 			ctx.BaselineGlobalCachedGen = e.globalCacheGen
 
-			// Place result in caller's register[A].
+			// Place result in caller's register[A], honoring the original CALL
+			// result arity. Native-call exits can occur before a callee's global
+			// caches are warm, so this path must preserve C=0 open-return top
+			// semantics just like the normal CALL handler.
 			callA := int(ctx.NativeCallA)
 			callC := int(ctx.NativeCallC)
 			absA := base + callA
-			if absA < len(regs) {
+			if callC == 0 {
+				if absA < len(regs) {
+					regs[absA] = result
+				}
+				if e.callVM != nil {
+					e.callVM.SetTop(absA + 1)
+				}
+			} else if callC > 1 && absA < len(regs) {
 				regs[absA] = result
-			}
-			// Fill extra return slots with nil if C > 2.
-			if callC > 2 {
-				for i := 1; i < callC-1; i++ {
-					idx := absA + i
-					if idx < len(regs) {
-						regs[idx] = runtime.NilValue()
+				// Fill extra return slots with nil if C > 2.
+				if callC > 2 {
+					for i := 1; i < callC-1; i++ {
+						idx := absA + i
+						if idx < len(regs) {
+							regs[idx] = runtime.NilValue()
+						}
 					}
 				}
 			}

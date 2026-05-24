@@ -452,6 +452,10 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 		return err
 	}
 
+	if handled := e.tryModAddGlobalConstLeafCall(fnVal, regs, absSlot, nArgs, rawC); handled {
+		return nil
+	}
+
 	if vmCallSiteRuntimeSpecializationArity(nArgs) && fnVal.IsFunction() {
 		argsStart := absSlot + 1
 		argsEnd := argsStart + nArgs
@@ -953,6 +957,70 @@ genericNativePath:
 		}
 	}
 	return nil
+}
+
+func (e *BaselineJITEngine) tryModAddGlobalConstLeafCall(fnVal runtime.Value, regs []runtime.Value, absSlot, nArgs, rawC int) bool {
+	if e == nil || e.callVM == nil || nArgs != 2 || !fnVal.IsFunction() || absSlot+2 >= len(regs) {
+		return false
+	}
+	cl, ok := vmClosureFromValue(fnVal)
+	if !ok || cl == nil || cl.Proto == nil || !isModAddGlobalConstLeaf(cl.Proto) {
+		return false
+	}
+	a := regs[absSlot+1]
+	b := regs[absSlot+2]
+	if !a.IsInt() || !b.IsInt() {
+		return false
+	}
+	modName := cl.Proto.Constants[0]
+	if !modName.IsString() {
+		return false
+	}
+	mod, ok := e.modAddGlobal(cl.Proto, modName.Str())
+	if !ok {
+		return false
+	}
+	if !mod.IsInt() || mod.Int() == 0 {
+		return false
+	}
+	result := runtime.IntValue((a.Int() + b.Int()) % mod.Int())
+	e.storeSingleCallResult(absSlot, rawC, result)
+	return true
+}
+
+func (e *BaselineJITEngine) modAddGlobal(proto *vm.FuncProto, name string) (runtime.Value, bool) {
+	if idx, ok := e.modAddGlobalIdx[proto]; ok {
+		if v, ok := e.callVM.GetGlobalByIndex(idx); ok {
+			return v, true
+		}
+	}
+	if idx, ok := e.callVM.GlobalIndex(name); ok {
+		e.modAddGlobalIdx[proto] = idx
+		if v, ok := e.callVM.GetGlobalByIndex(idx); ok {
+			return v, true
+		}
+	}
+	return e.callVM.GetGlobal(name), true
+}
+
+func isModAddGlobalConstLeaf(proto *vm.FuncProto) bool {
+	if proto == nil || proto.NumParams != 2 || len(proto.Code) != 4 || len(proto.Constants) != 1 {
+		return false
+	}
+	return vm.DecodeOp(proto.Code[0]) == vm.OP_ADD &&
+		vm.DecodeA(proto.Code[0]) == 3 &&
+		vm.DecodeB(proto.Code[0]) == 0 &&
+		vm.DecodeC(proto.Code[0]) == 1 &&
+		vm.DecodeOp(proto.Code[1]) == vm.OP_GETGLOBAL &&
+		vm.DecodeA(proto.Code[1]) == 4 &&
+		vm.DecodeBx(proto.Code[1]) == 0 &&
+		vm.DecodeOp(proto.Code[2]) == vm.OP_MOD &&
+		vm.DecodeA(proto.Code[2]) == 2 &&
+		vm.DecodeB(proto.Code[2]) == 3 &&
+		vm.DecodeC(proto.Code[2]) == 4 &&
+		vm.DecodeOp(proto.Code[3]) == vm.OP_RETURN &&
+		vm.DecodeA(proto.Code[3]) == 2 &&
+		vm.DecodeB(proto.Code[3]) == 2
 }
 
 func (e *BaselineJITEngine) executeCompiledTier2Call(compiled interface{}, cl *vm.Closure, regs []runtime.Value, base int, callerProto *vm.FuncProto, absSlot, nArgs, rawC int) error {
