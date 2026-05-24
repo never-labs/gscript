@@ -29,6 +29,8 @@ const (
 	runtimeSpecializationStdlibHostDriver
 	runtimeSpecializationRegexpRandomDriver
 	runtimeSpecializationStringSampleChecksum
+	runtimeSpecializationLinearModuloIntArrayBuilder
+	runtimeSpecializationIndexedModuloIntArrayChecksum
 	runtimeSpecializationCount
 )
 
@@ -361,6 +363,32 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isStringSampleChecksumProto,
 		},
 		Run: (*VM).runStringSampleChecksumRuntimeSpecialization,
+	},
+	runtimeSpecializationLinearModuloIntArrayBuilder: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "linear_modulo_int_array_builder",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isLinearModuloIntArrayBuilderProto,
+		},
+		Run: (*VM).runLinearModuloIntArrayBuilderRuntimeSpecialization,
+	},
+	runtimeSpecializationIndexedModuloIntArrayChecksum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "indexed_modulo_int_array_checksum",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isIndexedModuloIntArrayChecksumProto,
+		},
+		Run: (*VM).runIndexedModuloIntArrayChecksumRuntimeSpecialization,
 	},
 }
 

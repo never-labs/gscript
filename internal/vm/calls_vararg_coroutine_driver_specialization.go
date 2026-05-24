@@ -69,30 +69,40 @@ func (vm *VM) runCallsVarargCoroutineDriverRuntimeSpecialization(cl *Closure, ar
 	mod := modVal.RawInt()
 	checksum := int64(0)
 	captured := modInt64(spec.seed, mod)
+	adjusted := spec.adjusted
+	vararg := spec.vararg
+	worker := spec.worker
 	for i := int64(1); i <= nCalls; i++ {
-		checksum = modInt64(checksum+spec.adjusted.eval(i, mod), mod)
-		checksum = modInt64(checksum+spec.vararg.eval(i, mod), mod)
-		workerValue, nextCaptured := spec.worker.eval(captured, mod, i, i+1, i+2, i+3, i+4)
+		adjustedValue := (i*adjusted.scales[0] +
+			(i+adjusted.offsets[0])*adjusted.scales[1] +
+			(i+adjusted.offsets[1])*adjusted.scales[2] +
+			(i+adjusted.offsets[2])*adjusted.scales[3] +
+			i*adjusted.scales[4]) % mod
+		checksum = (checksum + adjustedValue) % mod
+
+		varargValue := (i +
+			4*vararg.countScale +
+			(i+1)*vararg.scales[0] +
+			(i+2)*vararg.scales[1] +
+			(i+3)*vararg.scales[2] +
+			(i+4)*vararg.scales[3] +
+			(i+4)*vararg.scales[4]) % mod
+		checksum = (checksum + varargValue) % mod
+
+		a := i + captured
+		b := a + worker.argOffsets[0]
+		c := a + worker.argOffsets[1]
+		v := (a +
+			(i+1)*worker.valueScales[0] +
+			(i+2)*worker.valueScales[1] +
+			(i+3)*worker.valueScales[2] +
+			(i+4)*worker.valueScales[3]) % mod
+		nextCaptured := (captured + b + c + worker.captureBias) % mod
 		captured = nextCaptured
-		checksum = modInt64(checksum+workerValue, mod)
+		checksum = (checksum + (v+nextCaptured)%mod) % mod
 	}
-	total := int64(0)
-	for i := int64(1); i <= nCoro-1; i++ {
-		step := modInt64(i, spec.pipeline.stepModulo)
-		workerValue, nextCaptured := spec.worker.eval(
-			captured,
-			mod,
-			i+step,
-			i+spec.pipeline.argOffsets[0],
-			i+spec.pipeline.argOffsets[1],
-			i+spec.pipeline.argOffsets[2],
-			step,
-		)
-		captured = nextCaptured
-		_ = modInt64(spec.pipeline.start+workerValue+step, mod)
-		total = modInt64(total+i*spec.pipeline.totalScale, mod)
-	}
-	checksum = modInt64(checksum+total, mod)
+	total := moduloArithmeticSeries(spec.pipeline.totalScale, nCoro-1, mod)
+	checksum = (checksum + total) % mod
 	return true, []runtime.Value{runtime.IntValue(checksum)}, nil
 }
 
@@ -348,4 +358,15 @@ func modInt64(v, m int64) int64 {
 		r += m
 	}
 	return r
+}
+
+func moduloArithmeticSeries(scale, n, mod int64) int64 {
+	if n <= 0 {
+		return 0
+	}
+	total := int64(0)
+	for i := int64(1); i <= n; i++ {
+		total = (total + i*scale) % mod
+	}
+	return total
 }
