@@ -24,7 +24,7 @@ const (
 	fixedTableCacheRefillBatch    = 8192
 	newTableCacheMaxBatch         = 512
 	newTableCacheTargetBytes      = 4 << 20
-	newTableCacheLargeTargetBytes = 8 << 20
+	newTableCacheLargeTargetBytes = 16 << 20
 	newTableCacheLargeArrayHint   = 64 * 1024
 	mixedArraySparsePayloadValues = 1025
 )
