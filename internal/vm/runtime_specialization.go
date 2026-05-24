@@ -16,6 +16,8 @@ const (
 	runtimeSpecializationRecordWalkFold
 	runtimeSpecializationBoolTableMarkCount
 	runtimeSpecializationAffineModuloIntLeaf
+	runtimeSpecializationTableAffineUpdateModuloLeaf
+	runtimeSpecializationCallableLenPairsDriver
 	runtimeSpecializationCount
 )
 
@@ -179,6 +181,32 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isAffineModuloIntLeafProto,
 		},
 		Run: (*VM).runAffineModuloIntLeafRuntimeSpecialization,
+	},
+	runtimeSpecializationTableAffineUpdateModuloLeaf: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "table_affine_update_modulo_leaf",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         3,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isTableAffineUpdateModuloLeafProto,
+		},
+		Run: (*VM).runTableAffineUpdateModuloLeafRuntimeSpecialization,
+	},
+	runtimeSpecializationCallableLenPairsDriver: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "callable_len_pairs_driver",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isCallableLenPairsDriverProto,
+		},
+		Run: (*VM).runCallableLenPairsDriverRuntimeSpecialization,
 	},
 }
 

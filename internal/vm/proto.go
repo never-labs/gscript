@@ -41,6 +41,7 @@ type FuncProto struct {
 	SpectralRuntimeSpecialization         *spectralRuntimeSpecializationCache         // guarded runtime-generated spectral call-site runtime specialization cache
 	RecordWalkFoldSpecialization          *recordWalkFoldSpecializationCache          // guarded runtime-generated record walk/fold specialization cache
 	BoolTableMarkCountSpecialization      *boolTableMarkCountSpecializationCache      // guarded runtime-generated bool table mark-count specialization cache
+	TableAffineUpdateModuloSpecialization *tableAffineUpdateModuloLeafCache           // guarded runtime-generated table affine update modulo cache
 	RecordPairwiseNumericSpecialization   *recordPairwiseNumericSpecializationCache   // guarded runtime-generated pairwise record numeric specialization cache
 	GenericRecordArrayLoopSpecialization  *genericRecordArrayLoopSpecializationCache  // guarded runtime-generated scalar record-array loop cache
 	RecursiveTableSpecialization          *recursiveTableSpecializationCache          // guarded runtime recursive table builder/fold specialization cache

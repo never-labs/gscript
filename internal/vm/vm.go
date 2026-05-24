@@ -4456,6 +4456,29 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					if cl, ok := closureFromValue(callMM); ok {
 						proto := cl.Proto
 						mmArgs := nArgs + 1
+						if callSiteRuntimeSpecializationArity(mmArgs) {
+							var local [4]runtime.Value
+							var specArgs []runtime.Value
+							if mmArgs <= len(local) {
+								specArgs = local[:mmArgs]
+							} else {
+								specArgs = make([]runtime.Value, mmArgs)
+							}
+							specArgs[0] = fnVal
+							srcStart := base + a + 1
+							for i := 0; i < nArgs; i++ {
+								specArgs[i+1] = vm.regs[srcStart+i]
+							}
+							handled, results, err := vm.tryRunNonRecursiveTableValueRuntimeSpecialization(cl, specArgs)
+							if handled {
+								if err != nil {
+									return nil, wrapLineErr(frame, err)
+								}
+								vm.writeCallResults(base+a, c, results)
+								observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
+								break
+							}
+						}
 						if !proto.IsVarArg || mmArgs <= proto.NumParams {
 							newBase := base + frame.closure.Proto.MaxStack
 							if vm.top > newBase {
