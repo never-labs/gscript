@@ -137,8 +137,9 @@ func (ec *emitContext) emitTableShapeID(instr *Instr) {
 		asm.CBZ(jit.X0, deoptLabel)
 		ec.tableVerified[tblID] = true
 	}
-	asm.LDRW(jit.X0, jit.X0, jit.TableOffShapeID)
-	ec.storeRawInt(jit.X0, instr.ID)
+	asm.LDRW(jit.X3, jit.X0, jit.TableOffShapeID)
+	ec.storeRawTablePtr(jit.X0, tblID)
+	ec.storeRawInt(jit.X3, instr.ID)
 	asm.B(doneLabel)
 
 	asm.Label(deoptLabel)
