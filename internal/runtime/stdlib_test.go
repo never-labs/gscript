@@ -650,6 +650,8 @@ func TestMathUnaryFloatFastPaths(t *testing.T) {
 		in   Value
 		want float64
 	}{
+		"abs":  {FloatValue(-10.5), 10.5},
+		"ceil": {FloatValue(3.1), 4},
 		"sqrt": {FloatValue(16), 4},
 		"sin":  {FloatValue(0), 0},
 		"cos":  {FloatValue(0), 1},
@@ -700,6 +702,8 @@ func TestMathBinaryFastPaths(t *testing.T) {
 		"floorDiv": {IntValue(7), IntValue(3), IntValue(2)},
 		"fmod":     {IntValue(10), IntValue(3), IntValue(1)},
 		"ult":      {IntValue(3), IntValue(4), BoolValue(true)},
+		"max":      {IntValue(3), IntValue(9), IntValue(9)},
+		"min":      {FloatValue(3.2), FloatValue(-9.2), FloatValue(-9.2)},
 	}
 	for name, tc := range cases {
 		v := mathLib.RawGetString(name)

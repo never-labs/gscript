@@ -52,15 +52,20 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.abs'")
 		}
-		if args[0].IsInt() {
-			v := args[0].Int()
-			if v < 0 {
-				v = -v
-			}
-			return []Value{IntValue(v)}, nil
-		}
-		return []Value{FloatValue(math.Abs(toFloat(args[0])))}, nil
+		return []Value{mathAbsValue(args[0])}, nil
 	})
+	if v := t.RawGetString("abs"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = func(arg Value) (Value, error) {
+			return mathAbsValue(arg), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.abs'")
+			}
+			return mathAbsValue(args[0]), nil
+		}
+	}
 
 	// math.ceil(x) -> int
 	set("ceil", func(args []Value) ([]Value, error) {
@@ -69,6 +74,18 @@ func buildMathLib() *Table {
 		}
 		return []Value{mathCeilValue(args[0])}, nil
 	})
+	if v := t.RawGetString("ceil"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = func(arg Value) (Value, error) {
+			return mathCeilValue(arg), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.ceil'")
+			}
+			return mathCeilValue(args[0]), nil
+		}
+	}
 
 	// math.floor(x) -> int
 	set("floor", func(args []Value) ([]Value, error) {
@@ -211,30 +228,40 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.max'")
 		}
-		best := args[0]
-		for _, v := range args[1:] {
-			lt, ok := best.LessThan(v)
-			if ok && lt {
-				best = v
-			}
-		}
-		return []Value{best}, nil
+		return []Value{mathMaxValue(args)}, nil
 	})
+	if v := t.RawGetString("max"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg2 = func(a, b Value) (Value, error) {
+			return mathMax2Value(a, b), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.max'")
+			}
+			return mathMaxValue(args), nil
+		}
+	}
 
 	// math.min(x, ...)
 	set("min", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.min'")
 		}
-		best := args[0]
-		for _, v := range args[1:] {
-			lt, ok := v.LessThan(best)
-			if ok && lt {
-				best = v
-			}
-		}
-		return []Value{best}, nil
+		return []Value{mathMinValue(args)}, nil
 	})
+	if v := t.RawGetString("min"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg2 = func(a, b Value) (Value, error) {
+			return mathMin2Value(a, b), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.min'")
+			}
+			return mathMinValue(args), nil
+		}
+	}
 
 	// math.fmod(x, y)
 	set("fmod", func(args []Value) ([]Value, error) {
@@ -522,6 +549,49 @@ func mathFmodValue(a, b Value) (Value, error) {
 
 func mathToIntegerValue(v Value) Value {
 	return ToIntegerValue(v)
+}
+
+func mathAbsValue(arg Value) Value {
+	if arg.IsInt() {
+		v := arg.Int()
+		if v < 0 {
+			v = -v
+		}
+		return IntValue(v)
+	}
+	return FloatValue(math.Abs(toFloat(arg)))
+}
+
+func mathMaxValue(args []Value) Value {
+	best := args[0]
+	for _, v := range args[1:] {
+		best = mathMax2Value(best, v)
+	}
+	return best
+}
+
+func mathMax2Value(a, b Value) Value {
+	lt, ok := a.LessThan(b)
+	if ok && lt {
+		return b
+	}
+	return a
+}
+
+func mathMinValue(args []Value) Value {
+	best := args[0]
+	for _, v := range args[1:] {
+		best = mathMin2Value(best, v)
+	}
+	return best
+}
+
+func mathMin2Value(a, b Value) Value {
+	lt, ok := a.LessThan(b)
+	if ok && lt {
+		return a
+	}
+	return b
 }
 
 // ToIntegerValue converts a numeric or numeric-string value to an exact integer,
