@@ -110,16 +110,19 @@ func buildTableLib() *Table {
 			j = toInt(args[3])
 		}
 
-		parts := make([]string, 0, j-i+1)
+		var b strings.Builder
 		for k := i; k <= j; k++ {
 			v := tbl.RawGet(IntValue(k))
 			s, ok := ConcatOperandString(v)
 			if !ok {
 				return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
 			}
-			parts = append(parts, s)
+			if k > i {
+				b.WriteString(sep)
+			}
+			b.WriteString(s)
 		}
-		return []Value{StringValue(strings.Join(parts, sep))}, nil
+		return []Value{StringValue(b.String())}, nil
 	})
 
 	// table.sort(t [, comp])

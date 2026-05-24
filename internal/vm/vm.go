@@ -1832,10 +1832,7 @@ func (vm *VM) RegisterTableProxyLib() {
 			if len(args) >= 4 {
 				j = vmToInt(args[3])
 			}
-			parts := make([]string, 0)
-			if j >= i {
-				parts = make([]string, 0, j-i+1)
-			}
+			var b strings.Builder
 			for k := i; k <= j; k++ {
 				v, err := vm.tableGet(t, runtime.IntValue(k))
 				if err != nil {
@@ -1845,9 +1842,12 @@ func (vm *VM) RegisterTableProxyLib() {
 				if !ok {
 					return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
 				}
-				parts = append(parts, s)
+				if k > i {
+					b.WriteString(sep)
+				}
+				b.WriteString(s)
 			}
-			return []runtime.Value{runtime.StringValue(strings.Join(parts, sep))}, nil
+			return []runtime.Value{runtime.StringValue(b.String())}, nil
 		},
 	}))
 	tableUnpack := func(name string, args []runtime.Value) ([]runtime.Value, error) {
