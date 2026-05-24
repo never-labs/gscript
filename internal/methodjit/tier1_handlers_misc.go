@@ -265,10 +265,18 @@ func (e *BaselineJITEngine) handleVararg(ctx *ExecContext, regs []runtime.Value,
 						if gf := regs[absSlot].GoFunction(); gf != nil &&
 							gf.NativeKind == runtime.NativeKindStdSelect &&
 							gf.NativeData == runtime.StdSelectIdentityPtr() {
-							if err := e.callVM.ExecuteStdSelectVarargCall(absSlot, vm.DecodeC(next), regs[absSlot+1], varargs, gf); err != nil {
+							if ok, err := tier1ExecuteStdSelectVarargFast(regs, absSlot, vm.DecodeC(next), regs[absSlot+1], varargs, gf); err != nil {
+								return err
+							} else if !ok {
+								if err := e.callVM.ExecuteStdSelectVarargCall(absSlot, vm.DecodeC(next), regs[absSlot+1], varargs, gf); err != nil {
+									return err
+								}
+							}
+							resumePC, err := e.foldStdSelectVarargCluster(regs, base, proto, pc+2, varargs, pc+2, regs[absSlot], gf)
+							if err != nil {
 								return err
 							}
-							ctx.BaselinePC++
+							ctx.BaselinePC = int64(resumePC)
 							return nil
 						}
 					}
@@ -302,6 +310,102 @@ func (e *BaselineJITEngine) handleVararg(ctx *ExecContext, regs []runtime.Value,
 		}
 	}
 	return nil
+}
+
+func (e *BaselineJITEngine) foldStdSelectVarargCluster(regs []runtime.Value, base int, proto *vm.FuncProto, startPC int, varargs []runtime.Value, fallbackPC int, selectFn runtime.Value, gf *runtime.GoFunction) (int, error) {
+	if e.callVM == nil || proto == nil || startPC >= len(proto.Code) || gf == nil {
+		return fallbackPC, nil
+	}
+	pc := startPC
+	for pc+3 < len(proto.Code) {
+		getInst := proto.Code[pc]
+		selInst := proto.Code[pc+1]
+		varInst := proto.Code[pc+2]
+		callInst := proto.Code[pc+3]
+		if vm.DecodeOp(getInst) != vm.OP_GETGLOBAL ||
+			vm.DecodeOp(varInst) != vm.OP_VARARG ||
+			vm.DecodeOp(callInst) != vm.OP_CALL ||
+			vm.DecodeB(varInst) != 0 ||
+			vm.DecodeB(callInst) != 0 {
+			break
+		}
+		callA := vm.DecodeA(callInst)
+		if vm.DecodeA(getInst) != callA || vm.DecodeA(selInst) != callA+1 || vm.DecodeA(varInst) != callA+2 {
+			break
+		}
+		nameK := vm.DecodeBx(getInst)
+		if nameK >= len(proto.Constants) || !proto.Constants[nameK].IsString() || proto.Constants[nameK].Str() != "select" {
+			break
+		}
+		selector, ok := tier1ConstSelector(proto, selInst)
+		if !ok {
+			break
+		}
+		absSlot := base + callA
+		if absSlot+1 >= len(regs) {
+			break
+		}
+		regs[absSlot] = selectFn
+		regs[absSlot+1] = selector
+		if ok, err := tier1ExecuteStdSelectVarargFast(regs, absSlot, vm.DecodeC(callInst), selector, varargs, gf); err != nil {
+			return pc, err
+		} else if !ok {
+			if err := e.callVM.ExecuteStdSelectVarargCall(absSlot, vm.DecodeC(callInst), selector, varargs, gf); err != nil {
+				return pc, err
+			}
+		}
+		pc += 4
+	}
+	return pc, nil
+}
+
+func tier1ConstSelector(proto *vm.FuncProto, inst uint32) (runtime.Value, bool) {
+	switch vm.DecodeOp(inst) {
+	case vm.OP_LOADINT:
+		return runtime.IntValue(int64(vm.DecodesBx(inst))), true
+	case vm.OP_LOADK:
+		bx := vm.DecodeBx(inst)
+		if bx >= len(proto.Constants) {
+			return runtime.NilValue(), false
+		}
+		return proto.Constants[bx], true
+	default:
+		return runtime.NilValue(), false
+	}
+}
+
+func tier1ExecuteStdSelectVarargFast(regs []runtime.Value, absSlot, rawC int, selector runtime.Value, varargs []runtime.Value, gf *runtime.GoFunction) (bool, error) {
+	if rawC != 2 || gf == nil {
+		return false, nil
+	}
+	if selector.IsString() && selector.Str() == "#" {
+		runtime.RecordRuntimePathNativeCallFastFor(gf)
+		if absSlot < len(regs) {
+			regs[absSlot] = runtime.IntValue(int64(len(varargs)))
+		}
+		return true, nil
+	}
+	if selector.RawType() != runtime.TypeInt {
+		return false, nil
+	}
+	idx := int(selector.RawInt())
+	argCount := len(varargs) + 1
+	if idx < 0 {
+		idx = argCount + idx
+	}
+	if idx < 1 {
+		return true, fmt.Errorf("bad argument #1 to 'select' (index out of range)")
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(gf)
+	if absSlot >= len(regs) {
+		return true, nil
+	}
+	if idx > len(varargs) {
+		regs[absSlot] = runtime.NilValue()
+	} else {
+		regs[absSlot] = varargs[idx-1]
+	}
+	return true, nil
 }
 
 // handleTForCall handles OP_TFORCALL exit.
