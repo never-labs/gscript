@@ -179,6 +179,26 @@ func (vm *VM) PushFrameWithVarargs(cl *Closure, base int, varargs []runtime.Valu
 	return true
 }
 
+// PushFrameWithBorrowedVarargs pushes a frame whose varargs borrow a caller
+// register window. It is intended for synchronous JIT fast calls where the
+// caller frame remains alive until this frame is popped. Generic interpreter
+// calls still copy varargs so vararg state is independent of register reuse.
+func (vm *VM) PushFrameWithBorrowedVarargs(cl *Closure, base int, varargs []runtime.Value) bool {
+	if !vm.ensureFrameSlot() {
+		return false
+	}
+	frame := &vm.frames[vm.frameCount]
+	frame.closure = cl
+	frame.pc = 0
+	frame.base = base
+	frame.numResults = -1
+	frame.varargs = varargs
+	frame.callSitePC = -1
+	frame.defers = nil
+	vm.frameCount++
+	return true
+}
+
 func (vm *VM) ensureFrameSlot() bool {
 	if vm.frameCount < len(vm.frames) {
 		return true

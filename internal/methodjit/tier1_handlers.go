@@ -516,7 +516,7 @@ func (e *BaselineJITEngine) handleCall(ctx *ExecContext, regs []runtime.Value, b
 
 				// Push a VM frame so CurrentClosure()/CurrentVarargs() return
 				// the callee state and CloseUpvalues works correctly on return.
-				if !e.callVM.PushFrameWithVarargs(cl, calleeBase, varargs) {
+				if !e.callVM.PushFrameWithBorrowedVarargs(cl, calleeBase, varargs) {
 					// Stack overflow — fall through to generic path.
 					goto slowPath
 				}
