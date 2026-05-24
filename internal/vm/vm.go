@@ -850,6 +850,122 @@ func (vm *VM) storeStdSelectResults(absSlot, rawC int, results []runtime.Value) 
 	}
 }
 
+func (vm *VM) storeFixedFastCallResult(absSlot, rawC int, r0, r1 runtime.Value, n int) {
+	if rawC == 0 {
+		switch {
+		case n <= 0:
+			vm.top = absSlot
+		case n == 1:
+			vm.regs[absSlot] = r0
+			vm.top = absSlot + 1
+		default:
+			vm.regs[absSlot] = r0
+			vm.regs[absSlot+1] = r1
+			vm.top = absSlot + 2
+		}
+		return
+	}
+	nr := rawC - 1
+	if nr <= 0 {
+		return
+	}
+	if n >= 1 {
+		vm.regs[absSlot] = r0
+	} else {
+		vm.regs[absSlot] = runtime.NilValue()
+	}
+	if nr <= 1 {
+		return
+	}
+	if n >= 2 {
+		vm.regs[absSlot+1] = r1
+	} else {
+		vm.regs[absSlot+1] = runtime.NilValue()
+	}
+	for i := 2; i < nr; i++ {
+		vm.regs[absSlot+i] = runtime.NilValue()
+	}
+}
+
+func (vm *VM) executeDirectGoFunctionFastCall(gf *runtime.GoFunction, absSlot, nArgs, rawC int) (bool, error) {
+	if gf == nil || nArgs < 1 || nArgs > 8 || absSlot+nArgs >= len(vm.regs) {
+		return false, nil
+	}
+	if nArgs == 7 {
+		return false, nil
+	}
+	hasFastPath := (nArgs == 1 && (gf.FastArg1Ret2 != nil || gf.FastArg1 != nil)) ||
+		(nArgs == 2 && (gf.FastArg2Ret2 != nil || gf.FastArg2 != nil)) ||
+		(nArgs == 3 && gf.FastArg3 != nil) ||
+		(nArgs == 4 && gf.FastArg4 != nil) ||
+		(nArgs == 5 && gf.FastArg5 != nil) ||
+		(nArgs == 6 && gf.FastArg6 != nil) ||
+		(nArgs == 8 && gf.FastArg8 != nil)
+	if !hasFastPath {
+		return false, nil
+	}
+	var err error
+	if err = vm.emitDebugHook("call", "native", gf.Name, runtime.NilValue()); err != nil {
+		return true, err
+	}
+	a0 := vm.regs[absSlot+1]
+	r0, r1 := runtime.NilValue(), runtime.NilValue()
+	n := 1
+	switch nArgs {
+	case 1:
+		if gf.FastArg1Ret2 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, r1, n, err = gf.FastArg1Ret2(a0)
+		} else if gf.FastArg1 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg1(a0)
+		}
+	case 2:
+		a1 := vm.regs[absSlot+2]
+		if gf.FastArg2Ret2 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, r1, n, err = gf.FastArg2Ret2(a0, a1)
+		} else if gf.FastArg2 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg2(a0, a1)
+		}
+	case 3:
+		if gf.FastArg3 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg3(a0, vm.regs[absSlot+2], vm.regs[absSlot+3])
+		}
+	case 4:
+		if gf.FastArg4 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg4(a0, vm.regs[absSlot+2], vm.regs[absSlot+3], vm.regs[absSlot+4])
+		}
+	case 5:
+		if gf.FastArg5 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg5(a0, vm.regs[absSlot+2], vm.regs[absSlot+3], vm.regs[absSlot+4], vm.regs[absSlot+5])
+		}
+	case 6:
+		if gf.FastArg6 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg6(a0, vm.regs[absSlot+2], vm.regs[absSlot+3], vm.regs[absSlot+4], vm.regs[absSlot+5], vm.regs[absSlot+6])
+		}
+	case 8:
+		if gf.FastArg8 != nil {
+			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			r0, err = gf.FastArg8(a0, vm.regs[absSlot+2], vm.regs[absSlot+3], vm.regs[absSlot+4], vm.regs[absSlot+5], vm.regs[absSlot+6], vm.regs[absSlot+7], vm.regs[absSlot+8])
+		}
+	}
+	if err != nil {
+		_ = vm.emitDebugHook("error", "native", gf.Name, runtime.StringValue(err.Error()))
+		return true, err
+	}
+	if err = vm.emitDebugHook("return", "native", gf.Name, runtime.NilValue()); err != nil {
+		return true, err
+	}
+	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)
+	return true, nil
+}
+
 // ExecuteStdIPairsCall handles the standard multi-return ipairs setup without
 // routing through the generic GoFunction adapter.
 func (vm *VM) ExecuteStdIPairsCall(absSlot, nArgs, rawC int) (bool, error) {
@@ -4536,6 +4652,13 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						}
 					}
 					if handledSpecial {
+						break
+					}
+					if handled, err := vm.executeDirectGoFunctionFastCall(gf, base+a, nArgs, c); handled {
+						if err != nil {
+							return nil, wrapLineErr(frame, err)
+						}
+						observeCallResultFixed(callerProto, callPC, vm.regs, base+a, c)
 						break
 					}
 					var args []runtime.Value
