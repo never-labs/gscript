@@ -49,12 +49,26 @@ func (e *BaselineJITEngine) handleLen(ctx *ExecContext, regs []runtime.Value, ba
 		return nil
 	}
 	v := regs[absB]
-	if v.IsTable() {
-		regs[absA] = runtime.IntValue(int64(v.Table().Len()))
-	} else if v.IsString() {
-		regs[absA] = runtime.IntValue(int64(runtime.StringLen(v)))
+	if e.callVM != nil {
+		var cache *runtime.FieldCacheEntry
+		pc := int(ctx.BaselinePC) - 1
+		if proto != nil && pc >= 0 && pc < len(proto.Code) {
+			ensureFieldCache(proto)
+			cache = &proto.FieldCache[pc]
+		}
+		result, err := e.callVM.LengthForJIT(v, cache)
+		if err != nil {
+			return err
+		}
+		regs[absA] = result
 	} else {
-		regs[absA] = runtime.IntValue(0)
+		if v.IsTable() {
+			regs[absA] = runtime.IntValue(int64(v.Table().Len()))
+		} else if v.IsString() {
+			regs[absA] = runtime.IntValue(int64(runtime.StringLen(v)))
+		} else {
+			regs[absA] = runtime.IntValue(0)
+		}
 	}
 	if proto != nil && proto.Feedback != nil {
 		pc := int(ctx.BaselinePC) - 1
