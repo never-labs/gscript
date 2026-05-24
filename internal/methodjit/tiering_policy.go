@@ -140,6 +140,15 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 	if shouldStayTier0SmallDynamicLeaf(proto, profile) {
 		return tier0PolicyDecision("Tier0SmallDynamicLeaf", "stay_tier0_small_dynamic_leaf", "jit_disabled")
 	}
+	if shouldStayTier0ReadonlyTableArithLeaf(proto, profile) {
+		return tier0PolicyDecision("Tier0ReadonlyTableArithLeaf", "stay_tier0_readonly_table_arith_leaf", "jit_disabled")
+	}
+	if shouldStayTier0ReadonlyTablePredicateLeaf(proto, profile) {
+		return tier0PolicyDecision("Tier0ReadonlyTablePredicateLeaf", "stay_tier0_readonly_table_predicate_leaf", "jit_disabled")
+	}
+	if shouldStayTier0SmallDynamicTableCallLeaf(proto, profile) {
+		return tier0PolicyDecision("Tier0SmallDynamicTableCallLeaf", "stay_tier0_small_dynamic_table_call_leaf", "jit_disabled")
+	}
 	if shouldStayTier0RecursiveTableWalker(proto, profile) {
 		return tier0PolicyDecision("Tier0RecursiveTableWalker", "stay_tier0_recursive_table_walker", "jit_disabled")
 	}

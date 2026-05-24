@@ -851,6 +851,69 @@ func get(t, k) {
 	t.Logf("get profile: %+v", p)
 }
 
+func TestAnalyzeFuncProfile_TableWrites(t *testing.T) {
+	src := `
+func set(t, k, v) {
+    t[k] = v
+}
+`
+	proto := compileProto(t, src)
+	setProto := proto.Protos[0]
+	p := analyzeFuncProfile(setProto)
+
+	if p.TableWriteCount != 1 {
+		t.Fatalf("expected one table write, got %+v", p)
+	}
+}
+
+func TestShouldStayTier0ReadonlyTableArithLeaf(t *testing.T) {
+	src := `
+func add_field(a, b) {
+    return a.v + b.v
+}
+`
+	proto := compileProto(t, src)
+	leaf := proto.Protos[0]
+	if !shouldStayTier0ReadonlyTableArithLeaf(leaf, analyzeFuncProfile(leaf)) {
+		t.Fatal("expected small readonly table arithmetic leaf to stay tier0")
+	}
+}
+
+func TestShouldStayTier0ReadonlyTablePredicateLeaf(t *testing.T) {
+	src := `
+func less_field(a, b) {
+    return a.v < b.v
+}
+`
+	proto := compileProto(t, src)
+	leaf := proto.Protos[0]
+	p := analyzeFuncProfile(leaf)
+	if p.CompareCount == 0 {
+		t.Fatalf("expected compare count, got %+v", p)
+	}
+	if !shouldStayTier0ReadonlyTablePredicateLeaf(leaf, p) {
+		t.Fatal("expected small readonly table predicate leaf to stay tier0")
+	}
+}
+
+func TestShouldStayTier0SmallDynamicTableCallLeaf(t *testing.T) {
+	src := `
+func proxy(obj, key) {
+    slots := rawget(obj, "slots")
+    value := slots[key]
+    if value != nil {
+        return value
+    }
+    return rawget(obj, "base") + #key
+}
+`
+	proto := compileProto(t, src)
+	leaf := proto.Protos[0]
+	if !shouldStayTier0SmallDynamicTableCallLeaf(leaf, analyzeFuncProfile(leaf)) {
+		t.Fatal("expected small dynamic table call leaf to stay tier0")
+	}
+}
+
 func TestShouldPromoteTier2_PureComputeLoop(t *testing.T) {
 	// sum(n) with loop and arithmetic: should promote at callCount=2.
 	src := `

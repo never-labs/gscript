@@ -25,8 +25,10 @@ type FuncProfile struct {
 	LoopDepth          int  // maximum nesting depth of loops
 	BytecodeCount      int  // total number of bytecodes
 	ArithCount         int  // ADD/SUB/MUL/DIV/MOD/UNM count
+	CompareCount       int  // EQ/LT/LE count
 	CallCount          int  // OP_CALL count (static, not runtime)
 	TableOpCount       int  // GETTABLE/SETTABLE/GETFIELD/SETFIELD count
+	TableWriteCount    int  // SETTABLE/SETFIELD count
 	NewTableCount      int  // OP_NEWTABLE/OP_NEWOBJECT* count (allocation pressure signal)
 	EmptyNewTableCount int  // OP_NEWTABLE array=0 hash=0 count (native-cacheable leaf allocation)
 	HasClosure         bool // contains OP_CLOSURE
@@ -111,13 +113,19 @@ func analyzeFuncProfile(proto *vm.FuncProto) FuncProfile {
 		case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_DIV, vm.OP_MOD, vm.OP_UNM:
 			p.ArithCount++
 
+		case vm.OP_EQ, vm.OP_LT, vm.OP_LE:
+			p.CompareCount++
+
 		// Call ops
 		case vm.OP_CALL, vm.OP_YIELD, vm.OP_RESUME:
 			p.CallCount++
 
 		// Table/field ops
-		case vm.OP_GETTABLE, vm.OP_SETTABLE, vm.OP_GETFIELD, vm.OP_SETFIELD:
+		case vm.OP_GETTABLE, vm.OP_GETFIELD:
 			p.TableOpCount++
+		case vm.OP_SETTABLE, vm.OP_SETFIELD:
+			p.TableOpCount++
+			p.TableWriteCount++
 
 		case vm.OP_NEWTABLE:
 			p.NewTableCount++
@@ -200,6 +208,63 @@ func shouldStayTier0SmallDynamicLeaf(proto *vm.FuncProto, profile FuncProfile) b
 		return false
 	}
 	return profile.HasGlobal && profile.TableOpCount > 0
+}
+
+func shouldStayTier0ReadonlyTableArithLeaf(proto *vm.FuncProto, profile FuncProfile) bool {
+	if proto == nil || profile.HasLoop || profile.CallCount != 0 || profile.BytecodeCount > 20 {
+		return false
+	}
+	if profile.TableOpCount == 0 || profile.TableWriteCount != 0 || profile.NewTableCount != 0 {
+		return false
+	}
+	if profile.HasGlobal || profile.HasClosure || profile.HasUpval || profile.HasVararg {
+		return false
+	}
+	if profile.TableOpCount != 2 || profile.ArithCount != 1 {
+		return false
+	}
+	return profile.ArithCount > 0
+}
+
+func shouldStayTier0ReadonlyTablePredicateLeaf(proto *vm.FuncProto, profile FuncProfile) bool {
+	if proto == nil || profile.HasLoop || profile.CallCount != 0 || profile.BytecodeCount > 20 {
+		return false
+	}
+	if profile.TableOpCount == 0 || profile.TableWriteCount != 0 || profile.NewTableCount != 0 {
+		return false
+	}
+	if profile.HasGlobal || profile.HasClosure || profile.HasUpval || profile.HasVararg {
+		return false
+	}
+	if profile.TableOpCount != 2 || profile.CompareCount != 1 {
+		return false
+	}
+	return profile.CompareCount > 0
+}
+
+func shouldStayTier0SmallDynamicTableCallLeaf(proto *vm.FuncProto, profile FuncProfile) bool {
+	if proto == nil || profile.HasLoop || profile.CallCount == 0 || profile.BytecodeCount > 35 {
+		return false
+	}
+	if profile.TableOpCount == 0 || profile.NewTableCount != 0 {
+		return false
+	}
+	if profile.HasClosure || profile.HasUpval || profile.HasVararg {
+		return false
+	}
+	return profile.HasGlobal && protoHasStringConstant(proto, "rawget")
+}
+
+func protoHasStringConstant(proto *vm.FuncProto, want string) bool {
+	if proto == nil {
+		return false
+	}
+	for _, c := range proto.Constants {
+		if c.IsString() && c.Str() == want {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldStayTier0LoopFactoryBuilder(proto *vm.FuncProto, profile FuncProfile) bool {

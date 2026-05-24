@@ -318,7 +318,11 @@ func (e *BaselineJITEngine) handleLT(ctx *ExecContext, regs []runtime.Value, bas
 
 	lt, ok := bval.LessThan(cval)
 	if !ok {
-		return fmt.Errorf("LT: cannot compare %s with %s", bval.TypeName(), cval.TypeName())
+		var err error
+		lt, err = e.callComparisonMetamethod("__lt", bval, cval)
+		if err != nil {
+			return fmt.Errorf("LT: %w", err)
+		}
 	}
 	if lt != (a != 0) {
 		// VM does PC++ to skip the next instruction. BaselinePC is
@@ -340,13 +344,58 @@ func (e *BaselineJITEngine) handleLE(ctx *ExecContext, regs []runtime.Value, bas
 	// (b <= c) == !(c < b)
 	gt, ok := cval.LessThan(bval)
 	if !ok {
-		return fmt.Errorf("LE: cannot compare %s with %s", bval.TypeName(), cval.TypeName())
+		var err error
+		gt, err = e.callComparisonMetamethod("__le", bval, cval)
+		if err != nil {
+			return fmt.Errorf("LE: %w", err)
+		}
+		if gt != (a != 0) {
+			ctx.BaselinePC++
+		}
+		return nil
 	}
 	le := !gt
 	if le != (a != 0) {
 		ctx.BaselinePC++
 	}
 	return nil
+}
+
+func (e *BaselineJITEngine) callComparisonMetamethod(name string, left, right runtime.Value) (bool, error) {
+	if e.callVM == nil {
+		return false, fmt.Errorf("no callVM for comparison metamethod")
+	}
+	mm := lookupBinaryMetamethod(left, right, name)
+	if mm.IsNil() {
+		return false, fmt.Errorf("cannot compare %s with %s", left.TypeName(), right.TypeName())
+	}
+	args := [2]runtime.Value{left, right}
+	results, err := e.callVM.CallValue(mm, args[:])
+	if err != nil {
+		return false, err
+	}
+	if len(results) == 0 {
+		return false, nil
+	}
+	return results[0].Truthy(), nil
+}
+
+func lookupBinaryMetamethod(left, right runtime.Value, name string) runtime.Value {
+	if left.IsTable() {
+		if mt := left.Table().GetMetatable(); mt != nil {
+			if mm := mt.RawGetString(name); !mm.IsNil() {
+				return mm
+			}
+		}
+	}
+	if right.IsTable() {
+		if mt := right.Table().GetMetatable(); mt != nil {
+			if mm := mt.RawGetString(name); !mm.IsNil() {
+				return mm
+			}
+		}
+	}
+	return runtime.NilValue()
 }
 
 // handleCall handles OP_CALL exit: execute the function call via the VM.
