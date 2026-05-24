@@ -2,7 +2,7 @@
 -- Covers __index/__newindex, method dispatch, arithmetic/compare, and concat.
 
 local MOD = 1000000007
-local N = 25000
+local N = 600000
 
 local methods = {}
 

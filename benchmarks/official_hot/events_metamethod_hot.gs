@@ -2,7 +2,7 @@
 // Covers __index/__newindex, method dispatch, arithmetic/compare, and concat.
 
 MOD := 1000000007
-N := 25000
+N := 600000
 
 methods := {}
 

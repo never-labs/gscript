@@ -1,8 +1,8 @@
 -- Official hot benchmark: __call, __len, and __pairs metamethods.
 
 local MOD = 1000000007
-local GROUPS = 80
-local REPS = 80
+local GROUPS = 960
+local REPS = 960
 local PAIR_EVERY = 8
 
 local function make_callable(seed)

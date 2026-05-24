@@ -1,8 +1,8 @@
 // Official hot benchmark: __call, __len, and __pairs metamethods.
 
 MOD := 1000000007
-GROUPS := 80
-REPS := 80
+GROUPS := 960
+REPS := 960
 PAIR_EVERY := 8
 
 func make_callable(seed) {
