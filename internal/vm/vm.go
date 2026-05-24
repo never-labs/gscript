@@ -4452,7 +4452,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			// ---- Fast path: callable table with VM __call metamethod ----
 			if b != 0 && fnVal.IsTable() {
 				if mt := fnVal.Table().GetMetatable(); mt != nil {
-					callMM := mt.RawGet(runtime.StringValue("__call"))
+					callMM := mt.RawGetString("__call")
 					if cl, ok := closureFromValue(callMM); ok {
 						proto := cl.Proto
 						mmArgs := nArgs + 1
@@ -5570,9 +5570,15 @@ func (vm *VM) callValue(fnVal runtime.Value, args []runtime.Value) ([]runtime.Va
 	if fnVal.IsTable() {
 		mt := fnVal.Table().GetMetatable()
 		if mt != nil {
-			callMM := mt.RawGet(runtime.StringValue("__call"))
+			callMM := mt.RawGetString("__call")
 			if !callMM.IsNil() {
-				newArgs := make([]runtime.Value, len(args)+1)
+				var local [8]runtime.Value
+				var newArgs []runtime.Value
+				if len(args)+1 <= len(local) {
+					newArgs = local[:len(args)+1]
+				} else {
+					newArgs = make([]runtime.Value, len(args)+1)
+				}
 				newArgs[0] = fnVal
 				copy(newArgs[1:], args)
 				return vm.callValue(callMM, newArgs)
