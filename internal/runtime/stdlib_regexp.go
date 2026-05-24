@@ -30,83 +30,114 @@ func makeReObject(re *regexp.Regexp) *Table {
 			Fn:   fn,
 		}))
 	}
+	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "re." + name,
+			Fn:       fn,
+			FastArg1: fast,
+		}))
+	}
+	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "re." + name,
+			Fn:       fn,
+			FastArg2: fast,
+		}))
+	}
 
 	// re.pattern — the pattern string
 	t.RawSet(StringValue("pattern"), StringValue(re.String()))
 
 	// re.match(str) → bool
-	set("match", func(args []Value) ([]Value, error) {
+	reMatch := func(str Value) (Value, error) {
+		return BoolValue(re.MatchString(str.Str())), nil
+	}
+	setFastArg1("match", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 're.match'")
 		}
-		return []Value{BoolValue(re.MatchString(args[0].Str()))}, nil
-	})
+		v, err := reMatch(args[0])
+		return []Value{v}, err
+	}, reMatch)
 
 	// re.find(str) → string or nil
-	set("find", func(args []Value) ([]Value, error) {
+	reFind := func(str Value) (Value, error) {
+		s := str.Str()
+		m := re.FindString(s)
+		if m == "" && !re.MatchString(s) {
+			return NilValue(), nil
+		}
+		return StringValue(m), nil
+	}
+	setFastArg1("find", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 're.find'")
 		}
-		m := re.FindString(args[0].Str())
-		if m == "" && !re.MatchString(args[0].Str()) {
-			return []Value{NilValue()}, nil
+		v, err := reFind(args[0])
+		if err != nil {
+			return nil, err
 		}
-		return []Value{StringValue(m)}, nil
-	})
+		return []Value{v}, nil
+	}, reFind)
 
 	// re.findSubmatch(str) → table or nil
-	set("findSubmatch", func(args []Value) ([]Value, error) {
+	reFindSubmatch := func(str Value) (Value, error) {
+		matches := re.FindStringSubmatch(str.Str())
+		if matches == nil {
+			return NilValue(), nil
+		}
+		return regexpStringSliceTable(matches), nil
+	}
+	setFastArg1("findSubmatch", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 're.findSubmatch'")
 		}
-		matches := re.FindStringSubmatch(args[0].Str())
-		if matches == nil {
-			return []Value{NilValue()}, nil
+		v, err := reFindSubmatch(args[0])
+		if err != nil {
+			return nil, err
 		}
-		tbl := NewTable()
-		for i, m := range matches {
-			tbl.RawSet(IntValue(int64(i+1)), StringValue(m))
-		}
-		return []Value{TableValue(tbl)}, nil
-	})
+		return []Value{v}, nil
+	}, reFindSubmatch)
 
 	// re.findAll(str [, n]) → table
-	set("findAll", func(args []Value) ([]Value, error) {
+	reFindAll := func(str Value, n Value) (Value, error) {
+		matches := re.FindAllString(str.Str(), int(toInt(n)))
+		return regexpStringSliceTable(matches), nil
+	}
+	setFastArg2("findAll", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 're.findAll'")
 		}
-		n := -1
+		n := IntValue(-1)
 		if len(args) >= 2 {
-			n = int(toInt(args[1]))
+			n = args[1]
 		}
-		matches := re.FindAllString(args[0].Str(), n)
-		tbl := NewTable()
-		for i, m := range matches {
-			tbl.RawSet(IntValue(int64(i+1)), StringValue(m))
+		v, err := reFindAll(args[0], n)
+		if err != nil {
+			return nil, err
 		}
-		return []Value{TableValue(tbl)}, nil
-	})
+		return []Value{v}, nil
+	}, reFindAll)
 
 	// re.findAllSubmatch(str [, n]) → table of tables
-	set("findAllSubmatch", func(args []Value) ([]Value, error) {
+	reFindAllSubmatch := func(str Value, n Value) (Value, error) {
+		allMatches := re.FindAllStringSubmatch(str.Str(), int(toInt(n)))
+		return regexpStringMatrixTable(allMatches), nil
+	}
+	setFastArg2("findAllSubmatch", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 're.findAllSubmatch'")
 		}
-		n := -1
+		n := IntValue(-1)
 		if len(args) >= 2 {
-			n = int(toInt(args[1]))
+			n = args[1]
 		}
-		allMatches := re.FindAllStringSubmatch(args[0].Str(), n)
-		tbl := NewTable()
-		for i, matches := range allMatches {
-			sub := NewTable()
-			for j, m := range matches {
-				sub.RawSet(IntValue(int64(j+1)), StringValue(m))
-			}
-			tbl.RawSet(IntValue(int64(i+1)), TableValue(sub))
+		v, err := reFindAllSubmatch(args[0], n)
+		if err != nil {
+			return nil, err
 		}
-		return []Value{TableValue(tbl)}, nil
-	})
+		return []Value{v}, nil
+	}, reFindAllSubmatch)
 
 	// re.replace(str, repl) → string (replace first)
 	set("replace", func(args []Value) ([]Value, error) {
@@ -124,29 +155,33 @@ func makeReObject(re *regexp.Regexp) *Table {
 	})
 
 	// re.replaceAll(str, repl) → string
-	set("replaceAll", func(args []Value) ([]Value, error) {
+	reReplaceAll := func(str, repl Value) (Value, error) {
+		return StringValue(re.ReplaceAllString(str.Str(), repl.Str())), nil
+	}
+	setFastArg2("replaceAll", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 're.replaceAll'")
 		}
-		return []Value{StringValue(re.ReplaceAllString(args[0].Str(), args[1].Str()))}, nil
-	})
+		v, err := reReplaceAll(args[0], args[1])
+		return []Value{v}, err
+	}, reReplaceAll)
 
 	// re.split(str [, n]) → table of strings
-	set("split", func(args []Value) ([]Value, error) {
+	reSplit := func(str Value, n Value) (Value, error) {
+		parts := re.Split(str.Str(), int(toInt(n)))
+		return regexpStringSliceTable(parts), nil
+	}
+	setFastArg2("split", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 're.split'")
 		}
-		n := -1
+		n := IntValue(-1)
 		if len(args) >= 2 {
-			n = int(toInt(args[1]))
+			n = args[1]
 		}
-		parts := re.Split(args[0].Str(), n)
-		tbl := NewTable()
-		for i, p := range parts {
-			tbl.RawSet(IntValue(int64(i+1)), StringValue(p))
-		}
-		return []Value{TableValue(tbl)}, nil
-	})
+		v, err := reSplit(args[0], n)
+		return []Value{v}, err
+	}, reSplit)
 
 	// re.numSubexp() → int
 	set("numSubexp", func(args []Value) ([]Value, error) {
@@ -154,6 +189,26 @@ func makeReObject(re *regexp.Regexp) *Table {
 	})
 
 	return t
+}
+
+func regexpStringSliceTable(values []string) Value {
+	tbl := NewTableSized(len(values), 0)
+	for i, s := range values {
+		tbl.RawSetInt(int64(i+1), StringValue(s))
+	}
+	return TableValue(tbl)
+}
+
+func regexpStringMatrixTable(values [][]string) Value {
+	tbl := NewTableSized(len(values), 0)
+	for i, matches := range values {
+		sub := NewTableSized(len(matches), 0)
+		for j, m := range matches {
+			sub.RawSetInt(int64(j+1), StringValue(m))
+		}
+		tbl.RawSetInt(int64(i+1), TableValue(sub))
+	}
+	return TableValue(tbl)
 }
 
 // buildRegexpLib creates the "regexp" standard library table.
@@ -178,6 +233,14 @@ func buildRegexpLib() *Table {
 			Name:     "regexp." + name,
 			Fn:       fn,
 			FastArg3: fast,
+		}))
+	}
+	setFastArg23 := func(name string, fn func([]Value) ([]Value, error), fast2 func(Value, Value) (Value, error), fast3 func(Value, Value, Value) (Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
+			Name:     "regexp." + name,
+			Fn:       fn,
+			FastArg2: fast2,
+			FastArg3: fast3,
 		}))
 	}
 
@@ -250,13 +313,9 @@ func buildRegexpLib() *Table {
 			return NilValue(), fmt.Errorf("regexp.findAll: %v", err)
 		}
 		matches := re.FindAllString(str.Str(), n)
-		tbl := NewTable()
-		for i, m := range matches {
-			tbl.RawSet(IntValue(int64(i+1)), StringValue(m))
-		}
-		return TableValue(tbl), nil
+		return regexpStringSliceTable(matches), nil
 	}
-	setFastArg2("findAll", func(args []Value) ([]Value, error) {
+	setFastArg23("findAll", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.findAll'")
 		}
@@ -268,31 +327,34 @@ func buildRegexpLib() *Table {
 		return []Value{v}, err
 	}, func(pattern, str Value) (Value, error) {
 		return regexpFindAll(pattern, str, -1)
+	}, func(pattern, str, n Value) (Value, error) {
+		return regexpFindAll(pattern, str, int(toInt(n)))
 	})
 
 	// regexp.findAllSubmatch(pattern, str [, n]) → table of tables
-	set("findAllSubmatch", func(args []Value) ([]Value, error) {
+	regexpFindAllSubmatch := func(pattern, str Value, n int) (Value, error) {
+		re, err := cachedStdlibRegexp(pattern.Str())
+		if err != nil {
+			return NilValue(), fmt.Errorf("regexp.findAllSubmatch: %v", err)
+		}
+		allMatches := re.FindAllStringSubmatch(str.Str(), n)
+		return regexpStringMatrixTable(allMatches), nil
+	}
+	setFastArg3("findAllSubmatch", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.findAllSubmatch'")
-		}
-		re, err := cachedStdlibRegexp(args[0].Str())
-		if err != nil {
-			return nil, fmt.Errorf("regexp.findAllSubmatch: %v", err)
 		}
 		n := -1
 		if len(args) >= 3 {
 			n = int(toInt(args[2]))
 		}
-		allMatches := re.FindAllStringSubmatch(args[1].Str(), n)
-		tbl := NewTable()
-		for i, matches := range allMatches {
-			sub := NewTable()
-			for j, m := range matches {
-				sub.RawSet(IntValue(int64(j+1)), StringValue(m))
-			}
-			tbl.RawSet(IntValue(int64(i+1)), TableValue(sub))
+		v, err := regexpFindAllSubmatch(args[0], args[1], n)
+		if err != nil {
+			return nil, err
 		}
-		return []Value{TableValue(tbl)}, nil
+		return []Value{v}, nil
+	}, func(pattern, str, n Value) (Value, error) {
+		return regexpFindAllSubmatch(pattern, str, int(toInt(n)))
 	})
 
 	// regexp.replace(pattern, str, repl) → string (replace first)
@@ -340,13 +402,9 @@ func buildRegexpLib() *Table {
 			return NilValue(), fmt.Errorf("regexp.split: %v", err)
 		}
 		parts := re.Split(str.Str(), n)
-		tbl := NewTable()
-		for i, p := range parts {
-			tbl.RawSet(IntValue(int64(i+1)), StringValue(p))
-		}
-		return TableValue(tbl), nil
+		return regexpStringSliceTable(parts), nil
 	}
-	setFastArg2("split", func(args []Value) ([]Value, error) {
+	setFastArg23("split", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'regexp.split'")
 		}
@@ -358,6 +416,8 @@ func buildRegexpLib() *Table {
 		return []Value{v}, err
 	}, func(pattern, str Value) (Value, error) {
 		return regexpSplit(pattern, str, -1)
+	}, func(pattern, str, n Value) (Value, error) {
+		return regexpSplit(pattern, str, int(toInt(n)))
 	})
 
 	return t
