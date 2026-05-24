@@ -202,6 +202,14 @@ func shouldStayTier0SmallDynamicLeaf(proto *vm.FuncProto, profile FuncProfile) b
 	return profile.HasGlobal && profile.TableOpCount > 0
 }
 
+func shouldStayTier0LoopFactoryBuilder(proto *vm.FuncProto, profile FuncProfile) bool {
+	return proto != nil &&
+		profile.HasLoop &&
+		profile.HasClosure &&
+		profile.NewTableCount > 0 &&
+		profile.CallCount > 0
+}
+
 func shouldStayTier0(profile FuncProfile) bool {
 	return shouldStayTier0ForProto(nil, profile)
 }
