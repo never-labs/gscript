@@ -2306,6 +2306,65 @@ result := <-ch2
 	expectGlobalInt(t, g, "result", 42)
 }
 
+func TestMetatableIndexRawSlotFallbackFastPath(t *testing.T) {
+	g := compileAndRun(t, `
+methods := {}
+
+func proxy_index(obj, key) {
+    if key == "mix" {
+        return methods.mix
+    }
+    slots := rawget(obj, "slots")
+    value := slots[key]
+    if value != nil {
+        return value
+    }
+    return rawget(obj, "base") + #key
+}
+
+methods.mix = func(self) {
+    return self.accum + self.missing
+}
+
+obj := setmetatable({base: 10, slots: {accum: 7}}, {__index: proxy_index})
+result := obj:mix()
+`)
+	expectGlobalInt(t, g, "result", 24)
+}
+
+func TestMetatableIndexRawSlotFallbackHonorsRawgetOverride(t *testing.T) {
+	g := compileAndRun(t, `
+methods := {}
+
+func proxy_index(obj, key) {
+    if key == "mix" {
+        return methods.mix
+    }
+    slots := rawget(obj, "slots")
+    value := slots[key]
+    if value != nil {
+        return value
+    }
+    return rawget(obj, "base") + #key
+}
+
+methods.mix = func(self) {
+    return self.missing
+}
+
+rawget = func(obj, key) {
+    if key == "slots" {
+        return {missing: 99}
+    }
+    return 1
+}
+
+obj := setmetatable({base: 10, slots: {}}, {__index: proxy_index})
+result := obj:mix()
+`)
+	expectGlobalInt(t, g, "result", 99)
+}
+
 // Ensure the test file is valid even if some helpers aren't wired up yet.
 // This provides a graceful message.
 func init() {

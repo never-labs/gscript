@@ -5493,7 +5493,7 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 		return vm.tableGetDepth(runtime.TableValue(idx.Table()), key, depth+1)
 	}
 	if idx.IsFunction() {
-		if result, ok, err := vm.fastIndexStringDispatch(idx, key); ok || err != nil {
+		if result, ok, err := vm.fastIndexStringDispatch(idx, t, key); ok || err != nil {
 			return result, err
 		}
 		args := [2]runtime.Value{t, key}
@@ -5509,7 +5509,7 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 	return runtime.NilValue(), nil
 }
 
-func (vm *VM) fastIndexStringDispatch(fn, key runtime.Value) (runtime.Value, bool, error) {
+func (vm *VM) fastIndexStringDispatch(fn, receiver, key runtime.Value) (runtime.Value, bool, error) {
 	if !key.IsString() {
 		return runtime.NilValue(), false, nil
 	}
@@ -5520,7 +5520,8 @@ func (vm *VM) fastIndexStringDispatch(fn, key runtime.Value) (runtime.Value, boo
 	code := cl.Proto.Code
 	constants := cl.Proto.Constants
 	want := key.Str()
-	for pc := 0; pc+5 < len(code); pc += 6 {
+	pc := 0
+	for ; pc+5 < len(code); pc += 6 {
 		loadKey := code[pc]
 		eq := code[pc+1]
 		jmp := code[pc+2]
@@ -5529,7 +5530,7 @@ func (vm *VM) fastIndexStringDispatch(fn, key runtime.Value) (runtime.Value, boo
 		ret := code[pc+5]
 		if DecodeOp(loadKey) != OP_LOADK || DecodeOp(eq) != OP_EQ || DecodeOp(jmp) != OP_JMP ||
 			DecodeOp(getGlobal) != OP_GETGLOBAL || DecodeOp(getField) != OP_GETFIELD || DecodeOp(ret) != OP_RETURN {
-			return runtime.NilValue(), false, nil
+			break
 		}
 		keyConstReg := DecodeA(loadKey)
 		keyConstIdx := DecodeBx(loadKey)
@@ -5558,7 +5559,138 @@ func (vm *VM) fastIndexStringDispatch(fn, key runtime.Value) (runtime.Value, boo
 		result, err := vm.tableGet(global, runtime.StringValue(constants[fieldIdx].Str()))
 		return result, true, err
 	}
+	if cl.Proto.IndexRawSlotFallbackShape == 0 {
+		if matchIndexRawSlotFallbackShape(code, constants, pc) {
+			cl.Proto.IndexRawSlotFallbackShape = 1
+			cl.Proto.IndexRawSlotFallbackPC = pc
+		} else {
+			cl.Proto.IndexRawSlotFallbackShape = -1
+		}
+	}
+	if cl.Proto.IndexRawSlotFallbackShape > 0 {
+		if result, ok, err := vm.fastIndexRawSlotFallback(receiver, key, code, constants, cl.Proto.IndexRawSlotFallbackPC); ok || err != nil {
+			return result, ok, err
+		}
+	}
 	return runtime.NilValue(), false, nil
+}
+
+func matchIndexRawSlotFallbackShape(code []uint32, constants []runtime.Value, pc int) bool {
+	if pc+18 >= len(code) {
+		return false
+	}
+	loadRawGet1 := code[pc]
+	moveObj1 := code[pc+1]
+	loadSlotKey := code[pc+2]
+	callRawGet1 := code[pc+3]
+	moveLookupKey := code[pc+4]
+	getSlotValue := code[pc+5]
+	loadNil := code[pc+6]
+	eqNil := code[pc+7]
+	jmpFallback := code[pc+8]
+	moveReturnSlot := code[pc+9]
+	returnSlot := code[pc+10]
+	loadRawGet2 := code[pc+11]
+	moveObj2 := code[pc+12]
+	loadBaseKey := code[pc+13]
+	callRawGet2 := code[pc+14]
+	moveLenKey := code[pc+15]
+	lenKey := code[pc+16]
+	addFallback := code[pc+17]
+	returnFallback := code[pc+18]
+
+	if DecodeOp(loadRawGet1) != OP_GETGLOBAL || DecodeOp(moveObj1) != OP_MOVE || DecodeOp(loadSlotKey) != OP_LOADK ||
+		DecodeOp(callRawGet1) != OP_CALL || DecodeOp(moveLookupKey) != OP_MOVE || DecodeOp(getSlotValue) != OP_GETTABLE ||
+		DecodeOp(loadNil) != OP_LOADNIL || DecodeOp(eqNil) != OP_EQ || DecodeOp(jmpFallback) != OP_JMP ||
+		DecodeOp(moveReturnSlot) != OP_MOVE || DecodeOp(returnSlot) != OP_RETURN ||
+		DecodeOp(loadRawGet2) != OP_GETGLOBAL || DecodeOp(moveObj2) != OP_MOVE || DecodeOp(loadBaseKey) != OP_LOADK ||
+		DecodeOp(callRawGet2) != OP_CALL || DecodeOp(moveLenKey) != OP_MOVE || DecodeOp(lenKey) != OP_LEN ||
+		DecodeOp(addFallback) != OP_ADD || DecodeOp(returnFallback) != OP_RETURN {
+		return false
+	}
+
+	rawGetReg := DecodeA(loadRawGet1)
+	rawGetConst := DecodeBx(loadRawGet1)
+	slotKeyReg := DecodeA(loadSlotKey)
+	slotKeyConst := DecodeBx(loadSlotKey)
+	slotTableReg := DecodeA(callRawGet1)
+	lookupKeyReg := DecodeA(moveLookupKey)
+	slotValueReg := DecodeA(getSlotValue)
+	nilRegStart := DecodeA(loadNil)
+	nilRegCount := DecodeB(loadNil)
+	returnSlotReg := DecodeA(moveReturnSlot)
+	rawGet2Reg := DecodeA(loadRawGet2)
+	rawGet2Const := DecodeBx(loadRawGet2)
+	baseKeyReg := DecodeA(loadBaseKey)
+	baseKeyConst := DecodeBx(loadBaseKey)
+	baseValueReg := DecodeA(callRawGet2)
+	lenMoveReg := DecodeA(moveLenKey)
+	lenReg := DecodeA(lenKey)
+	fallbackReg := DecodeA(addFallback)
+	if rawGetConst < 0 || rawGetConst >= len(constants) || rawGet2Const < 0 || rawGet2Const >= len(constants) ||
+		slotKeyConst < 0 || slotKeyConst >= len(constants) || baseKeyConst < 0 || baseKeyConst >= len(constants) ||
+		!constants[rawGetConst].IsString() || !constants[rawGet2Const].IsString() ||
+		!constants[slotKeyConst].IsString() || !constants[baseKeyConst].IsString() {
+		return false
+	}
+	if constants[rawGetConst].Str() != "rawget" || constants[rawGet2Const].Str() != "rawget" {
+		return false
+	}
+	return DecodeB(moveObj1) == 0 && DecodeB(moveObj2) == 0 &&
+		DecodeA(callRawGet1) == rawGetReg && DecodeB(callRawGet1) == 3 && DecodeC(callRawGet1) == 2 &&
+		slotTableReg == rawGetReg && DecodeB(getSlotValue) == slotTableReg && DecodeB(moveLookupKey) == 1 && DecodeC(getSlotValue) == lookupKeyReg &&
+		nilRegCount == 0 && DecodeA(eqNil) == 1 && DecodeB(eqNil) == slotValueReg && DecodeC(eqNil) == nilRegStart && DecodesBx(jmpFallback) == 2 &&
+		DecodeB(moveReturnSlot) == slotValueReg && DecodeA(returnSlot) == returnSlotReg && DecodeB(returnSlot) == 2 &&
+		DecodeA(callRawGet2) == rawGet2Reg && rawGet2Reg == baseValueReg && DecodeB(callRawGet2) == 3 && DecodeC(callRawGet2) == 2 &&
+		DecodeB(moveLenKey) == 1 && DecodeA(lenKey) == lenReg && DecodeB(lenKey) == lenMoveReg &&
+		DecodeA(addFallback) == fallbackReg && DecodeB(addFallback) == baseValueReg && DecodeC(addFallback) == lenReg &&
+		DecodeA(returnFallback) == fallbackReg && DecodeB(returnFallback) == 2 &&
+		DecodeA(moveObj1) == rawGetReg+1 && slotKeyReg == rawGetReg+2 &&
+		DecodeA(moveObj2) == rawGet2Reg+1 && baseKeyReg == rawGet2Reg+2
+}
+
+func (vm *VM) fastIndexRawSlotFallback(receiver, key runtime.Value, code []uint32, constants []runtime.Value, pc int) (runtime.Value, bool, error) {
+	if !receiver.IsTable() || !key.IsString() || pc+18 >= len(code) {
+		return runtime.NilValue(), false, nil
+	}
+	if !vm.globalIsStdRawGet("rawget") {
+		return runtime.NilValue(), false, nil
+	}
+
+	loadSlotKey := code[pc+2]
+	loadBaseKey := code[pc+13]
+	slotKeyConst := DecodeBx(loadSlotKey)
+	baseKeyConst := DecodeBx(loadBaseKey)
+	if slotKeyConst < 0 || slotKeyConst >= len(constants) || baseKeyConst < 0 || baseKeyConst >= len(constants) ||
+		!constants[slotKeyConst].IsString() || !constants[baseKeyConst].IsString() {
+		return runtime.NilValue(), false, nil
+	}
+
+	receiverTable := receiver.Table()
+	slotTable := receiverTable.RawGet(runtime.StringValue(constants[slotKeyConst].Str()))
+	if !slotTable.IsTable() {
+		return runtime.NilValue(), true, fmt.Errorf("attempt to index a %s value", slotTable.TypeName())
+	}
+	slotValue, err := vm.tableGet(slotTable, key)
+	if err != nil {
+		return runtime.NilValue(), true, err
+	}
+	if !slotValue.IsNil() {
+		return slotValue, true, nil
+	}
+	baseValue := receiverTable.RawGet(runtime.StringValue(constants[baseKeyConst].Str()))
+	keyLen, err := vm.length(key)
+	if err != nil {
+		return runtime.NilValue(), true, err
+	}
+	result, err := vm.arith(baseValue, keyLen, "__add", func(x, y float64) float64 { return x + y })
+	return result, true, err
+}
+
+func (vm *VM) globalIsStdRawGet(name string) bool {
+	global := vm.GetGlobal(name)
+	gf := global.GoFunction()
+	return gf != nil && gf.NativeKind == runtime.NativeKindStdRawGet && gf.NativeData == runtime.StdRawGetIdentityPtr()
 }
 
 // tableSet performs table assignment with __newindex metamethod support.
