@@ -3,7 +3,7 @@
 
 package runtime
 
-import "sort"
+import "slices"
 
 // sparseArrayMax is the maximum array size for auto-expansion of sparse keys.
 // Keys like board[col*100+row] (range 101-910) will use array instead of imap.
@@ -283,16 +283,12 @@ func (t *Table) TryPlainArraySort(length int64) bool {
 		if len(t.intArray) != n+1 || (len(t.intArray) > 0 && t.arrayZeroValid) {
 			return false
 		}
-		sort.SliceStable(t.intArray[1:], func(i, j int) bool {
-			return t.intArray[i+1] < t.intArray[j+1]
-		})
+		slices.Sort(t.intArray[1:])
 	case ArrayFloat:
 		if len(t.floatArray) != n+1 || (len(t.floatArray) > 0 && t.arrayZeroValid) {
 			return false
 		}
-		sort.SliceStable(t.floatArray[1:], func(i, j int) bool {
-			return t.floatArray[i+1] < t.floatArray[j+1]
-		})
+		slices.Sort(t.floatArray[1:])
 	default:
 		return false
 	}
