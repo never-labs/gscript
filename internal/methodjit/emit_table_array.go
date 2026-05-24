@@ -571,8 +571,8 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		ec.storeResultNB(jit.X0, instr.ID)
 	default:
 		ec.emitDeopt(instr)
+		return
 	}
-	asm.B(successLabel)
 
 	asm.Label(successLabel)
 	ec.recordTableArrayBoundedKey(instr)
