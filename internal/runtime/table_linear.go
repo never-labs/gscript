@@ -25,3 +25,23 @@ func NewLinearModuloIntArray(n, salt, indexMul, saltMul, lengthMul, modulus int6
 	t.keysDirty = true
 	return t
 }
+
+// NewMappedIntArray builds a dense 1-based integer array by applying a linear
+// transform to an existing dense integer region. The source slice is expected to
+// start at logical key 1.
+func NewMappedIntArray(src []int64, mul, add int64) *Table {
+	n := len(src)
+	t := NewTableSizedKind(n, 0, ArrayInt)
+	size := n + 1
+	if cap(t.intArray) < size {
+		t.intArray = DefaultHeap.GrowInt64s(t.intArray, size)
+	}
+	t.intArray = t.intArray[:size]
+	clear(t.intArray)
+	for i, v := range src {
+		t.intArray[i+1] = v*mul + add
+	}
+	t.arrayZeroValid = false
+	t.keysDirty = true
+	return t
+}

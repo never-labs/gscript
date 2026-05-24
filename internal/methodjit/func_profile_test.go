@@ -599,7 +599,11 @@ func map_array(a, f) {
 
 	mapArray.CallCount = 3
 	if compiled := tm.TryCompile(mapArray); compiled == nil {
-		t.Fatal("expected suppressed map_array to fall back to Tier1")
+		if !mapArray.JITDisabled {
+			t.Fatal("expected map_array to be handled by runtime specialization tiering")
+		}
+	} else {
+		t.Fatalf("expected map_array to avoid ordinary Tier1/Tier2 compilation, got %T", compiled)
 	}
 	if tm.Tier2Attempted() != 0 {
 		t.Fatalf("expected no Tier2 attempt for suppressed map_array, got %d", tm.Tier2Attempted())

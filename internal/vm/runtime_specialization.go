@@ -31,6 +31,7 @@ const (
 	runtimeSpecializationStringSampleChecksum
 	runtimeSpecializationLinearModuloIntArrayBuilder
 	runtimeSpecializationIndexedModuloIntArrayChecksum
+	runtimeSpecializationUnaryIntArrayMap
 	runtimeSpecializationCount
 )
 
@@ -389,6 +390,19 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isIndexedModuloIntArrayChecksumProto,
 		},
 		Run: (*VM).runIndexedModuloIntArrayChecksumRuntimeSpecialization,
+	},
+	runtimeSpecializationUnaryIntArrayMap: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "unary_int_array_map",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isUnaryIntArrayMapProto,
+		},
+		Run: (*VM).runUnaryIntArrayMapRuntimeSpecialization,
 	},
 }
 

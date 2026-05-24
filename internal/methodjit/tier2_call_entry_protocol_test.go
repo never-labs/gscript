@@ -147,6 +147,8 @@ func TestTier1CallICNoFilterClosureBenchDoesNotCrash(t *testing.T) {
 	defer v.Close()
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
 
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute closure_bench with no-filter JIT: %v", err)
@@ -155,10 +157,25 @@ func TestTier1CallICNoFilterClosureBenchDoesNotCrash(t *testing.T) {
 	if mapArray == nil {
 		t.Fatal("map_array proto not found")
 	}
-	if mapArray.EnteredTier2 == 0 {
-		t.Fatalf("map_array did not enter Tier 2: promoted=%v entered=%d",
-			mapArray.Tier2Promoted, mapArray.EnteredTier2)
+	if got := methodJITRuntimeSpecializationHitCount(stats, "call_site_value", "unary_int_array_map"); got == 0 {
+		t.Fatalf("map_array was not handled by runtime specialization: promoted=%v entered=%d disabled=%v",
+			mapArray.Tier2Promoted, mapArray.EnteredTier2, mapArray.JITDisabled)
 	}
+	if mapArray.EnteredTier2 != 0 {
+		t.Fatalf("runtime-specialized map_array entered ordinary Tier 2: entered=%d", mapArray.EnteredTier2)
+	}
+}
+
+func methodJITRuntimeSpecializationHitCount(stats *runtime.RuntimePathStats, route, name string) uint64 {
+	if stats == nil {
+		return 0
+	}
+	for _, entry := range stats.Snapshot().RuntimeSpecialization.PerSpecialization {
+		if entry.Route == route && entry.Name == name {
+			return entry.Count
+		}
+	}
+	return 0
 }
 
 func TestTier2CallICUsesTier2EntryWhenGenericEntryCleared(t *testing.T) {
