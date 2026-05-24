@@ -129,7 +129,7 @@ func newFixedRecordValue(ctor *SmallTableCtorN, vals []Value, observeTypes bool)
 		}
 		fr.values[i] = v
 		if observeTypes {
-			ObserveShapeFieldValueType(fr.shapeID, i, v.Type())
+			ObserveShapeFieldValue(fr.shapeID, i, v)
 		}
 	}
 	p := unsafe.Pointer(fr)
@@ -168,7 +168,7 @@ func FillFixedRecordKnownCtor(fr *FixedRecord, ctor *SmallTableCtorN, vals []Val
 			return NilValue(), false
 		}
 		fr.values[i] = v
-		ObserveShapeFieldValueType(fr.shapeID, i, v.Type())
+		ObserveShapeFieldValue(fr.shapeID, i, v)
 	}
 	p := unsafe.Pointer(fr)
 	return Value(tagPtr | ptrSubFixedRecord | (uint64(uintptr(p)) & ptrAddrMask)), true
@@ -225,11 +225,11 @@ func NewFixedRecordValue5KnownCtor(ctor *SmallTableCtorN, v0, v1, v2, v3, v4 Val
 }
 
 func observeFixedRecord5ValueTypes(shapeID uint32, v0, v1, v2, v3, v4 Value) {
-	ObserveShapeFieldValueType(shapeID, 0, v0.Type())
-	ObserveShapeFieldValueType(shapeID, 1, v1.Type())
-	ObserveShapeFieldValueType(shapeID, 2, v2.Type())
-	ObserveShapeFieldValueType(shapeID, 3, v3.Type())
-	ObserveShapeFieldValueType(shapeID, 4, v4.Type())
+	ObserveShapeFieldValue(shapeID, 0, v0)
+	ObserveShapeFieldValue(shapeID, 1, v1)
+	ObserveShapeFieldValue(shapeID, 2, v2)
+	ObserveShapeFieldValue(shapeID, 3, v3)
+	ObserveShapeFieldValue(shapeID, 4, v4)
 }
 
 func (v Value) FixedRecord() *FixedRecord {

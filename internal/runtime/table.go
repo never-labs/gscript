@@ -943,8 +943,8 @@ func newTableFromCtor2Shape(ctor *SmallTableCtor2, shape *Shape, val1, val2 Valu
 	t.shape = shape
 	t.shapeID = ctor.shapeID
 	t.skeys = ctor.fieldKeys
-	ObserveShapeFieldValueType(t.shapeID, 0, val1.Type())
-	ObserveShapeFieldValueType(t.shapeID, 1, val2.Type())
+	ObserveShapeFieldValue(t.shapeID, 0, val1)
+	ObserveShapeFieldValue(t.shapeID, 1, val2)
 	return t
 }
 
@@ -968,7 +968,7 @@ func NewTableFromCtorN(ctor *SmallTableCtorN, vals []Value) *Table {
 		t.shapeID = ctor.shapeID
 		t.skeys = ctor.fieldKeys
 		for i := 0; i < n; i++ {
-			ObserveShapeFieldValueType(t.shapeID, i, t.svals[i].Type())
+			ObserveShapeFieldValue(t.shapeID, i, t.svals[i])
 		}
 		return t
 	}
@@ -1001,7 +1001,7 @@ func newTableFromCtorNNonNil(ctor *SmallTableCtorN, vals []Value, observeTypes b
 	t.skeys = ctor.fieldKeys
 	if observeTypes {
 		for i := 0; i < n; i++ {
-			ObserveShapeFieldValueType(t.shapeID, i, t.svals[i].Type())
+			ObserveShapeFieldValue(t.shapeID, i, t.svals[i])
 		}
 	}
 	return t
@@ -1232,7 +1232,7 @@ func (t *Table) RawSetStringCached(key string, val Value, cache *FieldCacheEntry
 			cache.ShapeID = 0
 		} else {
 			t.svals[idx] = val
-			ObserveShapeFieldValueType(oldShapeID, idx, val.Type())
+			ObserveShapeFieldValue(oldShapeID, idx, val)
 		}
 		RecordShapeFieldMutation(oldShapeID, idx)
 		return
@@ -1265,7 +1265,7 @@ func (t *Table) RawSetStringCached(key string, val Value, cache *FieldCacheEntry
 				t.svals[i] = val
 				cache.FieldIdx = i
 				cache.ShapeID = t.shapeID
-				ObserveShapeFieldValueType(oldShapeID, i, val.Type())
+				ObserveShapeFieldValue(oldShapeID, i, val)
 			}
 			t.bumpStringLookupVersionLocked()
 			RecordShapeFieldMutation(oldShapeID, i)
@@ -1326,7 +1326,7 @@ func (t *Table) RawSetStringDynamicCached(key string, val Value, cache []TableSt
 		if idx, ok := t.lookupDynamicStringCacheLocked(data, keyLen, cache); ok {
 			RecordShapeFieldMutation(t.shapeID, idx)
 			t.svals[idx] = val
-			ObserveShapeFieldValueType(t.shapeID, idx, val.Type())
+			ObserveShapeFieldValue(t.shapeID, idx, val)
 			t.bumpStringLookupVersionLocked()
 			RecordRuntimePathTableStringSetCacheHit()
 			return
@@ -1341,7 +1341,7 @@ func (t *Table) RawSetStringDynamicCached(key string, val Value, cache []TableSt
 			} else {
 				t.svals[i] = val
 				t.rememberDynamicStringCacheLocked(key, data, keyLen, i, cache)
-				ObserveShapeFieldValueType(oldShapeID, i, val.Type())
+				ObserveShapeFieldValue(oldShapeID, i, val)
 			}
 			t.bumpStringLookupVersionLocked()
 			RecordShapeFieldMutation(oldShapeID, i)
@@ -1525,7 +1525,7 @@ func (t *Table) appendShape(key string) {
 func (t *Table) appendSmallStringField(key string, val Value) {
 	t.appendSmallStringValue(val)
 	t.appendShape(key)
-	ObserveShapeFieldValueType(t.shapeID, len(t.svals)-1, val.Type())
+	ObserveShapeFieldValue(t.shapeID, len(t.svals)-1, val)
 }
 
 func (t *Table) appendSmallStringValue(val Value) {
@@ -1589,7 +1589,7 @@ func (t *Table) RawSetString(key string, val Value) {
 				t.deleteSmallStringField(i)
 			} else {
 				t.svals[i] = val
-				ObserveShapeFieldValueType(oldShapeID, i, val.Type())
+				ObserveShapeFieldValue(oldShapeID, i, val)
 			}
 			t.bumpStringLookupVersionLocked()
 			RecordShapeFieldMutation(oldShapeID, i)

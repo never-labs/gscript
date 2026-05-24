@@ -22,6 +22,8 @@ func (ec *emitContext) emitGuardInstr(instr *Instr) bool {
 		ec.emitGuardShapeFieldType(instr)
 	case OpGuardShapeFieldTypeMask:
 		ec.emitGuardShapeFieldTypeMask(instr)
+	case OpGuardShapeFieldVMClosure:
+		ec.emitGuardShapeFieldVMClosure(instr)
 	case OpGuardTruthy:
 		ec.emitGuardTruthy(instr)
 	case OpGuardNonNil:

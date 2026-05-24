@@ -785,7 +785,7 @@ func instrMayDirectDeoptWithoutFullFlush(instr *Instr) bool {
 		return false
 	}
 	switch instr.Op {
-	case OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpNumToFloat, OpDivIntExact,
+	case OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure, OpNumToFloat, OpDivIntExact,
 		OpGetFieldNumToFloat, OpFieldPolyLen, OpFieldSvals, OpFieldLoad, OpFieldLoadNumToFloat,
 		OpMatrixGetF, OpMatrixSetF, OpMatrixFlat, OpMatrixStride,
 		OpTableArrayHeader, OpTableArrayLoad, OpTableShapeID, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableArrayNestedLoad:

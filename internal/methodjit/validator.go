@@ -99,6 +99,7 @@ var validatorOpContracts = func() [OpMax]validatorOpContract {
 	contracts[OpGuardFieldCalleeProto].Args = fixedOpArgs(1)
 	contracts[OpGuardShapeFieldType].Args = fixedOpArgs(0)
 	contracts[OpGuardShapeFieldTypeMask].Args = fixedOpArgs(0)
+	contracts[OpGuardShapeFieldVMClosure].Args = fixedOpArgs(0)
 	contracts[OpFieldSvals].Args = fixedOpArgs(1)
 	contracts[OpFieldLoad].Args = fixedOpArgs(1)
 	contracts[OpFieldLoadNumToFloat].Args = fixedOpArgs(1)
@@ -460,6 +461,13 @@ func (v *validator) checkOpContracts() {
 				typ := Type(uint32(instr.Aux))
 				if shapeID == 0 || typ == TypeAny || typ == TypeUnknown || instr.Aux2 == 0 {
 					v.errorf("B%d: GuardShapeFieldTypeMask (v%d) must carry shape/type Aux and non-empty Aux2 mask, got Aux=%d Aux2=%d",
+						blk.ID, instr.ID, instr.Aux, instr.Aux2)
+				}
+			case OpGuardShapeFieldVMClosure:
+				shapeID := uint32(instr.Aux >> 32)
+				fieldIdx := int(int32(instr.Aux & 0xFFFFFFFF))
+				if shapeID == 0 || fieldIdx < 0 || instr.Aux2 == 0 {
+					v.errorf("B%d: GuardShapeFieldVMClosure (v%d) must carry shape/field Aux and closure Aux2, got Aux=%d Aux2=%d",
 						blk.ID, instr.ID, instr.Aux, instr.Aux2)
 				}
 			case OpFieldSvals:

@@ -1,6 +1,9 @@
 package runtime
 
-import "testing"
+import (
+	"testing"
+	"unsafe"
+)
 
 func TestShapeMutationProfileRecordsOverwriteAndDelete(t *testing.T) {
 	base := "shape_mutation_profile_overwrite_delete"
@@ -52,6 +55,42 @@ func TestShapeMutationProfileTracksFieldEpochsIndependently(t *testing.T) {
 	tbl.RawSetString(base+"_method", IntValue(4))
 	if got := ShapeFieldMutationCount(shapeID, 0); got <= methodBefore {
 		t.Fatalf("expected method field epoch to advance, before=%d after=%d", methodBefore, got)
+	}
+}
+
+func TestShapeFieldStableVMClosureTracksConstructorAndMixed(t *testing.T) {
+	base := "shape_vmclosure_stable"
+	closureA := &struct{ name string }{"a"}
+	closureB := &struct{ name string }{"b"}
+
+	tbl := NewTable()
+	tbl.RawSetString(base+"_method", VMClosureFastValue(unsafe.Pointer(closureA)))
+	shapeID := tbl.shapeID
+	if shapeID == 0 {
+		t.Fatal("expected shaped table")
+	}
+	want := uintptr(unsafe.Pointer(closureA))
+	if got, ok := ShapeFieldStableVMClosure(shapeID, 0); !ok || got != want {
+		t.Fatalf("stable closure=%#x ok=%v, want %#x", got, ok, want)
+	}
+	beforeEpoch := ShapeFieldVMClosureEpoch(shapeID, 0)
+
+	tbl2 := NewTable()
+	tbl2.RawSetString(base+"_method", VMClosureFastValue(unsafe.Pointer(closureA)))
+	if got, ok := ShapeFieldStableVMClosure(shapeID, 0); !ok || got != want {
+		t.Fatalf("same closure changed stable closure=%#x ok=%v", got, ok)
+	}
+	if got := ShapeFieldVMClosureEpoch(shapeID, 0); got != beforeEpoch {
+		t.Fatalf("same closure changed epoch from %d to %d", beforeEpoch, got)
+	}
+
+	tbl3 := NewTable()
+	tbl3.RawSetString(base+"_method", VMClosureFastValue(unsafe.Pointer(closureB)))
+	if got, ok := ShapeFieldStableVMClosure(shapeID, 0); ok {
+		t.Fatalf("mixed closure reported stable=%#x", got)
+	}
+	if got := ShapeFieldVMClosureEpoch(shapeID, 0); got <= beforeEpoch {
+		t.Fatalf("mixed closure did not advance epoch, before=%d after=%d", beforeEpoch, got)
 	}
 }
 

@@ -25,15 +25,17 @@ var (
 // All tables that have the same fields in the same insertion order share a
 // single Shape instance.
 type Shape struct {
-	ID              uint32
-	FieldKeys       []string       // ordered field names (immutable)
-	FieldMap        map[string]int // key → index for O(1) GetFieldIndex
-	transitions     sync.Map       // string → *Shape (cached addField transitions)
-	layoutMutations uint64         // observed transitions away from this exact layout
-	mutations       uint64         // observed overwrites/deletes of this shape
-	fieldMutations  []uint64       // observed overwrites/deletes by field index
-	fieldTypes      []uint32       // stable observed field value types, encoded as ValueType+1
-	fieldTypeEpoch  []uint64       // increments when a field's observed type changes or becomes mixed
+	ID                uint32
+	FieldKeys         []string       // ordered field names (immutable)
+	FieldMap          map[string]int // key → index for O(1) GetFieldIndex
+	transitions       sync.Map       // string → *Shape (cached addField transitions)
+	layoutMutations   uint64         // observed transitions away from this exact layout
+	mutations         uint64         // observed overwrites/deletes of this shape
+	fieldMutations    []uint64       // observed overwrites/deletes by field index
+	fieldTypes        []uint32       // stable observed field value types, encoded as ValueType+1
+	fieldTypeEpoch    []uint64       // increments when a field's observed type changes or becomes mixed
+	fieldClosures     []uintptr      // stable observed VM closure values by field index
+	fieldClosureEpoch []uint64       // increments when a field's observed VM closure changes or becomes mixed
 }
 
 // GetFieldIndex returns the slot index of key in FieldKeys, or -1 if absent.
@@ -77,12 +79,14 @@ func getOrCreateShape(keys []string) *Shape {
 		fm[key] = i
 	}
 	s := &Shape{
-		ID:             id,
-		FieldKeys:      keys,
-		FieldMap:       fm,
-		fieldMutations: make([]uint64, len(keys)),
-		fieldTypes:     make([]uint32, len(keys)),
-		fieldTypeEpoch: make([]uint64, len(keys)),
+		ID:                id,
+		FieldKeys:         keys,
+		FieldMap:          fm,
+		fieldMutations:    make([]uint64, len(keys)),
+		fieldTypes:        make([]uint32, len(keys)),
+		fieldTypeEpoch:    make([]uint64, len(keys)),
+		fieldClosures:     make([]uintptr, len(keys)),
+		fieldClosureEpoch: make([]uint64, len(keys)),
 	}
 	actual, loaded := shapeByKey.LoadOrStore(k, s)
 	if loaded {
@@ -100,12 +104,14 @@ func getOrCreateSingleFieldShape(key string) *Shape {
 	id := atomic.AddUint32(&shapeIDCounter, 1)
 	keys := []string{key}
 	s := &Shape{
-		ID:             id,
-		FieldKeys:      keys,
-		FieldMap:       map[string]int{key: 0},
-		fieldMutations: make([]uint64, len(keys)),
-		fieldTypes:     make([]uint32, len(keys)),
-		fieldTypeEpoch: make([]uint64, len(keys)),
+		ID:                id,
+		FieldKeys:         keys,
+		FieldMap:          map[string]int{key: 0},
+		fieldMutations:    make([]uint64, len(keys)),
+		fieldTypes:        make([]uint32, len(keys)),
+		fieldTypeEpoch:    make([]uint64, len(keys)),
+		fieldClosures:     make([]uintptr, len(keys)),
+		fieldClosureEpoch: make([]uint64, len(keys)),
 	}
 	actual, loaded := shapeByKey.LoadOrStore(key, s)
 	if loaded {
@@ -255,6 +261,7 @@ func ShapeFieldMutationCountPtr(id uint32, fieldIdx int) unsafe.Pointer {
 }
 
 const shapeFieldTypeMixed uint32 = ^uint32(0)
+const shapeFieldClosureMixed uintptr = ^uintptr(0)
 
 func encodeShapeFieldType(t ValueType) uint32 {
 	return uint32(t) + 1
@@ -337,6 +344,92 @@ func ShapeFieldTypeEpochPtr(id uint32, fieldIdx int) unsafe.Pointer {
 		return nil
 	}
 	return unsafe.Pointer(&s.fieldTypeEpoch[fieldIdx])
+}
+
+// ObserveShapeFieldValue records both type and VM-closure identity feedback for
+// one shaped table field. Type feedback is useful for numeric/string fields;
+// closure identity feedback lets JIT code guard a stable method slot once and
+// avoid repeated per-iteration callee checks.
+func ObserveShapeFieldValue(id uint32, fieldIdx int, val Value) {
+	ObserveShapeFieldValueType(id, fieldIdx, val.Type())
+	ObserveShapeFieldVMClosure(id, fieldIdx, uintptr(val.VMClosurePointer()))
+}
+
+// ObserveShapeFieldVMClosure records the process-wide stable VM closure pointer
+// observed for one shape field. Non-closure values mark an already-observed
+// closure field mixed, so optimized code cannot assume a stable method slot.
+func ObserveShapeFieldVMClosure(id uint32, fieldIdx int, closure uintptr) {
+	if id == 0 {
+		return
+	}
+	s := LookupShapeByID(id)
+	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldClosures) {
+		return
+	}
+	for {
+		old := atomic.LoadUintptr(&s.fieldClosures[fieldIdx])
+		switch old {
+		case shapeFieldClosureMixed:
+			return
+		case 0:
+			if closure == 0 {
+				return
+			}
+			if atomic.CompareAndSwapUintptr(&s.fieldClosures[fieldIdx], 0, closure) {
+				return
+			}
+		case closure:
+			return
+		default:
+			if atomic.CompareAndSwapUintptr(&s.fieldClosures[fieldIdx], old, shapeFieldClosureMixed) {
+				atomic.AddUint64(&s.fieldClosureEpoch[fieldIdx], 1)
+				return
+			}
+		}
+	}
+}
+
+// ShapeFieldStableVMClosure reports the globally observed stable VM closure for
+// a shape field. A false result means unknown or mixed.
+func ShapeFieldStableVMClosure(id uint32, fieldIdx int) (uintptr, bool) {
+	if id == 0 {
+		return 0, false
+	}
+	s := LookupShapeByID(id)
+	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldClosures) {
+		return 0, false
+	}
+	closure := atomic.LoadUintptr(&s.fieldClosures[fieldIdx])
+	if closure == 0 || closure == shapeFieldClosureMixed {
+		return 0, false
+	}
+	return closure, true
+}
+
+// ShapeFieldVMClosureEpoch returns the epoch used by native guards for stable
+// VM-closure method-field assumptions.
+func ShapeFieldVMClosureEpoch(id uint32, fieldIdx int) uint64 {
+	if id == 0 {
+		return 0
+	}
+	s := LookupShapeByID(id)
+	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldClosureEpoch) {
+		return 0
+	}
+	return atomic.LoadUint64(&s.fieldClosureEpoch[fieldIdx])
+}
+
+// ShapeFieldVMClosureEpochPtr returns the address of a VM-closure identity
+// epoch for native JIT guards.
+func ShapeFieldVMClosureEpochPtr(id uint32, fieldIdx int) unsafe.Pointer {
+	if id == 0 {
+		return nil
+	}
+	s := LookupShapeByID(id)
+	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldClosureEpoch) {
+		return nil
+	}
+	return unsafe.Pointer(&s.fieldClosureEpoch[fieldIdx])
 }
 
 // ShapeWasMutated reports whether this shape has ever been mutated after

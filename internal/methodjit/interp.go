@@ -1246,6 +1246,15 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 			}
 		}
 
+	case OpGuardShapeFieldVMClosure:
+		shapeID := uint32(instr.Aux >> 32)
+		fieldIdx := int(int32(instr.Aux & 0xFFFFFFFF))
+		want := uintptr(instr.Aux2)
+		got, stable := runtime.ShapeFieldStableVMClosure(shapeID, fieldIdx)
+		if !stable || got != want {
+			return nil, false, fmt.Errorf("IR interpreter: GuardShapeFieldVMClosure failed")
+		}
+
 	case OpGuardNonNil:
 		s.values[instr.ID] = s.val(instr.Args[0])
 

@@ -710,6 +710,7 @@ func TestTier2TableNativeLoweringModuleOrder(t *testing.T) {
 			"FieldSvalsCSE",
 			"FixedShapeTableFacts (post-FieldSvalsLower)",
 			"GuardFieldCallee (post-FieldSvalsLower)",
+			"StableFieldCalleeGuard",
 			"TableArrayLower (post-FieldSvalsLower)",
 			"TableArrayLoadTypeSpecialize (post-FieldSvalsLower)",
 			"StringEnumCompare (post-FieldSvalsLower)",

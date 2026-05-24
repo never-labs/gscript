@@ -1090,6 +1090,38 @@ func (ec *emitContext) emitGuardShapeFieldTypeMask(instr *Instr) {
 	ec.asm.Label(doneLabel)
 }
 
+func (ec *emitContext) emitGuardShapeFieldVMClosure(instr *Instr) {
+	shapeID := uint32(instr.Aux >> 32)
+	fieldIdx := int(int32(instr.Aux & 0xFFFFFFFF))
+	wantClosure := uintptr(instr.Aux2)
+	deoptLabel := ec.uniqueLabel("guard_shape_field_vmclosure_deopt")
+	doneLabel := ec.uniqueLabel("guard_shape_field_vmclosure_done")
+	if shapeID == 0 || fieldIdx < 0 || wantClosure == 0 {
+		ec.emitPreciseDeopt(instr)
+		return
+	}
+	got, stable := runtime.ShapeFieldStableVMClosure(shapeID, fieldIdx)
+	if !stable || got != wantClosure {
+		ec.emitPreciseDeopt(instr)
+		return
+	}
+	epochPtr := uintptr(runtime.ShapeFieldVMClosureEpochPtr(shapeID, fieldIdx))
+	if epochPtr == 0 {
+		ec.emitPreciseDeopt(instr)
+		return
+	}
+	epoch := runtime.ShapeFieldVMClosureEpoch(shapeID, fieldIdx)
+	ec.asm.LoadImm64(jit.X8, int64(epochPtr))
+	ec.asm.LDR(jit.X8, jit.X8, 0)
+	ec.asm.LoadImm64(jit.X9, int64(epoch))
+	ec.asm.CMPreg(jit.X8, jit.X9)
+	ec.asm.BCond(jit.CondNE, deoptLabel)
+	ec.asm.B(doneLabel)
+	ec.asm.Label(deoptLabel)
+	ec.emitPreciseDeopt(instr)
+	ec.asm.Label(doneLabel)
+}
+
 func irTypeToRuntimeValueType(t Type) (runtime.ValueType, bool) {
 	switch t {
 	case TypeInt:

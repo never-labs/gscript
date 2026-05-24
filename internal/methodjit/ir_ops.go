@@ -217,8 +217,9 @@ const (
 	OpGuardTableKind   // Args[0] must be a table with array kind Aux
 	OpGuardCalleeProto // Args[0] must be a VM closure whose proto pointer is Aux
 	OpGuardFieldCalleeProto
-	OpGuardShapeFieldType     // shape field type epoch must match; Aux=(shape<<32)|field, Aux2=Type
-	OpGuardShapeFieldTypeMask // multiple same-type shape field epochs; Aux=(shape<<32)|Type, Aux2=field bitmask
+	OpGuardShapeFieldType      // shape field type epoch must match; Aux=(shape<<32)|field, Aux2=Type
+	OpGuardShapeFieldTypeMask  // multiple same-type shape field epochs; Aux=(shape<<32)|Type, Aux2=field bitmask
+	OpGuardShapeFieldVMClosure // shape field VM closure epoch must match; Aux=(shape<<32)|field, Aux2=closure ptr
 	OpGuardNonNil
 	OpGuardTruthy
 
