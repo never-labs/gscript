@@ -829,6 +829,21 @@ func (ec *emitContext) emitTableArraySwapPairs(instr *Instr) {
 	asm.MOVreg(jit.X0, mRegTagBool)
 	ec.storeResultNB(jit.X0, instr.ID)
 	asm.Label(doneLabel)
+	ec.fuseBoolResultBitTest(instr.ID, jit.X0)
+}
+
+func (ec *emitContext) fuseBoolResultBitTest(valueID int, fallback jit.Reg) {
+	if ec == nil {
+		return
+	}
+	reg := fallback
+	if pr, ok := ec.alloc.ValueRegs[valueID]; ok && !pr.IsFloat {
+		reg = jit.Reg(pr.Reg)
+	}
+	ec.fusedBitTestReg = reg
+	ec.fusedBitTestBit = 0
+	ec.fusedBitTestZero = false
+	ec.fusedBitTestActive = true
 }
 
 func tableArrayStoreNeedsTablePtr(kind, flags int64) bool {
