@@ -134,6 +134,9 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 	if shouldStayTier0StdlibFieldCallLoop(proto, profile) {
 		return tier0PolicyDecision("Tier0StdlibFieldCallLoop", "stay_tier0_stdlib_field_call_loop", "stdlib_field_call_loop")
 	}
+	if shouldStayTier0MetamethodRuntimeLoop(proto, profile) {
+		return tier0PolicyDecision("Tier0MetamethodRuntimeLoop", "stay_tier0_metamethod_runtime_loop", "metamethod_runtime_loop")
+	}
 	if shouldStayTier0ForProto(proto, profile) {
 		return tier0PolicyDecision("Tier0Profile", "stay_tier0_profile", "jit_disabled")
 	}

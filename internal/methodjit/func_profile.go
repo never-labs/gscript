@@ -403,6 +403,26 @@ func shouldStayTier0StdlibFieldCallLoop(proto *vm.FuncProto, profile FuncProfile
 	return count >= 6 || (hostModuleCount >= 4 && profile.CallCount >= 16)
 }
 
+func shouldStayTier0MetamethodRuntimeLoop(proto *vm.FuncProto, profile FuncProfile) bool {
+	if proto == nil || !profile.HasLoop || profile.LoopDepth != 1 || profile.CallCount == 0 {
+		return false
+	}
+	if !hasFieldDispatchCallInLoop(proto) {
+		return false
+	}
+	inLoop := staticLoopPCs(proto)
+	for pc, inst := range proto.Code {
+		if !inLoop[pc] {
+			continue
+		}
+		switch vm.DecodeOp(inst) {
+		case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_UNM, vm.OP_LT, vm.OP_LE, vm.OP_CONCAT:
+			return true
+		}
+	}
+	return false
+}
+
 func isStdlibFieldCalleeCall(proto *vm.FuncProto, callPC, targetReg int) bool {
 	module, ok := stdlibFieldCalleeModule(proto, callPC, targetReg)
 	if !ok {

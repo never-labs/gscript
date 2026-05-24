@@ -5910,6 +5910,9 @@ func (vm *VM) arith(a, b runtime.Value, metamethod string, op func(float64, floa
 	}
 	mm, err := vm.getMetamethod(a, b, metamethod)
 	if err == nil && !mm.IsNil() {
+		if result, ok, err := vm.fastBinaryFieldMetamethod(mm, a, b, metamethod); ok || err != nil {
+			return result, err
+		}
 		args := [2]runtime.Value{a, b}
 		results, err := vm.callValue(mm, args[:])
 		if err != nil {
@@ -6024,6 +6027,9 @@ func (vm *VM) unaryMinus(v runtime.Value) (runtime.Value, error) {
 	}
 	mm, err := vm.getMetamethod(v, v, "__unm")
 	if err == nil && !mm.IsNil() {
+		if result, ok, err := vm.fastUnaryFieldMetamethod(mm, v); ok || err != nil {
+			return result, err
+		}
 		args := [1]runtime.Value{v}
 		results, err := vm.callValue(mm, args[:])
 		if err != nil {
@@ -6083,6 +6089,160 @@ func fastReturnUpvalueClosure(fn runtime.Value) (runtime.Value, bool) {
 		return runtime.NilValue(), false
 	}
 	return cl.Upvalues[upvalue].Get(), true
+}
+
+func (vm *VM) fastBinaryFieldMetamethod(fn, a, b runtime.Value, metamethod string) (runtime.Value, bool, error) {
+	cl, ok := closureFromValue(fn)
+	if !ok || cl == nil || cl.Proto == nil || cl.Proto.NumParams < 2 {
+		return runtime.NilValue(), false, nil
+	}
+	code := cl.Proto.Code
+	constants := cl.Proto.Constants
+	if len(code) == 4 {
+		leftGet := code[0]
+		rightGet := code[1]
+		opInst := code[2]
+		ret := code[3]
+		op := DecodeOp(opInst)
+		if DecodeOp(leftGet) != OP_GETFIELD || DecodeOp(rightGet) != OP_GETFIELD ||
+			DecodeB(leftGet) != 0 || DecodeB(rightGet) != 1 ||
+			DecodeOp(ret) != OP_RETURN || DecodeA(ret) != DecodeA(opInst) || DecodeB(ret) != 2 {
+			return runtime.NilValue(), false, nil
+		}
+		if !binaryMetamethodOpMatches(metamethod, op) {
+			return runtime.NilValue(), false, nil
+		}
+		left, right, ok, err := vm.fastMetamethodFieldOperands(a, b, constants, DecodeC(leftGet), DecodeC(rightGet))
+		if !ok || err != nil {
+			return runtime.NilValue(), ok, err
+		}
+		runtime.RecordRuntimePathRuntimeSpecializationHit("metamethod", "field_binary")
+		return vm.evalFastFieldBinaryOp(left, right, op)
+	}
+	if len(code) == 7 {
+		leftGet := code[0]
+		rightGet := code[1]
+		cmp := code[2]
+		jmp := code[3]
+		loadTrue := code[4]
+		loadFalse := code[5]
+		ret := code[6]
+		op := DecodeOp(cmp)
+		if DecodeOp(leftGet) != OP_GETFIELD || DecodeOp(rightGet) != OP_GETFIELD ||
+			DecodeB(leftGet) != 0 || DecodeB(rightGet) != 1 ||
+			(op != OP_LT && op != OP_LE) || !binaryMetamethodOpMatches(metamethod, op) ||
+			DecodeOp(jmp) != OP_JMP || DecodesBx(jmp) != 1 ||
+			DecodeOp(loadTrue) != OP_LOADBOOL || DecodeB(loadTrue) != 1 || DecodeC(loadTrue) != 1 ||
+			DecodeOp(loadFalse) != OP_LOADBOOL || DecodeB(loadFalse) != 0 || DecodeC(loadFalse) != 0 ||
+			DecodeOp(ret) != OP_RETURN || DecodeA(ret) != DecodeA(loadTrue) || DecodeA(loadFalse) != DecodeA(loadTrue) || DecodeB(ret) != 2 {
+			return runtime.NilValue(), false, nil
+		}
+		left, right, ok, err := vm.fastMetamethodFieldOperands(a, b, constants, DecodeC(leftGet), DecodeC(rightGet))
+		if !ok || err != nil {
+			return runtime.NilValue(), ok, err
+		}
+		runtime.RecordRuntimePathRuntimeSpecializationHit("metamethod", "field_compare")
+		result, err := vm.evalFastFieldCompareOp(left, right, op)
+		return runtime.BoolValue(result), true, err
+	}
+	return runtime.NilValue(), false, nil
+}
+
+func (vm *VM) fastUnaryFieldMetamethod(fn, v runtime.Value) (runtime.Value, bool, error) {
+	cl, ok := closureFromValue(fn)
+	if !ok || cl == nil || cl.Proto == nil || cl.Proto.NumParams < 1 || len(cl.Proto.Code) != 3 {
+		return runtime.NilValue(), false, nil
+	}
+	code := cl.Proto.Code
+	constants := cl.Proto.Constants
+	get := code[0]
+	op := code[1]
+	ret := code[2]
+	if DecodeOp(get) != OP_GETFIELD || DecodeB(get) != 0 ||
+		DecodeOp(op) != OP_UNM || DecodeB(op) != DecodeA(get) ||
+		DecodeOp(ret) != OP_RETURN || DecodeA(ret) != DecodeA(op) || DecodeB(ret) != 2 {
+		return runtime.NilValue(), false, nil
+	}
+	fieldIdx := DecodeC(get)
+	if fieldIdx < 0 || fieldIdx >= len(constants) || !constants[fieldIdx].IsString() {
+		return runtime.NilValue(), false, nil
+	}
+	field, err := vm.tableGet(v, runtime.StringValue(constants[fieldIdx].Str()))
+	if err != nil {
+		return runtime.NilValue(), true, err
+	}
+	if !field.IsNumber() {
+		return runtime.NilValue(), false, nil
+	}
+	runtime.RecordRuntimePathRuntimeSpecializationHit("metamethod", "field_unary")
+	result, err := vm.unaryMinus(field)
+	return result, true, err
+}
+
+func binaryMetamethodOpMatches(metamethod string, op Opcode) bool {
+	switch metamethod {
+	case "__add":
+		return op == OP_ADD
+	case "__sub":
+		return op == OP_SUB
+	case "__mul":
+		return op == OP_MUL
+	case "__lt":
+		return op == OP_LT
+	case "__le":
+		return op == OP_LE
+	default:
+		return false
+	}
+}
+
+func (vm *VM) fastMetamethodFieldOperands(a, b runtime.Value, constants []runtime.Value, leftIdx, rightIdx int) (runtime.Value, runtime.Value, bool, error) {
+	if leftIdx < 0 || leftIdx >= len(constants) || rightIdx < 0 || rightIdx >= len(constants) ||
+		!constants[leftIdx].IsString() || !constants[rightIdx].IsString() {
+		return runtime.NilValue(), runtime.NilValue(), false, nil
+	}
+	left, err := vm.tableGet(a, runtime.StringValue(constants[leftIdx].Str()))
+	if err != nil {
+		return runtime.NilValue(), runtime.NilValue(), true, err
+	}
+	right, err := vm.tableGet(b, runtime.StringValue(constants[rightIdx].Str()))
+	if err != nil {
+		return runtime.NilValue(), runtime.NilValue(), true, err
+	}
+	if !left.IsNumber() || !right.IsNumber() {
+		return runtime.NilValue(), runtime.NilValue(), false, nil
+	}
+	return left, right, true, nil
+}
+
+func (vm *VM) evalFastFieldBinaryOp(left, right runtime.Value, op Opcode) (runtime.Value, bool, error) {
+	switch op {
+	case OP_ADD:
+		result, err := vm.arith(left, right, "__add", func(x, y float64) float64 { return x + y })
+		return result, true, err
+	case OP_SUB:
+		result, err := vm.arith(left, right, "__sub", func(x, y float64) float64 { return x - y })
+		return result, true, err
+	case OP_MUL:
+		result, err := vm.arith(left, right, "__mul", func(x, y float64) float64 { return x * y })
+		return result, true, err
+	default:
+		return runtime.NilValue(), false, nil
+	}
+}
+
+func (vm *VM) evalFastFieldCompareOp(left, right runtime.Value, op Opcode) (bool, error) {
+	switch op {
+	case OP_LT:
+		if result, ok := left.LessThan(right); ok {
+			return result, nil
+		}
+	case OP_LE:
+		if result, ok := left.LessThan(right); ok {
+			return result || left.Equal(right), nil
+		}
+	}
+	return false, fmt.Errorf("attempt to compare %s with %s", left.TypeName(), right.TypeName())
 }
 
 func (vm *VM) ConcatValues(values []runtime.Value) (runtime.Value, error) {
@@ -6169,6 +6329,12 @@ func (vm *VM) valueLessThan(a, b runtime.Value) (bool, error) {
 	}
 	mm, err := vm.getMetamethod(a, b, "__lt")
 	if err == nil && !mm.IsNil() {
+		if result, ok, err := vm.fastBinaryFieldMetamethod(mm, a, b, "__lt"); ok || err != nil {
+			if err != nil {
+				return false, err
+			}
+			return result.Truthy(), nil
+		}
 		args := [2]runtime.Value{a, b}
 		results, err := vm.callValue(mm, args[:])
 		if err != nil {
@@ -6188,6 +6354,12 @@ func (vm *VM) valueLessEqual(a, b runtime.Value) (bool, error) {
 	}
 	mm, err := vm.getMetamethod(a, b, "__le")
 	if err == nil && !mm.IsNil() {
+		if result, ok, err := vm.fastBinaryFieldMetamethod(mm, a, b, "__le"); ok || err != nil {
+			if err != nil {
+				return false, err
+			}
+			return result.Truthy(), nil
+		}
 		args := [2]runtime.Value{a, b}
 		results, err := vm.callValue(mm, args[:])
 		if err != nil {
