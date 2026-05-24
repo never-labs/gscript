@@ -128,6 +128,9 @@ func (tm *TieringManager) osrRestartSafetyGate(proto *vm.FuncProto, profile Func
 	if profile.HasVararg {
 		return blockGate("OSRRestartSafety", "function contains vararg state")
 	}
+	if tm.osrWouldInlineVarargInLoop(proto, profile) {
+		return blockGateOp("OSRRestartSafety", "inlined loop callee contains vararg state", OpVararg)
+	}
 
 	fn := BuildGraph(proto)
 	if fn.Unpromotable {
@@ -164,6 +167,30 @@ func (tm *TieringManager) osrRestartSafetyGate(proto *vm.FuncProto, profile Func
 		return blockGate("OSRRestartSafety", "optimized body has restart-visible side effects")
 	}
 	return allowGate("OSRRestartSafety", "restart OSR is safe")
+}
+
+func (tm *TieringManager) osrWouldInlineVarargInLoop(proto *vm.FuncProto, profile FuncProfile) bool {
+	if tm == nil || proto == nil || !profile.HasLoop || profile.CallCount == 0 || !hasStaticCallInLoop(proto) {
+		return false
+	}
+	globals := tm.buildLoopCallGlobals(proto)
+	if len(globals) == 0 {
+		return false
+	}
+	inLoop := staticLoopPCs(proto)
+	for pc, inst := range proto.Code {
+		if !inLoop[pc] || vm.DecodeOp(inst) != vm.OP_CALL {
+			continue
+		}
+		callee, ok := findGetGlobalCallee(proto, pc, vm.DecodeA(inst), globals)
+		if !ok || callee == nil || len(callee.Code) > inlineMaxCalleeSize {
+			continue
+		}
+		if analyzeFuncProfile(callee).HasVararg {
+			return true
+		}
+	}
+	return false
 }
 
 func hasRestartVisibleSideEffect(fn *Function) bool {
