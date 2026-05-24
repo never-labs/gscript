@@ -93,6 +93,18 @@ func buildMathLib() *Table {
 		}
 		return []Value{FloatValue(math.Sqrt(toFloat(args[0])))}, nil
 	})
+	if v := t.RawGetString("sqrt"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg1 = func(arg Value) (Value, error) {
+			return FloatValue(math.Sqrt(toFloat(arg))), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 1 {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'math.sqrt'")
+			}
+			return FloatValue(math.Sqrt(toFloat(args[0]))), nil
+		}
+	}
 
 	// math.sin(x)
 	set("sin", func(args []Value) ([]Value, error) {
