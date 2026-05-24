@@ -6242,7 +6242,7 @@ func (vm *VM) fastUnaryFieldMetamethod(fn, v runtime.Value) (runtime.Value, bool
 	if fieldIdx < 0 || fieldIdx >= len(constants) || !constants[fieldIdx].IsString() {
 		return runtime.NilValue(), false, nil
 	}
-	field, err := vm.tableGet(v, runtime.StringValue(constants[fieldIdx].Str()))
+	field, err := vm.fastMetamethodFieldOperand(v, constants[fieldIdx].Str())
 	if err != nil {
 		return runtime.NilValue(), true, err
 	}
@@ -6276,11 +6276,11 @@ func (vm *VM) fastMetamethodFieldOperands(a, b runtime.Value, constants []runtim
 		!constants[leftIdx].IsString() || !constants[rightIdx].IsString() {
 		return runtime.NilValue(), runtime.NilValue(), false, nil
 	}
-	left, err := vm.tableGet(a, runtime.StringValue(constants[leftIdx].Str()))
+	left, err := vm.fastMetamethodFieldOperand(a, constants[leftIdx].Str())
 	if err != nil {
 		return runtime.NilValue(), runtime.NilValue(), true, err
 	}
-	right, err := vm.tableGet(b, runtime.StringValue(constants[rightIdx].Str()))
+	right, err := vm.fastMetamethodFieldOperand(b, constants[rightIdx].Str())
 	if err != nil {
 		return runtime.NilValue(), runtime.NilValue(), true, err
 	}
@@ -6288,6 +6288,19 @@ func (vm *VM) fastMetamethodFieldOperands(a, b runtime.Value, constants []runtim
 		return runtime.NilValue(), runtime.NilValue(), false, nil
 	}
 	return left, right, true, nil
+}
+
+func (vm *VM) fastMetamethodFieldOperand(v runtime.Value, field string) (runtime.Value, error) {
+	if v.IsTable() {
+		tbl := v.Table()
+		if raw := tbl.RawGetString(field); !raw.IsNil() {
+			return raw, nil
+		}
+		if tbl.GetMetatable() == nil {
+			return runtime.NilValue(), nil
+		}
+	}
+	return vm.tableGet(v, runtime.StringValue(field))
 }
 
 func (vm *VM) evalFastFieldBinaryOp(left, right runtime.Value, op Opcode) (runtime.Value, bool, error) {
@@ -6449,11 +6462,10 @@ func (vm *VM) valueLessEqual(a, b runtime.Value) (bool, error) {
 }
 
 func (vm *VM) getMetamethod(a, b runtime.Value, name string) (runtime.Value, error) {
-	key := runtime.StringValue(name)
 	if a.IsTable() {
 		mt := a.Table().GetMetatable()
 		if mt != nil {
-			mm := mt.RawGet(key)
+			mm := mt.RawGetString(name)
 			if !mm.IsNil() {
 				return mm, nil
 			}
@@ -6462,7 +6474,7 @@ func (vm *VM) getMetamethod(a, b runtime.Value, name string) (runtime.Value, err
 	if b.IsTable() {
 		mt := b.Table().GetMetatable()
 		if mt != nil {
-			mm := mt.RawGet(key)
+			mm := mt.RawGetString(name)
 			if !mm.IsNil() {
 				return mm, nil
 			}
