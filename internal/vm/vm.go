@@ -66,6 +66,7 @@ type VM struct {
 	globals              map[string]runtime.Value // legacy map (kept for interop)
 	globalArray          []runtime.Value          // indexed globals (fast path)
 	globalIndex          map[string]int           // name → index in globalArray
+	globalValueEpoch     []uint64                 // per-index value epoch for named global dependencies
 	globalVer            uint32                   // bumped on structural changes (new globals added)
 	globalValueVer       uint64                   // bumped whenever indexed global values may have changed
 	globalOverrides      map[string]runtime.Value // per-VM global overrides for coroutine-local builtins
@@ -351,6 +352,65 @@ func (vm *VM) GlobalValueVersionPtr() (*uint64, uint64, bool) {
 	return &vm.globalValueVer, vm.globalValueVer, true
 }
 
+func (vm *VM) GlobalValueVersion(name string) (uint64, bool) {
+	if vm == nil || vm.globalOverrides != nil {
+		return 0, false
+	}
+	if vm.noGlobalLock {
+		idx, ok := vm.globalIndex[name]
+		if !ok || idx < 0 || idx >= len(vm.globalValueEpoch) {
+			return 0, true
+		}
+		return vm.globalValueEpoch[idx], true
+	}
+	vm.globalsMu.RLock()
+	idx, ok := vm.globalIndex[name]
+	if !ok || idx < 0 || idx >= len(vm.globalValueEpoch) {
+		vm.globalsMu.RUnlock()
+		return 0, true
+	}
+	epoch := vm.globalValueEpoch[idx]
+	vm.globalsMu.RUnlock()
+	return epoch, true
+}
+
+func (vm *VM) GlobalValueVersionByIndex(idx int) (uint64, bool) {
+	if vm == nil || vm.globalOverrides != nil || idx < 0 {
+		return 0, false
+	}
+	if vm.noGlobalLock {
+		if idx >= len(vm.globalValueEpoch) {
+			return 0, true
+		}
+		return vm.globalValueEpoch[idx], true
+	}
+	vm.globalsMu.RLock()
+	if idx >= len(vm.globalValueEpoch) {
+		vm.globalsMu.RUnlock()
+		return 0, true
+	}
+	epoch := vm.globalValueEpoch[idx]
+	vm.globalsMu.RUnlock()
+	return epoch, true
+}
+
+func (vm *VM) ensureGlobalValueEpochLen() {
+	for len(vm.globalValueEpoch) < len(vm.globalArray) {
+		vm.globalValueEpoch = append(vm.globalValueEpoch, 0)
+	}
+}
+
+func (vm *VM) bumpGlobalValueEpoch(idx int) {
+	vm.globalValueVer++
+	if idx < 0 {
+		return
+	}
+	vm.ensureGlobalValueEpochLen()
+	if idx < len(vm.globalValueEpoch) {
+		vm.globalValueEpoch[idx]++
+	}
+}
+
 func (vm *VM) initTypeNameValues() {
 	vm.typeNameValues[runtime.TypeNil] = runtime.StringValue("nil")
 	vm.typeNameValues[runtime.TypeBool] = runtime.StringValue("boolean")
@@ -386,10 +446,11 @@ func (vm *VM) SetGlobal(name string, val runtime.Value) {
 		if idx, ok := vm.globalIndex[name]; ok {
 			vm.globalArray[idx] = val
 			vm.globals[name] = val
-			vm.globalValueVer++
+			vm.bumpGlobalValueEpoch(idx)
 		} else {
 			idx = len(vm.globalArray)
 			vm.globalArray = append(vm.globalArray, val)
+			vm.globalValueEpoch = append(vm.globalValueEpoch, 1)
 			vm.globalIndex[name] = idx
 			vm.globals[name] = val
 			vm.globalVer++
@@ -401,10 +462,11 @@ func (vm *VM) SetGlobal(name string, val runtime.Value) {
 	if idx, ok := vm.globalIndex[name]; ok {
 		vm.globalArray[idx] = val
 		vm.globals[name] = val
-		vm.globalValueVer++
+		vm.bumpGlobalValueEpoch(idx)
 	} else {
 		idx = len(vm.globalArray)
 		vm.globalArray = append(vm.globalArray, val)
+		vm.globalValueEpoch = append(vm.globalValueEpoch, 1)
 		vm.globalIndex[name] = idx
 		vm.globals[name] = val
 		vm.globalVer++
@@ -420,7 +482,7 @@ func (vm *VM) DeleteGlobal(name string) {
 			delete(vm.globalIndex, name)
 			delete(vm.globals, name)
 			vm.globalVer++
-			vm.globalValueVer++
+			vm.bumpGlobalValueEpoch(idx)
 		}
 		return
 	}
@@ -430,7 +492,7 @@ func (vm *VM) DeleteGlobal(name string) {
 		delete(vm.globalIndex, name)
 		delete(vm.globals, name)
 		vm.globalVer++
-		vm.globalValueVer++
+		vm.bumpGlobalValueEpoch(idx)
 	}
 	vm.globalsMu.Unlock()
 }
@@ -959,6 +1021,28 @@ func (vm *VM) ExecuteStdTypeCall(absSlot, nArgs, rawC int) (bool, error) {
 	}
 	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
 	vm.writeSingleCallResult(absSlot, rawC, vm.typeNameValue(vm.regs[absSlot+1]))
+	return true, nil
+}
+
+// ExecuteStdGetMetatableCall handles getmetatable(value) without allocating a
+// generic native argument/result slice.
+func (vm *VM) ExecuteStdGetMetatableCall(absSlot, nArgs, rawC int) (bool, error) {
+	if nArgs != 1 || absSlot+1 >= len(vm.regs) {
+		return false, nil
+	}
+	arg := vm.regs[absSlot+1]
+	result := runtime.NilValue()
+	if arg.IsTable() {
+		if mt := arg.Table().GetMetatable(); mt != nil {
+			if protected := mt.RawGetString("__metatable"); !protected.IsNil() {
+				result = protected
+			} else {
+				result = runtime.TableValue(mt)
+			}
+		}
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	vm.writeSingleCallResult(absSlot, rawC, result)
 	return true, nil
 }
 
@@ -1959,6 +2043,7 @@ func (vm *VM) SyncTier2GlobalMap(constants []runtime.Value, indices []int32, con
 				continue
 			}
 			vm.globals[constants[constIdx].Str()] = vm.globalArray[idx]
+			vm.bumpGlobalValueEpoch(idx)
 		}
 		return
 	}
@@ -1972,6 +2057,7 @@ func (vm *VM) SyncTier2GlobalMap(constants []runtime.Value, indices []int32, con
 			continue
 		}
 		vm.globals[constants[constIdx].Str()] = vm.globalArray[idx]
+		vm.bumpGlobalValueEpoch(idx)
 	}
 	vm.globalsMu.Unlock()
 }
@@ -2020,6 +2106,7 @@ func (vm *VM) resolveGlobalIndex(name string) int {
 		val = runtime.NilValue()
 	}
 	vm.globalArray = append(vm.globalArray, val)
+	vm.globalValueEpoch = append(vm.globalValueEpoch, 0)
 	vm.globalIndex[name] = idx
 	vm.globalVer++
 	return idx
@@ -2034,6 +2121,7 @@ func New(globals map[string]runtime.Value) *VM {
 		gi[name] = len(ga)
 		ga = append(ga, val)
 	}
+	ge := make([]uint64, len(ga))
 
 	v := &VM{
 		regs:               runtime.MakeNilSlice(1024),
@@ -2041,6 +2129,7 @@ func New(globals map[string]runtime.Value) *VM {
 		globals:            globals,
 		globalArray:        ga,
 		globalIndex:        gi,
+		globalValueEpoch:   ge,
 		globalOverrideFast: -1,
 		globalsMu:          &sync.RWMutex{},
 		noGlobalLock:       true, // single-threaded by default
@@ -2182,6 +2271,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		globals:            parent.globals,
 		globalArray:        parent.globalArray,
 		globalIndex:        parent.globalIndex,
+		globalValueEpoch:   parent.globalValueEpoch,
 		globalVer:          parent.globalVer,
 		globalValueVer:     parent.globalValueVer,
 		globalOverrideFast: -1,
@@ -2210,6 +2300,8 @@ func newIsolatedChildVM(parent *VM) *VM {
 	// Copy both globalArray and globalIndex for full isolation
 	ga := make([]runtime.Value, len(parent.globalArray))
 	copy(ga, parent.globalArray)
+	ge := make([]uint64, len(parent.globalValueEpoch))
+	copy(ge, parent.globalValueEpoch)
 
 	gi := make(map[string]int, len(parent.globalIndex))
 	for k, v := range parent.globalIndex {
@@ -2227,6 +2319,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		globals:            childGlobals,
 		globalArray:        ga,
 		globalIndex:        gi,
+		globalValueEpoch:   ge,
 		globalVer:          parent.globalVer,
 		globalValueVer:     parent.globalValueVer,
 		globalOverrideFast: -1,
@@ -3083,22 +3176,31 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 				}
 				cache := &proto.GlobalCache[bx]
+				idx := -1
 				if cache.index >= 0 && cache.version == vm.globalVer {
-					vm.globalArray[cache.index] = val
+					idx = int(cache.index)
+					vm.globalArray[idx] = val
 				} else {
-					idx := vm.resolveGlobalIndex(name)
+					idx = vm.resolveGlobalIndex(name)
 					cache.index = int32(idx)
 					cache.version = vm.globalVer
 					vm.globalArray[idx] = val
 				}
 				vm.globals[name] = val
-				vm.globalValueVer++
+				vm.bumpGlobalValueEpoch(idx)
 			} else {
 				// Multi-threaded: locked access, update both map and array
 				vm.globalsMu.Lock()
 				vm.globals[name] = val
 				if idx, ok := vm.globalIndex[name]; ok {
 					vm.globalArray[idx] = val
+					vm.bumpGlobalValueEpoch(idx)
+				} else {
+					idx := len(vm.globalArray)
+					vm.globalIndex[name] = idx
+					vm.globalArray = append(vm.globalArray, val)
+					vm.globalValueEpoch = append(vm.globalValueEpoch, 1)
+					vm.globalVer++
 					vm.globalValueVer++
 				}
 				vm.globalsMu.Unlock()
@@ -3126,19 +3228,22 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				cache.version = vm.globalVer
 				vm.globalArray[idx] = val
 				vm.globals[name] = val
-				vm.globalValueVer++
+				vm.bumpGlobalValueEpoch(idx)
 			} else {
 				vm.globalsMu.Lock()
 				vm.globals[name] = val
-				if idx, ok := vm.globalIndex[name]; ok {
+				idx := -1
+				if existingIdx, ok := vm.globalIndex[name]; ok {
+					idx = existingIdx
 					vm.globalArray[idx] = val
 				} else {
 					idx = len(vm.globalArray)
 					vm.globalIndex[name] = idx
 					vm.globalArray = append(vm.globalArray, val)
+					vm.globalValueEpoch = append(vm.globalValueEpoch, 0)
 					vm.globalVer++
 				}
-				vm.globalValueVer++
+				vm.bumpGlobalValueEpoch(idx)
 				vm.globalsMu.Unlock()
 			}
 			vm.markGlobalReadOnly(name)

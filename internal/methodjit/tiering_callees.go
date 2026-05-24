@@ -303,6 +303,10 @@ func (tm *TieringManager) ensureNativeLoopCallees(proto *vm.FuncProto) {
 		if _, ok := tm.tier2CompiledFor(callee); ok {
 			continue
 		}
+		profile := analyzeFuncProfile(callee)
+		if !profile.HasLoop && profile.HasGlobal {
+			continue
+		}
 		if !canPromoteToTier2(callee) || !nativeLoopCalleePrecompileSafe(callee) {
 			continue
 		}

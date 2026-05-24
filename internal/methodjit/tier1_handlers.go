@@ -638,6 +638,13 @@ slowPath:
 					return err
 				}
 			}
+		case runtime.NativeKindStdGetMetatable:
+			if e != nil && e.callVM != nil && gf.NativeData == runtime.StdGetMetatableIdentityPtr() {
+				handled, err := e.callVM.ExecuteStdGetMetatableCall(absSlot, nArgs, rawC)
+				if err != nil || handled {
+					return err
+				}
+			}
 		}
 		if nArgs == 1 && gf.FastArg1Ret2 != nil {
 			runtime.RecordRuntimePathNativeCallFastFor(gf)

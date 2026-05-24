@@ -31,8 +31,13 @@ type CompilationGlobalLookup interface {
 	GetGlobal(name string) runtime.Value
 }
 
-type compilationGlobalVersioned interface {
-	GlobalValueVersionPtr() (*uint64, uint64, bool)
+type compilationGlobalValueVersioned interface {
+	GlobalValueVersion(name string) (uint64, bool)
+}
+
+type compilationGlobalIndexedValueVersioned interface {
+	GlobalIndex(name string) (int, bool)
+	GlobalValueVersionByIndex(idx int) (uint64, bool)
 }
 
 // CompilationDependency is a single recorded assumption. Implementations should
@@ -210,10 +215,17 @@ func (r *CompilationDependencyRegistry) RecordGlobalValue(globals CompilationGlo
 	dep := GlobalValueDependency{Name: name}
 	if globals != nil {
 		dep.Value = globals.GetGlobal(name)
-		if v, ok := globals.(compilationGlobalVersioned); ok {
-			_, version, valid := v.GlobalValueVersionPtr()
-			dep.Version = version
-			dep.HasVersion = valid
+		if versioned, ok := globals.(compilationGlobalValueVersioned); ok {
+			if version, ok := versioned.GlobalValueVersion(name); ok {
+				dep.Version = version
+				dep.HasVersion = true
+			}
+		}
+		if indexed, ok := globals.(compilationGlobalIndexedValueVersioned); ok {
+			if idx, ok := indexed.GlobalIndex(name); ok {
+				dep.Index = idx
+				dep.HasIndex = true
+			}
 		}
 	}
 	return r.Record(dep)
@@ -291,14 +303,17 @@ func (d NoMetatableDependency) String() string {
 	return d.Key()
 }
 
-// GlobalValueDependency snapshots a global binding value. Version is optional:
-// current VMs expose it for cheap broad invalidation, while tests and future
-// embedding surfaces can validate by value only.
+// GlobalValueDependency snapshots one global binding. When the VM exposes a
+// per-binding epoch, validation can ignore writes to unrelated globals while
+// still invalidating on any write to the named binding, including write-same-
+// value cases that may matter for host interop and native caches.
 type GlobalValueDependency struct {
 	Name       string
 	Value      runtime.Value
 	Version    uint64
+	Index      int
 	HasVersion bool
+	HasIndex   bool
 }
 
 func (d GlobalValueDependency) Kind() CompilationDependencyKind {
@@ -313,11 +328,31 @@ func (d GlobalValueDependency) Validate(ctx CompilationDependencyContext) error 
 	if ctx.Globals == nil {
 		return fmt.Errorf("no global lookup context")
 	}
-	if v, ok := ctx.Globals.(compilationGlobalVersioned); ok && d.HasVersion {
-		_, version, valid := v.GlobalValueVersionPtr()
-		if valid && version != d.Version {
-			return fmt.Errorf("global version changed from %d to %d", d.Version, version)
+	if d.HasVersion {
+		if d.HasIndex {
+			if indexed, ok := ctx.Globals.(compilationGlobalIndexedValueVersioned); ok {
+				gotVersion, ok := indexed.GlobalValueVersionByIndex(d.Index)
+				if !ok {
+					return fmt.Errorf("global %q version unavailable", d.Name)
+				}
+				if gotVersion != d.Version {
+					return fmt.Errorf("global %q version changed from %d to %d", d.Name, d.Version, gotVersion)
+				}
+				return nil
+			}
 		}
+		versioned, ok := ctx.Globals.(compilationGlobalValueVersioned)
+		if !ok {
+			return fmt.Errorf("no global version context")
+		}
+		gotVersion, ok := versioned.GlobalValueVersion(d.Name)
+		if !ok {
+			return fmt.Errorf("global %q version unavailable", d.Name)
+		}
+		if gotVersion != d.Version {
+			return fmt.Errorf("global %q version changed from %d to %d", d.Name, d.Version, gotVersion)
+		}
+		return nil
 	}
 	if got := ctx.Globals.GetGlobal(d.Name); got != d.Value {
 		return fmt.Errorf("global %q changed from %v to %v", d.Name, d.Value, got)

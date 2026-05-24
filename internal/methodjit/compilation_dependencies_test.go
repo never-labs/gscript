@@ -145,8 +145,39 @@ func TestCompilationDependencyRegistryGlobalValidationFails(t *testing.T) {
 	if invalid.Kind != CompilationDependencyGlobal || invalid.Key != "global=limit" || invalid.Reason == "" {
 		t.Fatalf("unexpected invalidation: %+v", invalid)
 	}
-	if !strings.Contains(err.Error(), "global version changed") &&
+	if !strings.Contains(err.Error(), "global \"limit\" version changed") &&
+		!strings.Contains(err.Error(), "global version changed") &&
 		!strings.Contains(err.Error(), "global \"limit\" changed") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCompilationDependencyRegistryGlobalValidationIgnoresUnrelatedWrites(t *testing.T) {
+	v := vm.New(map[string]runtime.Value{"MOD": runtime.IntValue(10), "_": runtime.IntValue(0)})
+	defer v.Close()
+
+	reg := NewCompilationDependencyRegistry()
+	reg.RecordGlobalValue(v, "MOD")
+	v.SetGlobal("_", runtime.IntValue(1))
+
+	if err := reg.CommitOrValidate(CompilationDependencyContext{Globals: v}, nil); err != nil {
+		t.Fatalf("unrelated global write invalidated dependency: %v", err)
+	}
+}
+
+func TestCompilationDependencyRegistryGlobalValidationFailsOnWriteSameValue(t *testing.T) {
+	v := vm.New(map[string]runtime.Value{"limit": runtime.IntValue(10)})
+	defer v.Close()
+
+	reg := NewCompilationDependencyRegistry()
+	reg.RecordGlobalValue(v, "limit")
+	v.SetGlobal("limit", runtime.IntValue(10))
+
+	err := reg.CommitOrValidate(CompilationDependencyContext{Globals: v}, nil)
+	if err == nil {
+		t.Fatalf("expected write to dependent global to fail even when value is unchanged")
+	}
+	if !strings.Contains(err.Error(), "global \"limit\" version changed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

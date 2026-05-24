@@ -430,6 +430,21 @@ func (interp *Interpreter) registerBuiltins() {
 			}
 			return []Value{TableValue(mt)}, nil
 		},
+		FastArg1: func(v Value) (Value, error) {
+			if !v.IsTable() {
+				return NilValue(), nil
+			}
+			mt := v.Table().GetMetatable()
+			if mt == nil {
+				return NilValue(), nil
+			}
+			if protected := mt.RawGetString("__metatable"); !protected.IsNil() {
+				return protected, nil
+			}
+			return TableValue(mt), nil
+		},
+		NativeKind: NativeKindStdGetMetatable,
+		NativeData: StdGetMetatableIdentityPtr(),
 	}))
 
 	interp.globals.Define("rawget", FunctionValue(&GoFunction{
