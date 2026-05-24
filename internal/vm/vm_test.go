@@ -2414,6 +2414,65 @@ result := obj:mix()
 	expectGlobalInt(t, g, "result", 99)
 }
 
+func TestMetatableNewIndexRawSlotRuntimeSpecialization(t *testing.T) {
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	g := compileAndRun(t, `
+func proxy_newindex(obj, key, value) {
+    slots := rawget(obj, "slots")
+    slots[key] = value
+}
+
+obj := setmetatable({slots: {}}, {__newindex: proxy_newindex})
+for i := 1; i <= 5; i = i + 1 {
+    obj["k" .. i] = i
+}
+slots := rawget(obj, "slots")
+result := slots.k1 + slots.k5
+`)
+	expectGlobalInt(t, g, "result", 6)
+	if got := runtimePathSpecializationHitCount(stats, "metamethod", "raw_slot_newindex"); got != 5 {
+		t.Fatalf("raw_slot_newindex hits = %d, want 5", got)
+	}
+}
+
+func TestMetatableNewIndexRawSlotRuntimeSpecializationHonorsRawgetOverride(t *testing.T) {
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+
+	g := compileAndRun(t, `
+func proxy_newindex(obj, key, value) {
+    slots := rawget(obj, "slots")
+    slots[key] = value
+}
+
+calls := 0
+rawget = func(obj, key) {
+    calls = calls + 1
+    return obj.shadow
+}
+
+obj := setmetatable({slots: {}, shadow: {}}, {__newindex: proxy_newindex})
+obj.foo = 42
+result := obj.shadow.foo
+`)
+	expectGlobalInt(t, g, "result", 42)
+	expectGlobalInt(t, g, "calls", 1)
+	if got := runtimePathSpecializationHitCount(stats, "metamethod", "raw_slot_newindex"); got != 0 {
+		t.Fatalf("raw_slot_newindex hits = %d, want 0", got)
+	}
+}
+
+func runtimePathSpecializationHitCount(stats *runtime.RuntimePathStats, route, name string) uint64 {
+	for _, entry := range stats.Snapshot().RuntimeSpecialization.PerSpecialization {
+		if entry.Route == route && entry.Name == name {
+			return entry.Count
+		}
+	}
+	return 0
+}
+
 // Ensure the test file is valid even if some helpers aren't wired up yet.
 // This provides a graceful message.
 func init() {

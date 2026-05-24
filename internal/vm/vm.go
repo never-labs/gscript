@@ -5849,6 +5849,9 @@ func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) er
 			ni := mt.RawGetString("__newindex")
 			if !ni.IsNil() {
 				if ni.IsFunction() {
+					if handled, err := vm.fastNewIndexRawSlotSet(ni, t, key, val); handled || err != nil {
+						return err
+					}
 					args := [3]runtime.Value{t, key, val}
 					_, err := vm.callValue(ni, args[:])
 					return err
@@ -5862,6 +5865,65 @@ func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) er
 
 	tbl.RawSet(key, val)
 	return nil
+}
+
+func (vm *VM) fastNewIndexRawSlotSet(fn, receiver, key, val runtime.Value) (bool, error) {
+	cl, ok := closureFromValue(fn)
+	if !ok || cl == nil || cl.Proto == nil || cl.Proto.NumParams < 3 {
+		return false, nil
+	}
+	proto := cl.Proto
+	if proto.IndexRawSlotFallbackShape == 0 {
+		if matchNewIndexRawSlotSetShape(proto.Code, proto.Constants) {
+			proto.IndexRawSlotFallbackShape = 1
+		} else {
+			proto.IndexRawSlotFallbackShape = -1
+		}
+	}
+	if proto.IndexRawSlotFallbackShape < 1 {
+		return false, nil
+	}
+	if !receiver.IsTable() || !key.IsString() || !vm.globalIsStdRawGet("rawget") || len(proto.Constants) < 2 || !proto.Constants[1].IsString() {
+		return false, nil
+	}
+	slotTable := receiver.Table().RawGet(runtime.StringValue(proto.Constants[1].Str()))
+	if !slotTable.IsTable() {
+		return true, fmt.Errorf("attempt to index a %s value", slotTable.TypeName())
+	}
+	if err := vm.tableSet(slotTable, key, val); err != nil {
+		return true, err
+	}
+	runtime.RecordRuntimePathRuntimeSpecializationHit("metamethod", "raw_slot_newindex")
+	return true, nil
+}
+
+func matchNewIndexRawSlotSetShape(code []uint32, constants []runtime.Value) bool {
+	if len(code) != 8 || len(constants) < 2 || !constants[0].IsString() || !constants[1].IsString() ||
+		constants[0].Str() != "rawget" {
+		return false
+	}
+	loadRawGet := code[0]
+	moveObj := code[1]
+	loadSlotKey := code[2]
+	callRawGet := code[3]
+	moveValue := code[4]
+	moveKey := code[5]
+	setTable := code[6]
+	ret := code[7]
+	if DecodeOp(loadRawGet) != OP_GETGLOBAL || DecodeOp(moveObj) != OP_MOVE || DecodeOp(loadSlotKey) != OP_LOADK ||
+		DecodeOp(callRawGet) != OP_CALL || DecodeOp(moveValue) != OP_MOVE || DecodeOp(moveKey) != OP_MOVE ||
+		DecodeOp(setTable) != OP_SETTABLE || DecodeOp(ret) != OP_RETURN {
+		return false
+	}
+	rawGetReg := DecodeA(loadRawGet)
+	if DecodeBx(loadRawGet) != 0 || DecodeB(moveObj) != 0 || DecodeBx(loadSlotKey) != 1 ||
+		DecodeA(moveObj) != rawGetReg+1 || DecodeA(loadSlotKey) != rawGetReg+2 ||
+		DecodeA(callRawGet) != rawGetReg || DecodeB(callRawGet) != 3 || DecodeC(callRawGet) != 2 {
+		return false
+	}
+	return DecodeB(moveValue) == 2 && DecodeB(moveKey) == 1 &&
+		DecodeA(setTable) == rawGetReg && DecodeB(setTable) == DecodeA(moveKey) && DecodeC(setTable) == DecodeA(moveValue) &&
+		DecodeB(ret) == 1
 }
 
 func (vm *VM) tableLenInt(t runtime.Value) (int64, error) {
