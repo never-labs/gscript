@@ -254,24 +254,34 @@ func (vm *VM) stdlibHostDriverRuntimeGuards(spec stdlibHostDriverSpec) bool {
 }
 
 func isStdlibHostMixProto(p *FuncProto) bool {
-	return p != nil && p.NumParams == 2 && !p.UsesVarargBytecode && len(p.Code) == 6 &&
-		DecodeOp(p.Code[0]) == OP_LOADINT && DecodesBx(p.Code[0]) == 131 &&
-		DecodeOp(p.Code[1]) == OP_MUL &&
-		DecodeOp(p.Code[2]) == OP_ADD &&
-		DecodeOp(p.Code[3]) == OP_GETGLOBAL &&
-		DecodeOp(p.Code[4]) == OP_MOD &&
-		DecodeOp(p.Code[5]) == OP_RETURN
+	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 6 {
+		return false
+	}
+	pat := newBytecodePattern(p.Code)
+	return pat.hasSBxs(sbxAt{pc: 0, op: OP_LOADINT, sbx: 131}) &&
+		pat.hasOps(
+			opcodeAt{pc: 1, op: OP_MUL},
+			opcodeAt{pc: 2, op: OP_ADD},
+			opcodeAt{pc: 3, op: OP_GETGLOBAL},
+			opcodeAt{pc: 4, op: OP_MOD},
+			opcodeAt{pc: 5, op: OP_RETURN},
+		)
 }
 
 func isStdlibHostChecksumTextProto(p *FuncProto) bool {
-	return p != nil && p.NumParams == 2 && !p.UsesVarargBytecode && len(p.Code) == 23 &&
-		DecodeOp(p.Code[5]) == OP_FORPREP &&
-		DecodeOp(p.Code[10]) == OP_CALL &&
-		DecodeOp(p.Code[11]) == OP_LOADINT && DecodesBx(p.Code[11]) == 17 &&
-		DecodeOp(p.Code[17]) == OP_GETGLOBAL &&
-		DecodeOp(p.Code[18]) == OP_MOD &&
-		DecodeOp(p.Code[20]) == OP_FORLOOP &&
-		DecodeOp(p.Code[22]) == OP_RETURN
+	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 23 {
+		return false
+	}
+	pat := newBytecodePattern(p.Code)
+	return pat.hasSBxs(sbxAt{pc: 11, op: OP_LOADINT, sbx: 17}) &&
+		pat.hasOps(
+			opcodeAt{pc: 5, op: OP_FORPREP},
+			opcodeAt{pc: 10, op: OP_CALL},
+			opcodeAt{pc: 17, op: OP_GETGLOBAL},
+			opcodeAt{pc: 18, op: OP_MOD},
+			opcodeAt{pc: 20, op: OP_FORLOOP},
+			opcodeAt{pc: 22, op: OP_RETURN},
+		)
 }
 
 func stdlibHostTableFunction(table runtime.Value, field, name string) bool {

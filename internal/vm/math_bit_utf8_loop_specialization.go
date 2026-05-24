@@ -237,12 +237,15 @@ func mathBitUTF8ToIntProto(p *FuncProto) bool {
 	if p == nil || p.NumParams != 1 || p.IsVarArg || len(p.Code) != 30 {
 		return false
 	}
-	return DecodeOp(p.Code[0]) == OP_GETGLOBAL &&
-		DecodeOp(p.Code[2]) == OP_CALL &&
-		DecodeOp(p.Code[19]) == OP_GETGLOBAL &&
-		DecodeOp(p.Code[20]) == OP_GETFIELD &&
-		DecodeOp(p.Code[22]) == OP_CALL &&
-		DecodeOp(p.Code[29]) == OP_RETURN
+	pat := newBytecodePattern(p.Code)
+	return pat.hasOps(
+		opcodeAt{pc: 0, op: OP_GETGLOBAL},
+		opcodeAt{pc: 2, op: OP_CALL},
+		opcodeAt{pc: 19, op: OP_GETGLOBAL},
+		opcodeAt{pc: 20, op: OP_GETFIELD},
+		opcodeAt{pc: 22, op: OP_CALL},
+		opcodeAt{pc: 29, op: OP_RETURN},
+	)
 }
 
 func mathBitUTF8TableFunction(tableValue runtime.Value, field string, name string) bool {

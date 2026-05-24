@@ -187,15 +187,21 @@ func isRegexpRandomLineProto(p *FuncProto) bool {
 		return false
 	}
 	format, ok := constStringAt(p, 2)
-	return ok && format == "svc=api%d status=%d route=/v1/items/%d trace=t%05d" &&
-		DecodeOp(p.Code[3]) == OP_LOADINT && DecodesBx(p.Code[3]) == 17 &&
-		DecodeOp(p.Code[5]) == OP_LOADINT && DecodesBx(p.Code[5]) == 200 &&
-		DecodeOp(p.Code[6]) == OP_LOADINT && DecodesBx(p.Code[6]) == 5 &&
-		DecodeOp(p.Code[8]) == OP_LOADINT && DecodesBx(p.Code[8]) == 100 &&
-		DecodeOp(p.Code[11]) == OP_LOADINT && DecodesBx(p.Code[11]) == 997 &&
-		DecodeOp(p.Code[13]) == OP_LOADINT && DecodesBx(p.Code[13]) == 37 &&
-		DecodeOp(p.Code[17]) == OP_CALL &&
-		DecodeOp(p.Code[18]) == OP_RETURN
+	if !ok || format != "svc=api%d status=%d route=/v1/items/%d trace=t%05d" {
+		return false
+	}
+	pat := newBytecodePattern(p.Code)
+	return pat.hasSBxs(
+		sbxAt{pc: 3, op: OP_LOADINT, sbx: 17},
+		sbxAt{pc: 5, op: OP_LOADINT, sbx: 200},
+		sbxAt{pc: 6, op: OP_LOADINT, sbx: 5},
+		sbxAt{pc: 8, op: OP_LOADINT, sbx: 100},
+		sbxAt{pc: 11, op: OP_LOADINT, sbx: 997},
+		sbxAt{pc: 13, op: OP_LOADINT, sbx: 37},
+	) && pat.hasOps(
+		opcodeAt{pc: 17, op: OP_CALL},
+		opcodeAt{pc: 18, op: OP_RETURN},
+	)
 }
 
 func constInt64At(p *FuncProto, idx int) int64 {

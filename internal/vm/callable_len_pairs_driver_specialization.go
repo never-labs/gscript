@@ -166,16 +166,22 @@ func isCallableLenPairsMakePairProxyProto(p *FuncProto) bool {
 }
 
 func isReturnSingleUpvalueProto(p *FuncProto) bool {
-	return p != nil && p.NumParams == 1 && !p.IsVarArg && len(p.Code) == 2 &&
-		DecodeOp(p.Code[0]) == OP_GETUPVAL && DecodeA(p.Code[0]) == 1 &&
-		DecodeOp(p.Code[1]) == OP_RETURN && DecodeA(p.Code[1]) == 1 && DecodeB(p.Code[1]) == 2
+	if p == nil || p.NumParams != 1 || p.IsVarArg || len(p.Code) != 2 {
+		return false
+	}
+	pat := newBytecodePattern(p.Code)
+	return pat.hasAs(aAt{pc: 0, op: OP_GETUPVAL, a: 1}) &&
+		pat.hasABs(abAt{pc: 1, op: OP_RETURN, a: 1, b: 2})
 }
 
 func isCallableLenPairsPairsFactoryProto(p *FuncProto) bool {
-	return p != nil && p.NumParams == 1 && !p.IsVarArg && len(p.Code) == 7 && len(p.Protos) == 1 &&
-		DecodeOp(p.Code[0]) == OP_LOADINT && DecodeA(p.Code[0]) == 1 && DecodesBx(p.Code[0]) == 0 &&
-		DecodeOp(p.Code[1]) == OP_CLOSURE &&
-		DecodeOp(p.Code[4]) == OP_RETURN && DecodeA(p.Code[4]) == 2 && DecodeB(p.Code[4]) == 4
+	if p == nil || p.NumParams != 1 || p.IsVarArg || len(p.Code) != 7 || len(p.Protos) != 1 {
+		return false
+	}
+	pat := newBytecodePattern(p.Code)
+	return pat.hasASBxs(asbxAt{pc: 0, op: OP_LOADINT, a: 1, sbx: 0}) &&
+		pat.hasOps(opcodeAt{pc: 1, op: OP_CLOSURE}) &&
+		pat.hasABs(abAt{pc: 4, op: OP_RETURN, a: 2, b: 4})
 }
 
 func constStringAt(p *FuncProto, idx int) (string, bool) {
