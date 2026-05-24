@@ -19,11 +19,14 @@ func affineModuloIntLeafSpecForProto(p *FuncProto) (affineModuloIntLeafSpec, boo
 		return spec, false
 	}
 	code := p.Code
-	if DecodeOp(code[0]) != OP_LOADINT || DecodeA(code[0]) != 5 ||
-		DecodeOp(code[1]) != OP_MUL || DecodeA(code[1]) != 4 || DecodeB(code[1]) != 0 || DecodeC(code[1]) != 5 ||
-		DecodeOp(code[2]) != OP_ADD || DecodeA(code[2]) != 3 || DecodeB(code[2]) != 4 || DecodeC(code[2]) != 1 ||
-		DecodeOp(code[4]) != OP_MOD || DecodeA(code[4]) != 2 || DecodeB(code[4]) != 3 || DecodeC(code[4]) != 4 ||
-		DecodeOp(code[5]) != OP_RETURN || DecodeA(code[5]) != 2 || DecodeB(code[5]) != 2 {
+	pat := newBytecodePattern(code)
+	if !pat.hasAs(aAt{pc: 0, op: OP_LOADINT, a: 5}) ||
+		!pat.hasABCs(
+			abcAt{pc: 1, op: OP_MUL, a: 4, b: 0, c: 5},
+			abcAt{pc: 2, op: OP_ADD, a: 3, b: 4, c: 1},
+			abcAt{pc: 4, op: OP_MOD, a: 2, b: 3, c: 4},
+		) ||
+		!pat.hasABs(abAt{pc: 5, op: OP_RETURN, a: 2, b: 2}) {
 		return spec, false
 	}
 	spec.mulConst = int64(DecodesBx(code[0]))

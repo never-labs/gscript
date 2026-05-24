@@ -46,24 +46,31 @@ func recognizeTableAffineUpdateModuloLeafSpec(p *FuncProto) (tableAffineUpdateMo
 		return spec, false
 	}
 	code := p.Code
-	if DecodeOp(code[0]) != OP_GETFIELD || DecodeA(code[0]) != 4 || DecodeB(code[0]) != 0 ||
-		DecodeOp(code[1]) != OP_LOADINT || DecodeA(code[1]) != 5 || DecodesBx(code[1]) != 1 ||
-		DecodeOp(code[2]) != OP_ADD || DecodeA(code[2]) != 3 || DecodeB(code[2]) != 4 || DecodeC(code[2]) != 5 ||
-		DecodeOp(code[3]) != OP_SETFIELD || DecodeA(code[3]) != 0 || DecodeC(code[3]) != 3 ||
-		DecodeOp(code[4]) != OP_LOADINT || DecodeA(code[4]) != 8 ||
-		DecodeOp(code[5]) != OP_MUL || DecodeA(code[5]) != 7 || DecodeB(code[5]) != 1 || DecodeC(code[5]) != 8 ||
-		DecodeOp(code[6]) != OP_LOADINT || DecodeA(code[6]) != 9 ||
-		DecodeOp(code[7]) != OP_MUL || DecodeA(code[7]) != 8 || DecodeB(code[7]) != 2 || DecodeC(code[7]) != 9 ||
-		DecodeOp(code[8]) != OP_ADD || DecodeA(code[8]) != 6 || DecodeB(code[8]) != 7 || DecodeC(code[8]) != 8 ||
-		DecodeOp(code[9]) != OP_GETFIELD || DecodeA(code[9]) != 7 || DecodeB(code[9]) != 0 ||
-		DecodeOp(code[10]) != OP_ADD || DecodeA(code[10]) != 5 || DecodeB(code[10]) != 6 || DecodeC(code[10]) != 7 ||
-		DecodeOp(code[11]) != OP_GETFIELD || DecodeA(code[11]) != 7 || DecodeB(code[11]) != 0 ||
-		DecodeOp(code[12]) != OP_LOADINT || DecodeA(code[12]) != 8 ||
-		DecodeOp(code[13]) != OP_MUL || DecodeA(code[13]) != 6 || DecodeB(code[13]) != 7 || DecodeC(code[13]) != 8 ||
-		DecodeOp(code[14]) != OP_ADD || DecodeA(code[14]) != 4 || DecodeB(code[14]) != 5 || DecodeC(code[14]) != 6 ||
-		DecodeOp(code[15]) != OP_GETGLOBAL || DecodeA(code[15]) != 5 ||
-		DecodeOp(code[16]) != OP_MOD || DecodeA(code[16]) != 3 || DecodeB(code[16]) != 4 || DecodeC(code[16]) != 5 ||
-		DecodeOp(code[17]) != OP_RETURN || DecodeA(code[17]) != 3 || DecodeB(code[17]) != 2 {
+	pat := newBytecodePattern(code)
+	if !pat.hasABs(
+		abAt{pc: 0, op: OP_GETFIELD, a: 4, b: 0},
+		abAt{pc: 9, op: OP_GETFIELD, a: 7, b: 0},
+		abAt{pc: 11, op: OP_GETFIELD, a: 7, b: 0},
+		abAt{pc: 17, op: OP_RETURN, a: 3, b: 2},
+	) ||
+		!pat.hasASBxs(asbxAt{pc: 1, op: OP_LOADINT, a: 5, sbx: 1}) ||
+		!pat.hasAs(
+			aAt{pc: 4, op: OP_LOADINT, a: 8},
+			aAt{pc: 6, op: OP_LOADINT, a: 9},
+			aAt{pc: 12, op: OP_LOADINT, a: 8},
+			aAt{pc: 15, op: OP_GETGLOBAL, a: 5},
+		) ||
+		!pat.hasACs(acAt{pc: 3, op: OP_SETFIELD, a: 0, c: 3}) ||
+		!pat.hasABCs(
+			abcAt{pc: 2, op: OP_ADD, a: 3, b: 4, c: 5},
+			abcAt{pc: 5, op: OP_MUL, a: 7, b: 1, c: 8},
+			abcAt{pc: 7, op: OP_MUL, a: 8, b: 2, c: 9},
+			abcAt{pc: 8, op: OP_ADD, a: 6, b: 7, c: 8},
+			abcAt{pc: 10, op: OP_ADD, a: 5, b: 6, c: 7},
+			abcAt{pc: 13, op: OP_MUL, a: 6, b: 7, c: 8},
+			abcAt{pc: 14, op: OP_ADD, a: 4, b: 5, c: 6},
+			abcAt{pc: 16, op: OP_MOD, a: 3, b: 4, c: 5},
+		) {
 		return spec, false
 	}
 	updateIdx := DecodeC(code[0])
