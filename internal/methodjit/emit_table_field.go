@@ -1039,8 +1039,7 @@ func (ec *emitContext) emitGuardShapeFieldType(instr *Instr) {
 	epoch := runtime.ShapeFieldTypeEpoch(shapeID, fieldIdx)
 	ec.asm.LoadImm64(jit.X8, int64(epochPtr))
 	ec.asm.LDR(jit.X8, jit.X8, 0)
-	ec.asm.LoadImm64(jit.X9, int64(epoch))
-	ec.asm.CMPreg(jit.X8, jit.X9)
+	ec.emitCMPRegConst(jit.X8, int64(epoch), jit.X9)
 	ec.asm.BCond(jit.CondNE, deoptLabel)
 	ec.asm.B(doneLabel)
 	ec.asm.Label(deoptLabel)
@@ -1081,8 +1080,7 @@ func (ec *emitContext) emitGuardShapeFieldTypeMask(instr *Instr) {
 			ec.asm.LoadImm64(jit.X10, int64(offset))
 			ec.asm.LDRreg(jit.X9, jit.X8, jit.X10)
 		}
-		ec.asm.LoadImm64(jit.X10, int64(epoch))
-		ec.asm.CMPreg(jit.X9, jit.X10)
+		ec.emitCMPRegConst(jit.X9, int64(epoch), jit.X10)
 		ec.asm.BCond(jit.CondNE, deoptLabel)
 	}
 	ec.asm.B(doneLabel)
@@ -1114,13 +1112,21 @@ func (ec *emitContext) emitGuardShapeFieldVMClosure(instr *Instr) {
 	epoch := runtime.ShapeFieldVMClosureEpoch(shapeID, fieldIdx)
 	ec.asm.LoadImm64(jit.X8, int64(epochPtr))
 	ec.asm.LDR(jit.X8, jit.X8, 0)
-	ec.asm.LoadImm64(jit.X9, int64(epoch))
-	ec.asm.CMPreg(jit.X8, jit.X9)
+	ec.emitCMPRegConst(jit.X8, int64(epoch), jit.X9)
 	ec.asm.BCond(jit.CondNE, deoptLabel)
 	ec.asm.B(doneLabel)
 	ec.asm.Label(deoptLabel)
 	ec.emitPreciseDeopt(instr)
 	ec.asm.Label(doneLabel)
+}
+
+func (ec *emitContext) emitCMPRegConst(reg jit.Reg, value int64, scratch jit.Reg) {
+	if value >= 0 && value <= 0xFFF {
+		ec.asm.CMPimm(reg, uint16(value))
+		return
+	}
+	ec.asm.LoadImm64(scratch, value)
+	ec.asm.CMPreg(reg, scratch)
 }
 
 func irTypeToRuntimeValueType(t Type) (runtime.ValueType, bool) {
