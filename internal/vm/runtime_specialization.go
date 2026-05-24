@@ -26,6 +26,7 @@ const (
 	runtimeSpecializationLinkedRecordChecksum
 	runtimeSpecializationInsertRemoveChecksum
 	runtimeSpecializationTablePipelineChecksum
+	runtimeSpecializationStdlibHostDriver
 	runtimeSpecializationCount
 )
 
@@ -319,6 +320,19 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isTablePipelineChecksumProto,
 		},
 		Run: (*VM).runTablePipelineChecksumRuntimeSpecialization,
+	},
+	runtimeSpecializationStdlibHostDriver: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "stdlib_host_driver",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isStdlibHostDriverProto,
+		},
+		Run: (*VM).runStdlibHostDriverRuntimeSpecialization,
 	},
 }
 
