@@ -5704,7 +5704,11 @@ func (vm *VM) fastIndexStringDispatch(fn, receiver, key runtime.Value) (runtime.
 		if !global.IsTable() {
 			return runtime.NilValue(), true, nil
 		}
-		result, err := vm.tableGet(global, runtime.StringValue(constants[fieldIdx].Str()))
+		fieldName := constants[fieldIdx].Str()
+		if tbl := global.Table(); tbl.GetMetatable() == nil {
+			return tbl.RawGetString(fieldName), true, nil
+		}
+		result, err := vm.tableGet(global, runtime.StringValue(fieldName))
 		return result, true, err
 	}
 	if cl.Proto.IndexRawSlotFallbackShape == 0 {
@@ -5845,6 +5849,12 @@ func (vm *VM) globalIsStdRawGet(name string) bool {
 	global := vm.GetGlobal(name)
 	gf := global.GoFunction()
 	return gf != nil && gf.NativeKind == runtime.NativeKindStdRawGet && gf.NativeData == runtime.StdRawGetIdentityPtr()
+}
+
+func (vm *VM) globalIsStdType(name string) bool {
+	global := vm.GetGlobal(name)
+	gf := global.GoFunction()
+	return gf != nil && gf.NativeKind == runtime.NativeKindStdType && gf.NativeData == runtime.StdTypeIdentityPtr()
 }
 
 // tableSet performs table assignment with __newindex metamethod support.
@@ -6385,6 +6395,9 @@ func (vm *VM) concatPair(a, b runtime.Value) (runtime.Value, error) {
 	}
 	mm, err := vm.getMetamethod(a, b, "__concat")
 	if err == nil && !mm.IsNil() {
+		if result, ok, err := vm.fastConcatTableFieldMetamethod(mm, a, b); ok || err != nil {
+			return result, err
+		}
 		args := [2]runtime.Value{a, b}
 		results, err := vm.callValue(mm, args[:])
 		if err != nil {
@@ -6399,6 +6412,74 @@ func (vm *VM) concatPair(a, b runtime.Value) (runtime.Value, error) {
 		return runtime.NilValue(), fmt.Errorf("attempt to concatenate a %s value", a.TypeName())
 	}
 	return runtime.NilValue(), fmt.Errorf("attempt to concatenate a %s value", b.TypeName())
+}
+
+func (vm *VM) fastConcatTableFieldMetamethod(fn, a, b runtime.Value) (runtime.Value, bool, error) {
+	cl, ok := closureFromValue(fn)
+	if !ok || cl == nil || cl.Proto == nil || cl.Proto.NumParams < 2 || len(cl.Proto.Code) != 20 {
+		return runtime.NilValue(), false, nil
+	}
+	field, ok := matchConcatTableFieldMetamethodShape(cl.Proto)
+	if !ok || !vm.globalIsStdType("type") {
+		return runtime.NilValue(), false, nil
+	}
+	left, err := vm.concatTableFieldOperand(a, field)
+	if err != nil {
+		return runtime.NilValue(), true, err
+	}
+	right, err := vm.concatTableFieldOperand(b, field)
+	if err != nil {
+		return runtime.NilValue(), true, err
+	}
+	if !(left.IsString() || left.IsNumber()) || !(right.IsString() || right.IsNumber()) {
+		return runtime.NilValue(), false, nil
+	}
+	runtime.RecordRuntimePathRuntimeSpecializationHit("metamethod", "table_field_concat")
+	return runtime.LazyStringValue(left, right), true, nil
+}
+
+func (vm *VM) concatTableFieldOperand(v runtime.Value, field string) (runtime.Value, error) {
+	if !v.IsTable() {
+		return v, nil
+	}
+	return vm.fastMetamethodFieldOperand(v, field)
+}
+
+func matchConcatTableFieldMetamethodShape(proto *FuncProto) (string, bool) {
+	code := proto.Code
+	constants := proto.Constants
+	if len(constants) < 3 || !constants[0].IsString() || constants[0].Str() != "type" ||
+		!constants[1].IsString() || constants[1].Str() != "table" ||
+		!constants[2].IsString() {
+		return "", false
+	}
+	expectedOps := []Opcode{
+		OP_GETGLOBAL, OP_MOVE, OP_CALL, OP_LOADK, OP_EQ, OP_JMP, OP_GETFIELD, OP_MOVE,
+		OP_GETGLOBAL, OP_MOVE, OP_CALL, OP_LOADK, OP_EQ, OP_JMP, OP_GETFIELD, OP_MOVE,
+		OP_MOVE, OP_MOVE, OP_CONCAT, OP_RETURN,
+	}
+	for i, op := range expectedOps {
+		if DecodeOp(code[i]) != op {
+			return "", false
+		}
+	}
+	if DecodeBx(code[0]) != 0 || DecodeB(code[1]) != 0 || DecodeA(code[2]) != DecodeA(code[0]) ||
+		DecodeB(code[2]) != 2 || DecodeC(code[2]) != 2 ||
+		DecodeBx(code[3]) != 1 || DecodeB(code[4]) != DecodeA(code[2]) || DecodeC(code[4]) != DecodeA(code[3]) ||
+		DecodesBx(code[5]) != 2 || DecodeB(code[6]) != 0 || DecodeC(code[6]) != 2 || DecodeB(code[7]) != DecodeA(code[6]) {
+		return "", false
+	}
+	if DecodeBx(code[8]) != 0 || DecodeB(code[9]) != 1 || DecodeA(code[10]) != DecodeA(code[8]) ||
+		DecodeB(code[10]) != 2 || DecodeC(code[10]) != 2 ||
+		DecodeBx(code[11]) != 1 || DecodeB(code[12]) != DecodeA(code[10]) || DecodeC(code[12]) != DecodeA(code[11]) ||
+		DecodesBx(code[13]) != 2 || DecodeB(code[14]) != 1 || DecodeC(code[14]) != 2 || DecodeB(code[15]) != DecodeA(code[14]) {
+		return "", false
+	}
+	if DecodeB(code[16]) != 0 || DecodeB(code[17]) != 1 || DecodeB(code[18]) != DecodeA(code[16]) ||
+		DecodeC(code[18]) != DecodeA(code[17]) || DecodeA(code[19]) != DecodeA(code[18]) || DecodeB(code[19]) != 2 {
+		return "", false
+	}
+	return constants[2].Str(), true
 }
 
 func (vm *VM) valueEqual(a, b runtime.Value) (bool, error) {
