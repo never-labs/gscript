@@ -56,6 +56,10 @@ DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_GROUPS = ["suite", "extended", "variants"]
 ALL_GROUPS = ["suite", "extended", "variants", "official"]
 
+LOGICAL_TIME_BENCHMARKS = {
+    "official/defer_protected_hot",
+}
+
 VARIANT_BASES = {
     "ack_nested_shifted": "ackermann",
     "sort_mixed_numeric": "sort",
@@ -292,6 +296,7 @@ def summarize_repeated_runs(
     timer_resolution: float,
     min_sample_seconds: float,
     allow_wall_time: bool,
+    prefer_wall_time: bool = False,
 ) -> Sample:
     wall_total = sum(r.wall_seconds or 0.0 for r in runs)
     bad = [r for r in runs if r.status not in {"ok", "no_time"}]
@@ -315,6 +320,27 @@ def summarize_repeated_runs(
         )
 
     script_total = sum(r.seconds or 0.0 for r in runs)
+    if prefer_wall_time:
+        if allow_wall_time and wall_total >= min_sample_seconds:
+            return Sample(
+                status="ok",
+                seconds=wall_total / repeat,
+                repeat=repeat,
+                time_source="wall_repeat",
+                script_total_seconds=script_total,
+                wall_total_seconds=wall_total,
+                note="benchmark script Time is logical; per-command wall time used",
+                runs=runs,
+            )
+        return Sample(
+            status="low_resolution",
+            repeat=repeat,
+            script_total_seconds=script_total,
+            wall_total_seconds=wall_total,
+            note="benchmark script Time is logical; enable --allow-wall-time for performance comparison",
+            runs=runs,
+        )
+
     if script_total <= timer_resolution:
         if allow_wall_time and wall_total >= min_sample_seconds:
             return Sample(
@@ -355,9 +381,12 @@ def run_sample(
     timer_resolution: float,
     min_sample_seconds: float,
     allow_wall_time: bool,
+    prefer_wall_time: bool = False,
 ) -> Sample:
     runs = [run_command(cmd, timeout, env) for _ in range(repeat)]
-    return summarize_repeated_runs(runs, repeat, timer_resolution, min_sample_seconds, allow_wall_time)
+    return summarize_repeated_runs(
+        runs, repeat, timer_resolution, min_sample_seconds, allow_wall_time, prefer_wall_time
+    )
 
 
 def sample_is_big_enough(sample: Sample, min_sample_seconds: float) -> bool:
@@ -378,11 +407,14 @@ def calibrate_repeat(
     min_sample_seconds: float,
     max_repeat: int,
     allow_wall_time: bool,
+    prefer_wall_time: bool = False,
 ) -> tuple[int, Sample]:
     repeat = 1
     last: Sample | None = None
     while repeat <= max_repeat:
-        last = run_sample(cmd, env, repeat, timeout, timer_resolution, min_sample_seconds, allow_wall_time)
+        last = run_sample(
+            cmd, env, repeat, timeout, timer_resolution, min_sample_seconds, allow_wall_time, prefer_wall_time
+        )
         if sample_is_big_enough(last, min_sample_seconds):
             return repeat, last
         if last.status in {"error", "timeout", "no_time"}:
@@ -488,20 +520,21 @@ def run_mode(
     assert cmd is not None
 
     repeat = repeat_override or 1
+    prefer_wall_time = spec.benchmark_id in LOGICAL_TIME_BENCHMARKS
     warmups: list[Sample] = []
     if repeat_override is None:
         repeat, calibration = calibrate_repeat(
-            cmd, env, timeout, timer_resolution, min_sample_seconds, max_repeat, allow_wall_time
+            cmd, env, timeout, timer_resolution, min_sample_seconds, max_repeat, allow_wall_time, prefer_wall_time
         )
         warmups.append(calibration)
 
     for _ in range(warmup_runs):
         warmups.append(
-            run_sample(cmd, env, repeat, timeout, timer_resolution, min_sample_seconds, allow_wall_time)
+            run_sample(cmd, env, repeat, timeout, timer_resolution, min_sample_seconds, allow_wall_time, prefer_wall_time)
         )
 
     samples = [
-        run_sample(cmd, env, repeat, timeout, timer_resolution, min_sample_seconds, allow_wall_time)
+        run_sample(cmd, env, repeat, timeout, timer_resolution, min_sample_seconds, allow_wall_time, prefer_wall_time)
         for _ in range(measured_runs)
     ]
     result = summarize_mode(samples, warmups, repeat)
