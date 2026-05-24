@@ -232,6 +232,21 @@ func TestBranchLabel(t *testing.T) {
 	}
 }
 
+func TestBranchToNextInstructionBecomesNOP(t *testing.T) {
+	a := NewAssembler()
+	a.B("target")
+	a.Label("target")
+	a.ADDimm(X0, X0, 1)
+	code, err := a.Finalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	inst := binary.LittleEndian.Uint32(code[0:])
+	if inst != 0xD503201F {
+		t.Fatalf("B to next instruction: got 0x%08X, want NOP", inst)
+	}
+}
+
 func TestBCondLabel(t *testing.T) {
 	a := NewAssembler()
 	a.Label("loop")

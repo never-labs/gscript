@@ -162,6 +162,10 @@ func (a *Assembler) Finalize() ([]byte, error) {
 
 		switch f.kind {
 		case fixupB:
+			if offset == 1 && inst&0xFC000000 == 0x14000000 {
+				inst = 0xD503201F // NOP: unconditional branch to next instruction is fallthrough.
+				break
+			}
 			// B: imm26 at bits [25:0]
 			if offset < -(1<<25) || offset >= (1<<25) {
 				return nil, fmt.Errorf("jit: branch offset %d out of range for B", offset)
