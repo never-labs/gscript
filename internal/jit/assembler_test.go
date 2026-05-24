@@ -118,6 +118,14 @@ func TestMOVreg(t *testing.T) {
 	}
 }
 
+func TestMOVregSelfCopyElided(t *testing.T) {
+	a := NewAssembler()
+	a.MOVreg(X2, X2)
+	if got := len(a.Code()); got != 0 {
+		t.Fatalf("MOVreg self-copy emitted %d bytes, want 0", got)
+	}
+}
+
 func TestMOVimm16(t *testing.T) {
 	a := NewAssembler()
 	a.MOVimm16(X0, 42) // MOVZ X0, #42
@@ -425,6 +433,14 @@ func TestFMOVtoFP(t *testing.T) {
 	// 0x9E670000 | (1<<5) | 0 = 0x9E670020
 	if got != 0x9E670020 {
 		t.Fatalf("FMOVtoFP: got 0x%08X, want 0x9E670020", got)
+	}
+}
+
+func TestFMOVdSelfCopyElided(t *testing.T) {
+	a := NewAssembler()
+	a.FMOVd(D4, D4)
+	if got := len(a.Code()); got != 0 {
+		t.Fatalf("FMOVd self-copy emitted %d bytes, want 0", got)
 	}
 }
 

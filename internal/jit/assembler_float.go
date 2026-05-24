@@ -73,6 +73,9 @@ func (a *Assembler) FCVTMS(rd Reg, rn FReg) {
 
 // FMOVd: Dd = Dn (register to register copy, double precision)
 func (a *Assembler) FMOVd(rd, rn FReg) {
+	if rd == rn {
+		return
+	}
 	// FMOV Dd, Dn: 0|00|11110|01|1|00000|010000|Rn|Rd
 	a.emit(0x1E604000 | uint32(rn)<<5 | uint32(rd))
 }

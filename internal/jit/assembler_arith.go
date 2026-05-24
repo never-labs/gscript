@@ -83,6 +83,9 @@ func (a *Assembler) NEG(rd, rm Reg) {
 
 // MOVreg: Xd = Xn (ORR Xd, XZR, Xn)
 func (a *Assembler) MOVreg(rd, rn Reg) {
+	if rd == rn {
+		return
+	}
 	// ORR Xd, XZR, Xn
 	// 1|01|01010|00|0|Rm|000000|Rn=11111|Rd  (but MOV is ORR with Rn=XZR)
 	a.emit(0xAA0003E0 | uint32(rn)<<16 | uint32(rd))
