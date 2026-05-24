@@ -32,6 +32,8 @@ const (
 	runtimeSpecializationLinearModuloIntArrayBuilder
 	runtimeSpecializationIndexedModuloIntArrayChecksum
 	runtimeSpecializationUnaryIntArrayMap
+	runtimeSpecializationCoroutineYieldSumLoop
+	runtimeSpecializationCoroutineCreateResumeAffineSum
 	runtimeSpecializationCount
 )
 
@@ -403,6 +405,32 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isUnaryIntArrayMapProto,
 		},
 		Run: (*VM).runUnaryIntArrayMapRuntimeSpecialization,
+	},
+	runtimeSpecializationCoroutineYieldSumLoop: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "coroutine_yield_sum_loop",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isCoroutineYieldSumLoopProto,
+		},
+		Run: (*VM).runCoroutineYieldSumLoopRuntimeSpecialization,
+	},
+	runtimeSpecializationCoroutineCreateResumeAffineSum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "coroutine_create_resume_affine_sum",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isCoroutineCreateResumeAffineSumProto,
+		},
+		Run: (*VM).runCoroutineCreateResumeAffineSumRuntimeSpecialization,
 	},
 }
 
