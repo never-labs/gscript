@@ -105,6 +105,16 @@ func buildMathLib() *Table {
 		}
 		return []Value{v}, nil
 	})
+	if v := t.RawGetString("floorDiv"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg2 = mathFloorDivValue
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 2 {
+				return NilValue(), fmt.Errorf("bad argument to 'math.floorDiv'")
+			}
+			return mathFloorDivValue(args[0], args[1])
+		}
+	}
 
 	// math.sqrt(x)
 	setUnaryFloat("sqrt", math.Sqrt)
@@ -140,6 +150,9 @@ func buildMathLib() *Table {
 		gf := v.GoFunction()
 		gf.FastArg1 = func(arg Value) (Value, error) {
 			return FloatValue(math.Atan(toFloat(arg))), nil
+		}
+		gf.FastArg2 = func(a, b Value) (Value, error) {
+			return FloatValue(math.Atan2(toFloat(a), toFloat(b))), nil
 		}
 		gf.Fast1 = func(args []Value) (Value, error) {
 			if len(args) < 1 {
@@ -177,6 +190,9 @@ func buildMathLib() *Table {
 		gf := v.GoFunction()
 		gf.FastArg1 = func(arg Value) (Value, error) {
 			return FloatValue(math.Log(toFloat(arg))), nil
+		}
+		gf.FastArg2 = func(a, b Value) (Value, error) {
+			return FloatValue(math.Log(toFloat(a)) / math.Log(toFloat(b))), nil
 		}
 		gf.Fast1 = func(args []Value) (Value, error) {
 			if len(args) < 1 {
@@ -249,6 +265,18 @@ func buildMathLib() *Table {
 		}
 		return []Value{BoolValue(uint64(toInt(args[0])) < uint64(toInt(args[1])))}, nil
 	})
+	if v := t.RawGetString("ult"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg2 = func(a, b Value) (Value, error) {
+			return BoolValue(uint64(toInt(a)) < uint64(toInt(b))), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 2 {
+				return NilValue(), fmt.Errorf("bad argument to 'math.ult'")
+			}
+			return BoolValue(uint64(toInt(args[0])) < uint64(toInt(args[1]))), nil
+		}
+	}
 
 	// math.modf(x) -> int, frac
 	set("modf", func(args []Value) ([]Value, error) {
@@ -273,6 +301,18 @@ func buildMathLib() *Table {
 		}
 		return []Value{FloatValue(math.Pow(toFloat(args[0]), toFloat(args[1])))}, nil
 	})
+	if v := t.RawGetString("pow"); v.IsFunction() {
+		gf := v.GoFunction()
+		gf.FastArg2 = func(a, b Value) (Value, error) {
+			return FloatValue(math.Pow(toFloat(a), toFloat(b))), nil
+		}
+		gf.Fast1 = func(args []Value) (Value, error) {
+			if len(args) < 2 {
+				return NilValue(), fmt.Errorf("bad argument to 'math.pow'")
+			}
+			return FloatValue(math.Pow(toFloat(args[0]), toFloat(args[1]))), nil
+		}
+	}
 
 	// math.random([m [, n]])
 	set("random", func(args []Value) ([]Value, error) {

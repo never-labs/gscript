@@ -688,6 +688,62 @@ func TestMathUnaryFloatFastPaths(t *testing.T) {
 	}
 }
 
+func TestMathBinaryFastPaths(t *testing.T) {
+	mathLib := buildMathLib()
+	cases := map[string]struct {
+		a, b Value
+		want Value
+	}{
+		"atan":     {FloatValue(1), FloatValue(0), FloatValue(math.Pi / 2)},
+		"log":      {FloatValue(9), FloatValue(3), FloatValue(2)},
+		"pow":      {IntValue(2), IntValue(5), FloatValue(32)},
+		"floorDiv": {IntValue(7), IntValue(3), IntValue(2)},
+		"fmod":     {IntValue(10), IntValue(3), IntValue(1)},
+		"ult":      {IntValue(3), IntValue(4), BoolValue(true)},
+	}
+	for name, tc := range cases {
+		v := mathLib.RawGetString(name)
+		if !v.IsFunction() {
+			t.Fatalf("math.%s not registered as function: %v", name, v)
+		}
+		gf := v.GoFunction()
+		if gf == nil || gf.FastArg2 == nil || gf.Fast1 == nil {
+			t.Fatalf("math.%s missing binary fast paths: %#v", name, gf)
+		}
+		gotArg, err := gf.FastArg2(tc.a, tc.b)
+		if err != nil {
+			t.Fatalf("math.%s.FastArg2 error: %v", name, err)
+		}
+		gotSlice, err := gf.Fast1([]Value{tc.a, tc.b})
+		if err != nil {
+			t.Fatalf("math.%s.Fast1 error: %v", name, err)
+		}
+		if !fastPathValueEqual(gotArg, tc.want) {
+			t.Fatalf("math.%s.FastArg2 = %v, want %v", name, gotArg, tc.want)
+		}
+		if !fastPathValueEqual(gotSlice, tc.want) {
+			t.Fatalf("math.%s.Fast1 = %v, want %v", name, gotSlice, tc.want)
+		}
+	}
+}
+
+func fastPathValueEqual(got, want Value) bool {
+	if got.Type() != want.Type() {
+		if (got.IsInt() || got.IsFloat()) && (want.IsInt() || want.IsFloat()) {
+			return math.Abs(got.Number()-want.Number()) <= 1e-12
+		}
+		return false
+	}
+	switch {
+	case got.IsBool():
+		return got.Bool() == want.Bool()
+	case got.IsInt() || got.IsFloat():
+		return math.Abs(got.Number()-want.Number()) <= 1e-12
+	default:
+		return got.Equal(want)
+	}
+}
+
 func TestMathSqrt(t *testing.T) {
 	interp := runProgram(t, `result := math.sqrt(16)`)
 	v := interp.GetGlobal("result")
