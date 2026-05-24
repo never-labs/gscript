@@ -2460,6 +2460,8 @@ func (c *compiler) callExprKnownSingleResult(call *ast.CallExpr) bool {
 			return false
 		}
 		switch recv.Name {
+		case "bit32":
+			return true
 		case "math":
 			return true
 		case "string":
@@ -2471,6 +2473,13 @@ func (c *compiler) callExprKnownSingleResult(call *ast.CallExpr) bool {
 			switch field.Field {
 			case "now", "since":
 				return true
+			}
+		case "utf8":
+			switch field.Field {
+			case "char", "codes", "offset", "valid", "validate", "sanitize", "reverse", "sub", "upper", "lower", "charclass":
+				return true
+			case "codepoint":
+				return len(call.Args) <= 2
 			}
 		}
 	}
@@ -2485,9 +2494,9 @@ func builtinFixedArityCall(name, field string, argc int) bool {
 		return field == "" && argc == 1
 	case "math":
 		switch field {
-		case "abs", "ceil", "floor", "sqrt", "sin", "cos", "tan", "asin", "acos", "log", "exp", "deg", "rad":
+		case "abs", "ceil", "floor", "sqrt", "sin", "cos", "tan", "asin", "acos", "log", "exp", "deg", "rad", "tointeger":
 			return argc == 1
-		case "atan":
+		case "atan", "fmod":
 			return argc == 1 || argc == 2
 		case "floorDiv", "min", "max", "random":
 			return argc == 2

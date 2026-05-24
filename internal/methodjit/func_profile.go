@@ -372,6 +372,67 @@ func shouldStayTier0StringTokenLoop(proto *vm.FuncProto, profile FuncProfile) bo
 	return hasStringLib && hasSplitField
 }
 
+// shouldStayTier0StdlibFieldCallLoop keeps loops with many calls through
+// standard-library table fields on the VM path until Tier 2 can lower those
+// field-callee calls. Tier 1 handles each residual call through exit-resume; in
+// stdlib-heavy loops that overhead can dominate the native arithmetic wins,
+// while the interpreter still benefits from GoFunction fast paths and runtime
+// specializations.
+func shouldStayTier0StdlibFieldCallLoop(proto *vm.FuncProto, profile FuncProfile) bool {
+	if proto == nil || !profile.HasLoop || profile.CallCount < 8 {
+		return false
+	}
+	inLoop := staticLoopPCs(proto)
+	count := 0
+	for pc, inst := range proto.Code {
+		if !inLoop[pc] || vm.DecodeOp(inst) != vm.OP_CALL {
+			continue
+		}
+		if isStdlibFieldCalleeCall(proto, pc, vm.DecodeA(inst)) {
+			count++
+		}
+	}
+	return count >= 6
+}
+
+func isStdlibFieldCalleeCall(proto *vm.FuncProto, callPC, targetReg int) bool {
+	if proto == nil {
+		return false
+	}
+	for pc := callPC - 1; pc >= 0; pc-- {
+		inst := proto.Code[pc]
+		op := vm.DecodeOp(inst)
+		a := vm.DecodeA(inst)
+		if op == vm.OP_GETFIELD && a == targetReg {
+			return getFieldReceiverIsStdlibGlobal(proto, pc, vm.DecodeB(inst))
+		}
+		if op != vm.OP_GETFIELD && op != vm.OP_GETGLOBAL && a == targetReg {
+			return false
+		}
+	}
+	return false
+}
+
+func getFieldReceiverIsStdlibGlobal(proto *vm.FuncProto, beforePC, receiverReg int) bool {
+	for pc := beforePC - 1; pc >= 0; pc-- {
+		inst := proto.Code[pc]
+		op := vm.DecodeOp(inst)
+		a := vm.DecodeA(inst)
+		if op == vm.OP_GETGLOBAL && a == receiverReg {
+			name := protoConstString(proto, vm.DecodeBx(inst))
+			switch name {
+			case "bit32", "utf8":
+				return true
+			}
+			return false
+		}
+		if op != vm.OP_GETGLOBAL && a == receiverReg {
+			return false
+		}
+	}
+	return false
+}
+
 func hasStringSplitScalarFusionCandidate(proto *vm.FuncProto) bool {
 	if proto == nil {
 		return false

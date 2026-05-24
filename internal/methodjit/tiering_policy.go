@@ -131,6 +131,9 @@ func (p PromotionPolicy) Decide(proto *vm.FuncProto, profile FuncProfile, state 
 	if shouldStayTier0StringTokenLoop(proto, profile) {
 		return tier0PolicyDecision("Tier0StringTokenLoop", "stay_tier0_string_token_loop", "string_token_loop")
 	}
+	if shouldStayTier0StdlibFieldCallLoop(proto, profile) {
+		return tier0PolicyDecision("Tier0StdlibFieldCallLoop", "stay_tier0_stdlib_field_call_loop", "stdlib_field_call_loop")
+	}
 	if shouldStayTier0ForProto(proto, profile) {
 		return tier0PolicyDecision("Tier0Profile", "stay_tier0_profile", "jit_disabled")
 	}
