@@ -4314,6 +4314,108 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				continue
 			}
 
+			// ---- Fast path: callable table with VM __call metamethod ----
+			if b != 0 && fnVal.IsTable() {
+				if mt := fnVal.Table().GetMetatable(); mt != nil {
+					callMM := mt.RawGet(runtime.StringValue("__call"))
+					if cl, ok := closureFromValue(callMM); ok {
+						proto := cl.Proto
+						mmArgs := nArgs + 1
+						if !proto.IsVarArg || mmArgs <= proto.NumParams {
+							newBase := base + frame.closure.Proto.MaxStack
+							if vm.top > newBase {
+								newBase = vm.top
+							}
+
+							needed := newBase + proto.MaxStack + 1
+							if needed > len(vm.regs) {
+								newRegs := runtime.MakeNilSlice(needed * 2)
+								copy(newRegs, vm.regs)
+								vm.regs = newRegs
+							}
+
+							nParams := proto.NumParams
+							if nParams > 0 {
+								vm.regs[newBase] = fnVal
+							}
+							srcStart := base + a + 1
+							for i := 1; i < nParams && i <= nArgs; i++ {
+								vm.regs[newBase+i] = vm.regs[srcStart+i-1]
+							}
+							for i := mmArgs; i < nParams; i++ {
+								vm.regs[newBase+i] = runtime.NilValue()
+							}
+
+							if !vm.ensureFrameSlot() {
+								return nil, fmt.Errorf("stack overflow (max call depth %d)", maxCallDepth)
+							}
+							newFrame := &vm.frames[vm.frameCount]
+							newFrame.closure = cl
+							newFrame.pc = 0
+							newFrame.base = newBase
+							newFrame.varargs = nil
+							newFrame.resultBase = base + a
+							newFrame.resultCount = c
+							newFrame.callSitePC = callPC
+							newFrame.defers = nil
+							vm.frameCount++
+							if err := vm.emitDebugHook("call", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+								vm.frameCount--
+								return nil, err
+							}
+
+							if vm.methodJIT != nil && proto.MethodJITTier1Callable() && !proto.JITDisabled {
+								proto.CallCount++
+								if proto.CallCount <= 64 {
+									argEnd := newBase + mmArgs
+									if newBase >= 0 && argEnd >= newBase && argEnd <= len(vm.regs) {
+										proto.ObserveArgShapes(vm.regs[newBase:argEnd])
+										proto.ObserveArgArrayElementShapes(vm.regs[newBase:argEnd])
+									}
+								}
+								if compiled := vm.methodJIT.TryCompile(proto); compiled != nil {
+									results, err := vm.executeMethodJIT(compiled, vm.regs, newBase, proto)
+									if err == errCoroutineYield {
+										return results, err
+									}
+									if err == nil {
+										vm.closeUpvalues(newBase)
+										if err := vm.emitDebugHook("return", "script", debugProtoName(proto), runtime.NilValue()); err != nil {
+											vm.frameCount--
+											return nil, err
+										}
+										vm.frameCount--
+										if c == 0 {
+											for i, r := range results {
+												vm.regs[base+a+i] = r
+											}
+											vm.top = base + a + len(results)
+										} else {
+											nr := c - 1
+											for i := 0; i < nr; i++ {
+												if i < len(results) {
+													vm.regs[base+a+i] = results[i]
+												} else {
+													vm.regs[base+a+i] = runtime.NilValue()
+												}
+											}
+										}
+										observeCallResultSlice(callerProto, callPC, results, c)
+										break
+									}
+								}
+							}
+
+							frame = newFrame
+							code = proto.Code
+							constants = proto.Constants
+							base = newBase
+							continue
+						}
+					}
+				}
+			}
+
 			// ---- Fast path: GoFunction (direct call, skip callValue) ----
 			if fnVal.IsFunction() {
 				if gf := fnVal.GoFunction(); gf != nil {
