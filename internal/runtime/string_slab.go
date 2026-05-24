@@ -18,6 +18,7 @@ package runtime
 import (
 	"sort"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -71,6 +72,7 @@ func (h *Heap) AllocStringKeys(capacity int) []string {
 }
 
 const stringBoxSlabSize = 16384 // 16384 * 16 B = 256 KB per backing refill
+const stringBoxSlabElemSize = uintptr(unsafe.Sizeof(string("")))
 
 type stringBoxSlab struct {
 	backing []string
@@ -87,28 +89,56 @@ var stringBoxSlabRanges struct {
 	ranges []stringBoxSlabRange
 }
 
-func (s *stringBoxSlab) alloc(h *Heap, value string) *string {
-	if s.backing == nil || s.idx >= len(s.backing) {
-		s.backing = make([]string, stringBoxSlabSize)
-		s.idx = 0
-		if h != nil {
-			h.publishStringBoxSlab(s.backing)
+//go:nocheckptr
+func (h *Heap) tryAllocStringBoxFast(value string) *string {
+	if h == nil {
+		return nil
+	}
+	for {
+		next := atomic.LoadUintptr(&h.stringBoxSlabNext)
+		if next == 0 {
+			return nil
+		}
+		end := atomic.LoadUintptr(&h.stringBoxSlabEnd)
+		if end == 0 || next > end-stringBoxSlabElemSize {
+			return nil
+		}
+		if atomic.CompareAndSwapUintptr(&h.stringBoxSlabNext, next, next+stringBoxSlabElemSize) {
+			p := (*string)(unsafe.Pointer(next))
+			*p = value
+			return p
 		}
 	}
-	p := &s.backing[s.idx]
-	s.idx++
+}
+
+func (s *stringBoxSlab) allocSlow(h *Heap, value string) *string {
+	s.backing = make([]string, stringBoxSlabSize)
+	s.idx = 1
+	if h != nil {
+		h.publishStringBoxSlab(s.backing)
+	}
+	p := &s.backing[0]
 	*p = value
 	return p
 }
 
 func (h *Heap) AllocStringBox(value string) *string {
+	if p := h.tryAllocStringBoxFast(value); p != nil {
+		return p
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.stringBoxSlab.alloc(h, value)
+	if p := h.tryAllocStringBoxFast(value); p != nil {
+		return p
+	}
+	return h.stringBoxSlab.allocSlow(h, value)
 }
 
 func (h *Heap) publishStringBoxSlab(backing []string) {
 	if len(backing) == 0 {
+		atomic.StoreUintptr(&h.stringBoxSlabNext, 0)
+		atomic.StoreUintptr(&h.stringBoxSlabStart, 0)
+		atomic.StoreUintptr(&h.stringBoxSlabEnd, 0)
 		return
 	}
 	root := unsafe.Pointer(&backing[0])
@@ -116,6 +146,11 @@ func (h *Heap) publishStringBoxSlab(backing []string) {
 	end := start + uintptr(len(backing))*unsafe.Sizeof(backing[0])
 	registerStringBoxSlabRange(start, end)
 	keepAlive(root, nil)
+	atomic.StoreUintptr(&h.stringBoxSlabNext, 0)
+	atomic.StoreUintptr(&h.stringBoxSlabStart, 0)
+	atomic.StoreUintptr(&h.stringBoxSlabEnd, end)
+	atomic.StoreUintptr(&h.stringBoxSlabStart, start)
+	atomic.StoreUintptr(&h.stringBoxSlabNext, start+stringBoxSlabElemSize)
 }
 
 func registerStringBoxSlabRange(start, end uintptr) {

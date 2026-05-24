@@ -204,14 +204,10 @@ func NewSequentialArrayTable(length int) *Table {
 	if length+1 <= tableSvalsNInlineCap {
 		t, values := DefaultHeap.AllocTableWithSvals(length + 1)
 		t.array = values[: length+1 : length+1]
-		nv := NilValue()
-		for i := range t.array {
-			t.array[i] = nv
-		}
 		return t
 	}
 	t := DefaultHeap.AllocTable()
-	t.array = DefaultHeap.AllocValues(length+1, length+1)
+	t.array = DefaultHeap.AllocValues(1, length+1)[: length+1 : length+1]
 	return t
 }
 
@@ -287,6 +283,9 @@ func (t *Table) rawGetForNextLocked(key Value) Value {
 				return BoolValue(b == 2)
 			}
 		default:
+			if k == 0 && !t.arrayZeroValid && len(t.array) > 0 && t.array[0] == 0 {
+				return NilValue()
+			}
 			if k >= 0 && k < int64(len(t.array)) {
 				return t.array[k]
 			}
@@ -358,6 +357,9 @@ func (t *Table) RawGetInt(key int64) Value {
 			return BoolValue(b == 2) // 1=false, 2=true
 		}
 	default:
+		if key == 0 && !t.arrayZeroValid && len(t.array) > 0 && t.array[0] == 0 {
+			return NilValue()
+		}
 		if key >= 0 && key < int64(len(t.array)) {
 			return t.array[key]
 		}

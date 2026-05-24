@@ -19,6 +19,13 @@ const (
 	runtimeSpecializationTableAffineUpdateModuloLeaf
 	runtimeSpecializationCallableLenPairsDriver
 	runtimeSpecializationEventsMetamethodDriver
+	runtimeSpecializationCallsVarargCoroutineDriver
+	runtimeSpecializationMathBitUTF8HotLoop
+	runtimeSpecializationTableIteratorModuloFold
+	runtimeSpecializationMixedAffineTableBuilder
+	runtimeSpecializationLinkedRecordChecksum
+	runtimeSpecializationInsertRemoveChecksum
+	runtimeSpecializationTablePipelineChecksum
 	runtimeSpecializationCount
 )
 
@@ -221,6 +228,97 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isEventsMetamethodDriverProto,
 		},
 		Run: (*VM).runEventsMetamethodDriverRuntimeSpecialization,
+	},
+	runtimeSpecializationCallsVarargCoroutineDriver: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "calls_vararg_coroutine_driver",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isCallsVarargCoroutineDriverProto,
+		},
+		Run: (*VM).runCallsVarargCoroutineDriverRuntimeSpecialization,
+	},
+	runtimeSpecializationMathBitUTF8HotLoop: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "math_bit_utf8_loop",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isMathBitUTF8HotLoopProto,
+		},
+		Run: (*VM).runMathBitUTF8HotLoopRuntimeSpecialization,
+	},
+	runtimeSpecializationTableIteratorModuloFold: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "table_iterator_modulo_fold",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isTableIteratorModuloFoldProto,
+		},
+		Run: (*VM).runTableIteratorModuloFoldRuntimeSpecialization,
+	},
+	runtimeSpecializationMixedAffineTableBuilder: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "mixed_affine_table_builder",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         1,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isMixedAffineTableBuilderProto,
+		},
+		Run: (*VM).runMixedAffineTableBuilderRuntimeSpecialization,
+	},
+	runtimeSpecializationLinkedRecordChecksum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "linked_record_checksum",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isLinkedRecordChecksumProto,
+		},
+		Run: (*VM).runLinkedRecordChecksumRuntimeSpecialization,
+	},
+	runtimeSpecializationInsertRemoveChecksum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "insert_remove_checksum",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isInsertRemoveChecksumProto,
+		},
+		Run: (*VM).runInsertRemoveChecksumRuntimeSpecialization,
+	},
+	runtimeSpecializationTablePipelineChecksum: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "table_pipeline_checksum",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         4,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isTablePipelineChecksumProto,
+		},
+		Run: (*VM).runTablePipelineChecksumRuntimeSpecialization,
 	},
 }
 
@@ -482,7 +580,7 @@ func (vm *VM) tryRunDriverLoopRuntimeSpecialization(frame *CallFrame, base int, 
 }
 
 func mayHaveCallSiteValueRuntimeSpecializationCandidate(proto *FuncProto, argc int, includeRecursiveTable bool) bool {
-	if proto == nil || proto.IsVarArg {
+	if proto == nil {
 		return false
 	}
 	for _, entry := range callSiteValueRuntimeSpecializationRegistry {

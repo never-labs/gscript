@@ -636,6 +636,32 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			}
 			return []Value{StringValue(result), IntValue(int64(count))}, nil
 		}
+		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
+			count := 0
+			var result string
+			if repl.IsString() {
+				replStr := repl.Str()
+				if err := validateLuaReplacementString(replStr, simple.captureCount); err != nil {
+					return nil, err
+				}
+				result = replaceSimpleLuaPatternString(s, simple, replStr, maxRepl, &count)
+			} else if repl.IsTable() {
+				var err error
+				result, err = replaceSimpleLuaPatternTable(s, simple, repl.Table(), maxRepl, &count)
+				if err != nil {
+					return nil, err
+				}
+			} else if repl.IsFunction() {
+				var err error
+				result, err = replaceSimpleLuaPatternFunction(s, simple, repl, caller, maxRepl, &count)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				result = replaceSimpleLuaPatternRaw(s, simple, repl.String(), maxRepl, &count)
+			}
+			return []Value{StringValue(result), IntValue(int64(count))}, nil
+		}
 
 		prog, re, err := cachedLuaPatternRegexp(pattern)
 		if err != nil {
@@ -3481,6 +3507,207 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, prog luaPatternProgram,
 	}
 	b.WriteString(s[last:])
 	return b.String(), nil
+}
+
+func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Value, caller FunctionCaller, maxRepl int, count *int) (string, error) {
+	if pattern == nil {
+		return s, nil
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	last := 0
+	nextStart := 0
+	for maxRepl < 0 || *count < maxRepl {
+		m, ok := pattern.findNext(s, nextStart)
+		if !ok {
+			break
+		}
+		if m.start < last {
+			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			continue
+		}
+		replacement, err := callSimpleReplacementFunction(s, m, fn, caller)
+		if err != nil {
+			return "", err
+		}
+		b.WriteString(s[last:m.start])
+		b.WriteString(replacement)
+		last = m.end
+		(*count)++
+		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+	}
+	if *count == 0 {
+		return s, nil
+	}
+	b.WriteString(s[last:])
+	return b.String(), nil
+}
+
+func replaceSimpleLuaPatternString(s string, pattern *simpleLuaPattern, repl string, maxRepl int, count *int) string {
+	if pattern == nil {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	last := 0
+	nextStart := 0
+	for maxRepl < 0 || *count < maxRepl {
+		m, ok := pattern.findNext(s, nextStart)
+		if !ok {
+			break
+		}
+		if m.start < last {
+			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			continue
+		}
+		b.WriteString(s[last:m.start])
+		b.WriteString(expandSimpleLuaReplacement(s, m, repl))
+		last = m.end
+		(*count)++
+		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+	}
+	if *count == 0 {
+		return s
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Table, maxRepl int, count *int) (string, error) {
+	if pattern == nil {
+		return s, nil
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	last := 0
+	nextStart := 0
+	for maxRepl < 0 || *count < maxRepl {
+		m, ok := pattern.findNext(s, nextStart)
+		if !ok {
+			break
+		}
+		if m.start < last {
+			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			continue
+		}
+		key := simpleReplacementTableKey(s, m)
+		val := repl.RawGet(key)
+		replacement := s[m.start:m.end]
+		if !val.IsNil() && !(val.IsBool() && !val.Bool()) {
+			if val.IsString() || val.IsNumber() {
+				replacement = val.String()
+			} else {
+				return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
+			}
+		}
+		b.WriteString(s[last:m.start])
+		b.WriteString(replacement)
+		last = m.end
+		(*count)++
+		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+	}
+	if *count == 0 {
+		return s, nil
+	}
+	b.WriteString(s[last:])
+	return b.String(), nil
+}
+
+func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string, maxRepl int, count *int) string {
+	if pattern == nil {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	last := 0
+	nextStart := 0
+	for maxRepl < 0 || *count < maxRepl {
+		m, ok := pattern.findNext(s, nextStart)
+		if !ok {
+			break
+		}
+		if m.start < last {
+			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			continue
+		}
+		b.WriteString(s[last:m.start])
+		b.WriteString(repl)
+		last = m.end
+		(*count)++
+		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+	}
+	if *count == 0 {
+		return s
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, caller FunctionCaller) (string, error) {
+	results, err := callGScriptFunction(fn, simpleReplacementFunctionArgs(s, m), caller)
+	if err != nil {
+		return "", err
+	}
+	replacement := s[m.start:m.end]
+	if len(results) == 0 {
+		return replacement, nil
+	}
+	val := results[0]
+	if val.IsNil() || (val.IsBool() && !val.Bool()) {
+		return replacement, nil
+	}
+	if val.IsString() || val.IsNumber() {
+		return val.String(), nil
+	}
+	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
+}
+
+func simpleReplacementFunctionArgs(s string, m simpleLuaPatternMatch) []Value {
+	if m.ncap == 0 {
+		return []Value{StringValue(s[m.start:m.end])}
+	}
+	args := make([]Value, 0, m.ncap)
+	for i := 0; i < m.ncap; i++ {
+		args = append(args, StringValue(s[m.caps[i][0]:m.caps[i][1]]))
+	}
+	return args
+}
+
+func simpleReplacementTableKey(s string, m simpleLuaPatternMatch) Value {
+	if m.ncap == 0 {
+		return StringValue(s[m.start:m.end])
+	}
+	return StringValue(s[m.caps[0][0]:m.caps[0][1]])
+}
+
+func expandSimpleLuaReplacement(s string, m simpleLuaPatternMatch, repl string) string {
+	var b strings.Builder
+	for i := 0; i < len(repl); i++ {
+		if repl[i] != '%' || i+1 >= len(repl) {
+			b.WriteByte(repl[i])
+			continue
+		}
+		i++
+		ch := repl[i]
+		if ch == '%' {
+			b.WriteByte('%')
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			idx := int(ch - '0')
+			if idx == 0 {
+				b.WriteString(s[m.start:m.end])
+			} else if idx == 1 && m.ncap == 0 {
+				b.WriteString(s[m.start:m.end])
+			} else if idx > 0 && idx <= m.ncap {
+				b.WriteString(s[m.caps[idx-1][0]:m.caps[idx-1][1]])
+			}
+			continue
+		}
+		b.WriteByte('%')
+		b.WriteByte(ch)
+	}
+	return b.String()
 }
 
 func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn Value, caller FunctionCaller) (string, error) {
