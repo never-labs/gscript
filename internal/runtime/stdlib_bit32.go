@@ -348,11 +348,33 @@ func bit32FoldFixed8(name string, op func(uint32, uint32) uint32, a, b, c, d, e,
 	if err != nil {
 		return NilValue(), err
 	}
-	for i, v := range [...]Value{b, c, d, e, f, g, h} {
-		result, err = bit32FoldNextUint(name, op, result, i+1, v)
-		if err != nil {
-			return NilValue(), err
-		}
+	result, err = bit32FoldNextUint(name, op, result, 1, b)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 2, c)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 3, d)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 4, e)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 5, f)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 6, g)
+	if err != nil {
+		return NilValue(), err
+	}
+	result, err = bit32FoldNextUint(name, op, result, 7, h)
+	if err != nil {
+		return NilValue(), err
 	}
 	return IntValue(int64(result)), nil
 }
@@ -535,6 +557,12 @@ func bit32ReplaceValue(nv, valuev, fieldv, widthv Value) (Value, error) {
 }
 
 func bit32ValueArg(v Value, index int, name string) (int64, error) {
+	switch v.Type() {
+	case TypeInt:
+		return v.Int(), nil
+	case TypeFloat:
+		return int64(v.Float()), nil
+	}
 	n, ok := v.ToNumber()
 	if !ok {
 		return 0, fmt.Errorf("bad argument #%d to '%s' (number expected)", index+1, name)
