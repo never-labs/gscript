@@ -359,6 +359,18 @@ func TestLength(t *testing.T) {
 	expectGlobalInt(t, g, "x", 5)
 }
 
+func TestMetatableLenReturnsCurrentCapturedValue(t *testing.T) {
+	g := compileAndRun(t, `
+		n := 7
+		t := setmetatable({}, {__len: func(_) { return n }})
+		a := #t
+		n = 11
+		b := #t
+	`)
+	expectGlobalInt(t, g, "a", 7)
+	expectGlobalInt(t, g, "b", 11)
+}
+
 // ============================================================================
 // Phase 2: Comparison & Logic
 // ============================================================================

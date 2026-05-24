@@ -5627,6 +5627,9 @@ func (vm *VM) length(v runtime.Value) (runtime.Value, error) {
 		if mt != nil {
 			mm := mt.RawGetString("__len")
 			if !mm.IsNil() {
+				if result, ok := fastReturnUpvalueClosure(mm); ok {
+					return result, nil
+				}
 				args := [1]runtime.Value{v}
 				results, err := vm.callValue(mm, args[:])
 				if err != nil {
@@ -5641,6 +5644,27 @@ func (vm *VM) length(v runtime.Value) (runtime.Value, error) {
 		return runtime.IntValue(int64(v.Table().Len())), nil
 	}
 	return runtime.NilValue(), fmt.Errorf("attempt to get length of a %s value", v.TypeName())
+}
+
+func fastReturnUpvalueClosure(fn runtime.Value) (runtime.Value, bool) {
+	cl, ok := closureFromValue(fn)
+	if !ok || cl == nil || cl.Proto == nil || len(cl.Upvalues) == 0 || len(cl.Proto.Code) != 2 {
+		return runtime.NilValue(), false
+	}
+	first := cl.Proto.Code[0]
+	if DecodeOp(first) != OP_GETUPVAL {
+		return runtime.NilValue(), false
+	}
+	reg := DecodeA(first)
+	upvalue := DecodeB(first)
+	if upvalue < 0 || upvalue >= len(cl.Upvalues) || cl.Upvalues[upvalue] == nil {
+		return runtime.NilValue(), false
+	}
+	ret := cl.Proto.Code[1]
+	if DecodeOp(ret) != OP_RETURN || DecodeA(ret) != reg || DecodeB(ret) != 2 {
+		return runtime.NilValue(), false
+	}
+	return cl.Upvalues[upvalue].Get(), true
 }
 
 func (vm *VM) ConcatValues(values []runtime.Value) (runtime.Value, error) {
