@@ -15,6 +15,7 @@ const (
 	runtimeSpecializationMatrixMultiply
 	runtimeSpecializationRecordWalkFold
 	runtimeSpecializationBoolTableMarkCount
+	runtimeSpecializationAffineModuloIntLeaf
 	runtimeSpecializationCount
 )
 
@@ -165,6 +166,19 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isBoolTableMarkCountProto,
 		},
 		Run: (*VM).runBoolTableMarkCountRuntimeSpecialization,
+	},
+	runtimeSpecializationAffineModuloIntLeaf: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "affine_modulo_int_leaf",
+				Route:         RuntimeSpecializationRouteCallSiteValue,
+				Arity:         2,
+				Results:       runtimeSpecializationCallSiteSingleResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructural,
+			},
+			Recognize: isAffineModuloIntLeafProto,
+		},
+		Run: (*VM).runAffineModuloIntLeafRuntimeSpecialization,
 	},
 }
 

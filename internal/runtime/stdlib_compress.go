@@ -7,6 +7,7 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -14,7 +15,15 @@ var (
 	stdlibGzipWriterPools    [10]sync.Pool
 	stdlibZlibWriterPools    [10]sync.Pool
 	stdlibDeflateWriterPools [10]sync.Pool
+	stdlibGzipReaderPool     sync.Pool
+	stdlibZlibReaderPool     sync.Pool
+	stdlibDeflateReaderPool  sync.Pool
 )
+
+type resetReadCloser interface {
+	io.ReadCloser
+	Reset(io.Reader, []byte) error
+}
 
 func normalizeCompressLevel(level, def int) int {
 	if level < 1 || level > 9 {
@@ -111,14 +120,28 @@ func buildCompressLib() *Table {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.gzipDecode' (string expected)")
 		}
-		r, err := gzip.NewReader(bytes.NewReader([]byte(arg.Str())))
+		src := strings.NewReader(arg.Str())
+		var r *gzip.Reader
+		if cached := stdlibGzipReaderPool.Get(); cached != nil {
+			r = cached.(*gzip.Reader)
+			if err := r.Reset(src); err != nil {
+				return NilValue(), StringValue(err.Error()), 2, nil
+			}
+		} else {
+			var err error
+			r, err = gzip.NewReader(src)
+			if err != nil {
+				return NilValue(), StringValue(err.Error()), 2, nil
+			}
+		}
+		decoded, err := io.ReadAll(r)
+		closeErr := r.Close()
+		stdlibGzipReaderPool.Put(r)
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		defer r.Close()
-		decoded, err := io.ReadAll(r)
-		if err != nil {
-			return NilValue(), StringValue(err.Error()), 2, nil
+		if closeErr != nil {
+			return NilValue(), StringValue(closeErr.Error()), 2, nil
 		}
 		return StringValue(string(decoded)), NilValue(), 1, nil
 	}
@@ -195,14 +218,37 @@ func buildCompressLib() *Table {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.zlibDecode' (string expected)")
 		}
-		r, err := zlib.NewReader(bytes.NewReader([]byte(arg.Str())))
+		src := strings.NewReader(arg.Str())
+		var r resetReadCloser
+		if cached := stdlibZlibReaderPool.Get(); cached != nil {
+			r = cached.(resetReadCloser)
+			if err := r.Reset(src, nil); err != nil {
+				return NilValue(), StringValue(err.Error()), 2, nil
+			}
+		} else {
+			newReader, err := zlib.NewReader(src)
+			if err != nil {
+				return NilValue(), StringValue(err.Error()), 2, nil
+			}
+			resetter, ok := newReader.(resetReadCloser)
+			if !ok {
+				defer newReader.Close()
+				decoded, err := io.ReadAll(newReader)
+				if err != nil {
+					return NilValue(), StringValue(err.Error()), 2, nil
+				}
+				return StringValue(string(decoded)), NilValue(), 1, nil
+			}
+			r = resetter
+		}
+		decoded, err := io.ReadAll(r)
+		closeErr := r.Close()
+		stdlibZlibReaderPool.Put(r)
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		defer r.Close()
-		decoded, err := io.ReadAll(r)
-		if err != nil {
-			return NilValue(), StringValue(err.Error()), 2, nil
+		if closeErr != nil {
+			return NilValue(), StringValue(closeErr.Error()), 2, nil
 		}
 		return StringValue(string(decoded)), NilValue(), 1, nil
 	}
@@ -279,11 +325,24 @@ func buildCompressLib() *Table {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.deflateDecode' (string expected)")
 		}
-		r := flate.NewReader(bytes.NewReader([]byte(arg.Str())))
-		defer r.Close()
+		src := strings.NewReader(arg.Str())
+		var r resetReadCloser
+		if cached := stdlibDeflateReaderPool.Get(); cached != nil {
+			r = cached.(resetReadCloser)
+			if err := r.Reset(src, nil); err != nil {
+				return NilValue(), StringValue(err.Error()), 2, nil
+			}
+		} else {
+			r = flate.NewReader(src).(resetReadCloser)
+		}
 		decoded, err := io.ReadAll(r)
+		closeErr := r.Close()
+		stdlibDeflateReaderPool.Put(r)
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
+		}
+		if closeErr != nil {
+			return NilValue(), StringValue(closeErr.Error()), 2, nil
 		}
 		return StringValue(string(decoded)), NilValue(), 1, nil
 	}
