@@ -82,19 +82,38 @@ func eventsMetamethodDriverSpecForProto(p *FuncProto) (eventsMetamethodDriverSpe
 		return spec, false
 	}
 	code := p.Code
-	required := map[int]Opcode{
-		0: OP_GETGLOBAL, 1: OP_LOADINT, 3: OP_GETGLOBAL, 4: OP_LOADINT,
-		6: OP_GETGLOBAL, 7: OP_LOADINT, 9: OP_GETGLOBAL, 10: OP_LOADINT,
-		12: OP_GETGLOBAL, 13: OP_LOADK, 15: OP_GETGLOBAL, 16: OP_LOADK,
-		25: OP_GETFIELD, 27: OP_CALL, 29: OP_GETFIELD, 31: OP_GETFIELD,
-		33: OP_GETGLOBAL, 36: OP_ADD, 37: OP_SUB, 38: OP_MUL, 40: OP_UNM,
-		45: OP_LOADINT, 50: OP_LT, 52: OP_LOADINT, 58: OP_LE,
-		60: OP_LOADINT, 65: OP_LOADINT, 72: OP_CONCAT,
-	}
-	for pc, op := range required {
-		if DecodeOp(code[pc]) != op {
-			return spec, false
-		}
+	pat := newBytecodePattern(code)
+	if !pat.hasOps(
+		opcodeAt{pc: 0, op: OP_GETGLOBAL},
+		opcodeAt{pc: 1, op: OP_LOADINT},
+		opcodeAt{pc: 3, op: OP_GETGLOBAL},
+		opcodeAt{pc: 4, op: OP_LOADINT},
+		opcodeAt{pc: 6, op: OP_GETGLOBAL},
+		opcodeAt{pc: 7, op: OP_LOADINT},
+		opcodeAt{pc: 9, op: OP_GETGLOBAL},
+		opcodeAt{pc: 10, op: OP_LOADINT},
+		opcodeAt{pc: 12, op: OP_GETGLOBAL},
+		opcodeAt{pc: 13, op: OP_LOADK},
+		opcodeAt{pc: 15, op: OP_GETGLOBAL},
+		opcodeAt{pc: 16, op: OP_LOADK},
+		opcodeAt{pc: 25, op: OP_GETFIELD},
+		opcodeAt{pc: 27, op: OP_CALL},
+		opcodeAt{pc: 29, op: OP_GETFIELD},
+		opcodeAt{pc: 31, op: OP_GETFIELD},
+		opcodeAt{pc: 33, op: OP_GETGLOBAL},
+		opcodeAt{pc: 36, op: OP_ADD},
+		opcodeAt{pc: 37, op: OP_SUB},
+		opcodeAt{pc: 38, op: OP_MUL},
+		opcodeAt{pc: 40, op: OP_UNM},
+		opcodeAt{pc: 45, op: OP_LOADINT},
+		opcodeAt{pc: 50, op: OP_LT},
+		opcodeAt{pc: 52, op: OP_LOADINT},
+		opcodeAt{pc: 58, op: OP_LE},
+		opcodeAt{pc: 60, op: OP_LOADINT},
+		opcodeAt{pc: 65, op: OP_LOADINT},
+		opcodeAt{pc: 72, op: OP_CONCAT},
+	) {
+		return spec, false
 	}
 	var ok bool
 	if spec.newProxyGlobal, ok = constStringAt(p, DecodeBx(code[0])); !ok {
@@ -178,8 +197,14 @@ func eventsProxyFactorySpecForProto(p *FuncProto) (eventsProxyFactorySpec, bool)
 		return spec, false
 	}
 	code := p.Code
-	if DecodeOp(code[1]) != OP_LOADINT || DecodeOp(code[2]) != OP_LOADINT || DecodeOp(code[3]) != OP_LOADINT ||
-		DecodeOp(code[4]) != OP_NEWOBJECTN || DecodeOp(code[5]) != OP_NEWOBJECT2 {
+	pat := newBytecodePattern(code)
+	if !pat.hasOps(
+		opcodeAt{pc: 1, op: OP_LOADINT},
+		opcodeAt{pc: 2, op: OP_LOADINT},
+		opcodeAt{pc: 3, op: OP_LOADINT},
+		opcodeAt{pc: 4, op: OP_NEWOBJECTN},
+		opcodeAt{pc: 5, op: OP_NEWOBJECT2},
+	) {
 		return spec, false
 	}
 	if DecodesBx(code[1]) != 0 {
@@ -204,7 +229,12 @@ func eventsMixStepModuloForProto(p *FuncProto) (int64, bool) {
 	if p == nil || p.NumParams != 2 || p.IsVarArg || len(p.Code) != 9 {
 		return 0, false
 	}
-	if DecodeOp(p.Code[3]) != OP_LOADINT || DecodeOp(p.Code[4]) != OP_MOD || DecodeOp(p.Code[5]) != OP_CALL {
+	pat := newBytecodePattern(p.Code)
+	if !pat.hasOps(
+		opcodeAt{pc: 3, op: OP_LOADINT},
+		opcodeAt{pc: 4, op: OP_MOD},
+		opcodeAt{pc: 5, op: OP_CALL},
+	) {
 		return 0, false
 	}
 	return int64(DecodesBx(p.Code[3])), true

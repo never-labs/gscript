@@ -69,18 +69,22 @@ func callableLenPairsDriverSpecForProto(p *FuncProto) (callableLenPairsDriverSpe
 		return spec, false
 	}
 	code := p.Code
-	if DecodeOp(code[5]) != OP_GETGLOBAL || DecodeOp(code[8]) != OP_GETGLOBAL ||
-		DecodeOp(code[10]) != OP_LOADINT ||
-		DecodeOp(code[27]) != OP_GETFIELD || DecodeB(code[27]) != 11 ||
-		DecodeOp(code[29]) != OP_LOADINT ||
-		DecodeOp(code[33]) != OP_GETFIELD || DecodeB(code[33]) != 11 ||
-		DecodeOp(code[34]) != OP_LEN ||
-		DecodeOp(code[35]) != OP_LOADINT ||
-		DecodeOp(code[38]) != OP_GETGLOBAL ||
-		DecodeOp(code[41]) != OP_GETGLOBAL ||
-		DecodeOp(code[46]) != OP_GETGLOBAL ||
-		DecodeOp(code[49]) != OP_GETFIELD ||
-		DecodeOp(code[58]) != OP_LOADINT {
+	pat := newBytecodePattern(code)
+	if !pat.hasOps(
+		opcodeAt{pc: 5, op: OP_GETGLOBAL},
+		opcodeAt{pc: 8, op: OP_GETGLOBAL},
+		opcodeAt{pc: 10, op: OP_LOADINT},
+		opcodeAt{pc: 27, op: OP_GETFIELD},
+		opcodeAt{pc: 29, op: OP_LOADINT},
+		opcodeAt{pc: 33, op: OP_GETFIELD},
+		opcodeAt{pc: 34, op: OP_LEN},
+		opcodeAt{pc: 35, op: OP_LOADINT},
+		opcodeAt{pc: 38, op: OP_GETGLOBAL},
+		opcodeAt{pc: 41, op: OP_GETGLOBAL},
+		opcodeAt{pc: 46, op: OP_GETGLOBAL},
+		opcodeAt{pc: 49, op: OP_GETFIELD},
+		opcodeAt{pc: 58, op: OP_LOADINT},
+	) || DecodeB(code[27]) != 11 || DecodeB(code[33]) != 11 {
 		return spec, false
 	}
 	var ok bool
@@ -137,8 +141,13 @@ func callableLenPairsMakeCallableSpec(p *FuncProto) (tableAffineUpdateModuloLeaf
 		return callSpec, 0, 0, false
 	}
 	code := p.Code
-	if DecodeOp(code[4]) != OP_LOADINT || DecodeOp(code[5]) != OP_MUL ||
-		DecodeOp(code[6]) != OP_LOADINT || DecodeOp(code[7]) != OP_ADD {
+	pat := newBytecodePattern(code)
+	if !pat.hasOps(
+		opcodeAt{pc: 4, op: OP_LOADINT},
+		opcodeAt{pc: 5, op: OP_MUL},
+		opcodeAt{pc: 6, op: OP_LOADINT},
+		opcodeAt{pc: 7, op: OP_ADD},
+	) {
 		return callSpec, 0, 0, false
 	}
 	callSpec, ok := tableAffineUpdateModuloLeafSpecForProto(p.Protos[0])

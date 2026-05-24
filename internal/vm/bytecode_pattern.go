@@ -10,6 +10,11 @@ type numericForLoopShape struct {
 	loopPC    int
 }
 
+type opcodeAt struct {
+	pc int
+	op Opcode
+}
+
 func newBytecodePattern(code []uint32) bytecodePattern {
 	return bytecodePattern{code: code}
 }
@@ -24,6 +29,15 @@ func (p bytecodePattern) inst(pc int) (uint32, bool) {
 func (p bytecodePattern) op(pc int, op Opcode) (uint32, bool) {
 	inst, ok := p.inst(pc)
 	return inst, ok && DecodeOp(inst) == op
+}
+
+func (p bytecodePattern) hasOps(ops ...opcodeAt) bool {
+	for _, want := range ops {
+		if _, ok := p.op(want.pc, want.op); !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (p bytecodePattern) abc(pc int, op Opcode, a, b, c int) bool {
