@@ -362,8 +362,7 @@ func (ec *emitContext) emitGuardGlobalConst(instr *Instr) {
 	asm.LDRreg(jit.X1, jit.X16, jit.X17)
 	asm.LoadImm64(jit.X2, instr.Aux2)
 	asm.CMPreg(jit.X1, jit.X2)
-	asm.BCond(jit.CondNE, deoptLabel)
-	asm.B(doneLabel)
+	asm.BCond(jit.CondEQ, doneLabel)
 
 	asm.Label(deoptLabel)
 	ec.emitPreciseDeopt(instr)
