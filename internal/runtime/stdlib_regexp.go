@@ -194,7 +194,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 func regexpStringSliceTable(values []string) Value {
 	tbl := NewSequentialArrayTable(len(values))
 	for i, s := range values {
-		tbl.RawSetInt(int64(i+1), StringValue(s))
+		tbl.array[i+1] = StringValue(s)
 	}
 	return TableValue(tbl)
 }
@@ -204,9 +204,9 @@ func regexpStringMatrixTable(values [][]string) Value {
 	for i, matches := range values {
 		sub := NewSequentialArrayTable(len(matches))
 		for j, m := range matches {
-			sub.RawSetInt(int64(j+1), StringValue(m))
+			sub.array[j+1] = StringValue(m)
 		}
-		tbl.RawSetInt(int64(i+1), TableValue(sub))
+		tbl.array[i+1] = TableValue(sub)
 	}
 	return TableValue(tbl)
 }
