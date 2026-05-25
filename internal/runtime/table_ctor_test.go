@@ -34,3 +34,26 @@ func TestNewTableFromCtorNNonNilFallsBackForInvalidCtor(t *testing.T) {
 		t.Fatalf("nil ctor shapeID=%d, want 0", tbl.ShapeID())
 	}
 }
+
+func TestNewTableFromCtorNSparseNilUsesFixedShape(t *testing.T) {
+	ctor := NewSmallTableCtorN([]string{"a", "b", "c", "d"})
+	vals := []Value{IntValue(1), NilValue(), StringValue("see"), NilValue()}
+
+	tbl := NewTableFromCtorN(&ctor, vals)
+	if tbl == nil {
+		t.Fatal("nil table")
+	}
+	wantShape := GetShape([]string{"a", "c"})
+	if got := tbl.ShapeID(); got == 0 || got != wantShape.ID {
+		t.Fatalf("shapeID=%d want sparse shape %d", got, wantShape.ID)
+	}
+	if got := tbl.RawGetString("a"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("a=%v, want 1", got)
+	}
+	if got := tbl.RawGetString("b"); !got.IsNil() {
+		t.Fatalf("b=%v, want nil", got)
+	}
+	if got := tbl.RawGetString("c"); !got.IsString() || got.Str() != "see" {
+		t.Fatalf("c=%v, want see", got)
+	}
+}

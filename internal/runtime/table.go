@@ -1011,6 +1011,38 @@ func newTableFromCtorNFallback(ctor *SmallTableCtorN, vals []Value) *Table {
 	if ctor == nil || len(ctor.Keys) == 0 {
 		return NewEmptyTable()
 	}
+	if ctor.Shape != nil {
+		n := len(ctor.Keys)
+		if len(vals) < n {
+			n = len(vals)
+		}
+		nonNil := 0
+		for i := 0; i < n; i++ {
+			if !vals[i].IsNil() {
+				nonNil++
+			}
+		}
+		switch nonNil {
+		case 0:
+			return NewEmptyTable()
+		case len(ctor.Keys):
+			return newTableFromCtorNNonNil(ctor, vals, true)
+		default:
+			keys := make([]string, 0, nonNil)
+			copiedVals := make([]Value, 0, nonNil)
+			for i := 0; i < n; i++ {
+				if vals[i].IsNil() {
+					continue
+				}
+				keys = append(keys, ctor.Keys[i])
+				copiedVals = append(copiedVals, vals[i])
+			}
+			sparse := NewSmallTableCtorN(keys)
+			if sparse.Shape != nil {
+				return newTableFromCtorNNonNil(&sparse, copiedVals, true)
+			}
+		}
+	}
 	t := NewTableSized(0, len(ctor.Keys))
 	for i, key := range ctor.Keys {
 		if i >= len(vals) {
