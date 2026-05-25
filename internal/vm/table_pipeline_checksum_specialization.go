@@ -29,33 +29,38 @@ func tablePipelineChecksumSpecForProto(p *FuncProto) (tablePipelineChecksumSpec,
 		}
 	}
 	code := p.Code
-	if DecodeOp(code[4]) != OP_FORPREP ||
-		DecodeOp(code[5]) != OP_GETGLOBAL || DecodeBx(code[5]) != 0 ||
-		DecodeOp(code[7]) != OP_CALL ||
-		DecodeOp(code[8]) != OP_GETGLOBAL || DecodeBx(code[8]) != 1 ||
-		DecodeOp(code[10]) != OP_GETGLOBAL || DecodeBx(code[10]) != 2 ||
-		DecodeOp(code[12]) != OP_CALL ||
-		DecodeOp(code[13]) != OP_CALL ||
-		DecodeOp(code[15]) != OP_GETGLOBAL || DecodeBx(code[15]) != 1 ||
-		DecodeOp(code[17]) != OP_GETGLOBAL || DecodeBx(code[17]) != 3 ||
-		DecodeOp(code[19]) != OP_CALL ||
-		DecodeOp(code[20]) != OP_CALL ||
-		DecodeOp(code[22]) != OP_GETGLOBAL || DecodeBx(code[22]) != 1 ||
-		DecodeOp(code[24]) != OP_GETGLOBAL || DecodeBx(code[24]) != 4 ||
-		DecodeOp(code[26]) != OP_CALL ||
-		DecodeOp(code[27]) != OP_CALL ||
-		DecodeOp(code[29]) != OP_FORLOOP ||
-		DecodeOp(code[30]) != OP_GETGLOBAL || DecodeBx(code[30]) != 1 ||
-		DecodeOp(code[32]) != OP_GETGLOBAL || DecodeBx(code[32]) != 5 ||
-		DecodeOp(code[34]) != OP_LOADINT ||
-		DecodeOp(code[35]) != OP_MUL ||
-		DecodeOp(code[36]) != OP_CALL ||
-		DecodeOp(code[37]) != OP_CALL ||
-		DecodeOp(code[39]) != OP_GETGLOBAL || DecodeBx(code[39]) != 1 ||
-		DecodeOp(code[41]) != OP_GETGLOBAL || DecodeBx(code[41]) != 6 ||
-		DecodeOp(code[44]) != OP_CALL ||
-		DecodeOp(code[45]) != OP_CALL ||
-		DecodeOp(code[48]) != OP_RETURN {
+	pat := newBytecodePattern(code)
+	if !pat.hasBxs(
+		bxAt{pc: 5, op: OP_GETGLOBAL, bx: 0},
+		bxAt{pc: 8, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 10, op: OP_GETGLOBAL, bx: 2},
+		bxAt{pc: 15, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 17, op: OP_GETGLOBAL, bx: 3},
+		bxAt{pc: 22, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 24, op: OP_GETGLOBAL, bx: 4},
+		bxAt{pc: 30, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 32, op: OP_GETGLOBAL, bx: 5},
+		bxAt{pc: 39, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 41, op: OP_GETGLOBAL, bx: 6},
+	) ||
+		!pat.hasOps(
+			opcodeAt{pc: 4, op: OP_FORPREP},
+			opcodeAt{pc: 7, op: OP_CALL},
+			opcodeAt{pc: 12, op: OP_CALL},
+			opcodeAt{pc: 13, op: OP_CALL},
+			opcodeAt{pc: 19, op: OP_CALL},
+			opcodeAt{pc: 20, op: OP_CALL},
+			opcodeAt{pc: 26, op: OP_CALL},
+			opcodeAt{pc: 27, op: OP_CALL},
+			opcodeAt{pc: 29, op: OP_FORLOOP},
+			opcodeAt{pc: 34, op: OP_LOADINT},
+			opcodeAt{pc: 35, op: OP_MUL},
+			opcodeAt{pc: 36, op: OP_CALL},
+			opcodeAt{pc: 37, op: OP_CALL},
+			opcodeAt{pc: 44, op: OP_CALL},
+			opcodeAt{pc: 45, op: OP_CALL},
+			opcodeAt{pc: 48, op: OP_RETURN},
+		) {
 		return spec, false
 	}
 	return tablePipelineChecksumSpec{
