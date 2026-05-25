@@ -355,6 +355,10 @@ func ObserveShapeFieldValue(id uint32, fieldIdx int, val Value) {
 		return
 	}
 	s := LookupShapeByID(id)
+	ObserveShapeFieldValueOnShape(s, fieldIdx, val)
+}
+
+func ObserveShapeFieldValueOnShape(s *Shape, fieldIdx int, val Value) {
 	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldTypes) || fieldIdx >= len(s.fieldClosures) {
 		return
 	}

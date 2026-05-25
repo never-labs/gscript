@@ -1097,8 +1097,8 @@ func newTableFromCtor2Shape(ctor *SmallTableCtor2, shape *Shape, val1, val2 Valu
 	t.shape = shape
 	t.shapeID = ctor.shapeID
 	t.skeys = ctor.fieldKeys
-	ObserveShapeFieldValue(t.shapeID, 0, val1)
-	ObserveShapeFieldValue(t.shapeID, 1, val2)
+	ObserveShapeFieldValueOnShape(shape, 0, val1)
+	ObserveShapeFieldValueOnShape(shape, 1, val2)
 	return t
 }
 
@@ -1122,7 +1122,7 @@ func NewTableFromCtorN(ctor *SmallTableCtorN, vals []Value) *Table {
 		t.shapeID = ctor.shapeID
 		t.skeys = ctor.fieldKeys
 		for i := 0; i < n; i++ {
-			ObserveShapeFieldValue(t.shapeID, i, t.svals[i])
+			ObserveShapeFieldValueOnShape(ctor.Shape, i, t.svals[i])
 		}
 		return t
 	}
@@ -1165,7 +1165,7 @@ func newTableFromCtorNNonNilWithCapacity(ctor *SmallTableCtorN, vals []Value, ca
 	t.skeys = ctor.fieldKeys
 	if observeTypes {
 		for i := 0; i < n; i++ {
-			ObserveShapeFieldValue(t.shapeID, i, t.svals[i])
+			ObserveShapeFieldValueOnShape(ctor.Shape, i, t.svals[i])
 		}
 	}
 	return t
@@ -1248,7 +1248,7 @@ func newTableFromSparseCtorNWithCapacity(ctor *SmallTableCtorN, vals []Value, ma
 	t.skeys = ctor.fieldKeys
 	if observeTypes {
 		for i := 0; i < n; i++ {
-			ObserveShapeFieldValue(t.shapeID, i, t.svals[i])
+			ObserveShapeFieldValueOnShape(ctor.Shape, i, t.svals[i])
 		}
 	}
 	return t
