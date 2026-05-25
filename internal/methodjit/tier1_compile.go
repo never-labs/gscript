@@ -256,11 +256,7 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 			emitBaselineNewObject2(asm, inst, pc, proto, newTableCaches)
 			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_NEWOBJECTN:
-			if nativeCoroutineSwitchEnabled {
-				emitBaselineNewObjectN(asm, inst, pc, proto)
-			} else {
-				emitBaselineOpExit(asm, inst, pc, vm.OP_NEWOBJECTN)
-			}
+			emitBaselineNewObjectN(asm, inst, pc, proto, newTableCaches, nativeCoroutineSwitchEnabled)
 			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_GETTABLE:
 			emitBaselineGetTable(asm, inst, pc, feedbackEnabled)

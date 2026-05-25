@@ -24,6 +24,10 @@ func baselineNewTableCacheSlotsForProto(proto *vm.FuncProto) []newTableCacheEntr
 			if baselineNewObject2Cacheable(proto, inst) {
 				return make([]newTableCacheEntry, len(proto.Code))
 			}
+		case vm.OP_NEWOBJECTN:
+			if baselineNewObjectNCacheable(proto, inst) {
+				return make([]newTableCacheEntry, len(proto.Code))
+			}
 		}
 	}
 	return nil
@@ -48,7 +52,7 @@ func baselineNewObjectNCacheable(proto *vm.FuncProto, inst uint32) bool {
 	if ctorIdx < 0 || ctorIdx >= len(proto.TableCtorsN) {
 		return false
 	}
-	return cacheableFixedRecordCtorN(&proto.TableCtorsN[ctorIdx].Runtime)
+	return cacheableSmallCtorN(&proto.TableCtorsN[ctorIdx].Runtime)
 }
 
 func cacheableSmallCtor2(ctor *runtime.SmallTableCtor2) bool {

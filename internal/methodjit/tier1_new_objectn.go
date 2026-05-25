@@ -9,7 +9,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func emitBaselineNewObjectN(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto) {
+func emitBaselineNewObjectN(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, caches []newTableCacheEntry, preserveCoroutinePayloadFastPath bool) {
 	if !baselineNewObjectNCacheable(proto, inst) {
 		emitBaselineOpExit(asm, inst, pc, vm.OP_NEWOBJECTN)
 		return
@@ -30,6 +30,37 @@ func emitBaselineNewObjectN(asm *jit.Assembler, inst uint32, pc int, proto *vm.F
 		loadSlot(asm, valReg, c+i)
 		asm.CMPreg(valReg, jit.X7)
 		asm.BCond(jit.CondEQ, exitLabel)
+	}
+
+	if !preserveCoroutinePayloadFastPath && pc >= 0 && pc < len(caches) {
+		cacheBase := uintptr(unsafe.Pointer(&caches[0]))
+		entryOff := pc * newTableCacheEntrySize
+		asm.LoadImm64(jit.X2, int64(cacheBase))
+		if entryOff > 0 {
+			if entryOff <= 4095 {
+				asm.ADDimm(jit.X2, jit.X2, uint16(entryOff))
+			} else {
+				asm.LoadImm64(jit.X3, int64(entryOff))
+				asm.ADDreg(jit.X2, jit.X2, jit.X3)
+			}
+		}
+		asm.LDR(jit.X0, jit.X2, newTableCacheEntryValuesOff)
+		asm.CBZ(jit.X0, exitLabel)
+		asm.LDR(jit.X3, jit.X2, newTableCacheEntryPosOff)
+		asm.LDR(jit.X4, jit.X2, newTableCacheEntryLenOff)
+		asm.CMPreg(jit.X3, jit.X4)
+		asm.BCond(jit.CondGE, exitLabel)
+		asm.LDRreg(jit.X0, jit.X0, jit.X3)
+		asm.ADDimm(jit.X3, jit.X3, 1)
+		asm.STR(jit.X3, jit.X2, newTableCacheEntryPosOff)
+
+		jit.EmitExtractPtr(asm, jit.X1, jit.X0)
+		asm.LDR(jit.X2, jit.X1, jit.TableOffSvals)
+		for i := 0; i < n; i++ {
+			asm.STR(jit.Reg(int(jit.X8)+i), jit.X2, i*jit.ValueSize)
+		}
+		storeSlot(asm, a, jit.X0)
+		asm.B(doneLabel)
 	}
 
 	asm.LDR(jit.X1, mRegCtx, execCtxOffCoroutineCurrentPtr)

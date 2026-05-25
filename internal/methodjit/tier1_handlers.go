@@ -33,7 +33,7 @@ func (e *BaselineJITEngine) handleBaselineOpExit(ctx *ExecContext, regs []runtim
 	case vm.OP_NEWOBJECT2:
 		return e.handleNewObject2(ctx, regs, base, proto, bf)
 	case vm.OP_NEWOBJECTN:
-		return e.handleNewObjectN(ctx, regs, base, proto)
+		return e.handleNewObjectN(ctx, regs, base, proto, bf)
 	case vm.OP_GETTABLE:
 		return e.handleGetTable(ctx, regs, base, proto)
 	case vm.OP_SETTABLE:
@@ -260,7 +260,7 @@ func (e *BaselineJITEngine) handleNewObject2(ctx *ExecContext, regs []runtime.Va
 	return nil
 }
 
-func (e *BaselineJITEngine) handleNewObjectN(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto) error {
+func (e *BaselineJITEngine) handleNewObjectN(ctx *ExecContext, regs []runtime.Value, base int, proto *vm.FuncProto, bf *BaselineFunc) error {
 	a := int(ctx.BaselineA)
 	b := int(ctx.BaselineB)
 	c := int(ctx.BaselineC)
@@ -277,6 +277,11 @@ func (e *BaselineJITEngine) handleNewObjectN(ctx *ExecContext, regs []runtime.Va
 	start := base + c
 	if start < 0 || start+n > len(regs) {
 		regs[absA] = runtime.FreshTableValue(runtime.NewTableSized(0, n))
+		return nil
+	}
+	pc := int(ctx.BaselinePC) - 1
+	if bf != nil && !bf.HasNativeCoroutineSwitch && pc >= 0 && pc < len(proto.Code) && baselineNewObjectNCacheable(proto, proto.Code[pc]) {
+		regs[absA] = runtime.FreshTableValue(allocateFixedTableNWithCache(bf.NewTableCaches, pc, ctor, regs[start:start+n]))
 		return nil
 	}
 	if e.callVM != nil {
