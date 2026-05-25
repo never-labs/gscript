@@ -18,10 +18,10 @@ func TableArrayDataPtrFactPass(fn *Function) (*Function, error) {
 	fn.ensureAnalysis()
 	facts := collectTableArrayDataPtrFacts(fn)
 	if len(facts) == 0 {
-		fn.Analysis.TableArrayDataPtrs = nil
+		fn.Analysis.LoopSpecializationFacts().SetTableArrayDataPtrs(nil)
 		return fn, nil
 	}
-	fn.Analysis.TableArrayDataPtrs = facts
+	fn.Analysis.LoopSpecializationFacts().SetTableArrayDataPtrs(facts)
 	return fn, nil
 }
 
@@ -66,9 +66,8 @@ func collectTableArrayDataPtrFacts(fn *Function) map[int]TableArrayDataPtrFact {
 }
 
 func (f *Function) tableArrayDataPtrFact(valueID int) (TableArrayDataPtrFact, bool) {
-	if f == nil || f.Analysis.TableArrayDataPtrs == nil {
+	if f == nil {
 		return TableArrayDataPtrFact{}, false
 	}
-	fact, ok := f.Analysis.TableArrayDataPtrs[valueID]
-	return fact, ok
+	return f.Analysis.LoopSpecializationFacts().TableArrayDataPtr(valueID)
 }
