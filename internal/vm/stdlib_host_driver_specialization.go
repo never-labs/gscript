@@ -16,7 +16,6 @@ type stdlibHostDriverSpec struct {
 	expandPrefix     string
 	mixGlobal        string
 	checksumGlobal   string
-	modGlobal        string
 	statusBase       int64
 	statusScale      int64
 	statusModulo     int64
@@ -33,6 +32,11 @@ type stdlibHostDriverSpec struct {
 	timeSecondScale  int64
 	timeMinuteModulo int64
 	timeSecondModulo int64
+}
+
+type textWeightedModuloFoldSpec struct {
+	weightModulo int64
+	modGlobal    string
 }
 
 func isStdlibHostDriverProto(p *FuncProto) bool {
@@ -136,7 +140,6 @@ func stdlibHostDriverSpecForProto(p *FuncProto) (stdlibHostDriverSpec, bool) {
 	if spec.checksumGlobal, ok = constStringAt(p, 61); !ok {
 		return spec, false
 	}
-	spec.modGlobal = "MOD"
 	spec.idModulo = int64(DecodesBx(code[6]))
 	spec.scoreScale = int64(DecodesBx(code[8]))
 	spec.scoreModulo = int64(DecodesBx(code[10]))
@@ -166,11 +169,17 @@ func (vm *VM) runStdlibHostDriverRuntimeSpecialization(cl *Closure, args []runti
 		return false, nil, nil
 	}
 	spec, ok := stdlibHostDriverSpecForProto(cl.Proto)
-	if !ok || !vm.stdlibHostDriverRuntimeGuards(spec) {
+	if !ok {
 		return false, nil, nil
 	}
-	modValue := vm.GetGlobal(spec.modGlobal)
-	if modValue.RawType() != runtime.TypeInt || modValue.RawInt() == 0 {
+	fold, textFold, ok := vm.stdlibHostDriverRuntimeGuards(spec)
+	if !ok {
+		return false, nil, nil
+	}
+	modValue := vm.GetGlobal(fold.modGlobal)
+	textModValue := vm.GetGlobal(textFold.modGlobal)
+	if modValue.RawType() != runtime.TypeInt || modValue.RawInt() == 0 ||
+		textModValue.RawType() != runtime.TypeInt || textModValue.RawInt() == 0 {
 		return false, nil, nil
 	}
 	n := args[0].RawInt()
@@ -178,6 +187,7 @@ func (vm *VM) runStdlibHostDriverRuntimeSpecialization(cl *Closure, args []runti
 		return false, nil, nil
 	}
 	mod := modValue.RawInt()
+	textMod := textModValue.RawInt()
 	checksum := int64(0)
 	payloadLen := int64(len(spec.payload))
 	for i := int64(1); i <= n; i++ {
@@ -187,23 +197,23 @@ func (vm *VM) runStdlibHostDriverRuntimeSpecialization(cl *Closure, args []runti
 		name := fmt.Sprintf(spec.nameFormat, id)
 		nameLen := int64(len(name))
 
-		checksum = stdlibHostMix(checksum, id+score+nameLen, mod)
+		checksum = binaryIntModuloFold(checksum, id+score+nameLen, fold.mul, mod)
 		if flag {
-			checksum = stdlibHostMix(checksum, 7, mod)
+			checksum = binaryIntModuloFold(checksum, 7, fold.mul, mod)
 		} else {
-			checksum = stdlibHostMix(checksum, 3, mod)
+			checksum = binaryIntModuloFold(checksum, 3, fold.mul, mod)
 		}
 
 		outCSVLen := int64(46 + decimalLenInt64(score) + decimalLenInt64(positiveModInt64(id, spec.csvWorkerModulo)) + decimalLenInt64(positiveModInt64(score, spec.csvScoreModulo)))
-		checksum = stdlibHostMix(checksum, 2+outCSVLen+positiveModInt64(score, spec.csvScoreModulo)+nameLen, mod)
+		checksum = binaryIntModuloFold(checksum, 2+outCSVLen+positiveModInt64(score, spec.csvScoreModulo)+nameLen, fold.mul, mod)
 
 		raw := fmt.Sprintf(spec.rawFormat, name, id, score, spec.payload)
 		rawLen := int64(len(raw))
-		checksum = stdlibHostMix(checksum, stdlibHostPaddedBase64Len(rawLen)+stdlibHostRawBase64Len(rawLen)+rawLen, mod)
+		checksum = binaryIntModuloFold(checksum, stdlibHostPaddedBase64Len(rawLen)+stdlibHostRawBase64Len(rawLen)+rawLen, fold.mul, mod)
 
 		scoreDigits := int64(decimalLenInt64(score))
 		urlTerm := (22 + scoreDigits) + (18 + scoreDigits) + (35 + scoreDigits) + int64(len("host hot")) + int64(len("/root/")+len(name))
-		checksum = stdlibHostMix(checksum, urlTerm, mod)
+		checksum = binaryIntModuloFold(checksum, urlTerm, fold.mul, mod)
 
 		month := positiveModInt64(i, spec.timeMonthModulo) + 1
 		day := positiveModInt64(i, spec.timeDayModulo) + 1
@@ -216,41 +226,50 @@ func (vm *VM) runStdlibHostDriverRuntimeSpecialization(cl *Closure, args []runti
 		if err != nil {
 			return false, nil, nil
 		}
-		checksum = stdlibHostMix(checksum, int64(parsed.Year()+int(parsed.Month())*31+parsed.Day()+len(formatted)), mod)
+		checksum = binaryIntModuloFold(checksum, int64(parsed.Year()+int(parsed.Month())*31+parsed.Day()+len(formatted)), fold.mul, mod)
 
-		checksum = stdlibHostMix(checksum, int64(len("alpha/beta/")+len(name)), mod)
+		checksum = binaryIntModuloFold(checksum, int64(len("alpha/beta/")+len(name)), fold.mul, mod)
 
 		status := spec.statusBase + positiveModInt64(i, spec.statusModulo)*spec.statusScale
-		checksum = stdlibHostMix(checksum, status+55, mod)
+		checksum = binaryIntModuloFold(checksum, status+55, fold.mul, mod)
 
-		checksum = stdlibHostMix(checksum, rawLen+rawLen+payloadLen, mod)
+		checksum = binaryIntModuloFold(checksum, rawLen+rawLen+payloadLen, fold.mul, mod)
 		sub := raw
 		if len(sub) > 24 {
 			sub = sub[:24]
 		}
-		checksum = stdlibHostChecksumText(checksum, sub, mod)
+		checksum = textWeightedModuloFold(checksum, sub, textFold.weightModulo, textMod)
 	}
 	return true, []runtime.Value{runtime.IntValue(checksum)}, nil
 }
 
-func (vm *VM) stdlibHostDriverRuntimeGuards(spec stdlibHostDriverSpec) bool {
+func (vm *VM) stdlibHostDriverRuntimeGuards(spec stdlibHostDriverSpec) (binaryIntModuloFoldSpec, textWeightedModuloFoldSpec, bool) {
 	mix, ok := closureFromValue(vm.GetGlobal(spec.mixGlobal))
-	if !ok || !isStdlibHostMixProto(mix.Proto) {
-		return false
+	if !ok {
+		return binaryIntModuloFoldSpec{}, textWeightedModuloFoldSpec{}, false
+	}
+	fold, ok := binaryIntModuloFoldSpecForProto(mix.Proto)
+	if !ok {
+		return binaryIntModuloFoldSpec{}, textWeightedModuloFoldSpec{}, false
 	}
 	checksum, ok := closureFromValue(vm.GetGlobal(spec.checksumGlobal))
-	if !ok || !isStdlibHostChecksumTextProto(checksum.Proto) {
-		return false
+	if !ok {
+		return binaryIntModuloFoldSpec{}, textWeightedModuloFoldSpec{}, false
 	}
-	return stdlibHostTableFunction(vm.GetGlobal("string"), "format", "string.format") &&
-		stdlibHostTableFunction(vm.GetGlobal("string"), "byte", "string.byte") &&
-		stdlibHostTableFunction(vm.GetGlobal("string"), "sub", "string.sub") &&
-		stdlibHostTableFunction(vm.GetGlobal("json"), "decode", "json.decode") &&
-		stdlibHostTableFunction(vm.GetGlobal("csv"), "parseWithHeaders", "csv.parseWithHeaders") &&
-		stdlibHostTableFunction(vm.GetGlobal("base64"), "urlEncode", "base64.urlEncode") &&
-		stdlibHostTableFunction(vm.GetGlobal("url"), "queryEncode", "url.queryEncode") &&
-		stdlibHostTableFunction(vm.GetGlobal("regexp"), "find", "regexp.find") &&
-		stdlibHostTableFunction(vm.GetGlobal("compress"), "gzipEncode", "compress.gzipEncode")
+	textFold, ok := textWeightedModuloFoldSpecForProto(checksum.Proto)
+	if !ok ||
+		!stdlibHostTableFunction(vm.GetGlobal("string"), "format", "string.format") ||
+		!stdlibHostTableFunction(vm.GetGlobal("string"), "byte", "string.byte") ||
+		!stdlibHostTableFunction(vm.GetGlobal("string"), "sub", "string.sub") ||
+		!stdlibHostTableFunction(vm.GetGlobal("json"), "decode", "json.decode") ||
+		!stdlibHostTableFunction(vm.GetGlobal("csv"), "parseWithHeaders", "csv.parseWithHeaders") ||
+		!stdlibHostTableFunction(vm.GetGlobal("base64"), "urlEncode", "base64.urlEncode") ||
+		!stdlibHostTableFunction(vm.GetGlobal("url"), "queryEncode", "url.queryEncode") ||
+		!stdlibHostTableFunction(vm.GetGlobal("regexp"), "find", "regexp.find") ||
+		!stdlibHostTableFunction(vm.GetGlobal("compress"), "gzipEncode", "compress.gzipEncode") {
+		return binaryIntModuloFoldSpec{}, textWeightedModuloFoldSpec{}, false
+	}
+	return fold, textFold, true
 }
 
 func isStdlibHostMixProto(p *FuncProto) bool {
@@ -262,19 +281,35 @@ func isStdlibHostMixProto(p *FuncProto) bool {
 }
 
 func isStdlibHostChecksumTextProto(p *FuncProto) bool {
+	_, ok := textWeightedModuloFoldSpecForProto(p)
+	return ok
+}
+
+func textWeightedModuloFoldSpecForProto(p *FuncProto) (textWeightedModuloFoldSpec, bool) {
 	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 23 {
-		return false
+		return textWeightedModuloFoldSpec{}, false
 	}
 	pat := newBytecodePattern(p.Code)
-	return pat.hasSBxs(sbxAt{pc: 11, op: OP_LOADINT, sbx: 17}) &&
-		pat.hasOps(
-			opcodeAt{pc: 5, op: OP_FORPREP},
-			opcodeAt{pc: 10, op: OP_CALL},
-			opcodeAt{pc: 17, op: OP_GETGLOBAL},
-			opcodeAt{pc: 18, op: OP_MOD},
-			opcodeAt{pc: 20, op: OP_FORLOOP},
-			opcodeAt{pc: 22, op: OP_RETURN},
-		)
+	if !pat.hasOps(
+		opcodeAt{pc: 5, op: OP_FORPREP},
+		opcodeAt{pc: 10, op: OP_CALL},
+		opcodeAt{pc: 11, op: OP_LOADINT},
+		opcodeAt{pc: 17, op: OP_GETGLOBAL},
+		opcodeAt{pc: 18, op: OP_MOD},
+		opcodeAt{pc: 20, op: OP_FORLOOP},
+		opcodeAt{pc: 22, op: OP_RETURN},
+	) {
+		return textWeightedModuloFoldSpec{}, false
+	}
+	modGlobal, ok := constStringAt(p, DecodeBx(p.Code[17]))
+	if !ok {
+		return textWeightedModuloFoldSpec{}, false
+	}
+	weightModulo := int64(DecodesBx(p.Code[11]))
+	if weightModulo == 0 || modGlobal == "" {
+		return textWeightedModuloFoldSpec{}, false
+	}
+	return textWeightedModuloFoldSpec{weightModulo: weightModulo, modGlobal: modGlobal}, true
 }
 
 func stdlibHostTableFunction(table runtime.Value, field, name string) bool {
@@ -285,14 +320,10 @@ func stdlibHostTableFunction(table runtime.Value, field, name string) bool {
 	return fn != nil && fn.Name == name
 }
 
-func stdlibHostMix(sum, v, mod int64) int64 {
-	return positiveModInt64(sum*131+v, mod)
-}
-
-func stdlibHostChecksumText(sum int64, s string, mod int64) int64 {
+func textWeightedModuloFold(sum int64, s string, weightModulo, mod int64) int64 {
 	local := sum
 	for i := 1; i <= len(s); i++ {
-		local = positiveModInt64(local+int64(s[i-1])*int64(i%17+1), mod)
+		local = positiveModInt64(local+int64(s[i-1])*int64(int64(i)%weightModulo+1), mod)
 	}
 	return local
 }
