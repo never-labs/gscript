@@ -362,7 +362,7 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 	markConvergingInductionSafe(fn, safe)
 	markGuardedForwardInductionUpdatesSafe(fn, ranges, safe)
 	nonNegative := collectIntNonNegativeFacts(intInstrs, ranges)
-	for id := range numeric.IntNonNegative {
+	for id := range numeric.IntNonNegativeMap() {
 		nonNegative[id] = true
 	}
 	numeric.SetComputedRanges(safe, ranges, nonNegative)
@@ -959,7 +959,7 @@ func blockEntryExcludesZero(block *Block, valueID int) bool {
 func populateIntModFacts(fn *Function, baseRanges map[int]intRange) {
 	nonZeroDivisor := make(map[int]bool)
 	noSignAdjust := make(map[int]bool)
-	nonNegative := functionNumericFacts(fn).IntNonNegative
+	nonNegative := functionNumericFacts(fn).IntNonNegativeMap()
 	blockEntries := computeBlockEntryRanges(fn, baseRanges)
 
 	for _, block := range fn.Blocks {
