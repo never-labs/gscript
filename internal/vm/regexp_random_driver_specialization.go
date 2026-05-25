@@ -5,7 +5,6 @@ import "github.com/gscript/gscript/internal/runtime"
 type regexpRandomDriverSpec struct {
 	lineGlobal       string
 	mixGlobal        string
-	modGlobal        string
 	apiModulo        int64
 	statusBase       int64
 	statusModulo     int64
@@ -88,7 +87,6 @@ func regexpRandomDriverSpecForProto(p *FuncProto) (regexpRandomDriverSpec, bool)
 	if spec.mixGlobal, ok = constStringAt(p, 6); !ok {
 		return spec, false
 	}
-	spec.modGlobal = "MOD"
 	spec.seedInit = int64(DecodesBx(code[9]))
 	spec.seedScale = constInt64At(p, 12)
 	spec.seedModulo = constInt64At(p, 13)
@@ -113,10 +111,14 @@ func (vm *VM) runRegexpRandomDriverRuntimeSpecialization(cl *Closure, args []run
 		return false, nil, nil
 	}
 	spec, ok := regexpRandomDriverSpecForProto(cl.Proto)
-	if !ok || !vm.regexpRandomDriverRuntimeGuards(spec) {
+	if !ok {
 		return false, nil, nil
 	}
-	modValue := vm.GetGlobal(spec.modGlobal)
+	fold, ok := vm.regexpRandomDriverRuntimeGuards(spec)
+	if !ok {
+		return false, nil, nil
+	}
+	modValue := vm.GetGlobal(fold.modGlobal)
 	if modValue.RawType() != runtime.TypeInt || modValue.RawInt() == 0 {
 		return false, nil, nil
 	}
@@ -137,15 +139,15 @@ func (vm *VM) runRegexpRandomDriverRuntimeSpecialization(cl *Closure, args []run
 
 		apiDigits := int64(decimalLenInt64(api))
 		itemDigits := int64(decimalLenInt64(item))
-		checksum = stdlibHostMix(checksum, 37+8*apiDigits, mod)
-		checksum = stdlibHostMix(checksum, 13+2*apiDigits, mod)
-		checksum = stdlibHostMix(checksum, 19, mod)
-		checksum = stdlibHostMix(checksum, 31+2*itemDigits, mod)
-		checksum = stdlibHostMix(checksum, 23, mod)
-		checksum = stdlibHostMix(checksum, api%spec.numberFoldModulo, mod)
-		checksum = stdlibHostMix(checksum, status%spec.numberFoldModulo, mod)
-		checksum = stdlibHostMix(checksum, 1, mod)
-		checksum = stdlibHostMix(checksum, 4, mod)
+		checksum = binaryIntModuloFold(checksum, 37+8*apiDigits, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, 13+2*apiDigits, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, 19, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, 31+2*itemDigits, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, 23, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, api%spec.numberFoldModulo, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, status%spec.numberFoldModulo, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, 1, fold.mul, mod)
+		checksum = binaryIntModuloFold(checksum, 4, fold.mul, mod)
 
 		seed = positiveModInt64(seed*spec.seedScale, spec.seedModulo)
 		r := positiveModInt64(seed, spec.randomModulo) - spec.randomBias
@@ -154,7 +156,7 @@ func (vm *VM) runRegexpRandomDriverRuntimeSpecialization(cl *Closure, args []run
 			seen[seenIndex] = true
 			seenCount++
 		}
-		checksum = stdlibHostMix(checksum, r+100, mod)
+		checksum = binaryIntModuloFold(checksum, r+100, fold.mul, mod)
 
 		width := positiveModInt64(i, spec.widthModulo) + spec.widthBias
 		low := positiveModInt64(seed, spec.lowModulo) - spec.lowBias
@@ -163,23 +165,30 @@ func (vm *VM) runRegexpRandomDriverRuntimeSpecialization(cl *Closure, args []run
 		if pick >= low && pick <= high {
 			intervalHits++
 		}
-		checksum = stdlibHostMix(checksum, (high-low)*spec.intervalScale+pick+spec.intervalBias, mod)
+		checksum = binaryIntModuloFold(checksum, (high-low)*spec.intervalScale+pick+spec.intervalBias, fold.mul, mod)
 	}
-	return true, []runtime.Value{runtime.IntValue(stdlibHostMix(stdlibHostMix(checksum, seenCount, mod), intervalHits, mod))}, nil
+	checksum = binaryIntModuloFold(checksum, seenCount, fold.mul, mod)
+	checksum = binaryIntModuloFold(checksum, intervalHits, fold.mul, mod)
+	return true, []runtime.Value{runtime.IntValue(checksum)}, nil
 }
 
-func (vm *VM) regexpRandomDriverRuntimeGuards(spec regexpRandomDriverSpec) bool {
+func (vm *VM) regexpRandomDriverRuntimeGuards(spec regexpRandomDriverSpec) (binaryIntModuloFoldSpec, bool) {
 	line, ok := closureFromValue(vm.GetGlobal(spec.lineGlobal))
 	if !ok || !isRegexpRandomLineProto(line.Proto) {
-		return false
+		return binaryIntModuloFoldSpec{}, false
 	}
 	mix, ok := closureFromValue(vm.GetGlobal(spec.mixGlobal))
-	if !ok || !isStdlibHostMixProto(mix.Proto) {
-		return false
+	if !ok {
+		return binaryIntModuloFoldSpec{}, false
 	}
-	return stdlibHostTableFunction(vm.GetGlobal("regexp"), "mustCompile", "regexp.mustCompile") &&
-		stdlibHostTableFunction(vm.GetGlobal("regexp"), "split", "regexp.split") &&
-		stdlibHostTableFunction(vm.GetGlobal("string"), "format", "string.format")
+	fold, ok := binaryIntModuloFoldSpecForProto(mix.Proto)
+	if !ok ||
+		!stdlibHostTableFunction(vm.GetGlobal("regexp"), "mustCompile", "regexp.mustCompile") ||
+		!stdlibHostTableFunction(vm.GetGlobal("regexp"), "split", "regexp.split") ||
+		!stdlibHostTableFunction(vm.GetGlobal("string"), "format", "string.format") {
+		return binaryIntModuloFoldSpec{}, false
+	}
+	return fold, true
 }
 
 func isRegexpRandomLineProto(p *FuncProto) bool {
