@@ -23,9 +23,6 @@ const (
 	runtimeSpecializationMathBitUTF8HotLoop
 	runtimeSpecializationTableIteratorModuloFold
 	runtimeSpecializationMixedAffineTableBuilder
-	runtimeSpecializationLinkedRecordChecksum
-	runtimeSpecializationInsertRemoveChecksum
-	runtimeSpecializationTablePipelineChecksum
 	runtimeSpecializationStdlibHostDriver
 	runtimeSpecializationRegexpRandomDriver
 	runtimeSpecializationStringSampleChecksum
@@ -288,45 +285,6 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 			Recognize: isMixedAffineTableBuilderProto,
 		},
 		Run: (*VM).runMixedAffineTableBuilderRuntimeSpecialization,
-	},
-	runtimeSpecializationLinkedRecordChecksum: {
-		RuntimeSpecialization: RuntimeSpecialization{
-			Info: RuntimeSpecializationInfo{
-				Name:          "linked_record_checksum",
-				Route:         RuntimeSpecializationRouteCallSiteValue,
-				Arity:         2,
-				Results:       runtimeSpecializationCallSiteSingleResultCount,
-				TieringPolicy: runtimeSpecializationTieringStructural,
-			},
-			Recognize: isLinkedRecordChecksumProto,
-		},
-		Run: (*VM).runLinkedRecordChecksumRuntimeSpecialization,
-	},
-	runtimeSpecializationInsertRemoveChecksum: {
-		RuntimeSpecialization: RuntimeSpecialization{
-			Info: RuntimeSpecializationInfo{
-				Name:          "insert_remove_checksum",
-				Route:         RuntimeSpecializationRouteCallSiteValue,
-				Arity:         2,
-				Results:       runtimeSpecializationCallSiteSingleResultCount,
-				TieringPolicy: runtimeSpecializationTieringStructural,
-			},
-			Recognize: isInsertRemoveChecksumProto,
-		},
-		Run: (*VM).runInsertRemoveChecksumRuntimeSpecialization,
-	},
-	runtimeSpecializationTablePipelineChecksum: {
-		RuntimeSpecialization: RuntimeSpecialization{
-			Info: RuntimeSpecializationInfo{
-				Name:          "table_pipeline_checksum",
-				Route:         RuntimeSpecializationRouteCallSiteValue,
-				Arity:         4,
-				Results:       runtimeSpecializationCallSiteSingleResultCount,
-				TieringPolicy: runtimeSpecializationTieringStructural,
-			},
-			Recognize: isTablePipelineChecksumProto,
-		},
-		Run: (*VM).runTablePipelineChecksumRuntimeSpecialization,
 	},
 	runtimeSpecializationStdlibHostDriver: {
 		RuntimeSpecialization: RuntimeSpecialization{
