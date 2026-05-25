@@ -19,31 +19,33 @@ func unaryIntArrayMapSpecForProto(p *FuncProto) (unaryIntArrayMapSpec, bool) {
 		return unaryIntArrayMapSpec{}, false
 	}
 	code := p.Code
-	required := map[int]Opcode{
-		0: OP_NEWTABLE, 1: OP_MOVE, 2: OP_LEN, 3: OP_LOADINT,
-		4: OP_MOVE, 5: OP_LOADINT, 6: OP_FORPREP, 7: OP_MOVE,
-		8: OP_MOVE, 9: OP_GETTABLE, 10: OP_CALL, 11: OP_MOVE,
-		12: OP_SETTABLE, 13: OP_FORLOOP, 14: OP_MOVE, 15: OP_RETURN,
-	}
-	for pc, op := range required {
-		if DecodeOp(code[pc]) != op {
-			return unaryIntArrayMapSpec{}, false
-		}
-	}
-	if DecodeA(code[0]) != 2 ||
-		DecodeA(code[1]) != 4 || DecodeB(code[1]) != 0 ||
-		DecodeA(code[2]) != 3 || DecodeB(code[2]) != 4 ||
-		DecodeA(code[3]) != 4 || DecodesBx(code[3]) != 1 ||
-		DecodeA(code[4]) != 5 || DecodeB(code[4]) != 3 ||
-		DecodeA(code[5]) != 6 || DecodesBx(code[5]) != 1 ||
-		DecodeA(code[7]) != 8 || DecodeB(code[7]) != 1 ||
-		DecodeA(code[8]) != 10 || DecodeB(code[8]) != 7 ||
-		DecodeA(code[9]) != 9 || DecodeB(code[9]) != 0 || DecodeC(code[9]) != 10 ||
-		DecodeA(code[10]) != 8 ||
-		DecodeA(code[11]) != 9 || DecodeB(code[11]) != 7 ||
-		DecodeA(code[12]) != 2 || DecodeB(code[12]) != 9 || DecodeC(code[12]) != 8 ||
-		DecodeA(code[14]) != 7 || DecodeB(code[14]) != 2 ||
-		DecodeA(code[15]) != 7 || DecodeB(code[15]) != 2 {
+	pat := newBytecodePattern(code)
+	if !pat.hasAs(
+		aAt{pc: 0, op: OP_NEWTABLE, a: 2},
+		aAt{pc: 10, op: OP_CALL, a: 8},
+	) ||
+		!pat.hasASBxs(
+			asbxAt{pc: 3, op: OP_LOADINT, a: 4, sbx: 1},
+			asbxAt{pc: 5, op: OP_LOADINT, a: 6, sbx: 1},
+		) ||
+		!pat.hasABs(
+			abAt{pc: 1, op: OP_MOVE, a: 4, b: 0},
+			abAt{pc: 2, op: OP_LEN, a: 3, b: 4},
+			abAt{pc: 4, op: OP_MOVE, a: 5, b: 3},
+			abAt{pc: 7, op: OP_MOVE, a: 8, b: 1},
+			abAt{pc: 8, op: OP_MOVE, a: 10, b: 7},
+			abAt{pc: 11, op: OP_MOVE, a: 9, b: 7},
+			abAt{pc: 14, op: OP_MOVE, a: 7, b: 2},
+			abAt{pc: 15, op: OP_RETURN, a: 7, b: 2},
+		) ||
+		!pat.hasABCs(
+			abcAt{pc: 9, op: OP_GETTABLE, a: 9, b: 0, c: 10},
+			abcAt{pc: 12, op: OP_SETTABLE, a: 2, b: 9, c: 8},
+		) ||
+		!pat.hasOps(
+			opcodeAt{pc: 6, op: OP_FORPREP},
+			opcodeAt{pc: 13, op: OP_FORLOOP},
+		) {
 		return unaryIntArrayMapSpec{}, false
 	}
 	return unaryIntArrayMapSpec{}, true
@@ -54,16 +56,16 @@ func unaryIntAffineClosureSpecForProto(p *FuncProto) (unaryIntAffineClosureSpec,
 		return unaryIntAffineClosureSpec{}, false
 	}
 	code := p.Code
-	if DecodeOp(code[0]) != OP_LOADINT || DecodeOp(code[1]) != OP_MUL ||
-		DecodeOp(code[2]) != OP_LOADINT || DecodeOp(code[3]) != OP_ADD ||
-		DecodeOp(code[4]) != OP_RETURN {
-		return unaryIntAffineClosureSpec{}, false
-	}
-	if DecodeA(code[0]) != 3 ||
-		DecodeA(code[1]) != 2 || DecodeB(code[1]) != 0 || DecodeC(code[1]) != 3 ||
-		DecodeA(code[2]) != 3 ||
-		DecodeA(code[3]) != 1 || DecodeB(code[3]) != 2 || DecodeC(code[3]) != 3 ||
-		DecodeA(code[4]) != 1 || DecodeB(code[4]) != 2 {
+	pat := newBytecodePattern(code)
+	if !pat.hasAs(
+		aAt{pc: 0, op: OP_LOADINT, a: 3},
+		aAt{pc: 2, op: OP_LOADINT, a: 3},
+	) ||
+		!pat.hasABCs(
+			abcAt{pc: 1, op: OP_MUL, a: 2, b: 0, c: 3},
+			abcAt{pc: 3, op: OP_ADD, a: 1, b: 2, c: 3},
+		) ||
+		!pat.hasABs(abAt{pc: 4, op: OP_RETURN, a: 1, b: 2}) {
 		return unaryIntAffineClosureSpec{}, false
 	}
 	return unaryIntAffineClosureSpec{
