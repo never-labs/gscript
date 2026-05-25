@@ -105,15 +105,18 @@ func (vm *VM) runMixedAffineTableBuilderRuntimeSpecialization(cl *Closure, args 
 	if n > int64(int(^uint(0)>>1)-1) {
 		return false, nil, nil
 	}
-	hashHint := int(n/spec.strDiv + n/spec.negDiv + 2)
-	tbl := runtime.NewTableSizedKind(int(n), hashHint, runtime.ArrayInt)
+	strHint := int(n / spec.strDiv)
+	intMapHint := int(n / spec.negDiv)
+	tbl := runtime.NewPlainIntArrayMapTable(int(n), intMapHint, strHint)
 	for i := int64(1); i <= n; i++ {
-		tbl.RawSetInt(i, runtime.IntValue(i*spec.arrayScale+spec.arrayBias))
+		if !tbl.InitIntArraySlot(i, i*spec.arrayScale+spec.arrayBias) {
+			return false, nil, nil
+		}
 		if i%spec.strDiv == 0 {
-			tbl.RawSetString(spec.strPrefix+strconv.FormatInt(i, 10), runtime.IntValue(i*spec.strScale+spec.strBias))
+			tbl.InitStringMapSlot(spec.strPrefix+strconv.FormatInt(i, 10), runtime.IntValue(i*spec.strScale+spec.strBias))
 		}
 		if i%spec.negDiv == 0 {
-			tbl.RawSetInt(-i, runtime.IntValue(i*spec.negScale+spec.negBias))
+			tbl.InitIntMapSlot(-i, runtime.IntValue(i*spec.negScale+spec.negBias))
 		}
 	}
 	return true, []runtime.Value{runtime.TableValue(tbl)}, nil

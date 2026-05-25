@@ -195,6 +195,67 @@ func NewDenseMixedArrayTable(arrayHint, hashHint int) *Table {
 	return t
 }
 
+// NewPlainIntArrayMapTable creates a plain table for runtime-proven builders
+// that fill every positive integer slot 1..arrayLen and also need pre-sized
+// integer/string map parts. The table is ordinary after construction; callers
+// must initialize the advertised array slots before exposing it to user code.
+func NewPlainIntArrayMapTable(arrayLen, intMapHint, stringMapHint int) *Table {
+	if arrayLen < 0 {
+		arrayLen = 0
+	}
+	t := DefaultHeap.AllocTable()
+	if arrayLen > 0 {
+		t.arrayKind = ArrayInt
+		t.intArray = DefaultHeap.AllocInt64s(arrayLen+1, arrayLen+1)
+	}
+	if intMapHint > 0 {
+		t.imap = make(map[int64]Value, intMapHint)
+	}
+	if stringMapHint > 0 {
+		t.smap = make(map[string]Value, stringMapHint)
+	}
+	t.keysDirty = true
+	return t
+}
+
+// InitIntArraySlot initializes a slot in a freshly constructed ArrayInt table.
+// It returns false if the table no longer has the required storage shape.
+func (t *Table) InitIntArraySlot(index int64, value int64) bool {
+	if t == nil || t.arrayKind != ArrayInt || index < 0 || index >= int64(len(t.intArray)) {
+		return false
+	}
+	if index == 0 {
+		t.arrayZeroValid = true
+	}
+	t.intArray[index] = value
+	return true
+}
+
+// InitIntMapSlot initializes a non-array integer key in a freshly constructed
+// table. It uses Value storage because integer-map entries may hold any type.
+func (t *Table) InitIntMapSlot(key int64, val Value) bool {
+	if t == nil || val.IsNil() {
+		return false
+	}
+	if t.imap == nil {
+		t.imap = make(map[int64]Value)
+	}
+	t.imap[key] = val
+	return true
+}
+
+// InitStringMapSlot initializes a string-map key in a freshly constructed table.
+func (t *Table) InitStringMapSlot(key string, val Value) bool {
+	if t == nil || val.IsNil() {
+		return false
+	}
+	if t.smap == nil {
+		t.smap = make(map[string]Value)
+	}
+	t.smap[key] = val
+	return true
+}
+
 // NewSequentialArrayTable creates a table whose 1-based array part has exactly
 // length slots ready for direct sequential fill by runtime builders.
 func NewSequentialArrayTable(length int) *Table {

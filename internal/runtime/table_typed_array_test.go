@@ -329,6 +329,35 @@ func TestNewTableSizedKindPreallocatesTypedArray(t *testing.T) {
 	}
 }
 
+func TestNewPlainIntArrayMapTableInitializesRawStorage(t *testing.T) {
+	tbl := NewPlainIntArrayMapTable(3, 1, 1)
+	if !tbl.InitIntArraySlot(1, 11) || !tbl.InitIntArraySlot(2, 22) || !tbl.InitIntArraySlot(3, 33) {
+		t.Fatal("failed to initialize int array slots")
+	}
+	if !tbl.InitIntMapSlot(-2, IntValue(44)) {
+		t.Fatal("failed to initialize int map slot")
+	}
+	if !tbl.InitStringMapSlot("k", IntValue(55)) {
+		t.Fatal("failed to initialize string map slot")
+	}
+	if got := tbl.RawGetInt(1); !got.IsInt() || got.Int() != 11 {
+		t.Fatalf("RawGetInt(1) = %v, want 11", got)
+	}
+	if got := tbl.RawGetInt(-2); !got.IsInt() || got.Int() != 44 {
+		t.Fatalf("RawGetInt(-2) = %v, want 44", got)
+	}
+	if got := tbl.RawGetString("k"); !got.IsInt() || got.Int() != 55 {
+		t.Fatalf("RawGetString(k) = %v, want 55", got)
+	}
+	if got := tbl.Length(); got != 3 {
+		t.Fatalf("Length() = %d, want 3", got)
+	}
+	keys := tbl.PairsKeysSnapshot()
+	if len(keys) != 5 {
+		t.Fatalf("PairsKeysSnapshot len = %d, want 5 (%v)", len(keys), keys)
+	}
+}
+
 func TestArrayKindTypedNumericUnsetZeroReturnsNil(t *testing.T) {
 	cases := []struct {
 		name string
