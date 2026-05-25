@@ -170,42 +170,70 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 	var sum, count int64
 	switch spec.mode {
 	case tableIteratorModuloFoldPairs:
-		key := runtime.NilValue()
-		for {
-			k, v, ok := tbl.Next(key)
-			if !ok {
-				break
-			}
+		if ok := tbl.ForEachPlainRaw(func(k, v runtime.Value) bool {
 			var term int64
 			if k.RawType() == runtime.TypeInt && v.RawType() == runtime.TypeInt {
 				term = k.RawInt()*spec.numScale + v.RawInt()
 			} else if k.IsString() && v.RawType() == runtime.TypeInt {
 				term = int64(runtime.StringLen(k))*spec.strScale + v.RawInt()
 			} else {
-				return false, nil, nil
+				return false
 			}
 			sum = positiveModInt64(sum+term, mod)
 			count++
-			key = k
+			return true
+		}); !ok {
+			key := runtime.NilValue()
+			for {
+				k, v, ok := tbl.Next(key)
+				if !ok {
+					break
+				}
+				var term int64
+				if k.RawType() == runtime.TypeInt && v.RawType() == runtime.TypeInt {
+					term = k.RawInt()*spec.numScale + v.RawInt()
+				} else if k.IsString() && v.RawType() == runtime.TypeInt {
+					term = int64(runtime.StringLen(k))*spec.strScale + v.RawInt()
+				} else {
+					return false, nil, nil
+				}
+				sum = positiveModInt64(sum+term, mod)
+				count++
+				key = k
+			}
 		}
 	case tableIteratorModuloFoldNext:
-		key := runtime.NilValue()
-		for {
-			k, v, ok := tbl.Next(key)
-			if !ok {
-				break
-			}
+		if ok := tbl.ForEachPlainRaw(func(k, v runtime.Value) bool {
 			var term int64
 			if k.RawType() == runtime.TypeInt && v.RawType() == runtime.TypeInt {
 				term = k.RawInt()*spec.numScale + v.RawInt()
 			} else if k.IsString() && v.RawType() == runtime.TypeInt {
 				term = int64(runtime.StringLen(k))*spec.strScale + v.RawInt()
 			} else {
-				return false, nil, nil
+				return false
 			}
 			sum = positiveModInt64(sum+term, mod)
 			count++
-			key = k
+			return true
+		}); !ok {
+			key := runtime.NilValue()
+			for {
+				k, v, ok := tbl.Next(key)
+				if !ok {
+					break
+				}
+				var term int64
+				if k.RawType() == runtime.TypeInt && v.RawType() == runtime.TypeInt {
+					term = k.RawInt()*spec.numScale + v.RawInt()
+				} else if k.IsString() && v.RawType() == runtime.TypeInt {
+					term = int64(runtime.StringLen(k))*spec.strScale + v.RawInt()
+				} else {
+					return false, nil, nil
+				}
+				sum = positiveModInt64(sum+term, mod)
+				count++
+				key = k
+			}
 		}
 	case tableIteratorModuloFoldIPairs:
 		for i := int64(1); ; i++ {

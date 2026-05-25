@@ -322,6 +322,92 @@ func (t *Table) rawGetForNextLocked(key Value) Value {
 	return NilValue()
 }
 
+// ForEachPlainRaw visits a plain table's currently stored raw entries without
+// materializing the Next/pairs key cache or performing a second lookup for each
+// key. It is intentionally limited to tables whose traversal cannot be affected
+// by metatables, lazy materialization, or concurrent mutation.
+func (t *Table) ForEachPlainRaw(visit func(key, val Value) bool) bool {
+	if t == nil || visit == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil {
+		return false
+	}
+	switch t.arrayKind {
+	case ArrayInt:
+		if t.arrayZeroValid && len(t.intArray) > 0 {
+			if !visit(IntValue(0), IntValue(t.intArray[0])) {
+				return true
+			}
+		}
+		for i := 1; i < len(t.intArray); i++ {
+			if !visit(IntValue(int64(i)), IntValue(t.intArray[i])) {
+				return true
+			}
+		}
+	case ArrayFloat:
+		if t.arrayZeroValid && len(t.floatArray) > 0 {
+			if !visit(IntValue(0), FloatValue(t.floatArray[0])) {
+				return true
+			}
+		}
+		for i := 1; i < len(t.floatArray); i++ {
+			if !visit(IntValue(int64(i)), FloatValue(t.floatArray[i])) {
+				return true
+			}
+		}
+	case ArrayBool:
+		for i, b := range t.boolArray {
+			if b == 0 {
+				continue
+			}
+			if !visit(IntValue(int64(i)), BoolValue(b == 2)) {
+				return true
+			}
+		}
+	default:
+		for i, v := range t.array {
+			if v.IsNil() {
+				continue
+			}
+			if !visit(IntValue(int64(i)), v) {
+				return true
+			}
+		}
+	}
+	for k, v := range t.imap {
+		if v.IsNil() {
+			continue
+		}
+		if !visit(IntValue(k), v) {
+			return true
+		}
+	}
+	for i, k := range t.skeys {
+		v := t.svals[i]
+		if v.IsNil() {
+			continue
+		}
+		if !visit(StringValue(k), v) {
+			return true
+		}
+	}
+	for k, v := range t.smap {
+		if v.IsNil() {
+			continue
+		}
+		if !visit(StringValue(k), v) {
+			return true
+		}
+	}
+	for k, v := range t.hash {
+		if v.IsNil() {
+			continue
+		}
+		if !visit(k, v) {
+			return true
+		}
+	}
+	return true
+}
+
 // RawGetInt retrieves a value by integer key (fast path, no Value boxing).
 func (t *Table) RawGetInt(key int64) Value {
 	if t.mu != nil {
