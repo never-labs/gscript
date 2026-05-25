@@ -254,18 +254,11 @@ func (vm *VM) stdlibHostDriverRuntimeGuards(spec stdlibHostDriverSpec) bool {
 }
 
 func isStdlibHostMixProto(p *FuncProto) bool {
-	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 6 {
+	spec, ok := binaryIntModuloFoldSpecForProto(p)
+	if !ok {
 		return false
 	}
-	pat := newBytecodePattern(p.Code)
-	return pat.hasSBxs(sbxAt{pc: 0, op: OP_LOADINT, sbx: 131}) &&
-		pat.hasOps(
-			opcodeAt{pc: 1, op: OP_MUL},
-			opcodeAt{pc: 2, op: OP_ADD},
-			opcodeAt{pc: 3, op: OP_GETGLOBAL},
-			opcodeAt{pc: 4, op: OP_MOD},
-			opcodeAt{pc: 5, op: OP_RETURN},
-		)
+	return spec.mul == 131
 }
 
 func isStdlibHostChecksumTextProto(p *FuncProto) bool {

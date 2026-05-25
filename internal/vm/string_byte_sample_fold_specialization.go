@@ -4,9 +4,13 @@ import "github.com/gscript/gscript/internal/runtime"
 
 type stringByteSampleFoldSpec struct {
 	mixGlobal string
-	modGlobal string
 	divisor   int64
 	stepBias  int64
+}
+
+type binaryIntModuloFoldSpec struct {
+	mul       int64
+	modGlobal string
 }
 
 func isStringByteSampleFoldProto(p *FuncProto) bool {
@@ -36,7 +40,6 @@ func stringByteSampleFoldSpecForProto(p *FuncProto) (stringByteSampleFoldSpec, b
 	if spec.mixGlobal, ok = constStringAt(p, 0); !ok {
 		return spec, false
 	}
-	spec.modGlobal = "MOD"
 	spec.divisor = int64(DecodesBx(code[10]))
 	spec.stepBias = int64(DecodesBx(code[13]))
 	if spec.divisor <= 0 || spec.stepBias <= 0 {
@@ -50,31 +53,70 @@ func (vm *VM) runStringByteSampleFoldRuntimeSpecialization(cl *Closure, args []r
 		return false, nil, nil
 	}
 	spec, ok := stringByteSampleFoldSpecForProto(cl.Proto)
-	if !ok || !vm.stringByteSampleFoldRuntimeGuards(spec) {
+	if !ok {
 		return false, nil, nil
 	}
-	modValue := vm.GetGlobal(spec.modGlobal)
+	fold, ok := vm.stringByteSampleFoldRuntimeGuards(spec)
+	if !ok {
+		return false, nil, nil
+	}
+	modValue := vm.GetGlobal(fold.modGlobal)
 	if modValue.RawType() != runtime.TypeInt || modValue.RawInt() == 0 {
 		return false, nil, nil
 	}
 	mod := modValue.RawInt()
 	s := args[1].Str()
-	h := stdlibHostMix(args[0].RawInt(), int64(len(s)), mod)
+	h := binaryIntModuloFold(args[0].RawInt(), int64(len(s)), fold.mul, mod)
 	step := int64(len(s))/spec.divisor + spec.stepBias
 	for i := int64(1); i <= int64(len(s)); i += step {
-		h = stdlibHostMix(h, int64(s[i-1]), mod)
+		h = binaryIntModuloFold(h, int64(s[i-1]), fold.mul, mod)
 	}
 	if len(s) > 0 {
-		h = stdlibHostMix(h, int64(s[len(s)-1]), mod)
+		h = binaryIntModuloFold(h, int64(s[len(s)-1]), fold.mul, mod)
 	}
 	return true, []runtime.Value{runtime.IntValue(h)}, nil
 }
 
-func (vm *VM) stringByteSampleFoldRuntimeGuards(spec stringByteSampleFoldSpec) bool {
+func (vm *VM) stringByteSampleFoldRuntimeGuards(spec stringByteSampleFoldSpec) (binaryIntModuloFoldSpec, bool) {
 	mix, ok := closureFromValue(vm.GetGlobal(spec.mixGlobal))
-	if !ok || !isStdlibHostMixProto(mix.Proto) {
-		return false
+	if !ok {
+		return binaryIntModuloFoldSpec{}, false
 	}
-	return stdlibHostTableFunction(vm.GetGlobal("math"), "floor", "math.floor") &&
-		stdlibHostTableFunction(vm.GetGlobal("string"), "byte", "string.byte")
+	fold, ok := binaryIntModuloFoldSpecForProto(mix.Proto)
+	if !ok ||
+		!stdlibHostTableFunction(vm.GetGlobal("math"), "floor", "math.floor") ||
+		!stdlibHostTableFunction(vm.GetGlobal("string"), "byte", "string.byte") {
+		return binaryIntModuloFoldSpec{}, false
+	}
+	return fold, true
+}
+
+func binaryIntModuloFoldSpecForProto(p *FuncProto) (binaryIntModuloFoldSpec, bool) {
+	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 6 {
+		return binaryIntModuloFoldSpec{}, false
+	}
+	pat := newBytecodePattern(p.Code)
+	if !pat.hasOps(
+		opcodeAt{pc: 0, op: OP_LOADINT},
+		opcodeAt{pc: 1, op: OP_MUL},
+		opcodeAt{pc: 2, op: OP_ADD},
+		opcodeAt{pc: 3, op: OP_GETGLOBAL},
+		opcodeAt{pc: 4, op: OP_MOD},
+		opcodeAt{pc: 5, op: OP_RETURN},
+	) {
+		return binaryIntModuloFoldSpec{}, false
+	}
+	modGlobal, ok := constStringAt(p, DecodeBx(p.Code[3]))
+	if !ok {
+		return binaryIntModuloFoldSpec{}, false
+	}
+	mul := int64(DecodesBx(p.Code[0]))
+	if mul == 0 || modGlobal == "" {
+		return binaryIntModuloFoldSpec{}, false
+	}
+	return binaryIntModuloFoldSpec{mul: mul, modGlobal: modGlobal}, true
+}
+
+func binaryIntModuloFold(h, v, mul, mod int64) int64 {
+	return positiveModInt64(h*mul+v, mod)
 }
