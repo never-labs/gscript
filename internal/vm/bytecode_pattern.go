@@ -51,6 +51,12 @@ type sbxAt struct {
 	sbx int
 }
 
+type bxAt struct {
+	pc int
+	op Opcode
+	bx int
+}
+
 func newBytecodePattern(code []uint32) bytecodePattern {
 	return bytecodePattern{code: code}
 }
@@ -154,6 +160,20 @@ func (p bytecodePattern) sbx(pc int, op Opcode, sbx int) bool {
 func (p bytecodePattern) hasSBxs(ops ...sbxAt) bool {
 	for _, want := range ops {
 		if !p.sbx(want.pc, want.op, want.sbx) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p bytecodePattern) bx(pc int, op Opcode, bx int) bool {
+	inst, ok := p.op(pc, op)
+	return ok && DecodeBx(inst) == bx
+}
+
+func (p bytecodePattern) hasBxs(ops ...bxAt) bool {
+	for _, want := range ops {
+		if !p.bx(want.pc, want.op, want.bx) {
 			return false
 		}
 	}

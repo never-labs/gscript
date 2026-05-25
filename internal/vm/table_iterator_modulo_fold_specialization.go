@@ -40,26 +40,31 @@ func tableIteratorModuloFoldPairsSpec(p *FuncProto) (tableIteratorModuloFoldSpec
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	code := p.Code
-	if DecodeOp(code[2]) != OP_GETGLOBAL || DecodeBx(code[2]) != 0 ||
-		DecodeOp(code[4]) != OP_CALL || DecodeA(code[4]) != 3 || DecodeB(code[4]) != 2 || DecodeC(code[4]) != 4 ||
-		DecodeOp(code[5]) != OP_TFORCALL || DecodeA(code[5]) != 3 || DecodeC(code[5]) != 2 ||
-		DecodeOp(code[6]) != OP_TFORLOOP ||
-		DecodeOp(code[9]) != OP_ISNUMBER ||
-		DecodeOp(code[12]) != OP_GETGLOBAL || DecodeBx(code[12]) != 1 ||
-		DecodeOp(code[14]) != OP_LOADINT ||
-		DecodeOp(code[15]) != OP_MUL ||
-		DecodeOp(code[16]) != OP_ADD ||
-		DecodeOp(code[17]) != OP_CALL ||
-		DecodeOp(code[20]) != OP_GETGLOBAL || DecodeBx(code[20]) != 1 ||
-		DecodeOp(code[23]) != OP_LEN ||
-		DecodeOp(code[24]) != OP_LOADINT ||
-		DecodeOp(code[25]) != OP_MUL ||
-		DecodeOp(code[26]) != OP_ADD ||
-		DecodeOp(code[27]) != OP_CALL ||
-		DecodeOp(code[35]) != OP_LOADINT ||
-		DecodeOp(code[36]) != OP_MUL ||
-		DecodeOp(code[37]) != OP_CALL ||
-		DecodeOp(code[38]) != OP_RETURN {
+	pat := newBytecodePattern(code)
+	if !pat.hasBxs(
+		bxAt{pc: 2, op: OP_GETGLOBAL, bx: 0},
+		bxAt{pc: 12, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 20, op: OP_GETGLOBAL, bx: 1},
+	) ||
+		!pat.hasABCs(abcAt{pc: 4, op: OP_CALL, a: 3, b: 2, c: 4}) ||
+		!pat.hasACs(acAt{pc: 5, op: OP_TFORCALL, a: 3, c: 2}) ||
+		!pat.hasOps(
+			opcodeAt{pc: 6, op: OP_TFORLOOP},
+			opcodeAt{pc: 9, op: OP_ISNUMBER},
+			opcodeAt{pc: 14, op: OP_LOADINT},
+			opcodeAt{pc: 15, op: OP_MUL},
+			opcodeAt{pc: 16, op: OP_ADD},
+			opcodeAt{pc: 17, op: OP_CALL},
+			opcodeAt{pc: 23, op: OP_LEN},
+			opcodeAt{pc: 24, op: OP_LOADINT},
+			opcodeAt{pc: 25, op: OP_MUL},
+			opcodeAt{pc: 26, op: OP_ADD},
+			opcodeAt{pc: 27, op: OP_CALL},
+			opcodeAt{pc: 35, op: OP_LOADINT},
+			opcodeAt{pc: 36, op: OP_MUL},
+			opcodeAt{pc: 37, op: OP_CALL},
+			opcodeAt{pc: 38, op: OP_RETURN},
+		) {
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	return tableIteratorModuloFoldSpec{
@@ -77,25 +82,30 @@ func tableIteratorModuloFoldNextSpec(p *FuncProto) (tableIteratorModuloFoldSpec,
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	code := p.Code
-	if DecodeOp(code[4]) != OP_GETGLOBAL || DecodeBx(code[4]) != 0 ||
-		DecodeOp(code[7]) != OP_CALL || DecodeA(code[7]) != 5 || DecodeB(code[7]) != 3 || DecodeC(code[7]) != 3 ||
-		DecodeOp(code[11]) != OP_EQ ||
-		DecodeOp(code[15]) != OP_ISNUMBER ||
-		DecodeOp(code[18]) != OP_GETGLOBAL || DecodeBx(code[18]) != 1 ||
-		DecodeOp(code[20]) != OP_LOADINT ||
-		DecodeOp(code[21]) != OP_MUL ||
-		DecodeOp(code[22]) != OP_ADD ||
-		DecodeOp(code[23]) != OP_CALL ||
-		DecodeOp(code[26]) != OP_GETGLOBAL || DecodeBx(code[26]) != 1 ||
-		DecodeOp(code[29]) != OP_LEN ||
-		DecodeOp(code[30]) != OP_LOADINT ||
-		DecodeOp(code[31]) != OP_MUL ||
-		DecodeOp(code[32]) != OP_ADD ||
-		DecodeOp(code[33]) != OP_CALL ||
-		DecodeOp(code[41]) != OP_LOADINT ||
-		DecodeOp(code[42]) != OP_MUL ||
-		DecodeOp(code[43]) != OP_CALL ||
-		DecodeOp(code[44]) != OP_RETURN {
+	pat := newBytecodePattern(code)
+	if !pat.hasBxs(
+		bxAt{pc: 4, op: OP_GETGLOBAL, bx: 0},
+		bxAt{pc: 18, op: OP_GETGLOBAL, bx: 1},
+		bxAt{pc: 26, op: OP_GETGLOBAL, bx: 1},
+	) ||
+		!pat.hasABCs(abcAt{pc: 7, op: OP_CALL, a: 5, b: 3, c: 3}) ||
+		!pat.hasOps(
+			opcodeAt{pc: 11, op: OP_EQ},
+			opcodeAt{pc: 15, op: OP_ISNUMBER},
+			opcodeAt{pc: 20, op: OP_LOADINT},
+			opcodeAt{pc: 21, op: OP_MUL},
+			opcodeAt{pc: 22, op: OP_ADD},
+			opcodeAt{pc: 23, op: OP_CALL},
+			opcodeAt{pc: 29, op: OP_LEN},
+			opcodeAt{pc: 30, op: OP_LOADINT},
+			opcodeAt{pc: 31, op: OP_MUL},
+			opcodeAt{pc: 32, op: OP_ADD},
+			opcodeAt{pc: 33, op: OP_CALL},
+			opcodeAt{pc: 41, op: OP_LOADINT},
+			opcodeAt{pc: 42, op: OP_MUL},
+			opcodeAt{pc: 43, op: OP_CALL},
+			opcodeAt{pc: 44, op: OP_RETURN},
+		) {
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	return tableIteratorModuloFoldSpec{
@@ -113,19 +123,24 @@ func tableIteratorModuloFoldIPairsSpec(p *FuncProto) (tableIteratorModuloFoldSpe
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	code := p.Code
-	if DecodeOp(code[2]) != OP_GETGLOBAL || DecodeBx(code[2]) != 0 ||
-		DecodeOp(code[4]) != OP_CALL || DecodeA(code[4]) != 3 || DecodeB(code[4]) != 2 || DecodeC(code[4]) != 4 ||
-		DecodeOp(code[5]) != OP_TFORCALL || DecodeA(code[5]) != 3 || DecodeC(code[5]) != 2 ||
-		DecodeOp(code[6]) != OP_TFORLOOP ||
-		DecodeOp(code[8]) != OP_GETGLOBAL || DecodeBx(code[8]) != 1 ||
-		DecodeOp(code[10]) != OP_LOADINT ||
-		DecodeOp(code[11]) != OP_MUL ||
-		DecodeOp(code[12]) != OP_ADD ||
-		DecodeOp(code[13]) != OP_CALL ||
-		DecodeOp(code[21]) != OP_LOADINT ||
-		DecodeOp(code[22]) != OP_MUL ||
-		DecodeOp(code[23]) != OP_CALL ||
-		DecodeOp(code[24]) != OP_RETURN {
+	pat := newBytecodePattern(code)
+	if !pat.hasBxs(
+		bxAt{pc: 2, op: OP_GETGLOBAL, bx: 0},
+		bxAt{pc: 8, op: OP_GETGLOBAL, bx: 1},
+	) ||
+		!pat.hasABCs(abcAt{pc: 4, op: OP_CALL, a: 3, b: 2, c: 4}) ||
+		!pat.hasACs(acAt{pc: 5, op: OP_TFORCALL, a: 3, c: 2}) ||
+		!pat.hasOps(
+			opcodeAt{pc: 6, op: OP_TFORLOOP},
+			opcodeAt{pc: 10, op: OP_LOADINT},
+			opcodeAt{pc: 11, op: OP_MUL},
+			opcodeAt{pc: 12, op: OP_ADD},
+			opcodeAt{pc: 13, op: OP_CALL},
+			opcodeAt{pc: 21, op: OP_LOADINT},
+			opcodeAt{pc: 22, op: OP_MUL},
+			opcodeAt{pc: 23, op: OP_CALL},
+			opcodeAt{pc: 24, op: OP_RETURN},
+		) {
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	return tableIteratorModuloFoldSpec{
