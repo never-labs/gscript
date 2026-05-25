@@ -79,7 +79,7 @@ func (vm *VM) runLinearModuloIntArrayBuilderRuntimeSpecialization(cl *Closure, a
 	return true, []runtime.Value{runtime.TableValue(t)}, nil
 }
 
-type indexedModuloIntArrayChecksumSpec struct {
+type indexedModuloIntArrayFoldSpec struct {
 	init      int64
 	hashMul   int64
 	indexMod  int64
@@ -87,13 +87,13 @@ type indexedModuloIntArrayChecksumSpec struct {
 	modGlobal string
 }
 
-func isIndexedModuloIntArrayChecksumProto(p *FuncProto) bool {
-	_, ok := indexedModuloIntArrayChecksumSpecForProto(p)
+func isIndexedModuloIntArrayFoldProto(p *FuncProto) bool {
+	_, ok := indexedModuloIntArrayFoldSpecForProto(p)
 	return ok
 }
 
-func indexedModuloIntArrayChecksumSpecForProto(p *FuncProto) (indexedModuloIntArrayChecksumSpec, bool) {
-	var spec indexedModuloIntArrayChecksumSpec
+func indexedModuloIntArrayFoldSpecForProto(p *FuncProto) (indexedModuloIntArrayFoldSpec, bool) {
+	var spec indexedModuloIntArrayFoldSpec
 	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 21 || len(p.Constants) < 1 {
 		return spec, false
 	}
@@ -131,7 +131,7 @@ func indexedModuloIntArrayChecksumSpecForProto(p *FuncProto) (indexedModuloIntAr
 	if !ok {
 		return spec, false
 	}
-	spec = indexedModuloIntArrayChecksumSpec{
+	spec = indexedModuloIntArrayFoldSpec{
 		init:      int64(DecodesBx(code[0])),
 		hashMul:   int64(DecodesBx(code[5])),
 		indexMod:  int64(DecodesBx(code[9])),
@@ -139,16 +139,16 @@ func indexedModuloIntArrayChecksumSpecForProto(p *FuncProto) (indexedModuloIntAr
 		modGlobal: modGlobal,
 	}
 	if spec.indexMod == 0 || spec.modGlobal == "" {
-		return indexedModuloIntArrayChecksumSpec{}, false
+		return indexedModuloIntArrayFoldSpec{}, false
 	}
 	return spec, true
 }
 
-func (vm *VM) runIndexedModuloIntArrayChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runIndexedModuloIntArrayFoldRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if len(args) != 2 || !args[0].IsTable() || args[1].RawType() != runtime.TypeInt {
 		return false, nil, nil
 	}
-	spec, ok := indexedModuloIntArrayChecksumSpecForProto(cl.Proto)
+	spec, ok := indexedModuloIntArrayFoldSpecForProto(cl.Proto)
 	if !ok {
 		return false, nil, nil
 	}

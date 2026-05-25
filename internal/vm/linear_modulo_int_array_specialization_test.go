@@ -6,7 +6,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func TestLinearModuloIntArrayBuilderAndChecksumSpecializations(t *testing.T) {
+func TestLinearModuloIntArrayBuilderAndFoldSpecializations(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
@@ -33,8 +33,8 @@ result := checksum_array(a, 8)
 	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "linear_modulo_int_array_builder"); got == 0 {
 		t.Fatalf("linear_modulo_int_array_builder hit count = %d, want > 0", got)
 	}
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "indexed_modulo_int_array_checksum"); got == 0 {
-		t.Fatalf("indexed_modulo_int_array_checksum hit count = %d, want > 0", got)
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "indexed_modulo_int_array_fold"); got == 0 {
+		t.Fatalf("indexed_modulo_int_array_fold hit count = %d, want > 0", got)
 	}
 }
 

@@ -27,7 +27,7 @@ const (
 	runtimeSpecializationRegexpRandomDriver
 	runtimeSpecializationStringByteSampleFold
 	runtimeSpecializationLinearModuloIntArrayBuilder
-	runtimeSpecializationIndexedModuloIntArrayChecksum
+	runtimeSpecializationIndexedModuloIntArrayFold
 	runtimeSpecializationUnaryIntArrayMap
 	runtimeSpecializationCoroutineYieldSumLoop
 	runtimeSpecializationCoroutineCreateResumeAffineSum
@@ -338,18 +338,18 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 		},
 		Run: (*VM).runLinearModuloIntArrayBuilderRuntimeSpecialization,
 	},
-	runtimeSpecializationIndexedModuloIntArrayChecksum: {
+	runtimeSpecializationIndexedModuloIntArrayFold: {
 		RuntimeSpecialization: RuntimeSpecialization{
 			Info: RuntimeSpecializationInfo{
-				Name:          "indexed_modulo_int_array_checksum",
+				Name:          "indexed_modulo_int_array_fold",
 				Route:         RuntimeSpecializationRouteCallSiteValue,
 				Arity:         2,
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: isIndexedModuloIntArrayChecksumProto,
+			Recognize: isIndexedModuloIntArrayFoldProto,
 		},
-		Run: (*VM).runIndexedModuloIntArrayChecksumRuntimeSpecialization,
+		Run: (*VM).runIndexedModuloIntArrayFoldRuntimeSpecialization,
 	},
 	runtimeSpecializationUnaryIntArrayMap: {
 		RuntimeSpecialization: RuntimeSpecialization{
