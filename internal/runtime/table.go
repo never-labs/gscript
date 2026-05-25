@@ -1213,14 +1213,7 @@ func newTableFromCtorNFallback(ctor *SmallTableCtorN, vals []Value) *Table {
 				actual, _ := sparseCtorNCache.LoadOrStore(key, sparse)
 				sparse = actual.(SmallTableCtorN)
 			}
-			var local [smallFieldCap]Value
-			copiedVals := local[:0]
-			for i := 0; i < n; i++ {
-				if mask&(uint64(1)<<uint(i)) != 0 {
-					copiedVals = append(copiedVals, vals[i])
-				}
-			}
-			return newTableFromCtorNNonNilWithCapacity(&sparse, copiedVals, len(ctor.Keys), true)
+			return newTableFromSparseCtorNWithCapacity(&sparse, vals, mask, nonNil, len(ctor.Keys), true)
 		}
 	}
 	t := NewTableSized(0, len(ctor.Keys))
@@ -1229,6 +1222,34 @@ func newTableFromCtorNFallback(ctor *SmallTableCtorN, vals []Value) *Table {
 			break
 		}
 		t.RawSetString(key, vals[i])
+	}
+	return t
+}
+
+func newTableFromSparseCtorNWithCapacity(ctor *SmallTableCtorN, vals []Value, mask uint64, n, capacity int, observeTypes bool) *Table {
+	if ctor == nil || ctor.Shape == nil || n <= 0 || len(vals) == 0 {
+		return NewEmptyTable()
+	}
+	if capacity < n {
+		capacity = n
+	}
+	t, svals := DefaultHeap.AllocTableWithSvals(capacity)
+	t.svals = svals[:n]
+	dst := 0
+	for i := 0; i < len(vals) && dst < n; i++ {
+		if mask&(uint64(1)<<uint(i)) == 0 {
+			continue
+		}
+		t.svals[dst] = vals[i]
+		dst++
+	}
+	t.shape = ctor.Shape
+	t.shapeID = ctor.shapeID
+	t.skeys = ctor.fieldKeys
+	if observeTypes {
+		for i := 0; i < n; i++ {
+			ObserveShapeFieldValue(t.shapeID, i, t.svals[i])
+		}
 	}
 	return t
 }

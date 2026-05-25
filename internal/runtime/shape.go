@@ -351,8 +351,25 @@ func ShapeFieldTypeEpochPtr(id uint32, fieldIdx int) unsafe.Pointer {
 // closure identity feedback lets JIT code guard a stable method slot once and
 // avoid repeated per-iteration callee checks.
 func ObserveShapeFieldValue(id uint32, fieldIdx int, val Value) {
-	ObserveShapeFieldValueType(id, fieldIdx, val.Type())
-	ObserveShapeFieldVMClosure(id, fieldIdx, uintptr(val.VMClosurePointer()))
+	if id == 0 {
+		return
+	}
+	s := LookupShapeByID(id)
+	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldTypes) || fieldIdx >= len(s.fieldClosures) {
+		return
+	}
+	typ := val.Type()
+	if typ != TypeNil {
+		observeShapeFieldValueTypeLocked(s, fieldIdx, typ)
+	}
+	if typ != TypeFunction {
+		if atomic.LoadUintptr(&s.fieldClosures[fieldIdx]) == 0 {
+			return
+		}
+		observeShapeFieldVMClosureLocked(s, fieldIdx, 0)
+		return
+	}
+	observeShapeFieldVMClosureLocked(s, fieldIdx, uintptr(val.VMClosurePointer()))
 }
 
 // ObserveShapeFieldVMClosure records the process-wide stable VM closure pointer
@@ -366,6 +383,32 @@ func ObserveShapeFieldVMClosure(id uint32, fieldIdx int, closure uintptr) {
 	if s == nil || fieldIdx < 0 || fieldIdx >= len(s.fieldClosures) {
 		return
 	}
+	observeShapeFieldVMClosureLocked(s, fieldIdx, closure)
+}
+
+func observeShapeFieldValueTypeLocked(s *Shape, fieldIdx int, typ ValueType) {
+	encoded := encodeShapeFieldType(typ)
+	for {
+		old := atomic.LoadUint32(&s.fieldTypes[fieldIdx])
+		switch old {
+		case shapeFieldTypeMixed:
+			return
+		case 0:
+			if atomic.CompareAndSwapUint32(&s.fieldTypes[fieldIdx], 0, encoded) {
+				return
+			}
+		case encoded:
+			return
+		default:
+			if atomic.CompareAndSwapUint32(&s.fieldTypes[fieldIdx], old, shapeFieldTypeMixed) {
+				atomic.AddUint64(&s.fieldTypeEpoch[fieldIdx], 1)
+				return
+			}
+		}
+	}
+}
+
+func observeShapeFieldVMClosureLocked(s *Shape, fieldIdx int, closure uintptr) {
 	for {
 		old := atomic.LoadUintptr(&s.fieldClosures[fieldIdx])
 		switch old {
