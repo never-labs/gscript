@@ -861,6 +861,13 @@ type SmallTableCtorN struct {
 	fieldKeys []string
 }
 
+type sparseCtorNKey struct {
+	shapeID uint32
+	mask    uint64
+}
+
+var sparseCtorNCache sync.Map // map[sparseCtorNKey]SmallTableCtorN
+
 type smallCtorShape struct {
 	shape     *Shape
 	shapeID   uint32
@@ -992,8 +999,18 @@ func newTableFromCtorNNonNil(ctor *SmallTableCtorN, vals []Value, observeTypes b
 	if ctor == nil || ctor.Shape == nil || len(vals) < len(ctor.Keys) {
 		return NewTableFromCtorN(ctor, vals)
 	}
+	return newTableFromCtorNNonNilWithCapacity(ctor, vals, len(ctor.Keys), observeTypes)
+}
+
+func newTableFromCtorNNonNilWithCapacity(ctor *SmallTableCtorN, vals []Value, capacity int, observeTypes bool) *Table {
+	if ctor == nil || ctor.Shape == nil || len(vals) < len(ctor.Keys) {
+		return NewTableFromCtorN(ctor, vals)
+	}
 	n := len(ctor.Keys)
-	t, svals := DefaultHeap.AllocTableWithSvals(n)
+	if capacity < n {
+		capacity = n
+	}
+	t, svals := DefaultHeap.AllocTableWithSvals(capacity)
 	t.svals = svals[:n]
 	copy(t.svals, vals[:n])
 	t.shape = ctor.Shape
@@ -1011,15 +1028,17 @@ func newTableFromCtorNFallback(ctor *SmallTableCtorN, vals []Value) *Table {
 	if ctor == nil || len(ctor.Keys) == 0 {
 		return NewEmptyTable()
 	}
-	if ctor.Shape != nil {
+	if ctor.Shape != nil && len(ctor.Keys) <= 64 {
 		n := len(ctor.Keys)
 		if len(vals) < n {
 			n = len(vals)
 		}
 		nonNil := 0
+		var mask uint64
 		for i := 0; i < n; i++ {
 			if !vals[i].IsNil() {
 				nonNil++
+				mask |= uint64(1) << uint(i)
 			}
 		}
 		switch nonNil {
@@ -1028,19 +1047,33 @@ func newTableFromCtorNFallback(ctor *SmallTableCtorN, vals []Value) *Table {
 		case len(ctor.Keys):
 			return newTableFromCtorNNonNil(ctor, vals, true)
 		default:
-			keys := make([]string, 0, nonNil)
-			copiedVals := make([]Value, 0, nonNil)
-			for i := 0; i < n; i++ {
-				if vals[i].IsNil() {
-					continue
+			key := sparseCtorNKey{shapeID: ctor.shapeID, mask: mask}
+			cached, ok := sparseCtorNCache.Load(key)
+			var sparse SmallTableCtorN
+			if ok {
+				sparse = cached.(SmallTableCtorN)
+			} else {
+				keys := make([]string, 0, nonNil)
+				for i := 0; i < n; i++ {
+					if mask&(uint64(1)<<uint(i)) != 0 {
+						keys = append(keys, ctor.Keys[i])
+					}
 				}
-				keys = append(keys, ctor.Keys[i])
-				copiedVals = append(copiedVals, vals[i])
+				sparse = NewSmallTableCtorN(keys)
+				if sparse.Shape == nil {
+					break
+				}
+				actual, _ := sparseCtorNCache.LoadOrStore(key, sparse)
+				sparse = actual.(SmallTableCtorN)
 			}
-			sparse := NewSmallTableCtorN(keys)
-			if sparse.Shape != nil {
-				return newTableFromCtorNNonNil(&sparse, copiedVals, true)
+			var local [smallFieldCap]Value
+			copiedVals := local[:0]
+			for i := 0; i < n; i++ {
+				if mask&(uint64(1)<<uint(i)) != 0 {
+					copiedVals = append(copiedVals, vals[i])
+				}
 			}
+			return newTableFromCtorNNonNilWithCapacity(&sparse, copiedVals, len(ctor.Keys), true)
 		}
 	}
 	t := NewTableSized(0, len(ctor.Keys))
