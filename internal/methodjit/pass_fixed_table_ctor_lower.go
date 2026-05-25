@@ -11,13 +11,14 @@ import (
 // chance to scalar-replace the expanded NewTable+SetField form.
 func FixedTableConstructorLoweringPass(fn *Function) (*Function, error) {
 	fn.ensureAnalysis()
-	if len(fn.Analysis.FixedTableConstructors) > 0 {
+	tableShapes := fn.Analysis.TableShapeFacts()
+	if tableShapes.FixedTableConstructorCount() > 0 {
 		for _, block := range fn.Blocks {
 			for i, instr := range block.Instrs {
 				if instr == nil || instr.Op != OpNewTable {
 					continue
 				}
-				fact, ok := fn.Analysis.FixedTableConstructors[instr.ID]
+				fact, ok := tableShapes.FixedTableConstructorFact(instr.ID)
 				if !ok {
 					continue
 				}
