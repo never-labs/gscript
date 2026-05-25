@@ -6,7 +6,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-func TestStringSampleChecksumRuntimeSpecialization(t *testing.T) {
+func TestStringByteSampleFoldRuntimeSpecialization(t *testing.T) {
 	stats := runtime.EnableRuntimePathStats()
 	defer runtime.DisableRuntimePathStats()
 
@@ -29,12 +29,12 @@ func checksumString(h, s) {
 result := checksumString(17, "abcdef0123456789abcdef0123456789")
 `)
 	expectGlobalInt(t, globals, "result", 290590338)
-	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "string_sample_checksum"); got == 0 {
-		t.Fatalf("string_sample_checksum hit count = %d, want > 0", got)
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteValue, "string_byte_sample_fold"); got == 0 {
+		t.Fatalf("string_byte_sample_fold hit count = %d, want > 0", got)
 	}
 }
 
-func TestStringSampleChecksumRejectsNameOnly(t *testing.T) {
+func TestStringByteSampleFoldRejectsNameOnly(t *testing.T) {
 	top := compileProto(t, `
 func checksumString(h, s) {
     return h + #s
@@ -44,7 +44,7 @@ func checksumString(h, s) {
 	if child == nil {
 		t.Fatal("missing checksumString proto")
 	}
-	if isStringSampleChecksumProto(child) {
-		t.Fatal("string_sample_checksum should reject name-only matches")
+	if isStringByteSampleFoldProto(child) {
+		t.Fatal("string_byte_sample_fold should reject name-only matches")
 	}
 }

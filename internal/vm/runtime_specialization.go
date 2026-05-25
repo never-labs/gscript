@@ -25,7 +25,7 @@ const (
 	runtimeSpecializationMixedAffineTableBuilder
 	runtimeSpecializationStdlibHostDriver
 	runtimeSpecializationRegexpRandomDriver
-	runtimeSpecializationStringSampleChecksum
+	runtimeSpecializationStringByteSampleFold
 	runtimeSpecializationLinearModuloIntArrayBuilder
 	runtimeSpecializationIndexedModuloIntArrayChecksum
 	runtimeSpecializationUnaryIntArrayMap
@@ -312,18 +312,18 @@ var callSiteValueRuntimeSpecializationRegistry = [runtimeSpecializationCount]Cal
 		},
 		Run: (*VM).runRegexpRandomDriverRuntimeSpecialization,
 	},
-	runtimeSpecializationStringSampleChecksum: {
+	runtimeSpecializationStringByteSampleFold: {
 		RuntimeSpecialization: RuntimeSpecialization{
 			Info: RuntimeSpecializationInfo{
-				Name:          "string_sample_checksum",
+				Name:          "string_byte_sample_fold",
 				Route:         RuntimeSpecializationRouteCallSiteValue,
 				Arity:         2,
 				Results:       runtimeSpecializationCallSiteSingleResultCount,
 				TieringPolicy: runtimeSpecializationTieringStructural,
 			},
-			Recognize: isStringSampleChecksumProto,
+			Recognize: isStringByteSampleFoldProto,
 		},
-		Run: (*VM).runStringSampleChecksumRuntimeSpecialization,
+		Run: (*VM).runStringByteSampleFoldRuntimeSpecialization,
 	},
 	runtimeSpecializationLinearModuloIntArrayBuilder: {
 		RuntimeSpecialization: RuntimeSpecialization{

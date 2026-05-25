@@ -2,20 +2,20 @@ package vm
 
 import "github.com/gscript/gscript/internal/runtime"
 
-type stringSampleChecksumSpec struct {
+type stringByteSampleFoldSpec struct {
 	mixGlobal string
 	modGlobal string
 	divisor   int64
 	stepBias  int64
 }
 
-func isStringSampleChecksumProto(p *FuncProto) bool {
-	_, ok := stringSampleChecksumSpecForProto(p)
+func isStringByteSampleFoldProto(p *FuncProto) bool {
+	_, ok := stringByteSampleFoldSpecForProto(p)
 	return ok
 }
 
-func stringSampleChecksumSpecForProto(p *FuncProto) (stringSampleChecksumSpec, bool) {
-	var spec stringSampleChecksumSpec
+func stringByteSampleFoldSpecForProto(p *FuncProto) (stringByteSampleFoldSpec, bool) {
+	var spec stringByteSampleFoldSpec
 	if p == nil || p.NumParams != 2 || p.UsesVarargBytecode || len(p.Code) != 49 || len(p.Constants) != 5 {
 		return spec, false
 	}
@@ -40,17 +40,17 @@ func stringSampleChecksumSpecForProto(p *FuncProto) (stringSampleChecksumSpec, b
 	spec.divisor = int64(DecodesBx(code[10]))
 	spec.stepBias = int64(DecodesBx(code[13]))
 	if spec.divisor <= 0 || spec.stepBias <= 0 {
-		return stringSampleChecksumSpec{}, false
+		return stringByteSampleFoldSpec{}, false
 	}
 	return spec, true
 }
 
-func (vm *VM) runStringSampleChecksumRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
+func (vm *VM) runStringByteSampleFoldRuntimeSpecialization(cl *Closure, args []runtime.Value) (bool, []runtime.Value, error) {
 	if len(args) != 2 || args[0].RawType() != runtime.TypeInt || !args[1].IsString() {
 		return false, nil, nil
 	}
-	spec, ok := stringSampleChecksumSpecForProto(cl.Proto)
-	if !ok || !vm.stringSampleChecksumRuntimeGuards(spec) {
+	spec, ok := stringByteSampleFoldSpecForProto(cl.Proto)
+	if !ok || !vm.stringByteSampleFoldRuntimeGuards(spec) {
 		return false, nil, nil
 	}
 	modValue := vm.GetGlobal(spec.modGlobal)
@@ -70,7 +70,7 @@ func (vm *VM) runStringSampleChecksumRuntimeSpecialization(cl *Closure, args []r
 	return true, []runtime.Value{runtime.IntValue(h)}, nil
 }
 
-func (vm *VM) stringSampleChecksumRuntimeGuards(spec stringSampleChecksumSpec) bool {
+func (vm *VM) stringByteSampleFoldRuntimeGuards(spec stringByteSampleFoldSpec) bool {
 	mix, ok := closureFromValue(vm.GetGlobal(spec.mixGlobal))
 	if !ok || !isStdlibHostMixProto(mix.Proto) {
 		return false
