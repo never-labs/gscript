@@ -31,6 +31,14 @@ type Tier2ModuleRun struct {
 	Updates        []AnalysisFact
 	ActualFactDiff []AnalysisFactDomainDiff
 	ChangedDomains []string
+	// AccessedDomains lists the AnalysisResult fact domains the module read or
+	// wrote through the domain accessors during an observed run, sorted. It is
+	// populated only when a module-run callback is active (same gating as
+	// ChangedDomains). UndeclaredReadDomains is the subset of AccessedDomains not
+	// covered by any declared fact (Requires ∪ Provides ∪ Updates); these are the
+	// read-contract findings surfaced in report mode.
+	AccessedDomains       []string
+	UndeclaredReadDomains []string
 }
 
 // Tier2ModuleRunCallback is called after each optimizer module run, including
@@ -252,6 +260,9 @@ type PhaseScope struct {
 	moduleCallback   Tier2ModuleRunCallback
 	factBefore       map[string]analysisFactDomainSnapshot
 	hasModuleRun     bool
+	// observeAnalysis, when non-nil, is the AnalysisResult the read-side access
+	// observer was installed on; finish reads the accessed domains back from it.
+	observeAnalysis *AnalysisResult
 }
 
 type PhaseScopeOption func(*PhaseScope)
@@ -287,6 +298,10 @@ func phaseScopeModuleRun(run Tier2ModuleRun, callback Tier2ModuleRunCallback) Ph
 		scope.moduleCallback = callback
 		if callback != nil {
 			scope.factBefore = snapshotAnalysisFactDomains(run.InputFunction)
+			if run.InputFunction != nil && run.InputFunction.Analysis != nil {
+				run.InputFunction.Analysis.accessObserver = &factAccessObserver{}
+				scope.observeAnalysis = run.InputFunction.Analysis
+			}
 		}
 		scope.hasModuleRun = true
 	}
@@ -305,6 +320,12 @@ func (scope *PhaseScope) finish(fn *Function, err error) time.Duration {
 		run.Function = bestTier2ModuleRunFunction(run.InputFunction, fn)
 		run.ActualFactDiff = diffAnalysisFactDomains(scope.factBefore, snapshotAnalysisFactDomains(run.Function))
 		run.ChangedDomains = changedAnalysisFactDomains(run.ActualFactDiff)
+		if scope.observeAnalysis != nil {
+			observer := scope.observeAnalysis.accessObserver
+			scope.observeAnalysis.accessObserver = nil
+			run.AccessedDomains = observer.domains()
+			run.UndeclaredReadDomains = undeclaredReadDomains(run)
+		}
 		scope.moduleCallback(run)
 	}
 	if err == nil && scope.snapshotCallback != nil {

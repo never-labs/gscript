@@ -72,6 +72,11 @@ func snapshotAnalysisResultDomains(result *AnalysisResult) map[string]analysisFa
 		recordAnalysisFactMapSnapshot(out, name, field)
 	}
 	for i := 0; i < value.NumField(); i++ {
+		// accessObserver is the read-side access observer, not a fact domain; it
+		// must not surface as a changed/unmodeled domain in the write-side diff.
+		if valueType.Field(i).Name == "accessObserver" {
+			continue
+		}
 		field := value.Field(i)
 		field, ok := analysisResultDomainStructValue(field)
 		if !ok {

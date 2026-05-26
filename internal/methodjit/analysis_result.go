@@ -34,6 +34,13 @@ type AnalysisResult struct {
 	// Global groups cross-proto global/ABI input facts. It is the single source
 	// of truth for global analysis; access goes through its accessors.
 	Global *GlobalFacts
+
+	// accessObserver, when non-nil, records which fact domains were accessed
+	// through the domain accessors during an observed module run. It is nil on
+	// the production hot path; the module runner sets it only when a module-run
+	// callback is active (same gating as the write-side fact diff). See
+	// analysis_fact_domain.go and analysis_read_contract.go.
+	accessObserver *factAccessObserver
 }
 
 // NumericFacts groups integer range and arithmetic safety facts produced and
@@ -297,6 +304,9 @@ func (a *AnalysisResult) NumericFacts() *NumericFacts {
 	if a == nil {
 		return nil
 	}
+	if a.accessObserver != nil {
+		a.accessObserver.note(factDomainNumeric)
+	}
 	if a.Numeric == nil {
 		a.Numeric = &NumericFacts{}
 		a.Numeric.Initialize()
@@ -490,6 +500,9 @@ func (a *AnalysisResult) CallFacts() *CallFacts {
 	if a == nil {
 		return nil
 	}
+	if a.accessObserver != nil {
+		a.accessObserver.note(factDomainCall)
+	}
 	if a.Call == nil {
 		a.Call = &CallFacts{}
 		a.Call.Initialize()
@@ -672,6 +685,9 @@ func (a *AnalysisResult) LoopSpecializationFacts() *LoopSpecializationFacts {
 	if a == nil {
 		return nil
 	}
+	if a.accessObserver != nil {
+		a.accessObserver.note(factDomainLoopSpec)
+	}
 	if a.LoopSpecialization == nil {
 		a.LoopSpecialization = &LoopSpecializationFacts{}
 		a.LoopSpecialization.Initialize()
@@ -739,6 +755,9 @@ func (g *GlobalFacts) bindOwner() {}
 func (a *AnalysisResult) GlobalFacts() *GlobalFacts {
 	if a == nil {
 		return nil
+	}
+	if a.accessObserver != nil {
+		a.accessObserver.note(factDomainGlobal)
 	}
 	if a.Global == nil {
 		a.Global = &GlobalFacts{}
@@ -841,6 +860,9 @@ func (s *SpeculationFacts) bindOwner() {}
 func (a *AnalysisResult) SpeculationFacts() *SpeculationFacts {
 	if a == nil {
 		return nil
+	}
+	if a.accessObserver != nil {
+		a.accessObserver.note(factDomainSpeculation)
 	}
 	if a.Speculation == nil {
 		a.Speculation = &SpeculationFacts{}
@@ -1119,6 +1141,9 @@ func (t *TableShapeFacts) bindOwner() {}
 func (a *AnalysisResult) TableShapeFacts() *TableShapeFacts {
 	if a == nil {
 		return nil
+	}
+	if a.accessObserver != nil {
+		a.accessObserver.note(factDomainTableShape)
 	}
 	if a.TableShape == nil {
 		a.TableShape = &TableShapeFacts{}
