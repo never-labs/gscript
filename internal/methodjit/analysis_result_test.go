@@ -24,19 +24,19 @@ func TestAnalysisResultInitializeZeroValuePreservesNilSentinels(t *testing.T) {
 func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee"}
 	a := &AnalysisResult{
-		Global: &GlobalFacts{
+		Global: newGlobalFactsForTest(globalFactsSeed{
 			Globals: map[string]*vm.FuncProto{
 				"callee": callee,
 			},
-		},
-		Speculation: &SpeculationFacts{
+		}),
+		Speculation: newSpeculationFactsForTest(speculationFactsSeed{
 			SuppressedSpecGuardKinds: map[int]map[string]bool{
 				12: {"GuardCalleeProto": true},
 			},
-		},
-		Numeric: &NumericFacts{
+		}),
+		Numeric: newNumericFactsForTest(numericFactsSeed{
 			Int48Safe: map[int]bool{7: true},
-		},
+		}),
 	}
 
 	a.Initialize()
@@ -44,10 +44,10 @@ func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 	if got, _ := a.GlobalFacts().GlobalProto("callee"); got != callee {
 		t.Fatalf("Initialize replaced or lost Globals entry: got %p want %p", got, callee)
 	}
-	if !a.Speculation.SuppressedSpecGuardKinds[12]["GuardCalleeProto"] {
+	if !a.SpeculationFacts().SpecGuardKindSuppressed(12, "GuardCalleeProto") {
 		t.Fatalf("Initialize replaced or lost SuppressedSpecGuardKinds entry")
 	}
-	if !a.Numeric.Int48Safe[7] {
+	if !a.NumericFacts().IsInt48Safe(7) {
 		t.Fatalf("Initialize replaced or lost ordinary analysis map entry")
 	}
 }
@@ -80,7 +80,7 @@ func TestAnalysisResultNumericFactsMutatorsUpdateDomain(t *testing.T) {
 
 func TestAnalysisResultNumericFactsPreservesPrePopulatedDomain(t *testing.T) {
 	a := &AnalysisResult{
-		Numeric: &NumericFacts{
+		Numeric: newNumericFactsForTest(numericFactsSeed{
 			Int48Safe:            map[int]bool{21: true},
 			IntModNonZeroDivisor: map[int]bool{22: true},
 			IntModNoSignAdjust:   map[int]bool{23: true},
@@ -88,7 +88,7 @@ func TestAnalysisResultNumericFactsPreservesPrePopulatedDomain(t *testing.T) {
 			ProfiledIntRanges:    map[int]intRange{25: {min: 1, max: 9, known: true}},
 			ProfiledLenRanges:    map[int]intRange{26: {min: 2, max: 8, known: true}},
 			IntNonNegative:       map[int]bool{27: true},
-		},
+		}),
 	}
 
 	numeric := a.NumericFacts()
@@ -189,12 +189,12 @@ func TestAnalysisResultLoopSpecializationFactsPreservesPrePopulatedDomain(t *tes
 	loopFact := LoopTableArrayFact{HeaderBlockID: 3, PreheaderBlockID: 4, AccessOp: OpTableArrayStore}
 	spec := RecordArrayLoopSpecializationSpec{ShapeID: 77}
 	a := &AnalysisResult{
-		LoopSpecialization: &LoopSpecializationFacts{
+		LoopSpecialization: newLoopSpecializationFactsForTest(loopSpecializationFactsSeed{
 			TableArrayUpperBoundSafe:       map[int]bool{21: true},
 			TableArrayLowerBoundSafe:       map[int]bool{22: true},
 			LoopTableArrayFacts:            map[int]LoopTableArrayFact{23: loopFact},
 			RecordArrayLoopSpecializations: map[int]RecordArrayLoopSpecializationSpec{24: spec},
-		},
+		}),
 	}
 
 	specializations := a.LoopSpecializationFacts()
@@ -215,9 +215,7 @@ func TestAnalysisResultLoopSpecializationFactsPreservesPrePopulatedDomain(t *tes
 func TestAnalysisResultCallFactsPreservesPrePopulatedDomain(t *testing.T) {
 	desc := CallABIDescriptor{NumArgs: 3, NumRets: 1}
 	a := &AnalysisResult{
-		Call: &CallFacts{
-			CallABIs: map[int]CallABIDescriptor{21: desc},
-		},
+		Call: newCallFactsForTest(map[int]CallABIDescriptor{21: desc}),
 	}
 
 	calls := a.CallFacts()
@@ -259,10 +257,10 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 
 func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testing.T) {
 	a := &AnalysisResult{Call: NewCallFacts()}
-	a.Call.CallABIs[41] = CallABIDescriptor{NumArgs: 5}
-	a.Call.GuardedConstCallFolds[42] = GuardedConstCallFoldFact{Result: 13}
-	a.Call.CallSiteNoResultRuntimeSpecializations[43] = true
-	a.Call.CallSiteNoResultRuntimeSpecializationBatches[44] = CallSiteNoResultRuntimeSpecializationBatchFact{ExitPC: 66}
+	a.CallFacts().SetCallABIs(map[int]CallABIDescriptor{41: {NumArgs: 5}})
+	a.CallFacts().SetGuardedConstCallFolds(map[int]GuardedConstCallFoldFact{42: {Result: 13}})
+	a.CallFacts().SetCallSiteNoResultRuntimeSpecializations(map[int]bool{43: true})
+	a.CallFacts().SetCallSiteNoResultRuntimeSpecializationBatches(map[int]CallSiteNoResultRuntimeSpecializationBatchFact{44: {ExitPC: 66}})
 
 	calls := a.CallFacts()
 	if got, ok := calls.CallABI(41); !ok || got.NumArgs != 5 {
@@ -285,19 +283,19 @@ func TestAnalysisResultSpeculationFactsBindsCompatibilityFields(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee"}
 
 	spec.SetSpecDependencyProtos(map[*vm.FuncProto]bool{callee: true})
-	if !spec.SpecDependencyProtos[callee] {
+	if !spec.SpecDependencyProto(callee) {
 		t.Fatalf("SpeculationFacts.SetSpecDependencyProtos did not update domain field")
 	}
 
 	spec.SetSuppressedSpecGuardPCs(map[int]bool{31: true})
-	if !spec.SuppressedSpecGuardPCs[31] {
+	if !spec.SuppressedSpecGuardPC(31) {
 		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardPCs did not update domain field")
 	}
 
 	spec.SetSuppressedSpecGuardKinds(map[int]map[string]bool{
 		32: {"GuardType": true},
 	})
-	if !spec.SuppressedSpecGuardKinds[32]["GuardType"] {
+	if !spec.SpecGuardKindSuppressed(32, "GuardType") {
 		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardKinds did not update domain field")
 	}
 }
@@ -305,21 +303,21 @@ func TestAnalysisResultSpeculationFactsBindsCompatibilityFields(t *testing.T) {
 func TestAnalysisResultSpeculationFactsPreservesPrePopulatedDomain(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee"}
 	a := &AnalysisResult{
-		Speculation: &SpeculationFacts{
+		Speculation: newSpeculationFactsForTest(speculationFactsSeed{
 			SpecDependencyProtos:     map[*vm.FuncProto]bool{callee: true},
 			SuppressedSpecGuardPCs:   map[int]bool{41: true},
 			SuppressedSpecGuardKinds: map[int]map[string]bool{42: {"GuardCalleeProto": true}},
-		},
+		}),
 	}
 
 	spec := a.SpeculationFacts()
-	if !spec.SpecDependencyProtos[callee] {
+	if !spec.SpecDependencyProto(callee) {
 		t.Fatalf("SpeculationFacts did not adopt legacy SpecDependencyProtos")
 	}
-	if !spec.SuppressedSpecGuardPCs[41] {
+	if !spec.SuppressedSpecGuardPC(41) {
 		t.Fatalf("SpeculationFacts did not adopt legacy SuppressedSpecGuardPCs")
 	}
-	if !spec.SuppressedSpecGuardKinds[42]["GuardCalleeProto"] {
+	if !spec.SpecGuardKindSuppressed(42, "GuardCalleeProto") {
 		t.Fatalf("SpeculationFacts did not adopt legacy SuppressedSpecGuardKinds")
 	}
 }
@@ -328,7 +326,7 @@ func TestAnalysisResultSpeculationFactsPreservesSuppressedKindsNilSentinel(t *te
 	a := NewAnalysisResult()
 	spec := a.SpeculationFacts()
 
-	if spec.SuppressedSpecGuardKinds != nil {
+	if spec.SuppressedSpecGuardKindsMap() != nil {
 		t.Fatalf("NewAnalysisResult initialized SuppressedSpecGuardKinds nil sentinel")
 	}
 
@@ -413,12 +411,12 @@ func TestAnalysisResultTableShapeFactsRecordHelpersUpdateDomain(t *testing.T) {
 
 func TestAnalysisResultTableShapeFactsPreservesPrePopulatedDomain(t *testing.T) {
 	a := &AnalysisResult{
-		TableShape: &TableShapeFacts{
+		TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 			FieldPolyShapeFacts:     map[int][]FieldPolyShapeCase{201: {{ShapeID: 21, FieldIdx: 1}}},
 			FieldPolyShapeReceivers: map[int]bool{202: true},
 			FieldPolyShapeCatalog:   map[uint32]FixedShapeTableFact{22: {ShapeID: 22}},
 			FieldCallPolyLenFusions: map[int][]FieldCallPolyLenFusion{203: {{LenValueID: 204, ShapeID: 23}}},
-		},
+		}),
 	}
 
 	shapes := a.TableShapeFacts()
@@ -438,7 +436,7 @@ func TestAnalysisResultTableShapeFactsPreservesPrePopulatedDomain(t *testing.T) 
 
 func TestTableShapeFactsReadHelpers(t *testing.T) {
 	a := &AnalysisResult{
-		TableShape: &TableShapeFacts{
+		TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 				301: {
 					{ShapeID: 31, FieldIdx: 1},
@@ -448,7 +446,7 @@ func TestTableShapeFactsReadHelpers(t *testing.T) {
 			FieldPolyShapeCatalog: map[uint32]FixedShapeTableFact{
 				33: {ShapeID: 33},
 			},
-		},
+		}),
 	}
 	shapes := a.TableShapeFacts()
 
@@ -490,9 +488,9 @@ func TestTableShapeFactsReadHelpers(t *testing.T) {
 
 func TestAnalysisResultTableShapeFactsPreservesEmptyMapSentinelBehavior(t *testing.T) {
 	a := &AnalysisResult{
-		TableShape: &TableShapeFacts{
+		TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{401: {{ShapeID: 41}}},
-		},
+		}),
 	}
 	shapes := a.TableShapeFacts()
 
@@ -512,16 +510,16 @@ func TestAnalysisResultTableShapeFactsPreservesEmptyMapSentinelBehavior(t *testi
 
 func TestSpecGuardKindSuppressedNilKindsFallsBackToPCs(t *testing.T) {
 	fn := &Function{Analysis: &AnalysisResult{
-		Speculation: &SpeculationFacts{
+		Speculation: newSpeculationFactsForTest(speculationFactsSeed{
 			SuppressedSpecGuardPCs: map[int]bool{42: true},
-		},
+		}),
 	}}
 
 	if !specGuardKindSuppressed(fn, 42, "GuardCalleeProto") {
 		t.Fatalf("nil SuppressedSpecGuardKinds should fall back to SuppressedSpecGuardPCs")
 	}
 
-	fn.Analysis.Speculation.SuppressedSpecGuardKinds = map[int]map[string]bool{}
+	fn.Analysis.SpeculationFacts().SetSuppressedSpecGuardKinds(map[int]map[string]bool{})
 	if specGuardKindSuppressed(fn, 42, "GuardCalleeProto") {
 		t.Fatalf("empty non-nil SuppressedSpecGuardKinds should not fall back to SuppressedSpecGuardPCs")
 	}
@@ -556,7 +554,7 @@ func assertDomainStructMapSentinels(t *testing.T, v reflect.Value, constructor s
 		}
 
 		name := typ.Field(i).Name
-		if name == "Globals" || name == "SuppressedSpecGuardKinds" {
+		if name == "globals" || name == "suppressedSpecGuardKinds" {
 			if !fieldValue.IsNil() {
 				t.Fatalf("%s initialized nil sentinel field %s", constructor, name)
 			}

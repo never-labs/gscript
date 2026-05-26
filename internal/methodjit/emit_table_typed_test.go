@@ -361,14 +361,15 @@ func sum_floats(arr, n) {
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(sum_floats): %v", err)
 	}
-	if len(fn.Analysis.LoopSpecialization.TableArrayDataPtrs) == 0 {
+	if fn.Analysis.LoopSpecializationFacts().TableArrayDataPtrCount() == 0 {
 		t.Fatalf("expected raw table-array data pointer facts:\n%s", Print(fn))
 	}
-	for dataID, fact := range fn.Analysis.LoopSpecialization.TableArrayDataPtrs {
+	fn.Analysis.LoopSpecializationFacts().ForEachTableArrayDataPtr(func(dataID int, fact TableArrayDataPtrFact) bool {
 		if fact.Kind != int64(vm.FBKindFloat) || fact.LenID < 0 || fact.HeaderID < 0 || fact.TableID < 0 {
 			t.Fatalf("bad data pointer fact for v%d: %+v\n%s", dataID, fact, Print(fn))
 		}
-	}
+		return true
+	})
 }
 
 func TestTier2_TableArrayNestedLoadFloatUsesDirectFPLoad(t *testing.T) {

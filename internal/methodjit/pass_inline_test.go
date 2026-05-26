@@ -69,14 +69,14 @@ func step_b(actor, tick) { return tick + 2 }
 		Proto:   &vm.FuncProto{Name: "caller"},
 		Remarks: remarks,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					calleeLoad.ID: {
 						{ShapeID: 101, FieldIdx: 0, VMProto: stepA, ReceiverFact: FixedShapeTableFact{ShapeID: 101}},
 						{ShapeID: 202, FieldIdx: 0, VMProto: stepB, ReceiverFact: FixedShapeTableFact{ShapeID: 202}},
 					},
 				},
-			},
+			}),
 		},
 	}
 

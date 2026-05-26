@@ -15,13 +15,13 @@ func (g *GlobalFacts) SetGlobals(globals map[string]*vm.FuncProto) {
 	if g == nil {
 		return
 	}
-	g.Globals = globals
+	g.globals = globals
 	g.bindOwner()
 }
 
 // GlobalsPopulated reports whether the Globals sentinel map has been installed.
 func (g *GlobalFacts) GlobalsPopulated() bool {
-	return g != nil && g.Globals != nil
+	return g != nil && g.globals != nil
 }
 
 // GlobalsMap returns the underlying global function name -> proto map. It may be
@@ -30,24 +30,24 @@ func (g *GlobalFacts) GlobalsMap() map[string]*vm.FuncProto {
 	if g == nil {
 		return nil
 	}
-	return g.Globals
+	return g.globals
 }
 
 // GlobalProto returns the proto registered for the given global function name.
 func (g *GlobalFacts) GlobalProto(name string) (*vm.FuncProto, bool) {
-	if g == nil || g.Globals == nil {
+	if g == nil || g.globals == nil {
 		return nil, false
 	}
-	p, ok := g.Globals[name]
+	p, ok := g.globals[name]
 	return p, ok
 }
 
 // ForEachGlobal iterates the global function name -> proto map.
 func (g *GlobalFacts) ForEachGlobal(fn func(name string, proto *vm.FuncProto)) {
-	if g == nil || g.Globals == nil || fn == nil {
+	if g == nil || g.globals == nil || fn == nil {
 		return
 	}
-	for name, proto := range g.Globals {
+	for name, proto := range g.globals {
 		fn(name, proto)
 	}
 }
@@ -57,7 +57,7 @@ func (g *GlobalFacts) SetNumericGlobalValues(values map[string]runtime.Value) {
 	if g == nil {
 		return
 	}
-	g.NumericGlobalValues = values
+	g.numericGlobalValues = values
 	g.bindOwner()
 }
 
@@ -66,7 +66,7 @@ func (g *GlobalFacts) NumericGlobalValuesMap() map[string]runtime.Value {
 	if g == nil {
 		return nil
 	}
-	return g.NumericGlobalValues
+	return g.numericGlobalValues
 }
 
 // SetGlobalArrayElementFacts installs the stable global array-element facts map.
@@ -74,7 +74,7 @@ func (g *GlobalFacts) SetGlobalArrayElementFacts(facts map[string]FixedShapeTabl
 	if g == nil {
 		return
 	}
-	g.GlobalArrayElementFacts = facts
+	g.globalArrayElementFacts = facts
 	g.bindOwner()
 }
 
@@ -84,5 +84,5 @@ func (g *GlobalFacts) GlobalArrayElementFactsMap() map[string]FixedShapeTableFac
 	if g == nil {
 		return nil
 	}
-	return g.GlobalArrayElementFacts
+	return g.globalArrayElementFacts
 }

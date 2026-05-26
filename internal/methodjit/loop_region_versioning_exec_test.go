@@ -16,7 +16,7 @@ func TestTier2_LoopRegionVersionedTableArrayStoreExecutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Analysis.LoopSpecialization.TableArrayUpperBoundSafe == nil || !out.Analysis.LoopSpecialization.TableArrayUpperBoundSafe[store.ID] {
+	if !out.Analysis.LoopSpecializationFacts().TableArrayUpperBoundIsSafe(store.ID) {
 		t.Fatalf("expected checked store to reuse loop-region upper-bound fact:\n%s", Print(out))
 	}
 

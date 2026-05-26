@@ -127,8 +127,8 @@ for i := 0; i < 3; i++ {
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
-	if facts := functionCallFacts(fn); facts != nil && len(facts.CallSiteNoResultRuntimeSpecializations) != 0 {
-		t.Fatalf("stable non-specialization runtime call should not be annotated: %#v", facts.CallSiteNoResultRuntimeSpecializations)
+	if facts := functionCallFacts(fn); facts != nil && facts.CallSiteNoResultRuntimeSpecializationCount() != 0 {
+		t.Fatalf("stable non-specialization runtime call should not be annotated: %#v", facts.CallSiteNoResultRuntimeSpecializationMap())
 	}
 }
 
@@ -167,8 +167,8 @@ caller(sinkB, 1)
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(caller): %v", err)
 	}
-	if facts := functionCallFacts(fn); facts != nil && len(facts.CallSiteNoResultRuntimeSpecializations) != 0 {
-		t.Fatalf("polymorphic runtime call should not be annotated: %#v", facts.CallSiteNoResultRuntimeSpecializations)
+	if facts := functionCallFacts(fn); facts != nil && facts.CallSiteNoResultRuntimeSpecializationCount() != 0 {
+		t.Fatalf("polymorphic runtime call should not be annotated: %#v", facts.CallSiteNoResultRuntimeSpecializationMap())
 	}
 }
 

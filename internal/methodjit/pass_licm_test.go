@@ -763,11 +763,11 @@ func TestLICM_HoistTableArrayHeaderAcrossNoAliasNoGlobalCall(t *testing.T) {
 			Constants: []runtime.Value{runtime.StringValue("helper")},
 		},
 		Analysis: &AnalysisResult{
-			Global: &GlobalFacts{
+			Global: newGlobalFactsForTest(globalFactsSeed{
 				Globals: map[string]*vm.FuncProto{
 					"helper": {Name: "helper", NoGlobalOps: true},
 				},
-			},
+			}),
 		},
 	}
 	b0, b1, b2, b3 := buildSimpleLoop(fn)
@@ -1002,7 +1002,7 @@ func TestLICM_NestedLoop_InsideOut(t *testing.T) {
 // ---------- Test 10: hoist Int48Safe AddInt ----------
 
 func TestLICM_HoistInt48SafeAddInt(t *testing.T) {
-	fn := &Function{NumRegs: 8, Analysis: &AnalysisResult{Numeric: &NumericFacts{Int48Safe: make(map[int]bool)}}}
+	fn := &Function{NumRegs: 8, Analysis: NewAnalysisResult()}
 	b0, b1, b2, b3 := buildSimpleLoop(fn)
 
 	// b0
@@ -1028,7 +1028,7 @@ func TestLICM_HoistInt48SafeAddInt(t *testing.T) {
 		Args: []*Value{phi.Value(), addInv.Value()}}
 	b2Term := &Instr{ID: fn.newValueID(), Op: OpJump, Type: TypeUnknown, Block: b2, Aux: int64(b1.ID)}
 	b2.Instrs = []*Instr{la, lb, addInv, accum, b2Term}
-	fn.Analysis.Numeric.Int48Safe[addInv.ID] = true
+	fn.Analysis.NumericFacts().RecordInt48Safe(addInv.ID)
 	// accum is not Int48Safe intentionally (we only want addInv hoisted).
 
 	phi.Args = []*Value{seed.Value(), accum.Value()}
@@ -1486,11 +1486,11 @@ func TestLICM_HoistGetGlobal_AcrossNoGlobalOpsCall(t *testing.T) {
 			Constants: []runtime.Value{runtime.StringValue("g"), runtime.StringValue("helper")},
 		},
 		Analysis: &AnalysisResult{
-			Global: &GlobalFacts{
+			Global: newGlobalFactsForTest(globalFactsSeed{
 				Globals: map[string]*vm.FuncProto{
 					"helper": {Name: "helper", NoGlobalOps: true},
 				},
-			},
+			}),
 		},
 	}
 	b0, b1, b2, b3 := buildSimpleLoop(fn)
@@ -1541,11 +1541,11 @@ func TestLICM_HoistGetUpval_AcrossNoUpvalueCall(t *testing.T) {
 			Constants: []runtime.Value{runtime.StringValue("helper")},
 		},
 		Analysis: &AnalysisResult{
-			Global: &GlobalFacts{
+			Global: newGlobalFactsForTest(globalFactsSeed{
 				Globals: map[string]*vm.FuncProto{
 					"helper": {Name: "helper", NoGlobalOps: true},
 				},
-			},
+			}),
 		},
 	}
 	b0, b1, b2, b3 := buildSimpleLoop(fn)

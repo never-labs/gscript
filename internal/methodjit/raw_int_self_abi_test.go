@@ -609,7 +609,7 @@ func caller(n) {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr.Op == OpCall {
-				desc, ok := fn.Analysis.Call.CallABIs[instr.ID]
+				desc, ok := fn.Analysis.CallFacts().CallABIMap()[instr.ID]
 				if !ok {
 					t.Fatalf("call %d missing raw-int CallABI descriptor", instr.ID)
 				}
@@ -689,7 +689,7 @@ func M(n) {
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(F): %v", err)
 	}
-	if fn.Analysis.Call.CallABIs == nil {
+	if fn.Analysis.CallFacts().CallABIMap() == nil {
 		t.Fatalf("F pipeline did not annotate raw peer calls\nIR:\n%s", Print(fn))
 	}
 	cf, err := Compile(fn, AllocateRegisters(fn))

@@ -40,7 +40,7 @@ func f(n) {
 				if instr.Aux != 0 || instr.Aux2 != nestedLoopParamRangeMax {
 					t.Fatalf("unexpected GuardIntRange bounds: [%d,%d]", instr.Aux, instr.Aux2)
 				}
-				if r := fn.Analysis.Numeric.IntRanges[instr.ID]; !r.known || r.min != 0 || r.max != nestedLoopParamRangeMax {
+				if r := fn.Analysis.NumericFacts().IntRangeMap()[instr.ID]; !r.known || r.min != 0 || r.max != nestedLoopParamRangeMax {
 					t.Fatalf("GuardIntRange range not propagated: %+v", r)
 				}
 			}
@@ -49,7 +49,7 @@ func f(n) {
 			}
 			switch instr.Op {
 			case OpAddInt, OpSubInt, OpMulInt, OpDivIntExact, OpNegInt:
-				if fn.Analysis.Numeric.Int48Safe[instr.ID] {
+				if fn.Analysis.NumericFacts().IsInt48Safe(instr.ID) {
 					safeNonCounter++
 					if instr.Op == OpMulInt {
 						safeMul++

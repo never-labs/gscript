@@ -8,10 +8,10 @@ import "github.com/gscript/gscript/internal/vm"
 // visit callback may return false to stop iteration early. It is a read-only
 // accessor and does not mutate the facts, so no bindOwner() is required.
 func (s *SpeculationFacts) ForEachSpecDependencyProto(visit func(proto *vm.FuncProto) bool) {
-	if s == nil || s.SpecDependencyProtos == nil || visit == nil {
+	if s == nil || s.specDependencyProtos == nil || visit == nil {
 		return
 	}
-	for proto := range s.SpecDependencyProtos {
+	for proto := range s.specDependencyProtos {
 		if !visit(proto) {
 			return
 		}
@@ -24,5 +24,28 @@ func (s *SpeculationFacts) SpecDependencyProtoCount() int {
 	if s == nil {
 		return 0
 	}
-	return len(s.SpecDependencyProtos)
+	return len(s.specDependencyProtos)
+}
+
+// SpecDependencyProto reports whether the given proto is a recorded
+// spec-dependency. Read-only.
+func (s *SpeculationFacts) SpecDependencyProto(proto *vm.FuncProto) bool {
+	return s != nil && s.specDependencyProtos != nil && s.specDependencyProtos[proto]
+}
+
+// SuppressedSpecGuardPC reports whether the given bytecode PC has its runtime
+// guard suppressed. Read-only.
+func (s *SpeculationFacts) SuppressedSpecGuardPC(pc int) bool {
+	return s != nil && s.suppressedSpecGuardPCs != nil && s.suppressedSpecGuardPCs[pc]
+}
+
+// SuppressedSpecGuardKindsMap returns the underlying guard-kind-scoped
+// suppression map. Nil is a sentinel meaning kind information is unavailable.
+// Callers read or iterate without mutating; mutation goes through
+// SetSuppressedSpecGuardKinds.
+func (s *SpeculationFacts) SuppressedSpecGuardKindsMap() map[int]map[string]bool {
+	if s == nil {
+		return nil
+	}
+	return s.suppressedSpecGuardKinds
 }

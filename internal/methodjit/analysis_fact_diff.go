@@ -6,7 +6,21 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unsafe"
 )
+
+// exportableValue clears the read-only (RO) flag carried by reflect.Values
+// obtained from unexported struct fields. Such values cannot have .Interface()
+// called on them, which the fact-hash snapshot path relies on. When the value
+// is addressable (it is here: snapshotAnalysisResultDomains takes Elem() of the
+// domain pointers), reconstructing it via reflect.NewAt yields an equivalent
+// value without the RO flag. Non-addressable values are returned unchanged.
+func exportableValue(v reflect.Value) reflect.Value {
+	if v.CanAddr() {
+		return reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem()
+	}
+	return v
+}
 
 // AnalysisFactDomainDiff records a lightweight before/after change for one
 // AnalysisResult fact map. Top-level compatibility maps use their field name;
@@ -86,7 +100,7 @@ func snapshotAnalysisResultDomainStruct(out map[string]analysisFactDomainSnapsho
 		if field.Kind() != reflect.Map {
 			continue
 		}
-		recordAnalysisFactMapSnapshot(out, domain+"."+valueType.Field(i).Name, field)
+		recordAnalysisFactMapSnapshot(out, domain+"."+valueType.Field(i).Name, exportableValue(field))
 	}
 }
 

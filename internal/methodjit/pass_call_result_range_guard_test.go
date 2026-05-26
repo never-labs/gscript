@@ -83,7 +83,7 @@ func TestCallResultRangeGuardPass_RangeAnalysisConsumesGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !fn.Analysis.Numeric.Int48Safe[add.ID] {
+	if !fn.Analysis.NumericFacts().IsInt48Safe(add.ID) {
 		t.Fatalf("AddInt fed by guarded call result should be Int48Safe:\n%s", Print(fn))
 	}
 }
@@ -191,9 +191,9 @@ func TestCallResultRangeGuardPass_SpeculatesStableFieldCallFloor(t *testing.T) {
 	b.Instrs = []*Instr{recv, arg, call, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
-	}
+	})
 
 	out, err := CallResultRangeGuardPass(fn)
 	if err != nil {
@@ -220,11 +220,11 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	fn := &Function{
 		Proto: proto,
 		Analysis: &AnalysisResult{
-			Speculation: &SpeculationFacts{
+			Speculation: newSpeculationFactsForTest(speculationFactsSeed{
 				SuppressedSpecGuardKinds: map[int]map[string]bool{
 					0: {"GuardIntRange": true},
 				},
-			},
+			}),
 		},
 	}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
@@ -235,9 +235,9 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	b.Instrs = []*Instr{recv, arg, call, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
-	}
+	})
 
 	out, err := CallResultRangeGuardPass(fn)
 	if err != nil {

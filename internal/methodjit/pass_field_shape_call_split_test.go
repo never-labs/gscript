@@ -35,7 +35,7 @@ func step_b(actor, tick) {
 		NumRegs: 2,
 		nextID:  4,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					2: {
 						{
@@ -61,7 +61,7 @@ func step_b(actor, tick) {
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0}
@@ -92,7 +92,7 @@ func step_b(actor, tick) {
 	if strings.Contains(text, "GuardCalleeProto") {
 		t.Fatalf("split IR still contains inline-only guard:\n%s", text)
 	}
-	if got := len(fn.Analysis.TableShape.FieldPolyShapeFacts[call.ID]); got != 1 {
+	if got := len(fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[call.ID]); got != 1 {
 		t.Fatalf("fallback cases=%d want 1", got)
 	}
 
@@ -131,7 +131,7 @@ func step_b(actor, tick) {
 		NumRegs: 2,
 		nextID:  4,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					2: {
 						{
@@ -157,7 +157,7 @@ func step_b(actor, tick) {
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0}
@@ -176,7 +176,7 @@ func step_b(actor, tick) {
 	var caseCall *Instr
 	for _, block := range out.Blocks {
 		for _, instr := range block.Instrs {
-			if instr != nil && instr.Op == OpFieldCallFloor && len(out.Analysis.TableShape.FieldPolyShapeFacts[instr.ID]) == 1 {
+			if instr != nil && instr.Op == OpFieldCallFloor && len(out.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[instr.ID]) == 1 {
 				caseCall = instr
 				break
 			}
@@ -188,7 +188,7 @@ func step_b(actor, tick) {
 	ec := &emitContext{fn: out}
 	cases := ec.fieldShapeTypedPeerMethodCallCases(caseCall)
 	if len(cases) != 1 {
-		t.Fatalf("single-case field call cases=%d want 1\nIR:\n%s\nfacts=%#v", len(cases), Print(out), out.Analysis.TableShape.FieldPolyShapeFacts[caseCall.ID])
+		t.Fatalf("single-case field call cases=%d want 1\nIR:\n%s\nfacts=%#v", len(cases), Print(out), out.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[caseCall.ID])
 	}
 }
 
@@ -212,7 +212,7 @@ func step_b(actor, tick) {
 		NumRegs: 2,
 		nextID:  4,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					2: {
 						{
@@ -237,7 +237,7 @@ func step_b(actor, tick) {
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0}
@@ -260,7 +260,7 @@ func step_b(actor, tick) {
 	if strings.Contains(text, "TableShapeID") || len(fn.Blocks) != 1 {
 		t.Fatalf("unsafe callee was split unexpectedly:\n%s", text)
 	}
-	if got := len(fn.Analysis.TableShape.FieldPolyShapeFacts[call.ID]); got != 2 {
+	if got := len(fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[call.ID]); got != 2 {
 		t.Fatalf("fallback cases=%d want unchanged 2", got)
 	}
 }
@@ -317,7 +317,7 @@ func step_b(actor, tick) { return tick + 2 }`)
 		NumRegs: 2,
 		nextID:  5,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					2: {
 						{
@@ -342,7 +342,7 @@ func step_b(actor, tick) { return tick + 2 }`)
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0}
@@ -374,25 +374,25 @@ func step_b(actor, tick) { return tick + 2 }`)
 		}
 	}
 	sawMono := false
-	for id, cases := range fn.Analysis.TableShape.FieldPolyShapeFacts {
+	for id, cases := range fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap() {
 		if id != method.ID && len(cases) == 1 && cases[0].VMProto == stepA {
 			sawMono = true
 		}
 	}
 	if !sawMono {
-		t.Fatalf("missing monomorphic case call fact: %#v", fn.Analysis.TableShape.FieldPolyShapeFacts)
+		t.Fatalf("missing monomorphic case call fact: %#v", fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap())
 	}
 	sawFallback := false
-	for id, cases := range fn.Analysis.TableShape.FieldPolyShapeFacts {
+	for id, cases := range fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap() {
 		if id != method.ID && len(cases) == 1 && cases[0].VMProto == stepB {
 			sawFallback = true
 		}
 	}
 	if !sawFallback {
-		t.Fatalf("missing localized fallback case call fact: %#v", fn.Analysis.TableShape.FieldPolyShapeFacts)
+		t.Fatalf("missing localized fallback case call fact: %#v", fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap())
 	}
-	if _, ok := fn.Analysis.TableShape.FieldPolyShapeFacts[method.ID]; ok {
-		t.Fatalf("stale pre-branch method facts were not removed: %#v", fn.Analysis.TableShape.FieldPolyShapeFacts[method.ID])
+	if _, ok := fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[method.ID]; ok {
+		t.Fatalf("stale pre-branch method facts were not removed: %#v", fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[method.ID])
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -433,7 +433,7 @@ func step_b(actor, tick) { return tick + 2 }`)
 		NumRegs: 2,
 		nextID:  5,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					2: {
 						{
@@ -458,7 +458,7 @@ func step_b(actor, tick) { return tick + 2 }`)
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0}
@@ -519,7 +519,7 @@ func step_b(actor, tick) { return tick + 2 }`)
 		NumRegs: 2,
 		nextID:  5,
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
 					2: {
 						{
@@ -544,7 +544,7 @@ func step_b(actor, tick) { return tick + 2 }`)
 						},
 					},
 				},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0}

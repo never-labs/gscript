@@ -43,30 +43,30 @@ type NumericFacts struct {
 
 	// Int48Safe is the set of integer arithmetic SSA value IDs whose runtime
 	// result is provably within the int48 signed range.
-	Int48Safe map[int]bool
+	int48Safe map[int]bool
 
 	// IntModNonZeroDivisor is the set of ModInt SSA value IDs whose divisor
 	// range excludes zero.
-	IntModNonZeroDivisor map[int]bool
+	intModNonZeroDivisor map[int]bool
 
 	// IntModNoSignAdjust is the set of ModInt SSA value IDs whose operand signs
 	// prove that ARM64 SDIV/MSUB already matches Lua modulo semantics.
-	IntModNoSignAdjust map[int]bool
+	intModNoSignAdjust map[int]bool
 
 	// IntRanges records integer range facts computed by range analysis.
-	IntRanges map[int]intRange
+	intRanges map[int]intRange
 
 	// ProfiledIntRanges records guarded integer range facts from runtime
 	// feedback, keyed by SSA value ID.
-	ProfiledIntRanges map[int]intRange
+	profiledIntRanges map[int]intRange
 
 	// ProfiledLenRanges records guarded len() result ranges keyed by the value
 	// whose length is being read.
-	ProfiledLenRanges map[int]intRange
+	profiledLenRanges map[int]intRange
 
 	// IntNonNegative is the set of integer SSA value IDs whose runtime result is
 	// provably >= 0.
-	IntNonNegative map[int]bool
+	intNonNegative map[int]bool
 }
 
 func NewNumericFacts() *NumericFacts {
@@ -76,26 +76,26 @@ func NewNumericFacts() *NumericFacts {
 }
 
 func (n *NumericFacts) Initialize() {
-	if n.Int48Safe == nil {
-		n.Int48Safe = make(map[int]bool)
+	if n.int48Safe == nil {
+		n.int48Safe = make(map[int]bool)
 	}
-	if n.IntModNonZeroDivisor == nil {
-		n.IntModNonZeroDivisor = make(map[int]bool)
+	if n.intModNonZeroDivisor == nil {
+		n.intModNonZeroDivisor = make(map[int]bool)
 	}
-	if n.IntModNoSignAdjust == nil {
-		n.IntModNoSignAdjust = make(map[int]bool)
+	if n.intModNoSignAdjust == nil {
+		n.intModNoSignAdjust = make(map[int]bool)
 	}
-	if n.IntRanges == nil {
-		n.IntRanges = make(map[int]intRange)
+	if n.intRanges == nil {
+		n.intRanges = make(map[int]intRange)
 	}
-	if n.ProfiledIntRanges == nil {
-		n.ProfiledIntRanges = make(map[int]intRange)
+	if n.profiledIntRanges == nil {
+		n.profiledIntRanges = make(map[int]intRange)
 	}
-	if n.ProfiledLenRanges == nil {
-		n.ProfiledLenRanges = make(map[int]intRange)
+	if n.profiledLenRanges == nil {
+		n.profiledLenRanges = make(map[int]intRange)
 	}
-	if n.IntNonNegative == nil {
-		n.IntNonNegative = make(map[int]bool)
+	if n.intNonNegative == nil {
+		n.intNonNegative = make(map[int]bool)
 	}
 }
 
@@ -103,58 +103,58 @@ func (n *NumericFacts) SetInt48Safe(facts map[int]bool) {
 	if n == nil {
 		return
 	}
-	n.Int48Safe = facts
+	n.int48Safe = facts
 	n.bindOwner()
 }
 
 func (n *NumericFacts) IsInt48Safe(id int) bool {
-	return n != nil && n.Int48Safe != nil && n.Int48Safe[id]
+	return n != nil && n.int48Safe != nil && n.int48Safe[id]
 }
 
 func (n *NumericFacts) Int48SafeCount() int {
 	if n == nil {
 		return 0
 	}
-	return len(n.Int48Safe)
+	return len(n.int48Safe)
 }
 
 func (n *NumericFacts) SetIntModNonZeroDivisor(facts map[int]bool) {
 	if n == nil {
 		return
 	}
-	n.IntModNonZeroDivisor = facts
+	n.intModNonZeroDivisor = facts
 	n.bindOwner()
 }
 
 func (n *NumericFacts) IsIntModNonZeroDivisor(id int) bool {
-	return n != nil && n.IntModNonZeroDivisor != nil && n.IntModNonZeroDivisor[id]
+	return n != nil && n.intModNonZeroDivisor != nil && n.intModNonZeroDivisor[id]
 }
 
 func (n *NumericFacts) SetIntModNoSignAdjust(facts map[int]bool) {
 	if n == nil {
 		return
 	}
-	n.IntModNoSignAdjust = facts
+	n.intModNoSignAdjust = facts
 	n.bindOwner()
 }
 
 func (n *NumericFacts) IsIntModNoSignAdjust(id int) bool {
-	return n != nil && n.IntModNoSignAdjust != nil && n.IntModNoSignAdjust[id]
+	return n != nil && n.intModNoSignAdjust != nil && n.intModNoSignAdjust[id]
 }
 
 func (n *NumericFacts) SetIntRanges(facts map[int]intRange) {
 	if n == nil {
 		return
 	}
-	n.IntRanges = facts
+	n.intRanges = facts
 	n.bindOwner()
 }
 
 func (n *NumericFacts) IntRange(id int) (intRange, bool) {
-	if n == nil || n.IntRanges == nil {
+	if n == nil || n.intRanges == nil {
 		return intRange{}, false
 	}
-	r, ok := n.IntRanges[id]
+	r, ok := n.intRanges[id]
 	return r, ok
 }
 
@@ -162,22 +162,22 @@ func (n *NumericFacts) IntRangeMap() map[int]intRange {
 	if n == nil {
 		return nil
 	}
-	return n.IntRanges
+	return n.intRanges
 }
 
 func (n *NumericFacts) SetProfiledIntRanges(facts map[int]intRange) {
 	if n == nil {
 		return
 	}
-	n.ProfiledIntRanges = facts
+	n.profiledIntRanges = facts
 	n.bindOwner()
 }
 
 func (n *NumericFacts) ProfiledIntRange(id int) (intRange, bool) {
-	if n == nil || n.ProfiledIntRanges == nil {
+	if n == nil || n.profiledIntRanges == nil {
 		return intRange{}, false
 	}
-	r, ok := n.ProfiledIntRanges[id]
+	r, ok := n.profiledIntRanges[id]
 	return r, ok
 }
 
@@ -185,25 +185,25 @@ func (n *NumericFacts) ProfiledIntRangeMap() map[int]intRange {
 	if n == nil {
 		return nil
 	}
-	return n.ProfiledIntRanges
+	return n.profiledIntRanges
 }
 
 func (n *NumericFacts) RecordProfiledIntRange(id int, r intRange) {
 	if n == nil || !r.known {
 		return
 	}
-	if n.ProfiledIntRanges == nil {
-		n.ProfiledIntRanges = make(map[int]intRange)
+	if n.profiledIntRanges == nil {
+		n.profiledIntRanges = make(map[int]intRange)
 	}
-	n.ProfiledIntRanges[id] = r
+	n.profiledIntRanges[id] = r
 	n.bindOwner()
 }
 
 func (n *NumericFacts) DeleteProfiledIntRange(id int) {
-	if n == nil || n.ProfiledIntRanges == nil {
+	if n == nil || n.profiledIntRanges == nil {
 		return
 	}
-	delete(n.ProfiledIntRanges, id)
+	delete(n.profiledIntRanges, id)
 	n.bindOwner()
 }
 
@@ -211,15 +211,15 @@ func (n *NumericFacts) SetProfiledLenRanges(facts map[int]intRange) {
 	if n == nil {
 		return
 	}
-	n.ProfiledLenRanges = facts
+	n.profiledLenRanges = facts
 	n.bindOwner()
 }
 
 func (n *NumericFacts) ProfiledLenRange(id int) (intRange, bool) {
-	if n == nil || n.ProfiledLenRanges == nil {
+	if n == nil || n.profiledLenRanges == nil {
 		return intRange{}, false
 	}
-	r, ok := n.ProfiledLenRanges[id]
+	r, ok := n.profiledLenRanges[id]
 	return r, ok
 }
 
@@ -227,25 +227,25 @@ func (n *NumericFacts) ProfiledLenRangeMap() map[int]intRange {
 	if n == nil {
 		return nil
 	}
-	return n.ProfiledLenRanges
+	return n.profiledLenRanges
 }
 
 func (n *NumericFacts) RecordProfiledLenRange(id int, r intRange) {
 	if n == nil || id == 0 || !r.known {
 		return
 	}
-	if n.ProfiledLenRanges == nil {
-		n.ProfiledLenRanges = make(map[int]intRange)
+	if n.profiledLenRanges == nil {
+		n.profiledLenRanges = make(map[int]intRange)
 	}
-	n.ProfiledLenRanges[id] = r
+	n.profiledLenRanges[id] = r
 	n.bindOwner()
 }
 
 func (n *NumericFacts) DeleteProfiledLenRange(id int) {
-	if n == nil || n.ProfiledLenRanges == nil {
+	if n == nil || n.profiledLenRanges == nil {
 		return
 	}
-	delete(n.ProfiledLenRanges, id)
+	delete(n.profiledLenRanges, id)
 	n.bindOwner()
 }
 
@@ -253,7 +253,7 @@ func (n *NumericFacts) SetIntNonNegative(facts map[int]bool) {
 	if n == nil {
 		return
 	}
-	n.IntNonNegative = facts
+	n.intNonNegative = facts
 	n.bindOwner()
 }
 
@@ -261,24 +261,24 @@ func (n *NumericFacts) RecordIntNonNegative(id int) {
 	if n == nil {
 		return
 	}
-	if n.IntNonNegative == nil {
-		n.IntNonNegative = make(map[int]bool)
+	if n.intNonNegative == nil {
+		n.intNonNegative = make(map[int]bool)
 	}
-	n.IntNonNegative[id] = true
+	n.intNonNegative[id] = true
 	n.bindOwner()
 }
 
 func (n *NumericFacts) IsIntNonNegative(id int) bool {
-	return n != nil && n.IntNonNegative != nil && n.IntNonNegative[id]
+	return n != nil && n.intNonNegative != nil && n.intNonNegative[id]
 }
 
 func (n *NumericFacts) SetComputedRanges(safe map[int]bool, ranges map[int]intRange, nonNegative map[int]bool) {
 	if n == nil {
 		return
 	}
-	n.Int48Safe = safe
-	n.IntRanges = ranges
-	n.IntNonNegative = nonNegative
+	n.int48Safe = safe
+	n.intRanges = ranges
+	n.intNonNegative = nonNegative
 	n.bindOwner()
 }
 
@@ -286,8 +286,8 @@ func (n *NumericFacts) SetModuloFacts(nonZeroDivisor map[int]bool, noSignAdjust 
 	if n == nil {
 		return
 	}
-	n.IntModNonZeroDivisor = nonZeroDivisor
-	n.IntModNoSignAdjust = noSignAdjust
+	n.intModNonZeroDivisor = nonZeroDivisor
+	n.intModNoSignAdjust = noSignAdjust
 	n.bindOwner()
 }
 
@@ -326,22 +326,22 @@ type CallFacts struct {
 	// CallABIs records stable callsite ABI facts keyed by OpCall instruction
 	// ID. A descriptor is required before codegen may use a specialized
 	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
-	CallABIs map[int]CallABIDescriptor
+	callABIs map[int]CallABIDescriptor
 
 	// GuardedConstCallFolds records guarded call-site guarded
 	// constants keyed by OpCall instruction ID.
-	GuardedConstCallFolds map[int]GuardedConstCallFoldFact
+	guardedConstCallFolds map[int]GuardedConstCallFoldFact
 
 	// CallSiteNoResultRuntimeSpecializations records stable structural
 	// no-result call-site runtime specializations keyed by OpCall instruction
 	// ID. Codegen routes them through a precise op-exit rather than the generic
 	// CallExit path.
-	CallSiteNoResultRuntimeSpecializations map[int]bool
+	callSiteNoResultRuntimeSpecializations map[int]bool
 
 	// CallSiteNoResultRuntimeSpecializationBatches records loop-tail no-result
 	// call-site runtime specialization sites that can safely batch future
 	// complete loop iterations after the current iteration's final call has run.
-	CallSiteNoResultRuntimeSpecializationBatches map[int]CallSiteNoResultRuntimeSpecializationBatchFact
+	callSiteNoResultRuntimeSpecializationBatches map[int]CallSiteNoResultRuntimeSpecializationBatchFact
 }
 
 func NewCallFacts() *CallFacts {
@@ -351,30 +351,30 @@ func NewCallFacts() *CallFacts {
 }
 
 func (c *CallFacts) Initialize() {
-	if c.CallABIs == nil {
-		c.CallABIs = make(map[int]CallABIDescriptor)
+	if c.callABIs == nil {
+		c.callABIs = make(map[int]CallABIDescriptor)
 	}
-	if c.GuardedConstCallFolds == nil {
-		c.GuardedConstCallFolds = make(map[int]GuardedConstCallFoldFact)
+	if c.guardedConstCallFolds == nil {
+		c.guardedConstCallFolds = make(map[int]GuardedConstCallFoldFact)
 	}
-	if c.CallSiteNoResultRuntimeSpecializations == nil {
-		c.CallSiteNoResultRuntimeSpecializations = make(map[int]bool)
+	if c.callSiteNoResultRuntimeSpecializations == nil {
+		c.callSiteNoResultRuntimeSpecializations = make(map[int]bool)
 	}
-	if c.CallSiteNoResultRuntimeSpecializationBatches == nil {
-		c.CallSiteNoResultRuntimeSpecializationBatches = make(map[int]CallSiteNoResultRuntimeSpecializationBatchFact)
+	if c.callSiteNoResultRuntimeSpecializationBatches == nil {
+		c.callSiteNoResultRuntimeSpecializationBatches = make(map[int]CallSiteNoResultRuntimeSpecializationBatchFact)
 	}
 }
 
 func (c *CallFacts) SetCallABIs(facts map[int]CallABIDescriptor) {
-	c.CallABIs = facts
+	c.callABIs = facts
 	c.bindOwner()
 }
 
 func (c *CallFacts) CallABI(id int) (CallABIDescriptor, bool) {
-	if c == nil || c.CallABIs == nil {
+	if c == nil || c.callABIs == nil {
 		return CallABIDescriptor{}, false
 	}
-	desc, ok := c.CallABIs[id]
+	desc, ok := c.callABIs[id]
 	return desc, ok
 }
 
@@ -382,14 +382,23 @@ func (c *CallFacts) CallABICount() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.CallABIs)
+	return len(c.callABIs)
+}
+
+// CallABIMap returns the underlying callsite ABI descriptor map. Callers read
+// or iterate without mutating; mutation goes through SetCallABIs.
+func (c *CallFacts) CallABIMap() map[int]CallABIDescriptor {
+	if c == nil {
+		return nil
+	}
+	return c.callABIs
 }
 
 func (c *CallFacts) ForEachCallABI(visit func(int, CallABIDescriptor) bool) {
 	if c == nil || visit == nil {
 		return
 	}
-	for id, desc := range c.CallABIs {
+	for id, desc := range c.callABIs {
 		if !visit(id, desc) {
 			return
 		}
@@ -397,15 +406,15 @@ func (c *CallFacts) ForEachCallABI(visit func(int, CallABIDescriptor) bool) {
 }
 
 func (c *CallFacts) SetGuardedConstCallFolds(facts map[int]GuardedConstCallFoldFact) {
-	c.GuardedConstCallFolds = facts
+	c.guardedConstCallFolds = facts
 	c.bindOwner()
 }
 
 func (c *CallFacts) GuardedConstCallFold(id int) (GuardedConstCallFoldFact, bool) {
-	if c == nil || c.GuardedConstCallFolds == nil {
+	if c == nil || c.guardedConstCallFolds == nil {
 		return GuardedConstCallFoldFact{}, false
 	}
-	fact, ok := c.GuardedConstCallFolds[id]
+	fact, ok := c.guardedConstCallFolds[id]
 	return fact, ok
 }
 
@@ -413,14 +422,14 @@ func (c *CallFacts) GuardedConstCallFoldCount() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.GuardedConstCallFolds)
+	return len(c.guardedConstCallFolds)
 }
 
 func (c *CallFacts) ForEachGuardedConstCallFold(visit func(int, GuardedConstCallFoldFact) bool) {
 	if c == nil || visit == nil {
 		return
 	}
-	for id, fact := range c.GuardedConstCallFolds {
+	for id, fact := range c.guardedConstCallFolds {
 		if !visit(id, fact) {
 			return
 		}
@@ -428,24 +437,43 @@ func (c *CallFacts) ForEachGuardedConstCallFold(visit func(int, GuardedConstCall
 }
 
 func (c *CallFacts) SetCallSiteNoResultRuntimeSpecializations(facts map[int]bool) {
-	c.CallSiteNoResultRuntimeSpecializations = facts
+	c.callSiteNoResultRuntimeSpecializations = facts
 	c.bindOwner()
 }
 
 func (c *CallFacts) CallSiteNoResultRuntimeSpecialization(id int) bool {
-	return c != nil && c.CallSiteNoResultRuntimeSpecializations != nil && c.CallSiteNoResultRuntimeSpecializations[id]
+	return c != nil && c.callSiteNoResultRuntimeSpecializations != nil && c.callSiteNoResultRuntimeSpecializations[id]
+}
+
+// CallSiteNoResultRuntimeSpecializationCount reports the number of recorded
+// no-result call-site runtime specializations.
+func (c *CallFacts) CallSiteNoResultRuntimeSpecializationCount() int {
+	if c == nil {
+		return 0
+	}
+	return len(c.callSiteNoResultRuntimeSpecializations)
+}
+
+// CallSiteNoResultRuntimeSpecializationMap returns the underlying map of
+// no-result call-site runtime specializations. Callers read or iterate without
+// mutating; mutation goes through SetCallSiteNoResultRuntimeSpecializations.
+func (c *CallFacts) CallSiteNoResultRuntimeSpecializationMap() map[int]bool {
+	if c == nil {
+		return nil
+	}
+	return c.callSiteNoResultRuntimeSpecializations
 }
 
 func (c *CallFacts) SetCallSiteNoResultRuntimeSpecializationBatches(facts map[int]CallSiteNoResultRuntimeSpecializationBatchFact) {
-	c.CallSiteNoResultRuntimeSpecializationBatches = facts
+	c.callSiteNoResultRuntimeSpecializationBatches = facts
 	c.bindOwner()
 }
 
 func (c *CallFacts) CallSiteNoResultRuntimeSpecializationBatch(id int) (CallSiteNoResultRuntimeSpecializationBatchFact, bool) {
-	if c == nil || c.CallSiteNoResultRuntimeSpecializationBatches == nil {
+	if c == nil || c.callSiteNoResultRuntimeSpecializationBatches == nil {
 		return CallSiteNoResultRuntimeSpecializationBatchFact{}, false
 	}
-	fact, ok := c.CallSiteNoResultRuntimeSpecializationBatches[id]
+	fact, ok := c.callSiteNoResultRuntimeSpecializationBatches[id]
 	return fact, ok
 }
 
@@ -453,7 +481,7 @@ func (c *CallFacts) CallSiteNoResultRuntimeSpecializationBatchMap() map[int]Call
 	if c == nil {
 		return nil
 	}
-	return c.CallSiteNoResultRuntimeSpecializationBatches
+	return c.callSiteNoResultRuntimeSpecializationBatches
 }
 
 func (c *CallFacts) bindOwner() {}
@@ -492,24 +520,24 @@ type LoopSpecializationFacts struct {
 	// TableArrayUpperBoundSafe is the set of table-array access instruction IDs
 	// whose key < len check is already guaranteed by an enclosing loop-region
 	// fact.
-	TableArrayUpperBoundSafe map[int]bool
+	tableArrayUpperBoundSafe map[int]bool
 
 	// TableArrayLowerBoundSafe is the set of table-array access instruction IDs
 	// whose key >= 0 check is already guaranteed by loop-region induction facts.
-	TableArrayLowerBoundSafe map[int]bool
+	tableArrayLowerBoundSafe map[int]bool
 
 	// LoopTableArrayFacts records the table/len/data/key contract behind each
 	// TableArrayUpperBoundSafe access.
-	LoopTableArrayFacts map[int]LoopTableArrayFact
+	loopTableArrayFacts map[int]LoopTableArrayFact
 
 	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
 	// by OpRecordArrayLoopSpecialization instruction ID.
-	RecordArrayLoopSpecializations map[int]RecordArrayLoopSpecializationSpec
+	recordArrayLoopSpecializations map[int]RecordArrayLoopSpecializationSpec
 
 	// TableArrayDataPtrs records typed table-array data pointer SSA values. The
 	// key is an OpTableArrayData value ID; consumers can resolve it as a raw
 	// backing-array pointer only while the matching header guard remains valid.
-	TableArrayDataPtrs map[int]TableArrayDataPtrFact
+	tableArrayDataPtrs map[int]TableArrayDataPtrFact
 }
 
 func NewLoopSpecializationFacts() *LoopSpecializationFacts {
@@ -519,87 +547,87 @@ func NewLoopSpecializationFacts() *LoopSpecializationFacts {
 }
 
 func (k *LoopSpecializationFacts) Initialize() {
-	if k.TableArrayUpperBoundSafe == nil {
-		k.TableArrayUpperBoundSafe = make(map[int]bool)
+	if k.tableArrayUpperBoundSafe == nil {
+		k.tableArrayUpperBoundSafe = make(map[int]bool)
 	}
-	if k.TableArrayLowerBoundSafe == nil {
-		k.TableArrayLowerBoundSafe = make(map[int]bool)
+	if k.tableArrayLowerBoundSafe == nil {
+		k.tableArrayLowerBoundSafe = make(map[int]bool)
 	}
-	if k.LoopTableArrayFacts == nil {
-		k.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
+	if k.loopTableArrayFacts == nil {
+		k.loopTableArrayFacts = make(map[int]LoopTableArrayFact)
 	}
-	if k.RecordArrayLoopSpecializations == nil {
-		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
+	if k.recordArrayLoopSpecializations == nil {
+		k.recordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
 	}
-	if k.TableArrayDataPtrs == nil {
-		k.TableArrayDataPtrs = make(map[int]TableArrayDataPtrFact)
+	if k.tableArrayDataPtrs == nil {
+		k.tableArrayDataPtrs = make(map[int]TableArrayDataPtrFact)
 	}
 }
 
 func (k *LoopSpecializationFacts) SetTableArrayUpperBoundSafe(facts map[int]bool) {
-	k.TableArrayUpperBoundSafe = facts
+	k.tableArrayUpperBoundSafe = facts
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) TableArrayUpperBoundIsSafe(id int) bool {
-	return k != nil && k.TableArrayUpperBoundSafe != nil && k.TableArrayUpperBoundSafe[id]
+	return k != nil && k.tableArrayUpperBoundSafe != nil && k.tableArrayUpperBoundSafe[id]
 }
 
 func (k *LoopSpecializationFacts) TableArrayUpperBoundSafeMap() map[int]bool {
 	if k == nil {
 		return nil
 	}
-	return k.TableArrayUpperBoundSafe
+	return k.tableArrayUpperBoundSafe
 }
 
 func (k *LoopSpecializationFacts) RecordTableArrayUpperBoundSafe(id int) {
 	if k == nil {
 		return
 	}
-	if k.TableArrayUpperBoundSafe == nil {
-		k.TableArrayUpperBoundSafe = make(map[int]bool)
+	if k.tableArrayUpperBoundSafe == nil {
+		k.tableArrayUpperBoundSafe = make(map[int]bool)
 	}
-	k.TableArrayUpperBoundSafe[id] = true
+	k.tableArrayUpperBoundSafe[id] = true
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) SetTableArrayLowerBoundSafe(facts map[int]bool) {
-	k.TableArrayLowerBoundSafe = facts
+	k.tableArrayLowerBoundSafe = facts
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) TableArrayLowerBoundIsSafe(id int) bool {
-	return k != nil && k.TableArrayLowerBoundSafe != nil && k.TableArrayLowerBoundSafe[id]
+	return k != nil && k.tableArrayLowerBoundSafe != nil && k.tableArrayLowerBoundSafe[id]
 }
 
 func (k *LoopSpecializationFacts) TableArrayLowerBoundSafeMap() map[int]bool {
 	if k == nil {
 		return nil
 	}
-	return k.TableArrayLowerBoundSafe
+	return k.tableArrayLowerBoundSafe
 }
 
 func (k *LoopSpecializationFacts) RecordTableArrayLowerBoundSafe(id int) {
 	if k == nil {
 		return
 	}
-	if k.TableArrayLowerBoundSafe == nil {
-		k.TableArrayLowerBoundSafe = make(map[int]bool)
+	if k.tableArrayLowerBoundSafe == nil {
+		k.tableArrayLowerBoundSafe = make(map[int]bool)
 	}
-	k.TableArrayLowerBoundSafe[id] = true
+	k.tableArrayLowerBoundSafe[id] = true
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) SetLoopTableArrayFacts(facts map[int]LoopTableArrayFact) {
-	k.LoopTableArrayFacts = facts
+	k.loopTableArrayFacts = facts
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) LoopTableArrayFact(id int) (LoopTableArrayFact, bool) {
-	if k == nil || k.LoopTableArrayFacts == nil {
+	if k == nil || k.loopTableArrayFacts == nil {
 		return LoopTableArrayFact{}, false
 	}
-	fact, ok := k.LoopTableArrayFacts[id]
+	fact, ok := k.loopTableArrayFacts[id]
 	return fact, ok
 }
 
@@ -607,23 +635,23 @@ func (k *LoopSpecializationFacts) RecordLoopTableArrayFact(id int, fact LoopTabl
 	if k == nil {
 		return
 	}
-	if k.LoopTableArrayFacts == nil {
-		k.LoopTableArrayFacts = make(map[int]LoopTableArrayFact)
+	if k.loopTableArrayFacts == nil {
+		k.loopTableArrayFacts = make(map[int]LoopTableArrayFact)
 	}
-	k.LoopTableArrayFacts[id] = fact
+	k.loopTableArrayFacts[id] = fact
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecializations(facts map[int]RecordArrayLoopSpecializationSpec) {
-	k.RecordArrayLoopSpecializations = facts
+	k.recordArrayLoopSpecializations = facts
 	k.bindOwner()
 }
 
 func (k *LoopSpecializationFacts) RecordArrayLoopSpecialization(id int) (RecordArrayLoopSpecializationSpec, bool) {
-	if k == nil || k.RecordArrayLoopSpecializations == nil {
+	if k == nil || k.recordArrayLoopSpecializations == nil {
 		return RecordArrayLoopSpecializationSpec{}, false
 	}
-	spec, ok := k.RecordArrayLoopSpecializations[id]
+	spec, ok := k.recordArrayLoopSpecializations[id]
 	return spec, ok
 }
 
@@ -631,10 +659,10 @@ func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecialization(id int, spec 
 	if k == nil {
 		return
 	}
-	if k.RecordArrayLoopSpecializations == nil {
-		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
+	if k.recordArrayLoopSpecializations == nil {
+		k.recordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
 	}
-	k.RecordArrayLoopSpecializations[id] = spec
+	k.recordArrayLoopSpecializations[id] = spec
 	k.bindOwner()
 }
 
@@ -679,14 +707,14 @@ type GlobalFacts struct {
 	// intentionally provided and no fallback install should occur. Production
 	// code paths never consult this field; it exists only as a hook for the IR
 	// correctness oracle.
-	Globals map[string]*vm.FuncProto
+	globals map[string]*vm.FuncProto
 
 	// NumericGlobalValues and GlobalArrayElementFacts are stable cross-proto
 	// facts supplied by the Tier 2 manager for ABI analysis. They are hints:
 	// missing facts disable specialized entries, while emitted guards still
 	// protect any optimized path that consumes present facts.
-	NumericGlobalValues     map[string]runtime.Value
-	GlobalArrayElementFacts map[string]FixedShapeTableFact
+	numericGlobalValues     map[string]runtime.Value
+	globalArrayElementFacts map[string]FixedShapeTableFact
 }
 
 func NewGlobalFacts() *GlobalFacts {
@@ -698,11 +726,11 @@ func NewGlobalFacts() *GlobalFacts {
 func (g *GlobalFacts) Initialize() {
 	// Globals is a sentinel field (nil is meaningful); it is intentionally not
 	// allocated here.
-	if g.NumericGlobalValues == nil {
-		g.NumericGlobalValues = make(map[string]runtime.Value)
+	if g.numericGlobalValues == nil {
+		g.numericGlobalValues = make(map[string]runtime.Value)
 	}
-	if g.GlobalArrayElementFacts == nil {
-		g.GlobalArrayElementFacts = make(map[string]FixedShapeTableFact)
+	if g.globalArrayElementFacts == nil {
+		g.globalArrayElementFacts = make(map[string]FixedShapeTableFact)
 	}
 }
 
@@ -735,16 +763,16 @@ type SpeculationFacts struct {
 	// SpecDependencyProtos records other protos whose runtime feedback or native
 	// entry publication can change this function's optimized shape. It covers
 	// inlined callees and guarded polymorphic call targets.
-	SpecDependencyProtos map[*vm.FuncProto]bool
+	specDependencyProtos map[*vm.FuncProto]bool
 
 	// SuppressedSpecGuardPCs records bytecode PCs whose runtime guards have
 	// already failed for this proto version.
-	SuppressedSpecGuardPCs map[int]bool
+	suppressedSpecGuardPCs map[int]bool
 
 	// SuppressedSpecGuardKinds is the guard-kind-scoped form of
 	// SuppressedSpecGuardPCs. Nil is a sentinel meaning kind information is
 	// unavailable and consumers must fall back to SuppressedSpecGuardPCs.
-	SuppressedSpecGuardKinds map[int]map[string]bool
+	suppressedSpecGuardKinds map[int]map[string]bool
 }
 
 func NewSpeculationFacts() *SpeculationFacts {
@@ -754,16 +782,16 @@ func NewSpeculationFacts() *SpeculationFacts {
 }
 
 func (s *SpeculationFacts) Initialize() {
-	if s.SpecDependencyProtos == nil {
-		s.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
+	if s.specDependencyProtos == nil {
+		s.specDependencyProtos = make(map[*vm.FuncProto]bool)
 	}
-	if s.SuppressedSpecGuardPCs == nil {
-		s.SuppressedSpecGuardPCs = make(map[int]bool)
+	if s.suppressedSpecGuardPCs == nil {
+		s.suppressedSpecGuardPCs = make(map[int]bool)
 	}
 }
 
 func (s *SpeculationFacts) SetSpecDependencyProtos(facts map[*vm.FuncProto]bool) {
-	s.SpecDependencyProtos = facts
+	s.specDependencyProtos = facts
 	s.bindOwner()
 }
 
@@ -771,20 +799,20 @@ func (s *SpeculationFacts) RecordSpecDependencyProto(owner *vm.FuncProto, callee
 	if s == nil || callee == nil || callee == owner {
 		return
 	}
-	if s.SpecDependencyProtos == nil {
-		s.SpecDependencyProtos = make(map[*vm.FuncProto]bool)
+	if s.specDependencyProtos == nil {
+		s.specDependencyProtos = make(map[*vm.FuncProto]bool)
 	}
-	s.SpecDependencyProtos[callee] = true
+	s.specDependencyProtos[callee] = true
 	s.bindOwner()
 }
 
 func (s *SpeculationFacts) SetSuppressedSpecGuardPCs(facts map[int]bool) {
-	s.SuppressedSpecGuardPCs = facts
+	s.suppressedSpecGuardPCs = facts
 	s.bindOwner()
 }
 
 func (s *SpeculationFacts) SetSuppressedSpecGuardKinds(facts map[int]map[string]bool) {
-	s.SuppressedSpecGuardKinds = facts
+	s.suppressedSpecGuardKinds = facts
 	s.bindOwner()
 }
 
@@ -792,20 +820,20 @@ func (s *SpeculationFacts) SpecGuardKindSuppressed(pc int, kind string) bool {
 	if s == nil {
 		return false
 	}
-	if s.SuppressedSpecGuardKinds != nil {
-		if global := s.SuppressedSpecGuardKinds[tier2GlobalGuardSuppressPC]; len(global) > 0 && (global[kind] || global["*"]) {
+	if s.suppressedSpecGuardKinds != nil {
+		if global := s.suppressedSpecGuardKinds[tier2GlobalGuardSuppressPC]; len(global) > 0 && (global[kind] || global["*"]) {
 			return true
 		}
 		if pc < 0 {
 			return false
 		}
-		kinds := s.SuppressedSpecGuardKinds[pc]
+		kinds := s.suppressedSpecGuardKinds[pc]
 		return kinds[kind] || kinds["*"]
 	}
 	if pc < 0 {
 		return false
 	}
-	return s.SuppressedSpecGuardPCs != nil && s.SuppressedSpecGuardPCs[pc]
+	return s.suppressedSpecGuardPCs != nil && s.suppressedSpecGuardPCs[pc]
 }
 
 func (s *SpeculationFacts) bindOwner() {}
@@ -837,43 +865,43 @@ type TableShapeFacts struct {
 	// FieldPolyShapeFacts records small guarded polymorphic field caches keyed
 	// by OpGetField instruction ID. Each case maps receiver shapeID to the
 	// field index for that static field name.
-	FieldPolyShapeFacts map[int][]FieldPolyShapeCase
+	fieldPolyShapeFacts map[int][]FieldPolyShapeCase
 
 	// FieldPolyShapeReceivers records table SSA values known to carry guarded
 	// polymorphic shape facts.
-	FieldPolyShapeReceivers map[int]bool
+	fieldPolyShapeReceivers map[int]bool
 
 	// FieldPolyShapeCatalog records the receiver facts behind polymorphic field
 	// caches keyed by shape ID.
-	FieldPolyShapeCatalog map[uint32]FixedShapeTableFact
+	fieldPolyShapeCatalog map[uint32]FixedShapeTableFact
 
 	// FieldCallPolyLenFusions records same-block guarded field-call/field-len
 	// pairs keyed by OpFieldCallFloor instruction ID.
-	FieldCallPolyLenFusions map[int][]FieldCallPolyLenFusion
+	fieldCallPolyLenFusions map[int][]FieldCallPolyLenFusion
 
 	// FixedShapeTables records SSA table values whose field layout is known
 	// without consulting the runtime field cache.
-	FixedShapeTables map[int]FixedShapeTableFact
+	fixedShapeTables map[int]FixedShapeTableFact
 
 	// FixedShapeArgFacts records guarded fixed-shape facts keyed by parameter
 	// index.
-	FixedShapeArgFacts map[int]FixedShapeTableFact
+	fixedShapeArgFacts map[int]FixedShapeTableFact
 
 	// FixedTableConstructors records OpNewTable values that came from a
 	// bytecode-level fixed string-field table constructor.
-	FixedTableConstructors map[int]FixedTableConstructorFact
+	fixedTableConstructors map[int]FixedTableConstructorFact
 
 	// FixedRecordNewTableSites records OpNewFixedTable values that remain local
 	// to fixed-record-aware field reads.
-	FixedRecordNewTableSites map[int]bool
+	fixedRecordNewTableSites map[int]bool
 
 	// FixedShapeEntryGuards records parameter shape guards that codegen must
 	// execute before entering the optimized body.
-	FixedShapeEntryGuards map[int]FixedShapeTableFact
+	fixedShapeEntryGuards map[int]FixedShapeTableFact
 
 	// ShapeFieldTypeElidedLoads marks fixed-shape field loads whose result type
 	// is guarded once by shape field type epochs.
-	ShapeFieldTypeElidedLoads map[int]bool
+	shapeFieldTypeElidedLoads map[int]bool
 }
 
 func NewTableShapeFacts() *TableShapeFacts {
@@ -883,48 +911,48 @@ func NewTableShapeFacts() *TableShapeFacts {
 }
 
 func (t *TableShapeFacts) Initialize() {
-	if t.FieldPolyShapeFacts == nil {
-		t.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+	if t.fieldPolyShapeFacts == nil {
+		t.fieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
 	}
-	if t.FieldPolyShapeReceivers == nil {
-		t.FieldPolyShapeReceivers = make(map[int]bool)
+	if t.fieldPolyShapeReceivers == nil {
+		t.fieldPolyShapeReceivers = make(map[int]bool)
 	}
-	if t.FieldPolyShapeCatalog == nil {
-		t.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact)
+	if t.fieldPolyShapeCatalog == nil {
+		t.fieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact)
 	}
-	if t.FieldCallPolyLenFusions == nil {
-		t.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
+	if t.fieldCallPolyLenFusions == nil {
+		t.fieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
 	}
-	if t.FixedShapeTables == nil {
-		t.FixedShapeTables = make(map[int]FixedShapeTableFact)
+	if t.fixedShapeTables == nil {
+		t.fixedShapeTables = make(map[int]FixedShapeTableFact)
 	}
-	if t.FixedShapeArgFacts == nil {
-		t.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
+	if t.fixedShapeArgFacts == nil {
+		t.fixedShapeArgFacts = make(map[int]FixedShapeTableFact)
 	}
-	if t.FixedTableConstructors == nil {
-		t.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
+	if t.fixedTableConstructors == nil {
+		t.fixedTableConstructors = make(map[int]FixedTableConstructorFact)
 	}
-	if t.FixedRecordNewTableSites == nil {
-		t.FixedRecordNewTableSites = make(map[int]bool)
+	if t.fixedRecordNewTableSites == nil {
+		t.fixedRecordNewTableSites = make(map[int]bool)
 	}
-	if t.FixedShapeEntryGuards == nil {
-		t.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
+	if t.fixedShapeEntryGuards == nil {
+		t.fixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
 	}
-	if t.ShapeFieldTypeElidedLoads == nil {
-		t.ShapeFieldTypeElidedLoads = make(map[int]bool)
+	if t.shapeFieldTypeElidedLoads == nil {
+		t.shapeFieldTypeElidedLoads = make(map[int]bool)
 	}
 }
 
 func (t *TableShapeFacts) SetFieldPolyShapeFacts(facts map[int][]FieldPolyShapeCase) {
-	t.FieldPolyShapeFacts = facts
+	t.fieldPolyShapeFacts = facts
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) FieldPolyShapeCases(id int) ([]FieldPolyShapeCase, bool) {
-	if t == nil || t.FieldPolyShapeFacts == nil {
+	if t == nil || t.fieldPolyShapeFacts == nil {
 		return nil, false
 	}
-	cases, ok := t.FieldPolyShapeFacts[id]
+	cases, ok := t.fieldPolyShapeFacts[id]
 	return cases, ok
 }
 
@@ -937,14 +965,14 @@ func (t *TableShapeFacts) FieldPolyShapeFactCount() int {
 	if t == nil {
 		return 0
 	}
-	return len(t.FieldPolyShapeFacts)
+	return len(t.fieldPolyShapeFacts)
 }
 
 func (t *TableShapeFacts) ForEachFieldPolyShapeCase(visit func(id int, c FieldPolyShapeCase) bool) {
-	if t == nil || t.FieldPolyShapeFacts == nil || visit == nil {
+	if t == nil || t.fieldPolyShapeFacts == nil || visit == nil {
 		return
 	}
-	for id, cases := range t.FieldPolyShapeFacts {
+	for id, cases := range t.fieldPolyShapeFacts {
 		for _, c := range cases {
 			if !visit(id, c) {
 				return
@@ -954,10 +982,10 @@ func (t *TableShapeFacts) ForEachFieldPolyShapeCase(visit func(id int, c FieldPo
 }
 
 func (t *TableShapeFacts) RangeFieldPolyShapeCases(yield func(id int, cases []FieldPolyShapeCase) bool) {
-	if t == nil || t.FieldPolyShapeFacts == nil || yield == nil {
+	if t == nil || t.fieldPolyShapeFacts == nil || yield == nil {
 		return
 	}
-	for id, cases := range t.FieldPolyShapeFacts {
+	for id, cases := range t.fieldPolyShapeFacts {
 		if !yield(id, cases) {
 			return
 		}
@@ -968,24 +996,24 @@ func (t *TableShapeFacts) RecordFieldPolyShapeCases(id int, cases []FieldPolySha
 	if t == nil {
 		return
 	}
-	if t.FieldPolyShapeFacts == nil {
-		t.FieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
+	if t.fieldPolyShapeFacts == nil {
+		t.fieldPolyShapeFacts = make(map[int][]FieldPolyShapeCase)
 	}
-	t.FieldPolyShapeFacts[id] = cases
+	t.fieldPolyShapeFacts[id] = cases
 	t.RecordFieldPolyShapeCatalogCases(cases)
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) DeleteFieldPolyShapeCases(id int) {
-	if t == nil || t.FieldPolyShapeFacts == nil {
+	if t == nil || t.fieldPolyShapeFacts == nil {
 		return
 	}
-	delete(t.FieldPolyShapeFacts, id)
+	delete(t.fieldPolyShapeFacts, id)
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) SetFieldPolyShapeReceivers(facts map[int]bool) {
-	t.FieldPolyShapeReceivers = facts
+	t.fieldPolyShapeReceivers = facts
 	t.bindOwner()
 }
 
@@ -993,35 +1021,35 @@ func (t *TableShapeFacts) RecordFieldPolyShapeReceiver(id int) {
 	if t == nil {
 		return
 	}
-	if t.FieldPolyShapeReceivers == nil {
-		t.FieldPolyShapeReceivers = make(map[int]bool)
+	if t.fieldPolyShapeReceivers == nil {
+		t.fieldPolyShapeReceivers = make(map[int]bool)
 	}
-	t.FieldPolyShapeReceivers[id] = true
+	t.fieldPolyShapeReceivers[id] = true
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) FieldPolyShapeReceiver(id int) bool {
-	return t != nil && t.FieldPolyShapeReceivers != nil && t.FieldPolyShapeReceivers[id]
+	return t != nil && t.fieldPolyShapeReceivers != nil && t.fieldPolyShapeReceivers[id]
 }
 
 func (t *TableShapeFacts) SetFieldPolyShapeCatalog(facts map[uint32]FixedShapeTableFact) {
-	t.FieldPolyShapeCatalog = facts
+	t.fieldPolyShapeCatalog = facts
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) FieldPolyShapeCatalogFact(shapeID uint32) (FixedShapeTableFact, bool) {
-	if t == nil || t.FieldPolyShapeCatalog == nil {
+	if t == nil || t.fieldPolyShapeCatalog == nil {
 		return FixedShapeTableFact{}, false
 	}
-	fact, ok := t.FieldPolyShapeCatalog[shapeID]
+	fact, ok := t.fieldPolyShapeCatalog[shapeID]
 	return fact, ok
 }
 
 func (t *TableShapeFacts) ForEachFieldPolyShapeCatalogFact(visit func(shapeID uint32, fact FixedShapeTableFact) bool) {
-	if t == nil || t.FieldPolyShapeCatalog == nil || visit == nil {
+	if t == nil || t.fieldPolyShapeCatalog == nil || visit == nil {
 		return
 	}
-	for shapeID, fact := range t.FieldPolyShapeCatalog {
+	for shapeID, fact := range t.fieldPolyShapeCatalog {
 		if !visit(shapeID, fact) {
 			return
 		}
@@ -1032,14 +1060,14 @@ func (t *TableShapeFacts) RecordFieldPolyShapeCatalogCases(cases []FieldPolyShap
 	if t == nil || len(cases) == 0 {
 		return
 	}
-	if t.FieldPolyShapeCatalog == nil {
-		t.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, len(cases))
+	if t.fieldPolyShapeCatalog == nil {
+		t.fieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, len(cases))
 	}
 	for _, c := range cases {
 		if c.ShapeID == 0 || c.ReceiverFact.ShapeID != c.ShapeID {
 			continue
 		}
-		t.FieldPolyShapeCatalog[c.ShapeID] = cloneFixedShapeTableFact(c.ReceiverFact)
+		t.fieldPolyShapeCatalog[c.ShapeID] = cloneFixedShapeTableFact(c.ReceiverFact)
 	}
 	t.bindOwner()
 }
@@ -1048,23 +1076,23 @@ func (t *TableShapeFacts) RecordFixedShapeCatalogFact(fact FixedShapeTableFact) 
 	if t == nil || fact.ShapeID == 0 || len(fact.FieldNames) == 0 {
 		return
 	}
-	if t.FieldPolyShapeCatalog == nil {
-		t.FieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, 1)
+	if t.fieldPolyShapeCatalog == nil {
+		t.fieldPolyShapeCatalog = make(map[uint32]FixedShapeTableFact, 1)
 	}
-	t.FieldPolyShapeCatalog[fact.ShapeID] = cloneFixedShapeTableFact(fact)
+	t.fieldPolyShapeCatalog[fact.ShapeID] = cloneFixedShapeTableFact(fact)
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) SetFieldCallPolyLenFusions(facts map[int][]FieldCallPolyLenFusion) {
-	t.FieldCallPolyLenFusions = facts
+	t.fieldCallPolyLenFusions = facts
 	t.bindOwner()
 }
 
 func (t *TableShapeFacts) FieldCallPolyLenFusionCases(id int) ([]FieldCallPolyLenFusion, bool) {
-	if t == nil || t.FieldCallPolyLenFusions == nil {
+	if t == nil || t.fieldCallPolyLenFusions == nil {
 		return nil, false
 	}
-	fusions, ok := t.FieldCallPolyLenFusions[id]
+	fusions, ok := t.fieldCallPolyLenFusions[id]
 	return fusions, ok
 }
 
@@ -1072,10 +1100,10 @@ func (t *TableShapeFacts) RecordFieldCallPolyLenFusions(id int, fusions []FieldC
 	if t == nil || len(fusions) == 0 {
 		return
 	}
-	if t.FieldCallPolyLenFusions == nil {
-		t.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
+	if t.fieldCallPolyLenFusions == nil {
+		t.fieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
 	}
-	t.FieldCallPolyLenFusions[id] = append(t.FieldCallPolyLenFusions[id], fusions...)
+	t.fieldCallPolyLenFusions[id] = append(t.fieldCallPolyLenFusions[id], fusions...)
 	t.bindOwner()
 }
 

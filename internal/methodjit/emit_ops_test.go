@@ -243,7 +243,7 @@ func TestEmit_ModIntPositivePowerOfTwoUsesBitfield(t *testing.T) {
 				continue
 			}
 			foundModInt = true
-			if !fn.Analysis.Numeric.IntModNoSignAdjust[instr.ID] {
+			if !fn.Analysis.NumericFacts().IsIntModNoSignAdjust(instr.ID) {
 				t.Fatalf("ModInt v%d should have no-sign-adjust fact\nIR:\n%s", instr.ID, Print(fn))
 			}
 		}
@@ -346,10 +346,7 @@ func TestEmit_ModIntConstPositiveSingleSubtract(t *testing.T) {
 				continue
 			}
 			foundModInt = true
-			if fn.Analysis.Numeric.IntRanges == nil {
-				fn.Analysis.Numeric.IntRanges = make(map[int]intRange)
-			}
-			fn.Analysis.Numeric.IntRanges[instr.Args[0].ID] = intRange{min: 0, max: 1499, known: true}
+			fn.Analysis.NumericFacts().RecordIntRange(instr.Args[0].ID, intRange{min: 0, max: 1499, known: true})
 		}
 	}
 	if !foundModInt {
@@ -453,10 +450,7 @@ func TestEmit_ModIntConstPositiveMagicUsesNonNegativeFact(t *testing.T) {
 			}
 			foundMod = true
 			if len(instr.Args) > 0 && instr.Args[0] != nil {
-				if fn.Analysis.Numeric.IntNonNegative == nil {
-					fn.Analysis.Numeric.IntNonNegative = make(map[int]bool)
-				}
-				fn.Analysis.Numeric.IntNonNegative[instr.Args[0].ID] = true
+				fn.Analysis.NumericFacts().RecordIntNonNegative(instr.Args[0].ID)
 			}
 		}
 	}
@@ -464,7 +458,7 @@ func TestEmit_ModIntConstPositiveMagicUsesNonNegativeFact(t *testing.T) {
 		t.Fatalf("expected ModInt in optimized IR:\n%s", Print(fn))
 	}
 
-	fn.Analysis.Numeric.IntModNoSignAdjust = nil
+	fn.Analysis.NumericFacts().SetIntModNoSignAdjust(nil)
 	cf, err := Compile(fn, AllocateRegisters(fn))
 	if err != nil {
 		t.Fatalf("Compile: %v", err)

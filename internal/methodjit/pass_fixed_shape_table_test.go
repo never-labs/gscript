@@ -160,7 +160,7 @@ result := usePair()
 		for _, instr := range block.Instrs {
 			switch instr.Op {
 			case OpCall:
-				if _, ok := out.Analysis.TableShape.FixedShapeTables[instr.ID]; ok && instr.Type == TypeTable {
+				if _, ok := out.Analysis.TableShapeFacts().FixedShapeTableMap()[instr.ID]; ok && instr.Type == TypeTable {
 					sawCallFact = true
 				}
 			case OpGetField:
@@ -274,7 +274,7 @@ func TestFixedShapeTableFactsPass_PropagatesStringMapValueShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
 	}
-	if fact, ok := out.Analysis.TableShape.FixedShapeTables[item.ID]; !ok || fact.ShapeID == 0 || len(fact.FieldNames) != 2 {
+	if fact, ok := out.Analysis.TableShapeFacts().FixedShapeTableMap()[item.ID]; !ok || fact.ShapeID == 0 || len(fact.FieldNames) != 2 {
 		t.Fatalf("GetTable did not receive string-map value fact: %#v\n%s", fact, Print(out))
 	}
 	if stock.Aux2 == 0 || stock.Type != TypeInt {
@@ -309,7 +309,7 @@ func TestFixedShapeTableFactsPass_InfersSetFieldTypesFromLocalGlobals(t *testing
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
 	}
-	fact, ok := out.Analysis.TableShape.FixedShapeTables[obj.ID]
+	fact, ok := out.Analysis.TableShapeFacts().FixedShapeTableMap()[obj.ID]
 	if !ok {
 		t.Fatalf("missing object fact\n%s", Print(out))
 	}
@@ -387,10 +387,10 @@ func TestFixedShapeTableFactsPass_PropagatesNestedStringMapValueShape(t *testing
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
 	}
-	if fact, ok := out.Analysis.TableShape.FixedShapeTables[bySKU.ID]; !ok || fact.StringValueFact == nil {
+	if fact, ok := out.Analysis.TableShapeFacts().FixedShapeTableMap()[bySKU.ID]; !ok || fact.StringValueFact == nil {
 		t.Fatalf("nested map did not retain string value fact: %#v\n%s", fact, Print(out))
 	}
-	if fact, ok := out.Analysis.TableShape.FixedShapeTables[item.ID]; !ok || fact.ShapeID == 0 {
+	if fact, ok := out.Analysis.TableShapeFacts().FixedShapeTableMap()[item.ID]; !ok || fact.ShapeID == 0 {
 		t.Fatalf("nested string-map lookup did not produce item fact: %#v\n%s", fact, Print(out))
 	}
 	if stock.Aux2 == 0 || stock.Type != TypeInt {
@@ -434,7 +434,7 @@ func TestFixedShapeTableFactsPass_PropagatesStringMapValueShapeThroughPhiReceive
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
 	}
-	aggFact, ok := out.Analysis.TableShape.FixedShapeTables[loadedAgg.ID]
+	aggFact, ok := out.Analysis.TableShapeFacts().FixedShapeTableMap()[loadedAgg.ID]
 	if !ok || aggFact.ShapeID == 0 {
 		t.Fatalf("phi string-map lookup did not carry aggregate shape: %#v\n%s", aggFact, Print(out))
 	}
@@ -616,8 +616,8 @@ result := driver()
 	if annotated != 2 {
 		t.Fatalf("expected two annotated callee field reads, got %d\nIR:\n%s", annotated, Print(out))
 	}
-	if out.Analysis.TableShape.FixedShapeArgFacts == nil || !out.Analysis.TableShape.FixedShapeArgFacts[0].Guarded {
-		t.Fatalf("callee did not retain guarded argument fact metadata: %#v", out.Analysis.TableShape.FixedShapeArgFacts)
+	if out.Analysis.TableShapeFacts().FixedShapeArgFactMap() == nil || !out.Analysis.TableShapeFacts().FixedShapeArgFactMap()[0].Guarded {
+		t.Fatalf("callee did not retain guarded argument fact metadata: %#v", out.Analysis.TableShapeFacts().FixedShapeArgFactMap())
 	}
 }
 
@@ -711,14 +711,14 @@ result := driver()
 		t.Fatalf("RunTier2Pipeline(walk): %v", err)
 	}
 
-	fact, ok := out.Analysis.TableShape.FixedShapeEntryGuards[0]
+	fact, ok := out.Analysis.TableShapeFacts().FixedShapeEntryGuard(0)
 	if !ok {
-		t.Fatalf("callee did not record fixed-shape entry guard metadata: %#v", out.Analysis.TableShape.FixedShapeEntryGuards)
+		t.Fatalf("callee did not record fixed-shape entry guard metadata: %#v", out.Analysis.TableShapeFacts().FixedShapeEntryGuardMap())
 	}
 	if !fact.Guarded || !fact.EntryGuarded || fact.ShapeID == 0 || len(fact.FieldFacts) != 0 {
 		t.Fatalf("unexpected entry guard fact: %#v", fact)
 	}
-	if got := out.Analysis.TableShape.FixedShapeArgFacts[0]; !got.EntryGuarded || got.ShapeID != fact.ShapeID {
+	if got := out.Analysis.TableShapeFacts().FixedShapeArgFactMap()[0]; !got.EntryGuarded || got.ShapeID != fact.ShapeID {
 		t.Fatalf("arg fact did not retain entry-guard strength: %#v vs %#v", got, fact)
 	}
 }
@@ -838,7 +838,7 @@ result := buildInventory(2)
 	for _, block := range out.Blocks {
 		for _, instr := range block.Instrs {
 			if instr.Op == OpReturn && len(instr.Args) == 1 && instr.Args[0] != nil {
-				returnedFact = out.Analysis.TableShape.FixedShapeTables[instr.Args[0].ID]
+				returnedFact = out.Analysis.TableShapeFacts().FixedShapeTableMap()[instr.Args[0].ID]
 			}
 		}
 	}
@@ -902,7 +902,7 @@ result := walk({}, 0)
 			if instr.Op != OpGetField && instr.Op != OpFieldLoad {
 				continue
 			}
-			if r, ok := out.Analysis.Numeric.IntRanges[instr.ID]; ok && r.known {
+			if r, ok := out.Analysis.NumericFacts().IntRangeMap()[instr.ID]; ok && r.known {
 				rangedFields++
 				if instr.Type != TypeInt {
 					t.Fatalf("profiled range did not force int field type: %s", instr.Type)
@@ -953,7 +953,7 @@ func TestFixedShapeTableFactsPass_MutableFieldKeepsRangeWhenStoresStayRanged(t *
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
 	}
-	if r, ok := out.Analysis.Numeric.ProfiledIntRanges[second.ID]; !ok || !r.known || r.min != 0 || r.max != 10 {
+	if r, ok := out.Analysis.NumericFacts().ProfiledIntRangeMap()[second.ID]; !ok || !r.known || r.min != 0 || r.max != 10 {
 		t.Fatalf("mutable ranged field load lost safe joined range, got %#v ok=%v\nIR:\n%s", r, ok, Print(out))
 	}
 }
@@ -995,7 +995,7 @@ func TestFixedShapeTableFactsPass_MutableFieldSelfAddNonNegativeStore(t *testing
 	if !out.Analysis.NumericFacts().IsIntNonNegative(next.ID) {
 		t.Fatalf("self-add store result should carry non-negative fact:\n%s", Print(out))
 	}
-	if r, ok := out.Analysis.Numeric.ProfiledIntRanges[again.ID]; !ok || !r.known || r.min != 0 {
+	if r, ok := out.Analysis.NumericFacts().ProfiledIntRangeMap()[again.ID]; !ok || !r.known || r.min != 0 {
 		t.Fatalf("mutable self-add field load range = %#v ok=%v\nIR:\n%s", r, ok, Print(out))
 	}
 }
@@ -1009,7 +1009,7 @@ result := {count: 0, qty: 3}
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPass: %v", err)
 	}
-	for _, fact := range out.Analysis.TableShape.FixedShapeTables {
+	for _, fact := range out.Analysis.TableShapeFacts().FixedShapeTableMap() {
 		if len(fact.FieldNames) != 2 || fact.FieldNames[0] != "count" || fact.FieldNames[1] != "qty" {
 			continue
 		}
@@ -1105,7 +1105,7 @@ func TestFixedShapeTableFactsPass_LoweredArrayLoadCarriesNestedArrayRange(t *tes
 	if item.Aux != int64(vm.FBKindInt) || item.Type != TypeInt {
 		t.Fatalf("lowered array load should inherit int kind/type, aux=%d type=%s\nIR:\n%s", item.Aux, item.Type, Print(out))
 	}
-	if r, ok := out.Analysis.Numeric.ProfiledIntRanges[item.ID]; !ok || !r.known || r.min != 1 || r.max != 19 {
+	if r, ok := out.Analysis.NumericFacts().ProfiledIntRangeMap()[item.ID]; !ok || !r.known || r.min != 1 || r.max != 19 {
 		t.Fatalf("lowered array load missing profiled range, got %#v ok=%v\nIR:\n%s", r, ok, Print(out))
 	}
 }
@@ -1123,7 +1123,7 @@ func TestFixedShapeTableFactsPass_FieldSvalsUsesPolymorphicShapeCatalog(t *testi
 	block.Instrs = []*Instr{recv, svals, lines, idx, item}
 	fn.Entry = block
 	fn.Blocks = []*Block{block}
-	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{
 		99: {
 			{
 				ShapeID: shapeID,
@@ -1140,8 +1140,8 @@ func TestFixedShapeTableFactsPass_FieldSvalsUsesPolymorphicShapeCatalog(t *testi
 				},
 			},
 		},
-	}
-	recordFieldPolyShapeCatalog(fn, fn.Analysis.TableShape.FieldPolyShapeFacts[99])
+	})
+	recordFieldPolyShapeCatalog(fn, fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[99])
 
 	out, err := FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{})(fn)
 	if err != nil {

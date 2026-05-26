@@ -62,9 +62,9 @@ func TestSortedSpecDependencyProtosDropsSelfAndOrdersByName(t *testing.T) {
 		self: true,
 		a:    true,
 	})
-	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().SetFieldPolyShapeFacts(map[int][]FieldPolyShapeCase{
 		10: {{VMProto: c}},
-	}
+	})
 
 	got := sortedSpecDependencyProtos(fn)
 	if len(got) != 3 || got[0] != a || got[1] != b || got[2] != c {
@@ -78,9 +78,9 @@ func TestSortedSpecDependencyProtosAdoptsLegacyDependencies(t *testing.T) {
 	fn := &Function{
 		Proto: self,
 		Analysis: &AnalysisResult{
-			Speculation: &SpeculationFacts{
+			Speculation: newSpeculationFactsForTest(speculationFactsSeed{
 				SpecDependencyProtos: map[*vm.FuncProto]bool{callee: true},
-			},
+			}),
 		},
 	}
 

@@ -7,13 +7,13 @@ import "testing"
 func TestEmitContextInt48SafeUsesKnownRanges(t *testing.T) {
 	ec := &emitContext{fn: &Function{
 		Analysis: &AnalysisResult{
-			Numeric: &NumericFacts{
+			Numeric: newNumericFactsForTest(numericFactsSeed{
 				Int48Safe: map[int]bool{1: true},
 				IntRanges: map[int]intRange{
 					2: pointRange(1),
 					3: {min: MinInt48 - 1, max: 0, known: true},
 				},
-			},
+			}),
 		},
 	}}
 

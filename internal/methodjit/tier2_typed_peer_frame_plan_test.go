@@ -18,19 +18,19 @@ func TestTypedPeerFramePlanRequiresFullFrameForAllocatedCalleeSavedRegs(t *testi
 	}
 	step.LeafNoCall = protoHasNoCallLikeOps(step)
 	fn := BuildGraph(step)
-	fn.Analysis.TableShapeFacts().FixedShapeEntryGuards = map[int]FixedShapeTableFact{
+	fn.Analysis.TableShapeFacts().SetFixedShapeEntryGuards(map[int]FixedShapeTableFact{
 		0: {
 			ShapeID:    101,
 			FieldNames: []string{"count"},
 			FieldTypes: map[string]Type{"count": TypeInt},
 			Guarded:    true,
 		},
-	}
+	})
 	fn, _, err := RunTier2Pipeline(fn, &Tier2PipelineOpts{})
 	if err != nil {
 		t.Fatalf("RunTier2Pipeline(step): %v", err)
 	}
-	abi := AnalyzeTypedPeerABIWithArgFacts(step, fn.Analysis.TableShape.FixedShapeEntryGuards)
+	abi := AnalyzeTypedPeerABIWithArgFacts(step, fn.Analysis.TableShapeFacts().FixedShapeEntryGuardMap())
 	if !abi.Eligible {
 		t.Fatalf("typed peer ABI rejected: %s", abi.RejectWhy)
 	}
@@ -60,14 +60,14 @@ func TestCompiledFunctionCarriesTypedPeerFramePlan(t *testing.T) {
 	}
 	step.LeafNoCall = protoHasNoCallLikeOps(step)
 	fn := BuildGraph(step)
-	fn.Analysis.TableShapeFacts().FixedShapeEntryGuards = map[int]FixedShapeTableFact{
+	fn.Analysis.TableShapeFacts().SetFixedShapeEntryGuards(map[int]FixedShapeTableFact{
 		0: {
 			ShapeID:    101,
 			FieldNames: []string{"count"},
 			FieldTypes: map[string]Type{"count": TypeInt},
 			Guarded:    true,
 		},
-	}
+	})
 	cf, err := Compile(fn, AllocateRegisters(fn))
 	if err != nil {
 		t.Fatalf("Compile(step): %v", err)

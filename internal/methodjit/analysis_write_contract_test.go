@@ -10,7 +10,7 @@ func TestCheckModuleWriteContract_DeclaredWriteIsClean(t *testing.T) {
 		Phase:          Tier2PhaseNumeric,
 		ModuleName:     "RangeAnalysis",
 		Provides:       []AnalysisFact{AnalysisFactInt48Safe, AnalysisFactIntRanges},
-		ChangedDomains: []string{"Int48Safe", "IntRanges"},
+		ChangedDomains: []string{"int48Safe", "intRanges"},
 	}
 	report := CheckModuleWriteContract(run)
 	if report.HasViolations() {
@@ -28,7 +28,7 @@ func TestCheckModuleWriteContract_UndeclaredWriteIsViolation(t *testing.T) {
 		Phase:          Tier2PhaseNumeric,
 		ModuleName:     "OverflowBoxing",
 		Provides:       []AnalysisFact{AnalysisFactInt48Safe},
-		ChangedDomains: []string{"Int48Safe", "IntModNoSignAdjust"},
+		ChangedDomains: []string{"int48Safe", "intModNoSignAdjust"},
 	}
 	report := CheckModuleWriteContract(run)
 	if !report.HasViolations() {
@@ -48,7 +48,7 @@ func TestCheckModuleWriteContract_UpdatesCountAsDeclared(t *testing.T) {
 		Phase:          Tier2PhaseNumeric,
 		ModuleName:     "RangeRefresh",
 		Updates:        []AnalysisFact{AnalysisFactIntRanges},
-		ChangedDomains: []string{"IntRanges"},
+		ChangedDomains: []string{"intRanges"},
 	}
 	if report := CheckModuleWriteContract(run); report.HasViolations() {
 		t.Fatalf("Updates should satisfy the write contract, got: %s",
@@ -57,13 +57,13 @@ func TestCheckModuleWriteContract_UpdatesCountAsDeclared(t *testing.T) {
 }
 
 func TestCheckModuleWriteContract_DomainStructPrefixResolves(t *testing.T) {
-	// A domain-struct field surfaces as "Call.CallABIs" and aliases the same
-	// map as top-level "CallABIs"; both must resolve to AnalysisFactCallABIs.
+	// A domain-struct field surfaces as "Call.callABIs" and aliases the same
+	// map as top-level "callABIs"; both must resolve to AnalysisFactCallABIs.
 	run := Tier2ModuleRun{
 		Phase:          Tier2PhaseCallLower,
 		ModuleName:     "CallABI",
 		Provides:       []AnalysisFact{AnalysisFactCallABIs},
-		ChangedDomains: []string{"CallABIs", "Call.CallABIs"},
+		ChangedDomains: []string{"callABIs", "Call.callABIs"},
 	}
 	if report := CheckModuleWriteContract(run); report.HasViolations() {
 		t.Fatalf("domain-struct prefix should resolve to the same fact, got: %s",
@@ -76,14 +76,14 @@ func TestCheckModuleWriteContract_UnmodeledDomainIsReportedNotViolation(t *testi
 	run := Tier2ModuleRun{
 		Phase:          Tier2PhaseInlineCall,
 		ModuleName:     "Inline",
-		ChangedDomains: []string{"Globals", "NumericGlobalValues"},
+		ChangedDomains: []string{"globals", "numericGlobalValues"},
 	}
 	report := CheckModuleWriteContract(run)
 	if report.HasViolations() {
 		t.Fatalf("unmodeled fields must not be violations, got: %s",
 			FormatWriteContractViolations(report.Violations))
 	}
-	want := []string{"Globals", "NumericGlobalValues"}
+	want := []string{"globals", "numericGlobalValues"}
 	if !reflect.DeepEqual(report.UnmodeledDomains, want) {
 		t.Fatalf("unmodeled domains = %v, want %v", report.UnmodeledDomains, want)
 	}
@@ -95,19 +95,19 @@ func TestCheckPipelineWriteContract_AggregatesAndDedups(t *testing.T) {
 			Phase:          Tier2PhaseNumeric,
 			ModuleName:     "A",
 			Provides:       []AnalysisFact{AnalysisFactInt48Safe},
-			ChangedDomains: []string{"Int48Safe", "IntRanges"}, // IntRanges undeclared
+			ChangedDomains: []string{"int48Safe", "intRanges"}, // IntRanges undeclared
 		},
 		{
 			Phase:          Tier2PhaseInlineCall,
 			ModuleName:     "B",
-			ChangedDomains: []string{"Globals", "Globals"}, // unmodeled, duplicate
+			ChangedDomains: []string{"globals", "globals"}, // unmodeled, duplicate
 		},
 	}
 	agg := CheckPipelineWriteContract(runs)
 	if len(agg.Violations) != 1 {
 		t.Fatalf("expected 1 aggregate violation, got %d", len(agg.Violations))
 	}
-	if !reflect.DeepEqual(agg.UnmodeledDomains, []string{"Globals"}) {
-		t.Fatalf("unmodeled = %v, want [Globals]", agg.UnmodeledDomains)
+	if !reflect.DeepEqual(agg.UnmodeledDomains, []string{"globals"}) {
+		t.Fatalf("unmodeled = %v, want [globals]", agg.UnmodeledDomains)
 	}
 }

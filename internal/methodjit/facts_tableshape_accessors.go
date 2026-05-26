@@ -4,10 +4,30 @@ package methodjit
 // access through TableShapeFacts so single-domain passes do not touch the
 // AnalysisResult struct fields directly.
 
+// FieldPolyShapeFactsMap returns the underlying guarded polymorphic field-cache
+// map keyed by instruction ID. Callers read or iterate without mutating;
+// mutation goes through RecordFieldPolyShapeCases/DeleteFieldPolyShapeCases.
+func (t *TableShapeFacts) FieldPolyShapeFactsMap() map[int][]FieldPolyShapeCase {
+	if t == nil {
+		return nil
+	}
+	return t.fieldPolyShapeFacts
+}
+
+// FieldCallPolyLenFusionMap returns the underlying field-call/field-len fusion
+// map keyed by instruction ID. Callers read or iterate without mutating;
+// mutation goes through RecordFieldCallPolyLenFusions.
+func (t *TableShapeFacts) FieldCallPolyLenFusionMap() map[int][]FieldCallPolyLenFusion {
+	if t == nil {
+		return nil
+	}
+	return t.fieldCallPolyLenFusions
+}
+
 // FixedRecordNewTableSitesPopulated reports whether the FixedRecordNewTableSites
 // map has been computed for the owning analysis result.
 func (t *TableShapeFacts) FixedRecordNewTableSitesPopulated() bool {
-	return t != nil && t.FixedRecordNewTableSites != nil
+	return t != nil && t.fixedRecordNewTableSites != nil
 }
 
 // SetFixedRecordNewTableSites installs the computed FixedRecordNewTableSites map.
@@ -15,17 +35,17 @@ func (t *TableShapeFacts) SetFixedRecordNewTableSites(sites map[int]bool) {
 	if t == nil {
 		return
 	}
-	t.FixedRecordNewTableSites = sites
+	t.fixedRecordNewTableSites = sites
 	t.bindOwner()
 }
 
 // FixedRecordNewTableSite reports whether the given OpNewFixedTable instruction
 // ID remains a local fixed-record construction site.
 func (t *TableShapeFacts) FixedRecordNewTableSite(id int) bool {
-	if t == nil || t.FixedRecordNewTableSites == nil {
+	if t == nil || t.fixedRecordNewTableSites == nil {
 		return false
 	}
-	return t.FixedRecordNewTableSites[id]
+	return t.fixedRecordNewTableSites[id]
 }
 
 // FixedRecordNewTableSiteMap returns the underlying FixedRecordNewTableSites map.
@@ -33,7 +53,7 @@ func (t *TableShapeFacts) FixedRecordNewTableSiteMap() map[int]bool {
 	if t == nil {
 		return nil
 	}
-	return t.FixedRecordNewTableSites
+	return t.fixedRecordNewTableSites
 }
 
 // FixedTableConstructorCount returns the number of recorded fixed table
@@ -42,16 +62,16 @@ func (t *TableShapeFacts) FixedTableConstructorCount() int {
 	if t == nil {
 		return 0
 	}
-	return len(t.FixedTableConstructors)
+	return len(t.fixedTableConstructors)
 }
 
 // FixedTableConstructorFact returns the fixed table constructor fact for the
 // given OpNewTable instruction ID.
 func (t *TableShapeFacts) FixedTableConstructorFact(id int) (FixedTableConstructorFact, bool) {
-	if t == nil || t.FixedTableConstructors == nil {
+	if t == nil || t.fixedTableConstructors == nil {
 		return FixedTableConstructorFact{}, false
 	}
-	fact, ok := t.FixedTableConstructors[id]
+	fact, ok := t.fixedTableConstructors[id]
 	return fact, ok
 }
 
@@ -61,20 +81,20 @@ func (t *TableShapeFacts) RecordFixedTableConstructor(id int, fact FixedTableCon
 	if t == nil {
 		return
 	}
-	if t.FixedTableConstructors == nil {
-		t.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
+	if t.fixedTableConstructors == nil {
+		t.fixedTableConstructors = make(map[int]FixedTableConstructorFact)
 	}
-	t.FixedTableConstructors[id] = fact
+	t.fixedTableConstructors[id] = fact
 	t.bindOwner()
 }
 
 // ForEachFixedTableConstructor iterates the recorded fixed table constructor
 // facts.
 func (t *TableShapeFacts) ForEachFixedTableConstructor(visit func(id int, fact FixedTableConstructorFact) bool) {
-	if t == nil || t.FixedTableConstructors == nil || visit == nil {
+	if t == nil || t.fixedTableConstructors == nil || visit == nil {
 		return
 	}
-	for id, fact := range t.FixedTableConstructors {
+	for id, fact := range t.fixedTableConstructors {
 		if !visit(id, fact) {
 			return
 		}
@@ -84,10 +104,10 @@ func (t *TableShapeFacts) ForEachFixedTableConstructor(visit func(id int, fact F
 // FixedShapeTableFactFor returns the fixed-shape table fact for the given SSA
 // value ID.
 func (t *TableShapeFacts) FixedShapeTableFactFor(id int) (FixedShapeTableFact, bool) {
-	if t == nil || t.FixedShapeTables == nil {
+	if t == nil || t.fixedShapeTables == nil {
 		return FixedShapeTableFact{}, false
 	}
-	fact, ok := t.FixedShapeTables[id]
+	fact, ok := t.fixedShapeTables[id]
 	return fact, ok
 }
 
@@ -96,7 +116,7 @@ func (t *TableShapeFacts) SetFixedShapeTables(facts map[int]FixedShapeTableFact)
 	if t == nil {
 		return
 	}
-	t.FixedShapeTables = facts
+	t.fixedShapeTables = facts
 	t.bindOwner()
 }
 
@@ -105,16 +125,16 @@ func (t *TableShapeFacts) FixedShapeTableMap() map[int]FixedShapeTableFact {
 	if t == nil {
 		return nil
 	}
-	return t.FixedShapeTables
+	return t.fixedShapeTables
 }
 
 // FixedShapeArgFact returns the guarded fixed-shape fact for the given parameter
 // index.
 func (t *TableShapeFacts) FixedShapeArgFact(idx int) (FixedShapeTableFact, bool) {
-	if t == nil || t.FixedShapeArgFacts == nil {
+	if t == nil || t.fixedShapeArgFacts == nil {
 		return FixedShapeTableFact{}, false
 	}
-	fact, ok := t.FixedShapeArgFacts[idx]
+	fact, ok := t.fixedShapeArgFacts[idx]
 	return fact, ok
 }
 
@@ -124,10 +144,10 @@ func (t *TableShapeFacts) RecordFixedShapeArgFact(idx int, fact FixedShapeTableF
 	if t == nil {
 		return
 	}
-	if t.FixedShapeArgFacts == nil {
-		t.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
+	if t.fixedShapeArgFacts == nil {
+		t.fixedShapeArgFacts = make(map[int]FixedShapeTableFact)
 	}
-	t.FixedShapeArgFacts[idx] = fact
+	t.fixedShapeArgFacts[idx] = fact
 	t.bindOwner()
 }
 
@@ -136,7 +156,7 @@ func (t *TableShapeFacts) FixedShapeArgFactMap() map[int]FixedShapeTableFact {
 	if t == nil {
 		return nil
 	}
-	return t.FixedShapeArgFacts
+	return t.fixedShapeArgFacts
 }
 
 // RecordFixedShapeEntryGuard records a parameter shape entry guard for the given
@@ -145,10 +165,19 @@ func (t *TableShapeFacts) RecordFixedShapeEntryGuard(idx int, fact FixedShapeTab
 	if t == nil {
 		return
 	}
-	if t.FixedShapeEntryGuards == nil {
-		t.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
+	if t.fixedShapeEntryGuards == nil {
+		t.fixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
 	}
-	t.FixedShapeEntryGuards[idx] = fact
+	t.fixedShapeEntryGuards[idx] = fact
+	t.bindOwner()
+}
+
+// SetFixedShapeEntryGuards installs the computed FixedShapeEntryGuards map.
+func (t *TableShapeFacts) SetFixedShapeEntryGuards(facts map[int]FixedShapeTableFact) {
+	if t == nil {
+		return
+	}
+	t.fixedShapeEntryGuards = facts
 	t.bindOwner()
 }
 
@@ -157,16 +186,26 @@ func (t *TableShapeFacts) FixedShapeEntryGuardMap() map[int]FixedShapeTableFact 
 	if t == nil {
 		return nil
 	}
-	return t.FixedShapeEntryGuards
+	return t.fixedShapeEntryGuards
+}
+
+// FixedShapeEntryGuard returns the entry-guard fact recorded for the given
+// parameter index, if any.
+func (t *TableShapeFacts) FixedShapeEntryGuard(idx int) (FixedShapeTableFact, bool) {
+	if t == nil || t.fixedShapeEntryGuards == nil {
+		return FixedShapeTableFact{}, false
+	}
+	fact, ok := t.fixedShapeEntryGuards[idx]
+	return fact, ok
 }
 
 // ShapeFieldTypeElidedLoad reports whether the given field-load instruction ID
 // has its result type guarded once and may skip the per-load tag check.
 func (t *TableShapeFacts) ShapeFieldTypeElidedLoad(id int) bool {
-	if t == nil || t.ShapeFieldTypeElidedLoads == nil {
+	if t == nil || t.shapeFieldTypeElidedLoads == nil {
 		return false
 	}
-	return t.ShapeFieldTypeElidedLoads[id]
+	return t.shapeFieldTypeElidedLoads[id]
 }
 
 // RecordShapeFieldTypeElidedLoad marks the given field-load instruction ID as
@@ -175,9 +214,9 @@ func (t *TableShapeFacts) RecordShapeFieldTypeElidedLoad(id int) {
 	if t == nil {
 		return
 	}
-	if t.ShapeFieldTypeElidedLoads == nil {
-		t.ShapeFieldTypeElidedLoads = make(map[int]bool)
+	if t.shapeFieldTypeElidedLoads == nil {
+		t.shapeFieldTypeElidedLoads = make(map[int]bool)
 	}
-	t.ShapeFieldTypeElidedLoads[id] = true
+	t.shapeFieldTypeElidedLoads[id] = true
 	t.bindOwner()
 }

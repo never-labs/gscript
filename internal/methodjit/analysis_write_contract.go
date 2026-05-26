@@ -31,26 +31,31 @@ import (
 // so the gate does not false-positive on facts the contract layer never named.
 // Growing this map (and the AnalysisFact set) toward full coverage is itself a
 // tracked goal of the modularization.
+// Keys are the (now unexported) domain-struct map field names produced by
+// snapshotAnalysisFactDomains via reflection, so they are lowerCamel. The
+// String* facts model Function-level maps that are not part of AnalysisResult
+// and never surface through the AnalysisResult snapshot; their keys are kept for
+// completeness only.
 var analysisFactForDomainField = map[string]AnalysisFact{
-	"Int48Safe":                      AnalysisFactInt48Safe,
-	"IntModNonZeroDivisor":           AnalysisFactIntModNonZeroDivisor,
-	"IntModNoSignAdjust":             AnalysisFactIntModNoSignAdjust,
-	"IntRanges":                      AnalysisFactIntRanges,
-	"IntNonNegative":                 AnalysisFactIntNonNegative,
-	"TableArrayDataPtrs":             AnalysisFactTableArrayDataPtrs,
-	"ShapeFieldTypeElidedLoads":      AnalysisFactShapeFieldTypeElided,
-	"RecordArrayLoopSpecializations": AnalysisFactRecordArrayLoopSpecialization,
-	"FixedShapeTables":               AnalysisFactFixedShapeTables,
-	"FixedShapeEntryGuards":          AnalysisFactFixedShapeEntryGuards,
-	"FieldPolyShapeFacts":            AnalysisFactFieldPolyShapeFacts,
-	"FieldPolyShapeCatalog":          AnalysisFactFieldPolyShapeCatalog,
-	"FixedTableConstructors":         AnalysisFactFixedTableConstructors,
-	"SpecDependencyProtos":           AnalysisFactSpecDependencyProtos,
-	"CallABIs":                       AnalysisFactCallABIs,
-	"GuardedConstCallFolds":          AnalysisFactGuardedConstCallFolds,
+	"int48Safe":                      AnalysisFactInt48Safe,
+	"intModNonZeroDivisor":           AnalysisFactIntModNonZeroDivisor,
+	"intModNoSignAdjust":             AnalysisFactIntModNoSignAdjust,
+	"intRanges":                      AnalysisFactIntRanges,
+	"intNonNegative":                 AnalysisFactIntNonNegative,
+	"tableArrayDataPtrs":             AnalysisFactTableArrayDataPtrs,
+	"shapeFieldTypeElidedLoads":      AnalysisFactShapeFieldTypeElided,
+	"recordArrayLoopSpecializations": AnalysisFactRecordArrayLoopSpecialization,
+	"fixedShapeTables":               AnalysisFactFixedShapeTables,
+	"fixedShapeEntryGuards":          AnalysisFactFixedShapeEntryGuards,
+	"fieldPolyShapeFacts":            AnalysisFactFieldPolyShapeFacts,
+	"fieldPolyShapeCatalog":          AnalysisFactFieldPolyShapeCatalog,
+	"fixedTableConstructors":         AnalysisFactFixedTableConstructors,
+	"specDependencyProtos":           AnalysisFactSpecDependencyProtos,
+	"callABIs":                       AnalysisFactCallABIs,
+	"guardedConstCallFolds":          AnalysisFactGuardedConstCallFolds,
 
-	"CallSiteNoResultRuntimeSpecializations":       AnalysisFactCallSiteNoResultRuntimeSpecializations,
-	"CallSiteNoResultRuntimeSpecializationBatches": AnalysisFactCallSiteNoResultRuntimeSpecializationBatches,
+	"callSiteNoResultRuntimeSpecializations":       AnalysisFactCallSiteNoResultRuntimeSpecializations,
+	"callSiteNoResultRuntimeSpecializationBatches": AnalysisFactCallSiteNoResultRuntimeSpecializationBatches,
 
 	"StringConstTables":    AnalysisFactStringConstTables,
 	"StringFormatPatterns": AnalysisFactStringFormatPatterns,

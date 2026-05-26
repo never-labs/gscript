@@ -11,9 +11,9 @@ func TestFieldPolyLenPhi_ReplacesJoinWithShapeControlledPhi(t *testing.T) {
 	fn := &Function{
 		Proto: &vm.FuncProto{Name: "field_poly_len_phi", Constants: []runtime.Value{runtime.StringValue("kind")}},
 		Analysis: &AnalysisResult{
-			TableShape: &TableShapeFacts{
+			TableShape: newTableShapeFactsForTest(tableShapeFactsSeed{
 				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{},
-			},
+			}),
 		},
 	}
 	entry := &Block{ID: 0, defs: make(map[int]*Value)}
@@ -39,10 +39,10 @@ func TestFieldPolyLenPhi_ReplacesJoinWithShapeControlledPhi(t *testing.T) {
 	ln := &Instr{ID: fn.newValueID(), Op: OpFieldPolyLen, Type: TypeInt, Args: []*Value{tbl.Value()}, Aux: 0, Block: join}
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{ln.Value()}, Block: join}
 	join.Instrs = []*Instr{ln, ret}
-	fn.Analysis.TableShape.FieldPolyShapeFacts[ln.ID] = []FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().RecordFieldPolyShapeCases(ln.ID, []FieldPolyShapeCase{
 		{ShapeID: 10, ReceiverFact: FixedShapeTableFact{FieldLenRanges: map[string]intRange{"kind": pointRange(2)}}},
 		{ShapeID: 11, ReceiverFact: FixedShapeTableFact{FieldLenRanges: map[string]intRange{"kind": pointRange(5)}}},
-	}
+	})
 
 	out, err := FieldPolyLenPhiPass(fn)
 	if err != nil {
