@@ -746,10 +746,10 @@ func (e *BaselineJITEngine) EvictCompiled(proto *vm.FuncProto) {
 	}
 	delete(e.failed, proto)
 	proto.CompiledCodePtr = 0
-	clearFuncProtoDirectEntries(proto)
-	proto.Tier2GlobalCachePtr = 0
-	proto.Tier2GlobalCacheGenPtr = 0
-	proto.Tier2GlobalIndexPtr = 0
+	// Tier1-specific work above; route the Tier 2 install-pointer teardown
+	// through the single-source primitive (also clears Tier2Promoted, keeping
+	// the proto's promoted flag consistent with its now-zeroed entry pointers).
+	clearTier2InstallPointers(proto)
 	e.clearBaselineCallCachesForProto(proto)
 }
 

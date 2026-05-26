@@ -504,11 +504,10 @@ func (tm *TieringManager) retireStaleTier2AfterFeedback(proto *vm.FuncProto, cf 
 		if queued {
 			tm.exitProfile.markQueued(proto, current)
 			traceRefresh()
-			proto.Tier2Promoted = false
-			clearFuncProtoDirectEntries(proto)
-			proto.Tier2GlobalCachePtr = 0
-			proto.Tier2GlobalCacheGenPtr = 0
-			proto.Tier2GlobalIndexPtr = 0
+			// Policy: keep cf in the tier2Compiled map and DO NOT clear spec
+			// deps — the queued recompile reuses cf. Only revoke the published
+			// install pointers via the single-source primitive.
+			clearTier2InstallPointers(proto)
 		}
 		return
 	}
