@@ -54,14 +54,8 @@ func (ec *emitContext) emitNewFixedTable2CacheFastPath(instr *Instr, doneLabel, 
 	}
 	asm := ec.asm
 
-	val1Reg := ec.resolveValueNB(instr.Args[0].ID, jit.X5)
-	if val1Reg != jit.X5 {
-		asm.MOVreg(jit.X5, val1Reg)
-	}
-	val2Reg := ec.resolveValueNB(instr.Args[1].ID, jit.X6)
-	if val2Reg != jit.X6 {
-		asm.MOVreg(jit.X6, val2Reg)
-	}
+	ec.resolveValueToReg(instr.Args[0].ID, jit.X5)
+	ec.resolveValueToReg(instr.Args[1].ID, jit.X6)
 	emptyLabel := ec.uniqueLabel("newfixed_empty")
 	val1NeedsNilCheck := !fixedTableArgProvenNonNil(instr.Args[0])
 	val2NeedsNilCheck := !fixedTableArgProvenNonNil(instr.Args[1])
@@ -222,10 +216,7 @@ func (ec *emitContext) emitNewFixedTableNCacheFastPath(instr *Instr, doneLabel, 
 		if fixedTableArgProvenNonNil(arg) {
 			continue
 		}
-		valReg := ec.resolveValueNB(arg.ID, jit.X5)
-		if valReg != jit.X5 {
-			asm.MOVreg(jit.X5, valReg)
-		}
+		ec.resolveValueToReg(arg.ID, jit.X5)
 		if nilReg != jit.XZR {
 			asm.CMPreg(jit.X5, nilReg)
 		} else {
@@ -278,10 +269,7 @@ func (ec *emitContext) emitNewFixedTableNCacheFastPath(instr *Instr, doneLabel, 
 		asm.LDR(jit.X2, jit.X1, jit.TableOffSvals)
 	}
 	for i, arg := range instr.Args {
-		valReg := ec.resolveValueNB(arg.ID, jit.X5)
-		if valReg != jit.X5 {
-			asm.MOVreg(jit.X5, valReg)
-		}
+		ec.resolveValueToReg(arg.ID, jit.X5)
 		if !ec.emitNewFixedTableValueTypeGuard(shapeID, i, arg, jit.X5, missLabel) {
 			return false
 		}
@@ -370,10 +358,7 @@ func (ec *emitContext) emitNewFixedTableNExit(instr *Instr, resultSlot int) {
 		ec.fixedTableArgSlots[instr.ID] = append([]int(nil), slots...)
 	}
 	for i, arg := range instr.Args {
-		reg := ec.resolveValueNB(arg.ID, jit.X0)
-		if reg != jit.X0 {
-			asm.MOVreg(jit.X0, reg)
-		}
+		ec.resolveValueToReg(arg.ID, jit.X0)
 		asm.STR(jit.X0, mRegRegs, slotOffset(slots[i]))
 	}
 

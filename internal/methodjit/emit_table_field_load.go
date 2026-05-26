@@ -121,10 +121,7 @@ func (ec *emitContext) emitGetFieldFixedRecordFastPath(instr *Instr, tblValueID 
 	}
 	asm := ec.asm
 	notRecordLabel := ec.uniqueLabel("getfield_not_fixed_record")
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	asm.LSRimm(jit.X1, jit.X0, 48)
 	asm.MOVimm16(jit.X2, jit.NB_TagPtrShr48)
 	asm.CMPreg(jit.X1, jit.X2)
@@ -168,10 +165,7 @@ func (ec *emitContext) emitGetFieldDirectPolyShapeFacts(instr *Instr) bool {
 	missLabel := ec.uniqueLabel("getfield_direct_poly_miss")
 	doneLabel := ec.uniqueLabel("getfield_direct_poly_done")
 
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	if ec.irTypes[tblValueID] != TypeTable {
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
 	}
@@ -244,10 +238,7 @@ func (ec *emitContext) emitFieldPolyLen(instr *Instr) {
 	doneLabel := ec.uniqueLabel("field_poly_len_done")
 	tblValueID := instr.Args[0].ID
 
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	if ec.irTypes[tblValueID] != TypeTable {
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
 	}
@@ -286,10 +277,7 @@ func (ec *emitContext) emitGetFieldPolymorphicCache(instr *Instr) bool {
 	missLabel := ec.uniqueLabel("getfield_pic_miss")
 	doneLabel := ec.uniqueLabel("getfield_pic_done")
 
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	if ec.irTypes[tblValueID] != TypeTable {
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
 	}
@@ -504,10 +492,7 @@ func (ec *emitContext) emitGetFieldDynamicCache(instr *Instr) bool {
 	asm.CMPimm(jit.X4, 0)
 	asm.BCond(jit.CondLT, deoptLabel)
 
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	if ec.irTypes[tblValueID] != TypeTable {
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, deoptLabel)
 	}
@@ -627,10 +612,7 @@ func (ec *emitContext) emitFieldSvals(instr *Instr) {
 		tableLabel := ec.uniqueLabel("field_svals_table")
 		tablePtrLabel := ec.uniqueLabel("field_svals_table_ptr")
 
-		tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-		if tblReg != jit.X0 {
-			asm.MOVreg(jit.X0, tblReg)
-		}
+		ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 		asm.LSRimm(jit.X1, jit.X0, 48)
 		asm.MOVimm16(jit.X2, jit.NB_TagPtrShr48)
 		asm.CMPreg(jit.X1, jit.X2)
@@ -811,10 +793,7 @@ func (ec *emitContext) emitGetFieldExit(instr *Instr) {
 	// We need the table value in a register slot so Go can read it.
 	// Store the table arg to its home slot (it may only be in a register).
 	if len(instr.Args) > 0 {
-		tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-		if tblReg != jit.X0 {
-			asm.MOVreg(jit.X0, tblReg)
-		}
+		ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 		tblSlot, hasTblSlot := ec.slotMap[instr.Args[0].ID]
 		if hasTblSlot {
 			asm.STR(jit.X0, mRegRegs, slotOffset(tblSlot))

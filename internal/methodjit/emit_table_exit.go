@@ -22,10 +22,7 @@ func (ec *emitContext) emitTableArrayLoadExit(instr *Instr) bool {
 		return false
 	}
 
-	tblReg := ec.resolveValueNB(tableValue.ID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tableValue.ID, jit.X0)
 	tblSlot, hasTblSlot := ec.slotMap[tableValue.ID]
 	if !hasTblSlot {
 		ec.emitPreciseDeopt(instr)
@@ -34,10 +31,7 @@ func (ec *emitContext) emitTableArrayLoadExit(instr *Instr) bool {
 	asm.STR(jit.X0, mRegRegs, slotOffset(tblSlot))
 
 	keyValue := instr.Args[2]
-	keyReg := ec.resolveValueNB(keyValue.ID, jit.X0)
-	if keyReg != jit.X0 {
-		asm.MOVreg(jit.X0, keyReg)
-	}
+	ec.resolveValueToReg(keyValue.ID, jit.X0)
 	keySlot, hasKeySlot := ec.slotMap[keyValue.ID]
 	if !hasKeySlot {
 		ec.emitPreciseDeopt(instr)
@@ -193,20 +187,14 @@ func (ec *emitContext) emitGetTableExit(instr *Instr) {
 	}
 
 	if len(instr.Args) > 0 {
-		tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-		if tblReg != jit.X0 {
-			asm.MOVreg(jit.X0, tblReg)
-		}
+		ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 		if s, ok := ec.slotMap[instr.Args[0].ID]; ok {
 			asm.STR(jit.X0, mRegRegs, slotOffset(s))
 		}
 	}
 
 	if len(instr.Args) > 1 {
-		keyReg := ec.resolveValueNB(instr.Args[1].ID, jit.X0)
-		if keyReg != jit.X0 {
-			asm.MOVreg(jit.X0, keyReg)
-		}
+		ec.resolveValueToReg(instr.Args[1].ID, jit.X0)
 		if s, ok := ec.slotMap[instr.Args[1].ID]; ok {
 			asm.STR(jit.X0, mRegRegs, slotOffset(s))
 		}
@@ -284,30 +272,21 @@ func (ec *emitContext) emitSetTableExitArgs(instr *Instr, tableArg, keyArg, valu
 	asm := ec.asm
 
 	if len(instr.Args) > tableArg && instr.Args[tableArg] != nil {
-		tblReg := ec.resolveValueNB(instr.Args[tableArg].ID, jit.X0)
-		if tblReg != jit.X0 {
-			asm.MOVreg(jit.X0, tblReg)
-		}
+		ec.resolveValueToReg(instr.Args[tableArg].ID, jit.X0)
 		if s, ok := ec.slotMap[instr.Args[tableArg].ID]; ok {
 			asm.STR(jit.X0, mRegRegs, slotOffset(s))
 		}
 	}
 
 	if len(instr.Args) > keyArg && instr.Args[keyArg] != nil {
-		keyReg := ec.resolveValueNB(instr.Args[keyArg].ID, jit.X0)
-		if keyReg != jit.X0 {
-			asm.MOVreg(jit.X0, keyReg)
-		}
+		ec.resolveValueToReg(instr.Args[keyArg].ID, jit.X0)
 		if s, ok := ec.slotMap[instr.Args[keyArg].ID]; ok {
 			asm.STR(jit.X0, mRegRegs, slotOffset(s))
 		}
 	}
 
 	if len(instr.Args) > valueArg && instr.Args[valueArg] != nil {
-		valReg := ec.resolveValueNB(instr.Args[valueArg].ID, jit.X0)
-		if valReg != jit.X0 {
-			asm.MOVreg(jit.X0, valReg)
-		}
+		ec.resolveValueToReg(instr.Args[valueArg].ID, jit.X0)
 		if s, ok := ec.slotMap[instr.Args[valueArg].ID]; ok {
 			asm.STR(jit.X0, mRegRegs, slotOffset(s))
 		}

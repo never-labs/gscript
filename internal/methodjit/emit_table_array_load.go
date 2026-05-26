@@ -69,16 +69,10 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 			asm.MOVreg(jit.X1, reg)
 		}
 	} else if ec.irTypes[keyID] == TypeInt {
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitUnboxInt48(jit.X1)
 	} else {
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitIntTagCheckBranch(jit.X1, jit.X4, jit.X5, jit.CondNE, deoptLabel)
 		ec.emitUnboxInt48(jit.X1)
 	}
@@ -225,10 +219,7 @@ func (ec *emitContext) emitTableArrayNestedLoad(instr *Instr) {
 	}
 
 	if instr.Aux == int64(vm.FBKindFloat) {
-		outerTblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-		if outerTblReg != jit.X0 {
-			asm.MOVreg(jit.X0, outerTblReg)
-		}
+		ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 		asm.LDRW(jit.X6, jit.X0, jit.TableOffDMStride)
 		asm.CBZ(jit.X6, normalLabel)
@@ -475,10 +466,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 
 	// Load table value (NaN-boxed) into X0.
 	tblValueID := instr.Args[0].ID
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 
 	if ec.tableVerified[tblValueID] {
 		// Table already validated in this block — skip type/nil/metatable checks.
@@ -522,17 +510,11 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 		// Key is already a raw int64 — skip boxing, tag check, and unbox.
 	} else if ec.irTypes[keyID] == TypeInt {
 		// Fast path 2: key is known TypeInt but NaN-boxed — skip tag check, just unbox.
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitUnboxInt48(jit.X1)
 	} else {
 		// Slow path: full NaN-boxed key with tag check.
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitIntTagCheckBranch(jit.X1, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		ec.emitUnboxInt48(jit.X1)
 	}

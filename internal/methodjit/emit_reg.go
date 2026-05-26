@@ -219,6 +219,16 @@ func (ec *emitContext) resolveValueUnboxedInt(valueID int, scratchReg jit.Reg) j
 	return scratchReg
 }
 
+// resolveValueToReg loads value `id` and guarantees the result is in mustReg,
+// emitting a MOVreg only when resolveValueNB chose a different register.
+func (ec *emitContext) resolveValueToReg(id int, mustReg jit.Reg) jit.Reg {
+	r := ec.resolveValueNB(id, mustReg)
+	if r != mustReg {
+		ec.asm.MOVreg(mustReg, r)
+	}
+	return mustReg
+}
+
 // storeResultNB stores a NaN-boxed result. If the value has a register allocation,
 // stores to the register. If the value is also used in other blocks (cross-block
 // live), writes through to memory too. For block-local values, the memory write

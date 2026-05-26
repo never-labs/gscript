@@ -16,10 +16,7 @@ func (ec *emitContext) emitDynamicStringGetTableCache(instr *Instr, doneLabel st
 	}
 	asm := ec.asm
 	keyID := instr.Args[1].ID
-	keyReg := ec.resolveValueNB(keyID, jit.X1)
-	if keyReg != jit.X1 {
-		asm.MOVreg(jit.X1, keyReg)
-	}
+	ec.resolveValueToReg(keyID, jit.X1)
 	missLabel := ec.uniqueLabel("gettable_string_cache_miss")
 	deoptLabel := ec.uniqueLabel("gettable_string_type_deopt")
 	ec.emitDynamicStringCacheOrSmallScan(instr, missLabel, func(fieldIdxReg jit.Reg) {
@@ -50,16 +47,10 @@ func (ec *emitContext) emitDynamicStringSetTableCache(instr *Instr, doneLabel st
 	}
 	asm := ec.asm
 	keyID := instr.Args[1].ID
-	keyReg := ec.resolveValueNB(keyID, jit.X1)
-	if keyReg != jit.X1 {
-		asm.MOVreg(jit.X1, keyReg)
-	}
+	ec.resolveValueToReg(keyID, jit.X1)
 	missLabel := ec.uniqueLabel("settable_string_cache_miss")
 	ec.emitDynamicStringCacheOrSmallScan(instr, missLabel, func(fieldIdxReg jit.Reg) {
-		valReg := ec.resolveValueNB(instr.Args[2].ID, jit.X4)
-		if valReg != jit.X4 {
-			asm.MOVreg(jit.X4, valReg)
-		}
+		ec.resolveValueToReg(instr.Args[2].ID, jit.X4)
 		asm.LoadImm64(jit.X5, nb64(jit.NB_ValNil))
 		asm.CMPreg(jit.X4, jit.X5)
 		asm.BCond(jit.CondEQ, missLabel)
@@ -71,10 +62,7 @@ func (ec *emitContext) emitDynamicStringSetTableCache(instr *Instr, doneLabel st
 		asm.B(doneLabel)
 	}, dynamicStringCacheHandlers{
 		appendHit: func(fieldIdxReg, entryReg jit.Reg) {
-			valReg := ec.resolveValueNB(instr.Args[2].ID, jit.X4)
-			if valReg != jit.X4 {
-				asm.MOVreg(jit.X4, valReg)
-			}
+			ec.resolveValueToReg(instr.Args[2].ID, jit.X4)
 			asm.LoadImm64(jit.X5, nb64(jit.NB_ValNil))
 			asm.CMPreg(jit.X4, jit.X5)
 			asm.BCond(jit.CondEQ, missLabel)
@@ -597,30 +585,18 @@ func (ec *emitContext) emitGetTableStringFormatIntNative(instr *Instr) {
 	tempBase := ec.nextSlot
 	ec.nextSlot += 4
 
-	tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 	jit.EmitCheckIsTableFull(asm, jit.X0, jit.X2, jit.X3, nativeMissLabel)
 	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.CBZ(jit.X0, nativeMissLabel)
 	asm.LDR(jit.X2, jit.X0, jit.TableOffMetatable)
 	asm.CBNZ(jit.X2, nativeMissLabel)
 
-	callee := ec.resolveValueNB(instr.Args[1].ID, jit.X1)
-	if callee != jit.X1 {
-		asm.MOVreg(jit.X1, callee)
-	}
+	ec.resolveValueToReg(instr.Args[1].ID, jit.X1)
 	ec.emitStdStringFormatGuard(jit.X1, nativeMissLabel)
-	patternVal := ec.resolveValueNB(instr.Args[2].ID, jit.X1)
-	if patternVal != jit.X1 {
-		asm.MOVreg(jit.X1, patternVal)
-	}
+	ec.resolveValueToReg(instr.Args[2].ID, jit.X1)
 	ec.emitStringValueEqualsConstGuard(jit.X1, pattern, nativeMissLabel)
-	intVal := ec.resolveValueNB(instr.Args[3].ID, jit.X1)
-	if intVal != jit.X1 {
-		asm.MOVreg(jit.X1, intVal)
-	}
+	ec.resolveValueToReg(instr.Args[3].ID, jit.X1)
 	emitCheckIsIntPinned(asm, jit.X1, jit.X2)
 	asm.BCond(jit.CondNE, nativeMissLabel)
 	jit.EmitUnboxInt(asm, jit.X1, jit.X1)
@@ -653,10 +629,7 @@ func (ec *emitContext) emitGetTableStringFormatIntNative(instr *Instr) {
 
 	asm.Label(cacheMissLabel)
 	for i, arg := range instr.Args {
-		valReg := ec.resolveValueNB(arg.ID, jit.X0)
-		if valReg != jit.X0 {
-			asm.MOVreg(jit.X0, valReg)
-		}
+		ec.resolveValueToReg(arg.ID, jit.X0)
 		asm.STR(jit.X0, mRegRegs, slotOffset(tempBase+i))
 	}
 	if canFormatNative {

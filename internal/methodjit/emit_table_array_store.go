@@ -121,10 +121,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 
 	switch cfg.kind {
 	case int64(vm.FBKindMixed):
-		valReg := ec.resolveValueNB(cfg.valueID, jit.X4)
-		if valReg != jit.X4 {
-			asm.MOVreg(jit.X4, valReg)
-		}
+		ec.resolveValueToReg(cfg.valueID, jit.X4)
 		emitBounds(false)
 		asm.Label(storeLabel)
 		emitLoadData()
@@ -142,16 +139,10 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 				asm.MOVreg(jit.X4, reg)
 			}
 		} else if ec.irTypes[cfg.valueID] == TypeInt {
-			valReg := ec.resolveValueNB(cfg.valueID, jit.X4)
-			if valReg != jit.X4 {
-				asm.MOVreg(jit.X4, valReg)
-			}
+			ec.resolveValueToReg(cfg.valueID, jit.X4)
 			ec.emitUnboxInt48(jit.X4)
 		} else {
-			valReg := ec.resolveValueNB(cfg.valueID, jit.X4)
-			if valReg != jit.X4 {
-				asm.MOVreg(jit.X4, valReg)
-			}
+			ec.resolveValueToReg(cfg.valueID, jit.X4)
 			ec.emitIntTagCheckBranch(jit.X4, jit.X5, jit.X6, jit.CondNE, cfg.missLabel)
 			ec.emitUnboxInt48(jit.X4)
 		}
@@ -167,10 +158,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 		valueIsTypedFloat := ec.irTypes[cfg.valueID] == TypeFloat
 		valueHasRawFPR := valueIsTypedFloat && ec.hasFPReg(cfg.valueID)
 		if !valueHasRawFPR {
-			valReg := ec.resolveValueNB(cfg.valueID, jit.X4)
-			if valReg != jit.X4 {
-				asm.MOVreg(jit.X4, valReg)
-			}
+			ec.resolveValueToReg(cfg.valueID, jit.X4)
 			if !valueIsTypedFloat {
 				jit.EmitIsTaggedPinned(asm, jit.X4, jit.X5, mRegTagInt)
 				asm.BCond(jit.CondEQ, cfg.missLabel)
@@ -202,10 +190,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 			return true
 		}
 
-		valReg := ec.resolveValueNB(cfg.valueID, jit.X4)
-		if valReg != jit.X4 {
-			asm.MOVreg(jit.X4, valReg)
-		}
+		ec.resolveValueToReg(cfg.valueID, jit.X4)
 		asm.LSRimm(jit.X5, jit.X4, 48)
 		asm.MOVimm16(jit.X6, uint16(jit.NB_TagBoolShr48))
 		asm.CMPreg(jit.X5, jit.X6)
@@ -254,10 +239,7 @@ func (ec *emitContext) emitTableArrayStore(instr *Instr) {
 				asm.MOVreg(jit.X0, tblReg)
 			}
 		} else {
-			tblReg := ec.resolveValueNB(tblID, jit.X0)
-			if tblReg != jit.X0 {
-				asm.MOVreg(jit.X0, tblReg)
-			}
+			ec.resolveValueToReg(tblID, jit.X0)
 			jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 		}
 	}
@@ -405,10 +387,7 @@ func (ec *emitContext) emitTableArraySwapPairs(instr *Instr) {
 	loopLabel := ec.uniqueLabel("tarr_swappairs_loop")
 	doneLabel := ec.uniqueLabel("tarr_swappairs_done")
 
-	tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[1], jit.X1, failLabel)
 	ec.emitTableIntArraySpecializationKeyToReg(instr.Args[2], jit.X4, failLabel)
 	jit.EmitCheckIsTableFull(asm, jit.X0, jit.X2, jit.X3, failLabel)
@@ -523,10 +502,7 @@ func (ec *emitContext) emitSetTableNative(instr *Instr) {
 
 	// Load table value (NaN-boxed) into X0.
 	tblValueID := instr.Args[0].ID
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 
 	if ec.tableVerified[tblValueID] {
 		// Table already validated in this block — skip type/nil/metatable checks.
@@ -569,17 +545,11 @@ func (ec *emitContext) emitSetTableNative(instr *Instr) {
 		// Key is already a raw int64 — skip boxing, tag check, and unbox.
 	} else if ec.irTypes[keyID] == TypeInt {
 		// Fast path 2: key is known TypeInt but NaN-boxed — skip tag check, just unbox.
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitUnboxInt48(jit.X1)
 	} else {
 		// Slow path: full NaN-boxed key with tag check.
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitIntTagCheckBranch(jit.X1, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		ec.emitUnboxInt48(jit.X1)
 	}

@@ -25,10 +25,7 @@ func (ec *emitContext) emitTableArrayHeader(instr *Instr) {
 	}
 
 	tblID := instr.Args[0].ID
-	tblReg := ec.resolveValueNB(tblID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblID, jit.X0)
 	deoptActiveRegs := cloneBoolMap(ec.activeRegs)
 	deoptActiveFPRegs := cloneBoolMap(ec.activeFPRegs)
 	deoptReprs := ec.snapshotValueReprs()
@@ -96,10 +93,7 @@ func (ec *emitContext) emitGuardTableKind(instr *Instr) {
 	deoptLabel := ec.uniqueLabel("guard_table_kind_deopt")
 	doneLabel := ec.uniqueLabel("guard_table_kind_done")
 	tableID := instr.Args[0].ID
-	srcReg := ec.resolveValueNB(tableID, jit.X0)
-	if srcReg != jit.X0 {
-		asm.MOVreg(jit.X0, srcReg)
-	}
+	ec.resolveValueToReg(tableID, jit.X0)
 	jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, deoptLabel)
 	jit.EmitExtractPtr(asm, jit.X1, jit.X0)
 	asm.CBZ(jit.X1, deoptLabel)

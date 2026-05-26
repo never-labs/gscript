@@ -28,10 +28,7 @@ func (ec *emitContext) emitFieldStore(instr *Instr) {
 	valueID := instr.Args[1].ID
 	valStore := ec.prepareFieldStoreValue(valueID)
 	if !valStore.isFPR {
-		valReg := ec.resolveValueNB(valueID, jit.X3)
-		if valReg != jit.X3 {
-			ec.asm.MOVreg(jit.X3, valReg)
-		}
+		ec.resolveValueToReg(valueID, jit.X3)
 		valStore.gpr = jit.X3
 	}
 	svals := ec.resolveRawFieldSvalsPtr(instr.Args[0].ID, jit.X1)
@@ -61,10 +58,7 @@ func (ec *emitContext) emitStableShapeFieldStoreTypeGuard(instr *Instr, fieldIdx
 			return false
 		}
 	}
-	valReg := ec.resolveValueNB(value.ID, jit.X0)
-	if valReg != jit.X0 {
-		ec.asm.MOVreg(jit.X0, valReg)
-	}
+	ec.resolveValueToReg(value.ID, jit.X0)
 	deoptLabel := ec.uniqueLabel("field_store_type_deopt")
 	doneLabel := ec.uniqueLabel("field_store_type_done")
 	switch stable {
@@ -117,10 +111,7 @@ func (ec *emitContext) emitSetField(instr *Instr) {
 	if !valStore.isFPR {
 		// Load boxed values into X3 first, before table preparation uses
 		// X0-X2. X3 is scratch but not touched by emitPrepareFieldTablePtr.
-		valReg := ec.resolveValueNB(valueID, jit.X3)
-		if valReg != jit.X3 {
-			asm.MOVreg(jit.X3, valReg)
-		}
+		ec.resolveValueToReg(valueID, jit.X3)
 		valStore.gpr = jit.X3
 	}
 
@@ -145,10 +136,7 @@ func (ec *emitContext) emitSetField(instr *Instr) {
 
 	doneLabel := ec.uniqueLabel("setfield_done")
 	notRecordLabel := ec.uniqueLabel("setfield_not_fixed_record")
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	asm.LSRimm(jit.X4, jit.X0, 48)
 	asm.MOVimm16(jit.X5, jit.NB_TagPtrShr48)
 	asm.CMPreg(jit.X4, jit.X5)
@@ -231,10 +219,7 @@ func (ec *emitContext) emitSetFieldDynamicCache(instr *Instr) bool {
 	asm.CMPimm(jit.X4, 0)
 	asm.BCond(jit.CondLT, deoptLabel)
 
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	if ec.irTypes[tblValueID] != TypeTable {
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, deoptLabel)
 	}
@@ -252,17 +237,11 @@ func (ec *emitContext) emitSetFieldDynamicCache(instr *Instr) bool {
 		if valStore.isFPR {
 			asm.FSTRdReg(valStore.fpr, jit.X1, jit.X4)
 		} else {
-			valReg := ec.resolveValueNB(valueID, jit.X6)
-			if valReg != jit.X6 {
-				asm.MOVreg(jit.X6, valReg)
-			}
+			ec.resolveValueToReg(valueID, jit.X6)
 			asm.STRreg(jit.X6, jit.X1, jit.X4)
 		}
 	} else {
-		valReg := ec.resolveValueNB(valueID, jit.X6)
-		if valReg != jit.X6 {
-			asm.MOVreg(jit.X6, valReg)
-		}
+		ec.resolveValueToReg(valueID, jit.X6)
 		asm.LoadImm64(jit.X7, nb64(jit.NB_ValNil))
 		asm.CMPreg(jit.X6, jit.X7)
 		asm.BCond(jit.CondEQ, deoptLabel)
@@ -341,10 +320,7 @@ func (ec *emitContext) ensureNoStringLookupCacheGuard(tblValueID int, tableReg, 
 	if ec.stringLookupCleanGuarded[tblValueID] {
 		return true
 	}
-	tblReg := ec.resolveValueNB(tblValueID, tableReg)
-	if tblReg != tableReg {
-		ec.asm.MOVreg(tableReg, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, tableReg)
 	jit.EmitExtractPtr(ec.asm, tableReg, tableReg)
 	return ec.ensureNoStringLookupCacheGuardWithTablePtr(tblValueID, tableReg, tmp, deoptLabel)
 }
@@ -366,10 +342,7 @@ func (ec *emitContext) emitSetFieldExit(instr *Instr) {
 
 	// Store the table arg to its home slot.
 	if len(instr.Args) > 0 {
-		tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
-		if tblReg != jit.X0 {
-			asm.MOVreg(jit.X0, tblReg)
-		}
+		ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
 		tblSlot, hasTblSlot := ec.slotMap[instr.Args[0].ID]
 		if hasTblSlot {
 			asm.STR(jit.X0, mRegRegs, slotOffset(tblSlot))
@@ -384,10 +357,7 @@ func (ec *emitContext) emitSetFieldExit(instr *Instr) {
 			ec.emitDeopt(instr)
 			return
 		}
-		valReg := ec.resolveValueNB(instr.Args[1].ID, jit.X0)
-		if valReg != jit.X0 {
-			asm.MOVreg(jit.X0, valReg)
-		}
+		ec.resolveValueToReg(instr.Args[1].ID, jit.X0)
 		asm.STR(jit.X0, mRegRegs, slotOffset(valSlot))
 	}
 

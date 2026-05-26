@@ -114,17 +114,11 @@ func (ec *emitContext) emitTableArrayKeyToReg(key *Value, deoptLabel string) boo
 		return true
 	}
 	if ec.irTypes[keyID] == TypeInt {
-		keyReg := ec.resolveValueNB(keyID, jit.X1)
-		if keyReg != jit.X1 {
-			asm.MOVreg(jit.X1, keyReg)
-		}
+		ec.resolveValueToReg(keyID, jit.X1)
 		ec.emitUnboxInt48(jit.X1)
 		return true
 	}
-	keyReg := ec.resolveValueNB(keyID, jit.X1)
-	if keyReg != jit.X1 {
-		asm.MOVreg(jit.X1, keyReg)
-	}
+	ec.resolveValueToReg(keyID, jit.X1)
 	ec.emitIntTagCheckBranch(jit.X1, jit.X4, jit.X5, jit.CondNE, deoptLabel)
 	ec.emitUnboxInt48(jit.X1)
 	return true

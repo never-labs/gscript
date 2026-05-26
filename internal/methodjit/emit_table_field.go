@@ -74,10 +74,7 @@ func (ec *emitContext) emitPrepareFieldTablePtr(tblValueID int, shapeID uint32, 
 		ec.shapeVerified[tblValueID] = shapeID
 		return false
 	}
-	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
-	if tblReg != jit.X0 {
-		asm.MOVreg(jit.X0, tblReg)
-	}
+	ec.resolveValueToReg(tblValueID, jit.X0)
 	if prevShape, ok := ec.shapeVerified[tblValueID]; ok && prevShape == shapeID {
 		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 		return true
