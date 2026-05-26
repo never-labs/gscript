@@ -740,11 +740,7 @@ func (ec *emitContext) emitTableArraySwap(instr *Instr) {
 		ec.emitDeopt(instr)
 		return
 	}
-	asm.B(doneLabel)
-
-	asm.Label(deoptLabel)
-	ec.emitPreciseDeopt(instr)
-	asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, deoptLabel, doneLabel, true)
 }
 
 func (ec *emitContext) emitTableArraySwapPairs(instr *Instr) {
@@ -971,11 +967,7 @@ func (ec *emitContext) emitTableArrayNestedLoad(instr *Instr) {
 		ec.emitDeopt(instr)
 		return
 	}
-	asm.B(doneLabel)
-
-	asm.Label(deoptLabel)
-	ec.emitPreciseDeopt(instr)
-	asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, deoptLabel, doneLabel, true)
 }
 
 func tableArrayLoadScratchClobbers(reg jit.Reg) bool {
@@ -1800,8 +1792,5 @@ func (ec *emitContext) emitGuardTableKind(instr *Instr) {
 	asm.CMPimm(jit.X2, expectedKind)
 	asm.BCond(jit.CondNE, deoptLabel)
 	ec.storeResultNB(jit.X0, instr.ID)
-	asm.B(doneLabel)
-	asm.Label(deoptLabel)
-	ec.emitDeopt(instr)
-	asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, deoptLabel, doneLabel, false)
 }

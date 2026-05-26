@@ -140,11 +140,7 @@ func (ec *emitContext) emitTableShapeID(instr *Instr) {
 	asm.LDRW(jit.X3, jit.X0, jit.TableOffShapeID)
 	ec.storeRawTablePtr(jit.X0, tblID)
 	ec.storeRawInt(jit.X3, instr.ID)
-	asm.B(doneLabel)
-
-	asm.Label(deoptLabel)
-	ec.emitPreciseDeopt(instr)
-	asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, deoptLabel, doneLabel, true)
 }
 
 // emitGetField emits ARM64 code for OpGetField (table field read).
@@ -851,10 +847,7 @@ func (ec *emitContext) emitFieldLoad(instr *Instr) {
 		typeDeoptLabel := ec.uniqueLabel("field_load_type_deopt")
 		doneLabel := ec.uniqueLabel("field_load_done")
 		ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
-		ec.asm.B(doneLabel)
-		ec.asm.Label(typeDeoptLabel)
-		ec.emitPreciseDeopt(instr)
-		ec.asm.Label(doneLabel)
+		ec.emitGuardDeoptExit(instr, typeDeoptLabel, doneLabel, true)
 		return
 	}
 	ec.emitStoreTypedFieldLoad(instr, jit.X0, "")
@@ -874,10 +867,7 @@ func (ec *emitContext) emitFieldLoadNumToFloat(instr *Instr) {
 	typeDeoptLabel := ec.uniqueLabel("field_load_num_deopt")
 	doneLabel := ec.uniqueLabel("field_load_num_done")
 	ec.emitStoreNumericFieldLoad(instr, jit.X0, typeDeoptLabel)
-	ec.asm.B(doneLabel)
-	ec.asm.Label(typeDeoptLabel)
-	ec.emitPreciseDeopt(instr)
-	ec.asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, typeDeoptLabel, doneLabel, true)
 }
 
 func (ec *emitContext) emitFieldStore(instr *Instr) {
@@ -946,10 +936,7 @@ func (ec *emitContext) emitStableShapeFieldStoreTypeGuard(instr *Instr, fieldIdx
 	default:
 		return true
 	}
-	ec.asm.B(doneLabel)
-	ec.asm.Label(deoptLabel)
-	ec.emitPreciseDeopt(instr)
-	ec.asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, deoptLabel, doneLabel, true)
 	return true
 }
 
@@ -1082,10 +1069,7 @@ func (ec *emitContext) emitGuardShapeFieldTypeMask(instr *Instr) {
 		ec.emitCMPRegConst(jit.X9, int64(epoch), jit.X10)
 		ec.asm.BCond(jit.CondNE, deoptLabel)
 	}
-	ec.asm.B(doneLabel)
-	ec.asm.Label(deoptLabel)
-	ec.emitPreciseDeopt(instr)
-	ec.asm.Label(doneLabel)
+	ec.emitGuardDeoptExit(instr, deoptLabel, doneLabel, true)
 }
 
 func (ec *emitContext) emitGuardShapeFieldVMClosure(instr *Instr) {
