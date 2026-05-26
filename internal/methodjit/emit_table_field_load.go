@@ -1,0 +1,901 @@
+//go:build darwin && arm64
+
+// emit_table_field_load.go: table field load/read code paths (OpGetField,
+// OpFieldLoad, field svals/poly caches) and the table-exit fallback for loads.
+// Pure code movement from emit_table_field.go; no behavior change.
+
+package methodjit
+
+import (
+	"fmt"
+
+	"github.com/gscript/gscript/internal/jit"
+	"github.com/gscript/gscript/internal/runtime"
+)
+
+// emitGetField emits ARM64 code for OpGetField (table field read).
+//
+// If field cache info is available (Aux2 != 0), emits inline shape-guarded
+// access: extract table pointer, check shapeID, load svals[fieldIndex].
+// On shape guard failure, falls back to table-exit.
+//
+// If no field cache (Aux2 == 0), emits table-exit immediately (the
+// interpreter will populate the cache for next compilation).
+//
+// Instr layout:
+//   - Args[0] = table value (NaN-boxed)
+//   - Aux = constant pool index for field name
+//   - Aux2 = (shapeID << 32) | fieldIndex  (0 if no cache)
+func (ec *emitContext) emitGetField(instr *Instr) {
+	shapeID := uint32(instr.Aux2 >> 32)
+	fieldIdx := int(int32(instr.Aux2 & 0xFFFFFFFF))
+
+	// No field cache or invalid: use table-exit fallback.
+	if shapeID == 0 || instr.Aux2 == 0 {
+		if ec.emitGetFieldDirectPolyShapeFacts(instr) {
+			return
+		}
+		if ec.emitGetFieldPolymorphicCache(instr) {
+			return
+		}
+		if ec.emitGetFieldDynamicCache(instr) {
+			return
+		}
+		ec.invalidateFieldSvalsCache()
+		ec.emitGetFieldExit(instr)
+		return
+	}
+
+	asm := ec.asm
+	tblValueID := instr.Args[0].ID
+
+	typeDeoptLabel := ec.uniqueLabel("getfield_type_deopt")
+	doneLabel := ec.uniqueLabel("getfield_done")
+	deoptLabel := ec.uniqueLabel("getfield_deopt")
+	if ec.hasFieldSvalsCache(tblValueID, shapeID) {
+		asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
+		if instr.Type == TypeFloat || instr.Type == TypeInt {
+			ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+			asm.B(doneLabel)
+			asm.Label(typeDeoptLabel)
+			ec.emitDeopt(instr)
+			asm.Label(doneLabel)
+			return
+		}
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, "")
+		return
+	}
+
+	if instr.Args[0].Def != nil && instr.Args[0].Def.Op == OpNewFixedTable {
+		ec.emitGetFieldFixedRecordFastPath(instr, tblValueID, shapeID, fieldIdx, doneLabel, deoptLabel, typeDeoptLabel)
+	}
+
+	shapeWasVerified := ec.emitPrepareFieldTablePtr(tblValueID, shapeID, deoptLabel)
+	if shapeWasVerified {
+		asm.LDR(jit.X1, jit.X0, jit.TableOffSvals)
+		asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
+		if instr.Type == TypeFloat || instr.Type == TypeInt {
+			ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+			ec.rememberFieldSvalsCache(tblValueID, shapeID)
+			asm.B(doneLabel)
+			asm.Label(typeDeoptLabel)
+			ec.emitDeopt(instr)
+			asm.Label(doneLabel)
+			return
+		}
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, "")
+		ec.rememberFieldSvalsCache(tblValueID, shapeID)
+		return
+	}
+
+	// Direct field access: svals[fieldIndex].
+	// svals is a Go slice: first 8 bytes = data pointer.
+	asm.LDR(jit.X1, jit.X0, jit.TableOffSvals)      // X1 = svals data pointer
+	asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize) // X0 = svals[fieldIndex]
+
+	ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+	ec.rememberFieldSvalsCache(tblValueID, shapeID)
+
+	// Skip the deopt fallback.
+	asm.B(doneLabel)
+
+	// Deopt fallback: use table-exit to perform the field access in Go.
+	asm.Label(deoptLabel)
+	savedReprs := ec.snapshotValueReprs()
+	ec.emitGetFieldExit(instr)
+	ec.emitUnboxRawIntRegs(savedReprs)
+	ec.restoreValueReprSnapshot(savedReprs)
+	asm.B(doneLabel)
+
+	if instr.Type == TypeFloat || instr.Type == TypeInt {
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+	}
+
+	asm.Label(doneLabel)
+}
+
+func (ec *emitContext) emitGetFieldFixedRecordFastPath(instr *Instr, tblValueID int, shapeID uint32, fieldIdx int, doneLabel, deoptLabel, typeDeoptLabel string) {
+	if ec == nil || instr == nil || shapeID == 0 || fieldIdx < 0 {
+		return
+	}
+	asm := ec.asm
+	notRecordLabel := ec.uniqueLabel("getfield_not_fixed_record")
+	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
+	if tblReg != jit.X0 {
+		asm.MOVreg(jit.X0, tblReg)
+	}
+	asm.LSRimm(jit.X1, jit.X0, 48)
+	asm.MOVimm16(jit.X2, jit.NB_TagPtrShr48)
+	asm.CMPreg(jit.X1, jit.X2)
+	asm.BCond(jit.CondNE, notRecordLabel)
+	asm.LSRimm(jit.X1, jit.X0, uint8(jit.NB_PtrSubShift))
+	asm.LoadImm64(jit.X2, 0xF)
+	asm.ANDreg(jit.X1, jit.X1, jit.X2)
+	asm.CMPimm(jit.X1, jit.NB_PtrSubFixedRecord)
+	asm.BCond(jit.CondNE, notRecordLabel)
+
+	jit.EmitExtractPtr(asm, jit.X3, jit.X0)
+	asm.CBZ(jit.X3, deoptLabel)
+	asm.LDR(jit.X1, jit.X3, jit.FixedRecordOffMaterialized)
+	asm.CBNZ(jit.X1, deoptLabel)
+	asm.LDRW(jit.X1, jit.X3, jit.FixedRecordOffShapeID)
+	emitCMPWConst(asm, jit.X1, jit.X2, int64(shapeID))
+	asm.BCond(jit.CondNE, deoptLabel)
+	asm.LDRB(jit.X1, jit.X3, jit.FixedRecordOffN)
+	asm.LoadImm64(jit.X2, int64(fieldIdx))
+	asm.CMPreg(jit.X2, jit.X1)
+	asm.BCond(jit.CondGE, deoptLabel)
+	asm.ADDimm(jit.X3, jit.X3, jit.FixedRecordOffValues)
+	asm.LDRreg(jit.X0, jit.X3, jit.X2)
+	ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+	asm.B(doneLabel)
+
+	asm.Label(notRecordLabel)
+}
+
+func (ec *emitContext) emitGetFieldDirectPolyShapeFacts(instr *Instr) bool {
+	if ec == nil || ec.fn == nil || instr == nil || len(instr.Args) == 0 {
+		return false
+	}
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(instr.ID)
+	if len(cases) < 2 {
+		return false
+	}
+	asm := ec.asm
+	tblValueID := instr.Args[0].ID
+	typeDeoptLabel := ec.uniqueLabel("getfield_direct_poly_type_deopt")
+	missLabel := ec.uniqueLabel("getfield_direct_poly_miss")
+	doneLabel := ec.uniqueLabel("getfield_direct_poly_done")
+
+	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
+	if tblReg != jit.X0 {
+		asm.MOVreg(jit.X0, tblReg)
+	}
+	if ec.irTypes[tblValueID] != TypeTable {
+		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
+	}
+	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+	asm.CBZ(jit.X0, missLabel)
+	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
+	asm.LDR(jit.X5, jit.X0, jit.TableOffSvalsLen)
+	asm.LDR(jit.X6, jit.X0, jit.TableOffSvals)
+
+	for _, c := range cases {
+		if c.ShapeID == 0 || c.FieldIdx < 0 {
+			continue
+		}
+		nextLabel := ec.uniqueLabel("getfield_direct_poly_next")
+		emitCMPWConst(asm, jit.X1, jit.X2, int64(c.ShapeID))
+		asm.BCond(jit.CondNE, nextLabel)
+		fieldOff := c.FieldIdx * jit.ValueSize
+		if c.FieldIdx >= 0 && c.FieldIdx <= 4095 && fieldOff >= 0 && fieldOff <= 32760 {
+			asm.CMPimm(jit.X5, uint16(c.FieldIdx))
+			asm.BCond(jit.CondLS, missLabel)
+			asm.LDR(jit.X0, jit.X6, fieldOff)
+		} else {
+			asm.LoadImm64(jit.X4, int64(c.FieldIdx))
+			asm.CMPreg(jit.X4, jit.X5)
+			asm.BCond(jit.CondGE, missLabel)
+			asm.LDRreg(jit.X0, jit.X6, jit.X4)
+		}
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+		asm.B(doneLabel)
+		asm.Label(nextLabel)
+	}
+	asm.B(missLabel)
+
+	asm.Label(missLabel)
+	savedReprs := ec.snapshotValueReprs()
+	ec.emitGetFieldExit(instr)
+	ec.emitUnboxRawIntRegs(savedReprs)
+	ec.restoreValueReprSnapshot(savedReprs)
+	asm.B(doneLabel)
+
+	if instr.Type == TypeFloat || instr.Type == TypeInt {
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+	}
+
+	asm.Label(doneLabel)
+	return true
+}
+
+func (ec *emitContext) emitFieldPolyLen(instr *Instr) {
+	if ec == nil || ec.fn == nil || instr == nil || len(instr.Args) == 0 {
+		ec.emitDeopt(instr)
+		return
+	}
+	if ec.hasReg(instr.ID) && ec.valueReprOf(instr.ID) == valueReprRawInt {
+		return
+	}
+	cases, _ := functionTableShapeFacts(ec.fn).FieldPolyShapeCases(instr.ID)
+	if len(cases) < 2 {
+		ec.emitDeopt(instr)
+		return
+	}
+	name := fieldNameFromAux(ec.fn, instr.Aux)
+	if name == "" {
+		ec.emitDeopt(instr)
+		return
+	}
+	asm := ec.asm
+	missLabel := ec.uniqueLabel("field_poly_len_miss")
+	doneLabel := ec.uniqueLabel("field_poly_len_done")
+	tblValueID := instr.Args[0].ID
+
+	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
+	if tblReg != jit.X0 {
+		asm.MOVreg(jit.X0, tblReg)
+	}
+	if ec.irTypes[tblValueID] != TypeTable {
+		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
+	}
+	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+	asm.CBZ(jit.X0, missLabel)
+	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
+
+	for _, c := range cases {
+		r, ok := c.ReceiverFact.FieldLenRanges[name]
+		if c.ShapeID == 0 || !ok || !r.known || r.min != r.max {
+			asm.B(missLabel)
+			continue
+		}
+		nextLabel := ec.uniqueLabel("field_poly_len_next")
+		emitCMPWConst(asm, jit.X1, jit.X2, int64(c.ShapeID))
+		asm.BCond(jit.CondNE, nextLabel)
+		asm.LoadImm64(jit.X0, r.min)
+		ec.storeRawInt(jit.X0, instr.ID)
+		asm.B(doneLabel)
+		asm.Label(nextLabel)
+	}
+	asm.B(missLabel)
+
+	asm.Label(missLabel)
+	ec.emitDeopt(instr)
+	asm.Label(doneLabel)
+}
+
+func (ec *emitContext) emitGetFieldPolymorphicCache(instr *Instr) bool {
+	if instr == nil || instr.SourcePC < 0 || len(instr.Args) == 0 {
+		return false
+	}
+	asm := ec.asm
+	tblValueID := instr.Args[0].ID
+	typeDeoptLabel := ec.uniqueLabel("getfield_pic_type_deopt")
+	missLabel := ec.uniqueLabel("getfield_pic_miss")
+	doneLabel := ec.uniqueLabel("getfield_pic_done")
+
+	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
+	if tblReg != jit.X0 {
+		asm.MOVreg(jit.X0, tblReg)
+	}
+	if ec.irTypes[tblValueID] != TypeTable {
+		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
+	}
+	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+	asm.CBZ(jit.X0, missLabel)
+	asm.LDR(jit.X2, jit.X0, jit.TableOffLazyTree)
+	asm.CBNZ(jit.X2, missLabel)
+	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
+	smapCacheLabel := ec.uniqueLabel("getfield_pic_smap_cache")
+	asm.CBZ(jit.X1, smapCacheLabel)
+
+	dynamicCacheLabel := ec.uniqueLabel("getfield_pic_dynamic_cache")
+	ec.emitGetFieldPolyShapeCacheProbe(instr, dynamicCacheLabel, doneLabel, typeDeoptLabel)
+
+	asm.Label(dynamicCacheLabel)
+	ec.emitGetFieldPolymorphicCacheProbe(instr, missLabel, doneLabel, typeDeoptLabel)
+
+	asm.Label(smapCacheLabel)
+	if !ec.emitGetFieldStringMapValueCacheProbe(instr, missLabel, doneLabel, typeDeoptLabel) {
+		asm.B(missLabel)
+	}
+
+	asm.Label(missLabel)
+	savedReprs := ec.snapshotValueReprs()
+	ec.emitGetFieldExit(instr)
+	ec.emitUnboxRawIntRegs(savedReprs)
+	ec.restoreValueReprSnapshot(savedReprs)
+	asm.B(doneLabel)
+
+	if instr.Type == TypeFloat || instr.Type == TypeInt {
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+	}
+
+	asm.Label(doneLabel)
+	return true
+}
+
+func (ec *emitContext) emitGetFieldPolyShapeCacheProbe(instr *Instr, missLabel, doneLabel, typeDeoptLabel string) {
+	asm := ec.asm
+	asm.LDR(jit.X3, mRegCtx, execCtxOffBaselineFieldPolyCache)
+	asm.CBZ(jit.X3, missLabel)
+	entryOff := instr.SourcePC * runtime.FieldPolyCacheWays * jit.FieldPolyCacheEntrySize
+	if entryOff > 0 {
+		if entryOff <= 4095 {
+			asm.ADDimm(jit.X3, jit.X3, uint16(entryOff))
+		} else {
+			asm.LoadImm64(jit.X4, int64(entryOff))
+			asm.ADDreg(jit.X3, jit.X3, jit.X4)
+		}
+	}
+
+	for i := 0; i < runtime.FieldPolyCacheWays; i++ {
+		nextLabel := ec.uniqueLabel("getfield_fpic_next")
+		asm.LDRW(jit.X5, jit.X3, jit.FieldPolyCacheEntryOffShapeID)
+		asm.CMPreg(jit.X5, jit.X1)
+		asm.BCond(jit.CondNE, nextLabel)
+		asm.LDR(jit.X4, jit.X3, jit.FieldPolyCacheEntryOffFieldIdx)
+		asm.LDR(jit.X5, jit.X0, jit.TableOffSvalsLen)
+		asm.CMPreg(jit.X4, jit.X5)
+		asm.BCond(jit.CondGE, missLabel)
+		asm.LDR(jit.X5, jit.X0, jit.TableOffSvals)
+		asm.LDRreg(jit.X0, jit.X5, jit.X4)
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+		asm.B(doneLabel)
+
+		asm.Label(nextLabel)
+		if i+1 < runtime.FieldPolyCacheWays {
+			asm.ADDimm(jit.X3, jit.X3, uint16(jit.FieldPolyCacheEntrySize))
+		}
+	}
+	asm.B(missLabel)
+}
+
+func (ec *emitContext) emitGetFieldPolymorphicCacheProbe(instr *Instr, missLabel, doneLabel, typeDeoptLabel string) {
+	asm := ec.asm
+	asm.LDR(jit.X3, mRegCtx, execCtxOffBaselineTableStringKeyCache)
+	asm.CBZ(jit.X3, missLabel)
+	entryOff := instr.SourcePC * runtime.TableStringKeyCacheWays * tableStringKeyCacheEntrySize
+	if entryOff > 0 {
+		if entryOff <= 4095 {
+			asm.ADDimm(jit.X3, jit.X3, uint16(entryOff))
+		} else {
+			asm.LoadImm64(jit.X4, int64(entryOff))
+			asm.ADDreg(jit.X3, jit.X3, jit.X4)
+		}
+	}
+
+	loopLabel := ec.uniqueLabel("getfield_pic_loop")
+	nextLabel := ec.uniqueLabel("getfield_pic_next")
+	asm.MOVimm16(jit.X9, 0)
+	asm.Label(loopLabel)
+	asm.LDRW(jit.X5, jit.X3, tableStringKeyCacheEntryShapeID)
+	asm.CMPreg(jit.X5, jit.X1)
+	asm.BCond(jit.CondNE, nextLabel)
+	asm.LDR(jit.X4, jit.X3, tableStringKeyCacheEntryFieldIdx)
+	asm.LDR(jit.X5, jit.X0, jit.TableOffSvalsLen)
+	asm.CMPreg(jit.X4, jit.X5)
+	asm.BCond(jit.CondGE, missLabel)
+	asm.LDR(jit.X5, jit.X0, jit.TableOffSvals)
+	asm.LDRreg(jit.X0, jit.X5, jit.X4)
+	ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+	asm.B(doneLabel)
+
+	asm.Label(nextLabel)
+	asm.ADDimm(jit.X3, jit.X3, uint16(tableStringKeyCacheEntrySize))
+	asm.ADDimm(jit.X9, jit.X9, 1)
+	asm.CMPimm(jit.X9, runtime.TableStringKeyCacheWays)
+	asm.BCond(jit.CondLT, loopLabel)
+	asm.B(missLabel)
+}
+
+func (ec *emitContext) emitGetFieldStringMapValueCacheProbe(instr *Instr, missLabel, doneLabel, typeDeoptLabel string) bool {
+	if instr == nil || ec == nil || ec.fn == nil || ec.fn.Proto == nil {
+		return false
+	}
+	if _, ok := constString(ec.fn, instr.Aux); !ok {
+		return false
+	}
+
+	asm := ec.asm
+	constIdx := int(instr.Aux)
+	if constIdx >= 0 && constIdx <= 4095 {
+		asm.LDR(jit.X4, mRegConsts, constIdx*jit.ValueSize)
+	} else {
+		asm.LoadImm64(jit.X4, int64(constIdx))
+		asm.LDRreg(jit.X4, mRegConsts, jit.X4)
+	}
+	jit.EmitExtractPtr(asm, jit.X4, jit.X4)
+	asm.CBZ(jit.X4, missLabel)
+	asm.LDR(jit.X5, jit.X4, 0) // string data
+	asm.LDR(jit.X6, jit.X4, 8) // string len
+
+	asm.LDR(jit.X8, jit.X0, jit.TableOffStringLookupCache)
+	asm.CBZ(jit.X8, missLabel)
+	asm.LDR(jit.X3, jit.X8, jit.StringLookupCacheOffEntries)
+	asm.CBZ(jit.X3, missLabel)
+	asm.LDR(jit.X10, jit.X8, jit.StringLookupCacheOffMask)
+
+	ec.emitStringLookupContentHash(jit.X5, jit.X6, jit.X9, jit.X11, jit.X14, jit.X15, "getfield_smap_hash")
+	asm.MOVreg(jit.X15, jit.X9)
+	asm.ANDreg(jit.X9, jit.X9, jit.X10)
+
+	loopLabel := ec.uniqueLabel("getfield_smap_loop")
+	nextLabel := ec.uniqueLabel("getfield_smap_next")
+	foundLabel := ec.uniqueLabel("getfield_smap_found")
+	byteLoopLabel := ec.uniqueLabel("getfield_smap_bytes")
+	asm.MOVimm16(jit.X13, 0)
+	asm.Label(loopLabel)
+	asm.ADDreg(jit.X11, jit.X9, jit.X13)
+	asm.ANDreg(jit.X11, jit.X11, jit.X10)
+	asm.LSLimm(jit.X12, jit.X11, 6) // idx * 64
+	asm.ADDreg(jit.X12, jit.X3, jit.X12)
+
+	asm.LDRB(jit.X14, jit.X12, jit.StringLookupCacheEntryOffValid)
+	asm.CBZ(jit.X14, missLabel)
+	asm.LDR(jit.X14, jit.X12, jit.StringLookupCacheEntryOffHash)
+	asm.CMPreg(jit.X14, jit.X15)
+	asm.BCond(jit.CondNE, nextLabel)
+	asm.LDR(jit.X14, jit.X12, jit.StringLookupCacheEntryOffKeyLen)
+	asm.CMPreg(jit.X14, jit.X6)
+	asm.BCond(jit.CondNE, nextLabel)
+	asm.LDR(jit.X14, jit.X12, jit.StringLookupCacheEntryOffKeyData)
+	asm.CMPreg(jit.X14, jit.X5)
+	asm.BCond(jit.CondEQ, foundLabel)
+	asm.CBZ(jit.X6, foundLabel)
+	asm.MOVimm16(jit.X15, 0)
+	asm.Label(byteLoopLabel)
+	asm.LDRBreg(jit.X16, jit.X14, jit.X15)
+	asm.LDRBreg(jit.X17, jit.X5, jit.X15)
+	asm.CMPreg(jit.X16, jit.X17)
+	asm.BCond(jit.CondNE, nextLabel)
+	asm.ADDimm(jit.X15, jit.X15, 1)
+	asm.CMPreg(jit.X15, jit.X6)
+	asm.BCond(jit.CondLT, byteLoopLabel)
+
+	asm.Label(foundLabel)
+	asm.LDR(jit.X0, jit.X12, jit.StringLookupCacheEntryOffValue)
+	ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+	asm.B(doneLabel)
+
+	asm.Label(nextLabel)
+	asm.ADDimm(jit.X13, jit.X13, 1)
+	asm.CMPimm(jit.X13, runtime.StringLookupCacheProbeLimit)
+	asm.BCond(jit.CondLT, loopLabel)
+	asm.B(missLabel)
+	return true
+}
+
+func (ec *emitContext) emitGetFieldDynamicCache(instr *Instr) bool {
+	if instr == nil || instr.SourcePC < 0 || len(instr.Args) == 0 {
+		return false
+	}
+	asm := ec.asm
+	tblValueID := instr.Args[0].ID
+	typeDeoptLabel := ec.uniqueLabel("getfield_dyn_type_deopt")
+	deoptLabel := ec.uniqueLabel("getfield_dyn_deopt")
+	doneLabel := ec.uniqueLabel("getfield_dyn_done")
+
+	asm.LDR(jit.X3, mRegCtx, execCtxOffBaselineFieldCache)
+	asm.CBZ(jit.X3, deoptLabel)
+	entryOff := instr.SourcePC * jit.FieldCacheEntrySize
+	if entryOff <= 4095 {
+		asm.ADDimm(jit.X3, jit.X3, uint16(entryOff))
+	} else {
+		asm.LoadImm64(jit.X4, int64(entryOff))
+		asm.ADDreg(jit.X3, jit.X3, jit.X4)
+	}
+	asm.LDRW(jit.X5, jit.X3, jit.FieldCacheEntryOffShapeID)
+	asm.CBZ(jit.X5, deoptLabel)
+	asm.LDR(jit.X4, jit.X3, jit.FieldCacheEntryOffFieldIdx)
+	asm.CMPimm(jit.X4, 0)
+	asm.BCond(jit.CondLT, deoptLabel)
+
+	tblReg := ec.resolveValueNB(tblValueID, jit.X0)
+	if tblReg != jit.X0 {
+		asm.MOVreg(jit.X0, tblReg)
+	}
+	if ec.irTypes[tblValueID] != TypeTable {
+		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, deoptLabel)
+	}
+	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+	asm.CBZ(jit.X0, deoptLabel)
+	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
+	asm.CMPreg(jit.X1, jit.X5)
+	asm.BCond(jit.CondNE, deoptLabel)
+	asm.LDR(jit.X1, jit.X0, jit.TableOffSvalsLen)
+	asm.CMPreg(jit.X4, jit.X1)
+	asm.BCond(jit.CondGE, deoptLabel)
+	asm.LDR(jit.X1, jit.X0, jit.TableOffSvals)
+	asm.LDRreg(jit.X0, jit.X1, jit.X4)
+	ec.emitStoreDynamicFieldLoad(instr, jit.X0, typeDeoptLabel)
+	asm.B(doneLabel)
+
+	asm.Label(deoptLabel)
+	savedReprs := ec.snapshotValueReprs()
+	ec.emitGetFieldExit(instr)
+	ec.emitUnboxRawIntRegs(savedReprs)
+	ec.restoreValueReprSnapshot(savedReprs)
+	asm.B(doneLabel)
+
+	if instr.Type == TypeFloat || instr.Type == TypeInt {
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+	}
+
+	asm.Label(doneLabel)
+	return true
+}
+
+func (ec *emitContext) emitStoreDynamicFieldLoad(instr *Instr, valReg jit.Reg, deoptLabel string) {
+	if instr != nil && instr.Op == OpGetFieldNumToFloat {
+		ec.emitStoreNumericFieldLoad(instr, valReg, deoptLabel)
+		return
+	}
+	ec.emitStoreTypedFieldLoad(instr, valReg, deoptLabel)
+}
+
+func (ec *emitContext) emitGetFieldNumToFloat(instr *Instr) {
+	shapeID := uint32(instr.Aux2 >> 32)
+	fieldIdx := int(int32(instr.Aux2 & 0xFFFFFFFF))
+
+	// No field cache or invalid: use table-exit fallback. The resume path
+	// applies the same int-or-float conversion as the inline fast path.
+	if shapeID == 0 || instr.Aux2 == 0 {
+		if ec.emitGetFieldDynamicCache(instr) {
+			return
+		}
+		ec.invalidateFieldSvalsCache()
+		ec.emitGetFieldExit(instr)
+		return
+	}
+
+	asm := ec.asm
+	tblValueID := instr.Args[0].ID
+	typeDeoptLabel := ec.uniqueLabel("getfield_num_deopt")
+	doneLabel := ec.uniqueLabel("getfield_num_done")
+	deoptLabel := ec.uniqueLabel("getfield_num_shape_deopt")
+	if ec.hasFieldSvalsCache(tblValueID, shapeID) {
+		asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
+		ec.emitStoreNumericFieldLoad(instr, jit.X0, typeDeoptLabel)
+		asm.B(doneLabel)
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+		asm.Label(doneLabel)
+		return
+	}
+
+	shapeWasVerified := ec.emitPrepareFieldTablePtr(tblValueID, shapeID, deoptLabel)
+	if shapeWasVerified {
+		asm.LDR(jit.X1, jit.X0, jit.TableOffSvals)
+		asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
+		ec.emitStoreNumericFieldLoad(instr, jit.X0, typeDeoptLabel)
+		ec.rememberFieldSvalsCache(tblValueID, shapeID)
+		asm.B(doneLabel)
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+		asm.Label(doneLabel)
+		return
+	}
+
+	asm.LDR(jit.X1, jit.X0, jit.TableOffSvals)
+	asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
+	ec.emitStoreNumericFieldLoad(instr, jit.X0, typeDeoptLabel)
+	ec.rememberFieldSvalsCache(tblValueID, shapeID)
+
+	asm.B(doneLabel)
+
+	asm.Label(deoptLabel)
+	savedReprs := ec.snapshotValueReprs()
+	ec.emitGetFieldExit(instr)
+	ec.emitUnboxRawIntRegs(savedReprs)
+	ec.restoreValueReprSnapshot(savedReprs)
+	asm.B(doneLabel)
+
+	asm.Label(typeDeoptLabel)
+	ec.emitDeopt(instr)
+
+	asm.Label(doneLabel)
+}
+
+func (ec *emitContext) emitFieldSvals(instr *Instr) {
+	if instr == nil || len(instr.Args) == 0 {
+		return
+	}
+	shapeID := uint32(instr.Aux)
+	if shapeID == 0 {
+		ec.emitDeopt(instr)
+		return
+	}
+	asm := ec.asm
+	deoptLabel := ec.uniqueLabel("field_svals_deopt")
+	doneLabel := ec.uniqueLabel("field_svals_done")
+	if fieldSvalsMaySeeFixedRecord(instr) {
+		tableLabel := ec.uniqueLabel("field_svals_table")
+		tablePtrLabel := ec.uniqueLabel("field_svals_table_ptr")
+
+		tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+		asm.LSRimm(jit.X1, jit.X0, 48)
+		asm.MOVimm16(jit.X2, jit.NB_TagPtrShr48)
+		asm.CMPreg(jit.X1, jit.X2)
+		asm.BCond(jit.CondNE, tableLabel)
+		asm.LSRimm(jit.X1, jit.X0, uint8(jit.NB_PtrSubShift))
+		asm.LoadImm64(jit.X2, 0xF)
+		asm.ANDreg(jit.X1, jit.X1, jit.X2)
+		asm.CMPimm(jit.X1, jit.NB_PtrSubFixedRecord)
+		asm.BCond(jit.CondNE, tableLabel)
+		jit.EmitExtractPtr(asm, jit.X3, jit.X0)
+		asm.CBZ(jit.X3, deoptLabel)
+		asm.LDR(jit.X0, jit.X3, jit.FixedRecordOffMaterialized)
+		asm.CBNZ(jit.X0, tablePtrLabel)
+		asm.LDRW(jit.X1, jit.X3, jit.FixedRecordOffShapeID)
+		emitCMPWConst(asm, jit.X1, jit.X2, int64(shapeID))
+		asm.BCond(jit.CondNE, deoptLabel)
+		asm.LDRB(jit.X1, jit.X3, jit.FixedRecordOffN)
+		asm.CBZ(jit.X1, deoptLabel)
+		asm.ADDimm(jit.X0, jit.X3, jit.FixedRecordOffValues)
+		ec.storeRawFieldSvalsPtr(jit.X0, instr.ID)
+		asm.B(doneLabel)
+
+		asm.Label(tableLabel)
+		ec.emitPrepareFieldTablePtr(instr.Args[0].ID, shapeID, deoptLabel)
+		asm.Label(tablePtrLabel)
+		asm.LDR(jit.X0, jit.X0, jit.TableOffSvals)
+		ec.storeRawFieldSvalsPtr(jit.X0, instr.ID)
+		asm.B(doneLabel)
+	} else {
+		ec.emitPrepareFieldTablePtr(instr.Args[0].ID, shapeID, deoptLabel)
+		asm.LDR(jit.X0, jit.X0, jit.TableOffSvals)
+		ec.storeRawFieldSvalsPtr(jit.X0, instr.ID)
+		asm.B(doneLabel)
+	}
+
+	asm.Label(deoptLabel)
+	ec.emitPreciseDeopt(instr)
+	asm.Label(doneLabel)
+}
+
+func fieldSvalsMaySeeFixedRecord(instr *Instr) bool {
+	if instr == nil || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Args[0].Def == nil {
+		return false
+	}
+	switch instr.Args[0].Def.Op {
+	case OpNewFixedTable, OpFieldLoad, OpGetField:
+		return true
+	default:
+		return false
+	}
+}
+
+func (ec *emitContext) emitFieldLoad(instr *Instr) {
+	if instr == nil || len(instr.Args) == 0 {
+		return
+	}
+	fieldIdx := int(instr.Aux)
+	if fieldIdx < 0 {
+		ec.emitDeopt(instr)
+		return
+	}
+	svals := ec.resolveRawFieldSvalsPtr(instr.Args[0].ID, jit.X1)
+	if instr.Type == TypeFloat && ec.fieldLoadTypeCheckElided(instr) {
+		dstF := jit.D0
+		if pr, ok := ec.alloc.ValueRegs[instr.ID]; ok && pr.IsFloat {
+			dstF = jit.FReg(pr.Reg)
+		}
+		ec.asm.FLDRd(dstF, svals, fieldIdx*jit.ValueSize)
+		ec.storeRawFloat(dstF, instr.ID)
+		return
+	}
+	if instr.Type == TypeInt && ec.fieldLoadTypeCheckElided(instr) {
+		dst := jit.X0
+		if pr, ok := ec.alloc.ValueRegs[instr.ID]; ok && !pr.IsFloat {
+			dst = jit.Reg(pr.Reg)
+		}
+		ec.asm.LDR(dst, svals, fieldIdx*jit.ValueSize)
+		ec.asm.SBFX(dst, dst, 0, 48)
+		ec.storeRawInt(dst, instr.ID)
+		return
+	}
+	ec.asm.LDR(jit.X0, svals, fieldIdx*jit.ValueSize)
+	if instr.Type == TypeFloat || instr.Type == TypeInt {
+		typeDeoptLabel := ec.uniqueLabel("field_load_type_deopt")
+		doneLabel := ec.uniqueLabel("field_load_done")
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+		ec.emitGuardDeoptExit(instr, typeDeoptLabel, doneLabel, true)
+		return
+	}
+	ec.emitStoreTypedFieldLoad(instr, jit.X0, "")
+}
+
+func (ec *emitContext) emitFieldLoadNumToFloat(instr *Instr) {
+	if instr == nil || len(instr.Args) == 0 {
+		return
+	}
+	fieldIdx := int(instr.Aux)
+	if fieldIdx < 0 {
+		ec.emitDeopt(instr)
+		return
+	}
+	svals := ec.resolveRawFieldSvalsPtr(instr.Args[0].ID, jit.X1)
+	ec.asm.LDR(jit.X0, svals, fieldIdx*jit.ValueSize)
+	typeDeoptLabel := ec.uniqueLabel("field_load_num_deopt")
+	doneLabel := ec.uniqueLabel("field_load_num_done")
+	ec.emitStoreNumericFieldLoad(instr, jit.X0, typeDeoptLabel)
+	ec.emitGuardDeoptExit(instr, typeDeoptLabel, doneLabel, true)
+}
+func (ec *emitContext) emitStoreTypedFieldLoad(instr *Instr, valReg jit.Reg, typeDeoptLabel string) {
+	if instr.Type == TypeFloat {
+		if ec.fieldLoadTypeCheckElided(instr) {
+			ec.asm.FMOVtoFP(jit.D0, valReg)
+			ec.storeRawFloat(jit.D0, instr.ID)
+			return
+		}
+		ec.asm.LSRimm(jit.X2, valReg, 48)
+		ec.asm.MOVimm16(jit.X3, jit.NB_TagNilShr48)
+		ec.asm.CMPreg(jit.X2, jit.X3)
+		ec.asm.BCond(jit.CondGE, typeDeoptLabel)
+		ec.asm.FMOVtoFP(jit.D0, valReg)
+		ec.storeRawFloat(jit.D0, instr.ID)
+		return
+	}
+	if instr.Type == TypeInt && typeDeoptLabel != "" {
+		if valReg != jit.X0 {
+			ec.asm.MOVreg(jit.X0, valReg)
+		}
+		if !ec.fieldLoadTypeCheckElided(instr) {
+			emitCheckIsIntPinned(ec.asm, jit.X0, jit.X2)
+			ec.asm.BCond(jit.CondNE, typeDeoptLabel)
+		}
+		jit.EmitUnboxInt(ec.asm, jit.X0, jit.X0)
+		ec.storeRawInt(jit.X0, instr.ID)
+		return
+	}
+	ec.storeResultNB(valReg, instr.ID)
+}
+
+func (ec *emitContext) emitStoreNumericFieldLoad(instr *Instr, valReg jit.Reg, deoptLabel string) {
+	asm := ec.asm
+	intLabel := ec.uniqueLabel("field_num_int")
+	storeLabel := ec.uniqueLabel("field_num_store")
+
+	asm.LSRimm(jit.X2, valReg, 48)
+	asm.MOVimm16(jit.X3, jit.NB_TagNilShr48)
+	asm.CMPreg(jit.X2, jit.X3)
+	asm.BCond(jit.CondGE, intLabel)
+	asm.FMOVtoFP(jit.D0, valReg)
+	asm.B(storeLabel)
+
+	asm.Label(intLabel)
+	asm.MOVimm16(jit.X3, jit.NB_TagIntShr48)
+	asm.CMPreg(jit.X2, jit.X3)
+	asm.BCond(jit.CondNE, deoptLabel)
+	if valReg != jit.X0 {
+		asm.MOVreg(jit.X0, valReg)
+	}
+	jit.EmitUnboxInt(asm, jit.X0, jit.X0)
+	asm.SCVTF(jit.D0, jit.X0)
+
+	asm.Label(storeLabel)
+	ec.storeRawFloat(jit.D0, instr.ID)
+}
+
+func (ec *emitContext) fieldLoadTypeCheckElided(instr *Instr) bool {
+	if ec == nil || ec.fn == nil || instr == nil {
+		return false
+	}
+	return ec.fn.Analysis.TableShapeFacts().ShapeFieldTypeElidedLoad(instr.ID)
+}
+
+// emitGetFieldExit emits a table-exit for OpGetField when no inline cache
+// is available or when the shape guard fails. Stores table and field info
+// to ExecContext, exits to Go, and resumes after the operation completes.
+func (ec *emitContext) emitGetFieldExit(instr *Instr) {
+	asm := ec.asm
+
+	// We need the table value in a register slot so Go can read it.
+	// Store the table arg to its home slot (it may only be in a register).
+	if len(instr.Args) > 0 {
+		tblReg := ec.resolveValueNB(instr.Args[0].ID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+		tblSlot, hasTblSlot := ec.slotMap[instr.Args[0].ID]
+		if hasTblSlot {
+			asm.STR(jit.X0, mRegRegs, slotOffset(tblSlot))
+		}
+	}
+
+	resultSlot, hasSlot := ec.slotMap[instr.ID]
+	if !hasSlot {
+		ec.emitDeopt(instr)
+		return
+	}
+
+	tblSlot := 0
+	if len(instr.Args) > 0 {
+		if s, ok := ec.slotMap[instr.Args[0].ID]; ok {
+			tblSlot = s
+		}
+	}
+
+	// Store all active register-resident values to memory.
+	ec.recordExitResumeCheckSite(instr, ExitTableExit, []int{resultSlot}, exitResumeCheckOptions{RequireTableInputs: true})
+	ec.emitStoreAllActiveRegs()
+
+	// Write table-exit descriptor.
+	asm.LoadImm64(jit.X0, int64(TableOpGetField))
+	asm.STR(jit.X0, mRegCtx, execCtxOffTableOp)
+	asm.LoadImm64(jit.X0, int64(tblSlot))
+	asm.STR(jit.X0, mRegCtx, execCtxOffTableSlot)
+	asm.LoadImm64(jit.X0, int64(instr.Aux)) // constant pool index
+	asm.STR(jit.X0, mRegCtx, execCtxOffTableAux)
+	asm.LoadImm64(jit.X0, int64(resultSlot))
+	asm.STR(jit.X0, mRegCtx, execCtxOffTableAux2)
+	asm.LoadImm64(jit.X0, int64(instr.SourcePC))
+	asm.STR(jit.X0, mRegCtx, execCtxOffTableKeySlot)
+	asm.LoadImm64(jit.X0, int64(instr.ID))
+	asm.STR(jit.X0, mRegCtx, execCtxOffTableExitID)
+
+	// Set ExitCode = ExitTableExit and return to Go.
+	ec.emitSetResumeNumericPass()
+	asm.LoadImm64(jit.X0, ExitTableExit)
+	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
+	if ec.numericMode {
+		asm.B("num_deopt_epilogue")
+	} else {
+		asm.B("deopt_epilogue")
+	}
+
+	// Continue label: resume entry jumps here.
+	continueLabel := ec.passLabel(fmt.Sprintf("table_continue_%d", instr.ID))
+	asm.Label(continueLabel)
+
+	// Reload all active registers from memory.
+	ec.emitReloadAllActiveRegs()
+
+	// Load result from register file.
+	asm.LDR(jit.X0, mRegRegs, slotOffset(resultSlot))
+	if instr.Op == OpGetFieldNumToFloat {
+		typeDeoptLabel := ec.uniqueLabel("getfield_exit_num_deopt")
+		doneLabel := ec.uniqueLabel("getfield_exit_num_done")
+		ec.emitStoreNumericFieldLoad(instr, jit.X0, typeDeoptLabel)
+		asm.B(doneLabel)
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+		asm.Label(doneLabel)
+	} else if instr.Type == TypeFloat || instr.Type == TypeInt {
+		typeDeoptLabel := ec.uniqueLabel("getfield_exit_type_deopt")
+		doneLabel := ec.uniqueLabel("getfield_exit_typed_done")
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, typeDeoptLabel)
+		asm.B(doneLabel)
+		asm.Label(typeDeoptLabel)
+		ec.emitDeopt(instr)
+		asm.Label(doneLabel)
+	} else {
+		ec.emitStoreTypedFieldLoad(instr, jit.X0, "")
+	}
+
+	// Record for deferred resume.
+	ec.callExitIDs = append(ec.callExitIDs, instr.ID)
+	ec.deferredResumes = append(ec.deferredResumes, deferredResume{
+		instrID:       instr.ID,
+		continueLabel: continueLabel,
+		numericPass:   ec.numericMode,
+	})
+}
