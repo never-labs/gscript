@@ -236,10 +236,7 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 			if valReg != jit.X4 {
 				asm.MOVreg(jit.X4, valReg)
 			}
-			asm.LSRimm(jit.X5, jit.X4, 48)
-			asm.MOVimm16(jit.X6, uint16(jit.NB_TagIntShr48))
-			asm.CMPreg(jit.X5, jit.X6)
-			asm.BCond(jit.CondNE, cfg.missLabel)
+			ec.emitIntTagCheckBranch(jit.X4, jit.X5, jit.X6, jit.CondNE, cfg.missLabel)
 			asm.SBFX(jit.X4, jit.X4, 0, 48)
 		}
 		emitBounds(false)
@@ -462,10 +459,7 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.LSRimm(jit.X4, jit.X1, 48)
-		asm.MOVimm16(jit.X5, uint16(jit.NB_TagIntShr48))
-		asm.CMPreg(jit.X4, jit.X5)
-		asm.BCond(jit.CondNE, deoptLabel)
+		ec.emitIntTagCheckBranch(jit.X1, jit.X4, jit.X5, jit.CondNE, deoptLabel)
 		asm.SBFX(jit.X1, jit.X1, 0, 48)
 	}
 	if kv, isConst := ec.constInts[keyID]; (!isConst || kv < 0) && !ec.intNonNegative(keyID) && !ec.tableArrayLowerBoundSafe(instr.ID) {
@@ -504,10 +498,7 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		asm.LDRreg(jit.X0, dataReg, jit.X1)
 		switch instr.Type {
 		case TypeInt:
-			asm.LSRimm(jit.X2, jit.X0, 48)
-			asm.MOVimm16(jit.X3, uint16(jit.NB_TagIntShr48))
-			asm.CMPreg(jit.X2, jit.X3)
-			asm.BCond(jit.CondNE, deoptLabel)
+			ec.emitIntTagCheckBranch(jit.X0, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 			asm.SBFX(jit.X0, jit.X0, 0, 48)
 			ec.storeRawInt(jit.X0, instr.ID)
 		case TypeFloat:
@@ -1050,10 +1041,7 @@ func (ec *emitContext) emitTableArrayKeyToReg(key *Value, deoptLabel string) boo
 	if keyReg != jit.X1 {
 		asm.MOVreg(jit.X1, keyReg)
 	}
-	asm.LSRimm(jit.X4, jit.X1, 48)
-	asm.MOVimm16(jit.X5, uint16(jit.NB_TagIntShr48))
-	asm.CMPreg(jit.X4, jit.X5)
-	asm.BCond(jit.CondNE, deoptLabel)
+	ec.emitIntTagCheckBranch(jit.X1, jit.X4, jit.X5, jit.CondNE, deoptLabel)
 	asm.SBFX(jit.X1, jit.X1, 0, 48)
 	return true
 }
@@ -1082,10 +1070,7 @@ func (ec *emitContext) emitCheckTableArrayLoadExitResult(instr *Instr, deoptLabe
 	case int64(vm.FBKindMixed):
 		switch instr.Type {
 		case TypeInt:
-			asm.LSRimm(jit.X2, jit.X0, 48)
-			asm.MOVimm16(jit.X3, uint16(jit.NB_TagIntShr48))
-			asm.CMPreg(jit.X2, jit.X3)
-			asm.BCond(jit.CondNE, deoptLabel)
+			ec.emitIntTagCheckBranch(jit.X0, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		case TypeFloat:
 			jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
 			asm.BCond(jit.CondEQ, deoptLabel)
@@ -1096,10 +1081,7 @@ func (ec *emitContext) emitCheckTableArrayLoadExitResult(instr *Instr, deoptLabe
 		}
 	case int64(vm.FBKindInt):
 		if instr.Type == TypeInt {
-			asm.LSRimm(jit.X2, jit.X0, 48)
-			asm.MOVimm16(jit.X3, uint16(jit.NB_TagIntShr48))
-			asm.CMPreg(jit.X2, jit.X3)
-			asm.BCond(jit.CondNE, deoptLabel)
+			ec.emitIntTagCheckBranch(jit.X0, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		}
 	case int64(vm.FBKindFloat):
 		if instr.Type == TypeFloat {
@@ -1340,10 +1322,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.LSRimm(jit.X2, jit.X1, 48)
-		asm.MOVimm16(jit.X3, uint16(jit.NB_TagIntShr48))
-		asm.CMPreg(jit.X2, jit.X3)
-		asm.BCond(jit.CondNE, deoptLabel)
+		ec.emitIntTagCheckBranch(jit.X1, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		asm.SBFX(jit.X1, jit.X1, 0, 48)
 	}
 
@@ -1415,10 +1394,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 	asm.LDRreg(jit.X0, jit.X2, jit.X1)         // value = array[key]
 	switch instr.Type {
 	case TypeInt:
-		asm.LSRimm(jit.X2, jit.X0, 48)
-		asm.MOVimm16(jit.X3, uint16(jit.NB_TagIntShr48))
-		asm.CMPreg(jit.X2, jit.X3)
-		asm.BCond(jit.CondNE, deoptLabel)
+		ec.emitIntTagCheckBranch(jit.X0, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		asm.SBFX(jit.X0, jit.X0, 0, 48)
 		ec.storeRawInt(jit.X0, instr.ID)
 	case TypeFloat:
@@ -1593,10 +1569,7 @@ func (ec *emitContext) emitSetTableNative(instr *Instr) {
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.LSRimm(jit.X2, jit.X1, 48)
-		asm.MOVimm16(jit.X3, uint16(jit.NB_TagIntShr48))
-		asm.CMPreg(jit.X2, jit.X3)
-		asm.BCond(jit.CondNE, deoptLabel)
+		ec.emitIntTagCheckBranch(jit.X1, jit.X2, jit.X3, jit.CondNE, deoptLabel)
 		asm.SBFX(jit.X1, jit.X1, 0, 48)
 	}
 
