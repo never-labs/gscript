@@ -144,6 +144,59 @@ func CheckPipelineReadContract(runs []Tier2ModuleRun) AggregateReadContractRepor
 	return agg
 }
 
+// knownReadContractHints enumerates the (module, domain) undeclared reads that
+// ValidateDependencyOrder confirmed are legitimate HINTS rather than hard
+// dependencies, so they are intentionally NOT declared as Requires:
+//   - global reads (EscapeAnalysis, LICM, LICM post-MatrixRowPtrFactoring): the
+//     global domain is a seeded pipeline input with no module producer, so a
+//     Requires on it would fail dependency validation ("never provided").
+//   - numeric reads by modules that run BEFORE the numeric phase (CallABI in
+//     call_lower; FieldLenFold and FixedShapeTableFacts base/pre-inline in
+//     early_canonical): the numeric facts are produced later, so these reads see
+//     an absent map and treat it as "no range info", a hint not a requirement.
+//
+// The read contract is ENFORCED against everything else: any undeclared read NOT
+// in this allowlist is a contract violation (a pass reading a domain it should
+// declare, or a regression). Keyed by "module\x00domain".
+var knownReadContractHints = map[string]bool{
+	"CallABI\x00numeric":                           true,
+	"EscapeAnalysis\x00global":                     true,
+	"FieldLenFold\x00numeric":                      true,
+	"FixedShapeTableFacts\x00numeric":              true,
+	"FixedShapeTableFacts (pre-inline)\x00numeric": true,
+	"LICM\x00global":                               true,
+	"LICM (post-MatrixRowPtrFactoring)\x00global":  true,
+}
+
+// UnexpectedFindings returns the undeclared reads that are NOT in the known-hint
+// allowlist — i.e. the read-contract violations the gate enforces against.
+func (report AggregateReadContractReport) UnexpectedFindings() []ReadContractFinding {
+	var out []ReadContractFinding
+	for _, f := range report.Findings {
+		if !knownReadContractHints[f.Module+"\x00"+f.Domain] {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// StaleHintAllowlistEntries returns allowlist entries that no longer appear as
+// undeclared reads — candidates for removal so the allowlist does not rot.
+func (report AggregateReadContractReport) StaleHintAllowlistEntries() []string {
+	present := make(map[string]bool, len(report.Findings))
+	for _, f := range report.Findings {
+		present[f.Module+"\x00"+f.Domain] = true
+	}
+	var stale []string
+	for key := range knownReadContractHints {
+		if !present[key] {
+			stale = append(stale, strings.Replace(key, "\x00", " -> ", 1))
+		}
+	}
+	sort.Strings(stale)
+	return stale
+}
+
 // FormatReadContractFindings renders the per-module undeclared reads for logging.
 func FormatReadContractFindings(report AggregateReadContractReport) string {
 	if len(report.ByModule) == 0 {

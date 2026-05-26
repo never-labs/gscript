@@ -7,20 +7,24 @@ import (
 	"testing"
 )
 
+// (read-contract enforcement: see knownReadContractHints in analysis_read_contract.go)
+
 // TestReadContract_ProductionPipeline drives the real Tier 2 pipeline over the
 // benchmark corpus and observes, per optimizer module run, which AnalysisResult
 // fact domains the module accessed through the domain accessors. It compares the
 // accessed set against the domains covered by the module's declared facts
 // (Requires ∪ Provides ∪ Updates) and reports undeclared reads.
 //
-// This is REPORT mode, mirroring the write-contract test but deliberately NOT
-// enforcing: we log the landscape of undeclared reads so we can decide where to
-// add Requires before turning on enforcement. It never t.Errors.
+// It ENFORCES by default: any undeclared read NOT in the knownReadContractHints
+// allowlist (validator-confirmed legitimate hints) fails the test. Set
+// GSCRIPT_ENFORCE_READ_CONTRACT=0 to downgrade to report-only while
+// intentionally introducing a new undeclared read.
 //
 // Note: a module that declares nothing has an empty allowed set, so every domain
-// it reads is undeclared — those are the interesting findings. Reads performed
-// inside a pass's internally-built sub-Function (e.g. inlining) are not observed.
+// it reads is undeclared. Reads performed inside a pass's internally-built
+// sub-Function (e.g. inlining) are not observed.
 func TestReadContract_ProductionPipeline(t *testing.T) {
+	enforce := os.Getenv("GSCRIPT_ENFORCE_READ_CONTRACT") != "0"
 	roots := []string{
 		"../../benchmarks/suite",
 		"../../benchmarks/extended",
@@ -69,5 +73,36 @@ func TestReadContract_ProductionPipeline(t *testing.T) {
 	t.Logf("undeclared read domains by module (%d distinct module/domain pairs):\n%s",
 		len(report.Findings), FormatReadContractFindings(report))
 
-	// REPORT MODE: do not fail. Surface the landscape only.
+	if stale := report.StaleHintAllowlistEntries(); len(stale) > 0 {
+		t.Logf("knownReadContractHints entries no longer observed (consider removing): %v", stale)
+	}
+
+	unexpected := report.UnexpectedFindings()
+	if len(unexpected) == 0 {
+		t.Logf("all undeclared reads are known legitimate hints; read contract satisfied")
+		return
+	}
+	lines := make([]string, 0, len(unexpected))
+	for _, f := range unexpected {
+		lines = append(lines, f.String())
+	}
+	sort.Strings(lines)
+	msg := "read-contract violations (undeclared reads not in the known-hint allowlist):\n  " +
+		joinLines(lines)
+	if enforce {
+		t.Errorf("%d %s", len(unexpected), msg)
+	} else {
+		t.Logf("%d %s", len(unexpected), msg)
+	}
+}
+
+func joinLines(lines []string) string {
+	out := ""
+	for i, l := range lines {
+		if i > 0 {
+			out += "\n  "
+		}
+		out += l
+	}
+	return out
 }
