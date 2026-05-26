@@ -230,14 +230,14 @@ func (ec *emitContext) emitTableArrayRawStore(cfg tableArrayRawStoreConfig) bool
 			if valReg != jit.X4 {
 				asm.MOVreg(jit.X4, valReg)
 			}
-			asm.SBFX(jit.X4, jit.X4, 0, 48)
+			ec.emitUnboxInt48(jit.X4)
 		} else {
 			valReg := ec.resolveValueNB(cfg.valueID, jit.X4)
 			if valReg != jit.X4 {
 				asm.MOVreg(jit.X4, valReg)
 			}
 			ec.emitIntTagCheckBranch(jit.X4, jit.X5, jit.X6, jit.CondNE, cfg.missLabel)
-			asm.SBFX(jit.X4, jit.X4, 0, 48)
+			ec.emitUnboxInt48(jit.X4)
 		}
 		emitBounds(false)
 		asm.Label(storeLabel)
@@ -453,14 +453,14 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 	} else {
 		keyReg := ec.resolveValueNB(keyID, jit.X1)
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
 		ec.emitIntTagCheckBranch(jit.X1, jit.X4, jit.X5, jit.CondNE, deoptLabel)
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 	}
 	if kv, isConst := ec.constInts[keyID]; (!isConst || kv < 0) && !ec.intNonNegative(keyID) && !ec.tableArrayLowerBoundSafe(instr.ID) {
 		asm.CMPimm(jit.X1, 0)
@@ -499,7 +499,7 @@ func (ec *emitContext) emitTableArrayLoad(instr *Instr) {
 		switch instr.Type {
 		case TypeInt:
 			ec.emitIntTagCheckBranch(jit.X0, jit.X2, jit.X3, jit.CondNE, deoptLabel)
-			asm.SBFX(jit.X0, jit.X0, 0, 48)
+			ec.emitUnboxInt48(jit.X0)
 			ec.storeRawInt(jit.X0, instr.ID)
 		case TypeFloat:
 			jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
@@ -1026,7 +1026,7 @@ func (ec *emitContext) emitTableArrayKeyToReg(key *Value, deoptLabel string) boo
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 		return true
 	}
 	keyReg := ec.resolveValueNB(keyID, jit.X1)
@@ -1034,7 +1034,7 @@ func (ec *emitContext) emitTableArrayKeyToReg(key *Value, deoptLabel string) boo
 		asm.MOVreg(jit.X1, keyReg)
 	}
 	ec.emitIntTagCheckBranch(jit.X1, jit.X4, jit.X5, jit.CondNE, deoptLabel)
-	asm.SBFX(jit.X1, jit.X1, 0, 48)
+	ec.emitUnboxInt48(jit.X1)
 	return true
 }
 
@@ -1307,7 +1307,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 	} else {
 		// Slow path: full NaN-boxed key with tag check.
 		keyReg := ec.resolveValueNB(keyID, jit.X1)
@@ -1315,7 +1315,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 			asm.MOVreg(jit.X1, keyReg)
 		}
 		ec.emitIntTagCheckBranch(jit.X1, jit.X2, jit.X3, jit.CondNE, deoptLabel)
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 	}
 
 	// Check key >= 0 (shared by all paths). R97: skip when key is a
@@ -1387,7 +1387,7 @@ func (ec *emitContext) emitGetTableNative(instr *Instr) {
 	switch instr.Type {
 	case TypeInt:
 		ec.emitIntTagCheckBranch(jit.X0, jit.X2, jit.X3, jit.CondNE, deoptLabel)
-		asm.SBFX(jit.X0, jit.X0, 0, 48)
+		ec.emitUnboxInt48(jit.X0)
 		ec.storeRawInt(jit.X0, instr.ID)
 	case TypeFloat:
 		jit.EmitIsTaggedPinned(asm, jit.X0, jit.X2, mRegTagInt)
@@ -1554,7 +1554,7 @@ func (ec *emitContext) emitSetTableNative(instr *Instr) {
 		if keyReg != jit.X1 {
 			asm.MOVreg(jit.X1, keyReg)
 		}
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 	} else {
 		// Slow path: full NaN-boxed key with tag check.
 		keyReg := ec.resolveValueNB(keyID, jit.X1)
@@ -1562,7 +1562,7 @@ func (ec *emitContext) emitSetTableNative(instr *Instr) {
 			asm.MOVreg(jit.X1, keyReg)
 		}
 		ec.emitIntTagCheckBranch(jit.X1, jit.X2, jit.X3, jit.CondNE, deoptLabel)
-		asm.SBFX(jit.X1, jit.X1, 0, 48)
+		ec.emitUnboxInt48(jit.X1)
 	}
 
 	// Check key >= 0 (shared by all paths). R97: skip when key is a
