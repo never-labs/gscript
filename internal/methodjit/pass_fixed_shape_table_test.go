@@ -902,7 +902,7 @@ result := walk({}, 0)
 			if instr.Op != OpGetField && instr.Op != OpFieldLoad {
 				continue
 			}
-			if r, ok := out.Analysis.IntRanges[instr.ID]; ok && r.known {
+			if r, ok := out.Analysis.Numeric.IntRanges[instr.ID]; ok && r.known {
 				rangedFields++
 				if instr.Type != TypeInt {
 					t.Fatalf("profiled range did not force int field type: %s", instr.Type)
@@ -953,7 +953,7 @@ func TestFixedShapeTableFactsPass_MutableFieldKeepsRangeWhenStoresStayRanged(t *
 	if err != nil {
 		t.Fatalf("FixedShapeTableFactsPassWith: %v", err)
 	}
-	if r, ok := out.Analysis.ProfiledIntRanges[second.ID]; !ok || !r.known || r.min != 0 || r.max != 10 {
+	if r, ok := out.Analysis.Numeric.ProfiledIntRanges[second.ID]; !ok || !r.known || r.min != 0 || r.max != 10 {
 		t.Fatalf("mutable ranged field load lost safe joined range, got %#v ok=%v\nIR:\n%s", r, ok, Print(out))
 	}
 }
@@ -995,7 +995,7 @@ func TestFixedShapeTableFactsPass_MutableFieldSelfAddNonNegativeStore(t *testing
 	if !out.Analysis.NumericFacts().IsIntNonNegative(next.ID) {
 		t.Fatalf("self-add store result should carry non-negative fact:\n%s", Print(out))
 	}
-	if r, ok := out.Analysis.ProfiledIntRanges[again.ID]; !ok || !r.known || r.min != 0 {
+	if r, ok := out.Analysis.Numeric.ProfiledIntRanges[again.ID]; !ok || !r.known || r.min != 0 {
 		t.Fatalf("mutable self-add field load range = %#v ok=%v\nIR:\n%s", r, ok, Print(out))
 	}
 }
@@ -1105,7 +1105,7 @@ func TestFixedShapeTableFactsPass_LoweredArrayLoadCarriesNestedArrayRange(t *tes
 	if item.Aux != int64(vm.FBKindInt) || item.Type != TypeInt {
 		t.Fatalf("lowered array load should inherit int kind/type, aux=%d type=%s\nIR:\n%s", item.Aux, item.Type, Print(out))
 	}
-	if r, ok := out.Analysis.ProfiledIntRanges[item.ID]; !ok || !r.known || r.min != 1 || r.max != 19 {
+	if r, ok := out.Analysis.Numeric.ProfiledIntRanges[item.ID]; !ok || !r.known || r.min != 1 || r.max != 19 {
 		t.Fatalf("lowered array load missing profiled range, got %#v ok=%v\nIR:\n%s", r, ok, Print(out))
 	}
 }

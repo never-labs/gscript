@@ -16,7 +16,7 @@ func TestModRangeSimplify_ReplacesKnownBelowDivisor(t *testing.T) {
 	b.Instrs = []*Instr{x, d, mod, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.IntRanges = map[int]intRange{x.ID: {min: 0, max: 9, known: true}}
+	fn.Analysis.Numeric.IntRanges = map[int]intRange{x.ID: {min: 0, max: 9, known: true}}
 
 	out, err := ModRangeSimplifyPass(fn)
 	if err != nil {
@@ -40,7 +40,7 @@ func TestModRangeSimplify_KeepsPossibleWrap(t *testing.T) {
 	b.Instrs = []*Instr{x, d, mod, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.IntRanges = map[int]intRange{x.ID: {min: 0, max: 10, known: true}}
+	fn.Analysis.Numeric.IntRanges = map[int]intRange{x.ID: {min: 0, max: 10, known: true}}
 
 	out, err := ModRangeSimplifyPass(fn)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestModRangeSimplify_FoldsModuloOne(t *testing.T) {
 	b.Instrs = []*Instr{x, d, mod, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.IntRanges = map[int]intRange{x.ID: {min: -100, max: 100, known: true}}
+	fn.Analysis.Numeric.IntRanges = map[int]intRange{x.ID: {min: -100, max: 100, known: true}}
 
 	out, err := ModRangeSimplifyPass(fn)
 	if err != nil {

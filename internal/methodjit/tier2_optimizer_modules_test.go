@@ -330,7 +330,7 @@ func TestTier2ModuleRunRecordsActualFactDiff(t *testing.T) {
 				Phase:    Tier2PhaseNumeric,
 				Provides: analysisFacts(AnalysisFactInt48Safe),
 				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-					fn.Analysis.Int48Safe[42] = true
+					fn.Analysis.Numeric.Int48Safe[42] = true
 					return fn, nil
 				},
 			},
@@ -349,14 +349,14 @@ func TestTier2ModuleRunRecordsActualFactDiff(t *testing.T) {
 		t.Fatalf("module runs = %d, want 1", len(runs))
 	}
 	run := runs[0]
-	if len(run.ChangedDomains) != 1 || run.ChangedDomains[0] != "Int48Safe" {
-		t.Fatalf("changed domains = %v, want [Int48Safe]", run.ChangedDomains)
+	if len(run.ChangedDomains) != 1 || run.ChangedDomains[0] != "Numeric.Int48Safe" {
+		t.Fatalf("changed domains = %v, want [Numeric.Int48Safe]", run.ChangedDomains)
 	}
 	if len(run.ActualFactDiff) != 1 {
 		t.Fatalf("actual fact diffs = %+v, want one diff", run.ActualFactDiff)
 	}
 	diff := run.ActualFactDiff[0]
-	if diff.Domain != "Int48Safe" || diff.BeforeCount != 0 || diff.AfterCount != 1 || diff.BeforeHash == diff.AfterHash {
+	if diff.Domain != "Numeric.Int48Safe" || diff.BeforeCount != 0 || diff.AfterCount != 1 || diff.BeforeHash == diff.AfterHash {
 		t.Fatalf("unexpected fact diff: %+v", diff)
 	}
 	records := moduleFactDiffsFromRuns(runs)
@@ -364,7 +364,7 @@ func TestTier2ModuleRunRecordsActualFactDiff(t *testing.T) {
 		t.Fatalf("fact diff records = %+v", records)
 	}
 	text := FormatTier2ModuleFactDiffs(records)
-	if !strings.Contains(text, "numeric/FactProbe: Int48Safe") || !strings.Contains(text, "count 0->1") {
+	if !strings.Contains(text, "numeric/FactProbe: Numeric.Int48Safe") || !strings.Contains(text, "count 0->1") {
 		t.Fatalf("formatted fact diff missing details:\n%s", text)
 	}
 }

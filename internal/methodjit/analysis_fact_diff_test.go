@@ -4,15 +4,15 @@ import "testing"
 
 func TestSnapshotAnalysisResultDomainsPreservesTopLevelMapSnapshots(t *testing.T) {
 	a := NewAnalysisResult()
-	a.Int48Safe[42] = true
+	a.Numeric.Int48Safe[42] = true
 
 	snapshots := snapshotAnalysisResultDomains(a)
-	snapshot, ok := snapshots["Int48Safe"]
+	snapshot, ok := snapshots["Numeric.Int48Safe"]
 	if !ok {
-		t.Fatalf("snapshot missing top-level Int48Safe map")
+		t.Fatalf("snapshot missing domain map Numeric.Int48Safe")
 	}
 	if snapshot.Count != 1 || snapshot.Hash == 0 {
-		t.Fatalf("Int48Safe snapshot = %+v, want count 1 with nonzero hash", snapshot)
+		t.Fatalf("Numeric.Int48Safe snapshot = %+v, want count 1 with nonzero hash", snapshot)
 	}
 }
 

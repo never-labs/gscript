@@ -86,7 +86,7 @@ func TestFieldLenFold_LowersProfiledPolyFieldLen(t *testing.T) {
 	if len(cases) != 2 {
 		t.Fatalf("FieldPolyLen facts not copied, got %d cases", len(cases))
 	}
-	if r, ok := fn.Analysis.ProfiledIntRanges[ln.ID]; !ok || !r.known || r.min != 2 || r.max != 5 {
+	if r, ok := fn.Analysis.Numeric.ProfiledIntRanges[ln.ID]; !ok || !r.known || r.min != 2 || r.max != 5 {
 		t.Fatalf("FieldPolyLen profiled int range=%+v ok=%v, want [2,5]", r, ok)
 	}
 }
@@ -134,7 +134,7 @@ func TestFieldLenFold_FoldsProfiledExactLen(t *testing.T) {
 		Proto:   &vm.FuncProto{Name: "profiled_len"},
 		NumRegs: 1,
 		Analysis: &AnalysisResult{
-			ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
+			Numeric: &NumericFacts{ProfiledLenRanges: map[int]intRange{2: pointRange(4)}},
 		},
 	}
 	b0 := &Block{ID: 0, defs: make(map[int]*Value)}
@@ -159,7 +159,7 @@ func TestProfiledStringLenFold_FoldsAfterFieldLowering(t *testing.T) {
 		Proto:   &vm.FuncProto{Name: "profiled_len_after_lower"},
 		NumRegs: 1,
 		Analysis: &AnalysisResult{
-			ProfiledLenRanges: map[int]intRange{2: pointRange(4)},
+			Numeric: &NumericFacts{ProfiledLenRanges: map[int]intRange{2: pointRange(4)}},
 		},
 	}
 	b0 := &Block{ID: 0, defs: make(map[int]*Value)}
@@ -218,9 +218,11 @@ func TestProfiledStringLenFold_ReplacesLenOfPhi(t *testing.T) {
 		Proto:   &vm.FuncProto{Name: "profiled_len_phi"},
 		NumRegs: 1,
 		Analysis: &AnalysisResult{
-			ProfiledLenRanges: map[int]intRange{
-				10: pointRange(4),
-				11: pointRange(5),
+			Numeric: &NumericFacts{
+				ProfiledLenRanges: map[int]intRange{
+					10: pointRange(4),
+					11: pointRange(5),
+				},
 			},
 		},
 	}

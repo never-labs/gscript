@@ -739,7 +739,7 @@ func TestTableArrayLower_TableArrayLoadKeepsNonNegativeKeyFact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !fn.Analysis.IntNonNegative[key.ID] {
+	if !fn.Analysis.Numeric.IntNonNegative[key.ID] {
 		t.Fatalf("constant table key should be marked non-negative before lowering")
 	}
 	fn, err = TableArrayLowerPass(fn)
@@ -760,7 +760,7 @@ func TestTableArrayLower_TableArrayLoadKeepsNonNegativeKeyFact(t *testing.T) {
 	if len(load.Args) < 3 || load.Args[2].ID != key.ID {
 		t.Fatalf("lowered TableArrayLoad should retain original key argument:\n%s", Print(fn))
 	}
-	if !fn.Analysis.IntNonNegative[load.Args[2].ID] {
+	if !fn.Analysis.Numeric.IntNonNegative[load.Args[2].ID] {
 		t.Fatalf("lowered TableArrayLoad key should retain non-negative fact")
 	}
 }

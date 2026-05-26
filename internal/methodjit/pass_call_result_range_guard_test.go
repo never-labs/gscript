@@ -83,7 +83,7 @@ func TestCallResultRangeGuardPass_RangeAnalysisConsumesGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RangeAnalysisPass: %v", err)
 	}
-	if !fn.Analysis.Int48Safe[add.ID] {
+	if !fn.Analysis.Numeric.Int48Safe[add.ID] {
 		t.Fatalf("AddInt fed by guarded call result should be Int48Safe:\n%s", Print(fn))
 	}
 }
@@ -220,8 +220,10 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	fn := &Function{
 		Proto: proto,
 		Analysis: &AnalysisResult{
-			SuppressedSpecGuardKinds: map[int]map[string]bool{
-				0: {"GuardIntRange": true},
+			Speculation: &SpeculationFacts{
+				SuppressedSpecGuardKinds: map[int]map[string]bool{
+					0: {"GuardIntRange": true},
+				},
 			},
 		},
 	}

@@ -27,10 +27,14 @@ func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 		Globals: map[string]*vm.FuncProto{
 			"callee": callee,
 		},
-		SuppressedSpecGuardKinds: map[int]map[string]bool{
-			12: {"GuardCalleeProto": true},
+		Speculation: &SpeculationFacts{
+			SuppressedSpecGuardKinds: map[int]map[string]bool{
+				12: {"GuardCalleeProto": true},
+			},
 		},
-		Int48Safe: map[int]bool{7: true},
+		Numeric: &NumericFacts{
+			Int48Safe: map[int]bool{7: true},
+		},
 	}
 
 	a.Initialize()
@@ -38,15 +42,15 @@ func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 	if got := a.Globals["callee"]; got != callee {
 		t.Fatalf("Initialize replaced or lost Globals entry: got %p want %p", got, callee)
 	}
-	if !a.SuppressedSpecGuardKinds[12]["GuardCalleeProto"] {
+	if !a.Speculation.SuppressedSpecGuardKinds[12]["GuardCalleeProto"] {
 		t.Fatalf("Initialize replaced or lost SuppressedSpecGuardKinds entry")
 	}
-	if !a.Int48Safe[7] {
+	if !a.Numeric.Int48Safe[7] {
 		t.Fatalf("Initialize replaced or lost ordinary analysis map entry")
 	}
 }
 
-func TestAnalysisResultNumericFactsBindsCompatibilityFields(t *testing.T) {
+func TestAnalysisResultNumericFactsMutatorsUpdateDomain(t *testing.T) {
 	a := NewAnalysisResult()
 	numeric := a.NumericFacts()
 
@@ -58,43 +62,45 @@ func TestAnalysisResultNumericFactsBindsCompatibilityFields(t *testing.T) {
 	numeric.RecordProfiledIntRange(16, intRange{min: 1, max: 3, known: true})
 	numeric.RecordProfiledLenRange(17, intRange{min: 2, max: 4, known: true})
 
-	if !a.Int48Safe[11] || !a.IntModNonZeroDivisor[12] || !a.IntModNoSignAdjust[13] || !a.IntNonNegative[15] {
-		t.Fatalf("NumericFacts boolean mutators did not update compatibility fields")
+	if !numeric.IsInt48Safe(11) || !numeric.IsIntModNonZeroDivisor(12) || !numeric.IsIntModNoSignAdjust(13) || !numeric.IsIntNonNegative(15) {
+		t.Fatalf("NumericFacts boolean mutators did not update domain fields")
 	}
-	if got, ok := a.IntRanges[14]; !ok || !got.known || got.min != 5 || got.max != 5 {
-		t.Fatalf("NumericFacts.SetIntRanges did not update compatibility field: got %#v ok=%v", got, ok)
+	if got, ok := numeric.IntRange(14); !ok || !got.known || got.min != 5 || got.max != 5 {
+		t.Fatalf("NumericFacts.SetIntRanges did not update domain field: got %#v ok=%v", got, ok)
 	}
-	if got, ok := a.ProfiledIntRanges[16]; !ok || !got.known || got.min != 1 || got.max != 3 {
-		t.Fatalf("NumericFacts.RecordProfiledIntRange did not update compatibility field: got %#v ok=%v", got, ok)
+	if got, ok := numeric.ProfiledIntRange(16); !ok || !got.known || got.min != 1 || got.max != 3 {
+		t.Fatalf("NumericFacts.RecordProfiledIntRange did not update domain field: got %#v ok=%v", got, ok)
 	}
-	if got, ok := a.ProfiledLenRanges[17]; !ok || !got.known || got.min != 2 || got.max != 4 {
-		t.Fatalf("NumericFacts.RecordProfiledLenRange did not update compatibility field: got %#v ok=%v", got, ok)
+	if got, ok := numeric.ProfiledLenRange(17); !ok || !got.known || got.min != 2 || got.max != 4 {
+		t.Fatalf("NumericFacts.RecordProfiledLenRange did not update domain field: got %#v ok=%v", got, ok)
 	}
 }
 
-func TestAnalysisResultNumericFactsAdoptsLegacyFields(t *testing.T) {
+func TestAnalysisResultNumericFactsPreservesPrePopulatedDomain(t *testing.T) {
 	a := &AnalysisResult{
-		Int48Safe:            map[int]bool{21: true},
-		IntModNonZeroDivisor: map[int]bool{22: true},
-		IntModNoSignAdjust:   map[int]bool{23: true},
-		IntRanges:            map[int]intRange{24: pointRange(6)},
-		ProfiledIntRanges:    map[int]intRange{25: {min: 1, max: 9, known: true}},
-		ProfiledLenRanges:    map[int]intRange{26: {min: 2, max: 8, known: true}},
-		IntNonNegative:       map[int]bool{27: true},
+		Numeric: &NumericFacts{
+			Int48Safe:            map[int]bool{21: true},
+			IntModNonZeroDivisor: map[int]bool{22: true},
+			IntModNoSignAdjust:   map[int]bool{23: true},
+			IntRanges:            map[int]intRange{24: pointRange(6)},
+			ProfiledIntRanges:    map[int]intRange{25: {min: 1, max: 9, known: true}},
+			ProfiledLenRanges:    map[int]intRange{26: {min: 2, max: 8, known: true}},
+			IntNonNegative:       map[int]bool{27: true},
+		},
 	}
 
 	numeric := a.NumericFacts()
 	if !numeric.IsInt48Safe(21) || !numeric.IsIntModNonZeroDivisor(22) || !numeric.IsIntModNoSignAdjust(23) || !numeric.IsIntNonNegative(27) {
-		t.Fatalf("NumericFacts did not adopt legacy boolean fields")
+		t.Fatalf("NumericFacts did not preserve pre-populated boolean fields")
 	}
 	if got, ok := numeric.IntRange(24); !ok || !got.known || got.min != 6 || got.max != 6 {
-		t.Fatalf("NumericFacts did not adopt legacy IntRanges: got %#v ok=%v", got, ok)
+		t.Fatalf("NumericFacts did not preserve pre-populated IntRanges: got %#v ok=%v", got, ok)
 	}
 	if got, ok := numeric.ProfiledIntRange(25); !ok || !got.known || got.min != 1 || got.max != 9 {
-		t.Fatalf("NumericFacts did not adopt legacy ProfiledIntRanges: got %#v ok=%v", got, ok)
+		t.Fatalf("NumericFacts did not preserve pre-populated ProfiledIntRanges: got %#v ok=%v", got, ok)
 	}
 	if got, ok := numeric.ProfiledLenRange(26); !ok || !got.known || got.min != 2 || got.max != 8 {
-		t.Fatalf("NumericFacts did not adopt legacy ProfiledLenRanges: got %#v ok=%v", got, ok)
+		t.Fatalf("NumericFacts did not preserve pre-populated ProfiledLenRanges: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -118,29 +124,14 @@ func TestNumericFactsHelpersAreNilSafe(t *testing.T) {
 	numeric.RecordProfiledLenRange(1, pointRange(1))
 }
 
-func TestAnalysisResultNumericFactsRebindsAfterLegacyMutation(t *testing.T) {
-	a := NewAnalysisResult()
-	numeric := a.NumericFacts()
-	a.IntRanges = map[int]intRange{31: pointRange(7)}
-	a.Int48Safe = map[int]bool{32: true}
-
-	numeric = a.NumericFacts()
-	if got, ok := numeric.IntRange(31); !ok || !got.known || got.min != 7 || got.max != 7 {
-		t.Fatalf("NumericFacts did not rebind legacy IntRanges: got %#v ok=%v", got, ok)
-	}
-	if !numeric.IsInt48Safe(32) {
-		t.Fatalf("NumericFacts did not rebind legacy Int48Safe")
-	}
-}
-
 func TestAnalysisResultCallFactsBindsCompatibilityFields(t *testing.T) {
 	a := NewAnalysisResult()
 	calls := a.CallFacts()
 
 	desc := CallABIDescriptor{NumArgs: 2, NumRets: 1}
 	calls.SetCallABIs(map[int]CallABIDescriptor{11: desc})
-	if got, ok := a.CallABIs[11]; !ok || got.NumArgs != desc.NumArgs || got.NumRets != desc.NumRets {
-		t.Fatalf("CallFacts.SetCallABIs did not update compatibility field: got %#v ok=%v", got, ok)
+	if got, ok := calls.CallABI(11); !ok || got.NumArgs != desc.NumArgs || got.NumRets != desc.NumRets {
+		t.Fatalf("CallFacts.SetCallABIs did not update domain field: got %#v ok=%v", got, ok)
 	}
 
 	calls.SetGuardedConstCallFolds(map[int]GuardedConstCallFoldFact{12: {Result: 99}})
@@ -164,62 +155,72 @@ func TestAnalysisResultLoopSpecializationFactsBindsCompatibilityFields(t *testin
 	specializations := a.LoopSpecializationFacts()
 
 	specializations.SetTableArrayUpperBoundSafe(map[int]bool{11: true})
-	if !a.TableArrayUpperBoundSafe[11] {
-		t.Fatalf("LoopSpecializationFacts.SetTableArrayUpperBoundSafe did not update compatibility field")
+	if !specializations.TableArrayUpperBoundIsSafe(11) {
+		t.Fatalf("LoopSpecializationFacts.SetTableArrayUpperBoundSafe did not update domain field")
 	}
 
 	specializations.SetTableArrayLowerBoundSafe(map[int]bool{12: true})
-	if !a.TableArrayLowerBoundSafe[12] {
-		t.Fatalf("LoopSpecializationFacts.SetTableArrayLowerBoundSafe did not update compatibility field")
+	if !specializations.TableArrayLowerBoundIsSafe(12) {
+		t.Fatalf("LoopSpecializationFacts.SetTableArrayLowerBoundSafe did not update domain field")
 	}
 
 	loopFact := LoopTableArrayFact{HeaderBlockID: 1, PreheaderBlockID: 2, AccessOp: OpTableArrayLoad}
 	specializations.SetLoopTableArrayFacts(map[int]LoopTableArrayFact{13: loopFact})
-	if got, ok := a.LoopTableArrayFacts[13]; !ok || got.HeaderBlockID != 1 || got.AccessOp != OpTableArrayLoad {
-		t.Fatalf("LoopSpecializationFacts.SetLoopTableArrayFacts did not update compatibility field: got %#v ok=%v", got, ok)
+	if got, ok := specializations.LoopTableArrayFact(13); !ok || got.HeaderBlockID != 1 || got.AccessOp != OpTableArrayLoad {
+		t.Fatalf("LoopSpecializationFacts.SetLoopTableArrayFacts did not update domain field: got %#v ok=%v", got, ok)
 	}
 
 	spec := RecordArrayLoopSpecializationSpec{ShapeID: 99, ScalarCount: 1}
 	specializations.SetRecordArrayLoopSpecializations(map[int]RecordArrayLoopSpecializationSpec{14: spec})
-	if got, ok := a.RecordArrayLoopSpecializations[14]; !ok || got.ShapeID != 99 || got.ScalarCount != 1 {
-		t.Fatalf("LoopSpecializationFacts.SetRecordArrayLoopSpecializations did not update compatibility field: got %#v ok=%v", got, ok)
+	if got, ok := specializations.RecordArrayLoopSpecialization(14); !ok || got.ShapeID != 99 || got.ScalarCount != 1 {
+		t.Fatalf("LoopSpecializationFacts.SetRecordArrayLoopSpecializations did not update domain field: got %#v ok=%v", got, ok)
+	}
+
+	dataFact := TableArrayDataPtrFact{TableID: 5}
+	specializations.SetTableArrayDataPtrs(map[int]TableArrayDataPtrFact{15: dataFact})
+	if got, ok := specializations.TableArrayDataPtr(15); !ok || got.TableID != 5 {
+		t.Fatalf("LoopSpecializationFacts.SetTableArrayDataPtrs did not update domain field: got %#v ok=%v", got, ok)
 	}
 }
 
-func TestAnalysisResultLoopSpecializationFactsAdoptsLegacyFields(t *testing.T) {
+func TestAnalysisResultLoopSpecializationFactsPreservesPrePopulatedDomain(t *testing.T) {
 	loopFact := LoopTableArrayFact{HeaderBlockID: 3, PreheaderBlockID: 4, AccessOp: OpTableArrayStore}
 	spec := RecordArrayLoopSpecializationSpec{ShapeID: 77}
 	a := &AnalysisResult{
-		TableArrayUpperBoundSafe:       map[int]bool{21: true},
-		TableArrayLowerBoundSafe:       map[int]bool{22: true},
-		LoopTableArrayFacts:            map[int]LoopTableArrayFact{23: loopFact},
-		RecordArrayLoopSpecializations: map[int]RecordArrayLoopSpecializationSpec{24: spec},
+		LoopSpecialization: &LoopSpecializationFacts{
+			TableArrayUpperBoundSafe:       map[int]bool{21: true},
+			TableArrayLowerBoundSafe:       map[int]bool{22: true},
+			LoopTableArrayFacts:            map[int]LoopTableArrayFact{23: loopFact},
+			RecordArrayLoopSpecializations: map[int]RecordArrayLoopSpecializationSpec{24: spec},
+		},
 	}
 
 	specializations := a.LoopSpecializationFacts()
 	if !specializations.TableArrayUpperBoundIsSafe(21) {
-		t.Fatalf("LoopSpecializationFacts did not adopt legacy TableArrayUpperBoundSafe")
+		t.Fatalf("LoopSpecializationFacts did not preserve pre-populated TableArrayUpperBoundSafe")
 	}
 	if !specializations.TableArrayLowerBoundIsSafe(22) {
-		t.Fatalf("LoopSpecializationFacts did not adopt legacy TableArrayLowerBoundSafe")
+		t.Fatalf("LoopSpecializationFacts did not preserve pre-populated TableArrayLowerBoundSafe")
 	}
 	if got, ok := specializations.LoopTableArrayFact(23); !ok || got.HeaderBlockID != 3 || got.AccessOp != OpTableArrayStore {
-		t.Fatalf("LoopSpecializationFacts did not adopt legacy LoopTableArrayFacts: got %#v ok=%v", got, ok)
+		t.Fatalf("LoopSpecializationFacts did not preserve pre-populated LoopTableArrayFacts: got %#v ok=%v", got, ok)
 	}
 	if got, ok := specializations.RecordArrayLoopSpecialization(24); !ok || got.ShapeID != 77 {
-		t.Fatalf("LoopSpecializationFacts did not adopt legacy RecordArrayLoopSpecializations: got %#v ok=%v", got, ok)
+		t.Fatalf("LoopSpecializationFacts did not preserve pre-populated RecordArrayLoopSpecializations: got %#v ok=%v", got, ok)
 	}
 }
 
-func TestAnalysisResultCallFactsAdoptsLegacyFields(t *testing.T) {
+func TestAnalysisResultCallFactsPreservesPrePopulatedDomain(t *testing.T) {
 	desc := CallABIDescriptor{NumArgs: 3, NumRets: 1}
 	a := &AnalysisResult{
-		CallABIs: map[int]CallABIDescriptor{21: desc},
+		Call: &CallFacts{
+			CallABIs: map[int]CallABIDescriptor{21: desc},
+		},
 	}
 
 	calls := a.CallFacts()
 	if got, ok := calls.CallABI(21); !ok || got.NumArgs != desc.NumArgs {
-		t.Fatalf("CallFacts did not adopt legacy CallABIs: got %#v ok=%v", got, ok)
+		t.Fatalf("CallFacts did not preserve pre-populated CallABIs: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -254,17 +255,6 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 	}
 }
 
-func TestAnalysisResultCallFactsRebindsAfterLegacyMutation(t *testing.T) {
-	a := NewAnalysisResult()
-	calls := a.CallFacts()
-	a.CallABIs = map[int]CallABIDescriptor{31: {NumArgs: 4}}
-
-	calls = a.CallFacts()
-	if got, ok := calls.CallABI(31); !ok || got.NumArgs != 4 {
-		t.Fatalf("CallFacts did not rebind legacy CallABIs: got %#v ok=%v", got, ok)
-	}
-}
-
 func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testing.T) {
 	a := &AnalysisResult{Call: NewCallFacts()}
 	a.Call.CallABIs[41] = CallABIDescriptor{NumArgs: 5}
@@ -293,29 +283,31 @@ func TestAnalysisResultSpeculationFactsBindsCompatibilityFields(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee"}
 
 	spec.SetSpecDependencyProtos(map[*vm.FuncProto]bool{callee: true})
-	if !a.SpecDependencyProtos[callee] {
-		t.Fatalf("SpeculationFacts.SetSpecDependencyProtos did not update compatibility field")
+	if !spec.SpecDependencyProtos[callee] {
+		t.Fatalf("SpeculationFacts.SetSpecDependencyProtos did not update domain field")
 	}
 
 	spec.SetSuppressedSpecGuardPCs(map[int]bool{31: true})
-	if !a.SuppressedSpecGuardPCs[31] {
-		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardPCs did not update compatibility field")
+	if !spec.SuppressedSpecGuardPCs[31] {
+		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardPCs did not update domain field")
 	}
 
 	spec.SetSuppressedSpecGuardKinds(map[int]map[string]bool{
 		32: {"GuardType": true},
 	})
-	if !a.SuppressedSpecGuardKinds[32]["GuardType"] {
-		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardKinds did not update compatibility field")
+	if !spec.SuppressedSpecGuardKinds[32]["GuardType"] {
+		t.Fatalf("SpeculationFacts.SetSuppressedSpecGuardKinds did not update domain field")
 	}
 }
 
-func TestAnalysisResultSpeculationFactsAdoptsLegacyFields(t *testing.T) {
+func TestAnalysisResultSpeculationFactsPreservesPrePopulatedDomain(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee"}
 	a := &AnalysisResult{
-		SpecDependencyProtos:     map[*vm.FuncProto]bool{callee: true},
-		SuppressedSpecGuardPCs:   map[int]bool{41: true},
-		SuppressedSpecGuardKinds: map[int]map[string]bool{42: {"GuardCalleeProto": true}},
+		Speculation: &SpeculationFacts{
+			SpecDependencyProtos:     map[*vm.FuncProto]bool{callee: true},
+			SuppressedSpecGuardPCs:   map[int]bool{41: true},
+			SuppressedSpecGuardKinds: map[int]map[string]bool{42: {"GuardCalleeProto": true}},
+		},
 	}
 
 	spec := a.SpeculationFacts()
@@ -334,7 +326,7 @@ func TestAnalysisResultSpeculationFactsPreservesSuppressedKindsNilSentinel(t *te
 	a := NewAnalysisResult()
 	spec := a.SpeculationFacts()
 
-	if spec.SuppressedSpecGuardKinds != nil || a.SuppressedSpecGuardKinds != nil {
+	if spec.SuppressedSpecGuardKinds != nil {
 		t.Fatalf("NewAnalysisResult initialized SuppressedSpecGuardKinds nil sentinel")
 	}
 
@@ -343,10 +335,10 @@ func TestAnalysisResultSpeculationFactsPreservesSuppressedKindsNilSentinel(t *te
 		t.Fatalf("empty non-nil SuppressedSpecGuardKinds should not fall back to SuppressedSpecGuardPCs")
 	}
 
-	a.SuppressedSpecGuardPCs = map[int]bool{51: true}
-	a.SuppressedSpecGuardKinds = nil
+	spec.SetSuppressedSpecGuardPCs(map[int]bool{51: true})
+	spec.SetSuppressedSpecGuardKinds(nil)
 	if !specGuardKindSuppressed(&Function{Analysis: a}, 51, "GuardType") {
-		t.Fatalf("legacy nil SuppressedSpecGuardKinds sentinel should restore PC fallback")
+		t.Fatalf("nil SuppressedSpecGuardKinds sentinel should restore PC fallback")
 	}
 }
 
@@ -531,14 +523,16 @@ func TestAnalysisResultTableShapeFactsPreservesEmptyMapSentinelBehavior(t *testi
 
 func TestSpecGuardKindSuppressedNilKindsFallsBackToPCs(t *testing.T) {
 	fn := &Function{Analysis: &AnalysisResult{
-		SuppressedSpecGuardPCs: map[int]bool{42: true},
+		Speculation: &SpeculationFacts{
+			SuppressedSpecGuardPCs: map[int]bool{42: true},
+		},
 	}}
 
 	if !specGuardKindSuppressed(fn, 42, "GuardCalleeProto") {
 		t.Fatalf("nil SuppressedSpecGuardKinds should fall back to SuppressedSpecGuardPCs")
 	}
 
-	fn.Analysis.SuppressedSpecGuardKinds = map[int]map[string]bool{}
+	fn.Analysis.Speculation.SuppressedSpecGuardKinds = map[int]map[string]bool{}
 	if specGuardKindSuppressed(fn, 42, "GuardCalleeProto") {
 		t.Fatalf("empty non-nil SuppressedSpecGuardKinds should not fall back to SuppressedSpecGuardPCs")
 	}

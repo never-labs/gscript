@@ -78,7 +78,9 @@ func TestSortedSpecDependencyProtosAdoptsLegacyDependencies(t *testing.T) {
 	fn := &Function{
 		Proto: self,
 		Analysis: &AnalysisResult{
-			SpecDependencyProtos: map[*vm.FuncProto]bool{callee: true},
+			Speculation: &SpeculationFacts{
+				SpecDependencyProtos: map[*vm.FuncProto]bool{callee: true},
+			},
 		},
 	}
 

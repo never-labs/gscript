@@ -9,95 +9,21 @@ import (
 // AnalysisResult contains all analysis maps produced and consumed by optimization passes.
 // This struct extracts analysis state from the Function god object.
 type AnalysisResult struct {
-	// Int48Safe is the set of integer arithmetic SSA value IDs whose runtime
-	// result is provably within the int48 signed range. Populated by
-	// RangeAnalysisPass. The emitter consults this set to skip the
-	// SBFX+CMP+B.NE overflow check for provably safe AddInt/SubInt/MulInt/NegInt.
-	Int48Safe map[int]bool
-
-	// IntModNonZeroDivisor is the set of ModInt SSA value IDs whose divisor
-	// range excludes zero. Populated by RangeAnalysisPass so the emitter can
-	// skip the modulo-by-zero deopt guard at those sites.
-	IntModNonZeroDivisor map[int]bool
-
-	// IntModNoSignAdjust is the set of ModInt SSA value IDs whose operand signs
-	// prove that ARM64 SDIV/MSUB already matches Lua modulo semantics. Populated
-	// by RangeAnalysisPass so the emitter can skip the sign-adjust slow path.
-	IntModNoSignAdjust map[int]bool
-
-	// IntRanges records the integer range facts computed by RangeAnalysisPass.
-	// Unlike Int48Safe, consumers must treat these facts as optimization hints:
-	// missing or unknown ranges mean "top", not failure. OverflowBoxing uses
-	// this to distinguish bounded linear inductions from overflow-prone
-	// arithmetic recurrences such as multiplicative LCGs.
-	IntRanges map[int]intRange
-
-	// ProfiledIntRanges records guarded integer range facts from runtime
-	// feedback, keyed by SSA value ID. RangeAnalysis consumes these as seeds;
-	// the guarding shape/type facts are still emitted separately, so missing
-	// or invalid profile data only disables the optimization.
-	ProfiledIntRanges map[int]intRange
-
-	// ProfiledLenRanges records guarded len() result ranges for SSA values,
-	// keyed by the value whose length is being read. It lets RangeAnalysis seed
-	// OpLen without changing the value's own type or representation.
-	ProfiledLenRanges map[int]intRange
-
-	// IntNonNegative is the set of integer SSA value IDs whose runtime result is
-	// provably >= 0. Populated by RangeAnalysisPass for consumers that only need
-	// a sign fact and must not reuse Int48Safe's overflow-specific meaning.
-	IntNonNegative map[int]bool
-
-	// Numeric groups integer range and arithmetic safety facts. The map fields
-	// above remain for compatibility and are kept pointed at this domain's maps
-	// by constructors, Initialize, and domain mutators.
+	// Numeric groups integer range and arithmetic safety facts. It is the single
+	// source of truth for numeric analysis; access goes through its accessors.
 	Numeric *NumericFacts
-
-	// TableArrayUpperBoundSafe is the set of table-array access instruction IDs
-	// whose key < len check is already guaranteed by an enclosing loop-region
-	// fact. The emitter still performs key type and non-negative checks unless
-	// separate facts prove those safe.
-	TableArrayUpperBoundSafe map[int]bool
-
-	// TableArrayLowerBoundSafe is the set of table-array access instruction IDs
-	// whose key >= 0 check is already guaranteed by loop-region induction facts.
-	// It is separate from IntNonNegative so versioning-derived facts remain
-	// local to the guarded loop region.
-	TableArrayLowerBoundSafe map[int]bool
-
-	// LoopTableArrayFacts records the table/len/data/key contract behind each
-	// TableArrayUpperBoundSafe access. It is diagnostic and a staging point for
-	// broader loop-region versioning; codegen treats missing entries as a lack
-	// of optimization, not as an error.
-	LoopTableArrayFacts map[int]LoopTableArrayFact
 
 	// ShapeFieldTypeElidedLoads marks fixed-shape field loads whose result type
 	// is guarded once by shape field type epochs. Codegen may skip the per-load
 	// NaN-box tag check for these loads.
 	ShapeFieldTypeElidedLoads map[int]bool
 
-	// TableArrayDataPtrs records typed table-array data pointer SSA values. The
-	// key is an OpTableArrayData value ID; consumers can resolve it as a raw
-	// backing-array pointer only while the matching header guard remains valid.
-	TableArrayDataPtrs map[int]TableArrayDataPtrFact
-
-	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
-	// by OpRecordArrayLoopSpecialization instruction ID.
-	RecordArrayLoopSpecializations map[int]RecordArrayLoopSpecializationSpec
-
-	// CallABIs records stable callsite ABI facts keyed by OpCall instruction
-	// ID. A descriptor is required before codegen may use a specialized
-	// cross-proto raw-int call path; OpCall.Type alone is not authoritative.
-	CallABIs map[int]CallABIDescriptor
-
-	// Call groups call-oriented analysis facts. The map fields above and below
-	// remain for compatibility and are kept pointed at this domain's maps by
-	// constructors, Initialize, and domain mutators.
+	// Call groups call-oriented analysis facts. It is the single source of truth
+	// for call analysis; access goes through its accessors.
 	Call *CallFacts
 
-	// Speculation groups Tier 2 speculation facts. The map fields below remain
-	// for compatibility and are kept pointed at this domain's maps by
-	// constructors, Initialize, and domain mutators.
+	// Speculation groups Tier 2 speculation facts. It is the single source of
+	// truth for speculation analysis; access goes through its accessors.
 	Speculation *SpeculationFacts
 
 	// TableShape groups table/field shape analysis facts. The map fields below
@@ -105,30 +31,10 @@ type AnalysisResult struct {
 	// constructors, Initialize, and domain mutators.
 	TableShape *TableShapeFacts
 
-	// LoopSpecialization groups loop-specialization and table-array bound facts. The map fields
-	// above remain for compatibility and are kept pointed at this domain's maps
-	// by constructors, Initialize, and domain mutators.
+	// LoopSpecialization groups loop-specialization and table-array bound facts.
+	// It is the single source of truth for loop-specialization analysis; access
+	// goes through its accessors.
 	LoopSpecialization *LoopSpecializationFacts
-
-	// SpecDependencyProtos records other protos whose runtime feedback or native
-	// entry publication can change this function's optimized shape. It covers
-	// inlined callees and guarded polymorphic call targets.
-	SpecDependencyProtos map[*vm.FuncProto]bool
-
-	// SuppressedSpecGuardPCs records bytecode PCs whose runtime guards have
-	// already failed for this proto version. Later passes must treat matching
-	// feedback as unstable and keep the generic path instead of regenerating
-	// the same guarded specialization.
-	SuppressedSpecGuardPCs map[int]bool
-
-	// SuppressedSpecGuardKinds is the guard-kind-scoped form of
-	// SuppressedSpecGuardPCs. Passes that know the guard they are about to emit
-	// should consult this map so one unstable guard does not disable unrelated
-	// specializations at the same bytecode PC. Nil is a sentinel meaning kind
-	// information is unavailable and consumers must fall back to
-	// SuppressedSpecGuardPCs; an empty non-nil map means kind-scoped suppression
-	// is available but currently has no suppressed guards.
-	SuppressedSpecGuardKinds map[int]map[string]bool
 
 	// FixedShapeTables records SSA table values whose field layout is known
 	// without consulting the runtime field cache. The initial producer is a
@@ -459,51 +365,17 @@ func (n *NumericFacts) SetModuloFacts(nonZeroDivisor map[int]bool, noSignAdjust 
 	n.bindOwner()
 }
 
-func (n *NumericFacts) bindOwner() {
-	if n != nil && n.owner != nil {
-		n.owner.bindNumericCompatibilityFields()
-	}
-}
+func (n *NumericFacts) bindOwner() {}
 
 func (a *AnalysisResult) NumericFacts() *NumericFacts {
 	if a == nil {
 		return nil
 	}
 	if a.Numeric == nil {
-		a.Numeric = &NumericFacts{
-			Int48Safe:            a.Int48Safe,
-			IntModNonZeroDivisor: a.IntModNonZeroDivisor,
-			IntModNoSignAdjust:   a.IntModNoSignAdjust,
-			IntRanges:            a.IntRanges,
-			ProfiledIntRanges:    a.ProfiledIntRanges,
-			ProfiledLenRanges:    a.ProfiledLenRanges,
-			IntNonNegative:       a.IntNonNegative,
-		}
-	} else {
-		if a.Int48Safe != nil || a.Numeric.Int48Safe == nil {
-			a.Numeric.Int48Safe = a.Int48Safe
-		}
-		if a.IntModNonZeroDivisor != nil || a.Numeric.IntModNonZeroDivisor == nil {
-			a.Numeric.IntModNonZeroDivisor = a.IntModNonZeroDivisor
-		}
-		if a.IntModNoSignAdjust != nil || a.Numeric.IntModNoSignAdjust == nil {
-			a.Numeric.IntModNoSignAdjust = a.IntModNoSignAdjust
-		}
-		if a.IntRanges != nil || a.Numeric.IntRanges == nil {
-			a.Numeric.IntRanges = a.IntRanges
-		}
-		if a.ProfiledIntRanges != nil || a.Numeric.ProfiledIntRanges == nil {
-			a.Numeric.ProfiledIntRanges = a.ProfiledIntRanges
-		}
-		if a.ProfiledLenRanges != nil || a.Numeric.ProfiledLenRanges == nil {
-			a.Numeric.ProfiledLenRanges = a.ProfiledLenRanges
-		}
-		if a.IntNonNegative != nil || a.Numeric.IntNonNegative == nil {
-			a.Numeric.IntNonNegative = a.IntNonNegative
-		}
+		a.Numeric = &NumericFacts{}
+		a.Numeric.Initialize()
 	}
 	a.Numeric.owner = a
-	a.bindNumericCompatibilityFields()
 	return a.Numeric
 }
 
@@ -519,20 +391,6 @@ func (a *AnalysisResult) initializeNumericFacts() {
 		return
 	}
 	a.NumericFacts().Initialize()
-	a.bindNumericCompatibilityFields()
-}
-
-func (a *AnalysisResult) bindNumericCompatibilityFields() {
-	if a == nil || a.Numeric == nil {
-		return
-	}
-	a.Int48Safe = a.Numeric.Int48Safe
-	a.IntModNonZeroDivisor = a.Numeric.IntModNonZeroDivisor
-	a.IntModNoSignAdjust = a.Numeric.IntModNoSignAdjust
-	a.IntRanges = a.Numeric.IntRanges
-	a.ProfiledIntRanges = a.Numeric.ProfiledIntRanges
-	a.ProfiledLenRanges = a.Numeric.ProfiledLenRanges
-	a.IntNonNegative = a.Numeric.IntNonNegative
 }
 
 // CallFacts groups analysis facts produced and consumed by call-specialization passes.
@@ -672,27 +530,17 @@ func (c *CallFacts) CallSiteNoResultRuntimeSpecializationBatchMap() map[int]Call
 	return c.CallSiteNoResultRuntimeSpecializationBatches
 }
 
-func (c *CallFacts) bindOwner() {
-	if c != nil && c.owner != nil {
-		c.owner.bindCallCompatibilityFields()
-	}
-}
+func (c *CallFacts) bindOwner() {}
 
 func (a *AnalysisResult) CallFacts() *CallFacts {
 	if a == nil {
 		return nil
 	}
 	if a.Call == nil {
-		a.Call = &CallFacts{
-			CallABIs: a.CallABIs,
-		}
-	} else {
-		if a.CallABIs != nil || a.Call.CallABIs == nil {
-			a.Call.CallABIs = a.CallABIs
-		}
+		a.Call = &CallFacts{}
+		a.Call.Initialize()
 	}
 	a.Call.owner = a
-	a.bindCallCompatibilityFields()
 	return a.Call
 }
 
@@ -708,14 +556,6 @@ func (a *AnalysisResult) initializeCallFacts() {
 		return
 	}
 	a.CallFacts().Initialize()
-	a.bindCallCompatibilityFields()
-}
-
-func (a *AnalysisResult) bindCallCompatibilityFields() {
-	if a == nil || a.Call == nil {
-		return
-	}
-	a.CallABIs = a.Call.CallABIs
 }
 
 // LoopSpecializationFacts groups analysis facts produced and consumed by loop-specialization and
@@ -739,6 +579,11 @@ type LoopSpecializationFacts struct {
 	// RecordArrayLoopSpecializations records generated loop-body dataflow graphs keyed
 	// by OpRecordArrayLoopSpecialization instruction ID.
 	RecordArrayLoopSpecializations map[int]RecordArrayLoopSpecializationSpec
+
+	// TableArrayDataPtrs records typed table-array data pointer SSA values. The
+	// key is an OpTableArrayData value ID; consumers can resolve it as a raw
+	// backing-array pointer only while the matching header guard remains valid.
+	TableArrayDataPtrs map[int]TableArrayDataPtrFact
 }
 
 func NewLoopSpecializationFacts() *LoopSpecializationFacts {
@@ -759,6 +604,9 @@ func (k *LoopSpecializationFacts) Initialize() {
 	}
 	if k.RecordArrayLoopSpecializations == nil {
 		k.RecordArrayLoopSpecializations = make(map[int]RecordArrayLoopSpecializationSpec)
+	}
+	if k.TableArrayDataPtrs == nil {
+		k.TableArrayDataPtrs = make(map[int]TableArrayDataPtrFact)
 	}
 }
 
@@ -864,39 +712,17 @@ func (k *LoopSpecializationFacts) SetRecordArrayLoopSpecialization(id int, spec 
 	k.bindOwner()
 }
 
-func (k *LoopSpecializationFacts) bindOwner() {
-	if k != nil && k.owner != nil {
-		k.owner.bindLoopSpecializationCompatibilityFields()
-	}
-}
+func (k *LoopSpecializationFacts) bindOwner() {}
 
 func (a *AnalysisResult) LoopSpecializationFacts() *LoopSpecializationFacts {
 	if a == nil {
 		return nil
 	}
 	if a.LoopSpecialization == nil {
-		a.LoopSpecialization = &LoopSpecializationFacts{
-			TableArrayUpperBoundSafe:       a.TableArrayUpperBoundSafe,
-			TableArrayLowerBoundSafe:       a.TableArrayLowerBoundSafe,
-			LoopTableArrayFacts:            a.LoopTableArrayFacts,
-			RecordArrayLoopSpecializations: a.RecordArrayLoopSpecializations,
-		}
-	} else {
-		if a.TableArrayUpperBoundSafe != nil || a.LoopSpecialization.TableArrayUpperBoundSafe == nil {
-			a.LoopSpecialization.TableArrayUpperBoundSafe = a.TableArrayUpperBoundSafe
-		}
-		if a.TableArrayLowerBoundSafe != nil || a.LoopSpecialization.TableArrayLowerBoundSafe == nil {
-			a.LoopSpecialization.TableArrayLowerBoundSafe = a.TableArrayLowerBoundSafe
-		}
-		if a.LoopTableArrayFacts != nil || a.LoopSpecialization.LoopTableArrayFacts == nil {
-			a.LoopSpecialization.LoopTableArrayFacts = a.LoopTableArrayFacts
-		}
-		if a.RecordArrayLoopSpecializations != nil || a.LoopSpecialization.RecordArrayLoopSpecializations == nil {
-			a.LoopSpecialization.RecordArrayLoopSpecializations = a.RecordArrayLoopSpecializations
-		}
+		a.LoopSpecialization = &LoopSpecializationFacts{}
+		a.LoopSpecialization.Initialize()
 	}
 	a.LoopSpecialization.owner = a
-	a.bindLoopSpecializationCompatibilityFields()
 	return a.LoopSpecialization
 }
 
@@ -912,17 +738,6 @@ func (a *AnalysisResult) initializeLoopSpecializationFacts() {
 		return
 	}
 	a.LoopSpecializationFacts().Initialize()
-	a.bindLoopSpecializationCompatibilityFields()
-}
-
-func (a *AnalysisResult) bindLoopSpecializationCompatibilityFields() {
-	if a == nil || a.LoopSpecialization == nil {
-		return
-	}
-	a.TableArrayUpperBoundSafe = a.LoopSpecialization.TableArrayUpperBoundSafe
-	a.TableArrayLowerBoundSafe = a.LoopSpecialization.TableArrayLowerBoundSafe
-	a.LoopTableArrayFacts = a.LoopSpecialization.LoopTableArrayFacts
-	a.RecordArrayLoopSpecializations = a.LoopSpecialization.RecordArrayLoopSpecializations
 }
 
 // SpeculationFacts groups analysis facts produced and consumed by Tier 2
@@ -1006,29 +821,17 @@ func (s *SpeculationFacts) SpecGuardKindSuppressed(pc int, kind string) bool {
 	return s.SuppressedSpecGuardPCs != nil && s.SuppressedSpecGuardPCs[pc]
 }
 
-func (s *SpeculationFacts) bindOwner() {
-	if s != nil && s.owner != nil {
-		s.owner.bindSpeculationCompatibilityFields()
-	}
-}
+func (s *SpeculationFacts) bindOwner() {}
 
 func (a *AnalysisResult) SpeculationFacts() *SpeculationFacts {
 	if a == nil {
 		return nil
 	}
 	if a.Speculation == nil {
-		a.Speculation = &SpeculationFacts{
-			SpecDependencyProtos:     a.SpecDependencyProtos,
-			SuppressedSpecGuardPCs:   a.SuppressedSpecGuardPCs,
-			SuppressedSpecGuardKinds: a.SuppressedSpecGuardKinds,
-		}
-	} else {
-		a.Speculation.SpecDependencyProtos = a.SpecDependencyProtos
-		a.Speculation.SuppressedSpecGuardPCs = a.SuppressedSpecGuardPCs
-		a.Speculation.SuppressedSpecGuardKinds = a.SuppressedSpecGuardKinds
+		a.Speculation = &SpeculationFacts{}
+		a.Speculation.Initialize()
 	}
 	a.Speculation.owner = a
-	a.bindSpeculationCompatibilityFields()
 	return a.Speculation
 }
 
@@ -1037,16 +840,6 @@ func (a *AnalysisResult) initializeSpeculationFacts() {
 		return
 	}
 	a.SpeculationFacts().Initialize()
-	a.bindSpeculationCompatibilityFields()
-}
-
-func (a *AnalysisResult) bindSpeculationCompatibilityFields() {
-	if a == nil || a.Speculation == nil {
-		return
-	}
-	a.SpecDependencyProtos = a.Speculation.SpecDependencyProtos
-	a.SuppressedSpecGuardPCs = a.Speculation.SuppressedSpecGuardPCs
-	a.SuppressedSpecGuardKinds = a.Speculation.SuppressedSpecGuardKinds
 }
 
 // TableShapeFacts groups analysis facts produced and consumed by table/field
@@ -1321,17 +1114,12 @@ func (a *AnalysisResult) bindTableShapeCompatibilityFields() {
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	a := &AnalysisResult{
-		Numeric:                        NewNumericFacts(),
-		TableArrayUpperBoundSafe:       make(map[int]bool),
-		TableArrayLowerBoundSafe:       make(map[int]bool),
-		LoopTableArrayFacts:            make(map[int]LoopTableArrayFact),
-		ShapeFieldTypeElidedLoads:      make(map[int]bool),
-		TableArrayDataPtrs:             make(map[int]TableArrayDataPtrFact),
-		RecordArrayLoopSpecializations: make(map[int]RecordArrayLoopSpecializationSpec),
-		Call:                           NewCallFacts(),
-		Speculation:                    NewSpeculationFacts(),
-		TableShape:                     NewTableShapeFacts(),
-		LoopSpecialization:             NewLoopSpecializationFacts(),
+		Numeric:                   NewNumericFacts(),
+		ShapeFieldTypeElidedLoads: make(map[int]bool),
+		Call:                      NewCallFacts(),
+		Speculation:               NewSpeculationFacts(),
+		TableShape:                NewTableShapeFacts(),
+		LoopSpecialization:        NewLoopSpecializationFacts(),
 
 		FixedShapeTables:         make(map[int]FixedShapeTableFact),
 		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),
@@ -1341,11 +1129,12 @@ func NewAnalysisResult() *AnalysisResult {
 		NumericGlobalValues:      make(map[string]runtime.Value),
 		GlobalArrayElementFacts:  make(map[string]FixedShapeTableFact),
 	}
-	a.bindNumericCompatibilityFields()
-	a.bindCallCompatibilityFields()
-	a.bindSpeculationCompatibilityFields()
+	a.Numeric.owner = a
+	a.Call.owner = a
+	a.Speculation.owner = a
+	a.TableShape.owner = a
+	a.LoopSpecialization.owner = a
 	a.bindTableShapeCompatibilityFields()
-	a.bindLoopSpecializationCompatibilityFields()
 	return a
 }
 
@@ -1355,9 +1144,6 @@ func (a *AnalysisResult) Initialize() {
 	a.initializeLoopSpecializationFacts()
 	if a.ShapeFieldTypeElidedLoads == nil {
 		a.ShapeFieldTypeElidedLoads = make(map[int]bool)
-	}
-	if a.TableArrayDataPtrs == nil {
-		a.TableArrayDataPtrs = make(map[int]TableArrayDataPtrFact)
 	}
 	a.initializeCallFacts()
 	a.initializeSpeculationFacts()
