@@ -374,10 +374,28 @@ func (ec *emitContext) supportsIndexedGlobalGetProtocol() bool {
 }
 
 func (ec *emitContext) supportsIndexedGlobalSetProtocol(instr *Instr) bool {
-	// Keep Tier 2 eligibility for top-level global reducers, but route
-	// SetGlobal through the op-exit path for now. The direct indexed store
-	// protocol can return through an invalid resume PC in mixed global/call
-	// scripts, so only GetGlobal uses the indexed fast path.
+	// INTENTIONALLY DISABLED (not a stub): SetGlobal is routed through the
+	// op-exit path, which calls VM.SetGlobal. Do NOT flip this to true without
+	// addressing the two correctness hazards that caused it to be disabled
+	// (see commit 969342cb) — both stem from the native store writing only the
+	// indexed globalArray through a cached base pointer:
+	//
+	//  A. Dual-storage divergence: VM keeps globals in both globalArray and the
+	//     legacy `globals` map; VM.SetGlobal writes both, the native indexed
+	//     store writes only globalArray, and the map is reconciled only after
+	//     CallJIT returns. An in-run consumer that reads the `globals` map sees
+	//     a stale value.
+	//  B. Reallocation lost-write: defining a NEW global mid-run can append/
+	//     realloc globalArray (bumping globalVer); a native store through the
+	//     captured (now-dead) base pointer is silently lost, and the globalVer
+	//     guard is only re-checked on op-exit, which the all-fast-path run never
+	//     hits. <main> (a global reducer) is the worst case for both.
+	//
+	// GET is safe because a read has no side effect to lose and a stale read is
+	// corrected by the version guard on re-entry. Re-enabling SET safely needs a
+	// stable (non-reallocating) backing array or a compile-time "no new globals
+	// after Tier 2 entry" precondition, plus an audit that no in-run consumer
+	// reads the `globals` map directly.
 	return false
 }
 
