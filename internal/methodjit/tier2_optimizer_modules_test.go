@@ -847,7 +847,7 @@ func TestTier2RepeatedAnalysisModulesDeclareUpdates(t *testing.T) {
 		assertAnalysisFacts(t, module.Updates, fixedShapeTableFacts()...)
 	}
 
-	assertAnalysisFacts(t, findTier2Module(t, plan, "CallABI (final)").Updates, AnalysisFactCallABIs)
+	assertAnalysisFacts(t, findTier2Module(t, plan, "CallABI (final)").Updates, AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts)
 	assertAnalysisFacts(t, findTier2Module(t, plan, "CallSiteRuntimeSpecializationExit (final)").Updates,
 		AnalysisFactCallSiteNoResultRuntimeSpecializations,
 		AnalysisFactCallSiteNoResultRuntimeSpecializationBatches,

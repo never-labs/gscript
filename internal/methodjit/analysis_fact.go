@@ -44,6 +44,10 @@ const (
 	AnalysisFactShapeFieldTypeElided          AnalysisFact = "ShapeFieldTypeElidedLoads"
 	AnalysisFactRecordArrayLoopSpecialization AnalysisFact = "RecordArrayLoopSpecializations"
 	AnalysisFactRecordArrayLoopCaches         AnalysisFact = "RecordArrayLoopCaches"
+
+	AnalysisFactGlobals                 AnalysisFact = "Globals"
+	AnalysisFactNumericGlobalValues     AnalysisFact = "NumericGlobalValues"
+	AnalysisFactGlobalArrayElementFacts AnalysisFact = "GlobalArrayElementFacts"
 )
 
 var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
@@ -197,6 +201,24 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Description: "Record-array loop cache facts are available.",
 		Producers:   []string{"RecordArrayLoopSpecialization"},
 		Consumers:   []string{"codegen"},
+	},
+	AnalysisFactGlobals: {
+		Owner:       "global",
+		Description: "Global function protos seeded for the IR-interpreter oracle to resolve residual cross-function calls.",
+		Producers:   []string{"pipeline seed"},
+		Consumers:   []string{"Inline", "IR interpreter oracle"},
+	},
+	AnalysisFactNumericGlobalValues: {
+		Owner:       "global",
+		Description: "Cross-proto numeric global values seeded by the Tier 2 manager for ABI analysis (hints).",
+		Producers:   []string{"pipeline seed"},
+		Consumers:   []string{"CallABI", "EscapeAnalysis"},
+	},
+	AnalysisFactGlobalArrayElementFacts: {
+		Owner:       "global",
+		Description: "Cross-proto global array element shape facts seeded by the Tier 2 manager (hints).",
+		Producers:   []string{"pipeline seed"},
+		Consumers:   []string{"CallABI"},
 	},
 }
 

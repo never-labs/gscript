@@ -61,6 +61,15 @@ var analysisFactDomain = map[AnalysisFact]factDomain{
 	AnalysisFactTableArrayDataPtrs:            factDomainLoopSpec,
 	AnalysisFactRecordArrayLoopSpecialization: factDomainLoopSpec,
 	AnalysisFactRecordArrayLoopCaches:         factDomainLoopSpec,
+
+	// Global domain (GlobalFacts): cross-proto seeded inputs. These are seeded by
+	// the pipeline/manager outside any module run, not produced by a pass, so no
+	// module declares them in Provides. They are modeled here so global reads are
+	// named (read-contract) and global writes are not flagged as unmodeled
+	// (write-contract).
+	AnalysisFactGlobals:                 factDomainGlobal,
+	AnalysisFactNumericGlobalValues:     factDomainGlobal,
+	AnalysisFactGlobalArrayElementFacts: factDomainGlobal,
 }
 
 // factAccessObserver records the set of AnalysisResult fact domains accessed

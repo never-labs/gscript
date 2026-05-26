@@ -20,7 +20,7 @@ func init() {
 
 func tier2NumericModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("LoopBoundRangeGuard", Tier2PhaseNumeric, nil, nil, LoopBoundRangeGuardPass),
+		tier2PassModuleWith("LoopBoundRangeGuard", Tier2PhaseNumeric, analysisFacts(AnalysisFactSpecDependencyProtos), nil, LoopBoundRangeGuardPass),
 		tier2PassModuleWith("ObservedParamRangeGuard", Tier2PhaseNumeric, nil, nil, ObservedParamRangeGuardPass),
 		tier2PassModuleWith("ObservedParamTypeGuard", Tier2PhaseNumeric, nil, nil, ObservedParamTypeGuardPass),
 		tier2PassModuleWith("ExactGuardConst", Tier2PhaseNumeric, nil, nil, ExactGuardConstPass),
@@ -129,7 +129,7 @@ func tier2FloatNumericModules() []Tier2OptimizerModule {
 
 func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
-		tier2PassModuleWith("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe), nil, LICMPass),
+		tier2PassModuleWith("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, LICMPass),
 		tier2PassModuleWith("LoopGlobalStoreSink", Tier2PhaseLoopSpecialization, nil, nil, LoopGlobalStoreSinkPass),
 	}
 	modules = append(modules, tier2TableLoopSpecializationModules()...)
@@ -151,7 +151,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 		{
 			Name:     "LICM (post-MatrixRowPtrFactoring)",
 			Phase:    Tier2PhaseLoopPost,
-			Requires: analysisFacts(AnalysisFactInt48Safe),
+			Requires: analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables),
 			Provides: nil,
 			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 				if !hasMatrixNativeIR(fn) {
@@ -165,8 +165,8 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 		tier2PassModuleWith("IntAlgebraSimplify", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, IntAlgebraSimplifyPass),
 		tier2PassModuleWith("TableArrayStaticBounds (post-RangeAnalysis)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
-		tier2PassModuleWith("LoopRegionVersioning", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), nil, LoopRegionVersioningPass),
-		tier2PassModuleWith("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
+		tier2PassModuleWith("LoopRegionVersioning", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), nil, LoopRegionVersioningPass),
+		tier2PassModuleWith("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), nil, TableArrayStaticBoundsPass),
 		tier2PassModuleWith("ScalarPromotion", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), nil, ScalarPromotionPass),
 		tier2PassModuleWith("TableArrayDataPtrFact", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactTableArrayDataPtrs), TableArrayDataPtrFactPass),
 	}

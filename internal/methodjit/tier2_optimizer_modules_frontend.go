@@ -84,7 +84,7 @@ func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tie
 		{
 			Name:     "Inline",
 			Phase:    Tier2PhaseInlineCall,
-			Requires: analysisFacts(AnalysisFactInlineComplete),
+			Requires: analysisFacts(AnalysisFactInlineComplete, AnalysisFactFixedShapeTables),
 			Provides: analysisFacts(AnalysisFactSpecDependencyProtos),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				if len(globals) == 0 && !hasInlineFeedbackCallee(fn) {
@@ -190,7 +190,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Name:     "CallABI",
 			Phase:    Tier2PhaseCallLower,
 			Requires: analysisFacts(AnalysisFactFixedShapeTables),
-			Provides: analysisFacts(AnalysisFactCallABIs),
+			Provides: analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
 				fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
@@ -202,7 +202,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 				})(fn)
 			},
 		},
-		tier2PassModuleWith("CallReturnProjection", Tier2PhaseCallLower, nil, nil, CallReturnProjectionPass),
+		tier2PassModuleWith("CallReturnProjection", Tier2PhaseCallLower, analysisFacts(AnalysisFactCallABIs, AnalysisFactSpecDependencyProtos, AnalysisFactFixedShapeTables), nil, CallReturnProjectionPass),
 		tier2PassModuleWith("ModularCallFloorReduce", Tier2PhaseCallLower, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWith("CallResultRangeGuard", Tier2PhaseCallLower, nil, nil, CallResultRangeGuardPass),
 		tier2PassModuleWith("ConstProp", Tier2PhaseCallLower, nil, nil, ConstPropPass),
@@ -250,7 +250,7 @@ func optsNumericGlobalValuesByName(fn *Function, opts *Tier2PipelineOpts) map[st
 
 func tier2PostRewriteModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("CallReturnProjection (post-rewrite)", Tier2PhasePostRewrite, nil, nil, CallReturnProjectionPass),
+		tier2PassModuleWith("CallReturnProjection (post-rewrite)", Tier2PhasePostRewrite, analysisFacts(AnalysisFactCallABIs, AnalysisFactSpecDependencyProtos, AnalysisFactFixedShapeTables), nil, CallReturnProjectionPass),
 		tier2PassModuleWith("ModularCallFloorReduce (post-rewrite)", Tier2PhasePostRewrite, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWith("CallResultRangeGuard (post-rewrite)", Tier2PhasePostRewrite, nil, nil, CallResultRangeGuardPass),
 		tier2PassModuleWith("DCE", Tier2PhasePostRewrite, nil, nil, DCEPass),
@@ -271,8 +271,8 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		{
 			Name:     "CallABI (final)",
 			Phase:    Tier2PhaseFinalCall,
-			Requires: analysisFacts(AnalysisFactFixedShapeTables),
-			Updates:  analysisFacts(AnalysisFactCallABIs),
+			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
+			Updates:  analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
 				fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
@@ -293,7 +293,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 				return CallSiteRuntimeSpecializationExitPass(specializationGlobals)(fn)
 			},
 		},
-		tier2PassModuleWith("CallReturnProjection (final)", Tier2PhaseFinalCall, nil, nil, CallReturnProjectionPass),
+		tier2PassModuleWith("CallReturnProjection (final)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactCallABIs, AnalysisFactSpecDependencyProtos, AnalysisFactFixedShapeTables), nil, CallReturnProjectionPass),
 		tier2PassModuleWith("ModularCallFloorReduce (final)", Tier2PhaseFinalCall, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWith("CallResultRangeGuard (final)", Tier2PhaseFinalCall, nil, nil, CallResultRangeGuardPass),
 		tier2PassModuleWith("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPass),

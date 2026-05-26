@@ -57,6 +57,10 @@ var analysisFactForDomainField = map[string]AnalysisFact{
 	"callSiteNoResultRuntimeSpecializations":       AnalysisFactCallSiteNoResultRuntimeSpecializations,
 	"callSiteNoResultRuntimeSpecializationBatches": AnalysisFactCallSiteNoResultRuntimeSpecializationBatches,
 
+	"globals":                 AnalysisFactGlobals,
+	"numericGlobalValues":     AnalysisFactNumericGlobalValues,
+	"globalArrayElementFacts": AnalysisFactGlobalArrayElementFacts,
+
 	"StringConstTables":    AnalysisFactStringConstTables,
 	"StringFormatPatterns": AnalysisFactStringFormatPatterns,
 	"StringSplitSubSpecs":  AnalysisFactStringSplitSubSpecs,

@@ -72,18 +72,19 @@ func TestCheckModuleWriteContract_DomainStructPrefixResolves(t *testing.T) {
 }
 
 func TestCheckModuleWriteContract_UnmodeledDomainIsReportedNotViolation(t *testing.T) {
-	// Globals has no AnalysisFact: writing it is a coverage gap, not a violation.
+	// These fields have no AnalysisFact yet: writing them is a coverage gap, not a
+	// violation.
 	run := Tier2ModuleRun{
-		Phase:          Tier2PhaseInlineCall,
-		ModuleName:     "Inline",
-		ChangedDomains: []string{"globals", "numericGlobalValues"},
+		Phase:          Tier2PhaseLoopPost,
+		ModuleName:     "TableArrayStaticBounds",
+		ChangedDomains: []string{"loopTableArrayFacts", "profiledIntRanges"},
 	}
 	report := CheckModuleWriteContract(run)
 	if report.HasViolations() {
 		t.Fatalf("unmodeled fields must not be violations, got: %s",
 			FormatWriteContractViolations(report.Violations))
 	}
-	want := []string{"globals", "numericGlobalValues"}
+	want := []string{"loopTableArrayFacts", "profiledIntRanges"}
 	if !reflect.DeepEqual(report.UnmodeledDomains, want) {
 		t.Fatalf("unmodeled domains = %v, want %v", report.UnmodeledDomains, want)
 	}
@@ -98,16 +99,16 @@ func TestCheckPipelineWriteContract_AggregatesAndDedups(t *testing.T) {
 			ChangedDomains: []string{"int48Safe", "intRanges"}, // IntRanges undeclared
 		},
 		{
-			Phase:          Tier2PhaseInlineCall,
+			Phase:          Tier2PhaseLoopPost,
 			ModuleName:     "B",
-			ChangedDomains: []string{"globals", "globals"}, // unmodeled, duplicate
+			ChangedDomains: []string{"profiledIntRanges", "profiledIntRanges"}, // unmodeled, duplicate
 		},
 	}
 	agg := CheckPipelineWriteContract(runs)
 	if len(agg.Violations) != 1 {
 		t.Fatalf("expected 1 aggregate violation, got %d", len(agg.Violations))
 	}
-	if !reflect.DeepEqual(agg.UnmodeledDomains, []string{"globals"}) {
-		t.Fatalf("unmodeled = %v, want [globals]", agg.UnmodeledDomains)
+	if !reflect.DeepEqual(agg.UnmodeledDomains, []string{"profiledIntRanges"}) {
+		t.Fatalf("unmodeled = %v, want [profiledIntRanges]", agg.UnmodeledDomains)
 	}
 }
