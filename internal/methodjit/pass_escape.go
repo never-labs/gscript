@@ -1007,7 +1007,7 @@ func partialMaterializeCtorForAlloc(fn *Function, alloc *Instr) (partialMaterial
 	if alloc.Op != OpNewTable {
 		return partialMaterializeCtor{}, false
 	}
-	fact, hasFact := fn.Analysis.FixedTableConstructors[alloc.ID]
+	fact, hasFact := fn.Analysis.TableShapeFacts().FixedTableConstructorFact(alloc.ID)
 	expectedFields := 0
 	if hasFact {
 		expectedFields = len(fact.FieldNames)

@@ -787,14 +787,11 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, tbl)
 				if ctorIdx >= 0 && ctorIdx < len(b.proto.TableCtors2) {
 					ctor := b.proto.TableCtors2[ctorIdx]
-					if b.fn.Analysis.FixedTableConstructors == nil {
-						b.fn.Analysis.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
-					}
-					b.fn.Analysis.FixedTableConstructors[newTable.ID] = FixedTableConstructorFact{
+					b.fn.Analysis.TableShapeFacts().RecordFixedTableConstructor(newTable.ID, FixedTableConstructorFact{
 						Ctor2Index: ctorIdx,
 						CtorNIndex: -1,
 						FieldNames: []string{ctor.Runtime.Key1, ctor.Runtime.Key2},
-					}
+					})
 					val1 := b.readVariable(valueBase, block)
 					val2 := b.readVariable(valueBase+1, block)
 					b.emit(block, OpSetField, TypeUnknown, []*Value{tbl, val1}, int64(ctor.Key1Const), 0)
@@ -814,14 +811,11 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, tbl)
 				if ctorIdx >= 0 && ctorIdx < len(b.proto.TableCtorsN) {
 					ctor := b.proto.TableCtorsN[ctorIdx]
-					if b.fn.Analysis.FixedTableConstructors == nil {
-						b.fn.Analysis.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
-					}
-					b.fn.Analysis.FixedTableConstructors[newTable.ID] = FixedTableConstructorFact{
+					b.fn.Analysis.TableShapeFacts().RecordFixedTableConstructor(newTable.ID, FixedTableConstructorFact{
 						Ctor2Index: -1,
 						CtorNIndex: ctorIdx,
 						FieldNames: append([]string(nil), ctor.Runtime.Keys...),
-					}
+					})
 					for i, keyConst := range ctor.KeyConsts {
 						val := b.readVariable(valueBase+i, block)
 						b.emit(block, OpSetField, TypeUnknown, []*Value{tbl, val}, int64(keyConst), 0)

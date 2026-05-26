@@ -64,7 +64,7 @@ func TestFieldLenFold_LowersProfiledPolyFieldLen(t *testing.T) {
 	get := &Instr{ID: 2, Op: OpGetField, Type: TypeString, Args: []*Value{tbl.Value()}, Aux: 0, Block: b0}
 	ln := &Instr{ID: 3, Op: OpLen, Type: TypeInt, Args: []*Value{get.Value()}, Block: b0}
 	b0.Instrs = []*Instr{tbl, get, ln, {Op: OpReturn, Args: []*Value{ln.Value()}, Block: b0}}
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		get.ID: {
 			{ShapeID: 101, FieldIdx: 0, Type: TypeString, ReceiverFact: FixedShapeTableFact{
 				ShapeID: 101, FieldLenRanges: map[string]intRange{"kind": pointRange(2)},
@@ -82,7 +82,7 @@ func TestFieldLenFold_LowersProfiledPolyFieldLen(t *testing.T) {
 	if out == nil || ln.Op != OpFieldPolyLen || ln.Type != TypeInt || len(ln.Args) != 1 || ln.Args[0].ID != tbl.ID {
 		t.Fatalf("len op not lowered to FieldPolyLen:\n%s", Print(fn))
 	}
-	cases := fn.Analysis.FieldPolyShapeFacts[ln.ID]
+	cases := fn.Analysis.TableShape.FieldPolyShapeFacts[ln.ID]
 	if len(cases) != 2 {
 		t.Fatalf("FieldPolyLen facts not copied, got %d cases", len(cases))
 	}
@@ -109,7 +109,7 @@ func TestFieldLenFold_DoesNotLowerProfiledPolyLenForMutatedField(t *testing.T) {
 	get := &Instr{ID: 4, Op: OpGetField, Type: TypeString, Args: []*Value{tbl.Value()}, Aux: 0, Block: b0}
 	ln := &Instr{ID: 5, Op: OpLen, Type: TypeInt, Args: []*Value{get.Value()}, Block: b0}
 	b0.Instrs = []*Instr{tbl, next, set, get, ln, {Op: OpReturn, Args: []*Value{ln.Value()}, Block: b0}}
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		get.ID: {
 			{ShapeID: 101, FieldIdx: 0, Type: TypeString, ReceiverFact: FixedShapeTableFact{
 				ShapeID: 101, FieldLenRanges: map[string]intRange{"kind": pointRange(4)},
@@ -185,11 +185,13 @@ func TestProfiledStringLenFold_FoldsLoweredFixedShapeFieldLen(t *testing.T) {
 		Proto:   &vm.FuncProto{Name: "lowered_fixed_shape_len"},
 		NumRegs: 1,
 		Analysis: &AnalysisResult{
-			FixedShapeTables: map[int]FixedShapeTableFact{
-				1: {
-					ShapeID:        42,
-					FieldNames:     []string{"kind"},
-					FieldLenRanges: map[string]intRange{"kind": pointRange(7)},
+			TableShape: &TableShapeFacts{
+				FixedShapeTables: map[int]FixedShapeTableFact{
+					1: {
+						ShapeID:        42,
+						FieldNames:     []string{"kind"},
+						FieldLenRanges: map[string]intRange{"kind": pointRange(7)},
+					},
 				},
 			},
 		},

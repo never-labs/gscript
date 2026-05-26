@@ -481,8 +481,9 @@ func currentFixedShapeTableFacts(fn *Function) map[int]FixedShapeTableFact {
 	if fn == nil {
 		return nil
 	}
-	facts := make(map[int]FixedShapeTableFact, len(fn.Analysis.FixedShapeTables))
-	for id, fact := range fn.Analysis.FixedShapeTables {
+	shapeTables := fn.Analysis.TableShapeFacts().FixedShapeTableMap()
+	facts := make(map[int]FixedShapeTableFact, len(shapeTables))
+	for id, fact := range shapeTables {
 		facts[id] = cloneFixedShapeTableFact(fact)
 	}
 	for id, fact := range inferLocalFixedShapeTables(fn) {

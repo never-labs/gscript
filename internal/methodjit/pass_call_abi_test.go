@@ -292,11 +292,13 @@ func TestFieldShapeCalleeProtosDeduplicatesShapeCases(t *testing.T) {
 	}
 	fn := &Function{
 		Analysis: &AnalysisResult{
-			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-				calleeLoad.ID: {
-					{ShapeID: 11, FieldIdx: 0, VMProto: calleeA},
-					{ShapeID: 12, FieldIdx: 0, VMProto: calleeA},
-					{ShapeID: 13, FieldIdx: 0, VMProto: calleeB},
+			TableShape: &TableShapeFacts{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{ShapeID: 11, FieldIdx: 0, VMProto: calleeA},
+						{ShapeID: 12, FieldIdx: 0, VMProto: calleeA},
+						{ShapeID: 13, FieldIdx: 0, VMProto: calleeB},
+					},
 				},
 			},
 		},
@@ -334,21 +336,23 @@ func TestFieldShapeCalleeABISummaryUsesReceiverFacts(t *testing.T) {
 	}
 	fn := &Function{
 		Analysis: &AnalysisResult{
-			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-				calleeLoad.ID: {
-					{
-						ShapeID:  316,
-						FieldIdx: 5,
-						VMProto:  stepIO,
-						ReceiverFact: FixedShapeTableFact{
-							ShapeID:    316,
-							FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
-							FieldTypes: map[string]Type{
-								"id":    TypeInt,
-								"queue": TypeInt,
-								"bytes": TypeInt,
-								"state": TypeString,
-								"step":  TypeFunction,
+			TableShape: &TableShapeFacts{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{
+							ShapeID:  316,
+							FieldIdx: 5,
+							VMProto:  stepIO,
+							ReceiverFact: FixedShapeTableFact{
+								ShapeID:    316,
+								FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
+								FieldTypes: map[string]Type{
+									"id":    TypeInt,
+									"queue": TypeInt,
+									"bytes": TypeInt,
+									"state": TypeString,
+									"step":  TypeFunction,
+								},
 							},
 						},
 					},
@@ -389,21 +393,23 @@ func TestCallABIAnnotate_FieldShapeTypedPeerDescriptor(t *testing.T) {
 		Proto:  &vm.FuncProto{Name: "caller", Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 3, 2)}},
 		Blocks: []*Block{block},
 		Analysis: &AnalysisResult{
-			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-				calleeLoad.ID: {
-					{
-						ShapeID:  316,
-						FieldIdx: 5,
-						VMProto:  stepIO,
-						ReceiverFact: FixedShapeTableFact{
-							ShapeID:    316,
-							FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
-							FieldTypes: map[string]Type{
-								"id":    TypeInt,
-								"queue": TypeInt,
-								"bytes": TypeInt,
-								"state": TypeString,
-								"step":  TypeFunction,
+			TableShape: &TableShapeFacts{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{
+							ShapeID:  316,
+							FieldIdx: 5,
+							VMProto:  stepIO,
+							ReceiverFact: FixedShapeTableFact{
+								ShapeID:    316,
+								FieldNames: []string{"id", "kind", "queue", "bytes", "state", "step"},
+								FieldTypes: map[string]Type{
+									"id":    TypeInt,
+									"queue": TypeInt,
+									"bytes": TypeInt,
+									"state": TypeString,
+									"step":  TypeFunction,
+								},
 							},
 						},
 					},
@@ -456,19 +462,21 @@ func TestCallABIAnnotate_TypedPeerNoResultLeavesCallUntyped(t *testing.T) {
 		Proto:  &vm.FuncProto{Name: "caller", Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 3, 1)}},
 		Blocks: []*Block{block},
 		Analysis: &AnalysisResult{
-			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-				calleeLoad.ID: {
-					{
-						ShapeID:  316,
-						FieldIdx: 2,
-						VMProto:  stepIO,
-						ReceiverFact: FixedShapeTableFact{
-							ShapeID:    316,
-							FieldNames: []string{"id", "queue", "step"},
-							FieldTypes: map[string]Type{
-								"id":    TypeInt,
-								"queue": TypeInt,
-								"step":  TypeFunction,
+			TableShape: &TableShapeFacts{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{
+							ShapeID:  316,
+							FieldIdx: 2,
+							VMProto:  stepIO,
+							ReceiverFact: FixedShapeTableFact{
+								ShapeID:    316,
+								FieldNames: []string{"id", "queue", "step"},
+								FieldTypes: map[string]Type{
+									"id":    TypeInt,
+									"queue": TypeInt,
+									"step":  TypeFunction,
+								},
 							},
 						},
 					},
@@ -520,28 +528,30 @@ func step_float(a, tick) {
 	fn := &Function{
 		Proto: &vm.FuncProto{Name: "caller"},
 		Analysis: &AnalysisResult{
-			FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
-				calleeLoad.ID: {
-					{
-						ShapeID:   101,
-						FieldIdx:  2,
-						VMProto:   stepInt,
-						VMClosure: 0x1010,
-						ReceiverFact: FixedShapeTableFact{
-							ShapeID:    101,
-							FieldNames: []string{"count", "step"},
-							FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+			TableShape: &TableShapeFacts{
+				FieldPolyShapeFacts: map[int][]FieldPolyShapeCase{
+					calleeLoad.ID: {
+						{
+							ShapeID:   101,
+							FieldIdx:  2,
+							VMProto:   stepInt,
+							VMClosure: 0x1010,
+							ReceiverFact: FixedShapeTableFact{
+								ShapeID:    101,
+								FieldNames: []string{"count", "step"},
+								FieldTypes: map[string]Type{"count": TypeInt, "step": TypeFunction},
+							},
 						},
-					},
-					{
-						ShapeID:   102,
-						FieldIdx:  3,
-						VMProto:   stepFloat,
-						VMClosure: 0x2020,
-						ReceiverFact: FixedShapeTableFact{
-							ShapeID:    102,
-							FieldNames: []string{"x", "vx", "step"},
-							FieldTypes: map[string]Type{"x": TypeFloat, "vx": TypeFloat, "step": TypeFunction},
+						{
+							ShapeID:   102,
+							FieldIdx:  3,
+							VMProto:   stepFloat,
+							VMClosure: 0x2020,
+							ReceiverFact: FixedShapeTableFact{
+								ShapeID:    102,
+								FieldNames: []string{"x", "vx", "step"},
+								FieldTypes: map[string]Type{"x": TypeFloat, "vx": TypeFloat, "step": TypeFunction},
+							},
 						},
 					},
 				},
@@ -596,7 +606,7 @@ func step_float(a, tick) {
 	floor := &Instr{ID: 4, Op: OpFloor, Type: TypeInt, Args: []*Value{call.Value()}, Block: b}
 	ret := &Instr{ID: 5, Op: OpReturn, Args: []*Value{floor.Value()}, Block: b}
 	b.Instrs = []*Instr{receiver, calleeLoad, tick, call, floor, ret}
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		calleeLoad.ID: {
 			{
 				ShapeID:   101,
@@ -637,10 +647,10 @@ func step_float(a, tick) {
 	if len(call.Args) != 2 || call.Args[0].ID != receiver.ID || call.Args[1].ID != tick.ID {
 		t.Fatalf("fused args=%v want receiver,tick\nIR:\n%s", call.Args, Print(fn))
 	}
-	if got := len(fn.Analysis.FieldPolyShapeFacts[call.ID]); got != 2 {
+	if got := len(fn.Analysis.TableShape.FieldPolyShapeFacts[call.ID]); got != 2 {
 		t.Fatalf("fused FieldPolyShapeFacts=%d want 2", got)
 	}
-	fused := fn.Analysis.FieldPolyShapeFacts[call.ID]
+	fused := fn.Analysis.TableShape.FieldPolyShapeFacts[call.ID]
 	if fused[0].VMClosure != 0x3030 || fused[1].VMClosure != 0x4040 {
 		t.Fatalf("fused closures=%#x,%#x want 0x3030,0x4040", fused[0].VMClosure, fused[1].VMClosure)
 	}

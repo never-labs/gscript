@@ -1010,10 +1010,10 @@ func (ec *emitContext) emitStoreNumericFieldLoad(instr *Instr, valReg jit.Reg, d
 }
 
 func (ec *emitContext) fieldLoadTypeCheckElided(instr *Instr) bool {
-	if ec == nil || ec.fn == nil || instr == nil || ec.fn.Analysis.ShapeFieldTypeElidedLoads == nil {
+	if ec == nil || ec.fn == nil || instr == nil {
 		return false
 	}
-	return ec.fn.Analysis.ShapeFieldTypeElidedLoads[instr.ID]
+	return ec.fn.Analysis.TableShapeFacts().ShapeFieldTypeElidedLoad(instr.ID)
 }
 
 func (ec *emitContext) emitGuardShapeFieldType(instr *Instr) {

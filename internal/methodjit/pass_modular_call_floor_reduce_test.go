@@ -53,7 +53,7 @@ func TestCallResultRangeGuardPass_SkipsModuloReducedFloorCall(t *testing.T) {
 	b.Instrs = []*Instr{recv, tick, call, div, reduced, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
 	}
 

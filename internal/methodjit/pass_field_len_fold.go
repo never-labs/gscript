@@ -136,10 +136,11 @@ func fixedShapeFactForValue(fn *Function, id int) (FixedShapeTableFact, bool) {
 	if fn == nil {
 		return FixedShapeTableFact{}, false
 	}
-	if fact, ok := fn.Analysis.FixedShapeTables[id]; ok {
+	ts := fn.Analysis.TableShapeFacts()
+	if fact, ok := ts.FixedShapeTableFactFor(id); ok {
 		return fact, true
 	}
-	if fact, ok := fn.Analysis.FixedShapeArgFacts[id]; ok {
+	if fact, ok := ts.FixedShapeArgFact(id); ok {
 		return fact, true
 	}
 	return FixedShapeTableFact{}, false

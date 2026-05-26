@@ -67,10 +67,7 @@ func shapeFieldTypeGuardPass(fn *Function, registry *CompilationDependencyRegist
 			if registry != nil {
 				registry.RecordShapeField(shapeID, fieldIdx)
 			}
-			if fn.Analysis.ShapeFieldTypeElidedLoads == nil {
-				fn.Analysis.ShapeFieldTypeElidedLoads = make(map[int]bool)
-			}
-			fn.Analysis.ShapeFieldTypeElidedLoads[instr.ID] = true
+			fn.Analysis.TableShapeFacts().RecordShapeFieldTypeElidedLoad(instr.ID)
 			functionRemarks(fn).Add("ShapeFieldTypeGuard", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("elide per-load type check for shape %d field %d as %s", shapeID, fieldIdx, instr.Type))
 		}

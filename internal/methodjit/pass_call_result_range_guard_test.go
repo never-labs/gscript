@@ -191,7 +191,7 @@ func TestCallResultRangeGuardPass_SpeculatesStableFieldCallFloor(t *testing.T) {
 	b.Instrs = []*Instr{recv, arg, call, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
 	}
 
@@ -235,7 +235,7 @@ func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	b.Instrs = []*Instr{recv, arg, call, ret}
 	fn.Entry = b
 	fn.Blocks = []*Block{b}
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		call.ID: {{ShapeID: 7, FieldIdx: 1}},
 	}
 

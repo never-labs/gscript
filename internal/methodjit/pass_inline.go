@@ -1644,23 +1644,21 @@ func remapValue(v *Value, idMap map[int]int, paramValues map[int]*Value) *Value 
 }
 
 func copyInlinedFixedTableConstructors(callerFn, calleeFn *Function, idMap map[int]int) {
-	if callerFn == nil || callerFn.Proto == nil || calleeFn == nil || calleeFn.Proto == nil || len(calleeFn.Analysis.FixedTableConstructors) == 0 {
+	if callerFn == nil || callerFn.Proto == nil || calleeFn == nil || calleeFn.Proto == nil || calleeFn.Analysis.TableShapeFacts().FixedTableConstructorCount() == 0 {
 		return
 	}
-	for oldID, fact := range calleeFn.Analysis.FixedTableConstructors {
+	calleeFn.Analysis.TableShapeFacts().ForEachFixedTableConstructor(func(oldID int, fact FixedTableConstructorFact) bool {
 		newID, ok := idMap[oldID]
 		if !ok {
-			continue
+			return true
 		}
 		mapped, ok := remapInlineFixedTableConstructorFact(callerFn.Proto, calleeFn.Proto, fact)
 		if !ok {
-			continue
+			return true
 		}
-		if callerFn.Analysis.FixedTableConstructors == nil {
-			callerFn.Analysis.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
-		}
-		callerFn.Analysis.FixedTableConstructors[newID] = mapped
-	}
+		callerFn.Analysis.TableShapeFacts().RecordFixedTableConstructor(newID, mapped)
+		return true
+	})
 }
 
 func remapInlineFixedTableConstructorFact(caller, callee *vm.FuncProto, fact FixedTableConstructorFact) (FixedTableConstructorFact, bool) {

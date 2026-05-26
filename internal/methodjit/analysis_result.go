@@ -13,11 +13,6 @@ type AnalysisResult struct {
 	// source of truth for numeric analysis; access goes through its accessors.
 	Numeric *NumericFacts
 
-	// ShapeFieldTypeElidedLoads marks fixed-shape field loads whose result type
-	// is guarded once by shape field type epochs. Codegen may skip the per-load
-	// NaN-box tag check for these loads.
-	ShapeFieldTypeElidedLoads map[int]bool
-
 	// Call groups call-oriented analysis facts. It is the single source of truth
 	// for call analysis; access goes through its accessors.
 	Call *CallFacts
@@ -35,63 +30,6 @@ type AnalysisResult struct {
 	// It is the single source of truth for loop-specialization analysis; access
 	// goes through its accessors.
 	LoopSpecialization *LoopSpecializationFacts
-
-	// FixedShapeTables records SSA table values whose field layout is known
-	// without consulting the runtime field cache. The initial producer is a
-	// static table constructor or a call to a function whose every return path
-	// creates the same fixed-shape table. Consumers may use this as a guarded
-	// shape fact; it is not an aliasing proof and must not remove runtime shape
-	// checks by itself.
-	FixedShapeTables map[int]FixedShapeTableFact
-
-	// FieldPolyShapeFacts records small guarded polymorphic field caches keyed
-	// by OpGetField instruction ID. Each case maps receiver shapeID to the
-	// field index for that static field name.
-	FieldPolyShapeFacts map[int][]FieldPolyShapeCase
-
-	// FieldPolyShapeReceivers records table SSA values known to carry guarded
-	// polymorphic shape facts. Monomorphic fixed-shape lowering must not turn
-	// reads from these receivers into a single-shape FieldSvals path before
-	// FieldPolyShapeFacts can be attached to each field access.
-	FieldPolyShapeReceivers map[int]bool
-
-	// FieldPolyShapeCatalog records the receiver facts behind polymorphic
-	// field caches keyed by shape ID. Unlike FieldPolyShapeFacts, it is not
-	// tied to a specific IR value ID, so later split/inline/lowering passes can
-	// recover nested table facts from an OpFieldSvals(shape) after the original
-	// field-cache instruction has been cloned or removed.
-	FieldPolyShapeCatalog map[uint32]FixedShapeTableFact
-
-	// FieldCallPolyLenFusions records same-block guarded field-call/field-len
-	// pairs keyed by OpFieldCallFloor instruction ID. When a field call's shape
-	// dispatch succeeds and the callee is proven not to mutate the later length
-	// field, codegen can materialize the later OpFieldPolyLen result directly
-	// from the already-matched shape case and skip a second shape dispatch.
-	FieldCallPolyLenFusions map[int][]FieldCallPolyLenFusion
-
-	// FixedShapeArgFacts records guarded fixed-shape facts keyed by parameter
-	// index. These facts come from callsites, not from the callee body, so
-	// consumers may use them only through runtime guards such as field-cache
-	// shape checks.
-	FixedShapeArgFacts map[int]FixedShapeTableFact
-
-	// FixedTableConstructors records OpNewTable values that came from a
-	// bytecode-level fixed string-field table constructor. The graph builder
-	// keeps the constructor expanded as NewTable+SetField so scalar replacement
-	// can still see ordinary field stores; late lowering may combine surviving
-	// constructors into OpNewFixedTable for native codegen.
-	FixedTableConstructors map[int]FixedTableConstructorFact
-
-	// FixedRecordNewTableSites records OpNewFixedTable values that remain local
-	// to fixed-record-aware field reads. Constructors that escape through calls,
-	// stores, returns, or generic table operations must materialize ordinary
-	// tables so downstream code observes normal table semantics.
-	FixedRecordNewTableSites map[int]bool
-
-	// FixedShapeEntryGuards records parameter shape guards that codegen must
-	// execute before entering the optimized body. Once these guards have run,
-	// matching FixedShapeArgFacts are safe as callee-local shape facts.
-	FixedShapeEntryGuards map[int]FixedShapeTableFact
 
 	// Globals maps global function names to their protos for the IR interpreter
 	// to resolve residual cross-function calls, such as calls left after bounded
@@ -863,6 +801,30 @@ type TableShapeFacts struct {
 	// FieldCallPolyLenFusions records same-block guarded field-call/field-len
 	// pairs keyed by OpFieldCallFloor instruction ID.
 	FieldCallPolyLenFusions map[int][]FieldCallPolyLenFusion
+
+	// FixedShapeTables records SSA table values whose field layout is known
+	// without consulting the runtime field cache.
+	FixedShapeTables map[int]FixedShapeTableFact
+
+	// FixedShapeArgFacts records guarded fixed-shape facts keyed by parameter
+	// index.
+	FixedShapeArgFacts map[int]FixedShapeTableFact
+
+	// FixedTableConstructors records OpNewTable values that came from a
+	// bytecode-level fixed string-field table constructor.
+	FixedTableConstructors map[int]FixedTableConstructorFact
+
+	// FixedRecordNewTableSites records OpNewFixedTable values that remain local
+	// to fixed-record-aware field reads.
+	FixedRecordNewTableSites map[int]bool
+
+	// FixedShapeEntryGuards records parameter shape guards that codegen must
+	// execute before entering the optimized body.
+	FixedShapeEntryGuards map[int]FixedShapeTableFact
+
+	// ShapeFieldTypeElidedLoads marks fixed-shape field loads whose result type
+	// is guarded once by shape field type epochs.
+	ShapeFieldTypeElidedLoads map[int]bool
 }
 
 func NewTableShapeFacts() *TableShapeFacts {
@@ -883,6 +845,24 @@ func (t *TableShapeFacts) Initialize() {
 	}
 	if t.FieldCallPolyLenFusions == nil {
 		t.FieldCallPolyLenFusions = make(map[int][]FieldCallPolyLenFusion)
+	}
+	if t.FixedShapeTables == nil {
+		t.FixedShapeTables = make(map[int]FixedShapeTableFact)
+	}
+	if t.FixedShapeArgFacts == nil {
+		t.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
+	}
+	if t.FixedTableConstructors == nil {
+		t.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
+	}
+	if t.FixedRecordNewTableSites == nil {
+		t.FixedRecordNewTableSites = make(map[int]bool)
+	}
+	if t.FixedShapeEntryGuards == nil {
+		t.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
+	}
+	if t.ShapeFieldTypeElidedLoads == nil {
+		t.ShapeFieldTypeElidedLoads = make(map[int]bool)
 	}
 }
 
@@ -1057,39 +1037,17 @@ func functionTableShapeFacts(fn *Function) *TableShapeFacts {
 	return fn.Analysis.TableShapeFacts()
 }
 
-func (t *TableShapeFacts) bindOwner() {
-	if t != nil && t.owner != nil {
-		t.owner.bindTableShapeCompatibilityFields()
-	}
-}
+func (t *TableShapeFacts) bindOwner() {}
 
 func (a *AnalysisResult) TableShapeFacts() *TableShapeFacts {
 	if a == nil {
 		return nil
 	}
 	if a.TableShape == nil {
-		a.TableShape = &TableShapeFacts{
-			FieldPolyShapeFacts:     a.FieldPolyShapeFacts,
-			FieldPolyShapeReceivers: a.FieldPolyShapeReceivers,
-			FieldPolyShapeCatalog:   a.FieldPolyShapeCatalog,
-			FieldCallPolyLenFusions: a.FieldCallPolyLenFusions,
-		}
-	} else {
-		if a.FieldPolyShapeFacts != nil || a.TableShape.FieldPolyShapeFacts == nil {
-			a.TableShape.FieldPolyShapeFacts = a.FieldPolyShapeFacts
-		}
-		if a.FieldPolyShapeReceivers != nil || a.TableShape.FieldPolyShapeReceivers == nil {
-			a.TableShape.FieldPolyShapeReceivers = a.FieldPolyShapeReceivers
-		}
-		if a.FieldPolyShapeCatalog != nil || a.TableShape.FieldPolyShapeCatalog == nil {
-			a.TableShape.FieldPolyShapeCatalog = a.FieldPolyShapeCatalog
-		}
-		if a.FieldCallPolyLenFusions != nil || a.TableShape.FieldCallPolyLenFusions == nil {
-			a.TableShape.FieldCallPolyLenFusions = a.FieldCallPolyLenFusions
-		}
+		a.TableShape = &TableShapeFacts{}
+		a.TableShape.Initialize()
 	}
 	a.TableShape.owner = a
-	a.bindTableShapeCompatibilityFields()
 	return a.TableShape
 }
 
@@ -1098,43 +1056,25 @@ func (a *AnalysisResult) initializeTableShapeFacts() {
 		return
 	}
 	a.TableShapeFacts().Initialize()
-	a.bindTableShapeCompatibilityFields()
-}
-
-func (a *AnalysisResult) bindTableShapeCompatibilityFields() {
-	if a == nil || a.TableShape == nil {
-		return
-	}
-	a.FieldPolyShapeFacts = a.TableShape.FieldPolyShapeFacts
-	a.FieldPolyShapeReceivers = a.TableShape.FieldPolyShapeReceivers
-	a.FieldPolyShapeCatalog = a.TableShape.FieldPolyShapeCatalog
-	a.FieldCallPolyLenFusions = a.TableShape.FieldCallPolyLenFusions
 }
 
 // NewAnalysisResult creates a new AnalysisResult with all non-sentinel maps initialized.
 func NewAnalysisResult() *AnalysisResult {
 	a := &AnalysisResult{
-		Numeric:                   NewNumericFacts(),
-		ShapeFieldTypeElidedLoads: make(map[int]bool),
-		Call:                      NewCallFacts(),
-		Speculation:               NewSpeculationFacts(),
-		TableShape:                NewTableShapeFacts(),
-		LoopSpecialization:        NewLoopSpecializationFacts(),
+		Numeric:            NewNumericFacts(),
+		Call:               NewCallFacts(),
+		Speculation:        NewSpeculationFacts(),
+		TableShape:         NewTableShapeFacts(),
+		LoopSpecialization: NewLoopSpecializationFacts(),
 
-		FixedShapeTables:         make(map[int]FixedShapeTableFact),
-		FixedShapeArgFacts:       make(map[int]FixedShapeTableFact),
-		FixedTableConstructors:   make(map[int]FixedTableConstructorFact),
-		FixedRecordNewTableSites: make(map[int]bool),
-		FixedShapeEntryGuards:    make(map[int]FixedShapeTableFact),
-		NumericGlobalValues:      make(map[string]runtime.Value),
-		GlobalArrayElementFacts:  make(map[string]FixedShapeTableFact),
+		NumericGlobalValues:     make(map[string]runtime.Value),
+		GlobalArrayElementFacts: make(map[string]FixedShapeTableFact),
 	}
 	a.Numeric.owner = a
 	a.Call.owner = a
 	a.Speculation.owner = a
 	a.TableShape.owner = a
 	a.LoopSpecialization.owner = a
-	a.bindTableShapeCompatibilityFields()
 	return a
 }
 
@@ -1142,27 +1082,9 @@ func NewAnalysisResult() *AnalysisResult {
 func (a *AnalysisResult) Initialize() {
 	a.initializeNumericFacts()
 	a.initializeLoopSpecializationFacts()
-	if a.ShapeFieldTypeElidedLoads == nil {
-		a.ShapeFieldTypeElidedLoads = make(map[int]bool)
-	}
 	a.initializeCallFacts()
 	a.initializeSpeculationFacts()
-	if a.FixedShapeTables == nil {
-		a.FixedShapeTables = make(map[int]FixedShapeTableFact)
-	}
 	a.initializeTableShapeFacts()
-	if a.FixedShapeArgFacts == nil {
-		a.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
-	}
-	if a.FixedTableConstructors == nil {
-		a.FixedTableConstructors = make(map[int]FixedTableConstructorFact)
-	}
-	if a.FixedRecordNewTableSites == nil {
-		a.FixedRecordNewTableSites = make(map[int]bool)
-	}
-	if a.FixedShapeEntryGuards == nil {
-		a.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
-	}
 	if a.NumericGlobalValues == nil {
 		a.NumericGlobalValues = make(map[string]runtime.Value)
 	}

@@ -62,7 +62,7 @@ func TestSortedSpecDependencyProtosDropsSelfAndOrdersByName(t *testing.T) {
 		self: true,
 		a:    true,
 	})
-	fn.Analysis.FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
+	fn.Analysis.TableShapeFacts().FieldPolyShapeFacts = map[int][]FieldPolyShapeCase{
 		10: {{VMProto: c}},
 	}
 

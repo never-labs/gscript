@@ -128,7 +128,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		seedGuardedPolyShapeArrayElementArgFacts(fn, facts, config.ArrayElementPolyFacts)
 		seedProfiledDynamicTableValueFacts(fn, facts)
 		if config.EntryGuardedArgs {
-			markEntryGuardedFixedShapeArgFacts(fn, facts, fn.Analysis.FixedShapeArgFacts)
+			markEntryGuardedFixedShapeArgFacts(fn, facts, fn.Analysis.TableShapeFacts().FixedShapeArgFactMap())
 		}
 		propagateFixedShapePhiFacts(fn, facts)
 
@@ -161,7 +161,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		if len(facts) == 0 && fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
 			return fn, nil
 		}
-		fn.Analysis.FixedShapeTables = facts
+		fn.Analysis.TableShapeFacts().SetFixedShapeTables(facts)
 		annotateFixedShapeStringValueAccesses(fn, facts)
 		propagateFixedShapePhiFacts(fn, facts)
 		annotateFixedShapeGetFields(fn, facts)
@@ -190,10 +190,7 @@ func seedGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTableFa
 				continue
 			}
 			facts[instr.ID] = fact
-			if fn.Analysis.FixedShapeArgFacts == nil {
-				fn.Analysis.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
-			}
-			fn.Analysis.FixedShapeArgFacts[int(instr.Aux)] = fact
+			fn.Analysis.TableShapeFacts().RecordFixedShapeArgFact(int(instr.Aux), fact)
 			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("parameter %d carries guarded fixed table shape %v", instr.Aux, fact.FieldNames))
 		}
@@ -1031,14 +1028,8 @@ func markEntryGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTa
 			continue
 		}
 		fact.EntryGuarded = true
-		if fn.Analysis.FixedShapeEntryGuards == nil {
-			fn.Analysis.FixedShapeEntryGuards = make(map[int]FixedShapeTableFact)
-		}
-		fn.Analysis.FixedShapeEntryGuards[paramIdx] = fact
-		if fn.Analysis.FixedShapeArgFacts == nil {
-			fn.Analysis.FixedShapeArgFacts = make(map[int]FixedShapeTableFact)
-		}
-		fn.Analysis.FixedShapeArgFacts[paramIdx] = fact
+		fn.Analysis.TableShapeFacts().RecordFixedShapeEntryGuard(paramIdx, fact)
+		fn.Analysis.TableShapeFacts().RecordFixedShapeArgFact(paramIdx, fact)
 		for _, block := range fn.Blocks {
 			for _, instr := range block.Instrs {
 				if instr.Op == OpLoadSlot && int(instr.Aux) == paramIdx {
