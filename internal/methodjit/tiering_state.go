@@ -248,6 +248,35 @@ func (tm *TieringManager) markTier2Failed(proto *vm.FuncProto, reason string) {
 	tm.tierState.markFailed(proto, reason)
 }
 
+// clearTier2InstallPointers is the SINGLE SOURCE OF TRUTH for the mechanical
+// teardown of every proto field that an installed Tier 2 function publishes. It
+// performs ONLY the pointer/flag zeroing — it does NOT touch any policy state
+// (the tier2Compiled map, spec dependencies, tier1 caches, recompile queue);
+// each caller layers its own policy around this call.
+//
+// The canonical install field set is:
+//   - Direct/Tier2 entry pointers + ABI (via clearFuncProtoDirectEntries):
+//     DirectEntryPtr, Tier2DirectEntryPtr, Tier2LeafEntryPtr,
+//     Tier2NumericEntryPtr, Tier2TypedEntryPtr, Tier2TypedClobberEntryPtr,
+//     Tier2TypedEntryABI
+//   - Tier2GlobalCachePtr, Tier2GlobalCacheGenPtr, Tier2GlobalIndexPtr
+//   - Tier2Promoted
+//
+// IMPORTANT: clearFuncProtoDirectEntries zeroes the entry pointers AND bumps
+// proto.DirectEntryVersion in one atomic operation; JIT'd callers validate that
+// version before reusing Tier2DirectEntryPtr. Always route through it here — do
+// not reimplement the field writes or bump the version separately.
+func clearTier2InstallPointers(proto *vm.FuncProto) {
+	if proto == nil {
+		return
+	}
+	clearFuncProtoDirectEntries(proto)
+	proto.Tier2Promoted = false
+	proto.Tier2GlobalCachePtr = 0
+	proto.Tier2GlobalCacheGenPtr = 0
+	proto.Tier2GlobalIndexPtr = 0
+}
+
 func (tm *TieringManager) clearTier2Install(proto *vm.FuncProto) {
 	if tm == nil || proto == nil {
 		return
@@ -255,11 +284,7 @@ func (tm *TieringManager) clearTier2Install(proto *vm.FuncProto) {
 	tm.ensureTierStateStore()
 	tm.tierState.clearCompiled(proto)
 	tm.clearTier2SpecDependenciesForCaller(proto)
-	proto.Tier2Promoted = false
-	clearFuncProtoDirectEntries(proto)
-	proto.Tier2GlobalCachePtr = 0
-	proto.Tier2GlobalCacheGenPtr = 0
-	proto.Tier2GlobalIndexPtr = 0
+	clearTier2InstallPointers(proto)
 }
 
 func (tm *TieringManager) markJITDisabled(proto *vm.FuncProto) {
