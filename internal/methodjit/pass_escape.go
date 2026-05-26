@@ -897,7 +897,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 							ok = false
 							break
 						}
-						_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.Globals})
+						_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.GlobalFacts().GlobalsMap()})
 						if !calleeArgFieldsReadonly(callee, argIdx-1) {
 							ok = false
 							break

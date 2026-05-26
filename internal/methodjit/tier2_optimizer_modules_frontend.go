@@ -192,11 +192,11 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Provides: analysisFacts(AnalysisFactCallABIs),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalArrayElementFacts, collectStableGlobalArrayElementFacts(fn))
-				fn.Analysis.GlobalArrayElementFacts = cloneFixedShapeTableFactMap(globalArrayFacts)
+				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
+				fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
 				return AnnotateCallABIsPass(CallABIAnnotationConfig{
 					Globals:                 ctxGlobals(ctx),
-					NumericGlobalValues:     fn.Analysis.NumericGlobalValues,
+					NumericGlobalValues:     fn.Analysis.GlobalFacts().NumericGlobalValuesMap(),
 					GlobalArrayElementFacts: globalArrayFacts,
 					DependencyRegistry:      ctxDependencyRegistry(ctx),
 				})(fn)
@@ -274,11 +274,11 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Updates:  analysisFacts(AnalysisFactCallABIs),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalArrayElementFacts, collectStableGlobalArrayElementFacts(fn))
-				fn.Analysis.GlobalArrayElementFacts = cloneFixedShapeTableFactMap(globalArrayFacts)
+				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
+				fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
 				return AnnotateCallABIsPass(CallABIAnnotationConfig{
 					Globals:                 ctxGlobals(ctx),
-					NumericGlobalValues:     fn.Analysis.NumericGlobalValues,
+					NumericGlobalValues:     fn.Analysis.GlobalFacts().NumericGlobalValuesMap(),
 					GlobalArrayElementFacts: globalArrayFacts,
 					DependencyRegistry:      ctxDependencyRegistry(ctx),
 				})(fn)

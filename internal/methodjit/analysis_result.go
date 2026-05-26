@@ -31,21 +31,9 @@ type AnalysisResult struct {
 	// goes through its accessors.
 	LoopSpecialization *LoopSpecializationFacts
 
-	// Globals maps global function names to their protos for the IR interpreter
-	// to resolve residual cross-function calls, such as calls left after bounded
-	// recursive inlining. Nil is a sentinel meaning the inline pass may still
-	// install its config.Globals; an empty non-nil map means globals were
-	// intentionally provided and no fallback install should occur. Production
-	// code paths never consult this field; it exists only as a hook for the IR
-	// correctness oracle.
-	Globals map[string]*vm.FuncProto
-
-	// NumericGlobalValues and GlobalArrayElementFacts are stable cross-proto
-	// facts supplied by the Tier 2 manager for ABI analysis. They are hints:
-	// missing facts disable specialized entries, while emitted guards still
-	// protect any optimized path that consumes present facts.
-	NumericGlobalValues     map[string]runtime.Value
-	GlobalArrayElementFacts map[string]FixedShapeTableFact
+	// Global groups cross-proto global/ABI input facts. It is the single source
+	// of truth for global analysis; access goes through its accessors.
+	Global *GlobalFacts
 }
 
 // NumericFacts groups integer range and arithmetic safety facts produced and
@@ -678,6 +666,67 @@ func (a *AnalysisResult) initializeLoopSpecializationFacts() {
 	a.LoopSpecializationFacts().Initialize()
 }
 
+// GlobalFacts groups cross-proto global/ABI input facts. These are seeded at
+// pipeline/manager time rather than produced by an analysis pass, and consumed
+// by call lowering, the IR-interpreter oracle, and ABI specialization.
+type GlobalFacts struct {
+	owner *AnalysisResult
+
+	// Globals maps global function names to their protos for the IR interpreter
+	// to resolve residual cross-function calls, such as calls left after bounded
+	// recursive inlining. Nil is a sentinel meaning the inline pass may still
+	// install its config.Globals; an empty non-nil map means globals were
+	// intentionally provided and no fallback install should occur. Production
+	// code paths never consult this field; it exists only as a hook for the IR
+	// correctness oracle.
+	Globals map[string]*vm.FuncProto
+
+	// NumericGlobalValues and GlobalArrayElementFacts are stable cross-proto
+	// facts supplied by the Tier 2 manager for ABI analysis. They are hints:
+	// missing facts disable specialized entries, while emitted guards still
+	// protect any optimized path that consumes present facts.
+	NumericGlobalValues     map[string]runtime.Value
+	GlobalArrayElementFacts map[string]FixedShapeTableFact
+}
+
+func NewGlobalFacts() *GlobalFacts {
+	g := &GlobalFacts{}
+	g.Initialize()
+	return g
+}
+
+func (g *GlobalFacts) Initialize() {
+	// Globals is a sentinel field (nil is meaningful); it is intentionally not
+	// allocated here.
+	if g.NumericGlobalValues == nil {
+		g.NumericGlobalValues = make(map[string]runtime.Value)
+	}
+	if g.GlobalArrayElementFacts == nil {
+		g.GlobalArrayElementFacts = make(map[string]FixedShapeTableFact)
+	}
+}
+
+func (g *GlobalFacts) bindOwner() {}
+
+func (a *AnalysisResult) GlobalFacts() *GlobalFacts {
+	if a == nil {
+		return nil
+	}
+	if a.Global == nil {
+		a.Global = &GlobalFacts{}
+		a.Global.Initialize()
+	}
+	a.Global.owner = a
+	return a.Global
+}
+
+func (a *AnalysisResult) initializeGlobalFacts() {
+	if a == nil {
+		return
+	}
+	a.GlobalFacts().Initialize()
+}
+
 // SpeculationFacts groups analysis facts produced and consumed by Tier 2
 // speculation and guard-specialization paths.
 type SpeculationFacts struct {
@@ -1066,15 +1115,14 @@ func NewAnalysisResult() *AnalysisResult {
 		Speculation:        NewSpeculationFacts(),
 		TableShape:         NewTableShapeFacts(),
 		LoopSpecialization: NewLoopSpecializationFacts(),
-
-		NumericGlobalValues:     make(map[string]runtime.Value),
-		GlobalArrayElementFacts: make(map[string]FixedShapeTableFact),
+		Global:             NewGlobalFacts(),
 	}
 	a.Numeric.owner = a
 	a.Call.owner = a
 	a.Speculation.owner = a
 	a.TableShape.owner = a
 	a.LoopSpecialization.owner = a
+	a.Global.owner = a
 	return a
 }
 
@@ -1085,10 +1133,5 @@ func (a *AnalysisResult) Initialize() {
 	a.initializeCallFacts()
 	a.initializeSpeculationFacts()
 	a.initializeTableShapeFacts()
-	if a.NumericGlobalValues == nil {
-		a.NumericGlobalValues = make(map[string]runtime.Value)
-	}
-	if a.GlobalArrayElementFacts == nil {
-		a.GlobalArrayElementFacts = make(map[string]FixedShapeTableFact)
-	}
+	a.initializeGlobalFacts()
 }

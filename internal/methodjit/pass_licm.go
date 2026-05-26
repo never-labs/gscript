@@ -653,7 +653,7 @@ func isPureNumericLoopCall(fn *Function, call *Instr) bool {
 	if !hasDesc || desc.Callee == nil || desc.NumRets != 1 || !desc.RawIntReturn {
 		return false
 	}
-	globals := callABIMergeGlobals(fn.Analysis.Globals, callABIStableGlobals(fn.Proto))
+	globals := callABIMergeGlobals(fn.Analysis.GlobalFacts().GlobalsMap(), callABIStableGlobals(fn.Proto))
 	if len(globals) == 0 {
 		return false
 	}
@@ -678,7 +678,7 @@ func isPureLoopInvariantCall(fn *Function, call *Instr) bool {
 	if fn == nil || call == nil || call.Op != OpCall || !callABIHasExactResultShape(fn, call, 1) {
 		return false
 	}
-	globals := callABIMergeGlobals(fn.Analysis.Globals, callABIStableGlobals(fn.Proto))
+	globals := callABIMergeGlobals(fn.Analysis.GlobalFacts().GlobalsMap(), callABIStableGlobals(fn.Proto))
 	if len(globals) == 0 {
 		return false
 	}
@@ -853,7 +853,7 @@ func licmCallCalleeProtos(fn *Function, instr *Instr) []*vm.FuncProto {
 	if protos := fieldShapeCalleeProtos(fn, instr); len(protos) > 0 {
 		return protos
 	}
-	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.Globals})
+	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.GlobalFacts().GlobalsMap()})
 	if callee != nil {
 		return []*vm.FuncProto{callee}
 	}

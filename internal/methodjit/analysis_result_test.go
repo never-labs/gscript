@@ -24,8 +24,10 @@ func TestAnalysisResultInitializeZeroValuePreservesNilSentinels(t *testing.T) {
 func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee"}
 	a := &AnalysisResult{
-		Globals: map[string]*vm.FuncProto{
-			"callee": callee,
+		Global: &GlobalFacts{
+			Globals: map[string]*vm.FuncProto{
+				"callee": callee,
+			},
 		},
 		Speculation: &SpeculationFacts{
 			SuppressedSpecGuardKinds: map[int]map[string]bool{
@@ -39,7 +41,7 @@ func TestAnalysisResultInitializePreservesExplicitSentinelMaps(t *testing.T) {
 
 	a.Initialize()
 
-	if got := a.Globals["callee"]; got != callee {
+	if got, _ := a.GlobalFacts().GlobalProto("callee"); got != callee {
 		t.Fatalf("Initialize replaced or lost Globals entry: got %p want %p", got, callee)
 	}
 	if !a.Speculation.SuppressedSpecGuardKinds[12]["GuardCalleeProto"] {
@@ -528,7 +530,24 @@ func TestSpecGuardKindSuppressedNilKindsFallsBackToPCs(t *testing.T) {
 func assertAnalysisResultMapSentinels(t *testing.T, a *AnalysisResult, constructor string) {
 	t.Helper()
 
+	// AnalysisResult is now a pure domain-struct container; its analysis maps
+	// live on the domain structs. Walk each non-nil domain pointer and check the
+	// map sentinels there.
 	v := reflect.ValueOf(a).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		domain := v.Field(i)
+		if domain.Kind() != reflect.Pointer || domain.IsNil() {
+			continue
+		}
+		assertDomainStructMapSentinels(t, domain.Elem(), constructor)
+	}
+}
+
+func assertDomainStructMapSentinels(t *testing.T, v reflect.Value, constructor string) {
+	t.Helper()
+	if v.Kind() != reflect.Struct {
+		return
+	}
 	typ := v.Type()
 	for i := 0; i < v.NumField(); i++ {
 		fieldValue := v.Field(i)

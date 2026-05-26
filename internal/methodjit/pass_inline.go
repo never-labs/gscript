@@ -89,8 +89,8 @@ func InlinePassWith(config InlineConfig) PassFunc {
 		// oracle (Interpret) can resolve residual cross-function calls left
 		// behind by bounded recursive inlining. Production code paths don't
 		// read this field.
-		if fn.Analysis.Globals == nil && config.Globals != nil {
-			fn.Analysis.Globals = config.Globals
+		if !fn.Analysis.GlobalFacts().GlobalsPopulated() && config.Globals != nil {
+			fn.Analysis.GlobalFacts().SetGlobals(config.Globals)
 		}
 		// recursionCounts tracks, per callee proto, how many times that proto
 		// has been inlined into this caller across the whole fixpoint. It is

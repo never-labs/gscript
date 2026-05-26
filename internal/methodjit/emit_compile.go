@@ -270,7 +270,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	nativeCallCalleeResumeSafe := tier2NativeCallCalleeResumeSafe(fn)
 	rawIntSelfABI := AnalyzeRawIntSelfABI(fn.Proto)
 	typedSelfABI := AnalyzeTypedSelfABI(fn.Proto)
-	typedPeerABI := AnalyzeTypedPeerABIWithFactsAndGlobals(fn.Proto, nil, nil, fn.Analysis.NumericGlobalValues, fn.Analysis.GlobalArrayElementFacts)
+	typedPeerABI := AnalyzeTypedPeerABIWithFactsAndGlobals(fn.Proto, nil, nil, fn.Analysis.GlobalFacts().NumericGlobalValuesMap(), fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap())
 	typedEntryABI := typedSelfABI
 	if !typedEntryABI.Eligible && typedPeerABI.Eligible {
 		typedEntryABI = typedPeerABI

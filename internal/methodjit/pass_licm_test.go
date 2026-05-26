@@ -763,8 +763,10 @@ func TestLICM_HoistTableArrayHeaderAcrossNoAliasNoGlobalCall(t *testing.T) {
 			Constants: []runtime.Value{runtime.StringValue("helper")},
 		},
 		Analysis: &AnalysisResult{
-			Globals: map[string]*vm.FuncProto{
-				"helper": {Name: "helper", NoGlobalOps: true},
+			Global: &GlobalFacts{
+				Globals: map[string]*vm.FuncProto{
+					"helper": {Name: "helper", NoGlobalOps: true},
+				},
 			},
 		},
 	}
@@ -1484,8 +1486,10 @@ func TestLICM_HoistGetGlobal_AcrossNoGlobalOpsCall(t *testing.T) {
 			Constants: []runtime.Value{runtime.StringValue("g"), runtime.StringValue("helper")},
 		},
 		Analysis: &AnalysisResult{
-			Globals: map[string]*vm.FuncProto{
-				"helper": {Name: "helper", NoGlobalOps: true},
+			Global: &GlobalFacts{
+				Globals: map[string]*vm.FuncProto{
+					"helper": {Name: "helper", NoGlobalOps: true},
+				},
 			},
 		},
 	}
@@ -1537,8 +1541,10 @@ func TestLICM_HoistGetUpval_AcrossNoUpvalueCall(t *testing.T) {
 			Constants: []runtime.Value{runtime.StringValue("helper")},
 		},
 		Analysis: &AnalysisResult{
-			Globals: map[string]*vm.FuncProto{
-				"helper": {Name: "helper", NoGlobalOps: true},
+			Global: &GlobalFacts{
+				Globals: map[string]*vm.FuncProto{
+					"helper": {Name: "helper", NoGlobalOps: true},
+				},
 			},
 		},
 	}

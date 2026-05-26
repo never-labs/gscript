@@ -2587,7 +2587,7 @@ func (ec *emitContext) staticNoDepthCallee(instr *Instr) *vm.FuncProto {
 	if ec.tailCallInstrs[instr.ID] || ec.isStaticSelfCall(instr) {
 		return nil
 	}
-	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Analysis.Globals})
+	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Analysis.GlobalFacts().GlobalsMap()})
 	if callee == nil {
 		if feedbackCallee, ok := callABIFeedbackCalleeProto(ec.fn, instr); ok {
 			callee = feedbackCallee
@@ -2606,7 +2606,7 @@ func (ec *emitContext) staticNativeCallUnsafeCallee(instr *Instr) *vm.FuncProto 
 	if ec.tailCallInstrs[instr.ID] || ec.isStaticSelfCall(instr) {
 		return nil
 	}
-	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Analysis.Globals})
+	_, callee := resolveCallee(instr, ec.fn, InlineConfig{Globals: ec.fn.Analysis.GlobalFacts().GlobalsMap()})
 	if callee == nil {
 		if feedbackCallee, ok := callABIFeedbackCalleeProto(ec.fn, instr); ok {
 			callee = feedbackCallee

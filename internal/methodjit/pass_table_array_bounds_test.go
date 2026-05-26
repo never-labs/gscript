@@ -385,8 +385,10 @@ func tableArrayBoundsCallLoopFixture(t *testing.T, passTargetTable bool) (*Funct
 		},
 		NumRegs: 4,
 		Analysis: &AnalysisResult{
-			Globals: map[string]*vm.FuncProto{
-				"helper": {Name: "helper", NoGlobalOps: true},
+			Global: &GlobalFacts{
+				Globals: map[string]*vm.FuncProto{
+					"helper": {Name: "helper", NoGlobalOps: true},
+				},
 			},
 		},
 	}

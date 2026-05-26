@@ -154,7 +154,7 @@ func callResultHasStableCallee(fn *Function, instr *Instr, fb vm.CallSiteFeedbac
 	if _, ok := fb.StableCalleeVMProto(); ok {
 		return true
 	}
-	if _, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.Globals}); callee != nil {
+	if _, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.GlobalFacts().GlobalsMap()}); callee != nil {
 		return true
 	}
 	return false
