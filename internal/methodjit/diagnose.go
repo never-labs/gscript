@@ -251,15 +251,26 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	// Collect diffs for passes that changed the IR.
 	r.PassDiffs = collectPassDiffs(collector)
 
-	// 5. Register allocation (display only).
+	// 5. Register allocation.
 	optimized.CarryPreheaderInvariants = true
 	alloc := AllocateRegisters(optimized)
 	r.RegAllocMap = formatRegAlloc(alloc)
 
-	// 6. Native execution placeholder (emission layer being rewritten for v3).
-	r.NativeResult = r.InterpResult
-	r.NativeError = r.InterpError
-	r.Match = true
+	// 6. Compile to native ARM64 and execute, then compare against the IR
+	//    interpreter result. The interpreter ran on the UNOPTIMIZED IR and the
+	//    native code runs the OPTIMIZED IR, so a match validates the whole
+	//    pipeline end-to-end (optimization passes + codegen) in one check.
+	cf, compileErr := Compile(optimized, alloc)
+	if compileErr != nil {
+		r.NativeError = fmt.Errorf("compile error: %w", compileErr)
+		r.compareResults()
+		return r
+	}
+	defer cf.Code.Free()
+	nativeResult, nativeErr := cf.Execute(args)
+	r.NativeResult = nativeResult
+	r.NativeError = nativeErr
+	r.compareResults()
 	return r
 }
 
