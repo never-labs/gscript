@@ -829,7 +829,7 @@ func floatReductionBodyHasDivFloat(body *Block) bool {
 		return false
 	}
 	for _, instr := range body.Instrs[:len(body.Instrs)-1] {
-		if instr.Op == OpDivFloat {
+		if spec, ok := instr.Op.Spec(); ok && spec.FloatReductionDivOp {
 			return true
 		}
 	}

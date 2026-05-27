@@ -177,11 +177,13 @@ type OpSpec struct {
 	LoopBoundComparison              bool
 	ConstPoolUser                    bool
 	RawStringResult                  bool
+	DynamicStringQueryCacheKey       bool
 	UnrollCloneable                  bool
 	NestedFloatPhiOverrideSafe       bool
 	FloatReductionWideUnrollBarrier  bool
 	FloatReductionLatencyUnrollSeed  bool
 	FloatReductionLatencyUnrollBlock bool
+	FloatReductionDivOp              bool
 	ConstantPhiBranchThreadPure      bool
 	NeedsTier2FieldCache             bool
 	BoolTableFillBodyBenign          bool
@@ -193,7 +195,9 @@ type OpSpec struct {
 	CallResultRangeGuardCandidate    bool
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
+	FloatRegResultBlocked            bool
 	RawIntCarryValue                 bool
+	TableResultRawTablePtr           bool
 	TableArrayRegionGlobalBarrier    bool
 	TableArrayRegionAliasingCall     bool
 	TableArrayRegionAliasingAlways   bool
@@ -555,6 +559,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		if int(op) < len(opRawStringResultPolicies) {
 			spec.RawStringResult = opRawStringResultPolicies[op]
 		}
+		if int(op) < len(opDynamicStringQueryCacheKeyPolicies) {
+			spec.DynamicStringQueryCacheKey = opDynamicStringQueryCacheKeyPolicies[op]
+		}
 		if int(op) < len(opUnrollCloneablePolicies) {
 			spec.UnrollCloneable = opUnrollCloneablePolicies[op]
 		}
@@ -569,6 +576,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opFloatReductionLatencyUnrollBlockPolicies) {
 			spec.FloatReductionLatencyUnrollBlock = opFloatReductionLatencyUnrollBlockPolicies[op]
+		}
+		if int(op) < len(opFloatReductionDivOpPolicies) {
+			spec.FloatReductionDivOp = opFloatReductionDivOpPolicies[op]
 		}
 		if int(op) < len(opConstantPhiBranchThreadPurePolicies) {
 			spec.ConstantPhiBranchThreadPure = opConstantPhiBranchThreadPurePolicies[op]
@@ -603,8 +613,14 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		if int(op) < len(opFloatRegResultPolicies) {
 			spec.FloatRegResult = opFloatRegResultPolicies[op]
 		}
+		if int(op) < len(opFloatRegResultBlockedPolicies) {
+			spec.FloatRegResultBlocked = opFloatRegResultBlockedPolicies[op]
+		}
 		if int(op) < len(opRawIntCarryValuePolicies) {
 			spec.RawIntCarryValue = opRawIntCarryValuePolicies[op]
+		}
+		if int(op) < len(opTableResultRawTablePtrPolicies) {
+			spec.TableResultRawTablePtr = opTableResultRawTablePtrPolicies[op]
 		}
 		if int(op) < len(opTableArrayRegionGlobalBarrierPolicies) {
 			spec.TableArrayRegionGlobalBarrier = opTableArrayRegionGlobalBarrierPolicies[op]
@@ -1701,6 +1717,12 @@ var opRawStringResultPolicies = [...]bool{
 	OpGuardCalleeProto:     true,
 }
 
+var opDynamicStringQueryCacheKeyPolicies = [...]bool{
+	OpConstString:       true,
+	OpStringConstLookup: true,
+	OpStringFormatInt:   true,
+}
+
 var opUnrollCloneablePolicies = [...]bool{
 	OpConstInt:             true,
 	OpConstFloat:           true,
@@ -1788,6 +1810,10 @@ var opFloatReductionLatencyUnrollBlockPolicies = [...]bool{
 	OpFloor:    true,
 }
 
+var opFloatReductionDivOpPolicies = [...]bool{
+	OpDivFloat: true,
+}
+
 var opConstantPhiBranchThreadPurePolicies = [...]bool{
 	OpPhi:       true,
 	OpConstInt:  true,
@@ -1864,6 +1890,12 @@ var opFloatRegResultPolicies = [...]bool{
 	OpBoxFloat:   true,
 }
 
+var opFloatRegResultBlockedPolicies = [...]bool{
+	OpLtFloat:            true,
+	OpLeFloat:            true,
+	OpComplexEscapeInSet: true,
+}
+
 var opRawIntCarryValuePolicies = [...]bool{
 	OpConstInt:         true,
 	OpLoadSlot:         true,
@@ -1876,6 +1908,10 @@ var opRawIntCarryValuePolicies = [...]bool{
 	OpTableArrayHeader: true,
 	OpTableArrayLen:    true,
 	OpTableArrayData:   true,
+}
+
+var opTableResultRawTablePtrPolicies = [...]bool{
+	OpTableArrayLoad: true,
 }
 
 var opTableArrayRegionGlobalBarrierPolicies = [...]bool{

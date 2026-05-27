@@ -684,15 +684,14 @@ func needsFloatReg(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
+	spec, ok := instr.Op.Spec()
 	// Comparisons produce bools, not floats, regardless of operand type.
-	switch instr.Op {
-	case OpLtFloat, OpLeFloat, OpComplexEscapeInSet:
+	if ok && spec.FloatRegResultBlocked {
 		return false
 	}
 	if instr.Type == TypeFloat {
 		return true
 	}
-	spec, ok := instr.Op.Spec()
 	return ok && spec.FloatRegResult
 }
 

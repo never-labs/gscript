@@ -769,7 +769,8 @@ func isRawTablePtrValue(instr *Instr) bool {
 	if isRawTablePtrOp(instr.Op) {
 		return true
 	}
-	return instr.Op == OpTableArrayLoad && instr.Type == TypeTable
+	spec, ok := instr.Op.Spec()
+	return ok && spec.TableResultRawTablePtr && instr.Type == TypeTable
 }
 
 func isRawDataPtrOp(op Op) bool {

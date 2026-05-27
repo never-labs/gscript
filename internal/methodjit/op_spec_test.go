@@ -536,6 +536,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s raw-string result contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpConstString, OpStringConstLookup, OpStringFormatInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.DynamicStringQueryCacheKey {
+			t.Fatalf("%s dynamic string-query cache key contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpConstInt, OpAddInt, OpDivFloat, OpSqrt, OpNumToFloat, OpGuardType, OpMatrixLoadFAt, OpTableArrayLoad} {
 		spec, ok := op.Spec()
 		if !ok || !spec.UnrollCloneable || !isUnrollCloneableOp(op) {
@@ -562,6 +568,9 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 		if !ok || !spec.FloatReductionLatencyUnrollBlock {
 			t.Fatalf("%s latency-unroll block should be driven by OpSpec", op)
 		}
+	}
+	if spec, ok := OpDivFloat.Spec(); !ok || !spec.FloatReductionDivOp {
+		t.Fatalf("DivFloat float-reduction div-op contract should be driven by OpSpec")
 	}
 	for _, op := range []Op{OpPhi, OpConstInt, OpConstBool, OpEqInt, OpNot} {
 		spec, ok := op.Spec()
@@ -626,11 +635,20 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s float-register result contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpLtFloat, OpLeFloat, OpComplexEscapeInSet} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FloatRegResultBlocked || needsFloatReg(&Instr{Op: op, Type: TypeFloat}) {
+			t.Fatalf("%s float-register block contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpConstInt, OpLoadSlot, OpGuardType, OpGuardIntRange, OpCall, OpCallFloor, OpFieldCallFloor, OpPhi, OpTableArrayHeader, OpTableArrayLen, OpTableArrayData} {
 		spec, ok := op.Spec()
 		if !ok || !spec.RawIntCarryValue || !isRawIntCarryValue(&Instr{Op: op, Type: TypeInt}) {
 			t.Fatalf("%s raw-int carry contract should be driven by OpSpec", op)
 		}
+	}
+	if spec, ok := OpTableArrayLoad.Spec(); !ok || !spec.TableResultRawTablePtr || !isRawTablePtrValue(&Instr{Op: OpTableArrayLoad, Type: TypeTable}) {
+		t.Fatalf("TableArrayLoad table-result raw-table-ptr contract should be driven by OpSpec")
 	}
 	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpSelf, OpSetTable, OpAppend, OpSetList, OpTableBoolArrayFill} {
 		spec, ok := op.Spec()
