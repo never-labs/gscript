@@ -123,38 +123,10 @@ func overflowBoxingPass(fn *Function, forceBoxIntIDs map[int]bool) (*Function, e
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if boxed[instr.ID] {
-				switch instr.Op {
-				case OpPhi:
-					instr.Type = TypeUnknown
-				case OpAddInt:
-					instr.Op = OpAdd
-					instr.Type = TypeUnknown
-				case OpSubInt:
-					instr.Op = OpSub
-					instr.Type = TypeUnknown
-				case OpMulInt:
-					instr.Op = OpMul
-					instr.Type = TypeUnknown
-				case OpModInt:
-					instr.Op = OpMod
-					instr.Type = TypeUnknown
-				case OpDivIntExact:
-					instr.Op = OpDiv
-					instr.Type = TypeUnknown
-				case OpNegInt:
-					instr.Op = OpUnm
-					instr.Type = TypeUnknown
-				}
+				applyBoxedFallback(instr)
 			}
 			if anyArgBoxed(instr, boxed) {
-				switch instr.Op {
-				case OpEqInt:
-					instr.Op = OpEq
-				case OpLtInt:
-					instr.Op = OpLt
-				case OpLeInt:
-					instr.Op = OpLe
-				}
+				applyBoxedFallback(instr)
 			}
 		}
 	}
@@ -204,39 +176,33 @@ func forceBoxIntArithmeticOnly(fn *Function, force map[int]bool) *Function {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if boxed[instr.ID] {
-				switch instr.Op {
-				case OpPhi:
-					instr.Type = TypeUnknown
-				case OpAddInt:
-					instr.Op = OpAdd
-					instr.Type = TypeUnknown
-				case OpSubInt:
-					instr.Op = OpSub
-					instr.Type = TypeUnknown
-				case OpMulInt:
-					instr.Op = OpMul
-					instr.Type = TypeUnknown
-				case OpModInt:
-					instr.Op = OpMod
-					instr.Type = TypeUnknown
-				case OpNegInt:
-					instr.Op = OpUnm
-					instr.Type = TypeUnknown
-				}
+				applyBoxedFallback(instr)
 			}
 			if anyArgBoxed(instr, boxed) {
-				switch instr.Op {
-				case OpEqInt:
-					instr.Op = OpEq
-				case OpLtInt:
-					instr.Op = OpLt
-				case OpLeInt:
-					instr.Op = OpLe
-				}
+				applyBoxedFallback(instr)
 			}
 		}
 	}
 	return fn
+}
+
+func applyBoxedFallback(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	if instr.Op == OpPhi {
+		instr.Type = TypeUnknown
+		return true
+	}
+	spec, ok := instr.Op.Spec()
+	if !ok || spec.BoxedFallbackOp >= OpMax {
+		return false
+	}
+	instr.Op = spec.BoxedFallbackOp
+	if spec.BoxedFallbackResultUnknown {
+		instr.Type = TypeUnknown
+	}
+	return true
 }
 
 func collectModuloMultiplicativeAccumulatorDeps(fn *Function) map[int]bool {

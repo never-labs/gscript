@@ -690,6 +690,26 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 	if spec, ok := OpEqInt.Spec(); !ok || spec.RangeRefineKind != OpRangeRefineEqualInt {
 		t.Fatalf("EqInt range-refine equality contract should be driven by OpSpec")
 	}
+	for _, tc := range []struct {
+		raw      Op
+		fallback Op
+		unknown  bool
+	}{
+		{raw: OpAddInt, fallback: OpAdd, unknown: true},
+		{raw: OpSubInt, fallback: OpSub, unknown: true},
+		{raw: OpMulInt, fallback: OpMul, unknown: true},
+		{raw: OpModInt, fallback: OpMod, unknown: true},
+		{raw: OpDivIntExact, fallback: OpDiv, unknown: true},
+		{raw: OpNegInt, fallback: OpUnm, unknown: true},
+		{raw: OpEqInt, fallback: OpEq},
+		{raw: OpLtInt, fallback: OpLt},
+		{raw: OpLeInt, fallback: OpLe},
+	} {
+		spec, ok := tc.raw.Spec()
+		if !ok || spec.BoxedFallbackOp != tc.fallback || spec.BoxedFallbackResultUnknown != tc.unknown {
+			t.Fatalf("%s boxed fallback contract should be driven by OpSpec", tc.raw)
+		}
+	}
 	for _, op := range []Op{OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpUnboxFloat, OpBoxFloat} {
 		spec, ok := op.Spec()
 		if !ok || !spec.FloatRegResult || !needsFloatReg(&Instr{Op: op}) {
