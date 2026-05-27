@@ -101,6 +101,8 @@ type FixedShapeTableFactsConfig struct {
 	EntryGuardedArgs      bool
 }
 
+var fixedShapeTableFactsPassAllowedDomains = allowedDomainsForModule(nil, fixedShapeTableFacts(), nil, "FixedShapeTableFacts")
+
 // FixedShapeTableFactsPass records fixed-shape table facts and uses
 // interprocedural return facts from stable global callees to prefill GetField
 // shape-cache metadata. It deliberately leaves runtime shape guards intact.
@@ -111,11 +113,7 @@ func FixedShapeTableFactsPass(globals map[string]*vm.FuncProto) PassFunc {
 // FixedShapeTableFactsPassWith is the configurable fixed-shape pass entry.
 func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		if fn == nil {
-			return fixedShapeTableFactsPass(fn, config, nil, nil)
-		}
-		fn.ensureAnalysis()
-		return fixedShapeTableFactsPass(fn, config, fn.Analysis.TableShapeFacts(), fn.Analysis.NumericFacts())
+		return FixedShapeTableFactsPassCtx(config)(newPassContext(fn, nil, fixedShapeTableFactsPassAllowedDomains, false))
 	}
 }
 

@@ -41,14 +41,13 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
+var licmPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, nil, "LICM")
+
 // LICMPass moves loop-invariant computations out of loops into a
 // pre-header. Safe to call on functions without loops (no-op). Returns
 // a wrapping error if the IR fails validation after the transform.
 func LICMPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return licmPass(fn, nil)
-	}
-	return licmPass(fn, fn.Analysis.GlobalFacts().GlobalsMap())
+	return LICMPassCtx(newPassContext(fn, nil, licmPassAllowedDomains, false))
 }
 
 func LICMPassCtx(ctx *PassContext) (*Function, error) {

@@ -24,6 +24,8 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
+var escapeAnalysisPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "EscapeAnalysis")
+
 // blockForID returns the block with the given ID, or nil.
 // Block IDs may not match fn.Blocks slice indices after inlining.
 func blockForID(fn *Function, id int) *Block {
@@ -617,10 +619,7 @@ func hasFixedTableScalarReplacementCandidate(fn *Function) bool {
 // LoadElim has already forwarded any trivially-forwardable fields,
 // and DCE cleans up our OpNop'd instructions.
 func EscapeAnalysisPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return escapeAnalysisPass(fn, nil, nil)
-	}
-	return escapeAnalysisPass(fn, fn.Analysis.TableShapeFacts(), fn.Analysis.GlobalFacts().GlobalsMap())
+	return EscapeAnalysisPassCtx(newPassContext(fn, nil, escapeAnalysisPassAllowedDomains, false))
 }
 
 func EscapeAnalysisPassCtx(ctx *PassContext) (*Function, error) {
