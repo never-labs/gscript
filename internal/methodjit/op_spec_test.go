@@ -710,6 +710,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s boxed fallback contract should be driven by OpSpec", tc.raw)
 		}
 	}
+	for _, op := range []Op{OpAddInt, OpSubInt, OpMulInt, OpNegInt, OpDivIntExact} {
+		spec, ok := op.Spec()
+		if !ok || !spec.Int48SafeRangeCandidate {
+			t.Fatalf("%s int48-safe range candidate contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpUnboxFloat, OpBoxFloat} {
 		spec, ok := op.Spec()
 		if !ok || !spec.FloatRegResult || !needsFloatReg(&Instr{Op: op}) {

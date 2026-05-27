@@ -179,6 +179,7 @@ type OpSpec struct {
 	FieldCallPolyLenFusionBarrier    bool
 	BoxableIntArithmetic             bool
 	UnsafeIntArithmeticCandidate     bool
+	Int48SafeRangeCandidate          bool
 	ExactDivAllowedExternalUse       bool
 	NonNegativeDerivationCandidate   bool
 	Int48RuntimeValue                bool
@@ -559,6 +560,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opUnsafeIntArithmeticCandidatePolicies) {
 			spec.UnsafeIntArithmeticCandidate = opUnsafeIntArithmeticCandidatePolicies[op]
+		}
+		if int(op) < len(opInt48SafeRangeCandidatePolicies) {
+			spec.Int48SafeRangeCandidate = opInt48SafeRangeCandidatePolicies[op]
 		}
 		if int(op) < len(opExactDivAllowedExternalUsePolicies) {
 			spec.ExactDivAllowedExternalUse = opExactDivAllowedExternalUsePolicies[op]
@@ -1691,6 +1695,14 @@ var opBoxableIntArithmeticPolicies = [...]bool{
 }
 
 var opUnsafeIntArithmeticCandidatePolicies = [...]bool{
+	OpAddInt:      true,
+	OpSubInt:      true,
+	OpMulInt:      true,
+	OpNegInt:      true,
+	OpDivIntExact: true,
+}
+
+var opInt48SafeRangeCandidatePolicies = [...]bool{
 	OpAddInt:      true,
 	OpSubInt:      true,
 	OpMulInt:      true,
