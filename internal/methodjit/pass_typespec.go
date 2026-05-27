@@ -441,22 +441,8 @@ func (ts *typeSpecializer) wouldSpecialize(instr *Instr) bool {
 
 	lt := ts.argType(instr.Args[0])
 	rt := ts.argType(instr.Args[1])
-	bothInt := lt == TypeInt && rt == TypeInt
-	bothNumeric := (lt == TypeInt || lt == TypeFloat) && (rt == TypeInt || rt == TypeFloat)
-	hasFloat := lt == TypeFloat || rt == TypeFloat
-
-	switch instr.Op {
-	case OpAdd, OpSub, OpMul:
-		return bothInt || (bothNumeric && hasFloat)
-	case OpMod, OpEq:
-		return bothInt
-	case OpDiv:
-		return bothNumeric
-	case OpLt, OpLe:
-		return bothInt || (bothNumeric && hasFloat)
-	default:
-		return false
-	}
+	_, _, ok := typeSpecializedOp(instr.Op, lt, rt)
+	return ok
 }
 
 func (ts *typeSpecializer) wouldInsertNumToFloat(instr *Instr) bool {
@@ -485,6 +471,49 @@ func (ts *typeSpecializer) wouldInsertNumToFloat(instr *Instr) bool {
 func isGenericSpecializableOp(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.GenericSpecializable
+}
+
+func typeSpecializedOp(op Op, lt, rt Type) (Op, Type, bool) {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpMax, TypeUnknown, false
+	}
+	if lt == TypeInt && rt == TypeInt && spec.TypeSpecializeIntOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeIntOp)
+	}
+	if isNumericType(lt) && isNumericType(rt) && (lt == TypeFloat || rt == TypeFloat) && spec.TypeSpecializeFloatOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeFloatOp)
+	}
+	if lt == TypeString && rt == TypeString && spec.TypeSpecializeStringOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeStringOp)
+	}
+	return OpMax, TypeUnknown, false
+}
+
+func unaryTypeSpecializedOp(op Op, arg Type) (Op, Type, bool) {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpMax, TypeUnknown, false
+	}
+	if arg == TypeInt && spec.TypeSpecializeIntOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeIntOp)
+	}
+	if arg == TypeFloat && spec.TypeSpecializeFloatOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeFloatOp)
+	}
+	return OpMax, TypeUnknown, false
+}
+
+func opSpecializedTarget(op Op) (Op, Type, bool) {
+	spec, ok := op.Spec()
+	if !ok || spec.FixedResultType == TypeUnknown {
+		return OpMax, TypeUnknown, false
+	}
+	return op, spec.FixedResultType, true
+}
+
+func isNumericType(t Type) bool {
+	return t == TypeInt || t == TypeFloat
 }
 
 // typeSpecializer holds the inferred type map and does specialization.
@@ -1239,12 +1268,9 @@ func (ts *typeSpecializer) specialize(instr *Instr) {
 		// Unary ops.
 		if instr.Op == OpUnm && len(instr.Args) == 1 {
 			at := ts.argType(instr.Args[0])
-			if at == TypeInt {
-				instr.Op = OpNegInt
-				instr.Type = TypeInt
-			} else if at == TypeFloat {
-				instr.Op = OpNegFloat
-				instr.Type = TypeFloat
+			if op, typ, ok := unaryTypeSpecializedOp(instr.Op, at); ok {
+				instr.Op = op
+				instr.Type = typ
 			}
 		}
 		return
@@ -1252,69 +1278,8 @@ func (ts *typeSpecializer) specialize(instr *Instr) {
 
 	lt := ts.argType(instr.Args[0])
 	rt := ts.argType(instr.Args[1])
-	bothInt := lt == TypeInt && rt == TypeInt
-	bothNumeric := (lt == TypeInt || lt == TypeFloat) && (rt == TypeInt || rt == TypeFloat)
-	hasFloat := lt == TypeFloat || rt == TypeFloat
-
-	switch instr.Op {
-	case OpAdd:
-		if bothInt {
-			instr.Op = OpAddInt
-			instr.Type = TypeInt
-		} else if bothNumeric && hasFloat {
-			instr.Op = OpAddFloat
-			instr.Type = TypeFloat
-		}
-	case OpSub:
-		if bothInt {
-			instr.Op = OpSubInt
-			instr.Type = TypeInt
-		} else if bothNumeric && hasFloat {
-			instr.Op = OpSubFloat
-			instr.Type = TypeFloat
-		}
-	case OpMul:
-		if bothInt {
-			instr.Op = OpMulInt
-			instr.Type = TypeInt
-		} else if bothNumeric && hasFloat {
-			instr.Op = OpMulFloat
-			instr.Type = TypeFloat
-		}
-	case OpMod:
-		if bothInt {
-			instr.Op = OpModInt
-			instr.Type = TypeInt
-		}
-	case OpDiv:
-		// Division: always float, but specialize to DivFloat if both numeric.
-		if bothNumeric {
-			instr.Op = OpDivFloat
-			instr.Type = TypeFloat
-		}
-	case OpLt:
-		if bothInt {
-			instr.Op = OpLtInt
-			instr.Type = TypeBool
-		} else if bothNumeric && hasFloat {
-			instr.Op = OpLtFloat
-			instr.Type = TypeBool
-		}
-	case OpLe:
-		if bothInt {
-			instr.Op = OpLeInt
-			instr.Type = TypeBool
-		} else if bothNumeric && hasFloat {
-			instr.Op = OpLeFloat
-			instr.Type = TypeBool
-		}
-	case OpEq:
-		if bothInt {
-			instr.Op = OpEqInt
-			instr.Type = TypeBool
-		} else if lt == TypeString && rt == TypeString {
-			instr.Op = OpEqString
-			instr.Type = TypeBool
-		}
+	if op, typ, ok := typeSpecializedOp(instr.Op, lt, rt); ok {
+		instr.Op = op
+		instr.Type = typ
 	}
 }

@@ -170,6 +170,9 @@ type OpSpec struct {
 	NativeEffectLoopInline           bool
 	DirectDeoptWithoutFullFlush      bool
 	GenericSpecializable             bool
+	TypeSpecializeIntOp              Op
+	TypeSpecializeFloatOp            Op
+	TypeSpecializeStringOp           Op
 	NumToFloatInsertCandidate        bool
 	IntRecurrence                    bool
 	NumericOperand                   bool
@@ -259,6 +262,9 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		MayDeopt:                   mayDeopt,
 		TableArrayGPRInvariantRank: 1,
 		TableArrayKeyArgIndex:      -1,
+		TypeSpecializeIntOp:        OpMax,
+		TypeSpecializeFloatOp:      OpMax,
+		TypeSpecializeStringOp:     OpMax,
 		CallUserArgStart:           -1,
 		ExactIntNarrowOp:           OpMax,
 		BoxedFallbackOp:            OpMax,
@@ -535,6 +541,12 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opGenericSpecializablePolicies) {
 			spec.GenericSpecializable = opGenericSpecializablePolicies[op]
+		}
+		if int(op) < len(opTypeSpecializationPolicies) && opTypeSpecializationPolicies[op].Set {
+			policy := opTypeSpecializationPolicies[op]
+			spec.TypeSpecializeIntOp = policy.IntOp
+			spec.TypeSpecializeFloatOp = policy.FloatOp
+			spec.TypeSpecializeStringOp = policy.StringOp
 		}
 		if int(op) < len(opNumToFloatInsertCandidatePolicies) {
 			spec.NumToFloatInsertCandidate = opNumToFloatInsertCandidatePolicies[op]
@@ -1576,6 +1588,25 @@ var opGenericSpecializablePolicies = [...]bool{
 	OpEq:  true,
 	OpLt:  true,
 	OpLe:  true,
+}
+
+type opTypeSpecializationPolicy struct {
+	IntOp    Op
+	FloatOp  Op
+	StringOp Op
+	Set      bool
+}
+
+var opTypeSpecializationPolicies = [...]opTypeSpecializationPolicy{
+	OpAdd: {IntOp: OpAddInt, FloatOp: OpAddFloat, StringOp: OpMax, Set: true},
+	OpSub: {IntOp: OpSubInt, FloatOp: OpSubFloat, StringOp: OpMax, Set: true},
+	OpMul: {IntOp: OpMulInt, FloatOp: OpMulFloat, StringOp: OpMax, Set: true},
+	OpMod: {IntOp: OpModInt, FloatOp: OpMax, StringOp: OpMax, Set: true},
+	OpDiv: {IntOp: OpDivFloat, FloatOp: OpDivFloat, StringOp: OpMax, Set: true},
+	OpUnm: {IntOp: OpNegInt, FloatOp: OpNegFloat, StringOp: OpMax, Set: true},
+	OpEq:  {IntOp: OpEqInt, FloatOp: OpMax, StringOp: OpEqString, Set: true},
+	OpLt:  {IntOp: OpLtInt, FloatOp: OpLtFloat, StringOp: OpMax, Set: true},
+	OpLe:  {IntOp: OpLeInt, FloatOp: OpLeFloat, StringOp: OpMax, Set: true},
 }
 
 var opNumToFloatInsertCandidatePolicies = [...]bool{

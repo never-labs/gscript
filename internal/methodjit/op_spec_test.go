@@ -449,6 +449,29 @@ func TestTypeAndBarrierContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s generic specialization contract should be driven by OpSpec", op)
 		}
 	}
+	for _, tc := range []struct {
+		op      Op
+		intOp   Op
+		floatOp Op
+		strOp   Op
+	}{
+		{OpAdd, OpAddInt, OpAddFloat, OpMax},
+		{OpSub, OpSubInt, OpSubFloat, OpMax},
+		{OpMul, OpMulInt, OpMulFloat, OpMax},
+		{OpMod, OpModInt, OpMax, OpMax},
+		{OpDiv, OpDivFloat, OpDivFloat, OpMax},
+		{OpUnm, OpNegInt, OpNegFloat, OpMax},
+		{OpEq, OpEqInt, OpMax, OpEqString},
+		{OpLt, OpLtInt, OpLtFloat, OpMax},
+		{OpLe, OpLeInt, OpLeFloat, OpMax},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.TypeSpecializeIntOp != tc.intOp ||
+			spec.TypeSpecializeFloatOp != tc.floatOp ||
+			spec.TypeSpecializeStringOp != tc.strOp {
+			t.Fatalf("%s type-specialization targets should be driven by OpSpec", tc.op)
+		}
+	}
 	for _, op := range []Op{OpAdd, OpSub, OpMul, OpDiv, OpLt, OpLe} {
 		if !shouldInsertNumToFloat(op) {
 			t.Fatalf("%s NumToFloat insertion contract should be driven by OpSpec", op)
