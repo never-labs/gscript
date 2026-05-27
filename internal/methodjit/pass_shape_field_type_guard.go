@@ -15,17 +15,24 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 
 func ShapeFieldTypeGuardPassWith(registry *CompilationDependencyRegistry) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return shapeFieldTypeGuardPass(fn, registry)
+		if fn == nil || fn.Analysis == nil {
+			return shapeFieldTypeGuardPass(fn, registry, nil)
+		}
+		return shapeFieldTypeGuardPass(fn, registry, fn.Analysis.TableShapeFacts())
 	}
 }
 
-func shapeFieldTypeGuardPass(fn *Function, registry *CompilationDependencyRegistry) (*Function, error) {
+func ShapeFieldTypeGuardPassCtx(ctx *PassContext, registry *CompilationDependencyRegistry) (*Function, error) {
+	return shapeFieldTypeGuardPass(ctx.Func(), registry, ctx.TableShape())
+}
+
+func shapeFieldTypeGuardPass(fn *Function, registry *CompilationDependencyRegistry, tableShapes *TableShapeFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
 	seedShapeFieldTypesFromFixedConstructors(fn)
-	seedShapeFieldTypesFromCatalog(fn)
+	seedShapeFieldTypesFromCatalog(fn, tableShapes)
 	type key struct {
 		shapeID uint32
 		typ     Type
@@ -67,7 +74,9 @@ func shapeFieldTypeGuardPass(fn *Function, registry *CompilationDependencyRegist
 			if registry != nil {
 				registry.RecordShapeField(shapeID, fieldIdx)
 			}
-			fn.Analysis.TableShapeFacts().RecordShapeFieldTypeElidedLoad(instr.ID)
+			if tableShapes != nil {
+				tableShapes.RecordShapeFieldTypeElidedLoad(instr.ID)
+			}
 			functionRemarks(fn).Add("ShapeFieldTypeGuard", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("elide per-load type check for shape %d field %d as %s", shapeID, fieldIdx, instr.Type))
 		}
@@ -104,8 +113,11 @@ func shapeFieldTypeGuardedLoadType(t Type) bool {
 	}
 }
 
-func seedShapeFieldTypesFromCatalog(fn *Function) {
-	functionTableShapeFacts(fn).ForEachFieldPolyShapeCatalogFact(func(shapeID uint32, fact FixedShapeTableFact) bool {
+func seedShapeFieldTypesFromCatalog(fn *Function, tableShapes *TableShapeFacts) {
+	if tableShapes == nil {
+		return
+	}
+	tableShapes.ForEachFieldPolyShapeCatalogFact(func(shapeID uint32, fact FixedShapeTableFact) bool {
 		if shapeID == 0 || fact.ShapeID != shapeID || len(fact.FieldNames) == 0 || len(fact.FieldTypes) == 0 {
 			return true
 		}

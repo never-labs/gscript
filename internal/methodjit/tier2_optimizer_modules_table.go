@@ -114,10 +114,16 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		{
 			Name:     "ShapeFieldTypeGuard",
 			Phase:    Tier2PhaseTableFieldLower,
-			Requires: analysisFacts(AnalysisFactFixedShapeTables),
+			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFieldPolyShapeCatalog),
 			Provides: analysisFacts(AnalysisFactShapeFieldTypeElided),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				return ShapeFieldTypeGuardPassWith(ctxDependencyRegistry(ctx))(fn)
+				allowed := allowedDomainsForModule(
+					analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFieldPolyShapeCatalog),
+					analysisFacts(AnalysisFactShapeFieldTypeElided),
+					nil,
+					"ShapeFieldTypeGuard",
+				)
+				return ShapeFieldTypeGuardPassCtx(newPassContext(fn, opts, allowed, passContextEnforce), ctxDependencyRegistry(ctx))
 			},
 		},
 		tier2PassModuleWith("LateModuloMultiplyOverflowBoxing", Tier2PhaseTableFieldLower, nil, nil, LateModuloMultiplyOverflowBoxingPass),
