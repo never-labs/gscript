@@ -885,14 +885,11 @@ func licmCallCalleeProtos(fn *Function, instr *Instr, seededGlobals map[string]*
 }
 
 func licmCallUserArgs(instr *Instr) []*Value {
-	if instr == nil {
+	args, ok := callUserArgs(instr)
+	if !ok || len(args) == 0 {
 		return nil
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || spec.CallUserArgStart < 0 || len(instr.Args) <= spec.CallUserArgStart {
-		return nil
-	}
-	return instr.Args[spec.CallUserArgStart:]
+	return args
 }
 
 // canHoistOp returns true if moving an instruction with this op out of

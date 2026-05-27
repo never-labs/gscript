@@ -828,7 +828,7 @@ func singlePredRawValueClobberedAfter(block *Block, defIndex int, reg int, alloc
 		if instr == nil {
 			continue
 		}
-		if spec, ok := instr.Op.Spec(); ok && spec.RawCarryClobber {
+		if opIsRawCarryClobber(instr.Op) {
 			return true
 		}
 		if pr, ok := alloc.ValueRegs[instr.ID]; ok && !pr.IsFloat && pr.Reg == reg {

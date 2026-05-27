@@ -96,8 +96,8 @@ func fieldShapeTypedPeerProjectionCandidate(instr *Instr, tableShapes *TableShap
 	if instr == nil || tableShapes == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || spec.CallUserArgStart != 1 || len(instr.Args) < 2 ||
+	start, ok := callUserArgStart(instr.Op)
+	if !ok || start != 1 || len(instr.Args) < 2 ||
 		instr.Args[0] == nil || instr.Args[0].Def == nil {
 		return false
 	}

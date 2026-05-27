@@ -25,11 +25,7 @@ func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 			if instr == nil || !instr.HasSource || instr.SourceProto == nil || instr.SourcePC < 0 {
 				continue
 			}
-			spec, ok := instr.Op.Spec()
-			if !ok {
-				continue
-			}
-			switch spec.SourceFeedbackPolicy {
+			switch sourceFeedbackPolicy(instr.Op) {
 			case OpSourceFeedbackGetField:
 				sourceFeedbackRefreshGetField(fn, block, instr)
 			case OpSourceFeedbackSetField:

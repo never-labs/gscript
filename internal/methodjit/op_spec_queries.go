@@ -273,6 +273,30 @@ func isRawFloatOp(op Op) bool {
 	return ok && spec.RawFloatResult
 }
 
+func isMatrixNativeOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.MatrixNative
+}
+
+func opIsRawCarryClobber(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawCarryClobber
+}
+
+func isRawIntCarryValue(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	if instr.Type != TypeInt {
+		return false
+	}
+	if isRawIntOp(instr.Op) {
+		return true
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.RawIntCarryValue
+}
+
 func opIsGlobalConstUnsafe(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.GlobalConstUnsafe
@@ -339,6 +363,30 @@ func opIsCallFloorSpecFieldShape(op Op) bool {
 func opIsSpeculativeIntUseCandidate(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.SpeculativeIntUseCandidate
+}
+
+func callUserArgs(instr *Instr) ([]*Value, bool) {
+	if instr == nil {
+		return nil, false
+	}
+	spec, ok := instr.Op.Spec()
+	if !ok || spec.CallUserArgStart < 0 || len(instr.Args) < spec.CallUserArgStart {
+		return nil, false
+	}
+	return instr.Args[spec.CallUserArgStart:], true
+}
+
+func callUserArgStart(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.CallUserArgStart, ok && spec.CallUserArgStart >= 0
+}
+
+func sourceFeedbackPolicy(op Op) OpSourceFeedbackPolicy {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpSourceFeedbackNone
+	}
+	return spec.SourceFeedbackPolicy
 }
 
 func isPureNumericUnknownValue(instr *Instr) bool {

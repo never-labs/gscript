@@ -16,7 +16,7 @@ func enableSinglePredRawIntCarry(fn *Function) bool {
 			if isSinglePredRawCarryValue(instr) && instr.Type == TypeTable {
 				return true
 			}
-			if spec, ok := instr.Op.Spec(); ok && spec.RawCarryClobber && instr.Type == TypeInt {
+			if opIsRawCarryClobber(instr.Op) && instr.Type == TypeInt {
 				return true
 			}
 			if isMatrixNativeOp(instr.Op) {
@@ -25,25 +25,6 @@ func enableSinglePredRawIntCarry(fn *Function) bool {
 		}
 	}
 	return false
-}
-
-func isMatrixNativeOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.MatrixNative
-}
-
-func isRawIntCarryValue(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	if instr.Type != TypeInt {
-		return false
-	}
-	if isRawIntOp(instr.Op) {
-		return true
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.RawIntCarryValue
 }
 
 func isSinglePredRawCarryValue(instr *Instr) bool {
@@ -207,7 +188,7 @@ func gprClobberedInInstrRange(block *Block, start, end, reg int, alloc *RegAlloc
 		if instr == nil || instr.Op.IsTerminator() {
 			continue
 		}
-		if spec, ok := instr.Op.Spec(); ok && spec.RawCarryClobber {
+		if opIsRawCarryClobber(instr.Op) {
 			return true
 		}
 		if pr, ok := alloc.ValueRegs[instr.ID]; ok && !pr.IsFloat && pr.Reg == reg {
@@ -232,7 +213,7 @@ func fprClobberedInInstrRange(block *Block, start, end, reg int, alloc *RegAlloc
 		if instr == nil || instr.Op.IsTerminator() {
 			continue
 		}
-		if spec, ok := instr.Op.Spec(); ok && spec.RawCarryClobber {
+		if opIsRawCarryClobber(instr.Op) {
 			return true
 		}
 		if pr, ok := alloc.ValueRegs[instr.ID]; ok && pr.IsFloat && pr.Reg == reg {

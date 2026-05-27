@@ -836,14 +836,7 @@ func inlineMultiBlock(fn *Function, block *Block, callInstr *Instr, idx int, cal
 // slots. OpCall carries the callee value at Args[0]; OpFieldCallFloor has
 // already fused the method load and carries only receiver + user arguments.
 func inlineCallArgumentValues(callInstr *Instr) ([]*Value, bool) {
-	if callInstr == nil {
-		return nil, false
-	}
-	spec, ok := callInstr.Op.Spec()
-	if !ok || spec.CallUserArgStart < 0 || len(callInstr.Args) < spec.CallUserArgStart {
-		return nil, false
-	}
-	return callInstr.Args[spec.CallUserArgStart:], true
+	return callUserArgs(callInstr)
 }
 
 func inlineParamValues(calleeFn *Function, callArgs []*Value) map[int]*Value {
