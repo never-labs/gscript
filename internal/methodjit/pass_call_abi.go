@@ -692,7 +692,14 @@ func specGuardKindSuppressed(fn *Function, pc int, kind string) bool {
 	if fn == nil || fn.Analysis == nil {
 		return false
 	}
-	return fn.Analysis.SpeculationFacts().SpecGuardKindSuppressed(pc, kind)
+	return specGuardKindSuppressedFacts(fn.Analysis.SpeculationFacts(), pc, kind)
+}
+
+func specGuardKindSuppressedFacts(spec *SpeculationFacts, pc int, kind string) bool {
+	if spec == nil {
+		return false
+	}
+	return spec.SpecGuardKindSuppressed(pc, kind)
 }
 
 func callABIHasExactResultShape(fn *Function, instr *Instr, wantRets int) bool {

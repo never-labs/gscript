@@ -12,6 +12,12 @@ const (
 // per-op overflow checks in hot numeric/table-building specializations. Guard misses
 // deopt to the interpreter, preserving correctness for wider inputs.
 func LoopBoundRangeGuardPass(fn *Function) (*Function, error) {
+	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "LoopBoundRangeGuard")
+	return LoopBoundRangeGuardPassCtx(newPassContext(fn, nil, allowed, false))
+}
+
+func LoopBoundRangeGuardPassCtx(ctx *PassContext) (*Function, error) {
+	fn := ctx.Func()
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -43,7 +49,7 @@ func LoopBoundRangeGuardPass(fn *Function) (*Function, error) {
 				continue
 			}
 			max = loopBoundParamEffectiveMax(fn, slot, max)
-			if specGuardKindSuppressed(fn, -1, "GuardIntRange") {
+			if specGuardKindSuppressedFacts(ctx.Speculation(), -1, "GuardIntRange") {
 				functionRemarks(fn).Add("LoopBoundRangeGuard", "missed", block.ID, instr.ID, OpGuardIntRange,
 					"skipped globally suppressed int-range guard")
 				continue
