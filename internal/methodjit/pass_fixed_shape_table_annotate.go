@@ -12,12 +12,12 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact) {
+func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts, facts map[int]FixedShapeTableFact) {
 	mutableFields := collectFixedShapeMutableFields(fn)
 	mutableRanges := collectFixedShapeMutableFieldRanges(fn, tableShapes, facts, mutableFields)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if annotateFixedShapeFieldLoad(fn, tableShapes, block, instr, facts, mutableFields, mutableRanges) {
+			if annotateFixedShapeFieldLoad(fn, tableShapes, numeric, block, instr, facts, mutableFields, mutableRanges) {
 				continue
 			}
 			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
@@ -49,7 +49,9 @@ func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, fac
 				instr.Type = typ
 			}
 			if r, ok := fixedShapeFieldLoadRange(fact, name, idx, mutableFields, mutableRanges); ok {
-				fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
+				if numeric != nil {
+					numeric.RecordProfiledIntRange(instr.ID, r)
+				}
 				if instr.Type == TypeAny || instr.Type == TypeUnknown {
 					instr.Type = TypeInt
 				}
@@ -57,7 +59,7 @@ func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, fac
 					fmt.Sprintf("field %q carries guarded int range [%d,%d]", name, r.min, r.max))
 			}
 			if r, ok := fact.FieldLenRanges[name]; ok && r.known && !fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, idx) {
-				recordProfiledLenRange(fn, instr.ID, r)
+				recordProfiledLenRange(numeric, instr.ID, r)
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("field %q carries guarded string-len range [%d,%d]", name, r.min, r.max))
 			}
@@ -129,7 +131,7 @@ func tableKeyProvenString(fn *Function, instr *Instr, key *Value) bool {
 	return instr.SourcePC < len(proto.Feedback) && proto.Feedback[instr.SourcePC].Right == vm.FBString
 }
 
-func annotateFixedShapeFieldLoad(fn *Function, tableShapes *TableShapeFacts, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) bool {
+func annotateFixedShapeFieldLoad(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) bool {
 	if instr == nil || (instr.Op != OpFieldLoad && instr.Op != OpFieldLoadNumToFloat) || len(instr.Args) == 0 || instr.Args[0] == nil {
 		return false
 	}
@@ -151,12 +153,15 @@ func annotateFixedShapeFieldLoad(fn *Function, tableShapes *TableShapeFacts, blo
 	}
 	fieldMayMutate := fixedShapeFieldMayMutate(mutableFields, fact.ShapeID, fieldIdx)
 	if fieldMayMutate {
-		numeric := fn.Analysis.NumericFacts()
-		numeric.DeleteProfiledIntRange(instr.ID)
-		numeric.DeleteProfiledLenRange(instr.ID)
+		if numeric != nil {
+			numeric.DeleteProfiledIntRange(instr.ID)
+			numeric.DeleteProfiledLenRange(instr.ID)
+		}
 	}
 	if r, ok := fixedShapeFieldLoadRange(fact, name, fieldIdx, mutableFields, mutableRanges); ok {
-		fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
+		if numeric != nil {
+			numeric.RecordProfiledIntRange(instr.ID, r)
+		}
 		if instr.Op == OpFieldLoad && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = TypeInt
 		}
@@ -164,7 +169,7 @@ func annotateFixedShapeFieldLoad(fn *Function, tableShapes *TableShapeFacts, blo
 			fmt.Sprintf("field-load %q carries guarded int range [%d,%d]", name, r.min, r.max))
 	}
 	if r, ok := fact.FieldLenRanges[name]; ok && r.known && !fieldMayMutate {
-		recordProfiledLenRange(fn, instr.ID, r)
+		recordProfiledLenRange(numeric, instr.ID, r)
 		functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 			fmt.Sprintf("field-load %q carries guarded string-len range [%d,%d]", name, r.min, r.max))
 	}

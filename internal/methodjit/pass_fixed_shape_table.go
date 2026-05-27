@@ -116,6 +116,7 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		}
 		fn.ensureAnalysis()
 		tableShapes := fn.Analysis.TableShapeFacts()
+		numeric := fn.Analysis.NumericFacts()
 		facts := inferLocalFixedShapeTables(fn)
 		if len(facts) == 0 {
 			facts = make(map[int]FixedShapeTableFact)
@@ -162,13 +163,13 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		tableShapes.SetFixedShapeTables(facts)
 		annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
 		propagateFixedShapePhiFacts(fn, facts)
-		annotateFixedShapeGetFields(fn, tableShapes, facts)
+		annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
 		annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
 		propagateFixedShapePhiFacts(fn, facts)
-		annotateFixedShapeGetFields(fn, tableShapes, facts)
+		annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
 		annotateFixedShapeSetFields(fn, facts)
 		propagateShapeCacheFromSetFieldToGetField(fn, facts)
-		annotateFixedShapeArrayElementAccesses(fn, facts)
+		annotateFixedShapeArrayElementAccesses(fn, numeric, facts)
 		forwardFixedShapeGetFields(fn, facts)
 		return fn, nil
 	}
@@ -202,11 +203,11 @@ func cloneStringTypeMap(in map[string]Type) map[string]Type {
 	return out
 }
 
-func recordProfiledLenRange(fn *Function, valueID int, r intRange) {
-	if fn == nil {
+func recordProfiledLenRange(numeric *NumericFacts, valueID int, r intRange) {
+	if numeric == nil {
 		return
 	}
-	functionNumericFacts(fn).RecordProfiledLenRange(valueID, r)
+	numeric.RecordProfiledLenRange(valueID, r)
 }
 
 func cloneStringRangeMap(in map[string]intRange) map[string]intRange {

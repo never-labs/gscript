@@ -12,7 +12,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedShapeTableFact) {
+func annotateFixedShapeArrayElementAccesses(fn *Function, numeric *NumericFacts, facts map[int]FixedShapeTableFact) {
 	if fn == nil || len(facts) == 0 {
 		return
 	}
@@ -50,8 +50,8 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedSha
 				if typ, ok := tableArrayKindElementType(kind); ok && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 					instr.Type = typ
 				}
-				if r := fact.ArrayElementRange; r.known {
-					fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
+				if r := fact.ArrayElementRange; r.known && numeric != nil {
+					numeric.RecordProfiledIntRange(instr.ID, r)
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("table value carries guarded array element kind %d", kind))
@@ -63,8 +63,8 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, facts map[int]FixedSha
 				if typ, ok := tableArrayKindElementType(kind); ok && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 					instr.Type = typ
 				}
-				if r := fact.ArrayElementRange; r.known {
-					fn.Analysis.NumericFacts().RecordProfiledIntRange(instr.ID, r)
+				if r := fact.ArrayElementRange; r.known && numeric != nil {
+					numeric.RecordProfiledIntRange(instr.ID, r)
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("lowered table value carries guarded array element kind %d", kind))
