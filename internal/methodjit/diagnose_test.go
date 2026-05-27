@@ -50,6 +50,17 @@ func TestDiagnose_SimpleAdd(t *testing.T) {
 		t.Errorf("expected Match=true, got false. Mismatch: %s", report.Mismatch)
 	}
 
+	// Three-way oracle: optimizer and backend should both be clean.
+	if !report.OptimizerMatch {
+		t.Errorf("expected OptimizerMatch=true, got false. OptimizerMismatch: %s", report.OptimizerMismatch)
+	}
+	if !report.BackendMatch {
+		t.Errorf("expected BackendMatch=true, got false. BackendMismatch: %s", report.BackendMismatch)
+	}
+	if report.OptInterpError != nil {
+		t.Errorf("OptInterpError: %v", report.OptInterpError)
+	}
+
 	// Verify actual values.
 	if len(report.InterpResult) == 0 || !report.InterpResult[0].IsInt() || report.InterpResult[0].Int() != 7 {
 		t.Errorf("expected InterpResult=[int(7)], got %v", report.InterpResult)
@@ -87,6 +98,15 @@ func TestDiagnose_ForLoop(t *testing.T) {
 		t.Logf("Known JIT mismatch detected by Diagnose: %s", report.Mismatch)
 	}
 
+	// Three-way oracle: the optimizer must preserve semantics (unopt-interp
+	// vs opt-interp), and for this loop the backend matches too.
+	if !report.OptimizerMatch {
+		t.Errorf("expected OptimizerMatch=true, got false. OptimizerMismatch: %s", report.OptimizerMismatch)
+	}
+	if !report.BackendMatch {
+		t.Errorf("expected BackendMatch=true, got false. BackendMismatch: %s", report.BackendMismatch)
+	}
+
 	// TypeSpec should have changed the IR (Int-specialized ops).
 	hasTypeSpecDiff := false
 	for _, d := range report.PassDiffs {
@@ -121,6 +141,28 @@ func TestDiagnose_Fib(t *testing.T) {
 	if report.IRBefore == "" || report.IRAfter == "" {
 		t.Error("IR snapshots should be populated")
 	}
+
+	// Three-way oracle: the optimizer must preserve semantics here too. The
+	// optimized IR interpreter must agree with the unoptimized IR interpreter
+	// (both fib(10)=55) regardless of what the native backend does.
+	if !report.OptimizerMatch {
+		t.Errorf("expected OptimizerMatch=true, got false. OptimizerMismatch: %s", report.OptimizerMismatch)
+	}
+	if report.OptInterpError != nil {
+		t.Errorf("OptInterpError: %v", report.OptInterpError)
+	}
+	if len(report.OptInterpResult) == 0 || report.OptInterpResult[0].Int() != 55 {
+		t.Errorf("expected OptInterpResult=[int(55)], got %v", report.OptInterpResult)
+	}
+	// NOTE: BackendMatch is intentionally NOT asserted true for fib. In this
+	// in-process Diagnose harness the recursive-call native exit path needs a
+	// CallVM that Diagnose does not wire up, so native errors with
+	// "no CallVM set for global-exit". That is a harness/backend limitation,
+	// not an optimizer bug: the optimizer sub-verdict (OptimizerMatch) is
+	// clean, which is exactly what the three-way split is meant to reveal.
+	if !report.BackendMatch {
+		t.Logf("fib BackendMatch=false (expected in this harness): %s", report.BackendMismatch)
+	}
 }
 
 // TestDiagnose_FloatArith: f(1.5, 2.5)=4.0. Verify float comparison works.
@@ -150,6 +192,15 @@ func TestDiagnose_FloatArith(t *testing.T) {
 	// Match verdict (interp vs native).
 	if !report.Match {
 		t.Logf("Float mismatch (may be expected if JIT deopts): %s", report.Mismatch)
+	}
+
+	// Three-way oracle: optimizer and backend should both be clean for plain
+	// float arithmetic.
+	if !report.OptimizerMatch {
+		t.Errorf("expected OptimizerMatch=true, got false. OptimizerMismatch: %s", report.OptimizerMismatch)
+	}
+	if !report.BackendMatch {
+		t.Errorf("expected BackendMatch=true, got false. BackendMismatch: %s", report.BackendMismatch)
 	}
 }
 

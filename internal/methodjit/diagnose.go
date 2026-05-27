@@ -180,12 +180,31 @@ type DiagReport struct {
 	OptimizationRemarks []OptimizationRemark // structured pass/gate diagnostics
 	ValidateErrors      []error              // structural invariant violations
 	RegAllocMap         string               // human-readable register assignments
-	InterpResult        []runtime.Value      // IR interpreter output
+	InterpResult        []runtime.Value      // IR interpreter output on UNOPTIMIZED IR
 	InterpError         error
-	NativeResult        []runtime.Value // compiled ARM64 output
+	OptInterpResult     []runtime.Value // IR interpreter output on OPTIMIZED IR
+	OptInterpError      error
+	NativeResult        []runtime.Value // compiled ARM64 output (OPTIMIZED IR)
 	NativeError         error
-	Match               bool   // true if interp and native agree
-	Mismatch            string // description of mismatch (empty if Match)
+
+	// Three-way verdicts. The oracle interprets the unoptimized IR, interprets
+	// the optimized IR, and executes the optimized IR as native code. Comparing
+	// the three pairwise separates optimizer bugs from backend/codegen bugs.
+
+	// OptimizerMatch compares unoptimized-interp vs optimized-interp. A mismatch
+	// here means an optimization PASS changed observable semantics.
+	OptimizerMatch    bool
+	OptimizerMismatch string
+
+	// BackendMatch compares optimized-interp vs optimized-native. A mismatch
+	// here means codegen/backend diverged from the IR it was given.
+	BackendMatch    bool
+	BackendMismatch string
+
+	// Match is the end-to-end verdict (unoptimized-interp vs native), kept for
+	// backward compatibility with existing callers/tests.
+	Match    bool   // true if unoptimized-interp and native agree
+	Mismatch string // description of mismatch (empty if Match)
 }
 
 // Diagnose runs the full Method JIT pipeline on a function and compares
@@ -244,6 +263,13 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	r.IRAfter = Print(optimized)
 	r.OptimizationRemarks = remarks.List()
 	r.PipelineStages = collector.timings
+
+	// 4b. Interpret the OPTIMIZED IR. This is the middle of the three-way
+	//     oracle: comparing it against the unoptimized-interp result isolates
+	//     optimizer bugs, and comparing it against native isolates backend bugs.
+	optInterpResult, optInterpErr := Interpret(optimized, args)
+	r.OptInterpResult = optInterpResult
+	r.OptInterpError = optInterpErr
 	r.ModuleContracts = append([]Tier2ModuleContract(nil), collector.moduleContracts...)
 	r.ModuleReasons = append([]Tier2ModuleReason(nil), collector.moduleReasons...)
 	r.ModuleFactDiffs = append([]Tier2ModuleFactDiff(nil), collector.moduleFactDiffs...)
@@ -274,47 +300,90 @@ func Diagnose(proto *vm.FuncProto, args []runtime.Value) *DiagReport {
 	return r
 }
 
-// compareResults checks if InterpResult matches NativeResult.
+// compareResults computes the three pairwise verdicts of the oracle:
+//
+//   - OptimizerMatch: unoptimized-interp vs optimized-interp (optimizer bugs)
+//   - BackendMatch:   optimized-interp vs optimized-native   (codegen bugs)
+//   - Match:          unoptimized-interp vs native (end-to-end, backward compat)
+//
+// Each pairing reuses compareValueLists so the value/error comparison policy is
+// shared. When the optimizer failed to produce an optimized IR (pipeline or
+// compile error before OptInterp ran), OptInterpResult/OptInterpError are zero;
+// in that case the optimizer/backend sub-verdicts only carry meaning insofar as
+// the underlying comparison allows, and the end-to-end Match remains the
+// authoritative result.
 func (r *DiagReport) compareResults() {
-	// If either side errored, they don't match (unless both errored).
-	if r.InterpError != nil && r.NativeError != nil {
-		r.Match = true // both failed
-		return
-	}
-	if r.InterpError != nil {
-		r.Match = false
-		r.Mismatch = fmt.Sprintf("interpreter error: %v, native returned %s",
-			r.InterpError, formatValues(r.NativeResult))
-		return
-	}
-	if r.NativeError != nil {
-		r.Match = false
-		r.Mismatch = fmt.Sprintf("interpreter returned %s, native error: %v",
-			formatValues(r.InterpResult), r.NativeError)
-		return
+	r.OptimizerMatch, r.OptimizerMismatch = compareValueLists(
+		r.InterpResult, r.OptInterpResult, r.InterpError, r.OptInterpError,
+		"unopt-interp", "opt-interp")
+	r.BackendMatch, r.BackendMismatch = compareValueLists(
+		r.OptInterpResult, r.NativeResult, r.OptInterpError, r.NativeError,
+		"opt-interp", "native")
+	r.Match, r.Mismatch = compareValueLists(
+		r.InterpResult, r.NativeResult, r.InterpError, r.NativeError,
+		"unopt-interp", "native")
+}
+
+// compareValueLists compares two execution outcomes (value list + error) and
+// returns whether they match plus a human-readable mismatch description.
+//
+// Error policy: we require the two sides to be in the same error CATEGORY.
+// errorCategory classifies an error as nil / "deopt" / "runtime error". Both
+// nil is a match (and we go on to compare values). Both non-nil matches ONLY if
+// they fall in the same category — this avoids the previous blanket "both
+// errored => Match" leniency (which masked a real divergence whenever the two
+// engines failed for unrelated reasons) without being as brittle as requiring
+// byte-identical error strings (deopt messages legitimately carry differing PC
+// / reason text). One side erroring and the other not is always a mismatch.
+func compareValueLists(a, b []runtime.Value, aErr, bErr error, aName, bName string) (bool, string) {
+	aCat := errorCategory(aErr)
+	bCat := errorCategory(bErr)
+
+	if aErr != nil || bErr != nil {
+		if aCat != bCat {
+			return false, fmt.Sprintf("%s %s, %s %s",
+				aName, describeOutcome(a, aErr),
+				bName, describeOutcome(b, bErr))
+		}
+		// Same non-nil category on both sides: treat as matching failures.
+		return true, ""
 	}
 
-	// Compare result counts.
-	if len(r.InterpResult) != len(r.NativeResult) {
-		r.Match = false
-		r.Mismatch = fmt.Sprintf("result count: interpreter=%d, native=%d",
-			len(r.InterpResult), len(r.NativeResult))
-		return
+	// Both succeeded: compare the value lists.
+	if len(a) != len(b) {
+		return false, fmt.Sprintf("result count: %s=%d, %s=%d",
+			aName, len(a), bName, len(b))
 	}
-
-	// Compare each value.
-	for i := range r.InterpResult {
-		if !valuesMatch(r.InterpResult[i], r.NativeResult[i]) {
-			r.Match = false
-			r.Mismatch = fmt.Sprintf("result[%d]: interpreter=%s (%s), native=%s (%s)",
+	for i := range a {
+		if !valuesMatch(a[i], b[i]) {
+			return false, fmt.Sprintf("result[%d]: %s=%s (%s), %s=%s (%s)",
 				i,
-				r.InterpResult[i].String(), r.InterpResult[i].TypeName(),
-				r.NativeResult[i].String(), r.NativeResult[i].TypeName())
-			return
+				aName, a[i].String(), a[i].TypeName(),
+				bName, b[i].String(), b[i].TypeName())
 		}
 	}
+	return true, ""
+}
 
-	r.Match = true
+// errorCategory normalizes an error into a coarse category for comparison:
+// nil, "deopt", or "runtime error". Deopt is detected via the deopt sentinel /
+// message; everything else non-nil is a generic runtime error.
+func errorCategory(err error) string {
+	if err == nil {
+		return ""
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "deopt") {
+		return "deopt"
+	}
+	return "runtime error"
+}
+
+// describeOutcome renders an outcome (error or values) for a mismatch message.
+func describeOutcome(vals []runtime.Value, err error) string {
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("returned %s", formatValues(vals))
 }
 
 // valuesMatch compares two runtime.Values with float epsilon tolerance.
@@ -451,6 +520,12 @@ func (r *DiagReport) String() string {
 	} else {
 		w("Result: %s\n", formatValues(r.InterpResult))
 	}
+	w("\n--- IR Interpreter (optimized IR) ---\n")
+	if r.OptInterpError != nil {
+		w("Error: %v\n", r.OptInterpError)
+	} else {
+		w("Result: %s\n", formatValues(r.OptInterpResult))
+	}
 	w("\n--- Native Execution ---\n")
 	if r.NativeError != nil {
 		w("Error: %v\n", r.NativeError)
@@ -458,10 +533,15 @@ func (r *DiagReport) String() string {
 		w("Result: %s\n", formatValues(r.NativeResult))
 	}
 	w("\n--- Verdict ---\n")
-	if r.Match {
-		w("MATCH\n")
-	} else {
-		w("MISMATCH: %s\n", r.Mismatch)
+	verdict := func(label string, ok bool, mismatch string) {
+		if ok {
+			w("%s: MATCH\n", label)
+		} else {
+			w("%s: MISMATCH: %s\n", label, mismatch)
+		}
 	}
+	verdict("Optimizer (unopt-interp vs opt-interp)", r.OptimizerMatch, r.OptimizerMismatch)
+	verdict("Backend   (opt-interp vs native)      ", r.BackendMatch, r.BackendMismatch)
+	verdict("End-to-end (unopt-interp vs native)   ", r.Match, r.Mismatch)
 	return sb.String()
 }
