@@ -513,12 +513,12 @@ func (tm *TieringManager) intOverflowDeoptRefreshAction(proto *vm.FuncProto, cf 
 }
 
 func tier2IntOverflowOpCanBox(op string) bool {
-	switch op {
-	case "AddInt", "SubInt", "MulInt", "NegInt":
-		return true
-	default:
+	irOp, ok := OpByName(op)
+	if !ok {
 		return false
 	}
+	spec, ok := irOp.Spec()
+	return ok && spec.RuntimeOverflowBoxable
 }
 
 func tier2NeedsNativeStackReserve(cf *CompiledFunction) bool {
@@ -602,12 +602,12 @@ func (tm *TieringManager) guardDeoptRefreshAction(proto *vm.FuncProto, cf *Compi
 }
 
 func tier2GuardOpCanRefresh(op string) bool {
-	switch op {
-	case "GuardType", "GuardCalleeProto", "GuardConstString", "GuardTableKind", "GuardIntRange":
-		return true
-	default:
+	irOp, ok := OpByName(op)
+	if !ok {
 		return false
 	}
+	spec, ok := irOp.Spec()
+	return ok && spec.RuntimeGuardRefreshable
 }
 
 func (tm *TieringManager) applyTier2DeoptAction(proto *vm.FuncProto, action Tier2DeoptAction) {

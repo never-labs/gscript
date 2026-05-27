@@ -170,6 +170,8 @@ type OpSpec struct {
 	TableArrayRegionAliasingCall     bool
 	TableArrayRegionAliasingAlways   bool
 	TableArrayRegionTableMutation    bool
+	RuntimeOverflowBoxable           bool
+	RuntimeGuardRefreshable          bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -515,9 +517,20 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		if int(op) < len(opTableArrayRegionTableMutationPolicies) {
 			spec.TableArrayRegionTableMutation = opTableArrayRegionTableMutationPolicies[op]
 		}
+		if int(op) < len(opRuntimeOverflowBoxablePolicies) {
+			spec.RuntimeOverflowBoxable = opRuntimeOverflowBoxablePolicies[op]
+		}
+		if int(op) < len(opRuntimeGuardRefreshablePolicies) {
+			spec.RuntimeGuardRefreshable = opRuntimeGuardRefreshablePolicies[op]
+		}
 		return spec, true
 	}
 	return OpSpec{}, false
+}
+
+func OpByName(name string) (Op, bool) {
+	op, ok := opNameLookup[name]
+	return op, ok
 }
 
 func OpsByEmitterFamily(family OpEmitterFamily) []Op {
@@ -1584,4 +1597,30 @@ var opTableArrayRegionTableMutationPolicies = [...]bool{
 	OpTableBoolArrayFill: true,
 }
 
+var opRuntimeOverflowBoxablePolicies = [...]bool{
+	OpAddInt: true,
+	OpSubInt: true,
+	OpMulInt: true,
+	OpNegInt: true,
+}
+
+var opRuntimeGuardRefreshablePolicies = [...]bool{
+	OpGuardType:        true,
+	OpGuardCalleeProto: true,
+	OpGuardConstString: true,
+	OpGuardTableKind:   true,
+	OpGuardIntRange:    true,
+}
+
 var expandedOpSpecs = buildExpandedOpSpecs()
+var opNameLookup = buildOpNameLookup(expandedOpSpecs)
+
+func buildOpNameLookup(specs [OpMax]OpSpec) map[string]Op {
+	out := make(map[string]Op, int(OpMax))
+	for op := Op(0); op < OpMax; op++ {
+		if specs[op].Name != "" {
+			out[specs[op].Name] = op
+		}
+	}
+	return out
+}

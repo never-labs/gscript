@@ -520,6 +520,18 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s table-array region global barrier should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpAddInt, OpSubInt, OpMulInt, OpNegInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RuntimeOverflowBoxable || !tier2IntOverflowOpCanBox(op.String()) {
+			t.Fatalf("%s runtime overflow boxing contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpGuardType, OpGuardCalleeProto, OpGuardConstString, OpGuardTableKind, OpGuardIntRange} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RuntimeGuardRefreshable || !tier2GuardOpCanRefresh(op.String()) {
+			t.Fatalf("%s runtime guard refresh contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {
