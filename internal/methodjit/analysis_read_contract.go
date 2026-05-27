@@ -159,18 +159,16 @@ func CheckPipelineReadContract(runs []Tier2ModuleRun) AggregateReadContractRepor
 // in this allowlist is a contract violation (a pass reading a domain it should
 // declare, or a regression). Keyed by "module\x00domain".
 var knownReadContractHints = map[string]bool{
-	"CallABI\x00numeric":                                   true,
-	"CallResultRangeGuard\x00global":                       true,
-	"CallResultRangeGuard (final)\x00global":               true,
-	"CallResultRangeGuard (post-rewrite)\x00global":        true,
-	"EscapeAnalysis\x00global":                             true,
-	"EscapeAnalysis (post-fixed-table-lowering)\x00global": true,
-	"FieldLenFold\x00numeric":                              true,
-	"FixedShapeTableFacts\x00numeric":                      true,
-	"FixedShapeTableFacts (post-inline)\x00numeric":        true,
-	"FixedShapeTableFacts (pre-inline)\x00numeric":         true,
-	"LICM\x00global":                                       true,
-	"LICM (post-MatrixRowPtrFactoring)\x00global":          true,
+	"CallABI\x00numeric":                            true,
+	"CallResultRangeGuard\x00global":                true,
+	"CallResultRangeGuard (final)\x00global":        true,
+	"CallResultRangeGuard (post-rewrite)\x00global": true,
+	"EscapeAnalysis\x00global":                      true,
+	"FieldLenFold\x00numeric":                       true,
+	"FixedShapeTableFacts\x00numeric":               true,
+	"FixedShapeTableFacts (pre-inline)\x00numeric":  true,
+	"LICM\x00global":                                true,
+	"LICM (post-MatrixRowPtrFactoring)\x00global":   true,
 }
 
 // UnexpectedFindings returns the undeclared reads that are NOT in the known-hint
