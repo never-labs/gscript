@@ -250,12 +250,11 @@ func isExactDivComponentOp(instr *Instr, provenDiv map[int]bool) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpPhi,
-		OpAdd, OpSub, OpMul, OpMod,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt,
-		OpAddFloat, OpSubFloat, OpMulFloat:
+	spec, ok := instr.Op.Spec()
+	if ok && spec.ExactDivComponent {
 		return true
+	}
+	switch instr.Op {
 	case OpDiv, OpDivFloat:
 		return provenDiv[instr.ID]
 	default:
@@ -333,19 +332,19 @@ func solveIntNarrowableValues(fn *Function, provenDiv, candidates map[int]bool) 
 }
 
 func mayBeIntNarrowed(instr *Instr, provenDiv map[int]bool) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
 	switch instr.Op {
 	case OpConstInt, OpGuardType, OpGuardIntRange, OpUnboxInt:
 		return instr.Op != OpGuardType || instr.Type == TypeInt || instr.Aux == int64(TypeInt)
 	case OpPhi:
 		return instr.Type == TypeInt || instr.Type == TypeFloat || instr.Type == TypeAny || instr.Type == TypeUnknown
-	case OpAdd, OpSub, OpMul, OpMod, OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt:
-		return true
-	case OpAddFloat, OpSubFloat, OpMulFloat:
-		return true
 	case OpDiv, OpDivFloat:
 		return provenDiv[instr.ID]
 	default:
-		return instr.Type == TypeInt
+		return (ok && spec.IntNarrowCandidate) || instr.Type == TypeInt
 	}
 }
 
@@ -357,17 +356,13 @@ func intNarrowConstraintsHold(instr *Instr, possible map[int]bool, provenDiv map
 		return instr.Type == TypeInt || instr.Aux == int64(TypeInt)
 	case OpUnboxInt:
 		return true
-	case OpPhi:
-		return len(instr.Args) > 0 && allArgsInt(instr, possible)
-	case OpAdd, OpSub, OpMul, OpMod, OpAddInt, OpSubInt, OpMulInt, OpModInt:
-		return len(instr.Args) >= 2 && allArgsInt(instr, possible)
-	case OpAddFloat, OpSubFloat, OpMulFloat:
-		return len(instr.Args) >= 2 && allArgsInt(instr, possible)
-	case OpNegInt:
-		return len(instr.Args) >= 1 && allArgsInt(instr, possible)
 	case OpDiv, OpDivFloat:
 		return provenDiv[instr.ID] && len(instr.Args) >= 2 && allArgsInt(instr, possible)
 	default:
+		spec, ok := instr.Op.Spec()
+		if ok && spec.IntNarrowAllArgsConstraint {
+			return len(instr.Args) > 0 && allArgsInt(instr, possible)
+		}
 		return instr.Type == TypeInt
 	}
 }

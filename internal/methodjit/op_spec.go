@@ -194,6 +194,9 @@ type OpSpec struct {
 	FieldFactWideKiller              bool
 	TableMutationFirstArg            bool
 	CallLikeFactBarrier              bool
+	ExactDivComponent                bool
+	IntNarrowCandidate               bool
+	IntNarrowAllArgsConstraint       bool
 	BackendPolicy                    OpBackendPolicy
 	SourceFeedbackPolicy             OpSourceFeedbackPolicy
 }
@@ -578,6 +581,15 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opCallLikeFactBarrierPolicies) {
 			spec.CallLikeFactBarrier = opCallLikeFactBarrierPolicies[op]
+		}
+		if int(op) < len(opExactDivComponentPolicies) {
+			spec.ExactDivComponent = opExactDivComponentPolicies[op]
+		}
+		if int(op) < len(opIntNarrowCandidatePolicies) {
+			spec.IntNarrowCandidate = opIntNarrowCandidatePolicies[op]
+		}
+		if int(op) < len(opIntNarrowAllArgsConstraintPolicies) {
+			spec.IntNarrowAllArgsConstraint = opIntNarrowAllArgsConstraintPolicies[op]
 		}
 		if int(op) < len(opSourceFeedbackPolicies) {
 			spec.SourceFeedbackPolicy = opSourceFeedbackPolicies[op]
@@ -1914,6 +1926,57 @@ var opCallLikeFactBarrierPolicies = [...]bool{
 	OpGo:             true,
 	OpSend:           true,
 	OpRecv:           true,
+}
+
+var opExactDivComponentPolicies = [...]bool{
+	OpPhi:      true,
+	OpAdd:      true,
+	OpSub:      true,
+	OpMul:      true,
+	OpMod:      true,
+	OpAddInt:   true,
+	OpSubInt:   true,
+	OpMulInt:   true,
+	OpModInt:   true,
+	OpAddFloat: true,
+	OpSubFloat: true,
+	OpMulFloat: true,
+}
+
+var opIntNarrowCandidatePolicies = [...]bool{
+	OpConstInt:      true,
+	OpGuardType:     true,
+	OpGuardIntRange: true,
+	OpUnboxInt:      true,
+	OpPhi:           true,
+	OpAdd:           true,
+	OpSub:           true,
+	OpMul:           true,
+	OpMod:           true,
+	OpAddInt:        true,
+	OpSubInt:        true,
+	OpMulInt:        true,
+	OpModInt:        true,
+	OpNegInt:        true,
+	OpAddFloat:      true,
+	OpSubFloat:      true,
+	OpMulFloat:      true,
+}
+
+var opIntNarrowAllArgsConstraintPolicies = [...]bool{
+	OpPhi:      true,
+	OpAdd:      true,
+	OpSub:      true,
+	OpMul:      true,
+	OpMod:      true,
+	OpAddInt:   true,
+	OpSubInt:   true,
+	OpMulInt:   true,
+	OpModInt:   true,
+	OpAddFloat: true,
+	OpSubFloat: true,
+	OpMulFloat: true,
+	OpNegInt:   true,
 }
 
 var opSourceFeedbackPolicies = [...]OpSourceFeedbackPolicy{

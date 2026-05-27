@@ -620,6 +620,24 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s source-feedback policy should be driven by OpSpec", tc.op)
 		}
 	}
+	for _, op := range []Op{OpPhi, OpAdd, OpMod, OpAddInt, OpAddFloat, OpMulFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.ExactDivComponent || !isExactDivComponentOp(&Instr{Op: op}, nil) {
+			t.Fatalf("%s exact-div component contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstInt, OpPhi, OpAdd, OpNegInt, OpAddFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.IntNarrowCandidate {
+			t.Fatalf("%s int narrowing candidate contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpPhi, OpAdd, OpAddInt, OpAddFloat, OpNegInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.IntNarrowAllArgsConstraint {
+			t.Fatalf("%s int narrowing constraint contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {
