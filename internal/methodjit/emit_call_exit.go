@@ -374,28 +374,29 @@ func (ec *emitContext) supportsIndexedGlobalGetProtocol() bool {
 }
 
 func (ec *emitContext) supportsIndexedGlobalSetProtocol(instr *Instr) bool {
-	// INTENTIONALLY DISABLED (not a stub): SetGlobal is routed through the
-	// op-exit path, which calls VM.SetGlobal. Do NOT flip this to true without
-	// addressing the two correctness hazards that caused it to be disabled
-	// (see commit 969342cb) — both stem from the native store writing only the
-	// indexed globalArray through a cached base pointer:
-	//
-	//  A. Dual-storage divergence: VM keeps globals in both globalArray and the
-	//     legacy `globals` map; VM.SetGlobal writes both, the native indexed
-	//     store writes only globalArray, and the map is reconciled only after
-	//     CallJIT returns. An in-run consumer that reads the `globals` map sees
-	//     a stale value.
-	//  B. Reallocation lost-write: defining a NEW global mid-run can append/
-	//     realloc globalArray (bumping globalVer); a native store through the
-	//     captured (now-dead) base pointer is silently lost, and the globalVer
-	//     guard is only re-checked on op-exit, which the all-fast-path run never
-	//     hits. <main> (a global reducer) is the worst case for both.
-	//
-	// GET is safe because a read has no side effect to lose and a stale read is
-	// corrected by the version guard on re-entry. Re-enabling SET safely needs a
-	// stable (non-reallocating) backing array or a compile-time "no new globals
-	// after Tier 2 entry" precondition, plus an audit that no in-run consumer
-	// reads the `globals` map directly.
+	// INTENTIONALLY DISABLED (deliberate decision, not a dead stub). SetGlobal is
+	// routed through the op-exit path (VM.SetGlobal). An attempt to enable the
+	// native indexed-store fast path was investigated and rejected: the
+	// setglobal_crosstier_test.go safety net (which compares interpreter vs Tier 2
+	// global state) empirically proves it is unsafe. Three distinct hazards:
+	//   A. Dual-storage divergence (globalArray vs legacy globals map). Largely
+	//      mitigated: in noGlobalLock mode — the only mode the fast path is
+	//      eligible in — the interpreter's OpGetGlobal reads globalArray, and the
+	//      map is reconciled post-call by SyncTier2GlobalMap. (Mid-run readers via
+	//      vm.globalValue would also need to prefer the array.)
+	//   B. Reallocation lost-write. Mitigated: emitIndexedGlobalAddress re-checks
+	//      the live globalVer on every access and falls back to op-exit on any
+	//      bump, so a store never goes through a stale base pointer.
+	//   C. *** LIVE BLOCKER *** int/float representation divergence: the native
+	//      store writes the value's current register boxing, but Tier 2 may hold
+	//      an int accumulator in float representation, so the global is stored as
+	//      e.g. 50000.0 where the interpreter/op-exit store 50000. That is an
+	//      observable numeric-subtype difference (math.type / tostring). The
+	//      op-exit path re-boxes per IR type; the native store would need the same
+	//      re-boxing before this can be enabled.
+	// The perf upside (global writes in <main> reducers) does not justify the
+	// silent-global-corruption risk while C is open. Do NOT flip to true without
+	// fixing C and re-running setglobal_crosstier_test.go green.
 	return false
 }
 
