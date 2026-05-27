@@ -115,15 +115,9 @@ func pureNumericValue(v *Value) bool {
 	case TypeInt, TypeFloat:
 		return true
 	case TypeAny, TypeUnknown:
-		spec, ok := v.Def.Op.Spec()
-		return ok && spec.PureNumericUnknownValue
+		return isPureNumericUnknownValue(v.Def)
 	}
 	return false
-}
-
-func pureNumericInlineOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.PureNumericInline
 }
 
 func nativeEffectLoopInlineRejectReason(calleeFn *Function) string {
@@ -229,12 +223,4 @@ func calleeIsSimpleConstructor(calleeFn *Function) bool {
 		}
 	}
 	return allocCount == 1
-}
-
-func nativeEffectLoopInlineOp(op Op) bool {
-	if pureNumericInlineOp(op) {
-		return true
-	}
-	spec, ok := op.Spec()
-	return ok && spec.NativeEffectLoopInline
 }

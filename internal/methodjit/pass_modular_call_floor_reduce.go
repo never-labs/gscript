@@ -71,14 +71,6 @@ func reduceCallFloorLeavesInAdditiveTree(fn *Function, block *Block, root, divis
 	return visit(root)
 }
 
-func isModuloReducibleCallFloor(instr *Instr) bool {
-	if instr == nil || instr.Type != TypeInt {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.ModuloReducibleCallFloor
-}
-
 func insertModuloReductionAfterProducer(fn *Function, block *Block, producer *Instr, divisor *Value) (*Instr, bool) {
 	if fn == nil || block == nil || producer == nil || divisor == nil {
 		return nil, false

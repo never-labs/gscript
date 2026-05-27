@@ -621,8 +621,7 @@ func transferShapeFactInstr(facts map[int]int, instr *Instr) map[int]int {
 			facts[instr.Args[0].ID] = instr.ID
 		}
 	default:
-		spec, ok := instr.Op.Spec()
-		if ok && spec.LoadElimShapeFactKiller {
+		if loadElimShapeFactKiller(instr) {
 			clearShapeFacts(facts)
 		}
 	}
@@ -776,8 +775,7 @@ func transferFieldFactInstr(facts map[loadKey]int, instr *Instr) map[loadKey]int
 		key := loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}
 		facts[key] = instr.Args[1].ID
 	default:
-		spec, ok := instr.Op.Spec()
-		if ok && (spec.FieldFactWideKiller || spec.CallLikeFactBarrier) {
+		if loadElimFieldFactWideKiller(instr) || opIsCallLikeFactBarrier(instr.Op) {
 			clearFieldFacts(facts)
 		}
 	}

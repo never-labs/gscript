@@ -114,12 +114,90 @@ func loadElimPureCSE(instr *Instr) bool {
 	return ok && spec.LoadElimPureCSE
 }
 
+func loadElimShapeFactKiller(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimShapeFactKiller
+}
+
+func loadElimFieldFactWideKiller(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldFactWideKiller
+}
+
+func opIsCallLikeFactBarrier(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.CallLikeFactBarrier
+}
+
 func guardProvenByProducer(v *Value, guardType Type) bool {
 	if v == nil || v.Def == nil || guardType == TypeUnknown {
 		return false
 	}
 	spec, ok := v.Def.Op.Spec()
 	return ok && spec.GuardProvenResultType == guardType
+}
+
+func fixedResultType(op Op) (Type, bool) {
+	spec, ok := op.Spec()
+	return spec.FixedResultType, ok && spec.FixedResultType != TypeUnknown
+}
+
+func isModuloReducibleCallFloor(instr *Instr) bool {
+	if instr == nil || instr.Type != TypeInt {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.ModuloReducibleCallFloor
+}
+
+func isCallResultRangeGuardCandidate(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.CallResultRangeGuardCandidate
+}
+
+func opIsCallFloorSpecStableCallee(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.CallFloorSpecStableCallee
+}
+
+func opIsCallFloorSpecFieldShape(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.CallFloorSpecFieldShape
+}
+
+func opIsSpeculativeIntUseCandidate(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.SpeculativeIntUseCandidate
+}
+
+func isPureNumericUnknownValue(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.PureNumericUnknownValue
+}
+
+func pureNumericInlineOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.PureNumericInline
+}
+
+func nativeEffectLoopInlineOp(op Op) bool {
+	if pureNumericInlineOp(op) {
+		return true
+	}
+	spec, ok := op.Spec()
+	return ok && spec.NativeEffectLoopInline
 }
 
 func opCanDeriveNonNegative(instr *Instr) bool {

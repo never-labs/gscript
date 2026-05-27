@@ -500,11 +500,11 @@ func unaryTypeSpecializedOp(op Op, arg Type) (Op, Type, bool) {
 }
 
 func opSpecializedTarget(op Op) (Op, Type, bool) {
-	spec, ok := op.Spec()
-	if !ok || spec.FixedResultType == TypeUnknown {
+	typ, ok := fixedResultType(op)
+	if !ok {
 		return OpMax, TypeUnknown, false
 	}
-	return op, spec.FixedResultType, true
+	return op, typ, true
 }
 
 func isNumericType(t Type) bool {
@@ -540,8 +540,8 @@ func (ts *typeSpecializer) inferType(instr *Instr) Type {
 	if instr == nil {
 		return TypeUnknown
 	}
-	if spec, ok := instr.Op.Spec(); ok && spec.FixedResultType != TypeUnknown {
-		return spec.FixedResultType
+	if typ, ok := fixedResultType(instr.Op); ok {
+		return typ
 	}
 	if instr.Op == OpRecordArrayLoopSpecialization {
 		return TypeUnknown

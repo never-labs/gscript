@@ -76,8 +76,7 @@ func callFloorResultModuloReduced(fn *Function, instr *Instr, uses map[int]int) 
 	if fn == nil || instr == nil || uses[instr.ID] == 0 {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || !spec.ModuloReducibleCallFloor {
+	if !isModuloReducibleCallFloor(instr) {
 		return false
 	}
 	for _, block := range fn.Blocks {
@@ -97,11 +96,7 @@ func callFloorResultModuloReduced(fn *Function, instr *Instr, uses map[int]int) 
 }
 
 func callResultRangeGuardCandidate(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.CallResultRangeGuardCandidate
+	return isCallResultRangeGuardCandidate(instr)
 }
 
 func stableCallResultRange(fb vm.CallSiteFeedback) (int64, int64, bool) {
@@ -129,11 +124,7 @@ func callFloorSpeculativeNarrowRangeCandidate(instr *Instr, fb vm.CallSiteFeedba
 	if instr == nil || instr.Type != TypeInt || fb.Flags&vm.CallSiteArityPolymorphic != 0 {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return false
-	}
-	if spec.CallFloorSpecStableCallee {
+	if opIsCallFloorSpecStableCallee(instr.Op) {
 		if callFacts != nil {
 			if desc, ok := callFacts.CallABI(instr.ID); ok && desc.ReturnRep != SpecializedABIReturnNone {
 				return true
@@ -143,7 +134,7 @@ func callFloorSpeculativeNarrowRangeCandidate(instr *Instr, fb vm.CallSiteFeedba
 		_, vmOK := fb.StableCalleeVMProto()
 		return nativeOK || vmOK
 	}
-	if spec.CallFloorSpecFieldShape {
+	if opIsCallFloorSpecFieldShape(instr.Op) {
 		return tableShapes != nil && tableShapes.HasFieldPolyShapeCases(instr.ID)
 	}
 	return false
@@ -186,8 +177,7 @@ func callResultHasIntegerUse(fn *Function, valueID int) bool {
 			if user == nil {
 				continue
 			}
-			spec, ok := user.Op.Spec()
-			if !ok || !spec.SpeculativeIntUseCandidate {
+			if !opIsSpeculativeIntUseCandidate(user.Op) {
 				continue
 			}
 			for _, arg := range user.Args {
