@@ -623,6 +623,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s call-result range guard contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.Tier2LoopCall || !tier2LoopCallOp(op) {
+			t.Fatalf("%s Tier2 loop-call contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpAdd, OpSub, OpMul, OpMod, OpLt, OpLe} {
 		spec, ok := op.Spec()
 		if !ok || !spec.SpeculativeIntUseCandidate {

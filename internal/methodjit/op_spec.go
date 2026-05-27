@@ -193,6 +193,7 @@ type OpSpec struct {
 	BoolTableCountIncrementBenign    bool
 	BoolTableCountIncrement          bool
 	CallResultRangeGuardCandidate    bool
+	Tier2LoopCall                    bool
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
 	FloatRegResultBlocked            bool
@@ -606,6 +607,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
 			spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
+		}
+		if int(op) < len(opTier2LoopCallPolicies) {
+			spec.Tier2LoopCall = opTier2LoopCallPolicies[op]
 		}
 		if int(op) < len(opSpeculativeIntUseCandidatePolicies) {
 			spec.SpeculativeIntUseCandidate = opSpeculativeIntUseCandidatePolicies[op]
@@ -1865,6 +1869,12 @@ var opBoolTableCountIncrementPolicies = [...]bool{
 }
 
 var opCallResultRangeGuardCandidatePolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+}
+
+var opTier2LoopCallPolicies = [...]bool{
 	OpCall:           true,
 	OpCallFloor:      true,
 	OpFieldCallFloor: true,

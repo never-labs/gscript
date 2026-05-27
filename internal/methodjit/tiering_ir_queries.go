@@ -96,7 +96,7 @@ func irHasGetGlobal(fn *Function) bool {
 // back-edges + dominator analysis) — the same loopBlocks set the emitter
 // uses for raw-int loop mode.
 func hasCallInLoop(fn *Function) bool {
-	return hasExpensiveInLoop(fn, func(op Op) bool { return op == OpCall || op == OpCallFloor || op == OpFieldCallFloor })
+	return hasExpensiveInLoop(fn, tier2LoopCallOp)
 }
 
 // hasStaticCallInLoop is the bytecode-side prefilter for OSR. It marks PCs
@@ -132,7 +132,7 @@ func hasFieldDispatchCallInLoop(proto *vm.FuncProto) bool {
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if (instr.Op == OpCall || instr.Op == OpCallFloor || instr.Op == OpFieldCallFloor) && len(instr.Args) > 0 &&
+			if tier2LoopCallOp(instr.Op) && len(instr.Args) > 0 &&
 				callCalleeIsFieldDispatchValue(instr.Args[0]) {
 				return true
 			}
@@ -212,7 +212,7 @@ func hasNonNativeCallInLoop(fn *Function, globals map[string]*vm.FuncProto) bool
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if (instr.Op == OpCall || instr.Op == OpCallFloor || instr.Op == OpFieldCallFloor) && !tier2LoopCallIsNativeCandidate(fn, instr, globals) {
+			if tier2LoopCallOp(instr.Op) && !tier2LoopCallIsNativeCandidate(fn, instr, globals) {
 				return true
 			}
 		}
@@ -289,7 +289,7 @@ func nonNativeCallsConfinedToPrefixLoopsBeforeCallFreeHotLoop(fn *Function, glob
 						r.maxPC = instr.SourcePC
 					}
 				}
-				if instr.Op == OpCall || instr.Op == OpCallFloor || instr.Op == OpFieldCallFloor {
+				if tier2LoopCallOp(instr.Op) {
 					r.hasCall = true
 					if !tier2LoopCallIsNativeCandidate(fn, instr, globals) {
 						r.hasBlocker = true
@@ -306,6 +306,11 @@ func nonNativeCallsConfinedToPrefixLoopsBeforeCallFreeHotLoop(fn *Function, glob
 		}
 	}
 	return loopRangesHavePrefixBlockersBeforeHotCallFreeLoop(ranges)
+}
+
+func tier2LoopCallOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2LoopCall
 }
 
 func loopRangesHavePrefixBlockersBeforeHotCallFreeLoop(ranges []tier2LoopRange) bool {
