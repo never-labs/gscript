@@ -131,7 +131,7 @@ func TestOpSpecDomainFilesStayFocused(t *testing.T) {
 		switch {
 		case ok:
 		case strings.HasPrefix(name, "op_spec_policy_") && strings.HasSuffix(name, ".go"):
-			limit = 350
+			limit = 250
 		case strings.HasPrefix(name, "op_spec_query_") && strings.HasSuffix(name, ".go"):
 			limit = 250
 		case strings.HasPrefix(name, "op_spec_contract_") && strings.HasSuffix(name, "_test.go"):
