@@ -142,10 +142,16 @@ func TestOpSpecBuildOnlyOrchestratesPolicyDomains(t *testing.T) {
 		"applyOpSpecTableCallPolicies",
 		"applyOpSpecTypePolicies",
 	}
+	last := -1
 	for _, name := range required {
-		if !strings.Contains(text, name+"(") {
+		idx := strings.Index(text, name+"(")
+		if idx < 0 {
 			t.Fatalf("op_spec_build.go does not call %s", name)
 		}
+		if idx <= last {
+			t.Fatalf("op_spec_build.go calls %s out of policy-domain order", name)
+		}
+		last = idx
 	}
 }
 
