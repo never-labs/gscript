@@ -208,7 +208,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 				})(fn)
 			},
 		},
-		tier2PassModuleWith("CallReturnProjection", Tier2PhaseCallLower, analysisFacts(AnalysisFactCallABIs, AnalysisFactSpecDependencyProtos, AnalysisFactFixedShapeTables), nil, CallReturnProjectionPass),
+		tier2PassModuleWithCtx("CallReturnProjection", Tier2PhaseCallLower, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce", Tier2PhaseCallLower, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWithCtx("CallResultRangeGuard", Tier2PhaseCallLower, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
 		tier2PassModuleWith("ConstProp", Tier2PhaseCallLower, nil, nil, ConstPropPass),
@@ -241,6 +241,14 @@ func callResultRangeGuardFacts() []AnalysisFact {
 	)
 }
 
+func callReturnProjectionFacts() []AnalysisFact {
+	return analysisFacts(
+		AnalysisFactCallABIs,
+		AnalysisFactSpecDependencyProtos,
+		AnalysisFactFieldPolyShapeFacts,
+	)
+}
+
 func optsNumericGlobalValuesByName(fn *Function, opts *Tier2PipelineOpts) map[string]runtime.Value {
 	if fn == nil || fn.Proto == nil || opts == nil || len(opts.GlobalConstValues) == 0 {
 		return nil
@@ -264,7 +272,7 @@ func optsNumericGlobalValuesByName(fn *Function, opts *Tier2PipelineOpts) map[st
 
 func tier2PostRewriteModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("CallReturnProjection (post-rewrite)", Tier2PhasePostRewrite, analysisFacts(AnalysisFactCallABIs, AnalysisFactSpecDependencyProtos, AnalysisFactFixedShapeTables), nil, CallReturnProjectionPass),
+		tier2PassModuleWithCtx("CallReturnProjection (post-rewrite)", Tier2PhasePostRewrite, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce (post-rewrite)", Tier2PhasePostRewrite, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWithCtx("CallResultRangeGuard (post-rewrite)", Tier2PhasePostRewrite, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
 		tier2PassModuleWith("DCE", Tier2PhasePostRewrite, nil, nil, DCEPass),
@@ -307,7 +315,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 				return CallSiteRuntimeSpecializationExitPass(specializationGlobals)(fn)
 			},
 		},
-		tier2PassModuleWith("CallReturnProjection (final)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactCallABIs, AnalysisFactSpecDependencyProtos, AnalysisFactFixedShapeTables), nil, CallReturnProjectionPass),
+		tier2PassModuleWithCtx("CallReturnProjection (final)", Tier2PhaseFinalCall, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce (final)", Tier2PhaseFinalCall, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWithCtx("CallResultRangeGuard (final)", Tier2PhaseFinalCall, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
 		tier2PassModuleWith("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPass),

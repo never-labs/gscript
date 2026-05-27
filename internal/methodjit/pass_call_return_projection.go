@@ -5,21 +5,36 @@ package methodjit
 // gives codegen one protocol owner for fast path, fallback, and callee-exit
 // recovery instead of trying to fuse two independent instructions ad hoc.
 func CallReturnProjectionPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return callReturnProjectionPass(fn, nil, nil, nil)
+	}
+	return callReturnProjectionPass(
+		fn,
+		fn.Analysis.CallFacts(),
+		fn.Analysis.TableShapeFacts(),
+		fn.Analysis.SpeculationFacts(),
+	)
+}
+
+func CallReturnProjectionPassCtx(ctx *PassContext) (*Function, error) {
+	return callReturnProjectionPass(ctx.Func(), ctx.Call(), ctx.TableShape(), ctx.Speculation())
+}
+
+func callReturnProjectionPass(fn *Function, callFacts *CallFacts, tableShapes *TableShapeFacts, spec *SpeculationFacts) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	tableShapes := fn.Analysis.TableShapeFacts()
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {
 		for i, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpCall || uses[instr.ID] != 1 || i+1 >= len(block.Instrs) {
 				continue
 			}
-			if !callReturnProjectionCandidate(fn, instr) {
+			if !callReturnProjectionCandidate(fn, instr, callFacts, tableShapes) {
 				continue
 			}
-			if instr.HasSource && specGuardKindSuppressed(fn, instr.SourcePC, "GuardIntRange") {
+			if instr.HasSource && specGuardKindSuppressedFacts(spec, instr.SourcePC, "GuardIntRange") {
 				functionRemarks(fn).Add("CallReturnProjection", "missed", block.ID, instr.ID, instr.Op,
 					"skipped floor projection after int-range guard deopt")
 				continue
@@ -32,7 +47,7 @@ func CallReturnProjectionPass(fn *Function) (*Function, error) {
 			instr.Op = OpCallFloor
 			instr.Type = TypeInt
 			if calleeLoad := fieldShapeMethodCalleeLoad(instr); calleeLoad != nil &&
-				uses[calleeLoad.ID] == 1 && fieldShapeTypedPeerProjectionCandidate(fn, instr) {
+				uses[calleeLoad.ID] == 1 && fieldShapeTypedPeerProjectionCandidate(instr, tableShapes) {
 				if cases, _ := tableShapes.FieldPolyShapeCases(calleeLoad.ID); len(cases) > 0 {
 					tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
 				}
@@ -71,19 +86,21 @@ func fieldShapeMethodCalleeLoad(instr *Instr) *Instr {
 	return calleeLoad
 }
 
-func callReturnProjectionCandidate(fn *Function, instr *Instr) bool {
+func callReturnProjectionCandidate(fn *Function, instr *Instr, callFacts *CallFacts, tableShapes *TableShapeFacts) bool {
 	if fn == nil || instr == nil || instr.Op != OpCall {
 		return false
 	}
-	if _, ok := functionCallFacts(fn).CallABI(instr.ID); ok {
-		return true
+	if callFacts != nil {
+		if _, ok := callFacts.CallABI(instr.ID); ok {
+			return true
+		}
 	}
-	return fieldShapeTypedPeerProjectionCandidate(fn, instr)
+	return fieldShapeTypedPeerProjectionCandidate(instr, tableShapes)
 }
 
-func fieldShapeTypedPeerProjectionCandidate(fn *Function, instr *Instr) bool {
-	if fn == nil || instr == nil || (instr.Op != OpCall && instr.Op != OpCallFloor) || len(instr.Args) < 2 ||
-		instr.Args[0] == nil || instr.Args[0].Def == nil {
+func fieldShapeTypedPeerProjectionCandidate(instr *Instr, tableShapes *TableShapeFacts) bool {
+	if instr == nil || (instr.Op != OpCall && instr.Op != OpCallFloor) || len(instr.Args) < 2 ||
+		instr.Args[0] == nil || instr.Args[0].Def == nil || tableShapes == nil {
 		return false
 	}
 	calleeLoad := instr.Args[0].Def
@@ -98,7 +115,7 @@ func fieldShapeTypedPeerProjectionCandidate(fn *Function, instr *Instr) bool {
 	if callResultCountFromAux2(instr.Aux2) != 1 || nArgs < 1 || nArgs > 4 {
 		return false
 	}
-	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(calleeLoad.ID)
+	cases, _ := tableShapes.FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) < 2 {
 		return false
 	}
