@@ -30,6 +30,7 @@ var analysisFactDomain = map[AnalysisFact]factDomain{
 	// Numeric domain (NumericFacts): integer ranges and arithmetic safety.
 	AnalysisFactInt48Safe:            factDomainNumeric,
 	AnalysisFactIntRanges:            factDomainNumeric,
+	AnalysisFactProfiledIntRanges:    factDomainNumeric,
 	AnalysisFactIntNonNegative:       factDomainNumeric,
 	AnalysisFactIntModNonZeroDivisor: factDomainNumeric,
 	AnalysisFactIntModNoSignAdjust:   factDomainNumeric,
@@ -59,6 +60,8 @@ var analysisFactDomain = map[AnalysisFact]factDomain{
 	// record-array loop facts. TableArrayDataPtrs and RecordArrayLoop* maps live
 	// in this struct.
 	AnalysisFactTableArrayDataPtrs:            factDomainLoopSpec,
+	AnalysisFactTableArrayBoundsSafe:          factDomainLoopSpec,
+	AnalysisFactLoopTableArrayFacts:           factDomainLoopSpec,
 	AnalysisFactRecordArrayLoopSpecialization: factDomainLoopSpec,
 	AnalysisFactRecordArrayLoopCaches:         factDomainLoopSpec,
 

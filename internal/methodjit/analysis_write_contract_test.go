@@ -1,9 +1,6 @@
 package methodjit
 
-import (
-	"reflect"
-	"testing"
-)
+import "testing"
 
 func TestCheckModuleWriteContract_DeclaredWriteIsClean(t *testing.T) {
 	run := Tier2ModuleRun{
@@ -71,22 +68,35 @@ func TestCheckModuleWriteContract_DomainStructPrefixResolves(t *testing.T) {
 	}
 }
 
-func TestCheckModuleWriteContract_UnmodeledDomainIsReportedNotViolation(t *testing.T) {
-	// These fields have no AnalysisFact yet: writing them is a coverage gap, not a
-	// violation.
+func TestCheckModuleWriteContract_NewlyModeledDomainsAreViolationsWhenUndeclared(t *testing.T) {
 	run := Tier2ModuleRun{
 		Phase:          Tier2PhaseLoopPost,
 		ModuleName:     "TableArrayStaticBounds",
 		ChangedDomains: []string{"loopTableArrayFacts", "profiledIntRanges"},
 	}
 	report := CheckModuleWriteContract(run)
+	if len(report.Violations) != 2 {
+		t.Fatalf("expected modeled loop/profile writes to be violations, got %d: %s",
+			len(report.Violations), FormatWriteContractViolations(report.Violations))
+	}
+	if len(report.UnmodeledDomains) != 0 {
+		t.Fatalf("expected no unmodeled domains, got %v", report.UnmodeledDomains)
+	}
+}
+
+func TestCheckModuleWriteContract_UnknownDomainIsReportedNotViolation(t *testing.T) {
+	run := Tier2ModuleRun{
+		Phase:          Tier2PhaseLoopPost,
+		ModuleName:     "FuturePass",
+		ChangedDomains: []string{"futureUnmodeledFact"},
+	}
+	report := CheckModuleWriteContract(run)
 	if report.HasViolations() {
-		t.Fatalf("unmodeled fields must not be violations, got: %s",
+		t.Fatalf("unknown fields must not be violations, got: %s",
 			FormatWriteContractViolations(report.Violations))
 	}
-	want := []string{"loopTableArrayFacts", "profiledIntRanges"}
-	if !reflect.DeepEqual(report.UnmodeledDomains, want) {
-		t.Fatalf("unmodeled domains = %v, want %v", report.UnmodeledDomains, want)
+	if len(report.UnmodeledDomains) != 1 || report.UnmodeledDomains[0] != "futureUnmodeledFact" {
+		t.Fatalf("unmodeled domains = %v, want [futureUnmodeledFact]", report.UnmodeledDomains)
 	}
 }
 
@@ -101,14 +111,14 @@ func TestCheckPipelineWriteContract_AggregatesAndDedups(t *testing.T) {
 		{
 			Phase:          Tier2PhaseLoopPost,
 			ModuleName:     "B",
-			ChangedDomains: []string{"profiledIntRanges", "profiledIntRanges"}, // unmodeled, duplicate
+			ChangedDomains: []string{"futureUnmodeledFact", "futureUnmodeledFact"}, // unmodeled, duplicate
 		},
 	}
 	agg := CheckPipelineWriteContract(runs)
 	if len(agg.Violations) != 1 {
 		t.Fatalf("expected 1 aggregate violation, got %d", len(agg.Violations))
 	}
-	if !reflect.DeepEqual(agg.UnmodeledDomains, []string{"profiledIntRanges"}) {
-		t.Fatalf("unmodeled = %v, want [profiledIntRanges]", agg.UnmodeledDomains)
+	if len(agg.UnmodeledDomains) != 1 || agg.UnmodeledDomains[0] != "futureUnmodeledFact" {
+		t.Fatalf("unmodeled = %v, want [futureUnmodeledFact]", agg.UnmodeledDomains)
 	}
 }

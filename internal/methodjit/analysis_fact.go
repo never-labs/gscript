@@ -37,10 +37,13 @@ const (
 
 	AnalysisFactInt48Safe                     AnalysisFact = "Int48Safe"
 	AnalysisFactIntRanges                     AnalysisFact = "IntRanges"
+	AnalysisFactProfiledIntRanges             AnalysisFact = "ProfiledIntRanges"
 	AnalysisFactIntNonNegative                AnalysisFact = "IntNonNegative"
 	AnalysisFactIntModNonZeroDivisor          AnalysisFact = "IntModNonZeroDivisor"
 	AnalysisFactIntModNoSignAdjust            AnalysisFact = "IntModNoSignAdjust"
 	AnalysisFactTableArrayDataPtrs            AnalysisFact = "TableArrayDataPtrs"
+	AnalysisFactTableArrayBoundsSafe          AnalysisFact = "TableArrayBoundsSafe"
+	AnalysisFactLoopTableArrayFacts           AnalysisFact = "LoopTableArrayFacts"
 	AnalysisFactShapeFieldTypeElided          AnalysisFact = "ShapeFieldTypeElidedLoads"
 	AnalysisFactRecordArrayLoopSpecialization AnalysisFact = "RecordArrayLoopSpecializations"
 	AnalysisFactRecordArrayLoopCaches         AnalysisFact = "RecordArrayLoopCaches"
@@ -160,6 +163,12 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Producers:   []string{"RangeAnalysis"},
 		Consumers:   []string{"OverflowBoxing", "ModRangeSimplify", "QuadraticStepStrengthReduction", "IntAlgebraSimplify", "TableArrayStaticBounds", "codegen"},
 	},
+	AnalysisFactProfiledIntRanges: {
+		Owner:       "numeric",
+		Description: "Profile-backed integer ranges are available as guarded hints for later range analysis.",
+		Producers:   []string{"FixedShapeTableFacts", "FieldLenFold"},
+		Consumers:   []string{"RangeAnalysis", "FieldLenFold"},
+	},
 	AnalysisFactIntNonNegative: {
 		Owner:       "numeric",
 		Description: "Non-negative integer facts are available.",
@@ -182,6 +191,18 @@ var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 		Owner:       "table",
 		Description: "Table array data pointer facts are available for backend lowering.",
 		Producers:   []string{"TableArrayDataPtrFact"},
+		Consumers:   []string{"codegen"},
+	},
+	AnalysisFactTableArrayBoundsSafe: {
+		Owner:       "table",
+		Description: "Table array load/store lower and upper bounds have been proven safe.",
+		Producers:   []string{"TableArrayStaticBounds"},
+		Consumers:   []string{"LoopRegionVersioning", "codegen"},
+	},
+	AnalysisFactLoopTableArrayFacts: {
+		Owner:       "table",
+		Description: "Loop-region table-array facts are available for specialized loop lowering.",
+		Producers:   []string{"LoopRegionVersioning"},
 		Consumers:   []string{"codegen"},
 	},
 	AnalysisFactShapeFieldTypeElided: {
@@ -238,6 +259,7 @@ func fixedShapeTableFacts() []AnalysisFact {
 		AnalysisFactFieldPolyShapeFacts,
 		AnalysisFactFieldPolyShapeCatalog,
 		AnalysisFactFixedTableConstructors,
+		AnalysisFactProfiledIntRanges,
 	)
 }
 

@@ -135,10 +135,23 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 		tier2PassModuleWith("QuadraticStepStrengthReduction", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, QuadraticStepStrengthReductionPass),
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 		tier2PassModuleWithCtx("IntAlgebraSimplify", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, IntAlgebraSimplifyPassCtx),
-		tier2PassModuleWith("TableArrayStaticBounds (post-RangeAnalysis)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
+		tier2PassModuleWithCtxUpdates("TableArrayStaticBounds (post-RangeAnalysis)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), analysisFacts(AnalysisFactTableArrayBoundsSafe), func(ctx *PassContext) (*Function, error) {
+			return TableArrayStaticBoundsPass(ctx.Func())
+		}),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
-		tier2PassModuleWith("LoopRegionVersioning", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), nil, LoopRegionVersioningPass),
-		tier2PassModuleWith("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), nil, TableArrayStaticBoundsPass),
+		{
+			Name:     "LoopRegionVersioning",
+			Phase:    Tier2PhaseLoopPost,
+			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization),
+			Provides: analysisFacts(AnalysisFactLoopTableArrayFacts),
+			Updates:  analysisFacts(AnalysisFactTableArrayBoundsSafe),
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
+				return LoopRegionVersioningPass(fn)
+			},
+		},
+		tier2PassModuleWithCtxUpdates("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), analysisFacts(AnalysisFactTableArrayBoundsSafe), func(ctx *PassContext) (*Function, error) {
+			return TableArrayStaticBoundsPass(ctx.Func())
+		}),
 		tier2PassModuleWith("ScalarPromotion", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), nil, ScalarPromotionPass),
 		tier2PassModuleWithCtx("TableArrayDataPtrFact", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactTableArrayDataPtrs), TableArrayDataPtrFactPassCtx),
 	}

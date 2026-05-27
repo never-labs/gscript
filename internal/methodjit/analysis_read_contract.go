@@ -164,9 +164,6 @@ var knownReadContractHints = map[string]bool{
 	"CallResultRangeGuard (final)\x00global":        true,
 	"CallResultRangeGuard (post-rewrite)\x00global": true,
 	"EscapeAnalysis\x00global":                      true,
-	"FieldLenFold\x00numeric":                       true,
-	"FixedShapeTableFacts\x00numeric":               true,
-	"FixedShapeTableFacts (pre-inline)\x00numeric":  true,
 	"LICM\x00global":                                true,
 	"LICM (post-MatrixRowPtrFactoring)\x00global":   true,
 }
