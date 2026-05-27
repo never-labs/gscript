@@ -286,6 +286,46 @@ func TestGlobalConstAndNestedCallContractsLiveInOpSpec(t *testing.T) {
 	}
 }
 
+func TestLoadElimContractsLiveInOpSpec(t *testing.T) {
+	constOps := []Op{OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString}
+	for _, op := range constOps {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.LoadElimConstCSE || !loadElimConstCSE(&Instr{Op: op}) {
+			t.Fatalf("%s const CSE contract should be driven by OpSpec", op)
+		}
+	}
+
+	pureOps := []Op{OpAddInt, OpDivIntExact, OpNumToFloat, OpSqrt, OpModZeroInt, OpTableShapeID}
+	for _, op := range pureOps {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.LoadElimPureCSE || !loadElimPureCSE(&Instr{Op: op}) {
+			t.Fatalf("%s pure CSE contract should be driven by OpSpec", op)
+		}
+	}
+
+	killers := []Op{OpSetField, OpSetTable, OpTableArrayStore, OpAppend, OpCall, OpResume, OpSelf}
+	for _, op := range killers {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.LoadElimShapeFactKiller {
+			t.Fatalf("%s should kill load-elim shape facts by OpSpec", op)
+		}
+		facts := map[int]int{1: 2}
+		out := transferShapeFactInstr(facts, &Instr{Op: op, ID: 3})
+		if len(out) != 0 {
+			t.Fatalf("%s should clear shape facts through OpSpec, got %v", op, out)
+		}
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}

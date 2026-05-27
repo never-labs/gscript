@@ -124,8 +124,8 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 		tableAvail := make(map[tableKey]int)
 
 		for _, instr := range block.Instrs {
-			switch instr.Op {
-			case OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString:
+			handled := false
+			if loadElimConstCSE(instr) {
 				key := constCSEKey{op: instr.Op, typ: instr.Type, aux: instr.Aux, aux2: instr.Aux2}
 				if origID, ok := constAvail[key]; ok {
 					if origInstr := instrByID[origID]; origInstr != nil {
@@ -141,12 +141,9 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				} else {
 					constAvail[key] = instr.ID
 				}
-
-			case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt,
-				OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-				OpNumToFloat, OpSqrt, OpFloor, OpFMA, OpFMSUB,
-				OpEqInt, OpLtInt, OpLeInt, OpModZeroInt, OpLtFloat, OpLeFloat, OpEqString,
-				OpTableShapeID:
+				handled = true
+			}
+			if !handled && loadElimPureCSE(instr) {
 				if instr.Op == OpNumToFloat && redundantNumToFloatArg(instr) {
 					replaceAllUses(fn, instr.ID, instr.Args[0].Def)
 					instr.Op = OpNop
@@ -156,9 +153,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 					instr.Type = TypeUnknown
 					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, OpNumToFloat,
 						"removed numeric-to-float conversion of statically-float value")
-					continue
-				}
-				if key, ok := pureTypedCSEKey(instr); ok {
+				} else if key, ok := pureTypedCSEKey(instr); ok {
 					if origID, ok := pureAvail[key]; ok {
 						origInstr := instrByID[origID]
 						if origInstr != nil {
@@ -170,334 +165,339 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 						pureAvail[key] = instr.ID
 					}
 				}
+				handled = true
+			}
 
-			case OpGetGlobal:
-				// R53: globals are read-only for the body of a function in
-				// nearly all GScript code. Two reads of globals[i] in the
-				// same block return the same runtime pointer. CSE.
-				if origID, ok := globalAvail[instr.Aux]; ok {
-					origInstr := instrByID[origID]
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier GetGlobal result")
-				} else {
-					globalAvail[instr.Aux] = instr.ID
-				}
-
-			case OpMatrixFlat:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				if origID, ok := matrixFlatAvail[instr.Args[0].ID]; ok {
-					origInstr := instrByID[origID]
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier MatrixFlat result")
-				} else {
-					matrixFlatAvail[instr.Args[0].ID] = instr.ID
-				}
-
-			case OpMatrixStride:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				if origID, ok := matrixStrideAvail[instr.Args[0].ID]; ok {
-					origInstr := instrByID[origID]
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier MatrixStride result")
-				} else {
-					matrixStrideAvail[instr.Args[0].ID] = instr.ID
-				}
-
-			case OpTableArrayHeader:
-				if orig := tableArrayFacts.LookupHeader(instr); orig != nil {
-					origInstr := orig.Def
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier TableArrayHeader result")
-				} else {
-					tableArrayFacts.RecordHeader(instr)
-				}
-
-			case OpTableArrayLen:
-				if orig := tableArrayFacts.LookupLen(instr); orig != nil {
-					origInstr := orig.Def
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier TableArrayLen result")
-				} else {
-					tableArrayFacts.RecordLen(instr)
-				}
-
-			case OpTableArrayData:
-				if orig := tableArrayFacts.LookupData(instr); orig != nil {
-					origInstr := orig.Def
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier TableArrayData result")
-				} else {
-					tableArrayFacts.RecordData(instr)
-				}
-
-			case OpSetGlobal:
-				// SetGlobal on globals[i] kills the matching cache entry.
-				if _, ok := globalAvail[instr.Aux]; ok {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"SetGlobal invalidated cached global value")
-				}
-				delete(globalAvail, instr.Aux)
-				for key := range globalConstGuardAvail {
-					if key.constIdx == instr.Aux {
-						delete(globalConstGuardAvail, key)
-					}
-				}
-
-			case OpGetField:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				key := loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}
-				if origID, ok := available[key]; ok {
-					// Redundant load — replace all uses of this GetField
-					// with the original one.
-					origInstr := instrByID[origID]
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier GetField result")
-				} else {
-					available[key] = instr.ID
-				}
-
-			case OpGuardType:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				if guardProvenByProducer(instr.Args[0], Type(instr.Aux)) {
-					if def := instr.Args[0].Def; def != nil {
-						replaceAllUses(fn, instr.ID, def)
-						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"guard proven by producer type")
-					}
-					instr.Op = OpNop
-					instr.Args = nil
-					instr.Aux = 0
-					continue
-				}
-				key := guardKey{argID: instr.Args[0].ID, guardType: instr.Aux}
-				if origID, ok := guardAvail[key]; ok {
-					// Redundant guard — replace all uses with the original.
-					origInstr := instrByID[origID]
-					replaceAllUses(fn, instr.ID, origInstr)
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"reused earlier GuardType result")
-					// Guards are side-effecting so DCE won't remove them.
-					// Convert to Nop to make the redundant guard dead.
-					instr.Op = OpNop
-					instr.Args = nil
-					instr.Aux = 0
-				} else {
-					guardAvail[key] = instr.ID
-				}
-
-			case OpGuardGlobalConst:
-				key := globalConstGuardKey{constIdx: instr.Aux, value: instr.Aux2}
-				if globalConstGuardAvail[key] {
-					instr.Op = OpNop
-					instr.Args = nil
-					instr.Aux = 0
-					instr.Aux2 = 0
-					instr.Type = TypeUnknown
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, OpGuardGlobalConst,
-						"removed redundant global const guard")
-				} else {
-					globalConstGuardAvail[key] = true
-				}
-
-			case OpSetField:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				// Kill the specific (obj, field) entry, then record stored value.
-				key := loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}
-				if _, ok := available[key]; ok {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"SetField invalidated earlier field load")
-				}
-				delete(available, key)
-				// Store-to-load forwarding: a subsequent GetField on the same
-				// (obj, field) can reuse the stored value directly.
-				if len(instr.Args) >= 2 {
-					available[key] = instr.Args[1].ID
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"recorded SetField value for forwarding")
-				}
-
-			case OpGetUpval:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				key := upvalueKey{closureID: instr.Args[0].ID, upval: instr.Aux}
-				if origID, ok := upvalAvail[key]; ok {
-					if origInstr := instrByID[origID]; origInstr != nil {
+			if !handled {
+				switch instr.Op {
+				case OpGetGlobal:
+					// R53: globals are read-only for the body of a function in
+					// nearly all GScript code. Two reads of globals[i] in the
+					// same block return the same runtime pointer. CSE.
+					if origID, ok := globalAvail[instr.Aux]; ok {
+						origInstr := instrByID[origID]
 						replaceAllUses(fn, instr.ID, origInstr)
 						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"reused earlier GetUpval result")
+							"reused earlier GetGlobal result")
+					} else {
+						globalAvail[instr.Aux] = instr.ID
 					}
-				} else {
-					upvalAvail[key] = instr.ID
-				}
 
-			case OpSetUpval:
-				if len(instr.Args) < 2 {
-					upvalAvail = make(map[upvalueKey]int)
-					continue
-				}
-				key := upvalueKey{closureID: instr.Args[1].ID, upval: instr.Aux}
-				delete(upvalAvail, key)
-				upvalAvail[key] = instr.Args[0].ID
-				functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-					"recorded SetUpval value for forwarding")
-
-			case OpGetTable:
-				// R93: forward stored value if same (tbl, key) was just set.
-				if len(instr.Args) < 2 {
-					continue
-				}
-				key := tableKey{objID: instr.Args[0].ID, keyID: instr.Args[1].ID}
-				if origID, ok := tableAvail[key]; ok {
-					origInstr := instrByID[origID]
-					if origInstr != nil {
+				case OpMatrixFlat:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					if origID, ok := matrixFlatAvail[instr.Args[0].ID]; ok {
+						origInstr := instrByID[origID]
 						replaceAllUses(fn, instr.ID, origInstr)
 						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"forwarded value from earlier SetTable")
+							"reused earlier MatrixFlat result")
+					} else {
+						matrixFlatAvail[instr.Args[0].ID] = instr.ID
 					}
-				}
-				// R94 (reverted): don't populate with GetTable's own result.
-				// It increased register pressure by extending SSA value
-				// lifetimes in boolean-table loops.
 
-			case OpSetTable:
-				if len(instr.Args) < 3 {
-					continue
-				}
-				// Any SetTable on t invalidates ALL entries for that obj at
-				// non-matching keys (aliasing unknown). Keep only the
-				// just-written entry.
-				objID := instr.Args[0].ID
-				for k := range tableAvail {
-					if k.objID == objID {
-						delete(tableAvail, k)
+				case OpMatrixStride:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					if origID, ok := matrixStrideAvail[instr.Args[0].ID]; ok {
+						origInstr := instrByID[origID]
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier MatrixStride result")
+					} else {
+						matrixStrideAvail[instr.Args[0].ID] = instr.ID
+					}
+
+				case OpTableArrayHeader:
+					if orig := tableArrayFacts.LookupHeader(instr); orig != nil {
+						origInstr := orig.Def
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier TableArrayHeader result")
+					} else {
+						tableArrayFacts.RecordHeader(instr)
+					}
+
+				case OpTableArrayLen:
+					if orig := tableArrayFacts.LookupLen(instr); orig != nil {
+						origInstr := orig.Def
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier TableArrayLen result")
+					} else {
+						tableArrayFacts.RecordLen(instr)
+					}
+
+				case OpTableArrayData:
+					if orig := tableArrayFacts.LookupData(instr); orig != nil {
+						origInstr := orig.Def
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier TableArrayData result")
+					} else {
+						tableArrayFacts.RecordData(instr)
+					}
+
+				case OpSetGlobal:
+					// SetGlobal on globals[i] kills the matching cache entry.
+					if _, ok := globalAvail[instr.Aux]; ok {
 						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"SetTable invalidated dynamic-key table cache")
+							"SetGlobal invalidated cached global value")
 					}
-				}
-				// Record the stored value for future GetTable(t, k).
-				key := tableKey{objID: objID, keyID: instr.Args[1].ID}
-				tableAvail[key] = instr.Args[2].ID
-				functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-					"recorded SetTable value for forwarding")
-				if tableArrayFacts.InvalidateTable(objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"table mutation invalidated typed array facts")
-				}
+					delete(globalAvail, instr.Aux)
+					for key := range globalConstGuardAvail {
+						if key.constIdx == instr.Aux {
+							delete(globalConstGuardAvail, key)
+						}
+					}
 
-			case OpTableArrayStore:
-				if len(instr.Args) < 5 || instr.Args[0] == nil || instr.Args[3] == nil {
-					continue
-				}
-				objID := instr.Args[0].ID
-				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"typed array store invalidated dynamic-key table cache")
-				}
-				tableAvail[tableKey{objID: objID, keyID: instr.Args[3].ID}] = instr.Args[4].ID
-				functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-					"recorded typed array store value for forwarding")
+				case OpGetField:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					key := loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}
+					if origID, ok := available[key]; ok {
+						// Redundant load — replace all uses of this GetField
+						// with the original one.
+						origInstr := instrByID[origID]
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier GetField result")
+					} else {
+						available[key] = instr.ID
+					}
 
-			case OpTableArraySwap:
-				if len(instr.Args) < 1 || instr.Args[0] == nil {
-					continue
-				}
-				objID := instr.Args[0].ID
-				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"typed array swap invalidated dynamic-key table cache")
-				}
+				case OpGuardType:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					if guardProvenByProducer(instr.Args[0], Type(instr.Aux)) {
+						if def := instr.Args[0].Def; def != nil {
+							replaceAllUses(fn, instr.ID, def)
+							functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+								"guard proven by producer type")
+						}
+						instr.Op = OpNop
+						instr.Args = nil
+						instr.Aux = 0
+						continue
+					}
+					key := guardKey{argID: instr.Args[0].ID, guardType: instr.Aux}
+					if origID, ok := guardAvail[key]; ok {
+						// Redundant guard — replace all uses with the original.
+						origInstr := instrByID[origID]
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier GuardType result")
+						// Guards are side-effecting so DCE won't remove them.
+						// Convert to Nop to make the redundant guard dead.
+						instr.Op = OpNop
+						instr.Args = nil
+						instr.Aux = 0
+					} else {
+						guardAvail[key] = instr.ID
+					}
 
-			case OpTableArraySwapPairs:
-				if len(instr.Args) < 1 || instr.Args[0] == nil {
-					continue
-				}
-				objID := instr.Args[0].ID
-				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"typed array pair-swap specialization invalidated dynamic-key table cache")
-				}
-				if tableArrayFacts.InvalidateTable(objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"typed array pair-swap specialization invalidated typed array facts")
-				}
+				case OpGuardGlobalConst:
+					key := globalConstGuardKey{constIdx: instr.Aux, value: instr.Aux2}
+					if globalConstGuardAvail[key] {
+						instr.Op = OpNop
+						instr.Args = nil
+						instr.Aux = 0
+						instr.Aux2 = 0
+						instr.Type = TypeUnknown
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, OpGuardGlobalConst,
+							"removed redundant global const guard")
+					} else {
+						globalConstGuardAvail[key] = true
+					}
 
-			case OpTableIntArrayReversePrefix:
-				if len(instr.Args) < 1 || instr.Args[0] == nil {
-					continue
-				}
-				objID := instr.Args[0].ID
-				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array prefix specialization invalidated dynamic-key table cache")
-				}
-				if tableArrayFacts.InvalidateTable(objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array prefix specialization invalidated typed array facts")
-				}
+				case OpSetField:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					// Kill the specific (obj, field) entry, then record stored value.
+					key := loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}
+					if _, ok := available[key]; ok {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"SetField invalidated earlier field load")
+					}
+					delete(available, key)
+					// Store-to-load forwarding: a subsequent GetField on the same
+					// (obj, field) can reuse the stored value directly.
+					if len(instr.Args) >= 2 {
+						available[key] = instr.Args[1].ID
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"recorded SetField value for forwarding")
+					}
 
-			case OpTableIntArrayCopyPrefix:
-				if len(instr.Args) < 1 || instr.Args[0] == nil {
-					continue
-				}
-				objID := instr.Args[0].ID
-				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array copy specialization invalidated dynamic-key table cache")
-				}
-				if tableArrayFacts.InvalidateTable(objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"int-array copy specialization invalidated typed array facts")
-				}
+				case OpGetUpval:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					key := upvalueKey{closureID: instr.Args[0].ID, upval: instr.Aux}
+					if origID, ok := upvalAvail[key]; ok {
+						if origInstr := instrByID[origID]; origInstr != nil {
+							replaceAllUses(fn, instr.ID, origInstr)
+							functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+								"reused earlier GetUpval result")
+						}
+					} else {
+						upvalAvail[key] = instr.ID
+					}
 
-			case OpAppend, OpSetList:
-				if len(instr.Args) < 1 {
-					continue
-				}
-				objID := instr.Args[0].ID
-				if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"array mutation invalidated dynamic-key table cache")
-				}
-				if tableArrayFacts.InvalidateTable(objID) {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"array mutation invalidated typed array facts")
-				}
+				case OpSetUpval:
+					if len(instr.Args) < 2 {
+						upvalAvail = make(map[upvalueKey]int)
+						continue
+					}
+					key := upvalueKey{closureID: instr.Args[1].ID, upval: instr.Aux}
+					delete(upvalAvail, key)
+					upvalAvail[key] = instr.Args[0].ID
+					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+						"recorded SetUpval value for forwarding")
 
-			case OpCall, OpResume, OpSelf:
-				// Conservative: a call could mutate any table or change types.
-				if len(available) > 0 || len(guardAvail) > 0 || len(globalConstGuardAvail) > 0 || len(globalAvail) > 0 || len(upvalAvail) > 0 ||
-					len(matrixFlatAvail) > 0 || len(matrixStrideAvail) > 0 || len(tableAvail) > 0 ||
-					!tableArrayFacts.Empty() {
-					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-						"call invalidated available load/guard facts")
+				case OpGetTable:
+					// R93: forward stored value if same (tbl, key) was just set.
+					if len(instr.Args) < 2 {
+						continue
+					}
+					key := tableKey{objID: instr.Args[0].ID, keyID: instr.Args[1].ID}
+					if origID, ok := tableAvail[key]; ok {
+						origInstr := instrByID[origID]
+						if origInstr != nil {
+							replaceAllUses(fn, instr.ID, origInstr)
+							functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+								"forwarded value from earlier SetTable")
+						}
+					}
+					// R94 (reverted): don't populate with GetTable's own result.
+					// It increased register pressure by extending SSA value
+					// lifetimes in boolean-table loops.
+
+				case OpSetTable:
+					if len(instr.Args) < 3 {
+						continue
+					}
+					// Any SetTable on t invalidates ALL entries for that obj at
+					// non-matching keys (aliasing unknown). Keep only the
+					// just-written entry.
+					objID := instr.Args[0].ID
+					for k := range tableAvail {
+						if k.objID == objID {
+							delete(tableAvail, k)
+							functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+								"SetTable invalidated dynamic-key table cache")
+						}
+					}
+					// Record the stored value for future GetTable(t, k).
+					key := tableKey{objID: objID, keyID: instr.Args[1].ID}
+					tableAvail[key] = instr.Args[2].ID
+					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+						"recorded SetTable value for forwarding")
+					if tableArrayFacts.InvalidateTable(objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"table mutation invalidated typed array facts")
+					}
+
+				case OpTableArrayStore:
+					if len(instr.Args) < 5 || instr.Args[0] == nil || instr.Args[3] == nil {
+						continue
+					}
+					objID := instr.Args[0].ID
+					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"typed array store invalidated dynamic-key table cache")
+					}
+					tableAvail[tableKey{objID: objID, keyID: instr.Args[3].ID}] = instr.Args[4].ID
+					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+						"recorded typed array store value for forwarding")
+
+				case OpTableArraySwap:
+					if len(instr.Args) < 1 || instr.Args[0] == nil {
+						continue
+					}
+					objID := instr.Args[0].ID
+					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"typed array swap invalidated dynamic-key table cache")
+					}
+
+				case OpTableArraySwapPairs:
+					if len(instr.Args) < 1 || instr.Args[0] == nil {
+						continue
+					}
+					objID := instr.Args[0].ID
+					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"typed array pair-swap specialization invalidated dynamic-key table cache")
+					}
+					if tableArrayFacts.InvalidateTable(objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"typed array pair-swap specialization invalidated typed array facts")
+					}
+
+				case OpTableIntArrayReversePrefix:
+					if len(instr.Args) < 1 || instr.Args[0] == nil {
+						continue
+					}
+					objID := instr.Args[0].ID
+					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"int-array prefix specialization invalidated dynamic-key table cache")
+					}
+					if tableArrayFacts.InvalidateTable(objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"int-array prefix specialization invalidated typed array facts")
+					}
+
+				case OpTableIntArrayCopyPrefix:
+					if len(instr.Args) < 1 || instr.Args[0] == nil {
+						continue
+					}
+					objID := instr.Args[0].ID
+					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"int-array copy specialization invalidated dynamic-key table cache")
+					}
+					if tableArrayFacts.InvalidateTable(objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"int-array copy specialization invalidated typed array facts")
+					}
+
+				case OpAppend, OpSetList:
+					if len(instr.Args) < 1 {
+						continue
+					}
+					objID := instr.Args[0].ID
+					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"array mutation invalidated dynamic-key table cache")
+					}
+					if tableArrayFacts.InvalidateTable(objID) {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"array mutation invalidated typed array facts")
+					}
+
+				case OpCall, OpResume, OpSelf:
+					// Conservative: a call could mutate any table or change types.
+					if len(available) > 0 || len(guardAvail) > 0 || len(globalConstGuardAvail) > 0 || len(globalAvail) > 0 || len(upvalAvail) > 0 ||
+						len(matrixFlatAvail) > 0 || len(matrixStrideAvail) > 0 || len(tableAvail) > 0 ||
+						!tableArrayFacts.Empty() {
+						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+							"call invalidated available load/guard facts")
+					}
+					available = make(map[loadKey]int)
+					guardAvail = make(map[guardKey]int)
+					globalConstGuardAvail = make(map[globalConstGuardKey]bool)
+					globalAvail = make(map[int64]int)
+					upvalAvail = make(map[upvalueKey]int)
+					matrixFlatAvail = make(map[int]int)
+					matrixStrideAvail = make(map[int]int)
+					tableArrayFacts.Reset()
+					tableAvail = make(map[tableKey]int)
 				}
-				available = make(map[loadKey]int)
-				guardAvail = make(map[guardKey]int)
-				globalConstGuardAvail = make(map[globalConstGuardKey]bool)
-				globalAvail = make(map[int64]int)
-				upvalAvail = make(map[upvalueKey]int)
-				matrixFlatAvail = make(map[int]int)
-				matrixStrideAvail = make(map[int]int)
-				tableArrayFacts.Reset()
-				tableAvail = make(map[tableKey]int)
 			}
 
 			if loadElimKillsPureCSE(instr) {
@@ -620,10 +620,11 @@ func transferShapeFactInstr(facts map[int]int, instr *Instr) map[int]int {
 		if _, ok := facts[instr.Args[0].ID]; !ok {
 			facts[instr.Args[0].ID] = instr.ID
 		}
-	case OpSetField, OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix,
-		OpAppend, OpSetList, OpCall, OpResume, OpSelf:
-		clearShapeFacts(facts)
+	default:
+		spec, ok := instr.Op.Spec()
+		if ok && spec.LoadElimShapeFactKiller {
+			clearShapeFacts(facts)
+		}
 	}
 	return facts
 }
@@ -883,6 +884,22 @@ func pureTypedCSEKey(instr *Instr) (pureCSEKey, bool) {
 		key.args[i] = arg.ID
 	}
 	return key, true
+}
+
+func loadElimConstCSE(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimConstCSE
+}
+
+func loadElimPureCSE(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimPureCSE
 }
 
 func loadElimKillsPureCSE(instr *Instr) bool {
