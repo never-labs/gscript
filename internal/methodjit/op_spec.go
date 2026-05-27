@@ -186,6 +186,7 @@ type OpSpec struct {
 	TableArrayRegionAliasingCall     bool
 	TableArrayRegionAliasingAlways   bool
 	TableArrayRegionTableMutation    bool
+	TableMetatableMutationBarrier    bool
 	RuntimeOverflowBoxable           bool
 	RuntimeGuardRefreshable          bool
 	NativeNumericValueProducer       bool
@@ -568,6 +569,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opTableArrayRegionTableMutationPolicies) {
 			spec.TableArrayRegionTableMutation = opTableArrayRegionTableMutationPolicies[op]
+		}
+		if int(op) < len(opTableMetatableMutationBarrierPolicies) {
+			spec.TableMetatableMutationBarrier = opTableMetatableMutationBarrierPolicies[op]
 		}
 		if int(op) < len(opRuntimeOverflowBoxablePolicies) {
 			spec.RuntimeOverflowBoxable = opRuntimeOverflowBoxablePolicies[op]
@@ -1750,6 +1754,27 @@ var opTableArrayRegionTableMutationPolicies = [...]bool{
 	OpAppend:             true,
 	OpSetList:            true,
 	OpTableBoolArrayFill: true,
+}
+
+var opTableMetatableMutationBarrierPolicies = [...]bool{
+	OpCall:      true,
+	OpSelf:      true,
+	OpSetGlobal: true,
+	OpSetUpval:  true,
+	OpAppend:    true,
+	OpSetList:   true,
+	OpConcat:    true,
+	OpPow:       true,
+	OpClosure:   true,
+	OpClose:     true,
+	OpTForCall:  true,
+	OpTForLoop:  true,
+	OpVararg:    true,
+	OpTestSet:   true,
+	OpGo:        true,
+	OpMakeChan:  true,
+	OpSend:      true,
+	OpRecv:      true,
 }
 
 var opRuntimeOverflowBoxablePolicies = [...]bool{

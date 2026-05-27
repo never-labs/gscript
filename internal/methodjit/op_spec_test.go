@@ -572,6 +572,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s table-array region global barrier should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCall, OpSelf, OpSetGlobal, OpSetUpval, OpAppend, OpSetList, OpConcat, OpPow, OpClosure, OpClose, OpTForCall, OpTForLoop, OpVararg, OpTestSet, OpGo, OpMakeChan, OpSend, OpRecv} {
+		spec, ok := op.Spec()
+		if !ok || !spec.TableMetatableMutationBarrier {
+			t.Fatalf("%s table-metatable mutation barrier should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpAddInt, OpSubInt, OpMulInt, OpNegInt} {
 		spec, ok := op.Spec()
 		if !ok || !spec.RuntimeOverflowBoxable || !tier2IntOverflowOpCanBox(op.String()) {

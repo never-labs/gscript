@@ -99,15 +99,11 @@ func floorPhiValueType(v *Value) Type {
 	if v == nil || v.Def == nil {
 		return TypeUnknown
 	}
-	switch v.Def.Op {
-	case OpConstInt, OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt, OpFloor, OpGuardIntRange:
-		return TypeInt
-	case OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpNumToFloat, OpSqrt, OpFMA, OpFMSUB:
-		return TypeFloat
-	default:
-		if v.Def.Type != TypeUnknown && v.Def.Type != TypeAny {
-			return v.Def.Type
-		}
-		return TypeUnknown
+	if spec, ok := v.Def.Op.Spec(); ok && spec.FixedResultType != TypeUnknown {
+		return spec.FixedResultType
 	}
+	if v.Def.Type != TypeUnknown && v.Def.Type != TypeAny {
+		return v.Def.Type
+	}
+	return TypeUnknown
 }

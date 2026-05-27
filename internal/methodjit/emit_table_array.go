@@ -190,10 +190,7 @@ func functionHasNoTableMetatableMutationSurface(fn *Function) bool {
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			switch instr.Op {
-			case OpCall, OpSelf, OpSetGlobal, OpSetUpval, OpAppend, OpSetList,
-				OpConcat, OpPow, OpClosure, OpClose, OpTForCall, OpTForLoop,
-				OpVararg, OpTestSet, OpGo, OpMakeChan, OpSend, OpRecv:
+			if spec, ok := instr.Op.Spec(); ok && spec.TableMetatableMutationBarrier {
 				return false
 			}
 		}
