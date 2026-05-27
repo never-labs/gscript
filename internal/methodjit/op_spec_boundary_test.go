@@ -88,6 +88,7 @@ func TestOpSpecAggregateFilesStayThin(t *testing.T) {
 		"op_spec.go",
 		"op_spec_policies.go",
 		"op_spec_policy_type.go",
+		"op_spec_policy_value.go",
 		"op_spec_types.go",
 		"op_spec_queries.go",
 		"op_spec_query_traits.go",
@@ -210,6 +211,7 @@ func TestOpSpecPolicyApplyEntrypointsOnlyOrchestrateSubdomains(t *testing.T) {
 		{"op_spec_policy_numeric_apply.go", "applyOpSpecNumericPolicies"},
 		{"op_spec_policy_table_call_apply.go", "applyOpSpecTableCallPolicies"},
 		{"op_spec_policy_type_apply.go", "applyOpSpecTypePolicies"},
+		{"op_spec_policy_value_apply.go", "applyOpSpecValuePolicies"},
 	}
 	for _, tc := range cases {
 		hasPolicyIndex, err := funcHasPolicyTableIndex(filepath.Join(dir, tc.file), tc.fn)
