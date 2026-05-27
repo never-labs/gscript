@@ -45,6 +45,21 @@ import (
 // pre-header. Safe to call on functions without loops (no-op). Returns
 // a wrapping error if the IR fails validation after the transform.
 func LICMPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return licmPass(fn, nil)
+	}
+	return licmPass(fn, fn.Analysis.GlobalFacts().GlobalsMap())
+}
+
+func LICMPassCtx(ctx *PassContext) (*Function, error) {
+	globals := map[string]*vm.FuncProto(nil)
+	if globalFacts := ctx.Global(); globalFacts != nil {
+		globals = globalFacts.GlobalsMap()
+	}
+	return licmPass(ctx.Func(), globals)
+}
+
+func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -93,7 +108,7 @@ func LICMPass(fn *Function) (*Function, error) {
 			// blocks). Skip defensively.
 			continue
 		}
-		hoistOneLoop(fn, li, hdr)
+		hoistOneLoop(fn, li, hdr, seededGlobals)
 	}
 
 	if errs := Validate(fn); len(errs) > 0 {
@@ -129,7 +144,7 @@ func loopDepths(li *loopInfo) map[int]int {
 
 // hoistOneLoop performs LICM for a single loop identified by its header.
 // Assumes li reflects the current state of fn.
-func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
+func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[string]*vm.FuncProto) {
 	bodyBlocks := li.headerBlocks[hdr.ID]
 	if bodyBlocks == nil {
 		return
@@ -245,11 +260,11 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 					setUpvals[upvalueKey{closureID: instr.Args[1].ID, upval: instr.Aux}] = true
 				}
 			case OpCall:
-				if !isPureLoopInvariantCall(fn, instr) {
+				if !isPureLoopInvariantCall(fn, instr, seededGlobals) {
 					loopCalls = append(loopCalls, instr)
 				}
 			case OpResume:
-				if !isPureNumericLoopCall(fn, instr) {
+				if !isPureNumericLoopCall(fn, instr, seededGlobals) {
 					loopCalls = append(loopCalls, instr)
 				}
 			case OpSelf:
@@ -279,7 +294,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 				continue
 			}
 			if instr.Op == OpCall {
-				if !isPureLoopInvariantCall(fn, instr) {
+				if !isPureLoopInvariantCall(fn, instr, seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"call is not loop-invariant and pure")
 					continue
@@ -302,7 +317,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// GetField: require no in-loop store to same (obj, field) and no
 			// effectful call that can alias this specific receiver table.
 			if instr.Op == OpGetField {
-				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0]) {
+				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0], seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate fields")
 					continue
@@ -327,7 +342,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// only when nothing inside the loop can mutate the receiver shape
 			// before the original guard point.
 			if instr.Op == OpFieldSvals {
-				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0]) {
+				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0], seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate fields")
 					continue
@@ -356,7 +371,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// GetTable: require no in-loop SetTable on same obj and no
 			// effectful call that can alias this specific table.
 			if instr.Op == OpGetTable {
-				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0]) {
+				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0], seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate tables")
 					continue
@@ -378,7 +393,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// Len: pure for invariant strings/tables, but table length can be
 			// affected by dynamic table writes or calls that may alias the table.
 			if instr.Op == OpLen {
-				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0]) {
+				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0], seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate length operands")
 					continue
@@ -396,7 +411,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// inside the loop can change metatable/kind/data semantics before
 			// the original access point.
 			if instr.Op == OpTableArrayHeader {
-				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0]) {
+				if len(instr.Args) >= 1 && licmLoopCallMayMutateValue(fn, loopCalls, instr.Args[0], seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate tables")
 					continue
@@ -412,7 +427,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 			// GetGlobal and guarded global constants require no in-loop
 			// SetGlobal on same name and no calls.
 			if instr.Op == OpGetGlobal || instr.Op == OpGuardGlobalConst {
-				if licmLoopCallMayMutateGlobals(fn, loopCalls) {
+				if licmLoopCallMayMutateGlobals(fn, loopCalls, seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate globals")
 					continue
@@ -424,7 +439,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 				}
 			}
 			if instr.Op == OpGetUpval {
-				if licmLoopCallMayMutateUpvalues(fn, loopCalls) {
+				if licmLoopCallMayMutateUpvalues(fn, loopCalls, seededGlobals) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"loop contains a call that may mutate upvalues")
 					continue
@@ -645,7 +660,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block) {
 	insertBlockBefore(fn, ph, hdr)
 }
 
-func isPureNumericLoopCall(fn *Function, call *Instr) bool {
+func isPureNumericLoopCall(fn *Function, call *Instr, seededGlobals map[string]*vm.FuncProto) bool {
 	if fn == nil || call == nil || call.Op != OpCall {
 		return false
 	}
@@ -653,7 +668,7 @@ func isPureNumericLoopCall(fn *Function, call *Instr) bool {
 	if !hasDesc || desc.Callee == nil || desc.NumRets != 1 || !desc.RawIntReturn {
 		return false
 	}
-	globals := callABIMergeGlobals(fn.Analysis.GlobalFacts().GlobalsMap(), callABIStableGlobals(fn.Proto))
+	globals := callABIMergeGlobals(seededGlobals, callABIStableGlobals(fn.Proto))
 	if len(globals) == 0 {
 		return false
 	}
@@ -671,14 +686,14 @@ func isPureNumericLoopCall(fn *Function, call *Instr) bool {
 	return pureNumericInlineRejectReason(calleeFn) == ""
 }
 
-func isPureLoopInvariantCall(fn *Function, call *Instr) bool {
-	if isPureNumericLoopCall(fn, call) {
+func isPureLoopInvariantCall(fn *Function, call *Instr, seededGlobals map[string]*vm.FuncProto) bool {
+	if isPureNumericLoopCall(fn, call, seededGlobals) {
 		return true
 	}
 	if fn == nil || call == nil || call.Op != OpCall || !callABIHasExactResultShape(fn, call, 1) {
 		return false
 	}
-	globals := callABIMergeGlobals(fn.Analysis.GlobalFacts().GlobalsMap(), callABIStableGlobals(fn.Proto))
+	globals := callABIMergeGlobals(seededGlobals, callABIStableGlobals(fn.Proto))
 	if len(globals) == 0 {
 		return false
 	}
@@ -696,12 +711,12 @@ func isPureLoopInvariantCall(fn *Function, call *Instr) bool {
 // licmLoopCallMayMutateGlobals returns true if any loop call's callee may
 // write to globals (has SetGlobal bytecode ops). Uses NoGlobalOps flag from
 // callee proto analysis.
-func licmLoopCallMayMutateGlobals(fn *Function, loopCalls []*Instr) bool {
+func licmLoopCallMayMutateGlobals(fn *Function, loopCalls []*Instr, seededGlobals map[string]*vm.FuncProto) bool {
 	for _, call := range loopCalls {
 		if call == nil {
 			continue
 		}
-		callees := licmCallCalleeProtos(fn, call)
+		callees := licmCallCalleeProtos(fn, call, seededGlobals)
 		if len(callees) == 0 {
 			return true // conservative: can't resolve callee
 		}
@@ -716,12 +731,12 @@ func licmLoopCallMayMutateGlobals(fn *Function, loopCalls []*Instr) bool {
 
 // licmLoopCallMayMutateUpvalues returns true if any loop call's callee may
 // write to upvalues. A callee that captures no upvalues cannot mutate them.
-func licmLoopCallMayMutateUpvalues(fn *Function, loopCalls []*Instr) bool {
+func licmLoopCallMayMutateUpvalues(fn *Function, loopCalls []*Instr, seededGlobals map[string]*vm.FuncProto) bool {
 	for _, call := range loopCalls {
 		if call == nil {
 			continue
 		}
-		callees := licmCallCalleeProtos(fn, call)
+		callees := licmCallCalleeProtos(fn, call, seededGlobals)
 		if len(callees) == 0 {
 			return true // conservative: can't resolve callee
 		}
@@ -813,26 +828,32 @@ func insertBlockBefore(fn *Function, blk, target *Block) {
 	fn.Blocks = append(fn.Blocks, blk)
 }
 
-func licmLoopCallMayMutateValue(fn *Function, loopCalls []*Instr, value *Value) bool {
+func licmLoopCallMayMutateValue(fn *Function, loopCalls []*Instr, value *Value, seededGlobalsOpt ...map[string]*vm.FuncProto) bool {
 	if value == nil {
 		return true
+	}
+	var seededGlobals map[string]*vm.FuncProto
+	if len(seededGlobalsOpt) > 0 {
+		seededGlobals = seededGlobalsOpt[0]
+	} else if fn != nil && fn.Analysis != nil {
+		seededGlobals = fn.Analysis.GlobalFacts().GlobalsMap()
 	}
 	for _, call := range loopCalls {
 		if call == nil {
 			continue
 		}
-		if !licmCallCannotMutateValue(fn, call, value.ID) {
+		if !licmCallCannotMutateValue(fn, call, value.ID, seededGlobals) {
 			return true
 		}
 	}
 	return false
 }
 
-func licmCallCannotMutateValue(fn *Function, instr *Instr, valueID int) bool {
+func licmCallCannotMutateValue(fn *Function, instr *Instr, valueID int, seededGlobals map[string]*vm.FuncProto) bool {
 	if fn == nil || instr == nil {
 		return false
 	}
-	callees := licmCallCalleeProtos(fn, instr)
+	callees := licmCallCalleeProtos(fn, instr, seededGlobals)
 	if len(callees) == 0 {
 		return false
 	}
@@ -849,11 +870,12 @@ func licmCallCannotMutateValue(fn *Function, instr *Instr, valueID int) bool {
 	return true
 }
 
-func licmCallCalleeProtos(fn *Function, instr *Instr) []*vm.FuncProto {
+func licmCallCalleeProtos(fn *Function, instr *Instr, seededGlobals map[string]*vm.FuncProto) []*vm.FuncProto {
 	if protos := fieldShapeCalleeProtos(fn, instr); len(protos) > 0 {
 		return protos
 	}
-	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.GlobalFacts().GlobalsMap()})
+	globals := callABIMergeGlobals(seededGlobals, callABIStableGlobals(fn.Proto))
+	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: globals})
 	if callee != nil {
 		return []*vm.FuncProto{callee}
 	}
