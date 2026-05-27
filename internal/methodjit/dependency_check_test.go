@@ -149,6 +149,34 @@ func TestValidateDependencyOrderRejectsUnregisteredUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateDependencyOrderRejectsDuplicateFactsInOneRelation(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "Provider",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Provides: analysisFacts(AnalysisFactGlobals),
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:     "DuplicateReader",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Requires: analysisFacts(AnalysisFactGlobals, AnalysisFactGlobals),
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected duplicate fact declaration error, got nil")
+	}
+	if !strings.Contains(err.Error(), "requires duplicate fact Globals") {
+		t.Fatalf("error should report duplicate fact declaration, got: %v", err)
+	}
+}
+
 func TestValidateDependencyOrderRejectsRequiredOptionalOverlap(t *testing.T) {
 	plan := Tier2OptimizerPlan{
 		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},

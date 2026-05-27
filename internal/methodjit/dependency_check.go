@@ -28,6 +28,7 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 	// First pass: collect all facts that are provided and by which modules.
 	for _, module := range modules {
 		ref := dependencyModuleRef(module)
+		validateFactList(ref, "provides", module.Provides, &issues)
 		moduleRefs[ref] = true
 		for _, fact := range module.Provides {
 			validateDeclaredAnalysisFact(ref, "provides", fact, &issues)
@@ -40,6 +41,7 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 
 	for _, module := range modules {
 		ref := dependencyModuleRef(module)
+		validateFactList(ref, "requires", module.Requires, &issues)
 		for _, fact := range module.Requires {
 			consumed[fact] = true
 			validateDeclaredAnalysisFact(ref, "requires", fact, &issues)
@@ -47,6 +49,7 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}
 		}
+		validateFactList(ref, "updates", module.Updates, &issues)
 		for _, fact := range module.Updates {
 			consumed[fact] = true
 			validateDeclaredAnalysisFact(ref, "updates", fact, &issues)
@@ -54,6 +57,7 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}
 		}
+		validateFactList(ref, "optional-reads", module.OptionalReads, &issues)
 		for _, fact := range module.OptionalReads {
 			consumed[fact] = true
 			validateDeclaredAnalysisFact(ref, "optional-reads", fact, &issues)
@@ -167,6 +171,17 @@ func validateDeclaredAnalysisFact(moduleRef, relation string, fact AnalysisFact,
 		return
 	}
 	*issues = append(*issues, fmt.Sprintf("%s %s unregistered fact %s", moduleRef, relation, fact))
+}
+
+func validateFactList(moduleRef, relation string, facts []AnalysisFact, issues *[]string) {
+	seen := make(map[AnalysisFact]bool, len(facts))
+	for _, fact := range facts {
+		if seen[fact] {
+			*issues = append(*issues, fmt.Sprintf("%s %s duplicate fact %s", moduleRef, relation, fact))
+			continue
+		}
+		seen[fact] = true
+	}
 }
 
 func dependencyModuleRef(module Tier2OptimizerModule) string {
