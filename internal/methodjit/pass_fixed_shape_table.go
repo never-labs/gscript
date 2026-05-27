@@ -115,17 +115,18 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 			return fn, nil
 		}
 		fn.ensureAnalysis()
+		tableShapes := fn.Analysis.TableShapeFacts()
 		facts := inferLocalFixedShapeTables(fn)
 		if len(facts) == 0 {
 			facts = make(map[int]FixedShapeTableFact)
 		}
-		seedGuardedFixedShapeArgFacts(fn, facts, config.ArgFacts)
+		seedGuardedFixedShapeArgFacts(fn, tableShapes, facts, config.ArgFacts)
 		seedGuardedFixedShapeArrayElementArgFacts(fn, facts, config.ArrayElementArgFacts)
-		seedGuardedPolyShapeArgFacts(fn, config.ArgPolyFacts)
-		seedGuardedPolyShapeArrayElementArgFacts(fn, facts, config.ArrayElementPolyFacts)
+		seedGuardedPolyShapeArgFacts(fn, tableShapes, config.ArgPolyFacts)
+		seedGuardedPolyShapeArrayElementArgFacts(fn, tableShapes, facts, config.ArrayElementPolyFacts)
 		seedProfiledDynamicTableValueFacts(fn, facts)
 		if config.EntryGuardedArgs {
-			markEntryGuardedFixedShapeArgFacts(fn, facts, fn.Analysis.TableShapeFacts().FixedShapeArgFactMap())
+			markEntryGuardedFixedShapeArgFacts(fn, tableShapes, facts, tableShapes.FixedShapeArgFactMap())
 		}
 		propagateFixedShapePhiFacts(fn, facts)
 
@@ -155,10 +156,10 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 		arrayElementFacts := inferLocalArrayElementTableFacts(fn, facts)
 		seedLocalArrayElementTableFacts(fn, facts, arrayElementFacts)
 
-		if len(facts) == 0 && fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
+		if len(facts) == 0 && tableShapes.FieldPolyShapeFactCount() == 0 {
 			return fn, nil
 		}
-		fn.Analysis.TableShapeFacts().SetFixedShapeTables(facts)
+		tableShapes.SetFixedShapeTables(facts)
 		annotateFixedShapeStringValueAccesses(fn, facts)
 		propagateFixedShapePhiFacts(fn, facts)
 		annotateFixedShapeGetFields(fn, facts)

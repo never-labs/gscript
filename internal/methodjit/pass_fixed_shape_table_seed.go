@@ -14,8 +14,8 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func seedGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTableFact, argFacts map[int]FixedShapeTableFact) {
-	if fn == nil || fn.Proto == nil || len(argFacts) == 0 {
+func seedGuardedFixedShapeArgFacts(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, argFacts map[int]FixedShapeTableFact) {
+	if fn == nil || fn.Proto == nil || tableShapes == nil || len(argFacts) == 0 {
 		return
 	}
 	for _, block := range fn.Blocks {
@@ -28,7 +28,7 @@ func seedGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTableFa
 				continue
 			}
 			facts[instr.ID] = fact
-			fn.Analysis.TableShapeFacts().RecordFixedShapeArgFact(int(instr.Aux), fact)
+			tableShapes.RecordFixedShapeArgFact(int(instr.Aux), fact)
 			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("parameter %d carries guarded fixed table shape %v", instr.Aux, fact.FieldNames))
 		}
@@ -75,11 +75,10 @@ func seedGuardedFixedShapeArrayElementArgFacts(fn *Function, facts map[int]Fixed
 	}
 }
 
-func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTableFact) {
-	if fn == nil || fn.Proto == nil || len(argFacts) == 0 {
+func seedGuardedPolyShapeArgFacts(fn *Function, tableShapes *TableShapeFacts, argFacts map[int][]FixedShapeTableFact) {
+	if fn == nil || fn.Proto == nil || tableShapes == nil || len(argFacts) == 0 {
 		return
 	}
-	tableShapes := fn.Analysis.TableShapeFacts()
 	valueFacts := make(map[int][]FixedShapeTableFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -127,11 +126,10 @@ func seedGuardedPolyShapeArgFacts(fn *Function, argFacts map[int][]FixedShapeTab
 	}
 }
 
-func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, facts map[int]FixedShapeTableFact, argFacts map[int][]FixedShapeTableFact) {
-	if fn == nil || fn.Proto == nil || len(argFacts) == 0 {
+func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, argFacts map[int][]FixedShapeTableFact) {
+	if fn == nil || fn.Proto == nil || tableShapes == nil || len(argFacts) == 0 {
 		return
 	}
-	tableShapes := fn.Analysis.TableShapeFacts()
 	valueFacts := make(map[int][]FixedShapeTableFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -857,8 +855,8 @@ func fieldPolyShapeCases(facts []FixedShapeTableFact, name string) ([]FieldPolyS
 	return cases, typ
 }
 
-func markEntryGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTableFact, argFacts map[int]FixedShapeTableFact) {
-	if fn == nil || fn.Proto == nil || len(argFacts) == 0 {
+func markEntryGuardedFixedShapeArgFacts(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, argFacts map[int]FixedShapeTableFact) {
+	if fn == nil || fn.Proto == nil || tableShapes == nil || len(argFacts) == 0 {
 		return
 	}
 	for paramIdx, fact := range argFacts {
@@ -866,8 +864,8 @@ func markEntryGuardedFixedShapeArgFacts(fn *Function, facts map[int]FixedShapeTa
 			continue
 		}
 		fact.EntryGuarded = true
-		fn.Analysis.TableShapeFacts().RecordFixedShapeEntryGuard(paramIdx, fact)
-		fn.Analysis.TableShapeFacts().RecordFixedShapeArgFact(paramIdx, fact)
+		tableShapes.RecordFixedShapeEntryGuard(paramIdx, fact)
+		tableShapes.RecordFixedShapeArgFact(paramIdx, fact)
 		for _, block := range fn.Blocks {
 			for _, instr := range block.Instrs {
 				if instr.Op == OpLoadSlot && int(instr.Aux) == paramIdx {
