@@ -80,7 +80,7 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 
 func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
-		tier2PassModuleWith("FieldShapeCallSplitPreInline", Tier2PhaseInlineCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPreInlinePass),
+		tier2PassModuleWithCtx("FieldShapeCallSplitPreInline", Tier2PhaseInlineCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPreInlinePassCtx),
 		{
 			Name:     "Inline",
 			Phase:    Tier2PhaseInlineCall,
@@ -334,7 +334,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 	}
 	if os.Getenv("GSCRIPT_FIELD_SHAPE_SPLIT") == "1" {
-		modules = append(modules, tier2PassModuleWith("FieldShapeCallSplit (experimental)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPass))
+		modules = append(modules, tier2PassModuleWithCtx("FieldShapeCallSplit (experimental)", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPassCtx))
 	}
 	return modules
 }

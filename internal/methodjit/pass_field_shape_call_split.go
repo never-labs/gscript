@@ -13,11 +13,22 @@ import (
 // is a staging component for guarded runtime specialization; tests exercise the
 // CFG rewrite before the pipeline starts using it broadly.
 func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return fieldShapeCallSplitPass(fn, nil)
+	}
+	return fieldShapeCallSplitPass(fn, fn.Analysis.TableShapeFacts())
+}
+
+func FieldShapeCallSplitPassCtx(ctx *PassContext) (*Function, error) {
+	return fieldShapeCallSplitPass(ctx.Func(), ctx.TableShape())
+}
+
+func fieldShapeCallSplitPass(fn *Function, tableShapes *TableShapeFacts) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
+	if tableShapes == nil || tableShapes.FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	for splits := 0; splits < 16; splits++ {
@@ -27,7 +38,7 @@ func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
 				if instr == nil || instr.Op != OpFieldCallFloor {
 					continue
 				}
-				if fieldShapeSplitSingleBlockCase(fn, block, idx, instr) {
+				if fieldShapeSplitSingleBlockCase(fn, block, idx, instr, tableShapes) {
 					changed = true
 					break
 				}
@@ -54,11 +65,22 @@ func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
 // call path while eligible shape arms become visible to the regular inline and
 // table-native lowering pipeline.
 func FieldShapeCallSplitPreInlinePass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return fieldShapeCallSplitPreInlinePass(fn, nil)
+	}
+	return fieldShapeCallSplitPreInlinePass(fn, fn.Analysis.TableShapeFacts())
+}
+
+func FieldShapeCallSplitPreInlinePassCtx(ctx *PassContext) (*Function, error) {
+	return fieldShapeCallSplitPreInlinePass(ctx.Func(), ctx.TableShape())
+}
+
+func fieldShapeCallSplitPreInlinePass(fn *Function, tableShapes *TableShapeFacts) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
+	if tableShapes == nil || tableShapes.FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	for splits := 0; splits < 16; splits++ {
@@ -68,7 +90,7 @@ func FieldShapeCallSplitPreInlinePass(fn *Function) (*Function, error) {
 				if instr == nil || instr.Op != OpCall {
 					continue
 				}
-				if fieldShapeSplitPreInlineCallCase(fn, block, idx, instr) {
+				if fieldShapeSplitPreInlineCallCase(fn, block, idx, instr, tableShapes) {
 					changed = true
 					break
 				}
@@ -84,12 +106,15 @@ func FieldShapeCallSplitPreInlinePass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
-func fieldShapeSplitPreInlineCallCase(fn *Function, block *Block, idx int, call *Instr) bool {
+func fieldShapeSplitPreInlineCallCase(fn *Function, block *Block, idx int, call *Instr, tableShapes *TableShapeFacts) bool {
 	calleeLoad := fieldShapeCallCalleeLoad(call)
 	if calleeLoad == nil {
 		return false
 	}
-	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(calleeLoad.ID)
+	if tableShapes == nil {
+		return false
+	}
+	cases, _ := tableShapes.FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) < 2 || len(call.Args) < 2 {
 		return false
 	}
@@ -103,7 +128,7 @@ func fieldShapeSplitPreInlineCallCase(fn *Function, block *Block, idx int, call 
 				fmt.Sprintf("case shape=%d proto=%s pre-inline split rejected: %s", c.ShapeID, fieldShapeCaseProtoName(c), reason))
 			continue
 		}
-		fieldShapeSplitPreInlineCase(fn, block, idx, call, calleeLoad, c, cases, caseIdx)
+		fieldShapeSplitPreInlineCase(fn, block, idx, call, calleeLoad, c, cases, caseIdx, tableShapes)
 		functionRemarks(fn).Add("FieldShapeCallSplit", "changed", block.ID, call.ID, call.Op,
 			fmt.Sprintf("pre-inline split shape=%d proto=%s", c.ShapeID, fieldShapeCaseProtoName(c)))
 		return true
@@ -128,7 +153,7 @@ func fieldShapeCaseProtoName(c FieldPolyShapeCase) string {
 	return c.VMProto.Name
 }
 
-func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, calleeLoad *Instr, c FieldPolyShapeCase, cases []FieldPolyShapeCase, caseIdx int) {
+func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, calleeLoad *Instr, c FieldPolyShapeCase, cases []FieldPolyShapeCase, caseIdx int, tableShapes *TableShapeFacts) {
 	uses := computeUseCounts(fn)
 	localizeCalleeLoad := uses[calleeLoad.ID] == 1
 	maxBlockID := 0
@@ -191,7 +216,6 @@ func fieldShapeSplitPreInlineCase(fn *Function, block *Block, idx int, call, cal
 	caseJump.copySourceFrom(call)
 	caseBlock.Instrs = []*Instr{caseLoad, caseCall, caseJump}
 	caseBlock.Succs = []*Block{mergeBlock}
-	tableShapes := fn.Analysis.TableShapeFacts()
 	tableShapes.RecordFieldPolyShapeCases(caseLoad.ID, []FieldPolyShapeCase{c})
 
 	fallbackInstrs := make([]*Instr, 0, 3)
@@ -274,8 +298,11 @@ func removeInstrByID(instrs []*Instr, id int) []*Instr {
 	return out
 }
 
-func fieldShapeSplitSingleBlockCase(fn *Function, block *Block, idx int, call *Instr) bool {
-	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(call.ID)
+func fieldShapeSplitSingleBlockCase(fn *Function, block *Block, idx int, call *Instr, tableShapes *TableShapeFacts) bool {
+	if tableShapes == nil {
+		return false
+	}
+	cases, _ := tableShapes.FieldPolyShapeCases(call.ID)
 	if len(cases) < 2 || len(call.Args) == 0 {
 		functionRemarks(fn).Add("FieldShapeCallSplit", "missed", block.ID, call.ID, call.Op,
 			fmt.Sprintf("missing field-shape cases for call: cases=%d args=%d", len(cases), len(call.Args)))
@@ -330,7 +357,7 @@ func fieldShapeSplitSingleBlockCase(fn *Function, block *Block, idx int, call *I
 				fmt.Sprintf("case shape=%d proto=%s typed-peer ABI does not match current call values", c.ShapeID, c.VMProto.Name))
 			continue
 		}
-		fieldShapeSplitCase(fn, block, idx, call, c, cases, caseIdx)
+		fieldShapeSplitCase(fn, block, idx, call, c, cases, caseIdx, tableShapes)
 		functionRemarks(fn).Add("FieldShapeCallSplit", "changed", block.ID, call.ID, call.Op,
 			fmt.Sprintf("split shape=%d proto=%s monomorphic method case", c.ShapeID, c.VMProto.Name))
 		return true
@@ -504,7 +531,7 @@ func fieldPolyShapeCasesAux2(cases []FieldPolyShapeCase) int64 {
 	return fieldPolyShapeCaseAux2(cases[0])
 }
 
-func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c FieldPolyShapeCase, cases []FieldPolyShapeCase, caseIdx int) {
+func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c FieldPolyShapeCase, cases []FieldPolyShapeCase, caseIdx int, tableShapes *TableShapeFacts) {
 	maxBlockID := 0
 	for _, b := range fn.Blocks {
 		if b.ID > maxBlockID {
@@ -546,7 +573,6 @@ func fieldShapeSplitCase(fn *Function, block *Block, idx int, call *Instr, c Fie
 	}
 	caseCall.copySourceFrom(call)
 	caseBlock.Instrs = append(caseBlock.Instrs, caseCall)
-	tableShapes := fn.Analysis.TableShapeFacts()
 	tableShapes.RecordFieldPolyShapeCases(caseCall.ID, []FieldPolyShapeCase{c})
 	caseResult := caseCall.Value()
 	caseJump := &Instr{ID: fn.newValueID(), Op: OpJump, Block: caseBlock}
