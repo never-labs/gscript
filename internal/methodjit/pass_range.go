@@ -37,7 +37,23 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	numeric := fn.Analysis.NumericFacts()
+	// Delegate through a non-enforcing PassContext so the single body lives in
+	// the ctx form; direct callers (tests, the post-IntExactDivision skip path)
+	// keep the plain PassFunc signature.
+	allowed := allowedDomainsForModule(nil, rangeAnalysisFacts(), nil, "RangeAnalysis")
+	return RangeAnalysisPassCtx(newPassContext(fn, nil, allowed, false))
+}
+
+// RangeAnalysisPassCtx is the domain-scoped form of RangeAnalysisPass. It
+// reaches the IR via ctx.Func() and integer ranges/safety facts via
+// ctx.Numeric(); it touches no other fact domain.
+func RangeAnalysisPassCtx(ctx *PassContext) (*Function, error) {
+	fn := ctx.Func()
+	if fn == nil || len(fn.Blocks) == 0 {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	numeric := ctx.Numeric()
 
 	intInstrs := rangeAnalysisIntInstrs(fn)
 	profiledIntRanges := numeric.ProfiledIntRangeMap()

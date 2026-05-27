@@ -25,7 +25,7 @@ func tier2NumericModules() []Tier2OptimizerModule {
 		tier2PassModuleWith("ObservedParamTypeGuard", Tier2PhaseNumeric, nil, nil, ObservedParamTypeGuardPass),
 		tier2PassModuleWith("ExactGuardConst", Tier2PhaseNumeric, nil, nil, ExactGuardConstPass),
 		tier2PassModuleWith("ConstProp (post-ExactGuardConst)", Tier2PhaseNumeric, nil, nil, ConstPropPass),
-		tier2PassModuleWith("RangeAnalysis", Tier2PhaseNumeric, nil, rangeAnalysisFacts(), RangeAnalysisPass),
+		tier2PassModuleWithCtx("RangeAnalysis", Tier2PhaseNumeric, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 		{
 			Name:     "OverflowBoxing",
 			Phase:    Tier2PhaseNumeric,
@@ -57,13 +57,14 @@ func tier2NumericModules() []Tier2OptimizerModule {
 			Phase:    Tier2PhaseNumeric,
 			Requires: nil,
 			Updates:  rangeAnalysisFacts(),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
 				if opts != nil && !opts.LastPassChanged {
 					functionRemarks(fn).Add("RangeAnalysis", "skipped", 0, 0, OpNop,
 						"IntExactDivision had no candidate rewrite")
 					return fn, nil
 				}
-				return RangeAnalysisPass(fn)
+				allowed := allowedDomainsForModule(nil, nil, rangeAnalysisFacts(), "RangeAnalysis (post-IntExactDivision)")
+				return RangeAnalysisPassCtx(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("ModRangeSimplify", Tier2PhaseNumeric, analysisFacts(AnalysisFactIntRanges), nil, ModRangeSimplifyPass),
