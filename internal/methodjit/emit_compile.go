@@ -595,8 +595,7 @@ func ensureTier2FieldCachesForFunction(fn *Function) {
 			if instr == nil || instr.SourcePC < 0 {
 				continue
 			}
-			switch instr.Op {
-			case OpGetField, OpGetFieldNumToFloat, OpSetField:
+			if spec, ok := instr.Op.Spec(); ok && spec.NeedsTier2FieldCache {
 				ensureFieldCache(fn.Proto)
 				return
 			}

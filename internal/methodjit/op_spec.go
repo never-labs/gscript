@@ -182,6 +182,8 @@ type OpSpec struct {
 	FloatReductionWideUnrollBarrier  bool
 	FloatReductionLatencyUnrollSeed  bool
 	FloatReductionLatencyUnrollBlock bool
+	ConstantPhiBranchThreadPure      bool
+	NeedsTier2FieldCache             bool
 	CallResultRangeGuardCandidate    bool
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
@@ -561,6 +563,12 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opFloatReductionLatencyUnrollBlockPolicies) {
 			spec.FloatReductionLatencyUnrollBlock = opFloatReductionLatencyUnrollBlockPolicies[op]
+		}
+		if int(op) < len(opConstantPhiBranchThreadPurePolicies) {
+			spec.ConstantPhiBranchThreadPure = opConstantPhiBranchThreadPurePolicies[op]
+		}
+		if int(op) < len(opNeedsTier2FieldCachePolicies) {
+			spec.NeedsTier2FieldCache = opNeedsTier2FieldCachePolicies[op]
 		}
 		if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
 			spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
@@ -1754,6 +1762,20 @@ var opFloatReductionLatencyUnrollSeedPolicies = [...]bool{
 var opFloatReductionLatencyUnrollBlockPolicies = [...]bool{
 	OpDivFloat: true,
 	OpFloor:    true,
+}
+
+var opConstantPhiBranchThreadPurePolicies = [...]bool{
+	OpPhi:       true,
+	OpConstInt:  true,
+	OpConstBool: true,
+	OpEqInt:     true,
+	OpNot:       true,
+}
+
+var opNeedsTier2FieldCachePolicies = [...]bool{
+	OpGetField:           true,
+	OpGetFieldNumToFloat: true,
+	OpSetField:           true,
 }
 
 var opCallResultRangeGuardCandidatePolicies = [...]bool{

@@ -563,6 +563,18 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s latency-unroll block should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpPhi, OpConstInt, OpConstBool, OpEqInt, OpNot} {
+		spec, ok := op.Spec()
+		if !ok || !spec.ConstantPhiBranchThreadPure {
+			t.Fatalf("%s constant-phi branch threading purity should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpGetField, OpGetFieldNumToFloat, OpSetField} {
+		spec, ok := op.Spec()
+		if !ok || !spec.NeedsTier2FieldCache {
+			t.Fatalf("%s field-cache requirement should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
 		spec, ok := op.Spec()
 		if !ok || !spec.CallResultRangeGuardCandidate || !callResultRangeGuardCandidate(&Instr{Op: op}) {
