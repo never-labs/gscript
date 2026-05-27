@@ -548,25 +548,27 @@ func (ts *typeSpecializer) inferType(instr *Instr) Type {
 	if spec, ok := instr.Op.Spec(); ok && spec.FixedResultType != TypeUnknown {
 		return spec.FixedResultType
 	}
-	switch instr.Op {
-	case OpRecordArrayLoopSpecialization:
+	if instr.Op == OpRecordArrayLoopSpecialization {
 		return TypeUnknown
+	}
 
-	// Generic arithmetic: infer from operands.
-	case OpAdd, OpSub, OpMul, OpMod:
-		return ts.inferBinaryNumericType(instr)
-	case OpUnm:
+	if isGenericSpecializableOp(instr.Op) {
 		if len(instr.Args) > 0 {
-			at := ts.argType(instr.Args[0])
-			if at == TypeInt {
-				return TypeInt
-			}
-			if at == TypeFloat {
-				return TypeFloat
+			if len(instr.Args) == 1 {
+				_, typ, ok := unaryTypeSpecializedOp(instr.Op, ts.argType(instr.Args[0]))
+				if ok {
+					return typ
+				}
+			} else {
+				_, typ, ok := typeSpecializedOp(instr.Op, ts.argType(instr.Args[0]), ts.argType(instr.Args[1]))
+				if ok {
+					return typ
+				}
 			}
 		}
-		return TypeUnknown
+	}
 
+	switch instr.Op {
 	// Phi: if all args have the same type, the phi has that type.
 	case OpPhi:
 		return ts.inferPhiType(instr)
@@ -600,23 +602,6 @@ func (ts *typeSpecializer) inferType(instr *Instr) Type {
 	default:
 		return TypeUnknown
 	}
-}
-
-// inferBinaryNumericType returns TypeInt if both operands are int,
-// TypeFloat if both are numeric (at least one float), TypeUnknown otherwise.
-func (ts *typeSpecializer) inferBinaryNumericType(instr *Instr) Type {
-	if len(instr.Args) < 2 {
-		return TypeUnknown
-	}
-	lt := ts.argType(instr.Args[0])
-	rt := ts.argType(instr.Args[1])
-	if lt == TypeInt && rt == TypeInt {
-		return TypeInt
-	}
-	if (lt == TypeInt || lt == TypeFloat) && (rt == TypeInt || rt == TypeFloat) {
-		return TypeFloat
-	}
-	return TypeUnknown
 }
 
 // inferPhiType returns a type if all KNOWN phi inputs agree.
