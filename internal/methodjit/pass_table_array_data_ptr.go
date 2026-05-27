@@ -12,16 +12,23 @@ package methodjit
 // a boxed integer. The fact is generic for all typed table arrays; it does not
 // depend on a fixed source-program pattern.
 func TableArrayDataPtrFactPass(fn *Function) (*Function, error) {
+	allowed := allowedDomainsForModule(nil, analysisFacts(AnalysisFactTableArrayDataPtrs), nil, "TableArrayDataPtrFact")
+	return TableArrayDataPtrFactPassCtx(newPassContext(fn, nil, allowed, false))
+}
+
+func TableArrayDataPtrFactPassCtx(ctx *PassContext) (*Function, error) {
+	fn := ctx.Func()
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
 	facts := collectTableArrayDataPtrFacts(fn)
+	loopSpec := ctx.LoopSpecialization()
 	if len(facts) == 0 {
-		fn.Analysis.LoopSpecializationFacts().SetTableArrayDataPtrs(nil)
+		loopSpec.SetTableArrayDataPtrs(nil)
 		return fn, nil
 	}
-	fn.Analysis.LoopSpecializationFacts().SetTableArrayDataPtrs(facts)
+	loopSpec.SetTableArrayDataPtrs(facts)
 	return fn, nil
 }
 
