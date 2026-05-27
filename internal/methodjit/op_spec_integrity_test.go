@@ -12,11 +12,13 @@ import (
 	"testing"
 )
 
-func TestOpSpecPolicyTablesDoNotExceedOpSpace(t *testing.T) {
-	tables := []struct {
-		name  string
-		table any
-	}{
+type opSpecPolicyTable struct {
+	name  string
+	table any
+}
+
+func opSpecPolicyTables() []opSpecPolicyTable {
+	return []opSpecPolicyTable{
 		{"opBackendPolicies", opBackendPolicies},
 		{"opKeepUnusedPolicies", opKeepUnusedPolicies},
 		{"opNativeReplayMayExitPolicies", opNativeReplayMayExitPolicies},
@@ -133,7 +135,10 @@ func TestOpSpecPolicyTablesDoNotExceedOpSpace(t *testing.T) {
 		{"opSourceFeedbackPolicies", opSourceFeedbackPolicies},
 		{"opRangeRefineKindPolicies", opRangeRefineKindPolicies},
 	}
-	for _, table := range tables {
+}
+
+func TestOpSpecPolicyTablesDoNotExceedOpSpace(t *testing.T) {
+	for _, table := range opSpecPolicyTables() {
 		if got := reflect.ValueOf(table.table).Len(); got > int(OpMax) {
 			t.Fatalf("%s has length %d beyond OpMax %d", table.name, got, OpMax)
 		}
@@ -225,13 +230,15 @@ func TestOpSpecPolicyTableIntegrityCoversEveryPolicyVar(t *testing.T) {
 		t.Fatal("runtime.Caller failed")
 	}
 	dir := filepath.Dir(file)
-	self, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatalf("read %s: %v", filepath.Base(file), err)
+	covered := make(map[string]bool)
+	for _, table := range opSpecPolicyTables() {
+		if covered[table.name] {
+			t.Fatalf("duplicate OpSpec policy table registry entry: %s", table.name)
+		}
+		covered[table.name] = true
 	}
-	covered := string(self)
 	var missing []string
-	err = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -259,7 +266,7 @@ func TestOpSpecPolicyTableIntegrityCoversEveryPolicyVar(t *testing.T) {
 				}
 				for _, ident := range valueSpec.Names {
 					if strings.HasPrefix(ident.Name, "op") && strings.HasSuffix(ident.Name, "Policies") &&
-						!strings.Contains(covered, `"`+ident.Name+`"`) {
+						!covered[ident.Name] {
 						missing = append(missing, ident.Name)
 					}
 				}
