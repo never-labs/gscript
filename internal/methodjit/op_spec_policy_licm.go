@@ -96,15 +96,3 @@ var opLICMIntArithPolicies = [...]bool{
 	OpDivIntExact: true,
 	OpNegInt:      true,
 }
-
-func applyOpSpecLICMPolicies(op Op, spec *OpSpec) {
-	if int(op) < len(opLICMHoistablePolicies) {
-		spec.LICMHoistable = opLICMHoistablePolicies[op]
-	}
-	if int(op) < len(opLICMInterestingMissPolicies) {
-		spec.LICMInterestingMiss = opLICMInterestingMissPolicies[op]
-	}
-	if int(op) < len(opLICMIntArithPolicies) {
-		spec.LICMIntArith = opLICMIntArithPolicies[op]
-	}
-}
