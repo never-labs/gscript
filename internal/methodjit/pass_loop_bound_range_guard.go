@@ -119,9 +119,7 @@ func loopBoundParamMax(fn *Function) map[int]int64 {
 		if cond == nil || len(cond.Args) < 2 {
 			continue
 		}
-		switch cond.Op {
-		case OpLt, OpLtInt, OpLe, OpLeInt:
-		default:
+		if _, ok := orderedRangeRefineKind(cond.Op); !ok {
 			continue
 		}
 		max := singleLoopParamRangeMax

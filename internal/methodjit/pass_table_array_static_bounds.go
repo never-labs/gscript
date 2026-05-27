@@ -265,21 +265,24 @@ func tableArrayLenLowerGuard(cond *Instr) (int, int64, bool) {
 	rhsConst, rhsIsConst := constIntFromValue(cond.Args[1])
 	lhsLen := tableArrayLenValueID(cond.Args[0])
 	rhsLen := tableArrayLenValueID(cond.Args[1])
-	switch cond.Op {
-	case OpLt, OpLtInt:
+	strict, ok := orderedRangeRefineKind(cond.Op)
+	if !ok {
+		return 0, 0, false
+	}
+	if strict {
 		if lhsIsConst && rhsLen != 0 {
 			return rhsLen, lhsConst, true
 		}
 		if rhsIsConst && lhsLen != 0 {
 			return lhsLen, satSub(rhsConst, 1), true
 		}
-	case OpLe, OpLeInt:
-		if lhsIsConst && rhsLen != 0 {
-			return rhsLen, satSub(lhsConst, 1), true
-		}
-		if rhsIsConst && lhsLen != 0 {
-			return lhsLen, rhsConst, true
-		}
+		return 0, 0, false
+	}
+	if lhsIsConst && rhsLen != 0 {
+		return rhsLen, satSub(lhsConst, 1), true
+	}
+	if rhsIsConst && lhsLen != 0 {
+		return lhsLen, rhsConst, true
 	}
 	return 0, 0, false
 }
@@ -336,21 +339,24 @@ func keyUpperGuard(cond *Instr) (int, int64, bool) {
 	}
 	lhsConst, lhsIsConst := constIntFromValue(cond.Args[0])
 	rhsConst, rhsIsConst := constIntFromValue(cond.Args[1])
-	switch cond.Op {
-	case OpLt, OpLtInt:
+	strict, ok := orderedRangeRefineKind(cond.Op)
+	if !ok {
+		return 0, 0, false
+	}
+	if strict {
 		if rhsIsConst && cond.Args[0].Def != nil && cond.Args[0].Def.Type.isIntegerLike() {
 			return cond.Args[0].ID, satSub(rhsConst, 1), true
 		}
 		if lhsIsConst && cond.Args[1].Def != nil && cond.Args[1].Def.Type.isIntegerLike() {
 			return cond.Args[1].ID, lhsConst, true
 		}
-	case OpLe, OpLeInt:
-		if rhsIsConst && cond.Args[0].Def != nil && cond.Args[0].Def.Type.isIntegerLike() {
-			return cond.Args[0].ID, rhsConst, true
-		}
-		if lhsIsConst && cond.Args[1].Def != nil && cond.Args[1].Def.Type.isIntegerLike() {
-			return cond.Args[1].ID, satSub(lhsConst, 1), true
-		}
+		return 0, 0, false
+	}
+	if rhsIsConst && cond.Args[0].Def != nil && cond.Args[0].Def.Type.isIntegerLike() {
+		return cond.Args[0].ID, rhsConst, true
+	}
+	if lhsIsConst && cond.Args[1].Def != nil && cond.Args[1].Def.Type.isIntegerLike() {
+		return cond.Args[1].ID, satSub(lhsConst, 1), true
 	}
 	return 0, 0, false
 }

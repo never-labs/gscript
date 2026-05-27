@@ -716,9 +716,7 @@ func guardBoundsPhi(cond *Instr, phi *Instr) bool {
 	if cond == nil || phi == nil || len(cond.Args) < 2 {
 		return false
 	}
-	switch cond.Op {
-	case OpLe, OpLeInt, OpLt, OpLtInt:
-	default:
+	if _, ok := orderedRangeRefineKind(cond.Op); !ok {
 		return false
 	}
 	return cond.Args[0] != nil && cond.Args[0].ID == phi.ID
@@ -731,9 +729,7 @@ func guardBoundsLinearInduction(cond *Instr, phi *Instr, update *Instr) bool {
 	if cond == nil || update == nil || len(cond.Args) < 2 {
 		return false
 	}
-	switch cond.Op {
-	case OpLe, OpLeInt, OpLt, OpLtInt:
-	default:
+	if _, ok := orderedRangeRefineKind(cond.Op); !ok {
 		return false
 	}
 	return cond.Args[0] != nil && cond.Args[0].ID == update.ID
