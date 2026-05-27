@@ -7,6 +7,8 @@ const observedParamRangeGuardMinCount uint32 = 2
 const callFloorSpecRangeMin int64 = -1 << 31
 const callFloorSpecRangeMax int64 = 1<<31 - 1
 
+var callResultRangeGuardPassAllowedDomains = allowedDomainsForModule(callResultRangeGuardFacts(), nil, nil, "CallResultRangeGuard")
+
 // CallResultRangeGuardPass turns mature call-result range feedback into an
 // explicit GuardIntRange. For floor-projected calls with stable callee facts
 // but no mature result range yet, it may add a conservative int32 guard so
@@ -14,16 +16,7 @@ const callFloorSpecRangeMax int64 = 1<<31 - 1
 // RangeAnalysis can then consume the guarded value without trusting profile
 // data unconditionally.
 func CallResultRangeGuardPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return callResultRangeGuardPass(fn, nil, nil, nil, nil)
-	}
-	return callResultRangeGuardPass(
-		fn,
-		fn.Analysis.SpeculationFacts(),
-		fn.Analysis.CallFacts(),
-		fn.Analysis.TableShapeFacts(),
-		fn.Analysis.GlobalFacts(),
-	)
+	return CallResultRangeGuardPassCtx(newPassContext(fn, nil, callResultRangeGuardPassAllowedDomains, false))
 }
 
 func CallResultRangeGuardPassCtx(ctx *PassContext) (*Function, error) {

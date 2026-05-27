@@ -1,15 +1,14 @@
 package methodjit
 
+var fieldCallPolyLenFusionPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldCallPolyLenFusion")
+
 // FieldCallPolyLenFusionPass connects a guarded typed-peer field call with a
 // later same-block guarded field length on the same receiver. It does not
 // rewrite IR; it records a codegen-side fusion that lets the successful call
 // shape arm produce the later length value and lets OpFieldPolyLen skip its own
 // shape dispatch when that value is already live.
 func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return fieldCallPolyLenFusionPass(fn, nil)
-	}
-	return fieldCallPolyLenFusionPass(fn, fn.Analysis.TableShapeFacts())
+	return FieldCallPolyLenFusionPassCtx(newPassContext(fn, nil, fieldCallPolyLenFusionPassAllowedDomains, false))
 }
 
 func FieldCallPolyLenFusionPassCtx(ctx *PassContext) (*Function, error) {

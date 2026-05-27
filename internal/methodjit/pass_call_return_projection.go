@@ -1,19 +1,13 @@
 package methodjit
 
+var callReturnProjectionPassAllowedDomains = allowedDomainsForModule(callReturnProjectionFacts(), nil, nil, "CallReturnProjection")
+
 // CallReturnProjectionPass turns a side-effecting call followed by a pure
 // projection of its single result into one explicit call-projection op. This
 // gives codegen one protocol owner for fast path, fallback, and callee-exit
 // recovery instead of trying to fuse two independent instructions ad hoc.
 func CallReturnProjectionPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return callReturnProjectionPass(fn, nil, nil, nil)
-	}
-	return callReturnProjectionPass(
-		fn,
-		fn.Analysis.CallFacts(),
-		fn.Analysis.TableShapeFacts(),
-		fn.Analysis.SpeculationFacts(),
-	)
+	return CallReturnProjectionPassCtx(newPassContext(fn, nil, callReturnProjectionPassAllowedDomains, false))
 }
 
 func CallReturnProjectionPassCtx(ctx *PassContext) (*Function, error) {

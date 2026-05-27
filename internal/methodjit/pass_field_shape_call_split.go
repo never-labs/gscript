@@ -4,6 +4,11 @@ import (
 	"fmt"
 )
 
+var (
+	fieldShapeCallSplitPassAllowedDomains          = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldShapeCallSplit (experimental)")
+	fieldShapeCallSplitPreInlinePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldShapeCallSplitPreInline")
+)
+
 // FieldShapeCallSplitPass peels one case out of a polymorphic fixed-shape
 // method call. The remaining shapes keep the existing OpFieldCallFloor
 // fallback, while the peeled case becomes a monomorphic OpFieldCallFloor arm
@@ -13,10 +18,7 @@ import (
 // is a staging component for guarded runtime specialization; tests exercise the
 // CFG rewrite before the pipeline starts using it broadly.
 func FieldShapeCallSplitPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return fieldShapeCallSplitPass(fn, nil)
-	}
-	return fieldShapeCallSplitPass(fn, fn.Analysis.TableShapeFacts())
+	return FieldShapeCallSplitPassCtx(newPassContext(fn, nil, fieldShapeCallSplitPassAllowedDomains, false))
 }
 
 func FieldShapeCallSplitPassCtx(ctx *PassContext) (*Function, error) {
@@ -65,10 +67,7 @@ func fieldShapeCallSplitPass(fn *Function, tableShapes *TableShapeFacts) (*Funct
 // call path while eligible shape arms become visible to the regular inline and
 // table-native lowering pipeline.
 func FieldShapeCallSplitPreInlinePass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return fieldShapeCallSplitPreInlinePass(fn, nil)
-	}
-	return fieldShapeCallSplitPreInlinePass(fn, fn.Analysis.TableShapeFacts())
+	return FieldShapeCallSplitPreInlinePassCtx(newPassContext(fn, nil, fieldShapeCallSplitPreInlinePassAllowedDomains, false))
 }
 
 func FieldShapeCallSplitPreInlinePassCtx(ctx *PassContext) (*Function, error) {

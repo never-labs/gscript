@@ -6,14 +6,13 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
+var fixedTableConstructorLoweringPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "FixedTableConstructorLowering")
+
 // FixedTableConstructorLoweringPass combines surviving fixed-field table
 // constructors into one value-producing op after escape analysis has had a
 // chance to scalar-replace the expanded NewTable+SetField form.
 func FixedTableConstructorLoweringPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return fixedTableConstructorLoweringPass(fn, nil)
-	}
-	return fixedTableConstructorLoweringPass(fn, fn.Analysis.TableShapeFacts())
+	return FixedTableConstructorLoweringPassCtx(newPassContext(fn, nil, fixedTableConstructorLoweringPassAllowedDomains, false))
 }
 
 func FixedTableConstructorLoweringPassCtx(ctx *PassContext) (*Function, error) {

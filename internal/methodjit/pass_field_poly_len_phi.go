@@ -2,14 +2,13 @@ package methodjit
 
 import "fmt"
 
+var fieldPolyLenPhiPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldPolyLenPhi")
+
 // FieldPolyLenPhiPass replaces a guarded polymorphic field length with SSA
 // constants/phis when existing shape-split control flow already proves the
 // receiver shape on every incoming edge.
 func FieldPolyLenPhiPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return fieldPolyLenPhiPass(fn, nil)
-	}
-	return fieldPolyLenPhiPass(fn, fn.Analysis.TableShapeFacts())
+	return FieldPolyLenPhiPassCtx(newPassContext(fn, nil, fieldPolyLenPhiPassAllowedDomains, false))
 }
 
 func FieldPolyLenPhiPassCtx(ctx *PassContext) (*Function, error) {

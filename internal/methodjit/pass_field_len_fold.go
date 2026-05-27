@@ -1,14 +1,16 @@
 package methodjit
 
+var (
+	fieldLenFoldPassAllowedDomains          = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts, AnalysisFactIntRanges), nil, nil, "FieldLenFold")
+	profiledStringLenFoldPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts, AnalysisFactIntRanges), nil, nil, "ProfiledStringLenFold")
+)
+
 // FieldLenFoldPass folds len(obj.field) at simple join blocks when every
 // predecessor writes that field to a constant string of the same byte length.
 // Unlike profiled length ranges, this is a structural proof: no runtime guard
 // is needed because the dominating predecessor writes determine the value.
 func FieldLenFoldPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return fieldLenFoldPass(fn, nil, nil)
-	}
-	return fieldLenFoldPass(fn, fn.Analysis.TableShapeFacts(), fn.Analysis.NumericFacts())
+	return FieldLenFoldPassCtx(newPassContext(fn, nil, fieldLenFoldPassAllowedDomains, false))
 }
 
 func FieldLenFoldPassCtx(ctx *PassContext) (*Function, error) {
@@ -71,10 +73,7 @@ func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *Numer
 }
 
 func ProfiledStringLenFoldPass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return profiledStringLenFoldPass(fn, nil, nil)
-	}
-	return profiledStringLenFoldPass(fn, fn.Analysis.TableShapeFacts(), fn.Analysis.NumericFacts())
+	return ProfiledStringLenFoldPassCtx(newPassContext(fn, nil, profiledStringLenFoldPassAllowedDomains, false))
 }
 
 func ProfiledStringLenFoldPassCtx(ctx *PassContext) (*Function, error) {

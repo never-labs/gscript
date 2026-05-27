@@ -5,6 +5,8 @@ import (
 	"unsafe"
 )
 
+var guardFieldCalleePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "GuardFieldCallee")
+
 // GuardFieldCalleePass fuses a fixed-shape method field load that feeds only a
 // callee-proto guard:
 //
@@ -15,10 +17,7 @@ import (
 // native sequence. The optimization is generic over shape id, field index and
 // proto pointer; it does not inspect source names.
 func GuardFieldCalleePass(fn *Function) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
-		return guardFieldCalleePass(fn, nil)
-	}
-	return guardFieldCalleePass(fn, fn.Analysis.TableShapeFacts())
+	return GuardFieldCalleePassCtx(newPassContext(fn, nil, guardFieldCalleePassAllowedDomains, false))
 }
 
 func GuardFieldCalleePassCtx(ctx *PassContext) (*Function, error) {

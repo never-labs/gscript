@@ -6,6 +6,13 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
+var shapeFieldTypeGuardPassAllowedDomains = allowedDomainsForModule(
+	analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFieldPolyShapeCatalog),
+	analysisFacts(AnalysisFactShapeFieldTypeElided),
+	nil,
+	"ShapeFieldTypeGuard",
+)
+
 // ShapeFieldTypeGuardPass turns process-wide stable shape-field type feedback
 // into one epoch guard per compiled function. After the guard, fixed-shape
 // FieldLoad sites can skip their per-load tag check.
@@ -15,10 +22,7 @@ func ShapeFieldTypeGuardPass(fn *Function) (*Function, error) {
 
 func ShapeFieldTypeGuardPassWith(registry *CompilationDependencyRegistry) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		if fn == nil || fn.Analysis == nil {
-			return shapeFieldTypeGuardPass(fn, registry, nil)
-		}
-		return shapeFieldTypeGuardPass(fn, registry, fn.Analysis.TableShapeFacts())
+		return ShapeFieldTypeGuardPassCtx(newPassContext(fn, nil, shapeFieldTypeGuardPassAllowedDomains, false), registry)
 	}
 }
 
