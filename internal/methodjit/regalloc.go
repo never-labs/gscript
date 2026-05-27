@@ -620,14 +620,6 @@ func allocateBlock(block *Block, alloc *RegAllocation, lastUse map[int]int, carr
 	return gprs.snapshot(false)
 }
 
-func instructionHasNoSSAResult(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.NoSSAResult
-}
-
 func isFinalInputUse(instr *Instr, valueID int, lastUse map[int]int) bool {
 	if instr == nil || lastUse[valueID] != instr.ID {
 		return false
@@ -675,24 +667,6 @@ func freeDeadValues(block *Block, instrIdx int, alloc *RegAllocation, gprs, fprs
 			fprs.free(arg.ID)
 		}
 	}
-}
-
-// needsFloatReg returns true if the instruction's result should go in an FPR.
-// Note: Float COMPARISON ops (OpLtFloat, OpLeFloat) produce boolean results
-// (NaN-boxed bool), NOT float results, so they should NOT get FPR allocations.
-func needsFloatReg(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	// Comparisons produce bools, not floats, regardless of operand type.
-	if ok && spec.FloatRegResultBlocked {
-		return false
-	}
-	if instr.Type == TypeFloat {
-		return true
-	}
-	return ok && spec.FloatRegResult
 }
 
 // computeLastUse computes, for every value ID, the ID of the instruction that

@@ -169,6 +169,71 @@ func fixedResultType(op Op) (Type, bool) {
 	return spec.FixedResultType, ok && spec.FixedResultType != TypeUnknown
 }
 
+func typeSpecializedOp(op Op, lt, rt Type) (Op, Type, bool) {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpMax, TypeUnknown, false
+	}
+	if lt == TypeInt && rt == TypeInt && spec.TypeSpecializeIntOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeIntOp)
+	}
+	if isNumericType(lt) && isNumericType(rt) && (lt == TypeFloat || rt == TypeFloat) && spec.TypeSpecializeFloatOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeFloatOp)
+	}
+	if lt == TypeString && rt == TypeString && spec.TypeSpecializeStringOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeStringOp)
+	}
+	return OpMax, TypeUnknown, false
+}
+
+func unaryTypeSpecializedOp(op Op, arg Type) (Op, Type, bool) {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpMax, TypeUnknown, false
+	}
+	if arg == TypeInt && spec.TypeSpecializeIntOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeIntOp)
+	}
+	if arg == TypeFloat && spec.TypeSpecializeFloatOp < OpMax {
+		return opSpecializedTarget(spec.TypeSpecializeFloatOp)
+	}
+	return OpMax, TypeUnknown, false
+}
+
+func opSpecializedTarget(op Op) (Op, Type, bool) {
+	typ, ok := fixedResultType(op)
+	if !ok {
+		return OpMax, TypeUnknown, false
+	}
+	return op, typ, true
+}
+
+func isNumericType(t Type) bool {
+	return t == TypeInt || t == TypeFloat
+}
+
+func instructionHasNoSSAResult(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.NoSSAResult
+}
+
+func needsFloatReg(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	if ok && spec.FloatRegResultBlocked {
+		return false
+	}
+	if instr.Type == TypeFloat {
+		return true
+	}
+	return ok && spec.FloatRegResult
+}
+
 func isRawIntOp(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.RawIntResult
