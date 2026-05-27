@@ -1,7 +1,14 @@
 package methodjit
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -169,5 +176,61 @@ func assertOpSpecTarget(t *testing.T, owner Op, field string, target Op) {
 	}
 	if _, ok := target.Spec(); !ok {
 		t.Fatalf("%s.%s targets op %d without OpSpec", owner, field, target)
+	}
+}
+
+func TestOpSpecPolicyTableIntegrityCoversEveryPolicyVar(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	self, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read %s: %v", filepath.Base(file), err)
+	}
+	covered := string(self)
+	var missing []string
+	err = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		name := filepath.Base(path)
+		if !strings.HasPrefix(name, "op_spec_policy_") || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			return nil
+		}
+		fileSet := token.NewFileSet()
+		parsed, err := parser.ParseFile(fileSet, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		for _, decl := range parsed.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				valueSpec, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				for _, ident := range valueSpec.Names {
+					if strings.HasPrefix(ident.Name, "op") && strings.HasSuffix(ident.Name, "Policies") &&
+						!strings.Contains(covered, `"`+ident.Name+`"`) {
+						missing = append(missing, ident.Name)
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan OpSpec policy files: %v", err)
+	}
+	if len(missing) > 0 {
+		t.Fatalf("OpSpec policy integrity test does not cover policy vars: %s", strings.Join(missing, ", "))
 	}
 }
