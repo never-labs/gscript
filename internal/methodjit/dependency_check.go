@@ -52,6 +52,12 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}
 		}
+		for _, fact := range module.OptionalReads {
+			consumed[fact] = true
+			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
+				issues = append(issues, fmt.Sprintf("%s optional-reads unregistered fact %s", ref, fact))
+			}
+		}
 	}
 
 	for fact, providers := range providersByFact {

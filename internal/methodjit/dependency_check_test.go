@@ -41,6 +41,70 @@ func TestValidateDependencyOrderRejectsUnusedFact(t *testing.T) {
 	}
 }
 
+func TestValidateDependencyOrderTreatsOptionalReadAsConsumerWithoutHardDependency(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:          "OptionalReader",
+				Phase:         Tier2PhaseEarlyCanonical,
+				OptionalReads: analysisFacts(AnalysisFactGlobals),
+				Run:           func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	if err := ValidateDependencyOrder(plan); err != nil {
+		t.Fatalf("optional reads should not require a provider or ordering edge, got: %v", err)
+	}
+}
+
+func TestValidateDependencyOrderCountsOptionalReadAsFactConsumer(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "Provider",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Provides: analysisFacts(AnalysisFactGlobals),
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:          "OptionalReader",
+				Phase:         Tier2PhaseEarlyCanonical,
+				OptionalReads: analysisFacts(AnalysisFactGlobals),
+				Run:           func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	if err := ValidateDependencyOrder(plan); err != nil {
+		t.Fatalf("optional reads should count as consumers without requiring order, got: %v", err)
+	}
+}
+
+func TestValidateDependencyOrderRejectsUnregisteredOptionalRead(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:          "OptionalReader",
+				Phase:         Tier2PhaseEarlyCanonical,
+				OptionalReads: []AnalysisFact{"UnknownOptionalFact"},
+				Run:           func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected unregistered optional read error, got nil")
+	}
+	if !strings.Contains(err.Error(), "optional-reads unregistered fact UnknownOptionalFact") {
+		t.Fatalf("error should report unregistered optional read, got: %v", err)
+	}
+}
+
 func TestValidateDependencyOrderRejectsSelfDependency(t *testing.T) {
 	plan := Tier2OptimizerPlan{
 		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
