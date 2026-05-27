@@ -61,7 +61,10 @@ func TestWriteContract_ProductionPipeline(t *testing.T) {
 	t.Logf("write-contract scan: %d sources, %d protos compiled through pipeline, %d module runs observed",
 		compiled, pipelines, len(allRuns))
 	if len(agg.UnmodeledDomains) > 0 {
-		t.Logf("unmodeled fact domains (contract-coverage gaps, not failures): %v", agg.UnmodeledDomains)
+		t.Logf("unmodeled fact domains (contract-coverage gaps): %v", agg.UnmodeledDomains)
+		if enforce {
+			t.Errorf("%d unmodeled fact domains; add AnalysisFact coverage or set GSCRIPT_ENFORCE_WRITE_CONTRACT=0 while wiring it", len(agg.UnmodeledDomains))
+		}
 	}
 	if len(agg.Violations) > 0 {
 		t.Logf("WRITE-CONTRACT VIOLATIONS (%d):\n  %s", len(agg.Violations),

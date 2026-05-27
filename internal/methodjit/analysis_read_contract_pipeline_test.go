@@ -74,7 +74,10 @@ func TestReadContract_ProductionPipeline(t *testing.T) {
 		len(report.Findings), FormatReadContractFindings(report))
 
 	if stale := report.StaleHintAllowlistEntries(); len(stale) > 0 {
-		t.Logf("knownReadContractHints entries no longer observed (consider removing): %v", stale)
+		t.Logf("knownReadContractHints entries no longer observed: %v", stale)
+		if enforce {
+			t.Errorf("%d stale read-contract hints; remove them or set GSCRIPT_ENFORCE_READ_CONTRACT=0 while refactoring", len(stale))
+		}
 	}
 
 	unexpected := report.UnexpectedFindings()
