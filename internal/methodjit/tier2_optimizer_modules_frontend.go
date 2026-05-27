@@ -192,14 +192,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Provides: analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
-				fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
-				return AnnotateCallABIsPass(CallABIAnnotationConfig{
-					Globals:                 ctxGlobals(ctx),
-					NumericGlobalValues:     fn.Analysis.GlobalFacts().NumericGlobalValuesMap(),
-					GlobalArrayElementFacts: globalArrayFacts,
-					DependencyRegistry:      ctxDependencyRegistry(ctx),
-				})(fn)
+				return runCallABIModule(fn, ctx)
 			},
 		},
 		tier2PassModuleWithCtx("CallReturnProjection", Tier2PhaseCallLower, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
@@ -241,6 +234,24 @@ func callReturnProjectionFacts() []AnalysisFact {
 		AnalysisFactSpecDependencyProtos,
 		AnalysisFactFieldPolyShapeFacts,
 	)
+}
+
+func runCallABIModule(fn *Function, ctx *Tier2OptimizerContext) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return AnnotateCallABIsPass(CallABIAnnotationConfig{
+			Globals:            ctxGlobals(ctx),
+			DependencyRegistry: ctxDependencyRegistry(ctx),
+		})(fn)
+	}
+	globalFacts := fn.Analysis.GlobalFacts()
+	globalArrayFacts := mergeGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
+	globalFacts.SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
+	return AnnotateCallABIsPass(CallABIAnnotationConfig{
+		Globals:                 ctxGlobals(ctx),
+		NumericGlobalValues:     globalFacts.NumericGlobalValuesMap(),
+		GlobalArrayElementFacts: globalArrayFacts,
+		DependencyRegistry:      ctxDependencyRegistry(ctx),
+	})(fn)
 }
 
 func optsNumericGlobalValuesByName(fn *Function, opts *Tier2PipelineOpts) map[string]runtime.Value {
@@ -296,14 +307,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
 			Updates:  analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				globalArrayFacts := mergeGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
-				fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
-				return AnnotateCallABIsPass(CallABIAnnotationConfig{
-					Globals:                 ctxGlobals(ctx),
-					NumericGlobalValues:     fn.Analysis.GlobalFacts().NumericGlobalValuesMap(),
-					GlobalArrayElementFacts: globalArrayFacts,
-					DependencyRegistry:      ctxDependencyRegistry(ctx),
-				})(fn)
+				return runCallABIModule(fn, ctx)
 			},
 		},
 		{
