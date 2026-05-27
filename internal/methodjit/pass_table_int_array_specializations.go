@@ -433,7 +433,10 @@ func tableIntArrayReversePrefixCandidate(header *Block, bodySet map[int]bool) (t
 		return cand, "loop header is not a two-way branch", false
 	}
 	cond := term.Args[0]
-	if cond == nil || cond.Def == nil || (cond.Def.Op != OpLtInt && cond.Def.Op != OpLeInt) || len(cond.Def.Args) != 2 {
+	if cond == nil || cond.Def == nil || len(cond.Def.Args) != 2 {
+		return cand, "loop condition is not < or <= integer bounds", false
+	}
+	if _, ok := orderedRangeRefineKind(cond.Def.Op); !ok {
 		return cand, "loop condition is not < or <= integer bounds", false
 	}
 	phiA := cond.Def.Args[0]

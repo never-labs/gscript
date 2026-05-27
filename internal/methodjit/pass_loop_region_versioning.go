@@ -530,7 +530,7 @@ func tableArrayLoopUpperGuard(li *loopInfo, header *Block) (*Instr, *Block) {
 		return nil, nil
 	}
 	cond := term.Args[0].Def
-	if (cond.Op != OpLtInt && cond.Op != OpLeInt) || len(cond.Args) < 2 {
+	if _, ok := orderedRangeRefineKind(cond.Op); !ok || len(cond.Args) < 2 {
 		return nil, nil
 	}
 	body := li.headerBlocks[header.ID]

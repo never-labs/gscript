@@ -93,8 +93,12 @@ func callReturnProjectionCandidate(fn *Function, instr *Instr, callFacts *CallFa
 }
 
 func fieldShapeTypedPeerProjectionCandidate(instr *Instr, tableShapes *TableShapeFacts) bool {
-	if instr == nil || (instr.Op != OpCall && instr.Op != OpCallFloor) || len(instr.Args) < 2 ||
-		instr.Args[0] == nil || instr.Args[0].Def == nil || tableShapes == nil {
+	if instr == nil || tableShapes == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	if !ok || spec.CallUserArgStart != 1 || len(instr.Args) < 2 ||
+		instr.Args[0] == nil || instr.Args[0].Def == nil {
 		return false
 	}
 	calleeLoad := instr.Args[0].Def
