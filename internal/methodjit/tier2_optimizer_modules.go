@@ -501,7 +501,7 @@ func ValidateTier2OptimizerPlan(plan Tier2OptimizerPlan) (*Tier2ValidatedOptimiz
 	if err := ValidateDependencyOrder(plan); err != nil {
 		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
 	}
-	return &Tier2ValidatedOptimizerPlan{plan: cloneTier2OptimizerPlan(plan)}, nil
+	return &Tier2ValidatedOptimizerPlan{plan: plan}, nil
 }
 
 func validateTier2OptimizerPlanShape(plan Tier2OptimizerPlan) error {
