@@ -245,6 +245,82 @@ func TestRunTier2PipelineUsesValidatedPlan(t *testing.T) {
 	}
 }
 
+func TestValidateTier2OptimizerPlanRejectsMalformedModules(t *testing.T) {
+	validRunner := func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil }
+	tests := []struct {
+		name string
+		plan Tier2OptimizerPlan
+		want string
+	}{
+		{
+			name: "missing runner",
+			plan: Tier2OptimizerPlan{
+				Phases:  []Tier2OptimizerPhase{Tier2PhaseNumeric},
+				Modules: []Tier2OptimizerModule{{Name: "NoRunner", Phase: Tier2PhaseNumeric}},
+			},
+			want: "has no optimizer runner",
+		},
+		{
+			name: "ambiguous runner",
+			plan: Tier2OptimizerPlan{
+				Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+				Modules: []Tier2OptimizerModule{{
+					Name:  "BothRunners",
+					Phase: Tier2PhaseNumeric,
+					Run:   validRunner,
+					RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+						return fn, nil
+					},
+				}},
+			},
+			want: "has both legacy and context optimizer runners",
+		},
+		{
+			name: "missing phase",
+			plan: Tier2OptimizerPlan{
+				Phases:  []Tier2OptimizerPhase{Tier2PhaseNumeric},
+				Modules: []Tier2OptimizerModule{{Name: "WrongPhase", Phase: Tier2PhaseFinalCall, Run: validRunner}},
+			},
+			want: "missing from plan",
+		},
+		{
+			name: "duplicate name",
+			plan: Tier2OptimizerPlan{
+				Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+				Modules: []Tier2OptimizerModule{
+					{Name: "Duplicate", Phase: Tier2PhaseNumeric, Run: validRunner},
+					{Name: "Duplicate", Phase: Tier2PhaseNumeric, Run: validRunner},
+				},
+			},
+			want: "duplicate optimizer module name",
+		},
+		{
+			name: "phase group mismatch",
+			plan: Tier2OptimizerPlan{
+				Phases:  []Tier2OptimizerPhase{Tier2PhaseNumeric},
+				Modules: []Tier2OptimizerModule{{Name: "Grouped", Phase: Tier2PhaseNumeric, Run: validRunner}},
+				PhaseGroups: []Tier2OptimizerPhaseGroup{{
+					Phase:   Tier2PhaseFinalCall,
+					Modules: []Tier2OptimizerModule{{Name: "Grouped", Phase: Tier2PhaseNumeric, Run: validRunner}},
+				}},
+			},
+			want: "phase group final_call is missing from plan phases",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ValidateTier2OptimizerPlan(tt.plan)
+			if err == nil {
+				t.Fatal("expected malformed plan error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want substring %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestRunTier2PipelineFeatureFlagsDisableModuleAndPhase(t *testing.T) {
 	registry := NewModuleRegistry()
 	var ran []string

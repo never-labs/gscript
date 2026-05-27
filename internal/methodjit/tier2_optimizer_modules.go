@@ -2,6 +2,7 @@ package methodjit
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -493,10 +494,70 @@ func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2Opti
 }
 
 func ValidateTier2OptimizerPlan(plan Tier2OptimizerPlan) (*Tier2ValidatedOptimizerPlan, error) {
+	if err := validateTier2OptimizerPlanShape(plan); err != nil {
+		return nil, err
+	}
 	if err := ValidateDependencyOrder(plan); err != nil {
 		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
 	}
 	return &Tier2ValidatedOptimizerPlan{plan: plan}, nil
+}
+
+func validateTier2OptimizerPlanShape(plan Tier2OptimizerPlan) error {
+	var issues []string
+	phases := make(map[Tier2OptimizerPhase]bool, len(plan.Phases))
+	for _, phase := range plan.Phases {
+		if strings.TrimSpace(string(phase)) == "" {
+			issues = append(issues, "optimizer plan contains an empty phase")
+			continue
+		}
+		phases[phase] = true
+	}
+
+	moduleNames := make(map[string]bool, len(plan.Modules))
+	for _, module := range plan.Modules {
+		ref := dependencyModuleRef(module)
+		if strings.TrimSpace(module.Name) == "" {
+			issues = append(issues, fmt.Sprintf("%s has an empty module name", ref))
+		} else if moduleNames[module.Name] {
+			issues = append(issues, fmt.Sprintf("duplicate optimizer module name %q", module.Name))
+		}
+		moduleNames[module.Name] = true
+
+		if strings.TrimSpace(string(module.Phase)) == "" {
+			issues = append(issues, fmt.Sprintf("%s has an empty phase", ref))
+		} else if len(phases) > 0 && !phases[module.Phase] {
+			issues = append(issues, fmt.Sprintf("%s uses phase %s missing from plan", ref, module.Phase))
+		}
+
+		switch {
+		case module.Run == nil && module.RunWithContext == nil:
+			issues = append(issues, fmt.Sprintf("%s has no optimizer runner", ref))
+		case module.Run != nil && module.RunWithContext != nil:
+			issues = append(issues, fmt.Sprintf("%s has both legacy and context optimizer runners", ref))
+		}
+	}
+
+	for _, group := range plan.PhaseGroups {
+		if strings.TrimSpace(string(group.Phase)) == "" {
+			issues = append(issues, "optimizer plan contains a phase group with an empty phase")
+			continue
+		}
+		if len(phases) > 0 && !phases[group.Phase] {
+			issues = append(issues, fmt.Sprintf("phase group %s is missing from plan phases", group.Phase))
+		}
+		for _, module := range group.Modules {
+			if module.Phase != group.Phase {
+				issues = append(issues, fmt.Sprintf("phase group %s contains module %s for phase %s", group.Phase, module.Name, module.Phase))
+			}
+		}
+	}
+
+	if len(issues) == 0 {
+		return nil
+	}
+	sort.Strings(issues)
+	return fmt.Errorf("tier2 optimizer plan shape violations:\n  %s", strings.Join(issues, "\n  "))
 }
 
 func validateTier2OptimizerPlanForRun(ctx *Tier2OptimizerContext, plan Tier2OptimizerPlan) (*Tier2ValidatedOptimizerPlan, error) {
