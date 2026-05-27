@@ -15,11 +15,21 @@ import (
 // native sequence. The optimization is generic over shape id, field index and
 // proto pointer; it does not inspect source names.
 func GuardFieldCalleePass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return guardFieldCalleePass(fn, nil)
+	}
+	return guardFieldCalleePass(fn, fn.Analysis.TableShapeFacts())
+}
+
+func GuardFieldCalleePassCtx(ctx *PassContext) (*Function, error) {
+	return guardFieldCalleePass(ctx.Func(), ctx.TableShape())
+}
+
+func guardFieldCalleePass(fn *Function, tableShapes *TableShapeFacts) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	tableShapes := fn.Analysis.TableShapeFacts()
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {
 		if block == nil || len(block.Instrs) == 0 {
@@ -33,7 +43,7 @@ func GuardFieldCalleePass(fn *Function) (*Function, error) {
 			}
 			if instr.Op == OpGuardCalleeProto && len(instr.Args) == 1 && instr.Args[0] != nil {
 				load := instr.Args[0].Def
-				if aux2, c, hasCase, ok := guardFieldCalleeLoadAux2ForGuard(fn, load, instr.Aux); ok {
+				if aux2, c, hasCase, ok := guardFieldCalleeLoadAux2ForGuardWithFacts(load, instr.Aux, tableShapes); ok {
 					instr.Op = OpGuardFieldCalleeProto
 					instr.Args = []*Value{load.Args[0]}
 					instr.Aux2 = aux2
@@ -46,7 +56,7 @@ func GuardFieldCalleePass(fn *Function) (*Function, error) {
 				}
 			}
 			if instr.Op == OpGetField && uses[instr.ID] == 1 {
-				if nextGuardUsesFusedFieldLoad(fn, block, instr) {
+				if nextGuardUsesFusedFieldLoadWithFacts(block, instr, tableShapes) {
 					changed = true
 					continue
 				}
@@ -61,16 +71,28 @@ func GuardFieldCalleePass(fn *Function) (*Function, error) {
 }
 
 func guardFieldCalleeLoadAux2(fn *Function, instr *Instr) (int64, bool) {
-	aux2, _, _, ok := guardFieldCalleeLoadAux2ForGuard(fn, instr, 0)
+	var tableShapes *TableShapeFacts
+	if fn != nil && fn.Analysis != nil {
+		tableShapes = fn.Analysis.TableShapeFacts()
+	}
+	aux2, _, _, ok := guardFieldCalleeLoadAux2ForGuardWithFacts(instr, 0, tableShapes)
 	return aux2, ok
 }
 
 func guardFieldCalleeLoadAux2ForGuard(fn *Function, instr *Instr, protoPtr int64) (int64, FieldPolyShapeCase, bool, bool) {
+	var tableShapes *TableShapeFacts
+	if fn != nil && fn.Analysis != nil {
+		tableShapes = fn.Analysis.TableShapeFacts()
+	}
+	return guardFieldCalleeLoadAux2ForGuardWithFacts(instr, protoPtr, tableShapes)
+}
+
+func guardFieldCalleeLoadAux2ForGuardWithFacts(instr *Instr, protoPtr int64, tableShapes *TableShapeFacts) (int64, FieldPolyShapeCase, bool, bool) {
 	if instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 == 0 {
-		if fn == nil || instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
+		if tableShapes == nil || instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
 			return 0, FieldPolyShapeCase{}, false, false
 		}
-		cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(instr.ID)
+		cases, _ := tableShapes.FieldPolyShapeCases(instr.ID)
 		if protoPtr != 0 {
 			cases = guardFieldCalleeCasesForProto(cases, uintptr(protoPtr))
 		}
@@ -84,8 +106,8 @@ func guardFieldCalleeLoadAux2ForGuard(fn *Function, instr *Instr, protoPtr int64
 	if shapeID == 0 || fieldIdx < 0 {
 		return 0, FieldPolyShapeCase{}, false, false
 	}
-	if fn != nil {
-		baseCases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(instr.ID)
+	if tableShapes != nil {
+		baseCases, _ := tableShapes.FieldPolyShapeCases(instr.ID)
 		cases := guardFieldCalleeCasesForProto(baseCases, uintptr(protoPtr))
 		if len(cases) == 1 && cases[0].ShapeID == shapeID && cases[0].FieldIdx == fieldIdx {
 			return instr.Aux2, cases[0], true, true
@@ -108,10 +130,18 @@ func guardFieldCalleeCasesForProto(cases []FieldPolyShapeCase, protoPtr uintptr)
 }
 
 func nextGuardUsesFusedFieldLoad(fn *Function, block *Block, load *Instr) bool {
+	var tableShapes *TableShapeFacts
+	if fn != nil && fn.Analysis != nil {
+		tableShapes = fn.Analysis.TableShapeFacts()
+	}
+	return nextGuardUsesFusedFieldLoadWithFacts(block, load, tableShapes)
+}
+
+func nextGuardUsesFusedFieldLoadWithFacts(block *Block, load *Instr, tableShapes *TableShapeFacts) bool {
 	if block == nil {
 		return false
 	}
-	aux2, ok := guardFieldCalleeLoadAux2(fn, load)
+	aux2, _, _, ok := guardFieldCalleeLoadAux2ForGuardWithFacts(load, 0, tableShapes)
 	if !ok {
 		return false
 	}

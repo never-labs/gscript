@@ -68,7 +68,7 @@ func tier2TableArrayNativeLoweringModules() []Tier2OptimizerModule {
 func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("TableArrayStoreLower", Tier2PhaseTableFieldLower, nil, nil, TableArrayStoreLowerPass),
-		tier2PassModuleWith("GuardFieldCallee", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, GuardFieldCalleePass),
+		tier2PassModuleWithCtx("GuardFieldCallee", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, GuardFieldCalleePassCtx),
 		tier2PassModuleWithCtx("FieldPolyLenPhi", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldPolyLenPhiPassCtx),
 		{
 			Name:     "FieldSvalsLower",
@@ -95,7 +95,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 				})(fn)
 			},
 		},
-		tier2PassModuleWith("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, GuardFieldCalleePass),
+		tier2PassModuleWithCtx("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, GuardFieldCalleePassCtx),
 		{
 			Name:     "StableFieldCalleeGuard",
 			Phase:    Tier2PhaseTableFieldLower,
