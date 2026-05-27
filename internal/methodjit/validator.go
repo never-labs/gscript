@@ -16,99 +16,25 @@
 
 package methodjit
 
-import (
-	"fmt"
-)
-
-const opArgMaxAny = -1
-
-// validatorArgPolicy describes the SSA argument-count contract for an IR op.
-// A zero-value policy means the validator does not enforce argument count.
-type validatorArgPolicy struct {
-	Min int
-	Max int
-	Set bool
-}
-
-func fixedOpArgs(n int) validatorArgPolicy {
-	return validatorArgPolicy{Min: n, Max: n, Set: true}
-}
-
-func rangedOpArgs(min, max int) validatorArgPolicy {
-	return validatorArgPolicy{Min: min, Max: max, Set: true}
-}
-
-func (p validatorArgPolicy) accepts(got int) bool {
-	if !p.Set {
-		return true
-	}
-	if got < p.Min {
-		return false
-	}
-	return p.Max == opArgMaxAny || got <= p.Max
-}
-
-func (p validatorArgPolicy) describe() string {
-	if p.Max == opArgMaxAny {
-		return fmt.Sprintf("at least %d", p.Min)
-	}
-	return fmt.Sprintf("%d..%d", p.Min, p.Max)
-}
+import "fmt"
 
 type validatorOpContract struct {
-	Args       validatorArgPolicy
+	Args       OpCountPolicy
 	Terminator bool
-	SuccCount  int // opArgMaxAny means successor count is not checked.
+	SuccCount  int // OpCountAny means successor count is not checked.
 }
 
 func validatorContractForOp(op Op) validatorOpContract {
-	contract := validatorOpContract{SuccCount: opArgMaxAny}
+	contract := validatorOpContract{SuccCount: OpCountAny}
 	if spec, ok := op.Spec(); ok {
+		contract.Args = spec.ArgCount
 		contract.Terminator = spec.Terminator
-	}
-	if int(op) >= 0 && int(op) < len(validatorOpContracts) {
-		contract.Args = validatorOpContracts[op].Args
-		if validatorOpContracts[op].SuccCount != opArgMaxAny {
-			contract.SuccCount = validatorOpContracts[op].SuccCount
+		if spec.SuccCount != OpCountAny {
+			contract.SuccCount = spec.SuccCount
 		}
 	}
 	return contract
 }
-
-var validatorOpContracts = func() [OpMax]validatorOpContract {
-	var contracts [OpMax]validatorOpContract
-	for op := range contracts {
-		contracts[op].SuccCount = opArgMaxAny
-	}
-
-	contracts[OpJump] = validatorOpContract{Args: fixedOpArgs(0), SuccCount: 1}
-	contracts[OpBranch] = validatorOpContract{Args: fixedOpArgs(1), SuccCount: 2}
-	contracts[OpReturn] = validatorOpContract{Args: rangedOpArgs(0, opArgMaxAny), SuccCount: 0}
-
-	contracts[OpSetTable].Args = fixedOpArgs(3)
-	contracts[OpTableArrayStore].Args = rangedOpArgs(5, 6)
-	contracts[OpTableShapeID].Args = fixedOpArgs(1)
-	contracts[OpTableArraySwapPairs].Args = fixedOpArgs(3)
-	contracts[OpGuardType].Args = fixedOpArgs(1)
-	contracts[OpGuardGlobalConst].Args = fixedOpArgs(0)
-	contracts[OpGuardConstString].Args = fixedOpArgs(1)
-	contracts[OpGuardTableKind].Args = fixedOpArgs(1)
-	contracts[OpGuardCalleeProto].Args = fixedOpArgs(1)
-	contracts[OpGuardNonNil].Args = fixedOpArgs(1)
-	contracts[OpGuardTruthy].Args = fixedOpArgs(1)
-	contracts[OpGuardFieldCalleeProto].Args = fixedOpArgs(1)
-	contracts[OpGuardShapeFieldType].Args = fixedOpArgs(0)
-	contracts[OpGuardShapeFieldTypeMask].Args = fixedOpArgs(0)
-	contracts[OpGuardShapeFieldVMClosure].Args = fixedOpArgs(0)
-	contracts[OpFieldSvals].Args = fixedOpArgs(1)
-	contracts[OpFieldLoad].Args = fixedOpArgs(1)
-	contracts[OpFieldLoadNumToFloat].Args = fixedOpArgs(1)
-	contracts[OpFieldStore].Args = fixedOpArgs(2)
-	contracts[OpFieldPolyLen].Args = fixedOpArgs(1)
-	contracts[OpRecordArrayLoopSpecialization].Args = rangedOpArgs(3, 16)
-
-	return contracts
-}()
 
 // Validate checks all structural invariants of a Function's IR.
 // Returns nil if the IR is well-formed, or a list of errors describing violations.
@@ -364,7 +290,7 @@ func (v *validator) checkOpSpecs() {
 		for i, instr := range blk.Instrs {
 			contract := validatorContractForOp(instr.Op)
 			v.checkArgPolicy(blk, instr, contract.Args)
-			if contract.SuccCount == opArgMaxAny || i != len(blk.Instrs)-1 {
+			if contract.SuccCount == OpCountAny || i != len(blk.Instrs)-1 {
 				continue
 			}
 			nSuccs := len(blk.Succs)
@@ -375,7 +301,7 @@ func (v *validator) checkOpSpecs() {
 	}
 }
 
-func (v *validator) checkArgPolicy(blk *Block, instr *Instr, policy validatorArgPolicy) {
+func (v *validator) checkArgPolicy(blk *Block, instr *Instr, policy OpCountPolicy) {
 	if instr == nil || policy.accepts(len(instr.Args)) {
 		return
 	}

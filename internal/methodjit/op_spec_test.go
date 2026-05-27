@@ -55,6 +55,76 @@ func TestOnlyControlTransferOpsAreTerminators(t *testing.T) {
 	}
 }
 
+func TestValidatorCountContractsLiveInOpSpec(t *testing.T) {
+	cases := []struct {
+		op       Op
+		minArgs  int
+		maxArgs  int
+		succs    int
+		hasSuccs bool
+	}{
+		{op: OpSetTable, minArgs: 3, maxArgs: 3},
+		{op: OpGuardGlobalConst, minArgs: 0, maxArgs: 0},
+		{op: OpGuardType, minArgs: 1, maxArgs: 1},
+		{op: OpFieldStore, minArgs: 2, maxArgs: 2},
+		{op: OpRecordArrayLoopSpecialization, minArgs: 3, maxArgs: 16},
+		{op: OpJump, minArgs: 0, maxArgs: 0, succs: 1, hasSuccs: true},
+		{op: OpBranch, minArgs: 1, maxArgs: 1, succs: 2, hasSuccs: true},
+		{op: OpReturn, minArgs: 0, maxArgs: OpCountAny, succs: 0, hasSuccs: true},
+	}
+	for _, tc := range cases {
+		spec, ok := tc.op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", tc.op)
+		}
+		if !spec.ArgCount.Set || spec.ArgCount.Min != tc.minArgs || spec.ArgCount.Max != tc.maxArgs {
+			t.Fatalf("%s ArgCount=%+v, want %d..%d", tc.op, spec.ArgCount, tc.minArgs, tc.maxArgs)
+		}
+		if tc.hasSuccs && spec.SuccCount != tc.succs {
+			t.Fatalf("%s SuccCount=%d, want %d", tc.op, spec.SuccCount, tc.succs)
+		}
+	}
+}
+
+func TestDCEKeepUnusedContractLivesInOpSpec(t *testing.T) {
+	keep := []Op{
+		OpReturn,
+		OpSetTable,
+		OpMatrixSetF,
+		OpCall,
+		OpGuardType,
+		OpForLoop,
+		OpClosure,
+		OpGo,
+	}
+	for _, op := range keep {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.KeepUnused {
+			t.Fatalf("%s should be kept when unused by OpSpec", op)
+		}
+		if !hasSideEffect(&Instr{Op: op}) {
+			t.Fatalf("%s hasSideEffect should be driven by OpSpec KeepUnused", op)
+		}
+	}
+
+	droppable := []Op{OpAddInt, OpConstInt, OpNewTable, OpTableArrayLoad}
+	for _, op := range droppable {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if spec.KeepUnused {
+			t.Fatalf("%s should be droppable when unused by OpSpec", op)
+		}
+		if hasSideEffect(&Instr{Op: op}) {
+			t.Fatalf("%s hasSideEffect should be false through OpSpec KeepUnused", op)
+		}
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}

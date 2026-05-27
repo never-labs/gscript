@@ -53,47 +53,9 @@ func computeUseCounts(fn *Function) map[int]int {
 // hasSideEffect returns true if the instruction has observable side effects
 // and must not be removed even if its result is unused.
 func hasSideEffect(instr *Instr) bool {
-	switch instr.Op {
-	// Control flow: always kept.
-	case OpJump, OpBranch, OpReturn:
-		return true
-
-	// Store operations: mutate state.
-	case OpStoreSlot, OpSetGlobal, OpSetUpval:
-		return true
-
-	// Table mutations: observable.
-	case OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix, OpRecordArrayLoopSpecialization, OpFieldStore, OpSetField, OpSetList, OpAppend:
-		return true
-
-	// DenseMatrix writes: observable. Without this, DCE silently drops
-	// matrix.setf since its SSA result is never read; JIT produces zeros
-	// where VM mode produces correct values. This is a correctness rule, not
-	// a performance-only matrix specialization.
-	case OpMatrixSetF, OpMatrixStoreFAt, OpMatrixStoreFRow, OpMatrixStoreFRowConst:
-		return true
-
-	// Calls and coroutine transfers have arbitrary side effects.
-	case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf:
-		return true
-
-	// Guards: deoptimization side effect.
-	case OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure, OpGuardNonNil, OpGuardTruthy:
-		return true
-
-	// For-loop control: always kept.
-	case OpForPrep, OpForLoop, OpTForCall, OpTForLoop:
-		return true
-
-	// Closure creation may capture state.
-	case OpClosure, OpClose:
-		return true
-
-	// Channel/goroutine operations: always side-effectful.
-	case OpGo, OpMakeChan, OpSend, OpRecv:
-		return true
-
-	default:
+	if instr == nil {
 		return false
 	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.KeepUnused
 }

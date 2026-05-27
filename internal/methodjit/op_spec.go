@@ -1,5 +1,7 @@
 package methodjit
 
+import "fmt"
+
 // OpSideEffect describes the broad runtime effects an IR op may have.
 type OpSideEffect uint8
 
@@ -57,6 +59,41 @@ const (
 	OpArgControl
 )
 
+const OpCountAny = -1
+
+// OpCountPolicy describes an optional validator count contract. When Set is
+// false, the validator does not enforce the count.
+type OpCountPolicy struct {
+	Min int
+	Max int
+	Set bool
+}
+
+func OpFixedCount(n int) OpCountPolicy {
+	return OpCountPolicy{Min: n, Max: n, Set: true}
+}
+
+func OpRangedCount(min, max int) OpCountPolicy {
+	return OpCountPolicy{Min: min, Max: max, Set: true}
+}
+
+func (p OpCountPolicy) accepts(got int) bool {
+	if !p.Set {
+		return true
+	}
+	if got < p.Min {
+		return false
+	}
+	return p.Max == OpCountAny || got <= p.Max
+}
+
+func (p OpCountPolicy) describe() string {
+	if p.Max == OpCountAny {
+		return fmt.Sprintf("at least %d", p.Min)
+	}
+	return fmt.Sprintf("%d..%d", p.Min, p.Max)
+}
+
 // OpBackendPolicy describes backend-local cache and verification effects that
 // are easy to miss in emit_dispatch.go.
 type OpBackendPolicy uint16
@@ -77,6 +114,9 @@ type OpSpec struct {
 	Terminator    bool
 	SideEffect    OpSideEffect
 	ArgPolicy     OpArgPolicy
+	ArgCount      OpCountPolicy
+	SuccCount     int // OpCountAny means successor count is not checked.
+	KeepUnused    bool
 	EmitterFamily OpEmitterFamily
 	MayDeopt      bool
 	BackendPolicy OpBackendPolicy
@@ -87,14 +127,22 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		Name:          name,
 		SideEffect:    effect,
 		ArgPolicy:     args,
+		SuccCount:     OpCountAny,
 		EmitterFamily: family,
 		MayDeopt:      mayDeopt,
 	}
 }
 
-func opTerminatorSpec(name string, args OpArgPolicy) OpSpec {
+func opTerminatorSpec(name string, args OpArgPolicy, argCount OpCountPolicy, succCount int) OpSpec {
 	spec := opSpec(name, OpEmitterControl, args, OpSideEffectControl, false)
 	spec.Terminator = true
+	spec.ArgCount = argCount
+	spec.SuccCount = succCount
+	return spec
+}
+
+func opSpecArgCount(spec OpSpec, count OpCountPolicy) OpSpec {
+	spec.ArgCount = count
 	return spec
 }
 
@@ -144,7 +192,7 @@ var opSpecs = [...]OpSpec{
 	OpFMSUB:                         opSpec("FMSUB", OpEmitterArithmetic, OpArgFixed, OpSideEffectNone, false),
 	OpComplexEscapeInSet:            opSpec("ComplexEscapeInSet", OpEmitterSpecialization, OpArgFixedAux, OpSideEffectNone, false),
 	OpComplexEscapeRowCount:         opSpec("ComplexEscapeRowCount", OpEmitterSpecialization, OpArgFixedAux, OpSideEffectNone, false),
-	OpRecordArrayLoopSpecialization: opSpec("RecordArrayLoopSpecialization", OpEmitterSpecialization, OpArgVariadicAux, OpSideEffectReadWrite, true),
+	OpRecordArrayLoopSpecialization: opSpecArgCount(opSpec("RecordArrayLoopSpecialization", OpEmitterSpecialization, OpArgVariadicAux, OpSideEffectReadWrite, true), OpRangedCount(3, 16)),
 	OpEq:                            opSpec("Eq", OpEmitterCompare, OpArgFixed, OpSideEffectNone, true),
 	OpLt:                            opSpec("Lt", OpEmitterCompare, OpArgFixed, OpSideEffectNone, true),
 	OpLe:                            opSpec("Le", OpEmitterCompare, OpArgFixed, OpSideEffectNone, true),
@@ -167,15 +215,15 @@ var opSpecs = [...]OpSpec{
 	OpNewTable:                      opSpec("NewTable", OpEmitterTable, OpArgAux, OpSideEffectAllocate, true),
 	OpNewFixedTable:                 opSpec("NewFixedTable", OpEmitterTable, OpArgVariadicAux, OpSideEffectAllocate, true),
 	OpGetTable:                      opSpec("GetTable", OpEmitterTable, OpArgFixed, OpSideEffectRead, true),
-	OpSetTable:                      opSpec("SetTable", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
+	OpSetTable:                      opSpecArgCount(opSpec("SetTable", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true), OpFixedCount(3)),
 	OpTableArrayHeader:              opSpec("TableArrayHeader", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true),
 	OpTableArrayLen:                 opSpec("TableArrayLen", OpEmitterTable, OpArgFixed, OpSideEffectRead, false),
 	OpTableArrayData:                opSpec("TableArrayData", OpEmitterTable, OpArgFixed, OpSideEffectRead, false),
 	OpTableArrayLoad:                opSpec("TableArrayLoad", OpEmitterTable, OpArgFixed, OpSideEffectRead, true),
-	OpTableShapeID:                  opSpec("TableShapeID", OpEmitterTable, OpArgFixed, OpSideEffectRead, true),
-	OpTableArrayStore:               opSpec("TableArrayStore", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
+	OpTableShapeID:                  opSpecArgCount(opSpec("TableShapeID", OpEmitterTable, OpArgFixed, OpSideEffectRead, true), OpFixedCount(1)),
+	OpTableArrayStore:               opSpecArgCount(opSpec("TableArrayStore", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true), OpRangedCount(5, 6)),
 	OpTableArraySwap:                opSpec("TableArraySwap", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
-	OpTableArraySwapPairs:           opSpec("TableArraySwapPairs", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
+	OpTableArraySwapPairs:           opSpecArgCount(opSpec("TableArraySwapPairs", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true), OpFixedCount(3)),
 	OpTableBoolArrayFill:            opSpec("TableBoolArrayFill", OpEmitterTable, OpArgVariadicAux, OpSideEffectWrite, true),
 	OpTableBoolArrayCount:           opSpec("TableBoolArrayCount", OpEmitterTable, OpArgFixed, OpSideEffectRead, true),
 	OpTableIntArrayReversePrefix:    opSpec("TableIntArrayReversePrefix", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
@@ -183,11 +231,11 @@ var opSpecs = [...]OpSpec{
 	OpTableArrayNestedLoad:          opSpec("TableNestedLoad", OpEmitterTable, OpArgFixedAux, OpSideEffectRead, true),
 	OpGetField:                      opSpec("GetField", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
 	OpGetFieldNumToFloat:            opSpec("GetFieldNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
-	OpFieldPolyLen:                  opSpec("FieldPolyLen", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true),
-	OpFieldSvals:                    opSpec("FieldSvals", OpEmitterField, OpArgFixed, OpSideEffectRead, true),
-	OpFieldLoad:                     opSpec("FieldLoad", OpEmitterField, OpArgFixedAux, OpSideEffectRead, false),
-	OpFieldLoadNumToFloat:           opSpec("FieldLoadNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, false),
-	OpFieldStore:                    opSpec("FieldStore", OpEmitterField, OpArgFixedAux, OpSideEffectWrite, false),
+	OpFieldPolyLen:                  opSpecArgCount(opSpec("FieldPolyLen", OpEmitterField, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpFieldSvals:                    opSpecArgCount(opSpec("FieldSvals", OpEmitterField, OpArgFixed, OpSideEffectRead, true), OpFixedCount(1)),
+	OpFieldLoad:                     opSpecArgCount(opSpec("FieldLoad", OpEmitterField, OpArgFixedAux, OpSideEffectRead, false), OpFixedCount(1)),
+	OpFieldLoadNumToFloat:           opSpecArgCount(opSpec("FieldLoadNumToFloat", OpEmitterField, OpArgFixedAux, OpSideEffectRead, false), OpFixedCount(1)),
+	OpFieldStore:                    opSpecArgCount(opSpec("FieldStore", OpEmitterField, OpArgFixedAux, OpSideEffectWrite, false), OpFixedCount(2)),
 	OpSetField:                      opSpec("SetField", OpEmitterField, OpArgFixedAux, OpSideEffectWrite, true),
 	OpSetList:                       opSpec("SetList", OpEmitterTable, OpArgVariadic, OpSideEffectWrite, true),
 	OpAppend:                        opSpec("Append", OpEmitterTable, OpArgFixed, OpSideEffectWrite, true),
@@ -200,21 +248,21 @@ var opSpecs = [...]OpSpec{
 	OpUnboxInt:                      opSpec("UnboxInt", OpEmitterConversion, OpArgFixed, OpSideEffectNone, true),
 	OpUnboxFloat:                    opSpec("UnboxFloat", OpEmitterConversion, OpArgFixed, OpSideEffectNone, true),
 	OpNumToFloat:                    opSpec("NumToFloat", OpEmitterConversion, OpArgFixed, OpSideEffectNone, true),
-	OpGuardType:                     opSpec("GuardType", OpEmitterGuard, OpArgFixedAux, OpSideEffectNone, true),
+	OpGuardType:                     opSpecArgCount(opSpec("GuardType", OpEmitterGuard, OpArgFixedAux, OpSideEffectNone, true), OpFixedCount(1)),
 	OpGuardIntRange:                 opSpec("GuardIntRange", OpEmitterGuard, OpArgFixedAux, OpSideEffectNone, true),
-	OpGuardGlobalConst:              opSpec("GuardGlobalConst", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardConstString:              opSpec("GuardConstString", OpEmitterGuard, OpArgFixedAux, OpSideEffectNone, true),
-	OpGuardTableKind:                opSpec("GuardTableKind", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardCalleeProto:              opSpec("GuardCalleeProto", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardFieldCalleeProto:         opSpec("GuardFieldCalleeProto", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardShapeFieldType:           opSpec("GuardShapeFieldType", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardShapeFieldTypeMask:       opSpec("GuardShapeFieldTypeMask", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardShapeFieldVMClosure:      opSpec("GuardShapeFieldVMClosure", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true),
-	OpGuardNonNil:                   opSpec("GuardNonNil", OpEmitterGuard, OpArgFixed, OpSideEffectNone, true),
-	OpGuardTruthy:                   opSpec("GuardTruthy", OpEmitterGuard, OpArgFixed, OpSideEffectNone, true),
-	OpJump:                          opTerminatorSpec("Jump", OpArgControl),
-	OpBranch:                        opTerminatorSpec("Branch", OpArgControl),
-	OpReturn:                        opTerminatorSpec("Return", OpArgVariadic),
+	OpGuardGlobalConst:              opSpecArgCount(opSpec("GuardGlobalConst", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(0)),
+	OpGuardConstString:              opSpecArgCount(opSpec("GuardConstString", OpEmitterGuard, OpArgFixedAux, OpSideEffectNone, true), OpFixedCount(1)),
+	OpGuardTableKind:                opSpecArgCount(opSpec("GuardTableKind", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpGuardCalleeProto:              opSpecArgCount(opSpec("GuardCalleeProto", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpGuardFieldCalleeProto:         opSpecArgCount(opSpec("GuardFieldCalleeProto", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(1)),
+	OpGuardShapeFieldType:           opSpecArgCount(opSpec("GuardShapeFieldType", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(0)),
+	OpGuardShapeFieldTypeMask:       opSpecArgCount(opSpec("GuardShapeFieldTypeMask", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(0)),
+	OpGuardShapeFieldVMClosure:      opSpecArgCount(opSpec("GuardShapeFieldVMClosure", OpEmitterGuard, OpArgFixedAux, OpSideEffectRead, true), OpFixedCount(0)),
+	OpGuardNonNil:                   opSpecArgCount(opSpec("GuardNonNil", OpEmitterGuard, OpArgFixed, OpSideEffectNone, true), OpFixedCount(1)),
+	OpGuardTruthy:                   opSpecArgCount(opSpec("GuardTruthy", OpEmitterGuard, OpArgFixed, OpSideEffectNone, true), OpFixedCount(1)),
+	OpJump:                          opTerminatorSpec("Jump", OpArgControl, OpFixedCount(0), 1),
+	OpBranch:                        opTerminatorSpec("Branch", OpArgControl, OpFixedCount(1), 2),
+	OpReturn:                        opTerminatorSpec("Return", OpArgVariadic, OpRangedCount(0, OpCountAny), 0),
 	OpCall:                          opSpec("Call", OpEmitterCall, OpArgVariadic, OpSideEffectCall, true),
 	OpCallFloor:                     opSpec("CallFloor", OpEmitterCall, OpArgVariadic, OpSideEffectCall, true),
 	OpFieldCallFloor:                opSpec("FieldCallFloor", OpEmitterCall, OpArgVariadic, OpSideEffectCall, true),
@@ -242,6 +290,9 @@ func (op Op) Spec() (OpSpec, bool) {
 		spec := opSpecs[op]
 		if int(op) < len(opBackendPolicies) {
 			spec.BackendPolicy = opBackendPolicies[op]
+		}
+		if int(op) < len(opKeepUnusedPolicies) {
+			spec.KeepUnused = opKeepUnusedPolicies[op]
 		}
 		return spec, true
 	}
@@ -369,4 +420,57 @@ var opBackendPolicies = [...]OpBackendPolicy{
 	OpAppend:                        OpBackendClearsTableArrayBounds,
 	OpPow:                           OpBackendClearsTableArrayBounds,
 	OpGuardNonNil:                   OpBackendClearsTableArrayBounds,
+}
+
+var opKeepUnusedPolicies = [...]bool{
+	OpJump:                          true,
+	OpBranch:                        true,
+	OpReturn:                        true,
+	OpStoreSlot:                     true,
+	OpSetGlobal:                     true,
+	OpSetUpval:                      true,
+	OpSetTable:                      true,
+	OpTableArrayStore:               true,
+	OpTableArraySwap:                true,
+	OpTableArraySwapPairs:           true,
+	OpTableBoolArrayFill:            true,
+	OpTableIntArrayReversePrefix:    true,
+	OpTableIntArrayCopyPrefix:       true,
+	OpRecordArrayLoopSpecialization: true,
+	OpFieldStore:                    true,
+	OpSetField:                      true,
+	OpSetList:                       true,
+	OpAppend:                        true,
+	OpMatrixSetF:                    true,
+	OpMatrixStoreFAt:                true,
+	OpMatrixStoreFRow:               true,
+	OpMatrixStoreFRowConst:          true,
+	OpCall:                          true,
+	OpCallFloor:                     true,
+	OpFieldCallFloor:                true,
+	OpResume:                        true,
+	OpYield:                         true,
+	OpSelf:                          true,
+	OpGuardType:                     true,
+	OpGuardIntRange:                 true,
+	OpGuardGlobalConst:              true,
+	OpGuardConstString:              true,
+	OpGuardTableKind:                true,
+	OpGuardCalleeProto:              true,
+	OpGuardFieldCalleeProto:         true,
+	OpGuardShapeFieldType:           true,
+	OpGuardShapeFieldTypeMask:       true,
+	OpGuardShapeFieldVMClosure:      true,
+	OpGuardNonNil:                   true,
+	OpGuardTruthy:                   true,
+	OpForPrep:                       true,
+	OpForLoop:                       true,
+	OpTForCall:                      true,
+	OpTForLoop:                      true,
+	OpClosure:                       true,
+	OpClose:                         true,
+	OpGo:                            true,
+	OpMakeChan:                      true,
+	OpSend:                          true,
+	OpRecv:                          true,
 }
