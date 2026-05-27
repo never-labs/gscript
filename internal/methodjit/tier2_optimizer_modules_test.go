@@ -494,10 +494,11 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 				},
 			},
 			{
-				Name:     "FailingModule",
-				Phase:    Tier2PhaseNumeric,
-				Requires: analysisFacts(AnalysisFactIntRanges),
-				Updates:  analysisFacts(AnalysisFactInt48Safe),
+				Name:          "FailingModule",
+				Phase:         Tier2PhaseNumeric,
+				Requires:      analysisFacts(AnalysisFactIntRanges),
+				Updates:       analysisFacts(AnalysisFactInt48Safe),
+				OptionalReads: analysisFacts(AnalysisFactGlobals),
 				Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
 					return fn, wantErr
 				},
@@ -539,6 +540,17 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	if len(run.Updates) != 1 || run.Updates[0] != AnalysisFactInt48Safe {
 		t.Fatalf("run updates = %v, want Int48Safe", run.Updates)
 	}
+	if len(run.OptionalReads) != 1 || run.OptionalReads[0] != AnalysisFactGlobals {
+		t.Fatalf("run optional reads = %v, want Globals", run.OptionalReads)
+	}
+	contract := run.Contract()
+	if len(contract.OptionalReads) != 1 || contract.OptionalReads[0] != AnalysisFactGlobals {
+		t.Fatalf("contract optional reads = %v, want Globals", contract.OptionalReads)
+	}
+	contract.OptionalReads[0] = AnalysisFactIntRanges
+	if run.OptionalReads[0] != AnalysisFactGlobals {
+		t.Fatalf("run optional reads aliased contract clone: %v", run.OptionalReads)
+	}
 	if run.Duration < 0 {
 		t.Fatalf("duration = %s, want non-negative", run.Duration)
 	}
@@ -547,6 +559,21 @@ func TestTier2OptimizerModuleFailureRecordsScope(t *testing.T) {
 	}
 	if timings[1].Name != wantStage || timings[1].Error != wantErr.Error() || !timings[1].Nested {
 		t.Fatalf("unexpected timing: %+v", timings[1])
+	}
+}
+
+func TestFormatTier2ModuleContractsIncludesOptionalReads(t *testing.T) {
+	text := FormatTier2ModuleContracts([]Tier2ModuleContract{
+		{
+			Phase:         Tier2PhaseNumeric,
+			ModuleName:    "OptionalReader",
+			StageName:     "RunTier2Pipeline/numeric/OptionalReader",
+			Requires:      analysisFacts(AnalysisFactIntRanges),
+			OptionalReads: analysisFacts(AnalysisFactGlobals),
+		},
+	})
+	if !strings.Contains(text, "optional: Globals") {
+		t.Fatalf("contract text missing optional reads:\n%s", text)
 	}
 }
 
