@@ -567,26 +567,6 @@ func fieldSvalsLowerable(fn *Function, instr *Instr) bool {
 	return shapeID != 0 && fieldIdx >= 0
 }
 
-func opIsFieldRead(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.FieldRead
-}
-
-func opIsFieldSlotLoad(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.FieldSlotLoad
-}
-
-func opIsFieldWrite(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.FieldWrite
-}
-
-func opIsLiteralConst(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.LiteralConst
-}
-
 func fieldSvalsStoreLowerable(instr *Instr) bool {
 	if instr == nil || instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil || instr.Aux2 == 0 {
 		return false
