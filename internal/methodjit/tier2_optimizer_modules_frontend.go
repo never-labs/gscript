@@ -173,6 +173,12 @@ func tier2PostInlinePassModuleWith(name string, provides []AnalysisFact, pass Pa
 }
 
 func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+	callABIAllowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactFixedShapeTables),
+		analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
+		nil,
+		"CallABI",
+	)
 	guardedConstCallFoldAllowed := allowedDomainsForModule(
 		analysisFacts(AnalysisFactCallABIs),
 		analysisFacts(AnalysisFactGuardedConstCallFolds),
@@ -192,7 +198,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Provides: analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				return runCallABIModule(fn, ctx)
+				return runCallABIModule(fn, ctx, newPassContext(fn, opts, callABIAllowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWithCtx("CallReturnProjection", Tier2PhaseCallLower, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
@@ -236,21 +242,22 @@ func callReturnProjectionFacts() []AnalysisFact {
 	)
 }
 
-func runCallABIModule(fn *Function, ctx *Tier2OptimizerContext) (*Function, error) {
+func runCallABIModule(fn *Function, optCtx *Tier2OptimizerContext, passCtx *PassContext) (*Function, error) {
 	if fn == nil || fn.Analysis == nil {
 		return AnnotateCallABIsPass(CallABIAnnotationConfig{
-			Globals:            ctxGlobals(ctx),
-			DependencyRegistry: ctxDependencyRegistry(ctx),
+			Globals:            ctxGlobals(optCtx),
+			DependencyRegistry: ctxDependencyRegistry(optCtx),
 		})(fn)
 	}
-	globalFacts := fn.Analysis.GlobalFacts()
-	globalArrayFacts := mergeGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFactsWithFacts(fn, fn.Analysis.TableShapeFacts()))
+	globalFacts := passCtx.Global()
+	tableShapes := passCtx.TableShape()
+	globalArrayFacts := mergeGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFactsWithFacts(fn, tableShapes))
 	globalFacts.SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
 	return AnnotateCallABIsPass(CallABIAnnotationConfig{
-		Globals:                 ctxGlobals(ctx),
+		Globals:                 ctxGlobals(optCtx),
 		NumericGlobalValues:     globalFacts.NumericGlobalValuesMap(),
 		GlobalArrayElementFacts: globalArrayFacts,
-		DependencyRegistry:      ctxDependencyRegistry(ctx),
+		DependencyRegistry:      ctxDependencyRegistry(optCtx),
 	})(fn)
 }
 
@@ -294,6 +301,12 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 }
 
 func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+	callABIFinalAllowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
+		nil,
+		analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
+		"CallABI (final)",
+	)
 	callSiteRuntimeSpecializationFinalAllowed := allowedDomainsForModule(
 		analysisFacts(AnalysisFactCallABIs),
 		nil,
@@ -307,7 +320,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
 			Updates:  analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				return runCallABIModule(fn, ctx)
+				return runCallABIModule(fn, ctx, newPassContext(fn, opts, callABIFinalAllowed, passContextEnforce))
 			},
 		},
 		{
