@@ -10,9 +10,22 @@ import (
 // constructors into one value-producing op after escape analysis has had a
 // chance to scalar-replace the expanded NewTable+SetField form.
 func FixedTableConstructorLoweringPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return fixedTableConstructorLoweringPass(fn, nil)
+	}
+	return fixedTableConstructorLoweringPass(fn, fn.Analysis.TableShapeFacts())
+}
+
+func FixedTableConstructorLoweringPassCtx(ctx *PassContext) (*Function, error) {
+	return fixedTableConstructorLoweringPass(ctx.Func(), ctx.TableShape())
+}
+
+func fixedTableConstructorLoweringPass(fn *Function, tableShapes *TableShapeFacts) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
 	fn.ensureAnalysis()
-	tableShapes := fn.Analysis.TableShapeFacts()
-	if tableShapes.FixedTableConstructorCount() > 0 {
+	if tableShapes != nil && tableShapes.FixedTableConstructorCount() > 0 {
 		for _, block := range fn.Blocks {
 			for i, instr := range block.Instrs {
 				if instr == nil || instr.Op != OpNewTable {
