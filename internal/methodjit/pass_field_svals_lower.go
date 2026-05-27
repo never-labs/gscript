@@ -288,14 +288,6 @@ func crossBlockFieldSvalsSafe(fn *Function, dom *domInfo, key fieldSvalsLowerKey
 	return true
 }
 
-func crossBlockFieldSvalsGlobalBarrier(instr *Instr) bool {
-	if instr == nil {
-		return true
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.FieldSvalsCrossBlockBarrier
-}
-
 func crossBlockExistingFieldSvalsLower(fn *Function) bool {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return false
@@ -591,8 +583,7 @@ func fieldSvalsGlobalBarrier(instr *Instr) bool {
 		OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix:
 		return len(instr.Args) == 0 || instr.Args[0] == nil
 	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.FieldSvalsGlobalBarrier
+	return opIsFieldSvalsGlobalBarrier(instr)
 }
 
 func fieldSvalsMutationTableID(instr *Instr) (int, bool) {
@@ -606,8 +597,7 @@ func fieldSvalsMutationTableID(instr *Instr) (int, bool) {
 		}
 		return instr.Args[0].ID, true
 	default:
-		spec, ok := instr.Op.Spec()
-		if !ok || !spec.TableMutationFirstArg {
+		if !opIsTableMutationFirstArg(instr.Op) {
 			return 0, false
 		}
 		return instr.Args[0].ID, true
@@ -624,15 +614,4 @@ func fieldSvalsSetFieldPreservesShape(instr *Instr) bool {
 		return false
 	}
 	return valueProvenNonNil(instr.Args[1])
-}
-
-func valueProvenNonNil(v *Value) bool {
-	if v == nil || v.Def == nil {
-		return false
-	}
-	spec, ok := v.Def.Op.Spec()
-	if ok && spec.ProvesNonNilResult {
-		return true
-	}
-	return v.Def.Type == TypeInt || v.Def.Type == TypeFloat || v.Def.Type == TypeBool || v.Def.Type == TypeString || v.Def.Type == TypeTable
 }

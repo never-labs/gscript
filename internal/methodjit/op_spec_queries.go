@@ -220,6 +220,14 @@ func instructionHasNoSSAResult(instr *Instr) bool {
 	return ok && spec.NoSSAResult
 }
 
+func hasSideEffect(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.KeepUnused
+}
+
 func needsFloatReg(instr *Instr) bool {
 	if instr == nil {
 		return false
@@ -263,6 +271,43 @@ func isRawDataPtrOp(op Op) bool {
 func isRawFloatOp(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.RawFloatResult
+}
+
+func opIsGlobalConstUnsafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.GlobalConstUnsafe
+}
+
+func opMayCallOrRunConcurrently(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.MayCallOrRunConcurrently()
+}
+
+func crossBlockFieldSvalsGlobalBarrier(instr *Instr) bool {
+	if instr == nil {
+		return true
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldSvalsCrossBlockBarrier
+}
+
+func opIsFieldSvalsGlobalBarrier(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldSvalsGlobalBarrier
+}
+
+func valueProvenNonNil(v *Value) bool {
+	if v == nil || v.Def == nil {
+		return false
+	}
+	spec, ok := v.Def.Op.Spec()
+	if ok && spec.ProvesNonNilResult {
+		return true
+	}
+	return v.Def.Type == TypeInt || v.Def.Type == TypeFloat || v.Def.Type == TypeBool || v.Def.Type == TypeString || v.Def.Type == TypeTable
 }
 
 func isModuloReducibleCallFloor(instr *Instr) bool {

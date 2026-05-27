@@ -49,13 +49,3 @@ func computeUseCounts(fn *Function) map[int]int {
 	}
 	return counts
 }
-
-// hasSideEffect returns true if the instruction has observable side effects
-// and must not be removed even if its result is unused.
-func hasSideEffect(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.KeepUnused
-}

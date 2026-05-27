@@ -115,8 +115,7 @@ func globalConstFunctionSafe(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			spec, ok := instr.Op.Spec()
-			if ok && spec.GlobalConstUnsafe {
+			if opIsGlobalConstUnsafe(instr.Op) {
 				return false
 			}
 		}
