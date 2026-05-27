@@ -5,6 +5,17 @@ package methodjit
 // Unlike profiled length ranges, this is a structural proof: no runtime guard
 // is needed because the dominating predecessor writes determine the value.
 func FieldLenFoldPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return fieldLenFoldPass(fn, nil, nil)
+	}
+	return fieldLenFoldPass(fn, fn.Analysis.TableShapeFacts(), fn.Analysis.NumericFacts())
+}
+
+func FieldLenFoldPassCtx(ctx *PassContext) (*Function, error) {
+	return fieldLenFoldPass(ctx.Func(), ctx.TableShape(), ctx.Numeric())
+}
+
+func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts) (*Function, error) {
 	if fn == nil || fn.Proto == nil {
 		return fn, nil
 	}
@@ -15,7 +26,7 @@ func FieldLenFoldPass(fn *Function) (*Function, error) {
 			if instr == nil || instr.Op != OpLen || len(instr.Args) < 1 || instr.Args[0] == nil || instr.Args[0].Def == nil {
 				continue
 			}
-			if foldPhiStringLen(fn, block, instr) {
+			if foldPhiStringLen(fn, block, instr, numeric) {
 				continue
 			}
 			get := unwrapFieldLenInput(instr.Args[0]).Def
@@ -45,13 +56,13 @@ func FieldLenFoldPass(fn *Function) (*Function, error) {
 						continue
 					}
 				}
-				if lowerFieldPolyLen(fn, instr, get, mutations) {
+				if lowerFieldPolyLen(fn, instr, get, mutations, tableShapes, numeric) {
 					functionRemarks(fn).Add("FieldLenFold", "changed", block.ID, instr.ID, instr.Op,
 						"lowered len(field) to guarded polymorphic field length")
 					continue
 				}
 			}
-			if foldProfiledExactLen(fn, block, instr, mutations) {
+			if foldProfiledExactLen(fn, block, instr, mutations, numeric) {
 				continue
 			}
 		}
@@ -60,12 +71,23 @@ func FieldLenFoldPass(fn *Function) (*Function, error) {
 }
 
 func ProfiledStringLenFoldPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return profiledStringLenFoldPass(fn, nil, nil)
+	}
+	return profiledStringLenFoldPass(fn, fn.Analysis.TableShapeFacts(), fn.Analysis.NumericFacts())
+}
+
+func ProfiledStringLenFoldPassCtx(ctx *PassContext) (*Function, error) {
+	return profiledStringLenFoldPass(ctx.Func(), ctx.TableShape(), ctx.Numeric())
+}
+
+func profiledStringLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts) (*Function, error) {
 	if fn == nil || fn.Proto == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
 	mutations := collectFieldLenMutations(fn)
-	fieldLoadLens := fieldLoadExactLenFacts(fn, mutations)
+	fieldLoadLens := fieldLoadExactLenFacts(fn, mutations, tableShapes)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpLen || len(instr.Args) < 1 || instr.Args[0] == nil {
@@ -74,16 +96,16 @@ func ProfiledStringLenFoldPass(fn *Function) (*Function, error) {
 			if foldExactLenFromMap(fn, block, instr, fieldLoadLens) {
 				continue
 			}
-			if foldProfiledExactLen(fn, block, instr, mutations) {
+			if foldProfiledExactLen(fn, block, instr, mutations, numeric) {
 				continue
 			}
-			foldPhiStringLen(fn, block, instr)
+			foldPhiStringLen(fn, block, instr, numeric)
 		}
 	}
 	return fn, nil
 }
 
-func fieldLoadExactLenFacts(fn *Function, mutations fieldLenMutationIndex) map[int]intRange {
+func fieldLoadExactLenFacts(fn *Function, mutations fieldLenMutationIndex, tableShapes *TableShapeFacts) map[int]intRange {
 	if fn == nil {
 		return nil
 	}
@@ -99,7 +121,7 @@ func fieldLoadExactLenFacts(fn *Function, mutations fieldLenMutationIndex) map[i
 				if len(instr.Args) == 0 || instr.Args[0] == nil {
 					continue
 				}
-				fact, ok := fixedShapeFactForValue(fn, instr.Args[0].ID)
+				fact, ok := fixedShapeFactForValue(fn, instr.Args[0].ID, tableShapes)
 				if !ok || fact.ShapeID == 0 || uint32(instr.Aux) != fact.ShapeID {
 					continue
 				}
@@ -132,15 +154,14 @@ func fieldLoadExactLenFacts(fn *Function, mutations fieldLenMutationIndex) map[i
 	return out
 }
 
-func fixedShapeFactForValue(fn *Function, id int) (FixedShapeTableFact, bool) {
-	if fn == nil {
+func fixedShapeFactForValue(fn *Function, id int, tableShapes *TableShapeFacts) (FixedShapeTableFact, bool) {
+	if fn == nil || tableShapes == nil {
 		return FixedShapeTableFact{}, false
 	}
-	ts := fn.Analysis.TableShapeFacts()
-	if fact, ok := ts.FixedShapeTableFactFor(id); ok {
+	if fact, ok := tableShapes.FixedShapeTableFactFor(id); ok {
 		return fact, true
 	}
-	if fact, ok := ts.FixedShapeArgFact(id); ok {
+	if fact, ok := tableShapes.FixedShapeArgFact(id); ok {
 		return fact, true
 	}
 	return FixedShapeTableFact{}, false
@@ -164,14 +185,17 @@ func foldExactLenFromMap(fn *Function, block *Block, lenInstr *Instr, lens map[i
 	return true
 }
 
-func foldProfiledExactLen(fn *Function, block *Block, lenInstr *Instr, mutations fieldLenMutationIndex) bool {
+func foldProfiledExactLen(fn *Function, block *Block, lenInstr *Instr, mutations fieldLenMutationIndex, numeric *NumericFacts) bool {
 	if fn == nil || lenInstr == nil || len(lenInstr.Args) == 0 || lenInstr.Args[0] == nil {
 		return false
 	}
 	if profiledLenFoldReadsMutatedField(fn, lenInstr.Args[0], mutations) {
 		return false
 	}
-	r, ok := functionNumericFacts(fn).ProfiledLenRange(lenInstr.Args[0].ID)
+	if numeric == nil {
+		return false
+	}
+	r, ok := numeric.ProfiledLenRange(lenInstr.Args[0].ID)
 	if !ok || !r.known || r.min != r.max || r.min < 0 {
 		return false
 	}
@@ -185,8 +209,11 @@ func foldProfiledExactLen(fn *Function, block *Block, lenInstr *Instr, mutations
 	return true
 }
 
-func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr) bool {
+func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr, numeric *NumericFacts) bool {
 	if fn == nil || block == nil || lenInstr == nil || len(lenInstr.Args) == 0 || lenInstr.Args[0] == nil {
+		return false
+	}
+	if numeric == nil {
 		return false
 	}
 	phi := lenInstr.Args[0].Def
@@ -198,7 +225,7 @@ func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr) bool {
 		if arg == nil {
 			return false
 		}
-		r, ok := functionNumericFacts(fn).ProfiledLenRange(arg.ID)
+		r, ok := numeric.ProfiledLenRange(arg.ID)
 		if !ok || !r.known || r.min != r.max || r.min < 0 {
 			return false
 		}
@@ -229,18 +256,23 @@ func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr) bool {
 	return true
 }
 
-func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMutationIndex) bool {
+func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMutationIndex, tableShapes *TableShapeFacts, numeric *NumericFacts) bool {
 	if fn == nil || lenInstr == nil || get == nil || get.Op != OpGetField || len(get.Args) == 0 || get.Args[0] == nil {
 		return false
 	}
-	cases := fieldPolyExactLenCases(fn, get, mutations)
+	if tableShapes == nil {
+		return false
+	}
+	cases := fieldPolyExactLenCases(fn, get, mutations, tableShapes)
 	if len(cases) < 2 {
 		return false
 	}
-	fn.Analysis.TableShapeFacts().RecordFieldPolyShapeCases(lenInstr.ID, cases)
+	tableShapes.RecordFieldPolyShapeCases(lenInstr.ID, cases)
 	name := fieldNameFromAux(fn, get.Aux)
 	if r, ok := fieldPolyLenRange(fn, name, cases); ok {
-		fn.Analysis.NumericFacts().RecordProfiledIntRange(lenInstr.ID, r)
+		if numeric != nil {
+			numeric.RecordProfiledIntRange(lenInstr.ID, r)
+		}
 	}
 	lenInstr.Op = OpFieldPolyLen
 	lenInstr.Type = TypeInt
@@ -250,7 +282,7 @@ func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMut
 	return true
 }
 
-func fieldPolyExactLenCases(fn *Function, get *Instr, mutations fieldLenMutationIndex) []FieldPolyShapeCase {
+func fieldPolyExactLenCases(fn *Function, get *Instr, mutations fieldLenMutationIndex, tableShapes *TableShapeFacts) []FieldPolyShapeCase {
 	if fn == nil || get == nil || get.Op != OpGetField {
 		return nil
 	}
@@ -258,7 +290,10 @@ func fieldPolyExactLenCases(fn *Function, get *Instr, mutations fieldLenMutation
 	if name == "" {
 		return nil
 	}
-	src, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(get.ID)
+	if tableShapes == nil {
+		return nil
+	}
+	src, _ := tableShapes.FieldPolyShapeCases(get.ID)
 	if len(src) < 2 {
 		return nil
 	}
