@@ -64,3 +64,21 @@ func TestAnalysisFactDomainMappingsHaveMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestAnalysisFactMetadataDeclaresDomainBackedStatus(t *testing.T) {
+	unbacked := map[AnalysisFact]bool{
+		AnalysisFactInlineComplete:       true,
+		AnalysisFactStringConstTables:    true,
+		AnalysisFactStringFormatPatterns: true,
+		AnalysisFactStringSplitSubSpecs:  true,
+	}
+	for fact := range analysisFactMetadata {
+		_, domainBacked := analysisFactDomain[fact]
+		if !domainBacked && !unbacked[fact] {
+			t.Fatalf("%s has metadata but is neither domain-backed nor explicitly unbacked", fact)
+		}
+		if domainBacked && unbacked[fact] {
+			t.Fatalf("%s is both domain-backed and explicitly unbacked", fact)
+		}
+	}
+}
