@@ -139,16 +139,13 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 			return TableArrayStaticBoundsPass(ctx.Func())
 		}),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
-		{
-			Name:     "LoopRegionVersioning",
-			Phase:    Tier2PhaseLoopPost,
-			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization),
-			Provides: analysisFacts(AnalysisFactLoopTableArrayFacts),
-			Updates:  analysisFacts(AnalysisFactTableArrayBoundsSafe),
-			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
-				return LoopRegionVersioningPass(fn)
-			},
-		},
+		tier2PassModuleWithCtxProvidesUpdates("LoopRegionVersioning", Tier2PhaseLoopPost,
+			analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization),
+			analysisFacts(AnalysisFactLoopTableArrayFacts),
+			analysisFacts(AnalysisFactTableArrayBoundsSafe),
+			func(ctx *PassContext) (*Function, error) {
+				return LoopRegionVersioningPass(ctx.Func())
+			}),
 		tier2PassModuleWithCtxUpdates("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), analysisFacts(AnalysisFactTableArrayBoundsSafe), func(ctx *PassContext) (*Function, error) {
 			return TableArrayStaticBoundsPass(ctx.Func())
 		}),
