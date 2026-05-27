@@ -617,13 +617,28 @@ func hasFixedTableScalarReplacementCandidate(fn *Function) bool {
 // LoadElim has already forwarded any trivially-forwardable fields,
 // and DCE cleans up our OpNop'd instructions.
 func EscapeAnalysisPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return escapeAnalysisPass(fn, nil, nil)
+	}
+	return escapeAnalysisPass(fn, fn.Analysis.TableShapeFacts(), fn.Analysis.GlobalFacts().GlobalsMap())
+}
+
+func EscapeAnalysisPassCtx(ctx *PassContext) (*Function, error) {
+	globals := map[string]*vm.FuncProto(nil)
+	if globalFacts := ctx.Global(); globalFacts != nil {
+		globals = globalFacts.GlobalsMap()
+	}
+	return escapeAnalysisPass(ctx.Func(), ctx.TableShape(), globals)
+}
+
+func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[string]*vm.FuncProto) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
 
 	remarks := functionRemarks(fn)
-	if partialMaterializeTablesForReadonlyCalls(fn, remarks) {
+	if partialMaterializeTablesForReadonlyCalls(fn, remarks, tableShapes, globals) {
 		relinkValueDefs(fn)
 	}
 	virtuals := identifyVirtualAllocsWithRemarks(fn, remarks)
@@ -827,7 +842,7 @@ type partialMaterializeCtor struct {
 	stores []*Instr
 }
 
-func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *OptimizationRemarks) bool {
+func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *OptimizationRemarks, tableShapes *TableShapeFacts, globals map[string]*vm.FuncProto) bool {
 	if fn == nil || fn.Proto == nil || len(fn.Blocks) == 0 {
 		return false
 	}
@@ -849,7 +864,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 	}
 	changed := false
 	for _, alloc := range allocs {
-		ctor, ctorOK := partialMaterializeCtorForAlloc(fn, alloc)
+		ctor, ctorOK := partialMaterializeCtorForAlloc(fn, alloc, tableShapes)
 		if !ctorOK || len(ctor.fields) == 0 || len(ctor.args) == 0 {
 			continue
 		}
@@ -897,7 +912,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 							ok = false
 							break
 						}
-						_, callee := resolveCallee(instr, fn, InlineConfig{Globals: fn.Analysis.GlobalFacts().GlobalsMap()})
+						_, callee := resolveCallee(instr, fn, InlineConfig{Globals: globals})
 						if !calleeArgFieldsReadonly(callee, argIdx-1) {
 							ok = false
 							break
@@ -985,7 +1000,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 	return changed
 }
 
-func partialMaterializeCtorForAlloc(fn *Function, alloc *Instr) (partialMaterializeCtor, bool) {
+func partialMaterializeCtorForAlloc(fn *Function, alloc *Instr, tableShapes *TableShapeFacts) (partialMaterializeCtor, bool) {
 	if fn == nil || fn.Proto == nil || alloc == nil {
 		return partialMaterializeCtor{}, false
 	}
@@ -1007,7 +1022,10 @@ func partialMaterializeCtorForAlloc(fn *Function, alloc *Instr) (partialMaterial
 	if alloc.Op != OpNewTable {
 		return partialMaterializeCtor{}, false
 	}
-	fact, hasFact := fn.Analysis.TableShapeFacts().FixedTableConstructorFact(alloc.ID)
+	fact, hasFact := FixedTableConstructorFact{}, false
+	if tableShapes != nil {
+		fact, hasFact = tableShapes.FixedTableConstructorFact(alloc.ID)
+	}
 	expectedFields := 0
 	if hasFact {
 		expectedFields = len(fact.FieldNames)

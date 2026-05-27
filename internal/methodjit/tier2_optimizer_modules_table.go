@@ -37,7 +37,7 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 		tier2PassModuleWith("LoadElimination", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, LoadEliminationPass),
 		tier2PassModuleWithCtx("FieldLenFold", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, FieldLenFoldPassCtx),
 		tier2PassModuleWith("StaticTableLenFold", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, StaticTableLenFoldPass),
-		tier2PassModuleWith("EscapeAnalysis", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, EscapeAnalysisPass),
+		tier2PassModuleWithCtx("EscapeAnalysis", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, EscapeAnalysisPassCtx),
 		tier2PassModuleWithCtx("FixedTableConstructorLowering", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedTableConstructors), nil, FixedTableConstructorLoweringPassCtx),
 		tier2PassModuleWith("TablePreallocHint (post-fixed-table-lowering)", Tier2PhaseTableObjectPrep, nil, nil, TablePreallocHintPass),
 		{
@@ -45,11 +45,12 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 			Phase:    Tier2PhaseTableObjectPrep,
 			Requires: analysisFacts(AnalysisFactFixedShapeTables),
 			Provides: nil,
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, optCtx *Tier2OptimizerContext) (*Function, error) {
 				if !hasFixedTableScalarReplacementCandidate(fn) {
 					return fn, nil
 				}
-				return EscapeAnalysisPass(fn)
+				allowed := allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "EscapeAnalysis (post-fixed-table-lowering)")
+				return EscapeAnalysisPassCtx(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("RedundantGuardElimination", Tier2PhaseTableObjectPrep, nil, nil, RedundantGuardEliminationPass),
