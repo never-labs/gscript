@@ -116,6 +116,39 @@ func TestOpSpecDomainFilesStayFocused(t *testing.T) {
 	}
 }
 
+func TestOpSpecBuildOnlyOrchestratesPolicyDomains(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	src, err := os.ReadFile(filepath.Join(dir, "op_spec_build.go"))
+	if err != nil {
+		t.Fatalf("read op_spec_build.go: %v", err)
+	}
+	text := string(src)
+	if strings.Contains(text, "Policies[") {
+		t.Fatal("op_spec_build.go should orchestrate domain apply functions, not read policy tables directly")
+	}
+	required := []string{
+		"applyOpSpecBackendPolicies",
+		"applyOpSpecFieldPolicies",
+		"applyOpSpecValuePolicies",
+		"applyOpSpecLICMPolicies",
+		"applyOpSpecNumericPolicies",
+		"applyOpSpecFieldBarrierPolicies",
+		"applyOpSpecRangePolicies",
+		"applyOpSpecStringUnrollPolicies",
+		"applyOpSpecTableCallPolicies",
+		"applyOpSpecTypePolicies",
+	}
+	for _, name := range required {
+		if !strings.Contains(text, name+"(") {
+			t.Fatalf("op_spec_build.go does not call %s", name)
+		}
+	}
+}
+
 func countLines(src []byte) int {
 	if len(src) == 0 {
 		return 0
