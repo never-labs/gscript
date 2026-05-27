@@ -91,13 +91,16 @@ func collectStaticTableLenFacts(fn *Function) map[int][]staticTableLenFact {
 						invalid[arg.ID] = true
 					}
 				}
-			case OpCall, OpCallFloor, OpFieldCallFloor, OpSelf, OpResume:
-				for _, arg := range instr.Args {
-					if arg != nil {
-						invalid[arg.ID] = true
-					}
-				}
 			default:
+				spec, _ := instr.Op.Spec()
+				if spec.CallLikeFactBarrier {
+					for _, arg := range instr.Args {
+						if arg != nil {
+							invalid[arg.ID] = true
+						}
+					}
+					continue
+				}
 				for _, arg := range instr.Args {
 					if arg != nil && newTables[arg.ID] && !staticTableLenBenignUse(instr, arg.ID) {
 						invalid[arg.ID] = true
