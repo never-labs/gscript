@@ -125,6 +125,42 @@ func TestDCEKeepUnusedContractLivesInOpSpec(t *testing.T) {
 	}
 }
 
+func TestNativeReplayContractsLiveInOpSpec(t *testing.T) {
+	mayExit := []Op{OpCall, OpSetTable, OpGetField, OpGuardType, OpAddInt, OpMatrixDense}
+	for _, op := range mayExit {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.NativeReplayMayExit {
+			t.Fatalf("%s should be marked as native-replay may-exit by OpSpec", op)
+		}
+		if !tier2OpMayExitForNativeReplay(&Instr{Op: op}) {
+			t.Fatalf("%s native replay may-exit query should be driven by OpSpec", op)
+		}
+	}
+
+	if spec, _ := OpSetGlobal.Spec(); !spec.NativeReplayVisibleSideEffect || !spec.NativeCalleeResumeUnsafe {
+		t.Fatalf("SetGlobal should carry native visible and callee-resume-unsafe contracts in OpSpec")
+	}
+	if !tier2InstrHasNativeVisibleSideEffect(&Instr{Op: OpSetGlobal}) {
+		t.Fatalf("SetGlobal native visible side-effect query should be driven by OpSpec")
+	}
+
+	if spec, _ := OpSetTable.Spec(); !spec.NativeReplayVisibleTableMutation {
+		t.Fatalf("SetTable should carry native visible table-mutation contract in OpSpec")
+	}
+	if !tier2InstrHasNativeVisibleSideEffect(&Instr{Op: OpSetTable}) {
+		t.Fatalf("SetTable without local allocation should be native visible")
+	}
+
+	localTable := &Instr{ID: 1, Op: OpNewTable}
+	store := &Instr{ID: 2, Op: OpSetTable, Args: []*Value{localTable.Value()}}
+	if tier2InstrHasNativeVisibleSideEffect(store) {
+		t.Fatalf("SetTable to local allocation should keep its native replay exception")
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}

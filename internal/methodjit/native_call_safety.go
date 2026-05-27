@@ -74,8 +74,8 @@ func tier2NativeCallCalleeResumeSafe(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpSetGlobal, OpSetUpval, OpClose, OpGo, OpSend, OpRecv:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.NativeCalleeResumeUnsafe {
 				return false
 			}
 		}
@@ -87,20 +87,17 @@ func tier2InstrHasNativeVisibleSideEffect(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix, OpSetField, OpFieldStore, OpSetList, OpAppend:
+	spec, ok := instr.Op.Spec()
+	if !ok {
+		return false
+	}
+	if spec.NativeReplayVisibleTableMutation {
 		if len(instr.Args) == 0 {
 			return true
 		}
 		return !tier2ValueIsLocalTableAllocation(instr.Args[0], make(map[int]bool))
-	case OpSetGlobal, OpSetUpval,
-		OpMatrixSetF, OpMatrixStoreFAt, OpMatrixStoreFRow, OpMatrixStoreFRowConst,
-		OpClose,
-		OpGo, OpSend, OpRecv:
-		return true
-	default:
-		return false
 	}
+	return spec.NativeReplayVisibleSideEffect
 }
 
 func tier2ValueIsLocalTableAllocation(v *Value, seen map[int]bool) bool {
@@ -133,31 +130,6 @@ func tier2OpMayExitForNativeReplay(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpCall, OpCallFloor, OpFieldCallFloor, OpSelf,
-		OpNewTable, OpNewFixedTable,
-		OpGetTable, OpSetTable,
-		OpTableArrayHeader, OpTableArrayLen, OpTableArrayData, OpTableArrayLoad, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableBoolArrayFill, OpTableBoolArrayCount, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix, OpTableArrayNestedLoad,
-		OpGetField, OpGetFieldNumToFloat, OpFieldPolyLen, OpSetField, OpFieldStore,
-		OpSetList, OpAppend,
-		OpGetGlobal, OpSetGlobal,
-		OpGetUpval, OpSetUpval,
-		OpConstString, OpConcat, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen, OpGetTableStringFormatInt, OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber, OpLen, OpPow, OpFloor,
-		OpClosure, OpClose, OpVararg,
-		OpTForCall, OpTForLoop,
-		OpGo, OpMakeChan, OpSend, OpRecv,
-		OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure, OpGuardNonNil, OpGuardTruthy,
-		OpNumToFloat,
-		OpDivIntExact,
-		OpMatrixDense, OpMatrixGetF, OpMatrixSetF, OpMatrixFlat, OpMatrixStride:
-		return true
-	case OpAddInt, OpSubInt, OpMulInt, OpNegInt:
-		return true
-	case OpModInt:
-		return true
-	case OpModZeroInt:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.NativeReplayMayExit
 }

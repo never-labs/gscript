@@ -110,16 +110,20 @@ const (
 
 // OpSpec is the lightweight metadata contract for an IR op.
 type OpSpec struct {
-	Name          string
-	Terminator    bool
-	SideEffect    OpSideEffect
-	ArgPolicy     OpArgPolicy
-	ArgCount      OpCountPolicy
-	SuccCount     int // OpCountAny means successor count is not checked.
-	KeepUnused    bool
-	EmitterFamily OpEmitterFamily
-	MayDeopt      bool
-	BackendPolicy OpBackendPolicy
+	Name                             string
+	Terminator                       bool
+	SideEffect                       OpSideEffect
+	ArgPolicy                        OpArgPolicy
+	ArgCount                         OpCountPolicy
+	SuccCount                        int // OpCountAny means successor count is not checked.
+	KeepUnused                       bool
+	EmitterFamily                    OpEmitterFamily
+	MayDeopt                         bool
+	NativeReplayMayExit              bool
+	NativeReplayVisibleSideEffect    bool
+	NativeReplayVisibleTableMutation bool
+	NativeCalleeResumeUnsafe         bool
+	BackendPolicy                    OpBackendPolicy
 }
 
 func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSideEffect, mayDeopt bool) OpSpec {
@@ -293,6 +297,18 @@ func (op Op) Spec() (OpSpec, bool) {
 		}
 		if int(op) < len(opKeepUnusedPolicies) {
 			spec.KeepUnused = opKeepUnusedPolicies[op]
+		}
+		if int(op) < len(opNativeReplayMayExitPolicies) {
+			spec.NativeReplayMayExit = opNativeReplayMayExitPolicies[op]
+		}
+		if int(op) < len(opNativeReplayVisibleSideEffectPolicies) {
+			spec.NativeReplayVisibleSideEffect = opNativeReplayVisibleSideEffectPolicies[op]
+		}
+		if int(op) < len(opNativeReplayVisibleTableMutationPolicies) {
+			spec.NativeReplayVisibleTableMutation = opNativeReplayVisibleTableMutationPolicies[op]
+		}
+		if int(op) < len(opNativeCalleeResumeUnsafePolicies) {
+			spec.NativeCalleeResumeUnsafe = opNativeCalleeResumeUnsafePolicies[op]
 		}
 		return spec, true
 	}
@@ -473,4 +489,121 @@ var opKeepUnusedPolicies = [...]bool{
 	OpMakeChan:                      true,
 	OpSend:                          true,
 	OpRecv:                          true,
+}
+
+var opNativeReplayMayExitPolicies = [...]bool{
+	OpCall:                       true,
+	OpCallFloor:                  true,
+	OpFieldCallFloor:             true,
+	OpSelf:                       true,
+	OpNewTable:                   true,
+	OpNewFixedTable:              true,
+	OpGetTable:                   true,
+	OpSetTable:                   true,
+	OpTableArrayHeader:           true,
+	OpTableArrayLen:              true,
+	OpTableArrayData:             true,
+	OpTableArrayLoad:             true,
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableBoolArrayCount:        true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpTableArrayNestedLoad:       true,
+	OpGetField:                   true,
+	OpGetFieldNumToFloat:         true,
+	OpFieldPolyLen:               true,
+	OpSetField:                   true,
+	OpFieldStore:                 true,
+	OpSetList:                    true,
+	OpAppend:                     true,
+	OpGetGlobal:                  true,
+	OpSetGlobal:                  true,
+	OpGetUpval:                   true,
+	OpSetUpval:                   true,
+	OpConstString:                true,
+	OpConcat:                     true,
+	OpStringConstLookup:          true,
+	OpStringFormatInt:            true,
+	OpStringFormatConst:          true,
+	OpStringFormatConstLen:       true,
+	OpGetTableStringFormatInt:    true,
+	OpStringSplitPart:            true,
+	OpStringSplitSubstr:          true,
+	OpStringSplitSubstrNumber:    true,
+	OpLen:                        true,
+	OpPow:                        true,
+	OpFloor:                      true,
+	OpClosure:                    true,
+	OpClose:                      true,
+	OpVararg:                     true,
+	OpTForCall:                   true,
+	OpTForLoop:                   true,
+	OpGo:                         true,
+	OpMakeChan:                   true,
+	OpSend:                       true,
+	OpRecv:                       true,
+	OpGuardType:                  true,
+	OpGuardIntRange:              true,
+	OpGuardGlobalConst:           true,
+	OpGuardConstString:           true,
+	OpGuardTableKind:             true,
+	OpGuardCalleeProto:           true,
+	OpGuardFieldCalleeProto:      true,
+	OpGuardShapeFieldType:        true,
+	OpGuardShapeFieldTypeMask:    true,
+	OpGuardShapeFieldVMClosure:   true,
+	OpGuardNonNil:                true,
+	OpGuardTruthy:                true,
+	OpNumToFloat:                 true,
+	OpDivIntExact:                true,
+	OpMatrixDense:                true,
+	OpMatrixGetF:                 true,
+	OpMatrixSetF:                 true,
+	OpMatrixFlat:                 true,
+	OpMatrixStride:               true,
+	OpAddInt:                     true,
+	OpSubInt:                     true,
+	OpMulInt:                     true,
+	OpNegInt:                     true,
+	OpModInt:                     true,
+	OpModZeroInt:                 true,
+}
+
+var opNativeReplayVisibleSideEffectPolicies = [...]bool{
+	OpSetGlobal:            true,
+	OpSetUpval:             true,
+	OpMatrixSetF:           true,
+	OpMatrixStoreFAt:       true,
+	OpMatrixStoreFRow:      true,
+	OpMatrixStoreFRowConst: true,
+	OpClose:                true,
+	OpGo:                   true,
+	OpSend:                 true,
+	OpRecv:                 true,
+}
+
+var opNativeReplayVisibleTableMutationPolicies = [...]bool{
+	OpSetTable:                   true,
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpSetField:                   true,
+	OpFieldStore:                 true,
+	OpSetList:                    true,
+	OpAppend:                     true,
+}
+
+var opNativeCalleeResumeUnsafePolicies = [...]bool{
+	OpSetGlobal: true,
+	OpSetUpval:  true,
+	OpClose:     true,
+	OpGo:        true,
+	OpSend:      true,
+	OpRecv:      true,
 }
