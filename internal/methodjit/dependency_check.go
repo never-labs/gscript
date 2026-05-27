@@ -42,12 +42,18 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 		ref := dependencyModuleRef(module)
 		for _, fact := range module.Requires {
 			consumed[fact] = true
+			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
+				issues = append(issues, fmt.Sprintf("%s requires unregistered fact %s", ref, fact))
+			}
 			if provider, ok := provided[fact]; ok && provider != ref {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}
 		}
 		for _, fact := range module.Updates {
 			consumed[fact] = true
+			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
+				issues = append(issues, fmt.Sprintf("%s updates unregistered fact %s", ref, fact))
+			}
 			if provider, ok := provided[fact]; ok && provider != ref {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}

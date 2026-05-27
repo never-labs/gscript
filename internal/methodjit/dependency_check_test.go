@@ -105,6 +105,50 @@ func TestValidateDependencyOrderRejectsUnregisteredOptionalRead(t *testing.T) {
 	}
 }
 
+func TestValidateDependencyOrderRejectsUnregisteredRequirement(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "Consumer",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Requires: []AnalysisFact{"UnknownRequiredFact"},
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected unregistered requirement error, got nil")
+	}
+	if !strings.Contains(err.Error(), "requires unregistered fact UnknownRequiredFact") {
+		t.Fatalf("error should report unregistered requirement, got: %v", err)
+	}
+}
+
+func TestValidateDependencyOrderRejectsUnregisteredUpdate(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:    "Updater",
+				Phase:   Tier2PhaseEarlyCanonical,
+				Updates: []AnalysisFact{"UnknownUpdatedFact"},
+				Run:     func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected unregistered update error, got nil")
+	}
+	if !strings.Contains(err.Error(), "updates unregistered fact UnknownUpdatedFact") {
+		t.Fatalf("error should report unregistered update, got: %v", err)
+	}
+}
+
 func TestValidateDependencyOrderRejectsSelfDependency(t *testing.T) {
 	plan := Tier2OptimizerPlan{
 		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
