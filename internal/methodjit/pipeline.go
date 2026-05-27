@@ -97,13 +97,23 @@ type Tier2PipelineOpts struct {
 	LastPassChanged                 bool                           // scratch flag for adjacent optimizer modules
 }
 
-// RunTier2Pipeline runs the full production Tier 2 optimization pipeline:
+// RunTier2Pipeline runs the full production Tier 2 optimization pipeline.
 //
-//	TypeSpec → Intrinsic → TypeSpec → Inline → TypeSpec → ConstProp →
-//	LoadElim → EscapeAnalysis → DCE → PostRewriteTypeSpec →
-//	LoopBoundRangeGuard → RangeAnalysis → OverflowBoxing → FMAFusion →
-//	FloatStrengthReduction → FMAFusion → LICM → FieldNumToFloatFusion →
-//	LoadElim → DCE → UnrollAndJam → RangeAnalysis → DCE
+// The pass sequence is NOT a fixed linear list — it is assembled at runtime by
+// the module registry (modules_registry.go: BuildModulePlan) from the phase
+// builders each domain registers via init() (tier2_optimizer_modules_*.go).
+// The ordered phases (see the Tier2Phase* constants in
+// tier2_optimizer_modules.go) are, by ascending order value:
+//
+//	early_canonical → inline_call → call_lower → string_native →
+//	table_object_prep → post_rewrite → numeric → table_array_lower →
+//	matrix_native → table_field_lower → float_numeric → loop_specialization →
+//	loop_post → final_call
+//
+// Each phase contains one or more modules; inter-module fact dependencies are
+// declared (Requires/Provides/Updates) and validated by ValidateDependencyOrder.
+// To see the concrete plan for a given build, dump it via BuildModulePlan or the
+// Diagnose() report rather than trusting any hand-maintained list here.
 //
 // Returns the optimized function, any intrinsic rewrite notes (non-nil means
 // the function uses intrinsics that Tier 1 would execute differently), and an

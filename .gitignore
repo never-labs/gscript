@@ -32,3 +32,7 @@ game_engine
 # Local architecture review artifacts
 /docs/methodjit-architecture-optimization-plan.html
 /docs/methodjit-optimizer-pipeline.html
+
+# Transient strict_guard "latest" output (committed snapshots are baseline.json + history/)
+/benchmarks/data/strict_guard_latest.json
+/benchmarks/data/strict_guard_latest.md
