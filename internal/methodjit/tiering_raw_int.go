@@ -36,9 +36,10 @@ func forceRawIntSpecializationIR(fn *Function) {
 						instr.Type = TypeInt
 						changed = true
 					}
-					if instr.Op == OpEqInt || instr.Op == OpLtInt || instr.Op == OpLeInt {
-						if instr.Type != TypeBool {
-							instr.Type = TypeBool
+					if specializedSpec, ok := instr.Op.Spec(); ok && specializedSpec.FixedResultType != TypeUnknown {
+						if instr.Type != specializedSpec.FixedResultType {
+							instr.Type = specializedSpec.FixedResultType
+							changed = true
 						}
 					}
 				}
