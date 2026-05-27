@@ -217,6 +217,7 @@ type OpSpec struct {
 	NeedsTier2FieldCache             bool
 	FieldRead                        bool
 	FieldSlotLoad                    bool
+	FieldWrite                       bool
 	BoolTableFillBodyBenign          bool
 	BoolTableFillStore               bool
 	BoolTableCountLoadBodyBenign     bool
@@ -656,6 +657,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opFieldSlotLoadPolicies) {
 			spec.FieldSlotLoad = opFieldSlotLoadPolicies[op]
+		}
+		if int(op) < len(opFieldWritePolicies) {
+			spec.FieldWrite = opFieldWritePolicies[op]
 		}
 		if int(op) < len(opBoolTableFillBodyBenignPolicies) {
 			spec.BoolTableFillBodyBenign = opBoolTableFillBodyBenignPolicies[op]
@@ -1992,6 +1996,11 @@ var opFieldReadPolicies = [...]bool{
 var opFieldSlotLoadPolicies = [...]bool{
 	OpFieldLoad:           true,
 	OpFieldLoadNumToFloat: true,
+}
+
+var opFieldWritePolicies = [...]bool{
+	OpSetField:   true,
+	OpFieldStore: true,
 }
 
 var opBoolTableFillBodyBenignPolicies = [...]bool{

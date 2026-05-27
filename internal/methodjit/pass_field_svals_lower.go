@@ -577,6 +577,11 @@ func opIsFieldSlotLoad(op Op) bool {
 	return ok && spec.FieldSlotLoad
 }
 
+func opIsFieldWrite(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldWrite
+}
+
 func opIsLiteralConst(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.LiteralConst

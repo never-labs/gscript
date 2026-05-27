@@ -120,12 +120,12 @@ func promoteLoopPairs(fn *Function, li *loopInfo, hdr *Block, ph *Block) {
 				}
 				p.gets = append(p.gets, instr)
 				p.observeType(instr.Type)
-			case instr.Op == OpSetField || instr.Op == OpFieldStore:
+			case opIsFieldWrite(instr.Op):
 				if len(instr.Args) < 2 {
 					continue
 				}
 				p := getPair(instr.Args[0].ID, instr.Aux)
-				if instr.Op != OpSetField {
+				if instr.Op == OpFieldStore {
 					p.lowered = true
 				}
 				p.sets = append(p.sets, instr)

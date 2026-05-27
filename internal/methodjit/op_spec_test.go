@@ -622,6 +622,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s field-slot-load contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpSetField, OpFieldStore} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FieldWrite || !opIsFieldWrite(op) {
+			t.Fatalf("%s field-write contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpNop, OpJump, OpConstInt, OpConstBool, OpConstNil, OpAddInt} {
 		spec, ok := op.Spec()
 		if !ok || !spec.BoolTableFillBodyBenign {
