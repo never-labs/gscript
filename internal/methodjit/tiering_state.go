@@ -186,9 +186,43 @@ func (tm *TieringManager) markTier2Compiled(proto *vm.FuncProto, cf *CompiledFun
 	}
 	tm.ensureTierStateStore()
 	delete(tm.tier2InvalidReason, proto)
-	tm.tierState.markCompiled(proto, cf)
+	tm.publishTier2Compiled(proto, cf)
+}
+
+// publishTier2Compiled is the single transactional entry that makes a freshly
+// compiled Tier 2 function observable. It establishes the invariant:
+//
+//	cf is NOT observable as "published" (via tier2CompiledFor /
+//	rawTier2CompiledFor) until BOTH its install pointers AND its reverse
+//	spec-dependency registration are complete.
+//
+// Ordering rationale (load-bearing analysis):
+//   - installTier2 writes only proto/cf entry-pointer fields; it never reads the
+//     tierState compiled map, so it does not require markCompiled first.
+//   - registerTier2SpecDependencies reads cf.SpecDependencyProtos and writes the
+//     tm.specDependents reverse index keyed by callee; it never reads proto's own
+//     compiled-map entry, so it does not require markCompiled first.
+//
+// Because neither install nor dependency registration depends on the compiled
+// map, the observable publish (markCompiled) is performed LAST, after install +
+// registration, so no concurrent/async/refresh path can ever observe a
+// published-but-not-fully-registered intermediate state.
+//
+// queueSpecDependentsForRefresh runs after the publish: it enqueues OTHER protos
+// (dependents of proto as a callee), not proto itself, so its position relative
+// to markCompiled is immaterial for proto's own visibility.
+//
+// clearTier2Install / clearTier2InstallPointers form the symmetric teardown of
+// the pointer/flag state established here.
+func (tm *TieringManager) publishTier2Compiled(proto *vm.FuncProto, cf *CompiledFunction) {
+	if tm == nil || proto == nil || cf == nil {
+		return
+	}
 	tm.installTier2(proto, cf)
 	tm.registerTier2SpecDependencies(proto, cf)
+	// Observable publish: must be last so cf is never visible before its
+	// install pointers and dependency registration above are complete.
+	tm.tierState.markCompiled(proto, cf)
 	tm.queueSpecDependentsForRefresh(proto, "spec_dependency_compiled")
 }
 
