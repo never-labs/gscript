@@ -330,7 +330,7 @@ func fixedRecordCtorNCacheableForFunction(fn *Function, instr *Instr, ctor *runt
 	if fn == nil || instr == nil || !fixedRecordCtorNCacheableForProto(fn.Proto, ctor) {
 		return false
 	}
-	tableShapes := fn.Analysis.TableShapeFacts()
+	tableShapes := functionTableShapeFacts(fn)
 	if !tableShapes.FixedRecordNewTableSitesPopulated() {
 		tableShapes.SetFixedRecordNewTableSites(computeFixedRecordNewTableSites(fn))
 	}

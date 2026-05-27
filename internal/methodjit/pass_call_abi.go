@@ -27,7 +27,7 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 		return fn
 	}
 	globals := callABIMergeGlobals(config.Globals, callABIStableGlobals(fn.Proto))
-	callFacts := fn.Analysis.CallFacts()
+	callFacts := functionCallFacts(fn)
 	callFacts.SetCallABIs(nil)
 
 	tails := callABITailCalls(fn)
@@ -696,10 +696,7 @@ func fieldShapeCalleeABISummary(fn *Function, instr *Instr) string {
 }
 
 func specGuardKindSuppressed(fn *Function, pc int, kind string) bool {
-	if fn == nil || fn.Analysis == nil {
-		return false
-	}
-	return specGuardKindSuppressedFacts(fn.Analysis.SpeculationFacts(), pc, kind)
+	return specGuardKindSuppressedFacts(functionSpeculationFacts(fn), pc, kind)
 }
 
 func specGuardKindSuppressedFacts(spec *SpeculationFacts, pc int, kind string) bool {

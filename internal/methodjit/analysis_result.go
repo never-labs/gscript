@@ -767,6 +767,13 @@ func (a *AnalysisResult) GlobalFacts() *GlobalFacts {
 	return a.Global
 }
 
+func functionGlobalFacts(fn *Function) *GlobalFacts {
+	if fn == nil || fn.Analysis == nil {
+		return nil
+	}
+	return fn.Analysis.GlobalFacts()
+}
+
 func (a *AnalysisResult) initializeGlobalFacts() {
 	if a == nil {
 		return
@@ -870,6 +877,13 @@ func (a *AnalysisResult) SpeculationFacts() *SpeculationFacts {
 	}
 	a.Speculation.owner = a
 	return a.Speculation
+}
+
+func functionSpeculationFacts(fn *Function) *SpeculationFacts {
+	if fn == nil || fn.Analysis == nil {
+		return nil
+	}
+	return fn.Analysis.SpeculationFacts()
 }
 
 func (a *AnalysisResult) initializeSpeculationFacts() {

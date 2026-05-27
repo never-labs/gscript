@@ -134,8 +134,9 @@ func runTier2PipelineWithPlan(fn *Function, opts *Tier2PipelineOpts, buildPlan f
 	var globals map[string]*vm.FuncProto
 	if opts != nil {
 		globals = callABIMergeGlobals(opts.InlineGlobals, opts.SpecializationGlobals)
-		fn.Analysis.GlobalFacts().SetNumericGlobalValues(optsNumericGlobalValuesByName(fn, opts))
-		fn.Analysis.GlobalFacts().SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(opts.GlobalArrayElementFacts))
+		globalFacts := functionGlobalFacts(fn)
+		globalFacts.SetNumericGlobalValues(optsNumericGlobalValuesByName(fn, opts))
+		globalFacts.SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(opts.GlobalArrayElementFacts))
 		if opts.InlineMaxSize > 0 {
 			maxSize = opts.InlineMaxSize
 		}

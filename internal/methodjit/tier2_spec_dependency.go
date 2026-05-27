@@ -41,7 +41,7 @@ func sortedSpecDependencyProtos(fn *Function) []*vm.FuncProto {
 	if fn == nil || fn.Analysis == nil {
 		return nil
 	}
-	spec := fn.Analysis.SpeculationFacts()
+	spec := functionSpeculationFacts(fn)
 	deps := make(map[*vm.FuncProto]bool, spec.SpecDependencyProtoCount())
 	spec.ForEachSpecDependencyProto(func(proto *vm.FuncProto) bool {
 		recordSpecDependencyProto(fn, deps, proto)

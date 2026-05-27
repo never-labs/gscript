@@ -16,7 +16,7 @@ func recordTier2SpecDependency(fn *Function, callee *vm.FuncProto) {
 	if fn == nil || fn.Analysis == nil || callee == nil || callee == fn.Proto {
 		return
 	}
-	fn.Analysis.SpeculationFacts().RecordSpecDependencyProto(fn.Proto, callee)
+	functionSpeculationFacts(fn).RecordSpecDependencyProto(fn.Proto, callee)
 }
 
 func inlineFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool) {

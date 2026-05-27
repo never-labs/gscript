@@ -834,8 +834,8 @@ func licmLoopCallMayMutateValue(fn *Function, loopCalls []*Instr, value *Value, 
 	var seededGlobals map[string]*vm.FuncProto
 	if len(seededGlobalsOpt) > 0 {
 		seededGlobals = seededGlobalsOpt[0]
-	} else if fn != nil && fn.Analysis != nil {
-		seededGlobals = fn.Analysis.GlobalFacts().GlobalsMap()
+	} else if globalFacts := functionGlobalFacts(fn); globalFacts != nil {
+		seededGlobals = globalFacts.GlobalsMap()
 	}
 	for _, call := range loopCalls {
 		if call == nil {

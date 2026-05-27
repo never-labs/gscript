@@ -308,8 +308,9 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 				"optimization pipeline failed: "+err.Error())
 			return fmt.Errorf("tier2: pipeline: %w", err)
 		}
-		tm.learnGlobalNumericFacts(fn.Analysis.GlobalFacts().NumericGlobalValuesMap())
-		tm.learnGlobalArrayElementFacts(fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap())
+		globalFacts := functionGlobalFacts(fn)
+		tm.learnGlobalNumericFacts(globalFacts.NumericGlobalValuesMap())
+		tm.learnGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap())
 		return nil
 	})
 
