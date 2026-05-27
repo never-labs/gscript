@@ -119,6 +119,15 @@ const (
 	OpSourceFeedbackResultType
 )
 
+type OpRangeRefineKind uint8
+
+const (
+	OpRangeRefineNone OpRangeRefineKind = iota
+	OpRangeRefineLessThan
+	OpRangeRefineLessEqual
+	OpRangeRefineEqualInt
+)
+
 // OpSpec is the lightweight metadata contract for an IR op.
 type OpSpec struct {
 	Name                             string
@@ -233,6 +242,7 @@ type OpSpec struct {
 	RawIntSpecializedOp              Op
 	BackendPolicy                    OpBackendPolicy
 	SourceFeedbackPolicy             OpSourceFeedbackPolicy
+	RangeRefineKind                  OpRangeRefineKind
 }
 
 func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSideEffect, mayDeopt bool) OpSpec {
@@ -732,6 +742,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opSourceFeedbackPolicies) {
 			spec.SourceFeedbackPolicy = opSourceFeedbackPolicies[op]
+		}
+		if int(op) < len(opRangeRefineKindPolicies) {
+			spec.RangeRefineKind = opRangeRefineKindPolicies[op]
 		}
 		return spec, true
 	}
@@ -2410,6 +2423,14 @@ var opSourceFeedbackPolicies = [...]OpSourceFeedbackPolicy{
 	OpEq:                 OpSourceFeedbackResultType,
 	OpLt:                 OpSourceFeedbackResultType,
 	OpLe:                 OpSourceFeedbackResultType,
+}
+
+var opRangeRefineKindPolicies = [...]OpRangeRefineKind{
+	OpLt:    OpRangeRefineLessThan,
+	OpLtInt: OpRangeRefineLessThan,
+	OpLe:    OpRangeRefineLessEqual,
+	OpLeInt: OpRangeRefineLessEqual,
+	OpEqInt: OpRangeRefineEqualInt,
 }
 
 var expandedOpSpecs = buildExpandedOpSpecs()

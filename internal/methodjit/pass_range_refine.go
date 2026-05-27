@@ -11,12 +11,16 @@ func refineBranchEnvs(condValue *Value, trueEnv, falseEnv map[int]intRange) {
 		return
 	}
 	cond := condValue.Def
-	switch cond.Op {
-	case OpLtInt, OpLt:
+	spec, ok := cond.Op.Spec()
+	if !ok {
+		return
+	}
+	switch spec.RangeRefineKind {
+	case OpRangeRefineLessThan:
 		refineComparison(cond.Args[0], cond.Args[1], trueEnv, falseEnv, true)
-	case OpLeInt, OpLe:
+	case OpRangeRefineLessEqual:
 		refineComparison(cond.Args[0], cond.Args[1], trueEnv, falseEnv, false)
-	case OpEqInt:
+	case OpRangeRefineEqualInt:
 		refineEqInt(cond.Args[0], cond.Args[1], trueEnv, falseEnv)
 	}
 }

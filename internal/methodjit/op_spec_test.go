@@ -675,6 +675,21 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s speculative int-use contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpLt, OpLtInt} {
+		spec, ok := op.Spec()
+		if !ok || spec.RangeRefineKind != OpRangeRefineLessThan {
+			t.Fatalf("%s range-refine less-than contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpLe, OpLeInt} {
+		spec, ok := op.Spec()
+		if !ok || spec.RangeRefineKind != OpRangeRefineLessEqual {
+			t.Fatalf("%s range-refine less-equal contract should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpEqInt.Spec(); !ok || spec.RangeRefineKind != OpRangeRefineEqualInt {
+		t.Fatalf("EqInt range-refine equality contract should be driven by OpSpec")
+	}
 	for _, op := range []Op{OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpUnboxFloat, OpBoxFloat} {
 		spec, ok := op.Spec()
 		if !ok || !spec.FloatRegResult || !needsFloatReg(&Instr{Op: op}) {
