@@ -397,6 +397,31 @@ func TestBackendAndLoopContractsLiveInOpSpec(t *testing.T) {
 		!instrMayDirectDeoptWithoutFullFlush(&Instr{Op: OpGetField, Type: TypeFloat}) {
 		t.Fatalf("direct-deopt contracts should be driven by OpSpec plus instr-specific GetField float rule")
 	}
+
+	for _, tc := range []struct {
+		op   Op
+		rank int
+		mask uint8
+	}{
+		{OpTableArrayData, 0, 0},
+		{OpMatrixFlat, 0, 0},
+		{OpTableArrayLen, 1, 0},
+		{OpTableArrayHeader, 2, 0},
+		{OpTableArrayLoad, 1, 1<<0 | 1<<1},
+		{OpTableArrayNestedLoad, 1, 1<<0 | 1<<1 | 1<<2},
+		{OpTableArrayStore, 1, 1<<1 | 1<<2 | 1<<5},
+		{OpMatrixLoadFAt, 1, 1<<0 | 1<<1},
+		{OpMatrixStoreFAt, 1, 1<<0 | 1<<1},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", tc.op)
+		}
+		if spec.TableArrayGPRInvariantRank != tc.rank || spec.TableArrayGPRInvariantUseMask != tc.mask {
+			t.Fatalf("%s table-array invariant policy = rank %d mask %#x, want rank %d mask %#x",
+				tc.op, spec.TableArrayGPRInvariantRank, spec.TableArrayGPRInvariantUseMask, tc.rank, tc.mask)
+		}
+	}
 }
 
 func TestTypeAndBarrierContractsLiveInOpSpec(t *testing.T) {

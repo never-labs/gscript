@@ -151,6 +151,8 @@ type OpSpec struct {
 	RawFloatResult                   bool
 	MatrixNative                     bool
 	TableArrayGPRInvariant           bool
+	TableArrayGPRInvariantRank       int
+	TableArrayGPRInvariantUseMask    uint8
 	LICMHoistable                    bool
 	LICMInterestingMiss              bool
 	LICMIntArith                     bool
@@ -206,12 +208,13 @@ type OpSpec struct {
 
 func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSideEffect, mayDeopt bool) OpSpec {
 	return OpSpec{
-		Name:          name,
-		SideEffect:    effect,
-		ArgPolicy:     args,
-		SuccCount:     OpCountAny,
-		EmitterFamily: family,
-		MayDeopt:      mayDeopt,
+		Name:                       name,
+		SideEffect:                 effect,
+		ArgPolicy:                  args,
+		SuccCount:                  OpCountAny,
+		EmitterFamily:              family,
+		MayDeopt:                   mayDeopt,
+		TableArrayGPRInvariantRank: 1,
 	}
 }
 
@@ -455,6 +458,12 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opTableArrayGPRInvariantPolicies) {
 			spec.TableArrayGPRInvariant = opTableArrayGPRInvariantPolicies[op]
+		}
+		if int(op) < len(opTableArrayGPRInvariantRankPolicies) && opTableArrayGPRInvariantRankPolicies[op] != 0 {
+			spec.TableArrayGPRInvariantRank = int(opTableArrayGPRInvariantRankPolicies[op]) - 1
+		}
+		if int(op) < len(opTableArrayGPRInvariantUseMaskPolicies) {
+			spec.TableArrayGPRInvariantUseMask = opTableArrayGPRInvariantUseMaskPolicies[op]
 		}
 		if int(op) < len(opLICMHoistablePolicies) {
 			spec.LICMHoistable = opLICMHoistablePolicies[op]
@@ -1178,6 +1187,22 @@ var opTableArrayGPRInvariantPolicies = [...]bool{
 	OpTableShapeID:     true,
 	OpMatrixFlat:       true,
 	OpMatrixStride:     true,
+}
+
+var opTableArrayGPRInvariantRankPolicies = [...]uint8{
+	OpTableArrayData:   1,
+	OpMatrixFlat:       1,
+	OpTableArrayHeader: 3,
+}
+
+var opTableArrayGPRInvariantUseMaskPolicies = [...]uint8{
+	OpTableArrayLoad:       1<<0 | 1<<1,
+	OpTableArrayNestedLoad: 1<<0 | 1<<1 | 1<<2,
+	OpTableArrayStore:      1<<1 | 1<<2 | 1<<5,
+	OpTableArraySwap:       1<<1 | 1<<2,
+	OpMatrixRowPtr:         1<<0 | 1<<1,
+	OpMatrixLoadFAt:        1<<0 | 1<<1,
+	OpMatrixStoreFAt:       1<<0 | 1<<1,
 }
 
 var opLICMHoistablePolicies = [...]bool{

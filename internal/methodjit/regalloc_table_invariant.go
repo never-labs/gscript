@@ -35,48 +35,12 @@ func assignLoopTableArrayInvariantGPRs(fn *Function, li *loopInfo, alloc *RegAll
 				continue
 			}
 			for _, instr := range block.Instrs {
-				switch instr.Op {
-				case OpTableArrayLoad:
-					if len(instr.Args) >= 2 {
-						recordTableArrayInvariantCandidate(instr.Args[0], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
+				mask := tableArrayInvariantUseMask(instr)
+				for argIdx := 0; mask != 0 && argIdx < len(instr.Args); argIdx++ {
+					if mask&(1<<uint(argIdx)) == 0 {
+						continue
 					}
-				case OpTableArrayNestedLoad:
-					if len(instr.Args) >= 2 {
-						recordTableArrayInvariantCandidate(instr.Args[0], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-					if len(instr.Args) >= 3 {
-						recordTableArrayInvariantCandidate(instr.Args[2], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-				case OpTableArrayStore:
-					if len(instr.Args) >= 3 {
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[2], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-					if len(instr.Args) >= 6 && tableArrayStoreNeedsTablePtr(instr.Aux, instr.Aux2) {
-						recordTableArrayInvariantCandidate(instr.Args[5], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-				case OpTableArraySwap:
-					if len(instr.Args) >= 3 {
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[2], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-				case OpMatrixRowPtr:
-					if len(instr.Args) >= 2 {
-						recordTableArrayInvariantCandidate(instr.Args[0], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-				case OpMatrixLoadFAt:
-					if len(instr.Args) >= 2 {
-						recordTableArrayInvariantCandidate(instr.Args[0], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
-					}
-				case OpMatrixStoreFAt:
-					if len(instr.Args) >= 2 {
-						recordTableArrayInvariantCandidate(instr.Args[0], body, headerID, defs, defBlocks, dom, useCounts)
-						recordTableArrayInvariantCandidate(instr.Args[1], body, headerID, defs, defBlocks, dom, useCounts)
-					}
+					recordTableArrayInvariantCandidate(instr.Args[argIdx], body, headerID, defs, defBlocks, dom, useCounts)
 				}
 			}
 		}
@@ -165,6 +129,21 @@ func sortTableArrayInvariantCandidates(ids []int, useCounts map[int]int, defs ma
 	}
 }
 
+func tableArrayInvariantUseMask(instr *Instr) uint8 {
+	if instr == nil {
+		return 0
+	}
+	spec, ok := instr.Op.Spec()
+	if !ok {
+		return 0
+	}
+	mask := spec.TableArrayGPRInvariantUseMask
+	if instr.Op == OpTableArrayStore && !tableArrayStoreNeedsTablePtr(instr.Aux, instr.Aux2) {
+		mask &^= 1 << 5
+	}
+	return mask
+}
+
 func tableArrayInvariantLess(a, b int, useCounts map[int]int, defs map[int]*Instr) bool {
 	if useCounts[a] != useCounts[b] {
 		return useCounts[a] > useCounts[b]
@@ -178,16 +157,14 @@ func tableArrayInvariantLess(a, b int, useCounts map[int]int, defs map[int]*Inst
 }
 
 func tableArrayInvariantRank(instr *Instr) int {
-	if instr != nil && instr.Op == OpTableArrayData {
-		return 0
+	if instr == nil {
+		return 1
 	}
-	if instr != nil && instr.Op == OpMatrixFlat {
-		return 0
+	spec, ok := instr.Op.Spec()
+	if !ok {
+		return 1
 	}
-	if instr != nil && instr.Op == OpTableArrayHeader {
-		return 2
-	}
-	return 1
+	return spec.TableArrayGPRInvariantRank
 }
 
 func tableArrayInvariantSetHasHeader(ids []int, defs map[int]*Instr) bool {
