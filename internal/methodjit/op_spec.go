@@ -533,6 +533,10 @@ func OpByName(name string) (Op, bool) {
 	return op, ok
 }
 
+func (spec OpSpec) MayCallOrRunConcurrently() bool {
+	return spec.SideEffect == OpSideEffectCall || spec.SideEffect == OpSideEffectConcurrency
+}
+
 func OpsByEmitterFamily(family OpEmitterFamily) []Op {
 	var ops []Op
 	for op := Op(0); op < OpMax; op++ {

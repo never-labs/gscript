@@ -532,6 +532,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s runtime guard refresh contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCall, OpResume, OpGo, OpSend, OpRecv} {
+		spec, ok := op.Spec()
+		if !ok || !spec.MayCallOrRunConcurrently() {
+			t.Fatalf("%s call/concurrency side-effect contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {

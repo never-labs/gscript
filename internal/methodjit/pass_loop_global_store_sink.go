@@ -66,9 +66,11 @@ func sinkableLoopSetGlobal(fn *Function, li *loopInfo, header *Block) (*Block, *
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf, OpGo, OpSend, OpRecv:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.MayCallOrRunConcurrently() {
 				return nil, nil, false
+			}
+			switch instr.Op {
 			case OpGetGlobal:
 				if store != nil && instr.Aux == constIdx {
 					return nil, nil, false

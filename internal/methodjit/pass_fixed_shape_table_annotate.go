@@ -382,8 +382,8 @@ func fixedShapeMutableRangeFactsSafeFunction(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpTForCall:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.NestedCallLike {
 				return false
 			}
 		}
