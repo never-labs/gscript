@@ -525,7 +525,7 @@ func TestIntArithmeticContractsLiveInOpSpec(t *testing.T) {
 func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 	for _, op := range []Op{OpConstInt, OpLen, OpTableArrayLen, OpGuardIntRange, OpAddInt, OpMulInt, OpModInt, OpDivIntExact, OpPhi, OpBoxInt, OpUnboxInt} {
 		spec, ok := op.Spec()
-		if !ok || !spec.NonNegativeDerivationCandidate || !opCanDeriveNonNegative(&Instr{Op: op}) {
+		if !ok || !spec.NonNegativeDerivationCandidate || spec.NonNegativeDerivationKind == OpNonNegativeNone || !opCanDeriveNonNegative(&Instr{Op: op}) {
 			t.Fatalf("%s non-negative derivation contract should be driven by OpSpec", op)
 		}
 	}

@@ -48,38 +48,44 @@ func instrDerivesNonNegative(instr *Instr, facts map[int]bool, ranges map[int]in
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpConstInt:
+	spec, ok := instr.Op.Spec()
+	if !ok {
+		return false
+	}
+	switch spec.NonNegativeDerivationKind {
+	case OpNonNegativeConstIntAux:
 		return instr.Aux >= 0
-	case OpLen, OpTableArrayLen:
+	case OpNonNegativeAlways:
 		return true
-	case OpGuardIntRange:
+	case OpNonNegativeGuardRangeMin:
 		return instr.Aux >= 0
-	case OpAddInt, OpMulInt:
-		return len(instr.Args) >= 2 &&
-			valueNonNegative(instr.Args[0], facts, ranges) &&
-			valueNonNegative(instr.Args[1], facts, ranges)
-	case OpModInt:
+	case OpNonNegativeAllArgs:
+		return allValuesNonNegative(instr.Args, facts, ranges)
+	case OpNonNegativeBinaryAllArgs:
+		return len(instr.Args) >= 2 && allValuesNonNegative(instr.Args, facts, ranges)
+	case OpNonNegativeModuloDivisor:
 		return len(instr.Args) >= 2 && valueNonNegative(instr.Args[1], facts, ranges)
-	case OpDivIntExact:
+	case OpNonNegativeExactDivPositiveDivisor:
 		return len(instr.Args) >= 2 &&
 			valueNonNegative(instr.Args[0], facts, ranges) &&
 			valueStrictlyPositive(instr.Args[1], ranges)
-	case OpPhi:
-		if len(instr.Args) == 0 {
-			return false
-		}
-		for _, arg := range instr.Args {
-			if !valueNonNegative(arg, facts, ranges) {
-				return false
-			}
-		}
-		return true
-	case OpBoxInt, OpUnboxInt:
+	case OpNonNegativeForwardArg:
 		return len(instr.Args) >= 1 && valueNonNegative(instr.Args[0], facts, ranges)
 	default:
 		return false
 	}
+}
+
+func allValuesNonNegative(args []*Value, facts map[int]bool, ranges map[int]intRange) bool {
+	if len(args) == 0 {
+		return false
+	}
+	for _, arg := range args {
+		if !valueNonNegative(arg, facts, ranges) {
+			return false
+		}
+	}
+	return true
 }
 
 func valueNonNegative(v *Value, facts map[int]bool, ranges map[int]intRange) bool {

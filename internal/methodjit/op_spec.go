@@ -128,6 +128,20 @@ const (
 	OpRangeRefineEqualInt
 )
 
+type OpNonNegativeDerivationKind uint8
+
+const (
+	OpNonNegativeNone OpNonNegativeDerivationKind = iota
+	OpNonNegativeConstIntAux
+	OpNonNegativeAlways
+	OpNonNegativeGuardRangeMin
+	OpNonNegativeAllArgs
+	OpNonNegativeBinaryAllArgs
+	OpNonNegativeModuloDivisor
+	OpNonNegativeExactDivPositiveDivisor
+	OpNonNegativeForwardArg
+)
+
 // OpSpec is the lightweight metadata contract for an IR op.
 type OpSpec struct {
 	Name                             string
@@ -185,6 +199,7 @@ type OpSpec struct {
 	Int48SafeRangeCandidate          bool
 	ExactDivAllowedExternalUse       bool
 	NonNegativeDerivationCandidate   bool
+	NonNegativeDerivationKind        OpNonNegativeDerivationKind
 	Int48RuntimeValue                bool
 	FusableComparison                bool
 	LoopBoundComparison              bool
@@ -583,6 +598,10 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opNonNegativeDerivationCandidatePolicies) {
 			spec.NonNegativeDerivationCandidate = opNonNegativeDerivationCandidatePolicies[op]
+		}
+		if int(op) < len(opNonNegativeDerivationKindPolicies) {
+			spec.NonNegativeDerivationKind = opNonNegativeDerivationKindPolicies[op]
+			spec.NonNegativeDerivationCandidate = spec.NonNegativeDerivationCandidate || spec.NonNegativeDerivationKind != OpNonNegativeNone
 		}
 		if int(op) < len(opInt48RuntimeValuePolicies) {
 			spec.Int48RuntimeValue = opInt48RuntimeValuePolicies[op]
@@ -1770,6 +1789,20 @@ var opNonNegativeDerivationCandidatePolicies = [...]bool{
 	OpPhi:           true,
 	OpBoxInt:        true,
 	OpUnboxInt:      true,
+}
+
+var opNonNegativeDerivationKindPolicies = [...]OpNonNegativeDerivationKind{
+	OpConstInt:      OpNonNegativeConstIntAux,
+	OpLen:           OpNonNegativeAlways,
+	OpTableArrayLen: OpNonNegativeAlways,
+	OpGuardIntRange: OpNonNegativeGuardRangeMin,
+	OpAddInt:        OpNonNegativeBinaryAllArgs,
+	OpMulInt:        OpNonNegativeBinaryAllArgs,
+	OpModInt:        OpNonNegativeModuloDivisor,
+	OpDivIntExact:   OpNonNegativeExactDivPositiveDivisor,
+	OpPhi:           OpNonNegativeAllArgs,
+	OpBoxInt:        OpNonNegativeForwardArg,
+	OpUnboxInt:      OpNonNegativeForwardArg,
 }
 
 var opInt48RuntimeValuePolicies = [...]bool{
