@@ -182,3 +182,33 @@ var opNumericOperandPolicies = [...]bool{
 	OpLtFloat:  true,
 	OpLeFloat:  true,
 }
+
+func applyOpSpecNumericPolicies(op Op, spec *OpSpec) {
+	if int(op) < len(opPureNumericInlinePolicies) {
+		spec.PureNumericInline = opPureNumericInlinePolicies[op]
+	}
+	if int(op) < len(opNativeEffectLoopInlinePolicies) {
+		spec.NativeEffectLoopInline = opNativeEffectLoopInlinePolicies[op]
+	}
+	if int(op) < len(opDirectDeoptWithoutFullFlushPolicies) {
+		spec.DirectDeoptWithoutFullFlush = opDirectDeoptWithoutFullFlushPolicies[op]
+	}
+	if int(op) < len(opGenericSpecializablePolicies) {
+		spec.GenericSpecializable = opGenericSpecializablePolicies[op]
+	}
+	if int(op) < len(opTypeSpecializationPolicies) && opTypeSpecializationPolicies[op].Set {
+		policy := opTypeSpecializationPolicies[op]
+		spec.TypeSpecializeIntOp = policy.IntOp
+		spec.TypeSpecializeFloatOp = policy.FloatOp
+		spec.TypeSpecializeStringOp = policy.StringOp
+	}
+	if int(op) < len(opNumToFloatInsertCandidatePolicies) {
+		spec.NumToFloatInsertCandidate = opNumToFloatInsertCandidatePolicies[op]
+	}
+	if int(op) < len(opIntRecurrencePolicies) {
+		spec.IntRecurrence = opIntRecurrencePolicies[op]
+	}
+	if int(op) < len(opNumericOperandPolicies) {
+		spec.NumericOperand = opNumericOperandPolicies[op]
+	}
+}

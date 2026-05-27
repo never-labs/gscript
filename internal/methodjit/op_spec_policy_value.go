@@ -109,3 +109,36 @@ var opTableArrayKeyArgIndexPolicies = [...]uint8{
 	OpTableArraySwapPairs:  2,
 	OpTableArrayNestedLoad: 4,
 }
+
+func applyOpSpecValuePolicies(op Op, spec *OpSpec) {
+	if int(op) < len(opNoSSAResultPolicies) {
+		spec.NoSSAResult = opNoSSAResultPolicies[op]
+	}
+	if int(op) < len(opRawIntResultPolicies) {
+		spec.RawIntResult = opRawIntResultPolicies[op]
+	}
+	if int(op) < len(opRawTablePtrResultPolicies) {
+		spec.RawTablePtrResult = opRawTablePtrResultPolicies[op]
+	}
+	if int(op) < len(opRawDataPtrResultPolicies) {
+		spec.RawDataPtrResult = opRawDataPtrResultPolicies[op]
+	}
+	if int(op) < len(opRawFloatResultPolicies) {
+		spec.RawFloatResult = opRawFloatResultPolicies[op]
+	}
+	if int(op) < len(opMatrixNativePolicies) {
+		spec.MatrixNative = opMatrixNativePolicies[op]
+	}
+	if int(op) < len(opTableArrayGPRInvariantPolicies) {
+		spec.TableArrayGPRInvariant = opTableArrayGPRInvariantPolicies[op]
+	}
+	if int(op) < len(opTableArrayGPRInvariantRankPolicies) && opTableArrayGPRInvariantRankPolicies[op] != 0 {
+		spec.TableArrayGPRInvariantRank = int(opTableArrayGPRInvariantRankPolicies[op]) - 1
+	}
+	if int(op) < len(opTableArrayGPRInvariantUseMaskPolicies) {
+		spec.TableArrayGPRInvariantUseMask = opTableArrayGPRInvariantUseMaskPolicies[op]
+	}
+	if int(op) < len(opTableArrayKeyArgIndexPolicies) && opTableArrayKeyArgIndexPolicies[op] != 0 {
+		spec.TableArrayKeyArgIndex = int(opTableArrayKeyArgIndexPolicies[op]) - 1
+	}
+}
