@@ -542,6 +542,27 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s unroll cloneability contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpConstInt, OpLoadSlot, OpPhi, OpAddFloat, OpSqrt, OpGuardType, OpBranch, OpReturn} {
+		spec, ok := op.Spec()
+		if !ok || !spec.NestedFloatPhiOverrideSafe {
+			t.Fatalf("%s nested-float-phi override safety should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpDivFloat, OpFMA, OpFMSUB, OpSqrt, OpFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FloatReductionWideUnrollBarrier {
+			t.Fatalf("%s float-reduction wide-unroll barrier should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpSqrt.Spec(); !ok || !spec.FloatReductionLatencyUnrollSeed {
+		t.Fatalf("Sqrt latency-unroll seed should be driven by OpSpec")
+	}
+	for _, op := range []Op{OpDivFloat, OpFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FloatReductionLatencyUnrollBlock {
+			t.Fatalf("%s latency-unroll block should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
 		spec, ok := op.Spec()
 		if !ok || !spec.CallResultRangeGuardCandidate || !callResultRangeGuardCandidate(&Instr{Op: op}) {

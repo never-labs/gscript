@@ -234,20 +234,10 @@ func allowNestedFloatPhiOverride(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpConstInt, OpConstFloat, OpConstBool,
-				OpLoadSlot, OpPhi,
-				OpAdd, OpSub,
-				OpAddInt, OpSubInt, OpMulInt, OpNegInt,
-				OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-				OpNumToFloat, OpSqrt, OpFMA, OpFMSUB,
-				OpLtInt, OpLeInt, OpEqInt, OpLtFloat, OpLeFloat,
-				OpGuardType, OpGuardIntRange, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure, OpGuardTruthy,
-				OpJump, OpBranch, OpReturn:
+			if spec, ok := instr.Op.Spec(); ok && spec.NestedFloatPhiOverrideSafe {
 				continue
-			default:
-				return false
 			}
+			return false
 		}
 	}
 	return true

@@ -178,6 +178,10 @@ type OpSpec struct {
 	ConstPoolUser                    bool
 	RawStringResult                  bool
 	UnrollCloneable                  bool
+	NestedFloatPhiOverrideSafe       bool
+	FloatReductionWideUnrollBarrier  bool
+	FloatReductionLatencyUnrollSeed  bool
+	FloatReductionLatencyUnrollBlock bool
 	CallResultRangeGuardCandidate    bool
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
@@ -545,6 +549,18 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opUnrollCloneablePolicies) {
 			spec.UnrollCloneable = opUnrollCloneablePolicies[op]
+		}
+		if int(op) < len(opNestedFloatPhiOverrideSafePolicies) {
+			spec.NestedFloatPhiOverrideSafe = opNestedFloatPhiOverrideSafePolicies[op]
+		}
+		if int(op) < len(opFloatReductionWideUnrollBarrierPolicies) {
+			spec.FloatReductionWideUnrollBarrier = opFloatReductionWideUnrollBarrierPolicies[op]
+		}
+		if int(op) < len(opFloatReductionLatencyUnrollSeedPolicies) {
+			spec.FloatReductionLatencyUnrollSeed = opFloatReductionLatencyUnrollSeedPolicies[op]
+		}
+		if int(op) < len(opFloatReductionLatencyUnrollBlockPolicies) {
+			spec.FloatReductionLatencyUnrollBlock = opFloatReductionLatencyUnrollBlockPolicies[op]
 		}
 		if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
 			spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
@@ -1684,6 +1700,60 @@ var opUnrollCloneablePolicies = [...]bool{
 	OpMatrixLoadFRowConst:  true,
 	OpTableArrayLoad:       true,
 	OpTableArrayNestedLoad: true,
+}
+
+var opNestedFloatPhiOverrideSafePolicies = [...]bool{
+	OpConstInt:                 true,
+	OpConstFloat:               true,
+	OpConstBool:                true,
+	OpLoadSlot:                 true,
+	OpPhi:                      true,
+	OpAdd:                      true,
+	OpSub:                      true,
+	OpAddInt:                   true,
+	OpSubInt:                   true,
+	OpMulInt:                   true,
+	OpNegInt:                   true,
+	OpAddFloat:                 true,
+	OpSubFloat:                 true,
+	OpMulFloat:                 true,
+	OpDivFloat:                 true,
+	OpNegFloat:                 true,
+	OpNumToFloat:               true,
+	OpSqrt:                     true,
+	OpFMA:                      true,
+	OpFMSUB:                    true,
+	OpLtInt:                    true,
+	OpLeInt:                    true,
+	OpEqInt:                    true,
+	OpLtFloat:                  true,
+	OpLeFloat:                  true,
+	OpGuardType:                true,
+	OpGuardIntRange:            true,
+	OpGuardShapeFieldType:      true,
+	OpGuardShapeFieldTypeMask:  true,
+	OpGuardShapeFieldVMClosure: true,
+	OpGuardTruthy:              true,
+	OpJump:                     true,
+	OpBranch:                   true,
+	OpReturn:                   true,
+}
+
+var opFloatReductionWideUnrollBarrierPolicies = [...]bool{
+	OpDivFloat: true,
+	OpFMA:      true,
+	OpFMSUB:    true,
+	OpSqrt:     true,
+	OpFloor:    true,
+}
+
+var opFloatReductionLatencyUnrollSeedPolicies = [...]bool{
+	OpSqrt: true,
+}
+
+var opFloatReductionLatencyUnrollBlockPolicies = [...]bool{
+	OpDivFloat: true,
+	OpFloor:    true,
 }
 
 var opCallResultRangeGuardCandidatePolicies = [...]bool{
