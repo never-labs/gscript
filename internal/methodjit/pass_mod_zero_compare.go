@@ -61,11 +61,3 @@ func parseModZeroCompare(modVal, zeroVal *Value) (*Instr, int64, bool) {
 	}
 	return mod, divisor, true
 }
-
-func opIsBoxedOrFallback(op, boxed Op) bool {
-	if op == boxed {
-		return true
-	}
-	spec, ok := op.Spec()
-	return ok && spec.BoxedFallbackOp == boxed
-}

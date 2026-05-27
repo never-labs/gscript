@@ -93,11 +93,6 @@ func runIntExactDivisionIfCandidate(fn *Function) (*Function, bool, error) {
 	return fn, true, nil
 }
 
-func exactIntNarrowOp(op Op) (Op, bool) {
-	spec, ok := op.Spec()
-	return spec.ExactIntNarrowOp, ok && spec.ExactIntNarrowOp < OpMax
-}
-
 func findModuloProvenDivisions(fn *Function) map[int]bool {
 	dom := computeDominators(fn)
 	proofs := make([]modZeroProof, 0)

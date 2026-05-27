@@ -25,21 +25,6 @@ func refineBranchEnvs(condValue *Value, trueEnv, falseEnv map[int]intRange) {
 	}
 }
 
-func orderedRangeRefineKind(op Op) (strict bool, ok bool) {
-	spec, specOK := op.Spec()
-	if !specOK {
-		return false, false
-	}
-	switch spec.RangeRefineKind {
-	case OpRangeRefineLessThan:
-		return true, true
-	case OpRangeRefineLessEqual:
-		return false, true
-	default:
-		return false, false
-	}
-}
-
 func refineComparison(lhs, rhs *Value, trueEnv, falseEnv map[int]intRange, strict bool) {
 	if c, ok := constIntFromValue(rhs); ok && lhs != nil {
 		trueMax := c
