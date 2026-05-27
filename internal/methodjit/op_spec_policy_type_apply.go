@@ -1,6 +1,13 @@
 package methodjit
 
 func applyOpSpecTypePolicies(op Op, spec *OpSpec) {
+	applyOpSpecTypeRuntimePolicies(op, spec)
+	applyOpSpecTypeResultPolicies(op, spec)
+	applyOpSpecTypeBarrierPolicies(op, spec)
+	applyOpSpecTypeNarrowPolicies(op, spec)
+}
+
+func applyOpSpecTypeRuntimePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opRuntimeOverflowBoxablePolicies) {
 		spec.RuntimeOverflowBoxable = opRuntimeOverflowBoxablePolicies[op]
 	}
@@ -19,6 +26,9 @@ func applyOpSpecTypePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opStaticTableLenBenignUsePolicies) {
 		spec.StaticTableLenBenignUse = opStaticTableLenBenignUsePolicies[op]
 	}
+}
+
+func applyOpSpecTypeResultPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFixedResultTypePolicies) {
 		spec.FixedResultType = opFixedResultTypePolicies[op]
 	}
@@ -31,6 +41,9 @@ func applyOpSpecTypePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opRawFloatValueProducerPolicies) {
 		spec.RawFloatValueProducer = opRawFloatValueProducerPolicies[op]
 	}
+}
+
+func applyOpSpecTypeBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldFactWideKillerPolicies) {
 		spec.FieldFactWideKiller = opFieldFactWideKillerPolicies[op]
 	}
@@ -43,6 +56,9 @@ func applyOpSpecTypePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opRawCarryClobberPolicies) {
 		spec.RawCarryClobber = opRawCarryClobberPolicies[op]
 	}
+}
+
+func applyOpSpecTypeNarrowPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opExactDivComponentPolicies) {
 		spec.ExactDivComponent = opExactDivComponentPolicies[op]
 	}
