@@ -107,7 +107,7 @@ func (c *PassContext) Global() *GlobalFacts {
 // the union of the owning domains of its declared facts (Requires ∪ Provides ∪
 // Updates ∪ OptionalReads). OptionalReads are opportunistic hint reads that do
 // not participate in dependency ordering.
-func allowedDomainsForModule(requires, provides, updates []AnalysisFact, _ string, optionalReads ...[]AnalysisFact) map[factDomain]bool {
+func allowedDomainsForModule(requires, provides, updates []AnalysisFact, optionalReads ...[]AnalysisFact) map[factDomain]bool {
 	allowed := make(map[factDomain]bool, 6)
 	add := func(facts []AnalysisFact) {
 		for _, f := range facts {

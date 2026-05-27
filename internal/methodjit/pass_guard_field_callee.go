@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-var guardFieldCalleePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "GuardFieldCallee")
+var guardFieldCalleePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil)
 
 // GuardFieldCalleePass fuses a fixed-shape method field load that feeds only a
 // callee-proto guard:

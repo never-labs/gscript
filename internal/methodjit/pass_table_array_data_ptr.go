@@ -1,6 +1,6 @@
 package methodjit
 
-var tableArrayDataPtrFactPassAllowedDomains = allowedDomainsForModule(nil, analysisFacts(AnalysisFactTableArrayDataPtrs), nil, "TableArrayDataPtrFact")
+var tableArrayDataPtrFactPassAllowedDomains = allowedDomainsForModule(nil, analysisFacts(AnalysisFactTableArrayDataPtrs), nil)
 
 // TableArrayDataPtrFactPass records the explicit raw data-pointer ABI facts
 // behind the lowered typed-array shape:

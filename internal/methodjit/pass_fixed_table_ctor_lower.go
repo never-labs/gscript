@@ -6,7 +6,7 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
-var fixedTableConstructorLoweringPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "FixedTableConstructorLowering")
+var fixedTableConstructorLoweringPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil)
 
 // FixedTableConstructorLoweringPass combines surviving fixed-field table
 // constructors into one value-producing op after escape analysis has had a

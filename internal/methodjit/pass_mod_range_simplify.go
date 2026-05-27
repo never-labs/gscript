@@ -1,6 +1,6 @@
 package methodjit
 
-var modRangeSimplifyPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "ModRangeSimplify")
+var modRangeSimplifyPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil)
 
 // ModRangeSimplifyPass removes integer modulo operations that range analysis
 // proves are identity operations. It is deliberately conservative: it only

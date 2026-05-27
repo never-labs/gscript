@@ -1,6 +1,6 @@
 package methodjit
 
-var callReturnProjectionPassAllowedDomains = allowedDomainsForModule(callReturnProjectionFacts(), nil, nil, "CallReturnProjection")
+var callReturnProjectionPassAllowedDomains = allowedDomainsForModule(callReturnProjectionFacts(), nil, nil)
 
 // CallReturnProjectionPass turns a side-effecting call followed by a pure
 // projection of its single result into one explicit call-projection op. This

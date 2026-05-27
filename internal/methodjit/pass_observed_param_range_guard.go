@@ -1,6 +1,6 @@
 package methodjit
 
-var observedParamRangeGuardPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "ObservedParamRangeGuard")
+var observedParamRangeGuardPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil)
 
 // ObservedParamRangeGuardPass adds entry range guards for integer parameters
 // with stable runtime argument-range feedback. This gives RangeAnalysis concrete

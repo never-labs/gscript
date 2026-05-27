@@ -101,7 +101,7 @@ type FixedShapeTableFactsConfig struct {
 	EntryGuardedArgs      bool
 }
 
-var fixedShapeTableFactsPassAllowedDomains = allowedDomainsForModule(nil, fixedShapeTableFacts(), nil, "FixedShapeTableFacts")
+var fixedShapeTableFactsPassAllowedDomains = allowedDomainsForModule(nil, fixedShapeTableFacts(), nil)
 
 // FixedShapeTableFactsPass records fixed-shape table facts and uses
 // interprocedural return facts from stable global callees to prefill GetField

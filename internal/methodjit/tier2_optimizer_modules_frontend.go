@@ -27,7 +27,7 @@ func init() {
 
 func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	fixedShapeFacts := fixedShapeTableFacts()
-	fixedShapePreInlineAllowed := allowedDomainsForModule(nil, fixedShapeFacts, nil, "FixedShapeTableFacts (pre-inline)")
+	fixedShapePreInlineAllowed := allowedDomainsForModule(nil, fixedShapeFacts, nil)
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("SimplifyPhis", Tier2PhaseEarlyCanonical, nil, nil, SimplifyPhisPass),
 		tier2PassModuleWith("TypeSpecialize", Tier2PhaseEarlyCanonical, nil, nil, TypeSpecializePass),
@@ -75,7 +75,7 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 
 func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tier2OptimizerModule {
 	fixedShapeFacts := fixedShapeTableFacts()
-	fixedShapePostInlineAllowed := allowedDomainsForModule(nil, nil, fixedShapeFacts, "FixedShapeTableFacts (post-inline)")
+	fixedShapePostInlineAllowed := allowedDomainsForModule(nil, nil, fixedShapeFacts)
 	modules := []Tier2OptimizerModule{
 		tier2PassModuleWithCtx("FieldShapeCallSplitPreInline", Tier2PhaseInlineCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPreInlinePassCtx),
 		{
@@ -181,7 +181,6 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		callABIRequires,
 		callABIProvides,
 		nil,
-		"CallABI",
 		analysisFacts(AnalysisFactIntRanges),
 	)
 	guardedConstCallFoldRequires := analysisFacts(AnalysisFactCallABIs)
@@ -190,7 +189,6 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		guardedConstCallFoldRequires,
 		guardedConstCallFoldProvides,
 		nil,
-		"GuardedConstCallFold",
 	)
 	callSiteRuntimeSpecializationRequires := analysisFacts(AnalysisFactCallABIs)
 	callSiteRuntimeSpecializationProvides := analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches)
@@ -198,7 +196,6 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		callSiteRuntimeSpecializationRequires,
 		callSiteRuntimeSpecializationProvides,
 		nil,
-		"CallSiteRuntimeSpecializationExit",
 	)
 	return []Tier2OptimizerModule{
 		{
@@ -317,7 +314,6 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		callABIFinalRequires,
 		nil,
 		callABIFinalUpdates,
-		"CallABI (final)",
 	)
 	callSiteRuntimeSpecializationFinalRequires := analysisFacts(AnalysisFactCallABIs)
 	callSiteRuntimeSpecializationFinalUpdates := analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches)
@@ -325,7 +321,6 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		callSiteRuntimeSpecializationFinalRequires,
 		nil,
 		callSiteRuntimeSpecializationFinalUpdates,
-		"CallSiteRuntimeSpecializationExit (final)",
 	)
 	modules := []Tier2OptimizerModule{
 		{

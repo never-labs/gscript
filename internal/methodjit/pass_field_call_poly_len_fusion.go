@@ -1,6 +1,6 @@
 package methodjit
 
-var fieldCallPolyLenFusionPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldCallPolyLenFusion")
+var fieldCallPolyLenFusionPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil)
 
 // FieldCallPolyLenFusionPass connects a guarded typed-peer field call with a
 // later same-block guarded field length on the same receiver. It does not

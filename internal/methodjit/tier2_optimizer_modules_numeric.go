@@ -116,7 +116,7 @@ func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 func tier2LoopPostModules() []Tier2OptimizerModule {
 	licmPostRequires := analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables)
 	licmPostOptionalReads := analysisFacts(AnalysisFactGlobals)
-	licmPostAllowed := allowedDomainsForModule(licmPostRequires, nil, nil, "LICM (post-MatrixRowPtrFactoring)", licmPostOptionalReads)
+	licmPostAllowed := allowedDomainsForModule(licmPostRequires, nil, nil, licmPostOptionalReads)
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("UnrollAndJam", Tier2PhaseLoopPost, nil, nil, UnrollAndJamPass),
 		tier2PassModuleWith("MatrixRowPtrFactoring (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, MatrixRowPtrFactoringPass),

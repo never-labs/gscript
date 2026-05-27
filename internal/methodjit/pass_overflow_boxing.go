@@ -1,6 +1,6 @@
 package methodjit
 
-var overflowBoxingPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "OverflowBoxing")
+var overflowBoxingPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil)
 
 // OverflowBoxingPass backs unsafe integer arithmetic out of the raw-int
 // representation after RangeAnalysis has identified which ops are int48-safe.

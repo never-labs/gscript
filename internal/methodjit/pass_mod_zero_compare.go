@@ -1,6 +1,6 @@
 package methodjit
 
-var modZeroComparePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntModNonZeroDivisor), nil, nil, "ModZeroCompare")
+var modZeroComparePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntModNonZeroDivisor), nil, nil)
 
 // ModZeroComparePass rewrites integer modulo-zero comparisons into a boolean
 // divisibility test. For x % c == 0, Lua's sign-adjusted modulo and ARM64's

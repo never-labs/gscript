@@ -2,7 +2,7 @@ package methodjit
 
 import "fmt"
 
-var fieldPolyLenPhiPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldPolyLenPhi")
+var fieldPolyLenPhiPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil)
 
 // FieldPolyLenPhiPass replaces a guarded polymorphic field length with SSA
 // constants/phis when existing shape-split control flow already proves the

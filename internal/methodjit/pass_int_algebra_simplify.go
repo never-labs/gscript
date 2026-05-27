@@ -1,6 +1,6 @@
 package methodjit
 
-var intAlgebraSimplifyPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "IntAlgebraSimplify")
+var intAlgebraSimplifyPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil)
 
 // IntAlgebraSimplifyPass removes checked integer add/sub pairs that cancel
 // each other after RangeAnalysis has proven both checked operations int48-safe.

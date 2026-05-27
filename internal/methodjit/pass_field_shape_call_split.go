@@ -5,8 +5,8 @@ import (
 )
 
 var (
-	fieldShapeCallSplitPassAllowedDomains          = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldShapeCallSplit (experimental)")
-	fieldShapeCallSplitPreInlinePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil, "FieldShapeCallSplitPreInline")
+	fieldShapeCallSplitPassAllowedDomains          = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil)
+	fieldShapeCallSplitPreInlinePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, nil)
 )
 
 // FieldShapeCallSplitPass peels one case out of a polymorphic fixed-shape

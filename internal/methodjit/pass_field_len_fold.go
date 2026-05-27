@@ -1,8 +1,8 @@
 package methodjit
 
 var (
-	fieldLenFoldPassAllowedDomains          = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts, AnalysisFactIntRanges), nil, nil, "FieldLenFold")
-	profiledStringLenFoldPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts, AnalysisFactIntRanges), nil, nil, "ProfiledStringLenFold")
+	fieldLenFoldPassAllowedDomains          = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts, AnalysisFactIntRanges), nil, nil)
+	profiledStringLenFoldPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFieldPolyShapeFacts, AnalysisFactIntRanges), nil, nil)
 )
 
 // FieldLenFoldPass folds len(obj.field) at simple join blocks when every

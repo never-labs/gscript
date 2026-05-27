@@ -41,7 +41,7 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-var licmPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, nil, "LICM")
+var licmPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, nil)
 
 // LICMPass moves loop-invariant computations out of loops into a
 // pre-header. Safe to call on functions without loops (no-op). Returns

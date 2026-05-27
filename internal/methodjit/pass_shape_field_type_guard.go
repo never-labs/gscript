@@ -10,7 +10,6 @@ var shapeFieldTypeGuardPassAllowedDomains = allowedDomainsForModule(
 	analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFieldPolyShapeCatalog),
 	analysisFacts(AnalysisFactShapeFieldTypeElided),
 	nil,
-	"ShapeFieldTypeGuard",
 )
 
 // ShapeFieldTypeGuardPass turns process-wide stable shape-field type feedback

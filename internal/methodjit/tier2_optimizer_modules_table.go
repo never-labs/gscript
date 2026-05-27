@@ -16,8 +16,8 @@ func init() {
 
 func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	fixedShapeFacts := fixedShapeTableFacts()
-	fixedShapeAllowed := allowedDomainsForModule(nil, nil, fixedShapeFacts, "FixedShapeTableFacts")
-	escapePostAllowed := allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "EscapeAnalysis (post-fixed-table-lowering)")
+	fixedShapeAllowed := allowedDomainsForModule(nil, nil, fixedShapeFacts)
+	escapePostAllowed := allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil)
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("TablePreallocHint", Tier2PhaseTableObjectPrep, nil, nil, TablePreallocHintPass),
 		tier2PassModuleWith("TypeSpecialize (post-table-prealloc)", Tier2PhaseTableObjectPrep, nil, nil, TypeSpecializePass),
@@ -75,10 +75,10 @@ func fixedShapeTableFactsConfigFromOpts(globals map[string]*vm.FuncProto, opts *
 func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	fixedShapeFacts := fixedShapeTableFacts()
 	fixedShapePostFieldSvalsRequires := analysisFacts(AnalysisFactIntRanges)
-	fixedShapePostFieldSvalsAllowed := allowedDomainsForModule(fixedShapePostFieldSvalsRequires, nil, fixedShapeFacts, "FixedShapeTableFacts (post-FieldSvalsLower)")
+	fixedShapePostFieldSvalsAllowed := allowedDomainsForModule(fixedShapePostFieldSvalsRequires, nil, fixedShapeFacts)
 	shapeFieldTypeGuardRequires := analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFieldPolyShapeCatalog)
 	shapeFieldTypeGuardProvides := analysisFacts(AnalysisFactShapeFieldTypeElided)
-	shapeFieldTypeGuardAllowed := allowedDomainsForModule(shapeFieldTypeGuardRequires, shapeFieldTypeGuardProvides, nil, "ShapeFieldTypeGuard")
+	shapeFieldTypeGuardAllowed := allowedDomainsForModule(shapeFieldTypeGuardRequires, shapeFieldTypeGuardProvides, nil)
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("TableArrayStoreLower", Tier2PhaseTableFieldLower, nil, nil, TableArrayStoreLowerPass),
 		tier2PassModuleWithCtx("GuardFieldCallee", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, GuardFieldCalleePassCtx),

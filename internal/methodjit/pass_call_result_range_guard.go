@@ -7,7 +7,7 @@ const observedParamRangeGuardMinCount uint32 = 2
 const callFloorSpecRangeMin int64 = -1 << 31
 const callFloorSpecRangeMax int64 = 1<<31 - 1
 
-var callResultRangeGuardPassAllowedDomains = allowedDomainsForModule(callResultRangeGuardFacts(), nil, nil, "CallResultRangeGuard", analysisFacts(AnalysisFactGlobals))
+var callResultRangeGuardPassAllowedDomains = allowedDomainsForModule(callResultRangeGuardFacts(), nil, nil, analysisFacts(AnalysisFactGlobals))
 
 // CallResultRangeGuardPass turns mature call-result range feedback into an
 // explicit GuardIntRange. For floor-projected calls with stable callee facts

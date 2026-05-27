@@ -6,7 +6,7 @@ const (
 	singleLoopParamRangeMax         int64 = 1 << 30
 )
 
-var loopBoundRangeGuardPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "LoopBoundRangeGuard")
+var loopBoundRangeGuardPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil)
 
 // LoopBoundRangeGuardPass adds a narrow entry range guard for integer
 // parameters used as loop bounds. The guard feeds RangeAnalysis, which can then

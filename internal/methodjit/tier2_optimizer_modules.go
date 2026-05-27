@@ -385,7 +385,7 @@ type CtxPassFunc func(*PassContext) (*Function, error)
 // (off in production, on under tests). The legacy Run path is left nil so this
 // shares no code with the unmigrated PassFunc modules.
 func tier2PassModuleWithCtx(name string, phase Tier2OptimizerPhase, requires, provides []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
-	allowed := allowedDomainsForModule(requires, provides, nil, name)
+	allowed := allowedDomainsForModule(requires, provides, nil)
 	return Tier2OptimizerModule{
 		Name:     name,
 		Phase:    phase,
@@ -398,7 +398,7 @@ func tier2PassModuleWithCtx(name string, phase Tier2OptimizerPhase, requires, pr
 }
 
 func tier2PassModuleWithCtxOptionalReads(name string, phase Tier2OptimizerPhase, requires, provides, optionalReads []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
-	allowed := allowedDomainsForModule(requires, provides, nil, name, optionalReads)
+	allowed := allowedDomainsForModule(requires, provides, nil, optionalReads)
 	return Tier2OptimizerModule{
 		Name:          name,
 		Phase:         phase,
@@ -412,7 +412,7 @@ func tier2PassModuleWithCtxOptionalReads(name string, phase Tier2OptimizerPhase,
 }
 
 func tier2PassModuleWithCtxUpdates(name string, phase Tier2OptimizerPhase, requires, updates []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
-	allowed := allowedDomainsForModule(requires, nil, updates, name)
+	allowed := allowedDomainsForModule(requires, nil, updates)
 	return Tier2OptimizerModule{
 		Name:     name,
 		Phase:    phase,
@@ -425,7 +425,7 @@ func tier2PassModuleWithCtxUpdates(name string, phase Tier2OptimizerPhase, requi
 }
 
 func tier2PassModuleWithCtxProvidesUpdates(name string, phase Tier2OptimizerPhase, requires, provides, updates []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
-	allowed := allowedDomainsForModule(requires, provides, updates, name)
+	allowed := allowedDomainsForModule(requires, provides, updates)
 	return Tier2OptimizerModule{
 		Name:     name,
 		Phase:    phase,

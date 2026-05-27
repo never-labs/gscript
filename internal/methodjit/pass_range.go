@@ -28,7 +28,7 @@
 
 package methodjit
 
-var rangeAnalysisPassAllowedDomains = allowedDomainsForModule(nil, rangeAnalysisFacts(), nil, "RangeAnalysis")
+var rangeAnalysisPassAllowedDomains = allowedDomainsForModule(nil, rangeAnalysisFacts(), nil)
 
 // RangeAnalysisPass computes integer ranges across the IR and marks every
 // AddInt/SubInt/MulInt/DivIntExact/NegInt whose range provably fits in signed int48.
