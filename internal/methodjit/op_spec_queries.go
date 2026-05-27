@@ -108,3 +108,19 @@ func isInt48RuntimeValue(instr *Instr) bool {
 	spec, ok := instr.Op.Spec()
 	return ok && spec.Int48RuntimeValue
 }
+
+func instrIsDirectIntValue(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	switch instr.Op {
+	case OpConstInt, OpUnboxInt:
+		return true
+	case OpGuardType:
+		return instr.Type == TypeInt || Type(instr.Aux) == TypeInt
+	case OpGuardIntRange:
+		return true
+	default:
+		return false
+	}
+}

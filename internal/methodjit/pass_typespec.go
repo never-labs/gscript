@@ -1196,16 +1196,7 @@ func (ts *typeSpecializer) isKnownIntValue(v *Value) bool {
 	if ts.argType(v) == TypeInt {
 		return true
 	}
-	switch v.Def.Op {
-	case OpConstInt, OpUnboxInt:
-		return true
-	case OpGuardType:
-		return Type(v.Def.Aux) == TypeInt
-	case OpGuardIntRange:
-		return true
-	default:
-		return false
-	}
+	return instrIsDirectIntValue(v.Def)
 }
 
 // replaceValueUses replaces all uses of oldID with newVal across all blocks,

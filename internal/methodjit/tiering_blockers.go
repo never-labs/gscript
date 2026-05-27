@@ -92,9 +92,10 @@ func tier2ValueIsAdditiveIntLike(v *Value, seen map[int]bool) bool {
 	}
 	seen[v.ID] = true
 
-	switch v.Def.Op {
-	case OpConstInt, OpUnboxInt:
+	if instrIsDirectIntValue(v.Def) && v.Def.Op != OpGuardType && v.Def.Op != OpGuardIntRange {
 		return true
+	}
+	switch v.Def.Op {
 	case OpGuardType:
 		return v.Def.Type == TypeInt && len(v.Def.Args) == 1 &&
 			tier2ValueIsAdditiveIntLike(v.Def.Args[0], seen)
@@ -605,9 +606,10 @@ func isIntLikeTableKey(v *Value, seen map[int]bool) bool {
 		return true
 	}
 	seen[v.ID] = true
-	switch v.Def.Op {
-	case OpConstInt, OpUnboxInt:
+	if instrIsDirectIntValue(v.Def) && v.Def.Op != OpGuardType && v.Def.Op != OpGuardIntRange {
 		return true
+	}
+	switch v.Def.Op {
 	case OpPhi:
 		return allIntLikeArgs(v.Def, seen)
 	}

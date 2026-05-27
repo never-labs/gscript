@@ -208,7 +208,7 @@ func genericNumericUseHasIntPeer(user *Instr, valueID int) bool {
 		if arg == nil || arg.ID == valueID || arg.Def == nil {
 			continue
 		}
-		if arg.Def.Type == TypeInt || arg.Def.Op == OpConstInt || arg.Def.Op == OpGuardIntRange {
+		if arg.Def.Type == TypeInt || instrIsDirectIntValue(arg.Def) {
 			return true
 		}
 	}
