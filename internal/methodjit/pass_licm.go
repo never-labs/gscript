@@ -899,22 +899,3 @@ func licmCallUserArgs(instr *Instr) []*Value {
 // a loop is semantically safe (assuming all its operands are also
 // invariant). The emitter and regalloc must still be able to place the
 // result; we only whitelist pure, side-effect-free computations.
-func canHoistOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.LICMHoistable
-}
-
-func isInterestingLICMMiss(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.LICMInterestingMiss
-}
-
-// isIntArithOp reports whether the op is an integer arithmetic op that
-// requires an Int48Safe guarantee before we can hoist past its overflow
-// check. Comparisons (LtInt/LeInt/EqInt) and NegInt with safe input are
-// also listed in canHoistOp, but only the adds/subs/muls/negs carry the
-// emitter's SBFX+CMP overflow sequence — comparisons don't.
-func isIntArithOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.LICMIntArith
-}

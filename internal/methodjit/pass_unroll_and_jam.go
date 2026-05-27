@@ -835,8 +835,3 @@ func floatReductionBodyHasDivFloat(body *Block) bool {
 	}
 	return false
 }
-
-func isUnrollCloneableOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.UnrollCloneable
-}

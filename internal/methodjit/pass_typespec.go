@@ -468,11 +468,6 @@ func (ts *typeSpecializer) wouldInsertNumToFloat(instr *Instr) bool {
 	return false
 }
 
-func isGenericSpecializableOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.GenericSpecializable
-}
-
 func typeSpecializedOp(op Op, lt, rt Type) (Op, Type, bool) {
 	spec, ok := op.Spec()
 	if !ok {
@@ -1181,11 +1176,6 @@ func (ts *typeSpecializer) valueFlowsBackThroughIntRecurrence(id, phiID int, use
 	return false
 }
 
-func isIntRecurrenceOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.IntRecurrence
-}
-
 func (ts *typeSpecializer) intRecurrenceArgsOK(instr *Instr, recurrenceID int) bool {
 	if len(instr.Args) == 0 {
 		return false
@@ -1238,12 +1228,6 @@ func replaceValueUses(fn *Function, oldID int, newVal *Value, exceptID int) {
 			}
 		}
 	}
-}
-
-// isNumericOp returns true for ops that require numeric operands.
-func isNumericOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.NumericOperand
 }
 
 // specialize replaces a generic op with its type-specialized variant if
