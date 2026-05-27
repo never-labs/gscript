@@ -87,7 +87,9 @@ func TestOpSpecAggregateFilesStayThin(t *testing.T) {
 	aggregates := []string{
 		"op_spec.go",
 		"op_spec_policies.go",
+		"op_spec_policy_type.go",
 		"op_spec_queries.go",
+		"op_spec_query_traits.go",
 	}
 	for _, name := range aggregates {
 		src, err := os.ReadFile(filepath.Join(dir, name))
@@ -124,9 +126,9 @@ func TestOpSpecDomainFilesStayFocused(t *testing.T) {
 		switch {
 		case ok:
 		case strings.HasPrefix(name, "op_spec_policy_") && strings.HasSuffix(name, ".go"):
-			limit = 500
+			limit = 350
 		case strings.HasPrefix(name, "op_spec_query_") && strings.HasSuffix(name, ".go"):
-			limit = 400
+			limit = 250
 		default:
 			return nil
 		}
