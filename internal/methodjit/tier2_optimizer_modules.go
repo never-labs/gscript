@@ -363,7 +363,7 @@ func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provi
 		Phase:    phase,
 		Requires: requires,
 		Provides: provides,
-		Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+		RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
 			return pass(fn)
 		},
 	}

@@ -301,7 +301,7 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 			Phase:    Tier2PhasePostRewrite,
 			Requires: nil,
 			Provides: nil,
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
 				return runPostRewriteTypeSpecialize(fn, opts, "post-escape")
 			},
 		},
