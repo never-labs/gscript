@@ -607,6 +607,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s field-cache requirement should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpGetField, OpGetFieldNumToFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FieldRead || !opIsFieldRead(op) {
+			t.Fatalf("%s field-read contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpNop, OpJump, OpConstInt, OpConstBool, OpConstNil, OpAddInt} {
 		spec, ok := op.Spec()
 		if !ok || !spec.BoolTableFillBodyBenign {

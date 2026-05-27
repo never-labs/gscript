@@ -98,7 +98,10 @@ func seedGuardedPolyShapeArgFacts(fn *Function, tableShapes *TableShapeFacts, ar
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("parameter %d carries %d guarded polymorphic shapes", instr.Aux, len(poly)))
-			case OpGetField, OpGetFieldNumToFloat:
+			default:
+				if !opIsFieldRead(instr.Op) {
+					continue
+				}
 				if len(instr.Args) == 0 || instr.Args[0] == nil {
 					continue
 				}
@@ -162,7 +165,7 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, tableShapes *TableSh
 						fmt.Sprintf("parameter %d array element carries %d guarded polymorphic shapes", tableDef.Aux, len(poly)))
 				}
 			}
-			if instr.Op == OpGetField || instr.Op == OpGetFieldNumToFloat {
+			if opIsFieldRead(instr.Op) {
 				if len(instr.Args) == 0 || instr.Args[0] == nil {
 					continue
 				}

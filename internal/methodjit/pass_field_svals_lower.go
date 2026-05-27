@@ -559,14 +559,17 @@ func fieldSvalsLowerable(fn *Function, instr *Instr) bool {
 	if shapes.FieldPolyShapeReceiver(instr.Args[0].ID) {
 		return false
 	}
-	switch instr.Op {
-	case OpGetField, OpGetFieldNumToFloat:
-	default:
+	if !opIsFieldRead(instr.Op) {
 		return false
 	}
 	shapeID := uint32(instr.Aux2 >> 32)
 	fieldIdx := int(int32(instr.Aux2 & 0xFFFFFFFF))
 	return shapeID != 0 && fieldIdx >= 0
+}
+
+func opIsFieldRead(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldRead
 }
 
 func fieldSvalsStoreLowerable(instr *Instr) bool {
