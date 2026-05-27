@@ -147,10 +147,14 @@ func detectBoolTableCountLoop(fn *Function, header *Block) (boolCountLoopCandida
 func boolCountLoopLoad(block *Block, key *Value) (*Instr, *Value, bool) {
 	var load *Instr
 	for _, instr := range block.Instrs {
-		if instr == nil || instr.Op == OpNop || instr.Op == OpJump || instr.Op == OpBranch || instr.Op == OpGuardTruthy {
+		if instr == nil {
 			continue
 		}
-		if instr.Op != OpTableArrayLoad || len(instr.Args) < 3 || instr.Type != TypeBool {
+		spec, ok := instr.Op.Spec()
+		if ok && spec.BoolTableCountLoadBodyBenign {
+			continue
+		}
+		if !ok || !spec.BoolTableCountLoad || len(instr.Args) < 3 || instr.Type != TypeBool {
 			return nil, nil, false
 		}
 		if load != nil || instr.Args[2] == nil || key == nil || instr.Args[2].ID != key.ID {
@@ -169,13 +173,14 @@ func boolCountLoopLoad(block *Block, key *Value) (*Instr, *Value, bool) {
 func singleBoolCountIncrement(block *Block) *Instr {
 	var add *Instr
 	for _, instr := range block.Instrs {
-		if instr == nil || instr.Op == OpNop || instr.Op == OpJump {
+		if instr == nil {
 			continue
 		}
-		if instr.Op == OpConstInt {
+		spec, ok := instr.Op.Spec()
+		if ok && spec.BoolTableCountIncrementBenign {
 			continue
 		}
-		if instr.Op == OpAdd || instr.Op == OpAddInt {
+		if ok && spec.BoolTableCountIncrement {
 			if add != nil || !boolCountAddOne(instr) {
 				return nil
 			}

@@ -115,17 +115,18 @@ func detectBoolTableFillLoop(fn *Function, header *Block) (boolFillLoopCandidate
 func singleBoolFillBodyStore(body *Block) *Instr {
 	var store *Instr
 	for _, instr := range body.Instrs {
-		if instr == nil || instr.Op == OpNop || instr.Op == OpJump {
+		if instr == nil {
 			continue
 		}
-		if instr.Op == OpSetTable || instr.Op == OpTableArrayStore {
+		spec, ok := instr.Op.Spec()
+		if ok && spec.BoolTableFillBodyBenign {
+			continue
+		}
+		if ok && spec.BoolTableFillStore {
 			if store != nil {
 				return nil
 			}
 			store = instr
-			continue
-		}
-		if instr.Op == OpConstInt || instr.Op == OpConstBool || instr.Op == OpConstNil || instr.Op == OpAddInt {
 			continue
 		}
 		return nil

@@ -184,6 +184,12 @@ type OpSpec struct {
 	FloatReductionLatencyUnrollBlock bool
 	ConstantPhiBranchThreadPure      bool
 	NeedsTier2FieldCache             bool
+	BoolTableFillBodyBenign          bool
+	BoolTableFillStore               bool
+	BoolTableCountLoadBodyBenign     bool
+	BoolTableCountLoad               bool
+	BoolTableCountIncrementBenign    bool
+	BoolTableCountIncrement          bool
 	CallResultRangeGuardCandidate    bool
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
@@ -569,6 +575,24 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opNeedsTier2FieldCachePolicies) {
 			spec.NeedsTier2FieldCache = opNeedsTier2FieldCachePolicies[op]
+		}
+		if int(op) < len(opBoolTableFillBodyBenignPolicies) {
+			spec.BoolTableFillBodyBenign = opBoolTableFillBodyBenignPolicies[op]
+		}
+		if int(op) < len(opBoolTableFillStorePolicies) {
+			spec.BoolTableFillStore = opBoolTableFillStorePolicies[op]
+		}
+		if int(op) < len(opBoolTableCountLoadBodyBenignPolicies) {
+			spec.BoolTableCountLoadBodyBenign = opBoolTableCountLoadBodyBenignPolicies[op]
+		}
+		if int(op) < len(opBoolTableCountLoadPolicies) {
+			spec.BoolTableCountLoad = opBoolTableCountLoadPolicies[op]
+		}
+		if int(op) < len(opBoolTableCountIncrementBenignPolicies) {
+			spec.BoolTableCountIncrementBenign = opBoolTableCountIncrementBenignPolicies[op]
+		}
+		if int(op) < len(opBoolTableCountIncrementPolicies) {
+			spec.BoolTableCountIncrement = opBoolTableCountIncrementPolicies[op]
 		}
 		if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
 			spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
@@ -1776,6 +1800,42 @@ var opNeedsTier2FieldCachePolicies = [...]bool{
 	OpGetField:           true,
 	OpGetFieldNumToFloat: true,
 	OpSetField:           true,
+}
+
+var opBoolTableFillBodyBenignPolicies = [...]bool{
+	OpNop:       true,
+	OpJump:      true,
+	OpConstInt:  true,
+	OpConstBool: true,
+	OpConstNil:  true,
+	OpAddInt:    true,
+}
+
+var opBoolTableFillStorePolicies = [...]bool{
+	OpSetTable:        true,
+	OpTableArrayStore: true,
+}
+
+var opBoolTableCountLoadBodyBenignPolicies = [...]bool{
+	OpNop:         true,
+	OpJump:        true,
+	OpBranch:      true,
+	OpGuardTruthy: true,
+}
+
+var opBoolTableCountLoadPolicies = [...]bool{
+	OpTableArrayLoad: true,
+}
+
+var opBoolTableCountIncrementBenignPolicies = [...]bool{
+	OpNop:      true,
+	OpJump:     true,
+	OpConstInt: true,
+}
+
+var opBoolTableCountIncrementPolicies = [...]bool{
+	OpAdd:    true,
+	OpAddInt: true,
 }
 
 var opCallResultRangeGuardCandidatePolicies = [...]bool{

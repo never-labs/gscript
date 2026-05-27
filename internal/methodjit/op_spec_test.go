@@ -575,6 +575,39 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s field-cache requirement should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpNop, OpJump, OpConstInt, OpConstBool, OpConstNil, OpAddInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.BoolTableFillBodyBenign {
+			t.Fatalf("%s bool-fill body benign contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpSetTable, OpTableArrayStore} {
+		spec, ok := op.Spec()
+		if !ok || !spec.BoolTableFillStore {
+			t.Fatalf("%s bool-fill store contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpNop, OpJump, OpBranch, OpGuardTruthy} {
+		spec, ok := op.Spec()
+		if !ok || !spec.BoolTableCountLoadBodyBenign {
+			t.Fatalf("%s bool-count load-body benign contract should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpTableArrayLoad.Spec(); !ok || !spec.BoolTableCountLoad {
+		t.Fatalf("TableArrayLoad bool-count load contract should be driven by OpSpec")
+	}
+	for _, op := range []Op{OpNop, OpJump, OpConstInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.BoolTableCountIncrementBenign {
+			t.Fatalf("%s bool-count increment benign contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpAdd, OpAddInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.BoolTableCountIncrement {
+			t.Fatalf("%s bool-count increment contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
 		spec, ok := op.Spec()
 		if !ok || !spec.CallResultRangeGuardCandidate || !callResultRangeGuardCandidate(&Instr{Op: op}) {
