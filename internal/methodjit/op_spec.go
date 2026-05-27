@@ -175,6 +175,7 @@ type OpSpec struct {
 	NativeNumericValueProducer       bool
 	PureNumericUnknownValue          bool
 	TableArraySwapPureBetween        bool
+	StaticTableLenBenignUse          bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -534,6 +535,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opTableArraySwapPureBetweenPolicies) {
 			spec.TableArraySwapPureBetween = opTableArraySwapPureBetweenPolicies[op]
+		}
+		if int(op) < len(opStaticTableLenBenignUsePolicies) {
+			spec.StaticTableLenBenignUse = opStaticTableLenBenignUsePolicies[op]
 		}
 		return spec, true
 	}
@@ -1691,6 +1695,12 @@ var opTableArraySwapPureBetweenPolicies = [...]bool{
 	OpUnboxInt:         true,
 	OpGuardTableKind:   true,
 	OpNop:              true,
+}
+
+var opStaticTableLenBenignUsePolicies = [...]bool{
+	OpLen:              true,
+	OpGetTable:         true,
+	OpTableArrayHeader: true,
 }
 
 var expandedOpSpecs = buildExpandedOpSpecs()

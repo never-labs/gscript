@@ -116,16 +116,11 @@ func staticTableLenBenignUse(instr *Instr, tableID int) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpLen:
-		return len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID
-	case OpGetTable:
-		return len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID
-	case OpTableArrayHeader:
-		return len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID
-	default:
+	spec, ok := instr.Op.Spec()
+	if !ok || !spec.StaticTableLenBenignUse {
 		return false
 	}
+	return len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID
 }
 
 func staticTableLenFactForLen(facts []staticTableLenFact, dom *domInfo, order map[int]map[int]int, blockID, instrID int) (staticTableLenFact, bool) {

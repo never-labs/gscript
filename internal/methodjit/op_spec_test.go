@@ -556,6 +556,13 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s table-array swap pure-between contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpLen, OpGetTable, OpTableArrayHeader} {
+		spec, ok := op.Spec()
+		instr := &Instr{Op: op, Args: []*Value{{ID: 7}}}
+		if !ok || !spec.StaticTableLenBenignUse || !staticTableLenBenignUse(instr, 7) {
+			t.Fatalf("%s static table len benign-use contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {
