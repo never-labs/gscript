@@ -166,6 +166,46 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 	}
 }
 
+func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
+	for _, op := range []Op{OpConstInt, OpConstBool, OpNop, OpReturn} {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if spec.TypeSpecializeIntOp != OpMax || spec.TypeSpecializeFloatOp != OpMax || spec.TypeSpecializeStringOp != OpMax {
+			t.Fatalf("%s has unexpected type-specialization defaults: int=%s float=%s string=%s",
+				op, spec.TypeSpecializeIntOp, spec.TypeSpecializeFloatOp, spec.TypeSpecializeStringOp)
+		}
+		if spec.ExactIntNarrowOp != OpMax {
+			t.Fatalf("%s ExactIntNarrowOp default=%s, want OpMax", op, spec.ExactIntNarrowOp)
+		}
+		if spec.BoxedFallbackOp != OpMax {
+			t.Fatalf("%s BoxedFallbackOp default=%s, want OpMax", op, spec.BoxedFallbackOp)
+		}
+		if spec.CallUserArgStart != -1 {
+			t.Fatalf("%s CallUserArgStart default=%d, want -1", op, spec.CallUserArgStart)
+		}
+		if spec.TableArrayKeyArgIndex != -1 {
+			t.Fatalf("%s TableArrayKeyArgIndex default=%d, want -1", op, spec.TableArrayKeyArgIndex)
+		}
+		if _, ok := exactIntNarrowOp(op); ok {
+			t.Fatalf("%s should not report an exact int-narrow target", op)
+		}
+		if _, ok := boxedFallbackOp(op); ok {
+			t.Fatalf("%s should not report a boxed fallback target", op)
+		}
+		if _, ok := rawIntSpecializedOp(op); ok {
+			t.Fatalf("%s should not report a raw-int specialization target", op)
+		}
+		if _, ok := callUserArgStart(op); ok {
+			t.Fatalf("%s should not report a call-user arg start", op)
+		}
+		if _, ok := tableArrayKeyArgIndex(op); ok {
+			t.Fatalf("%s should not report a table-array key arg index", op)
+		}
+	}
+}
+
 func assertOpSpecTarget(t *testing.T, owner Op, field string, target Op) {
 	t.Helper()
 	if target == 0 || target == OpMax {
