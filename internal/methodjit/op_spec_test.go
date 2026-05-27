@@ -591,6 +591,18 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s raw-float value producer contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpSetTable, OpTableArrayStore, OpTableArraySwap, OpAppend, OpSetList} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FieldFactWideKiller || !spec.TableMutationFirstArg {
+			t.Fatalf("%s table/field mutation contracts should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf, OpGo, OpSend, OpRecv} {
+		spec, ok := op.Spec()
+		if !ok || !spec.CallLikeFactBarrier {
+			t.Fatalf("%s call-like fact barrier contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {

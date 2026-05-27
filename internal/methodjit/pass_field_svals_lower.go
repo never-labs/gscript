@@ -607,12 +607,12 @@ func fieldSvalsMutationTableID(instr *Instr) (int, bool) {
 			return 0, false
 		}
 		return instr.Args[0].ID, true
-	case OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix,
-		OpSetList, OpAppend:
-		return instr.Args[0].ID, true
 	default:
-		return 0, false
+		spec, ok := instr.Op.Spec()
+		if !ok || !spec.TableMutationFirstArg {
+			return 0, false
+		}
+		return instr.Args[0].ID, true
 	}
 }
 

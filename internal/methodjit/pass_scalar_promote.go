@@ -102,14 +102,15 @@ func promoteLoopPairs(fn *Function, li *loopInfo, hdr *Block, ph *Block) {
 	}
 	for _, b := range bodyList {
 		for _, instr := range b.Instrs {
-			switch instr.Op {
-			case OpCall, OpResume, OpSelf:
+			spec, ok := instr.Op.Spec()
+			switch {
+			case ok && spec.CallLikeFactBarrier:
 				hasLoopCall = true
-			case OpSetTable, OpAppend, OpSetList:
+			case ok && spec.TableMutationFirstArg:
 				if len(instr.Args) >= 1 {
 					wideKill[instr.Args[0].ID] = true
 				}
-			case OpGetField, OpFieldLoad, OpFieldLoadNumToFloat:
+			case instr.Op == OpGetField || instr.Op == OpFieldLoad || instr.Op == OpFieldLoadNumToFloat:
 				if len(instr.Args) < 1 {
 					continue
 				}
@@ -119,7 +120,7 @@ func promoteLoopPairs(fn *Function, li *loopInfo, hdr *Block, ph *Block) {
 				}
 				p.gets = append(p.gets, instr)
 				p.observeType(instr.Type)
-			case OpSetField, OpFieldStore:
+			case instr.Op == OpSetField || instr.Op == OpFieldStore:
 				if len(instr.Args) < 2 {
 					continue
 				}

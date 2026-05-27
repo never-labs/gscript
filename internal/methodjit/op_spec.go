@@ -180,6 +180,9 @@ type OpSpec struct {
 	ProvesNonNilResult               bool
 	GuardProvenResultType            Type
 	RawFloatValueProducer            bool
+	FieldFactWideKiller              bool
+	TableMutationFirstArg            bool
+	CallLikeFactBarrier              bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -554,6 +557,15 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opRawFloatValueProducerPolicies) {
 			spec.RawFloatValueProducer = opRawFloatValueProducerPolicies[op]
+		}
+		if int(op) < len(opFieldFactWideKillerPolicies) {
+			spec.FieldFactWideKiller = opFieldFactWideKillerPolicies[op]
+		}
+		if int(op) < len(opTableMutationFirstArgPolicies) {
+			spec.TableMutationFirstArg = opTableMutationFirstArgPolicies[op]
+		}
+		if int(op) < len(opCallLikeFactBarrierPolicies) {
+			spec.CallLikeFactBarrier = opCallLikeFactBarrierPolicies[op]
 		}
 		return spec, true
 	}
@@ -1851,6 +1863,42 @@ var opRawFloatValueProducerPolicies = [...]bool{
 	OpGetFieldNumToFloat:  true,
 	OpFieldLoadNumToFloat: true,
 	OpNumToFloat:          true,
+}
+
+var opFieldFactWideKillerPolicies = [...]bool{
+	OpSetTable:                   true,
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpAppend:                     true,
+	OpSetList:                    true,
+}
+
+var opTableMutationFirstArgPolicies = [...]bool{
+	OpSetTable:                   true,
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpSetList:                    true,
+	OpAppend:                     true,
+}
+
+var opCallLikeFactBarrierPolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+	OpResume:         true,
+	OpYield:          true,
+	OpSelf:           true,
+	OpGo:             true,
+	OpSend:           true,
+	OpRecv:           true,
 }
 
 var expandedOpSpecs = buildExpandedOpSpecs()

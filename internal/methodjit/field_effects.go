@@ -32,8 +32,9 @@ func SummarizeFieldEffects(proto *vm.FuncProto) FieldEffectSummary {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpSetField:
+			spec, ok := instr.Op.Spec()
+			switch {
+			case instr.Op == OpSetField:
 				param, ok := fieldEffectParamBase(instr)
 				if !ok {
 					continue
@@ -47,12 +48,11 @@ func SummarizeFieldEffects(proto *vm.FuncProto) FieldEffectSummary {
 					s.ParamWrites[param] = make(map[string]bool)
 				}
 				s.ParamWrites[param][name] = true
-			case OpSetTable, OpSetList, OpAppend, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-				OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix:
+			case ok && spec.TableMutationFirstArg:
 				if param, ok := fieldEffectParamBase(instr); ok {
 					s.UnknownParamMutation[param] = true
 				}
-			case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf, OpGo, OpSend, OpRecv:
+			case ok && spec.CallLikeFactBarrier:
 				s.HasCall = true
 			}
 		}

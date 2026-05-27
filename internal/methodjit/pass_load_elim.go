@@ -775,11 +775,11 @@ func transferFieldFactInstr(facts map[loadKey]int, instr *Instr) map[loadKey]int
 		}
 		key := loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}
 		facts[key] = instr.Args[1].ID
-	case OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableBoolArrayFill,
-		OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix, OpAppend, OpSetList:
-		clearFieldFacts(facts)
-	case OpCall, OpResume, OpSelf:
-		clearFieldFacts(facts)
+	default:
+		spec, ok := instr.Op.Spec()
+		if ok && (spec.FieldFactWideKiller || spec.CallLikeFactBarrier) {
+			clearFieldFacts(facts)
+		}
 	}
 	return facts
 }

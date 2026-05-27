@@ -77,13 +77,21 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 			// This store is structural-preserving on its continuing path.
 			continue
 
-		case OpAppend, OpSetList:
-			if len(instr.Args) >= 1 && instr.Args[0] != nil {
-				facts.InvalidateTable(instr.Args[0].ID)
+		default:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.TableMutationFirstArg {
+				if instr.Op == OpTableArrayStore {
+					// This store is structural-preserving on its continuing path.
+					continue
+				}
+				if len(instr.Args) >= 1 && instr.Args[0] != nil {
+					facts.InvalidateTable(instr.Args[0].ID)
+				}
+				continue
 			}
-
-		case OpCall, OpResume, OpSelf:
-			facts.Reset()
+			if ok && spec.CallLikeFactBarrier {
+				facts.Reset()
+			}
 		}
 	}
 }
