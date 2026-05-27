@@ -175,21 +175,27 @@ func tier2PostInlinePassModuleWith(name string, provides []AnalysisFact, pass Pa
 }
 
 func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+	callABIRequires := analysisFacts(AnalysisFactFixedShapeTables)
+	callABIProvides := analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts)
 	callABIAllowed := allowedDomainsForModule(
-		analysisFacts(AnalysisFactFixedShapeTables),
-		analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
+		callABIRequires,
+		callABIProvides,
 		nil,
 		"CallABI",
 	)
+	guardedConstCallFoldRequires := analysisFacts(AnalysisFactCallABIs)
+	guardedConstCallFoldProvides := analysisFacts(AnalysisFactGuardedConstCallFolds)
 	guardedConstCallFoldAllowed := allowedDomainsForModule(
-		analysisFacts(AnalysisFactCallABIs),
-		analysisFacts(AnalysisFactGuardedConstCallFolds),
+		guardedConstCallFoldRequires,
+		guardedConstCallFoldProvides,
 		nil,
 		"GuardedConstCallFold",
 	)
+	callSiteRuntimeSpecializationRequires := analysisFacts(AnalysisFactCallABIs)
+	callSiteRuntimeSpecializationProvides := analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches)
 	callSiteRuntimeSpecializationAllowed := allowedDomainsForModule(
-		analysisFacts(AnalysisFactCallABIs),
-		analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+		callSiteRuntimeSpecializationRequires,
+		callSiteRuntimeSpecializationProvides,
 		nil,
 		"CallSiteRuntimeSpecializationExit",
 	)
@@ -197,8 +203,8 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		{
 			Name:     "CallABI",
 			Phase:    Tier2PhaseCallLower,
-			Requires: analysisFacts(AnalysisFactFixedShapeTables),
-			Provides: analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
+			Requires: callABIRequires,
+			Provides: callABIProvides,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return runCallABIModule(fn, ctx, newPassContext(fn, opts, callABIAllowed, passContextEnforce))
 			},
@@ -210,8 +216,8 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		{
 			Name:     "GuardedConstCallFold",
 			Phase:    Tier2PhaseCallLower,
-			Requires: analysisFacts(AnalysisFactCallABIs),
-			Provides: analysisFacts(AnalysisFactGuardedConstCallFolds),
+			Requires: guardedConstCallFoldRequires,
+			Provides: guardedConstCallFoldProvides,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return GuardedConstCallFoldPassCtx(specializationGlobals)(newPassContext(fn, opts, guardedConstCallFoldAllowed, passContextEnforce))
 			},
@@ -219,8 +225,8 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		{
 			Name:     "CallSiteRuntimeSpecializationExit",
 			Phase:    Tier2PhaseCallLower,
-			Requires: analysisFacts(AnalysisFactCallABIs),
-			Provides: analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+			Requires: callSiteRuntimeSpecializationRequires,
+			Provides: callSiteRuntimeSpecializationProvides,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return CallSiteRuntimeSpecializationExitPassCtx(specializationGlobals)(newPassContext(fn, opts, callSiteRuntimeSpecializationAllowed, passContextEnforce))
 			},
@@ -303,24 +309,28 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 }
 
 func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+	callABIFinalRequires := analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges)
+	callABIFinalUpdates := analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts)
 	callABIFinalAllowed := allowedDomainsForModule(
-		analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
+		callABIFinalRequires,
 		nil,
-		analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
+		callABIFinalUpdates,
 		"CallABI (final)",
 	)
+	callSiteRuntimeSpecializationFinalRequires := analysisFacts(AnalysisFactCallABIs)
+	callSiteRuntimeSpecializationFinalUpdates := analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches)
 	callSiteRuntimeSpecializationFinalAllowed := allowedDomainsForModule(
-		analysisFacts(AnalysisFactCallABIs),
+		callSiteRuntimeSpecializationFinalRequires,
 		nil,
-		analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+		callSiteRuntimeSpecializationFinalUpdates,
 		"CallSiteRuntimeSpecializationExit (final)",
 	)
 	modules := []Tier2OptimizerModule{
 		{
 			Name:     "CallABI (final)",
 			Phase:    Tier2PhaseFinalCall,
-			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
-			Updates:  analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts),
+			Requires: callABIFinalRequires,
+			Updates:  callABIFinalUpdates,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return runCallABIModule(fn, ctx, newPassContext(fn, opts, callABIFinalAllowed, passContextEnforce))
 			},
@@ -328,8 +338,8 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		{
 			Name:     "CallSiteRuntimeSpecializationExit (final)",
 			Phase:    Tier2PhaseFinalCall,
-			Requires: analysisFacts(AnalysisFactCallABIs),
-			Updates:  analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+			Requires: callSiteRuntimeSpecializationFinalRequires,
+			Updates:  callSiteRuntimeSpecializationFinalUpdates,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return CallSiteRuntimeSpecializationExitPassCtx(specializationGlobals)(newPassContext(fn, opts, callSiteRuntimeSpecializationFinalAllowed, passContextEnforce))
 			},
