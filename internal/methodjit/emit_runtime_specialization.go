@@ -49,7 +49,7 @@ func (ec *emitContext) emitCallSiteRuntimeSpecializationOpExitIfEligible(instr *
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

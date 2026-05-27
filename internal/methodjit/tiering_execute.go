@@ -619,7 +619,7 @@ func (tm *TieringManager) applyTier2DeoptAction(proto *vm.FuncProto, action Tier
 		queued := tm.recompileQueue.enqueue(proto, "runtime_deopt_refresh", Tier2ExitProfileSite{
 			Proto:                proto.Name,
 			PC:                   action.GuardRelaxedPC,
-			ExitCode:             ExitDeopt,
+			ExitCode:             int(ExitDeopt),
 			ExitName:             "ExitDeopt",
 			Reason:               action.Reason,
 			QueuedRecompile:      true,

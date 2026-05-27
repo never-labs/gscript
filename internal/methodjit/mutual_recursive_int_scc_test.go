@@ -128,7 +128,7 @@ for rep := 1; rep <= 1000; rep++ {
 		t.Fatalf("suppressed loop driver should not precompile mutual recursive int SCC; cf=%#v", cf)
 	}
 	for _, site := range tm.ExitStats().Sites {
-		if site.Proto == "F" && site.ExitCode == ExitCallExit {
+		if site.Proto == "F" && site.ExitCode == int(ExitCallExit) {
 			t.Fatalf("F still used call-exit recursion after precompile: site=%#v", site)
 		}
 	}

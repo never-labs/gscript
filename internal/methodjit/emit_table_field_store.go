@@ -388,7 +388,7 @@ func (ec *emitContext) emitSetFieldExit(instr *Instr) {
 
 	// Set ExitCode = ExitTableExit and return to Go.
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitTableExit)
+	asm.LoadImm64(jit.X0, int64(ExitTableExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

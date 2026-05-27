@@ -163,7 +163,7 @@ func (ec *emitContext) emitShiftAddOverflowVersionDirect(spec *shiftAddOverflowV
 	asm.BCond(jit.CondEQ, guardOK)
 	asm.LoadImm64(jit.X0, int64(spec.cond.ID))
 	asm.STR(jit.X0, ctxReg, execCtxOffDeoptInstrID)
-	asm.LoadImm64(jit.X0, ExitDeopt)
+	asm.LoadImm64(jit.X0, int64(ExitDeopt))
 	asm.STR(jit.X0, ctxReg, execCtxOffExitCode)
 	asm.RET()
 

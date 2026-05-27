@@ -712,7 +712,7 @@ func (ec *emitContext) emitPushNativeCallExitFrameIfNested(tmpExit, tmpDepth, tm
 	overflowLabel := ec.uniqueLabel("native_exit_stack_overflow")
 
 	asm.LDR(tmpExit, mRegCtx, execCtxOffExitCode)
-	asm.CMPimm(tmpExit, ExitNativeCallExit)
+	asm.CMPimm(tmpExit, uint16(ExitNativeCallExit))
 	asm.BCond(jit.CondNE, doneLabel)
 
 	asm.LDR(tmpDepth, mRegCtx, execCtxOffNativeCallExitStackDepth)

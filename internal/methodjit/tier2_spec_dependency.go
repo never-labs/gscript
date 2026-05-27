@@ -155,7 +155,7 @@ func (tm *TieringManager) queueSpecDependentsForRefresh(callee *vm.FuncProto, re
 		site := Tier2ExitProfileSite{
 			Proto:                exitStatsProtoName(caller),
 			PC:                   -1,
-			ExitCode:             ExitNormal,
+			ExitCode:             int(ExitNormal),
 			ExitName:             "SpecDependency",
 			Reason:               reason,
 			VersionHash:          fmt.Sprintf("%x", cf.SpecializationVersion.Hash),

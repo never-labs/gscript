@@ -43,17 +43,17 @@ func nb64(v uint64) int64 { return int64(v) }
 // ExecContext is the calling convention struct between Go and JIT code.
 // Passed via X0 from callJIT trampoline, saved into X19.
 type ExecContext struct {
-	Regs         uintptr // pointer to vm.regs[base]
-	Constants    uintptr // pointer to proto.Constants[0] (or 0 if none)
-	ExitCode     int64   // 0 = normal, 2 = deopt, 3 = call-exit, 4 = global-exit, 5 = table-exit
-	ReturnPC     int64   // unused for now
-	CallSlot     int64   // VM register slot of the function value (call-exit)
-	CallNArgs    int64   // number of arguments for call-exit
-	CallNRets    int64   // number of expected results for call-exit
-	CallID       int64   // instruction ID for resolving resume address
-	GlobalSlot   int64   // VM register slot for global-exit result
-	GlobalConst  int64   // constant pool index for global name (global-exit)
-	GlobalExitID int64   // instruction ID for resolving global-exit resume address
+	Regs         uintptr  // pointer to vm.regs[base]
+	Constants    uintptr  // pointer to proto.Constants[0] (or 0 if none)
+	ExitCode     ExitKind // 0 = normal, 2 = deopt, 3 = call-exit, 4 = global-exit, 5 = table-exit (int64-backed; ABI unchanged)
+	ReturnPC     int64    // unused for now
+	CallSlot     int64    // VM register slot of the function value (call-exit)
+	CallNArgs    int64    // number of arguments for call-exit
+	CallNRets    int64    // number of expected results for call-exit
+	CallID       int64    // instruction ID for resolving resume address
+	GlobalSlot   int64    // VM register slot for global-exit result
+	GlobalConst  int64    // constant pool index for global name (global-exit)
+	GlobalExitID int64    // instruction ID for resolving global-exit resume address
 	// Table-exit fields (ExitCode=5): for OpNewTable, OpNewFixedTable, OpGetTable, OpSetTable
 	TableOp      int64 // 0=NewTable, 1=GetTable, 2=SetTable, 3=GetField, 4=SetField, 5=NewFixedTable2, 8=NewFixedTableN
 	TableSlot    int64 // VM register slot for the table (or result slot for NewTable)
@@ -93,16 +93,16 @@ type ExecContext struct {
 	// RETURN checks this to decide between baseline_exit and direct_exit.
 	CallMode int64
 	// Native call exit fields (ExitCode=8): when a native BLR callee hits exit-resume.
-	NativeCallA            int64   // caller's A field (destination slot)
-	NativeCallB            int64   // caller's B field (arg count)
-	NativeCallC            int64   // caller's C field (return count)
-	NativeCalleeExitCode   int64   // callee's original exit code before caller rewrites ExitCode
-	NativeCalleeResumePass int64   // callee's ResumeNumericPass before caller rewrites it
-	NativeCalleeBaseOff    int64   // callee base offset from caller regs (MaxStack*8)
-	NativeCalleeResumePC   int64   // callee's resume PC (saved before caller restores its own BaselinePC)
-	NativeCalleeClosurePtr uintptr // callee's closure pointer (saved before caller restores its own ClosurePtr)
-	NativeCalleeTier2Only  int64   // non-zero when caller used Tier2DirectEntryPtr because DirectEntryPtr was cleared
-	NativeCallerClosurePtr uintptr // caller closure pointer for resuming after a native-call-exit
+	NativeCallA            int64    // caller's A field (destination slot)
+	NativeCallB            int64    // caller's B field (arg count)
+	NativeCallC            int64    // caller's C field (return count)
+	NativeCalleeExitCode   ExitKind // callee's original exit code before caller rewrites ExitCode (int64-backed)
+	NativeCalleeResumePass int64    // callee's ResumeNumericPass before caller rewrites it
+	NativeCalleeBaseOff    int64    // callee base offset from caller regs (MaxStack*8)
+	NativeCalleeResumePC   int64    // callee's resume PC (saved before caller restores its own BaselinePC)
+	NativeCalleeClosurePtr uintptr  // callee's closure pointer (saved before caller restores its own ClosurePtr)
+	NativeCalleeTier2Only  int64    // non-zero when caller used Tier2DirectEntryPtr because DirectEntryPtr was cleared
+	NativeCallerClosurePtr uintptr  // caller closure pointer for resuming after a native-call-exit
 	// NativeCallExitStack preserves suspended native-call-exit descriptors
 	// when native callers wrap an already-suspended native callee. The current
 	// descriptor remains in the scalar Call*/NativeCallee* fields; older inner
@@ -229,7 +229,7 @@ type NativeCallExitFrame struct {
 	NativeCallA            int64
 	NativeCallB            int64
 	NativeCallC            int64
-	NativeCalleeExitCode   int64
+	NativeCalleeExitCode   ExitKind
 	NativeCalleeResumePass int64
 	NativeCalleeBaseOff    int64
 	NativeCalleeResumePC   int64
@@ -239,19 +239,7 @@ type NativeCallExitFrame struct {
 	ResumeNumericPass      int64
 }
 
-// ExitCode constants.
-const (
-	ExitNormal             = 0 // normal return
-	ExitDeopt              = 2 // deopt: bail to interpreter for the entire function
-	ExitCallExit           = 3 // call-exit: pause JIT, execute call via VM, resume JIT
-	ExitGlobalExit         = 4 // global-exit: pause JIT, load global via VM, resume JIT
-	ExitTableExit          = 5 // table-exit: pause JIT, do table op via Go, resume JIT
-	ExitOpExit             = 6 // op-exit: pause JIT, Go handles the operation, resume JIT
-	ExitBaselineOpExit     = 7 // baseline op-exit: bytecode-level exit for Tier 1
-	ExitNativeCallExit     = 8 // native call exit: callee hit exit-resume during BLR call
-	ExitOSR                = 9 // OSR: Tier 1 loop counter expired, request Tier 2 compilation
-	ExitCoroutineYieldFast = 10
-)
+// ExitCode constants are defined as typed ExitKind values in exit_kind.go.
 
 // TableOp constants (stored in ExecContext.TableOp).
 const (

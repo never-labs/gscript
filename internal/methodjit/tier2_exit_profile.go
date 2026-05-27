@@ -68,7 +68,7 @@ func (c *tier2ExitProfileCollector) record(proto *vm.FuncProto, cf *CompiledFunc
 	pc, reason := exitStatsSiteMeta(exitStatsKey{
 		proto:      proto,
 		cf:         cf,
-		code:       int(ctx.ExitCode),
+		code:       ctx.ExitCode,
 		opID:       opID,
 		fallbackOp: exitStatsFallbackOp(ctx),
 	})
@@ -91,7 +91,7 @@ func (c *tier2ExitProfileCollector) record(proto *vm.FuncProto, cf *CompiledFunc
 			Proto:         exitStatsProtoName(proto),
 			PC:            pc,
 			ExitCode:      key.ExitCode,
-			ExitName:      exitCodeName(key.ExitCode),
+			ExitName:      exitCodeName(ExitKind(key.ExitCode)),
 			OpID:          opID,
 			Reason:        reason,
 			VersionHash:   fmt.Sprintf("%x", cf.SpecializationVersion.Hash),

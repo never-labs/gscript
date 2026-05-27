@@ -537,7 +537,7 @@ func emitBaselineOpExitCommon(asm *jit.Assembler, op vm.Opcode, pc int, a, b, c 
 	// first, so memory is always in sync. Resume prologue reloads X22.
 
 	// Set ExitCode = ExitBaselineOpExit (7)
-	asm.LoadImm64(jit.X0, ExitBaselineOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitBaselineOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 
 	// Store op descriptor.
@@ -651,9 +651,9 @@ func emitBaselineResumeWithNativeSwitch(asm *jit.Assembler, inst uint32, pc int,
 	asm.LDR(jit.X17, jit.X20, vm.VMCoroutineFastJITCtxOffset())
 	asm.LDR(jit.X1, jit.X17, execCtxOffExitCode)
 	asm.CBZ(jit.X1, childReturnLabel)
-	asm.CMPimm(jit.X1, ExitCoroutineYieldFast)
+	asm.CMPimm(jit.X1, uint16(ExitCoroutineYieldFast))
 	asm.BCond(jit.CondEQ, doneLabel)
-	asm.CMPimm(jit.X1, ExitBaselineOpExit)
+	asm.CMPimm(jit.X1, uint16(ExitBaselineOpExit))
 	asm.BCond(jit.CondNE, childSlowLabel)
 	asm.LDR(jit.X1, jit.X17, execCtxOffBaselineOp)
 	asm.CMPimm(jit.X1, uint16(vm.OP_YIELD))
@@ -740,7 +740,7 @@ func emitBaselineYieldWithNativeSwitch(asm *jit.Assembler, inst uint32, pc int) 
 	asm.MOVimm16(jit.X6, 0) // VMCoroutineSuspended
 	asm.STR(jit.X6, jit.X2, vm.VMCoroutineStatusOffset())
 	asm.STR(jit.XZR, mRegCtx, execCtxOffCoroutineParentCtx)
-	asm.LoadImm64(jit.X0, ExitCoroutineYieldFast)
+	asm.LoadImm64(jit.X0, int64(ExitCoroutineYieldFast))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	asm.B("baseline_exit")
 

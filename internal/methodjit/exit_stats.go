@@ -23,7 +23,7 @@ type ExitSiteMeta struct {
 type exitStatsKey struct {
 	proto      *vm.FuncProto
 	cf         *CompiledFunction
-	code       int
+	code       ExitKind
 	opID       int
 	fallbackOp int64
 }
@@ -31,7 +31,7 @@ type exitStatsKey struct {
 type exitStatsCollector struct {
 	mu            sync.Mutex
 	total         uint64
-	byCode        map[int]uint64
+	byCode        map[ExitKind]uint64
 	sites         map[exitStatsKey]uint64
 	lastSite      exitStatsKey
 	lastSiteCount uint64
@@ -106,7 +106,7 @@ func (tm *TieringManager) recordTier2Exit(proto *vm.FuncProto, cf *CompiledFunct
 	tm.exitStats.record(exitStatsKey{
 		proto:      proto,
 		cf:         cf,
-		code:       int(ctx.ExitCode),
+		code:       ctx.ExitCode,
 		opID:       opID,
 		fallbackOp: exitStatsFallbackOp(ctx),
 	})
@@ -208,7 +208,7 @@ func (s *exitStatsCollector) record(key exitStatsKey) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.byCode == nil {
-		s.byCode = make(map[int]uint64)
+		s.byCode = make(map[ExitKind]uint64)
 	}
 	if s.sites == nil {
 		s.sites = make(map[exitStatsKey]uint64)
@@ -255,7 +255,7 @@ func (s *exitStatsCollector) snapshot() ExitStatsSnapshot {
 		pc, reason := exitStatsSiteMeta(key)
 		out.Sites = append(out.Sites, ExitStatsSite{
 			Proto:    exitStatsProtoName(key.proto),
-			ExitCode: key.code,
+			ExitCode: int(key.code),
 			ExitName: exitCodeName(key.code),
 			OpID:     key.opID,
 			PC:       pc,
@@ -398,21 +398,11 @@ func exitStatsFallbackReason(key exitStatsKey) string {
 	}
 }
 
-func exitCodeName(code int) string {
-	switch code {
-	case ExitDeopt:
-		return "ExitDeopt"
-	case ExitCallExit:
-		return "ExitCallExit"
-	case ExitGlobalExit:
-		return "ExitGlobalExit"
-	case ExitTableExit:
-		return "ExitTableExit"
-	case ExitOpExit:
-		return "ExitOpExit"
-	default:
-		return fmt.Sprintf("ExitCode%d", code)
-	}
+// exitCodeName returns the diagnostic name for an exit kind. It delegates to
+// ExitKind.String() so the centralized exit_kind.go table is the single source
+// of truth.
+func exitCodeName(code ExitKind) string {
+	return code.String()
 }
 
 func tableOpName(op int) string {

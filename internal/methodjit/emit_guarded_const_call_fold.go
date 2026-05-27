@@ -62,7 +62,7 @@ func (ec *emitContext) emitGuardedConstCallIfEligible(instr *Instr) bool {
 		}
 		asm.B(doneGuardLabel)
 		asm.Label(deoptLabel)
-		asm.LoadImm64(jit.X0, ExitDeopt)
+		asm.LoadImm64(jit.X0, int64(ExitDeopt))
 		asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 		if ec.numericMode {
 			asm.B("num_deopt_epilogue")
@@ -133,7 +133,7 @@ func (ec *emitContext) emitGuardedConstCallEntryGuards() {
 	}
 	ec.asm.B(doneLabel)
 	ec.asm.Label(deoptLabel)
-	ec.asm.LoadImm64(jit.X0, ExitDeopt)
+	ec.asm.LoadImm64(jit.X0, int64(ExitDeopt))
 	ec.asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		ec.asm.B("num_deopt_epilogue")

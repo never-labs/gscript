@@ -203,7 +203,7 @@ func (ec *emitContext) emitTableBoolArrayFillExit(instr *Instr) {
 	asm.STR(jit.X0, mRegCtx, execCtxOffTableExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitTableExit)
+	asm.LoadImm64(jit.X0, int64(ExitTableExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -380,7 +380,7 @@ func (ec *emitContext) emitTableBoolArrayCountExit(instr *Instr) {
 	asm.STR(jit.X0, mRegCtx, execCtxOffTableExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitTableExit)
+	asm.LoadImm64(jit.X0, int64(ExitTableExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

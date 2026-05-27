@@ -95,9 +95,9 @@ func (ec *emitContext) emitStoreCallExitDescriptorFields(desc callExitDescriptor
 	asm.STR(jit.X0, mRegCtx, execCtxOffCallID)
 }
 
-func (ec *emitContext) emitCallProtocolExitToGo(exitCode int64) {
+func (ec *emitContext) emitCallProtocolExitToGo(exitCode ExitKind) {
 	ec.emitSetResumeNumericPass()
-	ec.asm.LoadImm64(jit.X0, exitCode)
+	ec.asm.LoadImm64(jit.X0, int64(exitCode))
 	ec.asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		ec.asm.B("num_deopt_epilogue")
@@ -448,7 +448,7 @@ func (ec *emitContext) emitGlobalExitInner(instr *Instr) {
 
 	// Set ExitCode = ExitGlobalExit and return to Go.
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitGlobalExit)
+	asm.LoadImm64(jit.X0, int64(ExitGlobalExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

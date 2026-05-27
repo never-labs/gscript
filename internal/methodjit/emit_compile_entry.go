@@ -197,7 +197,7 @@ func (ec *emitContext) emitTypedSelfReturnEpilogue() {
 	asm.B(doneLabel)
 
 	asm.Label(failLabel)
-	asm.LoadImm64(jit.X16, ExitDeopt)
+	asm.LoadImm64(jit.X16, int64(ExitDeopt))
 	asm.STR(jit.X16, mRegCtx, execCtxOffExitCode)
 
 	asm.Label(doneLabel)
@@ -232,7 +232,7 @@ func (ec *emitContext) emitTypedPeerClobberReturnEpilogue() {
 	asm.B(doneLabel)
 
 	asm.Label(failLabel)
-	asm.LoadImm64(jit.X16, ExitDeopt)
+	asm.LoadImm64(jit.X16, int64(ExitDeopt))
 	asm.STR(jit.X16, mRegCtx, execCtxOffExitCode)
 
 	asm.Label(doneLabel)

@@ -486,7 +486,7 @@ func emitBaselineNativeCall(asm *jit.Assembler, inst uint32, pc int, callerProto
 	// Callee exited mid-execution (op-exit). Fall back to Go handler.
 	// No flush needed for pinned R(0) — storeSlot always keeps memory in sync.
 	asm.Label(exitHandleLabel)
-	asm.LoadImm64(jit.X0, ExitNativeCallExit)
+	asm.LoadImm64(jit.X0, int64(ExitNativeCallExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	asm.LoadImm64(jit.X0, int64(a))
 	asm.STR(jit.X0, mRegCtx, execCtxOffNativeCallA)

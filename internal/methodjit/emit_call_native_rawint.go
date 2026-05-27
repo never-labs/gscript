@@ -349,7 +349,7 @@ func (ec *emitContext) emitRawIntSelfCallExitResume(instr *Instr, funcSlot, nArg
 	asm.MOVimm16(jit.X2, jit.NB_TagIntShr48)
 	asm.CMPreg(jit.X1, jit.X2)
 	asm.BCond(jit.CondEQ, resultIntLabel)
-	asm.LoadImm64(jit.X1, ExitDeopt)
+	asm.LoadImm64(jit.X1, int64(ExitDeopt))
 	asm.STR(jit.X1, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -646,7 +646,7 @@ func (ec *emitContext) emitRawIntPeerCallExitResume(instr *Instr, funcSlot, nArg
 	asm.MOVimm16(jit.X2, jit.NB_TagIntShr48)
 	asm.CMPreg(jit.X1, jit.X2)
 	asm.BCond(jit.CondEQ, resultIntLabel)
-	asm.LoadImm64(jit.X1, ExitDeopt)
+	asm.LoadImm64(jit.X1, int64(ExitDeopt))
 	asm.STR(jit.X1, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

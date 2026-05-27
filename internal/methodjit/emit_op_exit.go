@@ -102,7 +102,7 @@ func (ec *emitContext) emitOpExit(instr *Instr) {
 
 	// Set ExitCode = ExitOpExit and return to Go.
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -178,7 +178,7 @@ func (ec *emitContext) emitConcatExit(instr *Instr) {
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -246,7 +246,7 @@ func (ec *emitContext) emitStringFormatIntExit(instr *Instr) {
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -314,7 +314,7 @@ func (ec *emitContext) emitGetTableStringFormatIntExitFromTemps(instr *Instr, re
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -382,7 +382,7 @@ func (ec *emitContext) emitStringFormatConstExit(instr *Instr) {
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -469,7 +469,7 @@ func (ec *emitContext) emitSetListExit(instr *Instr) {
 
 	// Set ExitCode = ExitOpExit and return to Go.
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -527,7 +527,7 @@ func (ec *emitContext) emitResumeExit(instr *Instr) {
 	asm.STR(jit.X0, mRegCtx, execCtxOffOpExitID)
 
 	ec.emitSetResumeNumericPass()
-	asm.LoadImm64(jit.X0, ExitOpExit)
+	asm.LoadImm64(jit.X0, int64(ExitOpExit))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

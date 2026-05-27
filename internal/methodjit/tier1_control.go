@@ -182,7 +182,7 @@ func emitBaselineForLoop(asm *jit.Assembler, inst uint32, pc int) {
 	asm.BCond(jit.CondGT, contLabel) // counter > 0 -> continue
 	// Counter reached 0: request OSR exit.
 	// No flush needed for pinned R(0) — storeSlot always keeps memory in sync.
-	asm.LoadImm64(jit.X0, ExitOSR)
+	asm.LoadImm64(jit.X0, int64(ExitOSR))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	// Check CallMode to choose the right exit path.
 	asm.LDR(jit.X0, mRegCtx, execCtxOffCallMode)

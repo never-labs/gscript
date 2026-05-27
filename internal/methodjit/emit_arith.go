@@ -622,7 +622,7 @@ func (ec *emitContext) emitIntModZeroDeopt() {
 	asm := ec.asm
 	asm.LoadImm64(jit.X0, -1)
 	asm.STR(jit.X0, mRegCtx, execCtxOffDeoptInstrID)
-	asm.LoadImm64(jit.X0, ExitDeopt)
+	asm.LoadImm64(jit.X0, int64(ExitDeopt))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")
@@ -715,7 +715,7 @@ func (ec *emitContext) emitInt48OverflowCheck(result jit.Reg, instr *Instr) {
 		asm.LoadImm64(jit.X0, int64(instr.ID))
 		asm.STR(jit.X0, mRegCtx, execCtxOffDeoptInstrID)
 	}
-	asm.LoadImm64(jit.X0, ExitDeopt)
+	asm.LoadImm64(jit.X0, int64(ExitDeopt))
 	asm.STR(jit.X0, mRegCtx, execCtxOffExitCode)
 	if ec.numericMode {
 		asm.B("num_deopt_epilogue")

@@ -15,7 +15,7 @@ import (
 const exitResumeCheckEnv = "GSCRIPT_EXIT_RESUME_CHECK"
 
 type exitResumeCheckKey struct {
-	ExitCode    int64
+	ExitCode    ExitKind
 	InstrID     int
 	NumericPass bool
 }
@@ -91,14 +91,14 @@ func (s *exitResumeCheckState) shadowPtr() uintptr {
 	return uintptr(unsafe.Pointer(&s.shadow[0]))
 }
 
-func (ec *emitContext) recordExitResumeCheckSite(instr *Instr, exitCode int64, modifiedSlots []int, opts exitResumeCheckOptions) {
+func (ec *emitContext) recordExitResumeCheckSite(instr *Instr, exitCode ExitKind, modifiedSlots []int, opts exitResumeCheckOptions) {
 	if instr == nil {
 		return
 	}
 	ec.recordExitResumeCheckSiteWithLive(instr, exitCode, ec.exitResumeLiveSlots(ec.activeRegs, ec.activeFPRegs), modifiedSlots, opts)
 }
 
-func (ec *emitContext) recordExitResumeCheckSiteWithLive(instr *Instr, exitCode int64, live []exitResumeLiveSlot, modifiedSlots []int, opts exitResumeCheckOptions) {
+func (ec *emitContext) recordExitResumeCheckSiteWithLive(instr *Instr, exitCode ExitKind, live []exitResumeLiveSlot, modifiedSlots []int, opts exitResumeCheckOptions) {
 	if instr == nil {
 		return
 	}
