@@ -48,6 +48,11 @@ func exactIntNarrowOp(op Op) (Op, bool) {
 	return spec.ExactIntNarrowOp, ok && spec.ExactIntNarrowOp < OpMax
 }
 
+func opNarrowsExactlyTo(op, narrowed Op) bool {
+	out, ok := exactIntNarrowOp(op)
+	return ok && out == narrowed
+}
+
 func isGenericSpecializableOp(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.GenericSpecializable
@@ -93,6 +98,30 @@ func isExactDivAllowedExternalUse(op Op) bool {
 	return ok && spec.ExactDivAllowedExternalUse
 }
 
+func loadElimConstCSE(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimConstCSE
+}
+
+func loadElimPureCSE(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimPureCSE
+}
+
+func guardProvenByProducer(v *Value, guardType Type) bool {
+	if v == nil || v.Def == nil || guardType == TypeUnknown {
+		return false
+	}
+	spec, ok := v.Def.Op.Spec()
+	return ok && spec.GuardProvenResultType == guardType
+}
+
 func opCanDeriveNonNegative(instr *Instr) bool {
 	if instr == nil {
 		return false
@@ -120,6 +149,20 @@ func instrIsDirectIntValue(instr *Instr) bool {
 		return instr.Type == TypeInt || Type(instr.Aux) == TypeInt
 	case OpGuardIntRange:
 		return true
+	default:
+		return false
+	}
+}
+
+func instrSatisfiesIntNarrowTypeConstraint(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	switch instr.Op {
+	case OpConstInt, OpUnboxInt:
+		return true
+	case OpGuardType, OpGuardIntRange:
+		return instr.Type == TypeInt || Type(instr.Aux) == TypeInt
 	default:
 		return false
 	}

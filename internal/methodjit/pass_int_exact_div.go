@@ -114,7 +114,7 @@ func findModuloProvenDivisions(fn *Function) map[int]bool {
 	out := make(map[int]bool)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr.Op != OpDiv && instr.Op != OpDivFloat {
+			if !opNarrowsExactlyTo(instr.Op, OpDivIntExact) {
 				continue
 			}
 			if len(instr.Args) < 2 {
@@ -313,36 +313,33 @@ func mayBeIntNarrowed(instr *Instr, provenDiv map[int]bool) bool {
 	if instr == nil {
 		return false
 	}
+	if instrIsDirectIntValue(instr) {
+		return true
+	}
 	spec, ok := instr.Op.Spec()
 	switch instr.Op {
-	case OpConstInt, OpGuardType, OpGuardIntRange, OpUnboxInt:
-		return instr.Op != OpGuardType || instr.Type == TypeInt || instr.Aux == int64(TypeInt)
 	case OpPhi:
 		return instr.Type == TypeInt || instr.Type == TypeFloat || instr.Type == TypeAny || instr.Type == TypeUnknown
-	case OpDiv, OpDivFloat:
-		return provenDiv[instr.ID]
 	default:
+		if opNarrowsExactlyTo(instr.Op, OpDivIntExact) {
+			return provenDiv[instr.ID]
+		}
 		return (ok && spec.IntNarrowCandidate) || instr.Type == TypeInt
 	}
 }
 
 func intNarrowConstraintsHold(instr *Instr, possible map[int]bool, provenDiv map[int]bool) bool {
-	switch instr.Op {
-	case OpConstInt:
+	if instrSatisfiesIntNarrowTypeConstraint(instr) {
 		return true
-	case OpGuardType, OpGuardIntRange:
-		return instr.Type == TypeInt || instr.Aux == int64(TypeInt)
-	case OpUnboxInt:
-		return true
-	case OpDiv, OpDivFloat:
-		return provenDiv[instr.ID] && len(instr.Args) >= 2 && allArgsInt(instr, possible)
-	default:
-		spec, ok := instr.Op.Spec()
-		if ok && spec.IntNarrowAllArgsConstraint {
-			return len(instr.Args) > 0 && allArgsInt(instr, possible)
-		}
-		return instr.Type == TypeInt
 	}
+	if opNarrowsExactlyTo(instr.Op, OpDivIntExact) {
+		return provenDiv[instr.ID] && len(instr.Args) >= 2 && allArgsInt(instr, possible)
+	}
+	spec, ok := instr.Op.Spec()
+	if ok && spec.IntNarrowAllArgsConstraint {
+		return len(instr.Args) > 0 && allArgsInt(instr, possible)
+	}
+	return instr.Type == TypeInt
 }
 
 func allArgsInt(instr *Instr, possible map[int]bool) bool {

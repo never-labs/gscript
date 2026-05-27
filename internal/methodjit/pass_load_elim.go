@@ -886,22 +886,6 @@ func pureTypedCSEKey(instr *Instr) (pureCSEKey, bool) {
 	return key, true
 }
 
-func loadElimConstCSE(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.LoadElimConstCSE
-}
-
-func loadElimPureCSE(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.LoadElimPureCSE
-}
-
 func loadElimKillsPureCSE(instr *Instr) bool {
 	if instr == nil {
 		return false
@@ -920,14 +904,6 @@ func redundantNumToFloatArg(instr *Instr) bool {
 		instr.Args[0] != nil &&
 		instr.Args[0].Def != nil &&
 		instr.Args[0].Def.Type == TypeFloat
-}
-
-func guardProvenByProducer(v *Value, guardType Type) bool {
-	if v == nil || v.Def == nil || guardType == TypeUnknown {
-		return false
-	}
-	spec, ok := v.Def.Op.Spec()
-	return ok && spec.GuardProvenResultType == guardType
 }
 
 // replaceAllUses rewrites every instruction argument that references oldID
