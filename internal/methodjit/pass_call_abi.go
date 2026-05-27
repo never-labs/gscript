@@ -395,7 +395,7 @@ func callABITypedPeerArrayElementArgFacts(fn *Function, instr *Instr, globals ma
 	if fn == nil || instr == nil || len(instr.Args) < 2 {
 		return nil
 	}
-	arrayFacts := inferLocalArrayElementTableFacts(fn, currentFixedShapeTableFacts(fn))
+	arrayFacts := inferLocalArrayElementTableFacts(fn, currentFixedShapeTableFacts(fn, functionTableShapeFacts(fn)))
 	arrayFacts = mergeFixedShapeTableFacts(arrayFacts, inferArrayElementValuesForArgs(fn, globals))
 	if len(arrayFacts) == 0 {
 		return nil
@@ -423,10 +423,14 @@ func callABITypedPeerArrayElementArgFacts(fn *Function, instr *Instr, globals ma
 }
 
 func collectStableGlobalArrayElementFacts(fn *Function) map[string]FixedShapeTableFact {
+	return collectStableGlobalArrayElementFactsWithFacts(fn, functionTableShapeFacts(fn))
+}
+
+func collectStableGlobalArrayElementFactsWithFacts(fn *Function, tableShapes *TableShapeFacts) map[string]FixedShapeTableFact {
 	if fn == nil || fn.Proto == nil {
 		return nil
 	}
-	arrayFacts := inferLocalArrayElementTableFacts(fn, currentFixedShapeTableFacts(fn))
+	arrayFacts := inferLocalArrayElementTableFacts(fn, currentFixedShapeTableFacts(fn, tableShapes))
 	if len(arrayFacts) == 0 {
 		return nil
 	}
@@ -477,11 +481,14 @@ func collectStableGlobalArrayElementFacts(fn *Function) map[string]FixedShapeTab
 	return out
 }
 
-func currentFixedShapeTableFacts(fn *Function) map[int]FixedShapeTableFact {
+func currentFixedShapeTableFacts(fn *Function, tableShapes *TableShapeFacts) map[int]FixedShapeTableFact {
 	if fn == nil {
 		return nil
 	}
-	shapeTables := fn.Analysis.TableShapeFacts().FixedShapeTableMap()
+	shapeTables := map[int]FixedShapeTableFact(nil)
+	if tableShapes != nil {
+		shapeTables = tableShapes.FixedShapeTableMap()
+	}
 	facts := make(map[int]FixedShapeTableFact, len(shapeTables))
 	for id, fact := range shapeTables {
 		facts[id] = cloneFixedShapeTableFact(fact)

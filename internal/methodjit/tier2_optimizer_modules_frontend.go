@@ -244,7 +244,7 @@ func runCallABIModule(fn *Function, ctx *Tier2OptimizerContext) (*Function, erro
 		})(fn)
 	}
 	globalFacts := fn.Analysis.GlobalFacts()
-	globalArrayFacts := mergeGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFacts(fn))
+	globalArrayFacts := mergeGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFactsWithFacts(fn, fn.Analysis.TableShapeFacts()))
 	globalFacts.SetGlobalArrayElementFacts(cloneFixedShapeTableFactMap(globalArrayFacts))
 	return AnnotateCallABIsPass(CallABIAnnotationConfig{
 		Globals:                 ctxGlobals(ctx),
