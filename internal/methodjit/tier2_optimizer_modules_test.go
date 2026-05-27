@@ -297,6 +297,32 @@ func TestValidatedTier2OptimizerPlanIsImmutableSnapshot(t *testing.T) {
 	}
 }
 
+func TestValidateTier2OptimizerPlanCanonicalizesPhaseGroupOnlyPlan(t *testing.T) {
+	validRunner := func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil }
+	plan := Tier2OptimizerPlan{
+		PhaseGroups: []Tier2OptimizerPhaseGroup{{
+			Phase: Tier2PhaseNumeric,
+			Modules: []Tier2OptimizerModule{{
+				Name:  "GroupedOnly",
+				Phase: Tier2PhaseNumeric,
+				Run:   validRunner,
+			}},
+		}},
+	}
+
+	validated, err := ValidateTier2OptimizerPlan(plan)
+	if err != nil {
+		t.Fatalf("ValidateTier2OptimizerPlan: %v", err)
+	}
+	canonical := validated.Plan()
+	if len(canonical.Phases) != 1 || canonical.Phases[0] != Tier2PhaseNumeric {
+		t.Fatalf("canonical phases = %v, want [numeric]", canonical.Phases)
+	}
+	if got := tier2ModuleNames(canonical.Modules); len(got) != 1 || got[0] != "GroupedOnly" {
+		t.Fatalf("canonical modules = %v, want [GroupedOnly]", got)
+	}
+}
+
 func TestValidateTier2OptimizerPlanRejectsMalformedModules(t *testing.T) {
 	validRunner := func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil }
 	tests := []struct {
@@ -357,6 +383,23 @@ func TestValidateTier2OptimizerPlanRejectsMalformedModules(t *testing.T) {
 				}},
 			},
 			want: "phase group final_call is missing from plan phases",
+		},
+		{
+			name: "phase group only missing runner",
+			plan: Tier2OptimizerPlan{
+				PhaseGroups: []Tier2OptimizerPhaseGroup{{
+					Phase:   Tier2PhaseNumeric,
+					Modules: []Tier2OptimizerModule{{Name: "GroupedNoRunner", Phase: Tier2PhaseNumeric}},
+				}},
+			},
+			want: "has no optimizer runner",
+		},
+		{
+			name: "modules without phases",
+			plan: Tier2OptimizerPlan{
+				Modules: []Tier2OptimizerModule{{Name: "NoPhaseList", Phase: Tier2PhaseNumeric, Run: validRunner}},
+			},
+			want: "modules but no phases",
 		},
 	}
 

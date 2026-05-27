@@ -494,6 +494,7 @@ func runTier2OptimizerPlan(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2Opti
 }
 
 func ValidateTier2OptimizerPlan(plan Tier2OptimizerPlan) (*Tier2ValidatedOptimizerPlan, error) {
+	plan = canonicalizeTier2OptimizerPlan(plan)
 	if err := validateTier2OptimizerPlanShape(plan); err != nil {
 		return nil, err
 	}
@@ -512,6 +513,9 @@ func validateTier2OptimizerPlanShape(plan Tier2OptimizerPlan) error {
 			continue
 		}
 		phases[phase] = true
+	}
+	if len(plan.Modules) > 0 && len(phases) == 0 {
+		issues = append(issues, "optimizer plan has modules but no phases")
 	}
 
 	moduleNames := make(map[string]bool, len(plan.Modules))
@@ -767,6 +771,29 @@ func cloneAnalysisFacts(facts []AnalysisFact) []AnalysisFact {
 		return nil
 	}
 	return append([]AnalysisFact(nil), facts...)
+}
+
+func canonicalizeTier2OptimizerPlan(plan Tier2OptimizerPlan) Tier2OptimizerPlan {
+	plan = cloneTier2OptimizerPlan(plan)
+	if len(plan.PhaseGroups) == 0 {
+		return plan
+	}
+	if len(plan.Phases) == 0 {
+		seen := make(map[Tier2OptimizerPhase]bool, len(plan.PhaseGroups))
+		for _, group := range plan.PhaseGroups {
+			if seen[group.Phase] {
+				continue
+			}
+			seen[group.Phase] = true
+			plan.Phases = append(plan.Phases, group.Phase)
+		}
+	}
+	if len(plan.Modules) == 0 {
+		for _, group := range plan.PhaseGroups {
+			plan.Modules = append(plan.Modules, group.Modules...)
+		}
+	}
+	return plan
 }
 
 func cloneTier2OptimizerPlan(plan Tier2OptimizerPlan) Tier2OptimizerPlan {
