@@ -365,6 +365,66 @@ func opIsSpeculativeIntUseCandidate(op Op) bool {
 	return ok && spec.SpeculativeIntUseCandidate
 }
 
+func opIsConstantPhiBranchThreadPure(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.ConstantPhiBranchThreadPure
+}
+
+func opIsBoolTableFillBodyBenign(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoolTableFillBodyBenign
+}
+
+func opIsBoolTableFillStore(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoolTableFillStore
+}
+
+func opIsBoolTableCountLoadBodyBenign(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoolTableCountLoadBodyBenign
+}
+
+func opIsBoolTableCountLoad(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoolTableCountLoad
+}
+
+func opIsBoolTableCountIncrementBenign(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoolTableCountIncrementBenign
+}
+
+func opIsBoolTableCountIncrement(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoolTableCountIncrement
+}
+
+func opIsFieldNumFusionGapSafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldNumFusionGapSafe
+}
+
+func fieldShapeSplitInlineOpSafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldShapeSplitInlineSafe
+}
+
+func opIsTableArraySwapPureBetween(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArraySwapPureBetween
+}
+
+func opIsNestedCallLike(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NestedCallLike
+}
+
+func opIsTier2ResidualCallBlocker(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2ResidualCallBlocker
+}
+
 func callUserArgs(instr *Instr) ([]*Value, bool) {
 	if instr == nil {
 		return nil, false

@@ -150,11 +150,10 @@ func boolCountLoopLoad(block *Block, key *Value) (*Instr, *Value, bool) {
 		if instr == nil {
 			continue
 		}
-		spec, ok := instr.Op.Spec()
-		if ok && spec.BoolTableCountLoadBodyBenign {
+		if opIsBoolTableCountLoadBodyBenign(instr.Op) {
 			continue
 		}
-		if !ok || !spec.BoolTableCountLoad || len(instr.Args) < 3 || instr.Type != TypeBool {
+		if !opIsBoolTableCountLoad(instr.Op) || len(instr.Args) < 3 || instr.Type != TypeBool {
 			return nil, nil, false
 		}
 		if load != nil || instr.Args[2] == nil || key == nil || instr.Args[2].ID != key.ID {
@@ -176,11 +175,10 @@ func singleBoolCountIncrement(block *Block) *Instr {
 		if instr == nil {
 			continue
 		}
-		spec, ok := instr.Op.Spec()
-		if ok && spec.BoolTableCountIncrementBenign {
+		if opIsBoolTableCountIncrementBenign(instr.Op) {
 			continue
 		}
-		if ok && spec.BoolTableCountIncrement {
+		if opIsBoolTableCountIncrement(instr.Op) {
 			if add != nil || !boolCountAddOne(instr) {
 				return nil
 			}

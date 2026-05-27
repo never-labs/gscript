@@ -50,8 +50,7 @@ func irHasCall(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			spec, ok := instr.Op.Spec()
-			if ok && spec.Tier2ResidualCallBlocker {
+			if opIsTier2ResidualCallBlocker(instr.Op) {
 				return true
 			}
 		}
@@ -68,8 +67,7 @@ func irHasNestedCallLike(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			spec, ok := instr.Op.Spec()
-			if ok && spec.NestedCallLike {
+			if opIsNestedCallLike(instr.Op) {
 				return true
 			}
 		}

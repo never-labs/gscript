@@ -215,8 +215,7 @@ func tableArraySwapPureBetween(instr *Instr) bool {
 	if instr == nil {
 		return true
 	}
-	spec, ok := instr.Op.Spec()
-	if ok && spec.TableArraySwapPureBetween {
+	if opIsTableArraySwapPureBetween(instr.Op) {
 		return true
 	}
 	if hasSideEffect(instr) {

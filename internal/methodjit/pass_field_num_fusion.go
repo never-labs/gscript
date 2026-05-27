@@ -55,8 +55,7 @@ func fieldNumFusionGapIsSafe(instrs []*Instr) bool {
 		if instr == nil {
 			return false
 		}
-		spec, ok := instr.Op.Spec()
-		if !ok || !spec.FieldNumFusionGapSafe {
+		if !opIsFieldNumFusionGapSafe(instr.Op) {
 			return false
 		}
 	}

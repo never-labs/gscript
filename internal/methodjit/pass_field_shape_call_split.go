@@ -490,11 +490,6 @@ func fieldShapeSplitInlineInstrSafe(instr *Instr) bool {
 	return fieldShapeSplitInlineOpSafe(instr.Op)
 }
 
-func fieldShapeSplitInlineOpSafe(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.FieldShapeSplitInlineSafe
-}
-
 func fieldPolyShapeCaseAux2(c FieldPolyShapeCase) int64 {
 	if c.ShapeID == 0 || c.FieldIdx < 0 {
 		return 0

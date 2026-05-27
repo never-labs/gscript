@@ -82,8 +82,7 @@ func constantPhiBranchBlockIsPure(block *Block) bool {
 		if i == len(block.Instrs)-1 {
 			return instr.Op == OpBranch
 		}
-		spec, ok := instr.Op.Spec()
-		if !ok || !spec.ConstantPhiBranchThreadPure {
+		if !opIsConstantPhiBranchThreadPure(instr.Op) {
 			return false
 		}
 	}

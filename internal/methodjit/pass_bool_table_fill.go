@@ -118,11 +118,10 @@ func singleBoolFillBodyStore(body *Block) *Instr {
 		if instr == nil {
 			continue
 		}
-		spec, ok := instr.Op.Spec()
-		if ok && spec.BoolTableFillBodyBenign {
+		if opIsBoolTableFillBodyBenign(instr.Op) {
 			continue
 		}
-		if ok && spec.BoolTableFillStore {
+		if opIsBoolTableFillStore(instr.Op) {
 			if store != nil {
 				return nil
 			}
