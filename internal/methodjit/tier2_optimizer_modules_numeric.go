@@ -28,21 +28,14 @@ func tier2NumericModules() []Tier2OptimizerModule {
 		tier2PassModuleWithCtx("RangeAnalysis", Tier2PhaseNumeric, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 		tier2PassModuleWithCtx("OverflowBoxing", Tier2PhaseNumeric, analysisFacts(AnalysisFactIntRanges), nil, OverflowBoxingPassCtx),
 		tier2PassModuleWithCtx("IntExactDivision", Tier2PhaseNumeric, nil, nil, IntExactDivisionPassCtx),
-		{
-			Name:     "RangeAnalysis (post-IntExactDivision)",
-			Phase:    Tier2PhaseNumeric,
-			Requires: nil,
-			Updates:  rangeAnalysisFacts(),
-			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
-				if opts != nil && !opts.LastPassChanged {
-					functionRemarks(fn).Add("RangeAnalysis", "skipped", 0, 0, OpNop,
-						"IntExactDivision had no candidate rewrite")
-					return fn, nil
-				}
-				allowed := allowedDomainsForModule(nil, nil, rangeAnalysisFacts(), "RangeAnalysis (post-IntExactDivision)")
-				return RangeAnalysisPassCtx(newPassContext(fn, opts, allowed, passContextEnforce))
-			},
-		},
+		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-IntExactDivision)", Tier2PhaseNumeric, nil, rangeAnalysisFacts(), func(ctx *PassContext) (*Function, error) {
+			if opts := ctx.Opts(); opts != nil && !opts.LastPassChanged {
+				functionRemarks(ctx.Func()).Add("RangeAnalysis", "skipped", 0, 0, OpNop,
+					"IntExactDivision had no candidate rewrite")
+				return ctx.Func(), nil
+			}
+			return RangeAnalysisPassCtx(ctx)
+		}),
 		tier2PassModuleWithCtx("ModRangeSimplify", Tier2PhaseNumeric, analysisFacts(AnalysisFactIntRanges), nil, ModRangeSimplifyPassCtx),
 		tier2PassModuleWith("DCE (post-ModRangeSimplify)", Tier2PhaseNumeric, nil, nil, DCEPass),
 		tier2PassModuleWithCtx("ModZeroCompare", Tier2PhaseNumeric, analysisFacts(AnalysisFactIntModNonZeroDivisor), nil, ModZeroComparePassCtx),

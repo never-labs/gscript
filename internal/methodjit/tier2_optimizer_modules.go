@@ -357,16 +357,6 @@ func bestTier2ModuleRunFunction(input, output *Function) *Function {
 	return input
 }
 
-func tier2PassModule(name string, phase Tier2OptimizerPhase, pass PassFunc) Tier2OptimizerModule {
-	return Tier2OptimizerModule{
-		Name:  name,
-		Phase: phase,
-		Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-			return pass(fn)
-		},
-	}
-}
-
 func tier2PassModuleWith(name string, phase Tier2OptimizerPhase, requires, provides []AnalysisFact, pass PassFunc) Tier2OptimizerModule {
 	return Tier2OptimizerModule{
 		Name:     name,
@@ -391,13 +381,26 @@ type CtxPassFunc func(*PassContext) (*Function, error)
 // (off in production, on under tests). The legacy Run path is left nil so this
 // shares no code with the unmigrated PassFunc modules.
 func tier2PassModuleWithCtx(name string, phase Tier2OptimizerPhase, requires, provides []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
+	allowed := allowedDomainsForModule(requires, provides, nil, name)
 	return Tier2OptimizerModule{
 		Name:     name,
 		Phase:    phase,
 		Requires: requires,
 		Provides: provides,
 		RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
-			allowed := allowedDomainsForModule(requires, provides, nil, name)
+			return pass(newPassContext(fn, opts, allowed, passContextEnforce))
+		},
+	}
+}
+
+func tier2PassModuleWithCtxUpdates(name string, phase Tier2OptimizerPhase, requires, updates []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
+	allowed := allowedDomainsForModule(requires, nil, updates, name)
+	return Tier2OptimizerModule{
+		Name:     name,
+		Phase:    phase,
+		Requires: requires,
+		Updates:  updates,
+		RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
 			return pass(newPassContext(fn, opts, allowed, passContextEnforce))
 		},
 	}
