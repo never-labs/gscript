@@ -245,6 +245,58 @@ func TestRunTier2PipelineUsesValidatedPlan(t *testing.T) {
 	}
 }
 
+func TestValidatedTier2OptimizerPlanIsImmutableSnapshot(t *testing.T) {
+	validRunner := func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil }
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseNumeric},
+		Modules: []Tier2OptimizerModule{{
+			Name:     "SnapshotProbe",
+			Phase:    Tier2PhaseNumeric,
+			Provides: analysisFacts(AnalysisFactGlobals),
+			Run:      validRunner,
+		}},
+		PhaseGroups: []Tier2OptimizerPhaseGroup{{
+			Phase: Tier2PhaseNumeric,
+			Modules: []Tier2OptimizerModule{{
+				Name:     "SnapshotProbe",
+				Phase:    Tier2PhaseNumeric,
+				Provides: analysisFacts(AnalysisFactGlobals),
+				Run:      validRunner,
+			}},
+		}},
+	}
+	validated, err := ValidateTier2OptimizerPlan(plan)
+	if err != nil {
+		t.Fatalf("ValidateTier2OptimizerPlan: %v", err)
+	}
+
+	plan.Phases[0] = Tier2PhaseFinalCall
+	plan.Modules[0].Name = "MutatedInput"
+	plan.Modules[0].Provides[0] = AnalysisFactIntRanges
+	plan.PhaseGroups[0].Modules[0].Name = "MutatedGroupInput"
+
+	first := validated.Plan()
+	if first.Phases[0] != Tier2PhaseNumeric ||
+		first.Modules[0].Name != "SnapshotProbe" ||
+		first.Modules[0].Provides[0] != AnalysisFactGlobals ||
+		first.PhaseGroups[0].Modules[0].Name != "SnapshotProbe" {
+		t.Fatalf("validated plan was affected by input mutation: %+v", first)
+	}
+
+	first.Phases[0] = Tier2PhaseFinalCall
+	first.Modules[0].Name = "MutatedReturnedPlan"
+	first.Modules[0].Provides[0] = AnalysisFactIntRanges
+	first.PhaseGroups[0].Modules[0].Name = "MutatedReturnedGroup"
+
+	second := validated.Plan()
+	if second.Phases[0] != Tier2PhaseNumeric ||
+		second.Modules[0].Name != "SnapshotProbe" ||
+		second.Modules[0].Provides[0] != AnalysisFactGlobals ||
+		second.PhaseGroups[0].Modules[0].Name != "SnapshotProbe" {
+		t.Fatalf("validated Plan() returned mutable aliases: %+v", second)
+	}
+}
+
 func TestValidateTier2OptimizerPlanRejectsMalformedModules(t *testing.T) {
 	validRunner := func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil }
 	tests := []struct {

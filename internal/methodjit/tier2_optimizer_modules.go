@@ -466,7 +466,7 @@ func (validated *Tier2ValidatedOptimizerPlan) Plan() Tier2OptimizerPlan {
 	if validated == nil {
 		return Tier2OptimizerPlan{}
 	}
-	return validated.plan
+	return cloneTier2OptimizerPlan(validated.plan)
 }
 
 func newTier2OptimizerPlan(ctx *Tier2OptimizerContext) Tier2OptimizerPlan {
@@ -500,7 +500,7 @@ func ValidateTier2OptimizerPlan(plan Tier2OptimizerPlan) (*Tier2ValidatedOptimiz
 	if err := ValidateDependencyOrder(plan); err != nil {
 		return nil, fmt.Errorf("tier2 optimizer dependency validation: %w", err)
 	}
-	return &Tier2ValidatedOptimizerPlan{plan: plan}, nil
+	return &Tier2ValidatedOptimizerPlan{plan: cloneTier2OptimizerPlan(plan)}, nil
 }
 
 func validateTier2OptimizerPlanShape(plan Tier2OptimizerPlan) error {
@@ -767,6 +767,43 @@ func cloneAnalysisFacts(facts []AnalysisFact) []AnalysisFact {
 		return nil
 	}
 	return append([]AnalysisFact(nil), facts...)
+}
+
+func cloneTier2OptimizerPlan(plan Tier2OptimizerPlan) Tier2OptimizerPlan {
+	return Tier2OptimizerPlan{
+		Phases:      append([]Tier2OptimizerPhase(nil), plan.Phases...),
+		Modules:     cloneTier2OptimizerModules(plan.Modules),
+		PhaseGroups: cloneTier2OptimizerPhaseGroups(plan.PhaseGroups),
+	}
+}
+
+func cloneTier2OptimizerPhaseGroups(groups []Tier2OptimizerPhaseGroup) []Tier2OptimizerPhaseGroup {
+	if len(groups) == 0 {
+		return nil
+	}
+	out := make([]Tier2OptimizerPhaseGroup, len(groups))
+	for i, group := range groups {
+		out[i] = Tier2OptimizerPhaseGroup{
+			Phase:   group.Phase,
+			Modules: cloneTier2OptimizerModules(group.Modules),
+		}
+	}
+	return out
+}
+
+func cloneTier2OptimizerModules(modules []Tier2OptimizerModule) []Tier2OptimizerModule {
+	if len(modules) == 0 {
+		return nil
+	}
+	out := make([]Tier2OptimizerModule, len(modules))
+	for i, module := range modules {
+		out[i] = module
+		out[i].Requires = cloneAnalysisFacts(module.Requires)
+		out[i].Provides = cloneAnalysisFacts(module.Provides)
+		out[i].Updates = cloneAnalysisFacts(module.Updates)
+		out[i].OptionalReads = cloneAnalysisFacts(module.OptionalReads)
+	}
+	return out
 }
 
 // FormatTier2ModuleContracts renders declared module analysis-fact contracts
