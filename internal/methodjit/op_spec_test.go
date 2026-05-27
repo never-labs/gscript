@@ -656,8 +656,8 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 		{op: OpFieldCallFloor, start: 0},
 	} {
 		spec, ok := tc.op.Spec()
-		if !ok || spec.LICMCallUserArgStart != tc.start {
-			t.Fatalf("%s LICM call-user arg layout should be driven by OpSpec", tc.op)
+		if !ok || spec.CallUserArgStart != tc.start {
+			t.Fatalf("%s call-user arg layout should be driven by OpSpec", tc.op)
 		}
 	}
 	for _, op := range []Op{OpAdd, OpSub, OpMul, OpMod, OpLt, OpLe} {

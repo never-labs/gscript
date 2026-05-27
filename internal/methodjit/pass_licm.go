@@ -889,10 +889,10 @@ func licmCallUserArgs(instr *Instr) []*Value {
 		return nil
 	}
 	spec, ok := instr.Op.Spec()
-	if !ok || spec.LICMCallUserArgStart < 0 || len(instr.Args) <= spec.LICMCallUserArgStart {
+	if !ok || spec.CallUserArgStart < 0 || len(instr.Args) <= spec.CallUserArgStart {
 		return nil
 	}
-	return instr.Args[spec.LICMCallUserArgStart:]
+	return instr.Args[spec.CallUserArgStart:]
 }
 
 // canHoistOp returns true if moving an instruction with this op out of

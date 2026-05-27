@@ -839,17 +839,11 @@ func inlineCallArgumentValues(callInstr *Instr) ([]*Value, bool) {
 	if callInstr == nil {
 		return nil, false
 	}
-	switch callInstr.Op {
-	case OpCall, OpCallFloor:
-		if len(callInstr.Args) == 0 {
-			return nil, false
-		}
-		return callInstr.Args[1:], true
-	case OpFieldCallFloor:
-		return callInstr.Args, true
-	default:
+	spec, ok := callInstr.Op.Spec()
+	if !ok || spec.CallUserArgStart < 0 || len(callInstr.Args) < spec.CallUserArgStart {
 		return nil, false
 	}
+	return callInstr.Args[spec.CallUserArgStart:], true
 }
 
 func inlineParamValues(calleeFn *Function, callArgs []*Value) map[int]*Value {
