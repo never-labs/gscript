@@ -926,32 +926,8 @@ func guardProvenByProducer(v *Value, guardType Type) bool {
 	if v == nil || v.Def == nil || guardType == TypeUnknown {
 		return false
 	}
-	switch guardType {
-	case TypeInt:
-		switch v.Def.Op {
-		case OpConstInt, OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt, OpFloor:
-			return true
-		}
-	case TypeFloat:
-		switch v.Def.Op {
-		case OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpNumToFloat, OpGetFieldNumToFloat, OpSqrt, OpFMA, OpFMSUB:
-			return true
-		}
-	case TypeBool:
-		switch v.Def.Op {
-		case OpConstBool, OpEqInt, OpLtInt, OpLeInt, OpModZeroInt, OpLtFloat, OpLeFloat, OpEqString, OpEq, OpLt, OpLe, OpNot:
-			return true
-		}
-	case TypeNil:
-		return v.Def.Op == OpConstNil
-	case TypeString:
-		return v.Def.Op == OpConstString
-	case TypeTable:
-		return v.Def.Op == OpNewTable || v.Def.Op == OpNewFixedTable
-	case TypeFunction:
-		return v.Def.Op == OpClosure
-	}
-	return false
+	spec, ok := v.Def.Op.Spec()
+	return ok && spec.GuardProvenResultType == guardType
 }
 
 // replaceAllUses rewrites every instruction argument that references oldID

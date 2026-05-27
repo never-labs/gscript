@@ -563,6 +563,34 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s static table len benign-use contract should be driven by OpSpec", op)
 		}
 	}
+	for _, tc := range []struct {
+		op  Op
+		typ Type
+	}{
+		{OpConstInt, TypeInt},
+		{OpAddFloat, TypeFloat},
+		{OpEqInt, TypeBool},
+		{OpConstString, TypeString},
+		{OpNewTable, TypeTable},
+		{OpClosure, TypeFunction},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.FixedResultType != tc.typ || spec.GuardProvenResultType != tc.typ {
+			t.Fatalf("%s fixed/proven result type contracts should be driven by OpSpec", tc.op)
+		}
+	}
+	for _, op := range []Op{OpConstInt, OpAdd, OpDivIntExact, OpGetFieldNumToFloat, OpFieldLoadNumToFloat, OpLen, OpEqInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.ProvesNonNilResult || !valueProvenNonNil((&Instr{Op: op}).Value()) {
+			t.Fatalf("%s non-nil producer contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpAddFloat, OpSqrt, OpFMA, OpGetFieldNumToFloat, OpFieldLoadNumToFloat, OpNumToFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RawFloatValueProducer {
+			t.Fatalf("%s raw-float value producer contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {

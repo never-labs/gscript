@@ -513,45 +513,19 @@ func (ts *typeSpecializer) runTypePropagation(fn *Function) {
 // the known types of its arguments. Returns TypeUnknown if type cannot be
 // determined.
 func (ts *typeSpecializer) inferType(instr *Instr) Type {
+	if instr == nil {
+		return TypeUnknown
+	}
+	if spec, ok := instr.Op.Spec(); ok && spec.FixedResultType != TypeUnknown {
+		return spec.FixedResultType
+	}
 	switch instr.Op {
-	// Constants have known types.
-	case OpConstInt:
-		return TypeInt
-	case OpConstFloat:
-		return TypeFloat
-	case OpConstBool:
-		return TypeBool
-	case OpConstNil:
-		return TypeNil
-	case OpConstString:
-		return TypeString
-
-	// Already-specialized ops produce known types.
-	case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt:
-		return TypeInt
-	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat:
-		return TypeFloat
-	case OpNumToFloat, OpSqrt:
-		return TypeFloat
-	case OpFloor:
-		return TypeInt
-	case OpEqInt, OpLtInt, OpLeInt, OpModZeroInt, OpLtFloat, OpLeFloat, OpEqString, OpComplexEscapeInSet:
-		return TypeBool
-	case OpComplexEscapeRowCount:
-		return TypeInt
 	case OpRecordArrayLoopSpecialization:
 		return TypeUnknown
-	case OpEq, OpLt, OpLe, OpNot:
-		return TypeBool
-	case OpLen:
-		return TypeInt
 
 	// Generic arithmetic: infer from operands.
 	case OpAdd, OpSub, OpMul, OpMod:
 		return ts.inferBinaryNumericType(instr)
-	case OpDiv:
-		// Division always produces float in GScript (Lua semantics).
-		return TypeFloat
 	case OpUnm:
 		if len(instr.Args) > 0 {
 			at := ts.argType(instr.Args[0])
@@ -571,17 +545,8 @@ func (ts *typeSpecializer) inferType(instr *Instr) Type {
 	// Guards: the guarded type is stored in Aux.
 	case OpGuardType:
 		return Type(instr.Aux)
-	case OpGuardIntRange:
-		return TypeInt
-	case OpGetFieldNumToFloat:
-		return TypeFloat
 
 	// Table/closure/call produce dynamic types.
-	case OpNewTable, OpNewFixedTable:
-		return TypeTable
-	case OpClosure:
-		return TypeFunction
-
 	// Typed table loads with monomorphic Kind feedback return a typed element.
 	// The runtime kind guard at emit_table_array.go:150 deopts on mismatch,
 	// so FBKindInt/Float/Bool -> TypeInt/Float/Bool is sound. FBKindMixed

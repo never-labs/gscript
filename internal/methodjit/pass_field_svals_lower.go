@@ -632,17 +632,9 @@ func valueProvenNonNil(v *Value) bool {
 	if v == nil || v.Def == nil {
 		return false
 	}
-	switch v.Def.Op {
-	case OpConstNil:
-		return false
-	case OpConstInt, OpConstFloat, OpConstBool, OpConstString,
-		OpAdd, OpSub, OpMul, OpDiv, OpMod, OpPow,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpSqrt, OpFloor, OpFMA, OpFMSUB, OpNumToFloat, OpGetFieldNumToFloat,
-		OpFieldLoadNumToFloat, OpLen, OpLtInt, OpLeInt, OpEqInt, OpLtFloat, OpLeFloat, OpEqString:
+	spec, ok := v.Def.Op.Spec()
+	if ok && spec.ProvesNonNilResult {
 		return true
-	default:
-		return v.Def.Type == TypeInt || v.Def.Type == TypeFloat || v.Def.Type == TypeBool || v.Def.Type == TypeString || v.Def.Type == TypeTable
 	}
+	return v.Def.Type == TypeInt || v.Def.Type == TypeFloat || v.Def.Type == TypeBool || v.Def.Type == TypeString || v.Def.Type == TypeTable
 }
