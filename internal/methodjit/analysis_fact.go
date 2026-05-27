@@ -53,6 +53,38 @@ const (
 	AnalysisFactGlobalArrayElementFacts AnalysisFact = "GlobalArrayElementFacts"
 )
 
+var allAnalysisFacts = []AnalysisFact{
+	AnalysisFactInlineComplete,
+	AnalysisFactFixedShapeTables,
+	AnalysisFactFixedShapeEntryGuards,
+	AnalysisFactFieldPolyShapeFacts,
+	AnalysisFactFieldPolyShapeCatalog,
+	AnalysisFactFixedTableConstructors,
+	AnalysisFactSpecDependencyProtos,
+	AnalysisFactCallABIs,
+	AnalysisFactGuardedConstCallFolds,
+	AnalysisFactCallSiteNoResultRuntimeSpecializations,
+	AnalysisFactCallSiteNoResultRuntimeSpecializationBatches,
+	AnalysisFactStringConstTables,
+	AnalysisFactStringFormatPatterns,
+	AnalysisFactStringSplitSubSpecs,
+	AnalysisFactInt48Safe,
+	AnalysisFactIntRanges,
+	AnalysisFactProfiledIntRanges,
+	AnalysisFactIntNonNegative,
+	AnalysisFactIntModNonZeroDivisor,
+	AnalysisFactIntModNoSignAdjust,
+	AnalysisFactTableArrayDataPtrs,
+	AnalysisFactTableArrayBoundsSafe,
+	AnalysisFactLoopTableArrayFacts,
+	AnalysisFactShapeFieldTypeElided,
+	AnalysisFactRecordArrayLoopSpecialization,
+	AnalysisFactRecordArrayLoopCaches,
+	AnalysisFactGlobals,
+	AnalysisFactNumericGlobalValues,
+	AnalysisFactGlobalArrayElementFacts,
+}
+
 var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 	AnalysisFactInlineComplete: {
 		Owner:       "frontend",
