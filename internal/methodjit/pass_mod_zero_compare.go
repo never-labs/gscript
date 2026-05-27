@@ -23,7 +23,7 @@ func ModZeroComparePassCtx(ctx *PassContext) (*Function, error) {
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if (instr.Op != OpEq && instr.Op != OpEqInt) || len(instr.Args) < 2 {
+			if !opIsBoxedOrFallback(instr.Op, OpEq) || len(instr.Args) < 2 {
 				continue
 			}
 			mod, divisor, ok := parseModZeroCompare(instr.Args[0], instr.Args[1])
@@ -52,7 +52,7 @@ func parseModZeroCompare(modVal, zeroVal *Value) (*Instr, int64, bool) {
 		return nil, 0, false
 	}
 	mod := modVal.Def
-	if (mod.Op != OpMod && mod.Op != OpModInt) || len(mod.Args) < 2 {
+	if !opIsBoxedOrFallback(mod.Op, OpMod) || len(mod.Args) < 2 {
 		return nil, 0, false
 	}
 	divisor, ok := constIntFromValue(mod.Args[1])
@@ -60,4 +60,12 @@ func parseModZeroCompare(modVal, zeroVal *Value) (*Instr, int64, bool) {
 		return nil, 0, false
 	}
 	return mod, divisor, true
+}
+
+func opIsBoxedOrFallback(op, boxed Op) bool {
+	if op == boxed {
+		return true
+	}
+	spec, ok := op.Spec()
+	return ok && spec.BoxedFallbackOp == boxed
 }
