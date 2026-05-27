@@ -5,10 +5,16 @@ package methodjit
 // callsite-sized bounds for arithmetic derived from non-loop parameters while
 // preserving semantics through normal guard deoptimization on mismatch.
 func ObservedParamRangeGuardPass(fn *Function) (*Function, error) {
+	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "ObservedParamRangeGuard")
+	return ObservedParamRangeGuardPassCtx(newPassContext(fn, nil, allowed, false))
+}
+
+func ObservedParamRangeGuardPassCtx(ctx *PassContext) (*Function, error) {
+	fn := ctx.Func()
 	if fn == nil || fn.Proto == nil || fn.Entry == nil || len(fn.Proto.ArgIntRangeFeedback) == 0 {
 		return fn, nil
 	}
-	if specGuardKindSuppressed(fn, -1, "GuardIntRange") {
+	if specGuardKindSuppressedFacts(ctx.Speculation(), -1, "GuardIntRange") {
 		functionRemarks(fn).Add("ObservedParamRangeGuard", "missed", 0, 0, OpGuardIntRange,
 			"skipped globally suppressed int-range guard")
 		return fn, nil
