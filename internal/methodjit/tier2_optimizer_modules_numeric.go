@@ -114,6 +114,8 @@ func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 }
 
 func tier2LoopPostModules() []Tier2OptimizerModule {
+	licmPostRequires := analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables)
+	licmPostAllowed := allowedDomainsForModule(licmPostRequires, nil, nil, "LICM (post-MatrixRowPtrFactoring)")
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("UnrollAndJam", Tier2PhaseLoopPost, nil, nil, UnrollAndJamPass),
 		tier2PassModuleWith("MatrixRowPtrFactoring (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, MatrixRowPtrFactoringPass),
@@ -121,15 +123,13 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 		{
 			Name:     "LICM (post-MatrixRowPtrFactoring)",
 			Phase:    Tier2PhaseLoopPost,
-			Requires: analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables),
+			Requires: licmPostRequires,
 			Provides: nil,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, optCtx *Tier2OptimizerContext) (*Function, error) {
 				if !hasMatrixNativeIR(fn) {
 					return fn, nil
 				}
-				requires := analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables)
-				allowed := allowedDomainsForModule(requires, nil, nil, "LICM (post-MatrixRowPtrFactoring)")
-				return LICMPassCtx(newPassContext(fn, opts, allowed, passContextEnforce))
+				return LICMPassCtx(newPassContext(fn, opts, licmPostAllowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("QuadraticStepStrengthReduction", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, QuadraticStepStrengthReductionPass),
