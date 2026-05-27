@@ -160,10 +160,10 @@ func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 			return fn, nil
 		}
 		tableShapes.SetFixedShapeTables(facts)
-		annotateFixedShapeStringValueAccesses(fn, facts)
+		annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
 		propagateFixedShapePhiFacts(fn, facts)
 		annotateFixedShapeGetFields(fn, facts)
-		annotateFixedShapeStringValueAccesses(fn, facts)
+		annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
 		propagateFixedShapePhiFacts(fn, facts)
 		annotateFixedShapeGetFields(fn, facts)
 		annotateFixedShapeSetFields(fn, facts)

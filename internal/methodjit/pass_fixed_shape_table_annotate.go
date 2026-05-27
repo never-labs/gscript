@@ -78,7 +78,7 @@ func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact
 	}
 }
 
-func annotateFixedShapeStringValueAccesses(fn *Function, facts map[int]FixedShapeTableFact) {
+func annotateFixedShapeStringValueAccesses(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact) {
 	if fn == nil || len(facts) == 0 {
 		return
 	}
@@ -105,7 +105,7 @@ func annotateFixedShapeStringValueAccesses(fn *Function, facts map[int]FixedShap
 			}
 			valueFact := cloneFixedShapeTableFact(*fact.StringValueFact)
 			facts[instr.ID] = valueFact
-			recordFixedShapeCatalogFact(fn, valueFact)
+			recordFixedShapeCatalogFact(tableShapes, valueFact)
 			if instr.Type == TypeAny || instr.Type == TypeUnknown {
 				instr.Type = TypeTable
 			}

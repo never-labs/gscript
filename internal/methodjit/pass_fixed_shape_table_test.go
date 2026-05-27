@@ -1141,7 +1141,7 @@ func TestFixedShapeTableFactsPass_FieldSvalsUsesPolymorphicShapeCatalog(t *testi
 			},
 		},
 	})
-	recordFieldPolyShapeCatalog(fn, fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[99])
+	recordFieldPolyShapeCatalog(fn.Analysis.TableShapeFacts(), fn.Analysis.TableShapeFacts().FieldPolyShapeFactsMap()[99])
 
 	out, err := FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{})(fn)
 	if err != nil {

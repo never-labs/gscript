@@ -190,18 +190,18 @@ func seedGuardedPolyShapeArrayElementArgFacts(fn *Function, tableShapes *TableSh
 	}
 }
 
-func recordFieldPolyShapeCatalog(fn *Function, cases []FieldPolyShapeCase) {
-	if fn == nil || len(cases) == 0 {
+func recordFieldPolyShapeCatalog(tableShapes *TableShapeFacts, cases []FieldPolyShapeCase) {
+	if tableShapes == nil || len(cases) == 0 {
 		return
 	}
-	fn.Analysis.TableShapeFacts().RecordFieldPolyShapeCatalogCases(cases)
+	tableShapes.RecordFieldPolyShapeCatalogCases(cases)
 }
 
-func recordFixedShapeCatalogFact(fn *Function, fact FixedShapeTableFact) {
-	if fn == nil || fact.ShapeID == 0 || len(fact.FieldNames) == 0 {
+func recordFixedShapeCatalogFact(tableShapes *TableShapeFacts, fact FixedShapeTableFact) {
+	if tableShapes == nil || fact.ShapeID == 0 || len(fact.FieldNames) == 0 {
 		return
 	}
-	fn.Analysis.TableShapeFacts().RecordFixedShapeCatalogFact(fact)
+	tableShapes.RecordFixedShapeCatalogFact(fact)
 }
 
 func guardedFixedShapePolyFacts(facts []FixedShapeTableFact) []FixedShapeTableFact {
