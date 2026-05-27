@@ -8,9 +8,8 @@ import (
 
 // analysis_write_contract.go enforces the Tier 2 optimizer's *write* contract:
 // a module may only mutate AnalysisResult fact domains it declared in Provides
-// or Updates. This converts the declarative Provides/Updates lists from
-// documentation into an enforced invariant, closing the "looks modular, shares
-// global state" gap on the write side.
+// or Updates. This converts the declarative Provides/Updates lists into an
+// enforced invariant and makes module fact ownership explicit on the write side.
 //
 // The check piggybacks on the existing per-module fact diff: PhaseScope.finish
 // already computes run.ChangedDomains (the AnalysisResult fact-map domains a
@@ -26,11 +25,11 @@ import (
 // snapshotAnalysisFactDomains (a domain-struct field may also appear prefixed
 // as "Domain.Field"; canonicalDomainField strips the prefix before lookup).
 //
-// Fields absent from this map are not yet modeled by the fact-contract system.
-// Writes to them are reported as Unmodeled rather than treated as violations,
-// so the gate does not false-positive on facts the contract layer never named.
-// Growing this map (and the AnalysisFact set) toward full coverage is itself a
-// tracked goal of the modularization.
+// Fields absent from this map are outside the current fact-contract vocabulary.
+// Writes to them are reported as Unmodeled rather than treated as violations by
+// this pure checker, but the production-pipeline gate now fails on unmodeled
+// domains by default. Add an AnalysisFact mapping before introducing new
+// AnalysisResult fact maps.
 // Keys are the (now unexported) domain-struct map field names produced by
 // snapshotAnalysisFactDomains via reflection, so they are lowerCamel. The
 // String* facts model Function-level maps that are not part of AnalysisResult

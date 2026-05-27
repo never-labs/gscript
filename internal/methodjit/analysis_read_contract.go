@@ -14,15 +14,16 @@ import (
 // actually accessed through the AnalysisResult accessors during an observed run.
 // Any accessed domain not covered by a declared fact is an undeclared read.
 //
-// This is REPORT mode: it records and surfaces the landscape so the gaps can be
-// closed deliberately. It never panics and never fails the build. Production
-// cost is zero: the observer is nil unless the module runner installs it during
-// an observed run (callback active), the same gating as the write-side diff.
+// The production pipeline test enforces this contract against the current
+// corpus: undeclared reads must either be declared or explicitly listed in
+// knownReadContractHints as legitimate hint reads. Production cost is zero: the
+// observer is nil unless the module runner installs it during an observed run
+// (callback active), the same gating as the write-side diff.
 //
 // Limitation: the observer watches a single AnalysisResult (the one the pass
 // mutates, fn.Analysis). If a pass internally builds a sub-Function with its own
 // AnalysisResult (e.g. inlining), accesses on that sub-result are not observed.
-// That is acceptable for report mode and noted here for honesty.
+// Those sub-functions are outside the per-module run's primary fact contract.
 
 // allowedReadDomains returns the set of fact domains covered by a run's declared
 // facts (Requires ∪ Provides ∪ Updates). A module that declares nothing has an

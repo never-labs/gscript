@@ -6,8 +6,10 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-// AnalysisResult contains all analysis maps produced and consumed by optimization passes.
-// This struct extracts analysis state from the Function god object.
+// AnalysisResult groups all analysis fact domains produced and consumed by
+// optimizer modules. Passes should reach these domains through PassContext or
+// the function*Facts helpers so module contracts can observe and validate reads
+// and writes.
 type AnalysisResult struct {
 	// Numeric groups integer range and arithmetic safety facts. It is the single
 	// source of truth for numeric analysis; access goes through its accessors.
