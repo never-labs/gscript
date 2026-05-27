@@ -127,22 +127,8 @@ func pureNumericValue(v *Value) bool {
 }
 
 func pureNumericInlineOp(op Op) bool {
-	switch op {
-	case OpConstInt, OpConstFloat,
-		OpLoadSlot,
-		OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpNumToFloat, OpSqrt, OpFloor, OpFMA, OpFMSUB,
-		OpEq, OpLt, OpLe, OpEqInt, OpLtInt, OpLeInt, OpLtFloat, OpLeFloat, OpEqString,
-		OpModZeroInt, OpTableShapeID,
-		OpGuardType, OpGuardIntRange, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure,
-		OpJump, OpBranch,
-		OpPhi:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.PureNumericInline
 }
 
 func nativeEffectLoopInlineRejectReason(calleeFn *Function) string {
@@ -254,18 +240,6 @@ func nativeEffectLoopInlineOp(op Op) bool {
 	if pureNumericInlineOp(op) {
 		return true
 	}
-	switch op {
-	case OpGetGlobal, OpGuardGlobalConst,
-		OpTableArrayHeader, OpTableArrayLen, OpTableArrayData, OpTableArrayLoad,
-		OpTableArrayNestedLoad, OpTableArrayStore,
-		OpFieldSvals, OpFieldLoad, OpFieldStore,
-		OpMatrixGetF, OpMatrixSetF,
-		OpMatrixFlat, OpMatrixStride,
-		OpMatrixLoadFAt, OpMatrixStoreFAt,
-		OpMatrixRowPtr, OpMatrixLoadFRow, OpMatrixStoreFRow,
-		OpMatrixLoadFRowConst, OpMatrixStoreFRowConst:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.NativeEffectLoopInline
 }

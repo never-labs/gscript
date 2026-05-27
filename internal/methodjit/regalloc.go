@@ -634,18 +634,8 @@ func instructionHasNoSSAResult(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpNop, OpStoreSlot,
-		OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableBoolArrayFill,
-		OpFieldStore, OpSetField, OpSetList, OpAppend,
-		OpGuardGlobalConst, OpGuardTableKind, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure,
-		OpSetGlobal, OpSetUpval,
-		OpMatrixSetF, OpMatrixStoreFAt, OpMatrixStoreFRow, OpMatrixStoreFRowConst,
-		OpClose, OpGo, OpSend:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.NoSSAResult
 }
 
 func isFinalInputUse(instr *Instr, valueID int, lastUse map[int]int) bool {

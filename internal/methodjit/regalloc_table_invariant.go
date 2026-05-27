@@ -148,12 +148,8 @@ func isTableArrayGPRInvariant(instr *Instr) bool {
 	if instr == nil || instr.Type != TypeInt {
 		return false
 	}
-	switch instr.Op {
-	case OpTableArrayHeader, OpTableArrayLen, OpTableArrayData, OpTableShapeID, OpMatrixFlat, OpMatrixStride:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.TableArrayGPRInvariant
 }
 
 func sortTableArrayInvariantCandidates(ids []int, useCounts map[int]int, defs map[int]*Instr) {

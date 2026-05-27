@@ -660,17 +660,11 @@ func instrMayDirectDeoptWithoutFullFlush(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpGuardType, OpGuardIntRange, OpGuardGlobalConst, OpGuardConstString, OpGuardTableKind, OpGuardCalleeProto, OpGuardFieldCalleeProto, OpGuardShapeFieldType, OpGuardShapeFieldTypeMask, OpGuardShapeFieldVMClosure, OpNumToFloat, OpDivIntExact,
-		OpGetFieldNumToFloat, OpFieldPolyLen, OpFieldSvals, OpFieldLoad, OpFieldLoadNumToFloat,
-		OpMatrixGetF, OpMatrixSetF, OpMatrixFlat, OpMatrixStride,
-		OpTableArrayHeader, OpTableArrayLoad, OpTableShapeID, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableArrayNestedLoad:
+	spec, ok := instr.Op.Spec()
+	if ok && spec.DirectDeoptWithoutFullFlush {
 		return true
-	case OpGetField:
-		return instr.Type == TypeFloat
-	default:
-		return false
 	}
+	return instr.Op == OpGetField && instr.Type == TypeFloat
 }
 
 // emitContext holds transient state during code generation.

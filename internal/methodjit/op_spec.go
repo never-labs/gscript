@@ -133,6 +133,19 @@ type OpSpec struct {
 	LoadElimConstCSE                 bool
 	LoadElimPureCSE                  bool
 	LoadElimShapeFactKiller          bool
+	NoSSAResult                      bool
+	RawIntResult                     bool
+	RawTablePtrResult                bool
+	RawDataPtrResult                 bool
+	RawFloatResult                   bool
+	MatrixNative                     bool
+	TableArrayGPRInvariant           bool
+	LICMHoistable                    bool
+	LICMInterestingMiss              bool
+	LICMIntArith                     bool
+	PureNumericInline                bool
+	NativeEffectLoopInline           bool
+	DirectDeoptWithoutFullFlush      bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -349,6 +362,45 @@ func (op Op) Spec() (OpSpec, bool) {
 		}
 		if int(op) < len(opLoadElimShapeFactKillerPolicies) {
 			spec.LoadElimShapeFactKiller = opLoadElimShapeFactKillerPolicies[op]
+		}
+		if int(op) < len(opNoSSAResultPolicies) {
+			spec.NoSSAResult = opNoSSAResultPolicies[op]
+		}
+		if int(op) < len(opRawIntResultPolicies) {
+			spec.RawIntResult = opRawIntResultPolicies[op]
+		}
+		if int(op) < len(opRawTablePtrResultPolicies) {
+			spec.RawTablePtrResult = opRawTablePtrResultPolicies[op]
+		}
+		if int(op) < len(opRawDataPtrResultPolicies) {
+			spec.RawDataPtrResult = opRawDataPtrResultPolicies[op]
+		}
+		if int(op) < len(opRawFloatResultPolicies) {
+			spec.RawFloatResult = opRawFloatResultPolicies[op]
+		}
+		if int(op) < len(opMatrixNativePolicies) {
+			spec.MatrixNative = opMatrixNativePolicies[op]
+		}
+		if int(op) < len(opTableArrayGPRInvariantPolicies) {
+			spec.TableArrayGPRInvariant = opTableArrayGPRInvariantPolicies[op]
+		}
+		if int(op) < len(opLICMHoistablePolicies) {
+			spec.LICMHoistable = opLICMHoistablePolicies[op]
+		}
+		if int(op) < len(opLICMInterestingMissPolicies) {
+			spec.LICMInterestingMiss = opLICMInterestingMissPolicies[op]
+		}
+		if int(op) < len(opLICMIntArithPolicies) {
+			spec.LICMIntArith = opLICMIntArithPolicies[op]
+		}
+		if int(op) < len(opPureNumericInlinePolicies) {
+			spec.PureNumericInline = opPureNumericInlinePolicies[op]
+		}
+		if int(op) < len(opNativeEffectLoopInlinePolicies) {
+			spec.NativeEffectLoopInline = opNativeEffectLoopInlinePolicies[op]
+		}
+		if int(op) < len(opDirectDeoptWithoutFullFlushPolicies) {
+			spec.DirectDeoptWithoutFullFlush = opDirectDeoptWithoutFullFlushPolicies[op]
 		}
 		return spec, true
 	}
@@ -827,4 +879,294 @@ var opLoadElimShapeFactKillerPolicies = [...]bool{
 	OpCall:                       true,
 	OpResume:                     true,
 	OpSelf:                       true,
+}
+
+var opNoSSAResultPolicies = [...]bool{
+	OpNop:                      true,
+	OpStoreSlot:                true,
+	OpSetTable:                 true,
+	OpTableArrayStore:          true,
+	OpTableArraySwap:           true,
+	OpTableArraySwapPairs:      true,
+	OpTableBoolArrayFill:       true,
+	OpFieldStore:               true,
+	OpSetField:                 true,
+	OpSetList:                  true,
+	OpAppend:                   true,
+	OpGuardGlobalConst:         true,
+	OpGuardTableKind:           true,
+	OpGuardShapeFieldType:      true,
+	OpGuardShapeFieldTypeMask:  true,
+	OpGuardShapeFieldVMClosure: true,
+	OpSetGlobal:                true,
+	OpSetUpval:                 true,
+	OpMatrixSetF:               true,
+	OpMatrixStoreFAt:           true,
+	OpMatrixStoreFRow:          true,
+	OpMatrixStoreFRowConst:     true,
+	OpClose:                    true,
+	OpGo:                       true,
+	OpSend:                     true,
+}
+
+var opRawIntResultPolicies = [...]bool{
+	OpAddInt:        true,
+	OpSubInt:        true,
+	OpMulInt:        true,
+	OpModInt:        true,
+	OpDivIntExact:   true,
+	OpNegInt:        true,
+	OpTableArrayLen: true,
+	OpTableShapeID:  true,
+}
+
+var opRawTablePtrResultPolicies = [...]bool{
+	OpTableArrayHeader: true,
+}
+
+var opRawDataPtrResultPolicies = [...]bool{
+	OpTableArrayData: true,
+	OpFieldSvals:     true,
+}
+
+var opRawFloatResultPolicies = [...]bool{
+	OpAddFloat:            true,
+	OpSubFloat:            true,
+	OpMulFloat:            true,
+	OpDivFloat:            true,
+	OpNegFloat:            true,
+	OpNumToFloat:          true,
+	OpGetFieldNumToFloat:  true,
+	OpFieldLoadNumToFloat: true,
+	OpSqrt:                true,
+	OpFMA:                 true,
+	OpFMSUB:               true,
+}
+
+var opMatrixNativePolicies = [...]bool{
+	OpMatrixDense:          true,
+	OpMatrixGetF:           true,
+	OpMatrixSetF:           true,
+	OpMatrixFlat:           true,
+	OpMatrixStride:         true,
+	OpMatrixLoadFAt:        true,
+	OpMatrixStoreFAt:       true,
+	OpMatrixRowPtr:         true,
+	OpMatrixLoadFRow:       true,
+	OpMatrixStoreFRow:      true,
+	OpMatrixLoadFRowConst:  true,
+	OpMatrixStoreFRowConst: true,
+}
+
+var opTableArrayGPRInvariantPolicies = [...]bool{
+	OpTableArrayHeader: true,
+	OpTableArrayLen:    true,
+	OpTableArrayData:   true,
+	OpTableShapeID:     true,
+	OpMatrixFlat:       true,
+	OpMatrixStride:     true,
+}
+
+var opLICMHoistablePolicies = [...]bool{
+	OpConstInt:            true,
+	OpConstFloat:          true,
+	OpConstBool:           true,
+	OpConstNil:            true,
+	OpLoadSlot:            true,
+	OpGetField:            true,
+	OpGetGlobal:           true,
+	OpGuardGlobalConst:    true,
+	OpGetUpval:            true,
+	OpSqrt:                true,
+	OpFloor:               true,
+	OpLen:                 true,
+	OpGetTable:            true,
+	OpAddFloat:            true,
+	OpSubFloat:            true,
+	OpMulFloat:            true,
+	OpDivFloat:            true,
+	OpNegFloat:            true,
+	OpFMA:                 true,
+	OpFMSUB:               true,
+	OpAddInt:              true,
+	OpSubInt:              true,
+	OpMulInt:              true,
+	OpDivIntExact:         true,
+	OpNegInt:              true,
+	OpLtInt:               true,
+	OpLeInt:               true,
+	OpEqInt:               true,
+	OpModZeroInt:          true,
+	OpLtFloat:             true,
+	OpLeFloat:             true,
+	OpEqString:            true,
+	OpNot:                 true,
+	OpGuardType:           true,
+	OpGuardIntRange:       true,
+	OpGuardCalleeProto:    true,
+	OpNumToFloat:          true,
+	OpTableShapeID:        true,
+	OpFieldSvals:          true,
+	OpFieldLoad:           true,
+	OpFieldLoadNumToFloat: true,
+	OpMatrixFlat:          true,
+	OpMatrixStride:        true,
+	OpTableArrayHeader:    true,
+	OpTableArrayLen:       true,
+	OpTableArrayData:      true,
+	OpMatrixRowPtr:        true,
+}
+
+var opLICMInterestingMissPolicies = [...]bool{
+	OpGetField:         true,
+	OpGetTable:         true,
+	OpGetGlobal:        true,
+	OpGuardGlobalConst: true,
+	OpGuardCalleeProto: true,
+	OpGetUpval:         true,
+	OpLoadSlot:         true,
+	OpAdd:              true,
+	OpSub:              true,
+	OpMul:              true,
+	OpDiv:              true,
+	OpMod:              true,
+	OpUnm:              true,
+	OpAddInt:           true,
+	OpSubInt:           true,
+	OpMulInt:           true,
+	OpModInt:           true,
+	OpDivIntExact:      true,
+	OpNegInt:           true,
+	OpAddFloat:         true,
+	OpSubFloat:         true,
+	OpMulFloat:         true,
+	OpDivFloat:         true,
+	OpNegFloat:         true,
+	OpFMA:              true,
+	OpFMSUB:            true,
+	OpMatrixFlat:       true,
+	OpMatrixStride:     true,
+	OpMatrixRowPtr:     true,
+	OpTableArrayHeader: true,
+	OpTableArrayLen:    true,
+	OpTableArrayData:   true,
+	OpSqrt:             true,
+	OpFloor:            true,
+	OpLen:              true,
+	OpNumToFloat:       true,
+}
+
+var opLICMIntArithPolicies = [...]bool{
+	OpAddInt:      true,
+	OpSubInt:      true,
+	OpMulInt:      true,
+	OpDivIntExact: true,
+	OpNegInt:      true,
+}
+
+var opPureNumericInlinePolicies = [...]bool{
+	OpConstInt:                 true,
+	OpConstFloat:               true,
+	OpLoadSlot:                 true,
+	OpAdd:                      true,
+	OpSub:                      true,
+	OpMul:                      true,
+	OpDiv:                      true,
+	OpMod:                      true,
+	OpUnm:                      true,
+	OpAddInt:                   true,
+	OpSubInt:                   true,
+	OpMulInt:                   true,
+	OpModInt:                   true,
+	OpDivIntExact:              true,
+	OpNegInt:                   true,
+	OpAddFloat:                 true,
+	OpSubFloat:                 true,
+	OpMulFloat:                 true,
+	OpDivFloat:                 true,
+	OpNegFloat:                 true,
+	OpNumToFloat:               true,
+	OpSqrt:                     true,
+	OpFloor:                    true,
+	OpFMA:                      true,
+	OpFMSUB:                    true,
+	OpEq:                       true,
+	OpLt:                       true,
+	OpLe:                       true,
+	OpEqInt:                    true,
+	OpLtInt:                    true,
+	OpLeInt:                    true,
+	OpLtFloat:                  true,
+	OpLeFloat:                  true,
+	OpEqString:                 true,
+	OpModZeroInt:               true,
+	OpTableShapeID:             true,
+	OpGuardType:                true,
+	OpGuardIntRange:            true,
+	OpGuardConstString:         true,
+	OpGuardTableKind:           true,
+	OpGuardCalleeProto:         true,
+	OpGuardFieldCalleeProto:    true,
+	OpGuardShapeFieldType:      true,
+	OpGuardShapeFieldTypeMask:  true,
+	OpGuardShapeFieldVMClosure: true,
+	OpJump:                     true,
+	OpBranch:                   true,
+	OpPhi:                      true,
+}
+
+var opNativeEffectLoopInlinePolicies = [...]bool{
+	OpGetGlobal:            true,
+	OpGuardGlobalConst:     true,
+	OpTableArrayHeader:     true,
+	OpTableArrayLen:        true,
+	OpTableArrayData:       true,
+	OpTableArrayLoad:       true,
+	OpTableArrayNestedLoad: true,
+	OpTableArrayStore:      true,
+	OpFieldSvals:           true,
+	OpFieldLoad:            true,
+	OpFieldStore:           true,
+	OpMatrixGetF:           true,
+	OpMatrixSetF:           true,
+	OpMatrixFlat:           true,
+	OpMatrixStride:         true,
+	OpMatrixLoadFAt:        true,
+	OpMatrixStoreFAt:       true,
+	OpMatrixRowPtr:         true,
+	OpMatrixLoadFRow:       true,
+	OpMatrixStoreFRow:      true,
+	OpMatrixLoadFRowConst:  true,
+	OpMatrixStoreFRowConst: true,
+}
+
+var opDirectDeoptWithoutFullFlushPolicies = [...]bool{
+	OpGuardType:                true,
+	OpGuardIntRange:            true,
+	OpGuardGlobalConst:         true,
+	OpGuardConstString:         true,
+	OpGuardTableKind:           true,
+	OpGuardCalleeProto:         true,
+	OpGuardFieldCalleeProto:    true,
+	OpGuardShapeFieldType:      true,
+	OpGuardShapeFieldTypeMask:  true,
+	OpGuardShapeFieldVMClosure: true,
+	OpNumToFloat:               true,
+	OpDivIntExact:              true,
+	OpGetFieldNumToFloat:       true,
+	OpFieldPolyLen:             true,
+	OpFieldSvals:               true,
+	OpFieldLoad:                true,
+	OpFieldLoadNumToFloat:      true,
+	OpMatrixGetF:               true,
+	OpMatrixSetF:               true,
+	OpMatrixFlat:               true,
+	OpMatrixStride:             true,
+	OpTableArrayHeader:         true,
+	OpTableArrayLoad:           true,
+	OpTableShapeID:             true,
+	OpTableArrayStore:          true,
+	OpTableArraySwap:           true,
+	OpTableArraySwapPairs:      true,
+	OpTableArrayNestedLoad:     true,
 }

@@ -906,88 +906,13 @@ func licmCallUserArgs(instr *Instr) []*Value {
 // invariant). The emitter and regalloc must still be able to place the
 // result; we only whitelist pure, side-effect-free computations.
 func canHoistOp(op Op) bool {
-	switch op {
-	case OpConstInt, OpConstFloat, OpConstBool, OpConstNil:
-		return true
-	case OpLoadSlot:
-		return true
-	case OpGetField:
-		// Caller must also check alias info (no SetField/SetTable/Call in loop).
-		return true
-	case OpGetGlobal, OpGuardGlobalConst:
-		// Caller must also check alias info (no SetGlobal on same name, no Call in loop).
-		return true
-	case OpGetUpval:
-		// Caller must also check alias info (no SetUpval on same cell, no Call in loop).
-		return true
-	case OpSqrt:
-		// Pure single-input float op with no side effects.
-		return true
-	case OpFloor:
-		return true
-	case OpLen:
-		// Caller must also check alias info for table operands.
-		return true
-	case OpGetTable:
-		// Caller must also check alias info (no SetTable on same obj, no Call in loop).
-		return true
-	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpFMA, OpFMSUB:
-		return true
-	case OpAddInt, OpSubInt, OpMulInt, OpDivIntExact, OpNegInt:
-		// Caller must also check NumericFacts.
-		return true
-	case OpLtInt, OpLeInt, OpEqInt, OpModZeroInt, OpLtFloat, OpLeFloat, OpEqString, OpNot:
-		return true
-	case OpGuardType, OpGuardIntRange, OpGuardCalleeProto:
-		// Pure guards; deopt metadata has no PC-dependent state,
-		// so hoisting is safe when the guarded value is invariant.
-		return true
-	case OpNumToFloat:
-		// Pure numeric widening check; like GuardType, deopt state is not
-		// PC-dependent, so it can move with invariant operands.
-		return true
-	case OpTableShapeID:
-		// Pure table-shape extraction guarded by the table operand. Hoisting is
-		// valid when the table value is loop-invariant.
-		return true
-	case OpFieldSvals, OpFieldLoad, OpFieldLoadNumToFloat:
-		return true
-	case OpMatrixFlat, OpMatrixStride:
-		// R45: extracting dmFlat / dmStride is pure (output depends
-		// only on the Table argument; DenseMatrix descriptor is
-		// immutable once NewDenseMatrix returns). Hoisting these to
-		// the preheader is the entire point of the R45 split.
-		// Caller must still check that no in-loop call could invalidate
-		// m (hasLoopCall) — LICM already enforces that for GetField/
-		// GetTable, and the same guard applies here.
-		return true
-	case OpTableArrayHeader, OpTableArrayLen, OpTableArrayData:
-		// Header has a guard, but is loop-invariant under the same alias
-		// conditions as GetTable. Len/data are pure loads from that verified
-		// header and can follow it into the preheader.
-		return true
-	case OpMatrixRowPtr:
-		// R46: row-pointer arithmetic is pure. Hoists when all 3 inputs
-		// (flat, stride, i) are loop-invariant. In row-fixed inner loops,
-		// row_a hoists outside the inner body.
-		return true
-	}
-	return false
+	spec, ok := op.Spec()
+	return ok && spec.LICMHoistable
 }
 
 func isInterestingLICMMiss(op Op) bool {
-	switch op {
-	case OpGetField, OpGetTable, OpGetGlobal, OpGuardGlobalConst, OpGuardCalleeProto, OpGetUpval, OpLoadSlot,
-		OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpFMA, OpFMSUB,
-		OpMatrixFlat, OpMatrixStride, OpMatrixRowPtr,
-		OpTableArrayHeader, OpTableArrayLen, OpTableArrayData,
-		OpSqrt, OpFloor, OpLen, OpNumToFloat:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.LICMInterestingMiss
 }
 
 // isIntArithOp reports whether the op is an integer arithmetic op that
@@ -996,9 +921,6 @@ func isInterestingLICMMiss(op Op) bool {
 // also listed in canHoistOp, but only the adds/subs/muls/negs carry the
 // emitter's SBFX+CMP overflow sequence — comparisons don't.
 func isIntArithOp(op Op) bool {
-	switch op {
-	case OpAddInt, OpSubInt, OpMulInt, OpDivIntExact, OpNegInt:
-		return true
-	}
-	return false
+	spec, ok := op.Spec()
+	return ok && spec.LICMIntArith
 }

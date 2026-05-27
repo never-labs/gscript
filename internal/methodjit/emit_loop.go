@@ -753,16 +753,13 @@ func sortedLoopFPRegEntryIDs(m map[int]loopFPRegEntry) []int {
 // isRawIntOp returns true if the op produces a raw int64 result
 // (stored via storeRawInt rather than storeResultNB).
 func isRawIntOp(op Op) bool {
-	switch op {
-	case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt, OpTableArrayLen, OpTableShapeID:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.RawIntResult
 }
 
 func isRawTablePtrOp(op Op) bool {
-	return op == OpTableArrayHeader
+	spec, ok := op.Spec()
+	return ok && spec.RawTablePtrResult
 }
 
 func isRawTablePtrValue(instr *Instr) bool {
@@ -776,16 +773,13 @@ func isRawTablePtrValue(instr *Instr) bool {
 }
 
 func isRawDataPtrOp(op Op) bool {
-	return op == OpTableArrayData || op == OpFieldSvals
+	spec, ok := op.Spec()
+	return ok && spec.RawDataPtrResult
 }
 
 // isRawFloatOp returns true if the op produces a raw float64 result
 // (stored via storeRawFloat in an FPR).
 func isRawFloatOp(op Op) bool {
-	switch op {
-	case OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpNumToFloat, OpGetFieldNumToFloat, OpFieldLoadNumToFloat, OpSqrt, OpFMA, OpFMSUB:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.RawFloatResult
 }

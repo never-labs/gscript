@@ -326,6 +326,79 @@ func TestLoadElimContractsLiveInOpSpec(t *testing.T) {
 	}
 }
 
+func TestBackendAndLoopContractsLiveInOpSpec(t *testing.T) {
+	noResult := []Op{OpSetTable, OpFieldStore, OpGuardGlobalConst, OpMatrixSetF, OpClose}
+	for _, op := range noResult {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.NoSSAResult || !instructionHasNoSSAResult(&Instr{Op: op}) {
+			t.Fatalf("%s no-SSA-result contract should be driven by OpSpec", op)
+		}
+	}
+
+	raws := []struct {
+		op   Op
+		want string
+	}{
+		{OpAddInt, "int"},
+		{OpTableArrayHeader, "tableptr"},
+		{OpTableArrayData, "dataptr"},
+		{OpAddFloat, "float"},
+		{OpMatrixDense, "matrix"},
+	}
+	for _, tc := range raws {
+		spec, ok := tc.op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", tc.op)
+		}
+		switch tc.want {
+		case "int":
+			if !spec.RawIntResult || !isRawIntOp(tc.op) {
+				t.Fatalf("%s raw-int contract should be driven by OpSpec", tc.op)
+			}
+		case "tableptr":
+			if !spec.RawTablePtrResult || !isRawTablePtrOp(tc.op) {
+				t.Fatalf("%s raw-table-ptr contract should be driven by OpSpec", tc.op)
+			}
+		case "dataptr":
+			if !spec.RawDataPtrResult || !isRawDataPtrOp(tc.op) {
+				t.Fatalf("%s raw-data-ptr contract should be driven by OpSpec", tc.op)
+			}
+		case "float":
+			if !spec.RawFloatResult || !isRawFloatOp(tc.op) {
+				t.Fatalf("%s raw-float contract should be driven by OpSpec", tc.op)
+			}
+		case "matrix":
+			if !spec.MatrixNative || !isMatrixNativeOp(tc.op) {
+				t.Fatalf("%s matrix-native contract should be driven by OpSpec", tc.op)
+			}
+		}
+	}
+
+	licm := []Op{OpConstInt, OpGetField, OpAddFloat, OpGuardType, OpTableArrayHeader, OpMatrixRowPtr}
+	for _, op := range licm {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.LICMHoistable || !canHoistOp(op) {
+			t.Fatalf("%s LICM hoistability should be driven by OpSpec", op)
+		}
+	}
+	if !isInterestingLICMMiss(OpGetField) || !isIntArithOp(OpAddInt) {
+		t.Fatalf("LICM diagnostic/int-arith contracts should be driven by OpSpec")
+	}
+	if !pureNumericInlineOp(OpAddInt) || !nativeEffectLoopInlineOp(OpTableArrayLoad) {
+		t.Fatalf("inline loop contracts should be driven by OpSpec")
+	}
+	if !instrMayDirectDeoptWithoutFullFlush(&Instr{Op: OpGuardType}) ||
+		!instrMayDirectDeoptWithoutFullFlush(&Instr{Op: OpGetField, Type: TypeFloat}) {
+		t.Fatalf("direct-deopt contracts should be driven by OpSpec plus instr-specific GetField float rule")
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}
