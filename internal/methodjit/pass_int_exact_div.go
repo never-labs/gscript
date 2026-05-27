@@ -269,11 +269,6 @@ func componentHasObservableUse(component map[int]bool, uses map[int][]*Instr) bo
 	return false
 }
 
-func isExactDivAllowedExternalUse(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.ExactDivAllowedExternalUse
-}
-
 func buildInstrDefs(fn *Function) map[int]*Instr {
 	defs := make(map[int]*Instr)
 	for _, block := range fn.Blocks {

@@ -36,14 +36,6 @@ func collectIntNonNegativeFacts(intInstrs []*Instr, ranges map[int]intRange) map
 	return facts
 }
 
-func opCanDeriveNonNegative(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.NonNegativeDerivationCandidate
-}
-
 func instrDerivesNonNegative(instr *Instr, facts map[int]bool, ranges map[int]intRange) bool {
 	if instr == nil {
 		return false

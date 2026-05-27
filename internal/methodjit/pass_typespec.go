@@ -1032,11 +1032,6 @@ func (ts *typeSpecializer) insertNumToFloatConversions(fn *Function) {
 	}
 }
 
-func shouldInsertNumToFloat(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.NumToFloatInsertCandidate
-}
-
 func isUnknownNumericCandidate(t Type) bool {
 	return t == TypeUnknown || t == TypeAny
 }

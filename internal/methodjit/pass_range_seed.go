@@ -458,14 +458,6 @@ func squareExprOfPhi(v *Value, phiID int) (phiLinearExpr, bool) {
 	return left, true
 }
 
-func isInt48RuntimeValue(instr *Instr) bool {
-	if instr == nil || instr.Type != TypeInt {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.Int48RuntimeValue
-}
-
 func isqrt64(v int64) int64 {
 	if v <= 0 {
 		return 0

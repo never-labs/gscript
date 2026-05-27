@@ -82,3 +82,29 @@ func isUnrollCloneableOp(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.UnrollCloneable
 }
+
+func shouldInsertNumToFloat(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NumToFloatInsertCandidate
+}
+
+func isExactDivAllowedExternalUse(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.ExactDivAllowedExternalUse
+}
+
+func opCanDeriveNonNegative(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.NonNegativeDerivationCandidate
+}
+
+func isInt48RuntimeValue(instr *Instr) bool {
+	if instr == nil || instr.Type != TypeInt {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.Int48RuntimeValue
+}
