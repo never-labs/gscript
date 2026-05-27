@@ -24,7 +24,7 @@ package methodjit
 
 import "github.com/gscript/gscript/internal/vm"
 
-var escapeAnalysisPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "EscapeAnalysis")
+var escapeAnalysisPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactFixedShapeTables), nil, nil, "EscapeAnalysis", analysisFacts(AnalysisFactGlobals))
 
 // blockForID returns the block with the given ID, or nil.
 // Block IDs may not match fn.Blocks slice indices after inlining.

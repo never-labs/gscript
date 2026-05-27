@@ -33,7 +33,7 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 		tier2PassModuleWith("LoadElimination", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, LoadEliminationPass),
 		tier2PassModuleWithCtxUpdates("FieldLenFold", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactProfiledIntRanges), FieldLenFoldPassCtx),
 		tier2PassModuleWith("StaticTableLenFold", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, StaticTableLenFoldPass),
-		tier2PassModuleWithCtx("EscapeAnalysis", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, EscapeAnalysisPassCtx),
+		tier2PassModuleWithCtxOptionalReads("EscapeAnalysis", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, analysisFacts(AnalysisFactGlobals), EscapeAnalysisPassCtx),
 		tier2PassModuleWithCtx("FixedTableConstructorLowering", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedTableConstructors), nil, FixedTableConstructorLoweringPassCtx),
 		tier2PassModuleWith("TablePreallocHint (post-fixed-table-lowering)", Tier2PhaseTableObjectPrep, nil, nil, TablePreallocHintPass),
 		{

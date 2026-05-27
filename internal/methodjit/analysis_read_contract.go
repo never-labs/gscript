@@ -8,15 +8,16 @@ import (
 
 // analysis_read_contract.go observes the Tier 2 optimizer's *read* contract,
 // symmetric to the write-side gate in analysis_write_contract.go. A module
-// declares the facts it Requires/Provides/Updates; the union of those facts'
-// owning domains is the set of domains the module is "allowed" to touch. The
-// read observer (see analysis_fact_domain.go) records which domains a module
-// actually accessed through the AnalysisResult accessors during an observed run.
-// Any accessed domain not covered by a declared fact is an undeclared read.
+// declares the facts it Requires/Provides/Updates/OptionalReads; the union of
+// those facts' owning domains is the set of domains the module is "allowed" to
+// touch. The read observer (see analysis_fact_domain.go) records which domains
+// a module actually accessed through the AnalysisResult accessors during an
+// observed run. Any accessed domain not covered by a declared fact is an
+// undeclared read.
 //
 // The production pipeline test enforces this contract against the current
-// corpus: undeclared reads must either be declared or explicitly listed in
-// knownReadContractHints as legitimate hint reads. Production cost is zero: the
+// corpus: every observed domain must be declared as a required/provided/updated
+// fact or as an explicit optional hint read. Production cost is zero: the
 // observer is nil unless the module runner installs it during an observed run
 // (callback active), the same gating as the write-side diff.
 //
@@ -26,9 +27,9 @@ import (
 // Those sub-functions are outside the per-module run's primary fact contract.
 
 // allowedReadDomains returns the set of fact domains covered by a run's declared
-// facts (Requires ∪ Provides ∪ Updates). A module that declares nothing has an
-// empty allowed set, so every accessed domain is undeclared — exactly the
-// interesting finding this observation is meant to surface.
+// facts (Requires ∪ Provides ∪ Updates ∪ OptionalReads). A module that declares
+// nothing has an empty allowed set, so every accessed domain is undeclared —
+// exactly the interesting finding this observation is meant to surface.
 func allowedReadDomains(run Tier2ModuleRun) map[factDomain]bool {
 	allowed := make(map[factDomain]bool)
 	add := func(facts []AnalysisFact) {
@@ -41,6 +42,7 @@ func allowedReadDomains(run Tier2ModuleRun) map[factDomain]bool {
 	add(run.Requires)
 	add(run.Provides)
 	add(run.Updates)
+	add(run.OptionalReads)
 	return allowed
 }
 
@@ -145,57 +147,10 @@ func CheckPipelineReadContract(runs []Tier2ModuleRun) AggregateReadContractRepor
 	return agg
 }
 
-// knownReadContractHints enumerates the (module, domain) undeclared reads that
-// ValidateDependencyOrder confirmed are legitimate HINTS rather than hard
-// dependencies, so they are intentionally NOT declared as Requires:
-//   - global reads (EscapeAnalysis, LICM, LICM post-MatrixRowPtrFactoring): the
-//     global domain is a seeded pipeline input with no module producer, so a
-//     Requires on it would fail dependency validation ("never provided").
-//   - numeric reads by modules that run BEFORE the numeric phase (CallABI in
-//     call_lower; FieldLenFold and FixedShapeTableFacts base/pre-inline in
-//     early_canonical): the numeric facts are produced later, so these reads see
-//     an absent map and treat it as "no range info", a hint not a requirement.
-//
-// The read contract is ENFORCED against everything else: any undeclared read NOT
-// in this allowlist is a contract violation (a pass reading a domain it should
-// declare, or a regression). Keyed by "module\x00domain".
-var knownReadContractHints = map[string]bool{
-	"CallABI\x00numeric":                            true,
-	"CallResultRangeGuard\x00global":                true,
-	"CallResultRangeGuard (final)\x00global":        true,
-	"CallResultRangeGuard (post-rewrite)\x00global": true,
-	"EscapeAnalysis\x00global":                      true,
-	"LICM\x00global":                                true,
-	"LICM (post-MatrixRowPtrFactoring)\x00global":   true,
-}
-
-// UnexpectedFindings returns the undeclared reads that are NOT in the known-hint
-// allowlist — i.e. the read-contract violations the gate enforces against.
+// UnexpectedFindings returns all undeclared reads. Optional hint reads must be
+// declared on the module contract, so there is no out-of-band allowlist.
 func (report AggregateReadContractReport) UnexpectedFindings() []ReadContractFinding {
-	var out []ReadContractFinding
-	for _, f := range report.Findings {
-		if !knownReadContractHints[f.Module+"\x00"+f.Domain] {
-			out = append(out, f)
-		}
-	}
-	return out
-}
-
-// StaleHintAllowlistEntries returns allowlist entries that no longer appear as
-// undeclared reads — candidates for removal so the allowlist does not rot.
-func (report AggregateReadContractReport) StaleHintAllowlistEntries() []string {
-	present := make(map[string]bool, len(report.Findings))
-	for _, f := range report.Findings {
-		present[f.Module+"\x00"+f.Domain] = true
-	}
-	var stale []string
-	for key := range knownReadContractHints {
-		if !present[key] {
-			stale = append(stale, strings.Replace(key, "\x00", " -> ", 1))
-		}
-	}
-	sort.Strings(stale)
-	return stale
+	return append([]ReadContractFinding(nil), report.Findings...)
 }
 
 // FormatReadContractFindings renders the per-module undeclared reads for logging.

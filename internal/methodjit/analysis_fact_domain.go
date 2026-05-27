@@ -6,7 +6,8 @@ import "sort"
 // mapping from each modeled AnalysisFact to its owning domain. The read-side
 // contract observer (see analysis_read_contract.go) records which domains a
 // module accessed through the AnalysisResult accessors and compares that against
-// the domains its declared facts (Requires ∪ Provides ∪ Updates) cover.
+// the domains its declared facts (Requires ∪ Provides ∪ Updates ∪ OptionalReads)
+// cover.
 
 // factDomain names one of the six AnalysisResult fact domains. The values match
 // the domain struct names in lowercase form for stable, human-readable output.

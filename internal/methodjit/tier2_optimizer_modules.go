@@ -29,14 +29,16 @@ type Tier2ModuleRun struct {
 	Requires       []AnalysisFact
 	Provides       []AnalysisFact
 	Updates        []AnalysisFact
+	OptionalReads  []AnalysisFact
 	ActualFactDiff []AnalysisFactDomainDiff
 	ChangedDomains []string
 	// AccessedDomains lists the AnalysisResult fact domains the module read or
 	// wrote through the domain accessors during an observed run, sorted. It is
 	// populated only when a module-run callback is active (same gating as
 	// ChangedDomains). UndeclaredReadDomains is the subset of AccessedDomains not
-	// covered by any declared fact (Requires ∪ Provides ∪ Updates); these are the
-	// read-contract findings surfaced in report mode.
+	// covered by any declared fact (Requires ∪ Provides ∪ Updates ∪
+	// OptionalReads); these are the read-contract findings surfaced in report
+	// mode.
 	AccessedDomains       []string
 	UndeclaredReadDomains []string
 }
@@ -57,12 +59,13 @@ type Tier2PipelineDiagnostics struct {
 // module. It intentionally reports declarations only; it does not diff or copy
 // the full AnalysisResult.
 type Tier2ModuleContract struct {
-	Phase      Tier2OptimizerPhase `json:"phase"`
-	ModuleName string              `json:"module"`
-	StageName  string              `json:"stage"`
-	Requires   []AnalysisFact      `json:"requires,omitempty"`
-	Provides   []AnalysisFact      `json:"provides,omitempty"`
-	Updates    []AnalysisFact      `json:"updates,omitempty"`
+	Phase         Tier2OptimizerPhase `json:"phase"`
+	ModuleName    string              `json:"module"`
+	StageName     string              `json:"stage"`
+	Requires      []AnalysisFact      `json:"requires,omitempty"`
+	Provides      []AnalysisFact      `json:"provides,omitempty"`
+	Updates       []AnalysisFact      `json:"updates,omitempty"`
+	OptionalReads []AnalysisFact      `json:"optional_reads,omitempty"`
 }
 
 // Tier2ModuleReason records why an optimizer module/pass hit, skipped, or
@@ -224,6 +227,7 @@ type Tier2OptimizerModule struct {
 	Requires       []AnalysisFact // Facts this module needs to be already computed
 	Provides       []AnalysisFact // Facts this module computes
 	Updates        []AnalysisFact // Facts this module refreshes after an earlier provider
+	OptionalReads  []AnalysisFact // Facts this module may read as hints without depending on ordering
 	Run            func(*Function, *Tier2PipelineOpts) (*Function, error)
 	RunWithContext func(*Function, *Tier2PipelineOpts, *Tier2OptimizerContext) (*Function, error)
 }
@@ -387,6 +391,20 @@ func tier2PassModuleWithCtx(name string, phase Tier2OptimizerPhase, requires, pr
 		Phase:    phase,
 		Requires: requires,
 		Provides: provides,
+		RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
+			return pass(newPassContext(fn, opts, allowed, passContextEnforce))
+		},
+	}
+}
+
+func tier2PassModuleWithCtxOptionalReads(name string, phase Tier2OptimizerPhase, requires, provides, optionalReads []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
+	allowed := allowedDomainsForModule(requires, provides, nil, name, optionalReads)
+	return Tier2OptimizerModule{
+		Name:          name,
+		Phase:         phase,
+		Requires:      requires,
+		Provides:      provides,
+		OptionalReads: optionalReads,
 		RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, _ *Tier2OptimizerContext) (*Function, error) {
 			return pass(newPassContext(fn, opts, allowed, passContextEnforce))
 		},
@@ -592,6 +610,7 @@ func runTier2OptimizerModulesWithContext(fn *Function, opts *Tier2PipelineOpts, 
 				Requires:      cloneAnalysisFacts(module.Requires),
 				Provides:      cloneAnalysisFacts(module.Provides),
 				Updates:       cloneAnalysisFacts(module.Updates),
+				OptionalReads: cloneAnalysisFacts(module.OptionalReads),
 			}, ctxModuleRunCallback(ctx)),
 		)
 		if module.RunWithContext != nil {
@@ -628,12 +647,13 @@ func tier2VerifyIROptEnabled(opts *Tier2PipelineOpts) bool {
 
 func (run Tier2ModuleRun) Contract() Tier2ModuleContract {
 	return Tier2ModuleContract{
-		Phase:      run.Phase,
-		ModuleName: run.ModuleName,
-		StageName:  run.StageName,
-		Requires:   cloneAnalysisFacts(run.Requires),
-		Provides:   cloneAnalysisFacts(run.Provides),
-		Updates:    cloneAnalysisFacts(run.Updates),
+		Phase:         run.Phase,
+		ModuleName:    run.ModuleName,
+		StageName:     run.StageName,
+		Requires:      cloneAnalysisFacts(run.Requires),
+		Provides:      cloneAnalysisFacts(run.Provides),
+		Updates:       cloneAnalysisFacts(run.Updates),
+		OptionalReads: cloneAnalysisFacts(run.OptionalReads),
 	}
 }
 
@@ -658,7 +678,7 @@ func moduleContractsFromRuns(runs []Tier2ModuleRun) []Tier2ModuleContract {
 	contracts := make([]Tier2ModuleContract, 0, len(runs))
 	for _, run := range runs {
 		contract := run.Contract()
-		if len(contract.Requires) == 0 && len(contract.Provides) == 0 && len(contract.Updates) == 0 {
+		if len(contract.Requires) == 0 && len(contract.Provides) == 0 && len(contract.Updates) == 0 && len(contract.OptionalReads) == 0 {
 			continue
 		}
 		contracts = append(contracts, contract)
@@ -700,6 +720,7 @@ func FormatTier2ModuleContracts(contracts []Tier2ModuleContract) string {
 		fmt.Fprintf(&b, "    requires: %s\n", formatAnalysisFacts(contract.Requires))
 		fmt.Fprintf(&b, "    provides: %s\n", formatAnalysisFacts(contract.Provides))
 		fmt.Fprintf(&b, "    updates:  %s\n", formatAnalysisFacts(contract.Updates))
+		fmt.Fprintf(&b, "    optional: %s\n", formatAnalysisFacts(contract.OptionalReads))
 	}
 	return b.String()
 }

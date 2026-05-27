@@ -99,7 +99,7 @@ func tier2FloatNumericModules() []Tier2OptimizerModule {
 
 func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
-		tier2PassModuleWithCtx("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, LICMPassCtx),
+		tier2PassModuleWithCtxOptionalReads("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, analysisFacts(AnalysisFactGlobals), LICMPassCtx),
 		tier2PassModuleWith("LoopGlobalStoreSink", Tier2PhaseLoopSpecialization, nil, nil, LoopGlobalStoreSinkPass),
 	}
 	modules = append(modules, tier2TableLoopSpecializationModules()...)
@@ -115,16 +115,18 @@ func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 
 func tier2LoopPostModules() []Tier2OptimizerModule {
 	licmPostRequires := analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables)
-	licmPostAllowed := allowedDomainsForModule(licmPostRequires, nil, nil, "LICM (post-MatrixRowPtrFactoring)")
+	licmPostOptionalReads := analysisFacts(AnalysisFactGlobals)
+	licmPostAllowed := allowedDomainsForModule(licmPostRequires, nil, nil, "LICM (post-MatrixRowPtrFactoring)", licmPostOptionalReads)
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("UnrollAndJam", Tier2PhaseLoopPost, nil, nil, UnrollAndJamPass),
 		tier2PassModuleWith("MatrixRowPtrFactoring (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, MatrixRowPtrFactoringPass),
 		tier2PassModuleWith("FMAFusion (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, FMAFusionPass),
 		{
-			Name:     "LICM (post-MatrixRowPtrFactoring)",
-			Phase:    Tier2PhaseLoopPost,
-			Requires: licmPostRequires,
-			Provides: nil,
+			Name:          "LICM (post-MatrixRowPtrFactoring)",
+			Phase:         Tier2PhaseLoopPost,
+			Requires:      licmPostRequires,
+			Provides:      nil,
+			OptionalReads: licmPostOptionalReads,
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, optCtx *Tier2OptimizerContext) (*Function, error) {
 				if !hasMatrixNativeIR(fn) {
 					return fn, nil

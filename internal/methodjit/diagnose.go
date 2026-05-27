@@ -108,7 +108,7 @@ func (sc *snapshotCollector) addSnapshotAndTiming(name string, fn *Function, dur
 
 func (sc *snapshotCollector) addModuleRun(run Tier2ModuleRun) {
 	sc.timings = append(sc.timings, newNestedPipelineStageTiming(run.StageName, run.Duration, run.Err))
-	if len(run.Requires) > 0 || len(run.Provides) > 0 || len(run.Updates) > 0 {
+	if len(run.Requires) > 0 || len(run.Provides) > 0 || len(run.Updates) > 0 || len(run.OptionalReads) > 0 {
 		sc.moduleContracts = append(sc.moduleContracts, run.Contract())
 	}
 	if reason, ok := run.ReasonRecord(); ok {

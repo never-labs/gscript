@@ -1,9 +1,9 @@
 // pass_context.go defines the domain-scoped PassContext: the execution-level
 // counterpart to the test-time read/write contract. A pass migrated to the ctx
 // form receives a PassContext whose domain accessors are gated by the set of
-// fact domains the module declared (Requires ∪ Provides ∪ Updates) plus its
-// allowlisted read-contract hints. With enforcement enabled (tests), reaching
-// an undeclared domain panics; in production enforcement is off and the
+// fact domains the module declared (Requires ∪ Provides ∪ Updates ∪
+// OptionalReads). With enforcement enabled (tests), reaching an undeclared
+// domain panics; in production enforcement is off and the
 // accessors are pure delegation to fn.Analysis with zero overhead.
 //
 // This is the keystone of the modular pass interface: declaring a fact domain
@@ -44,7 +44,7 @@ func (c *PassContext) Opts() *Tier2PipelineOpts { return c.opts }
 func (c *PassContext) guard(d factDomain) {
 	if c.enforce && !c.allowed[d] {
 		panic("pass accessed undeclared domain " + string(d) +
-			"; declare the owning fact in Requires/Provides/Updates or add to knownReadContractHints")
+			"; declare the owning fact in Requires/Provides/Updates or OptionalReads")
 	}
 }
 
@@ -105,10 +105,9 @@ func (c *PassContext) Global() *GlobalFacts {
 
 // allowedDomainsForModule computes the set of fact domains a module may access:
 // the union of the owning domains of its declared facts (Requires ∪ Provides ∪
-// Updates) plus the hint domains the read-contract allowlist confirmed are
-// legitimate undeclared reads for this module name. This mirrors exactly the
-// "declared ∪ hint" allowance the read contract enforces against at test time.
-func allowedDomainsForModule(requires, provides, updates []AnalysisFact, moduleName string) map[factDomain]bool {
+// Updates ∪ OptionalReads). OptionalReads are opportunistic hint reads that do
+// not participate in dependency ordering.
+func allowedDomainsForModule(requires, provides, updates []AnalysisFact, _ string, optionalReads ...[]AnalysisFact) map[factDomain]bool {
 	allowed := make(map[factDomain]bool, 6)
 	add := func(facts []AnalysisFact) {
 		for _, f := range facts {
@@ -120,15 +119,8 @@ func allowedDomainsForModule(requires, provides, updates []AnalysisFact, moduleN
 	add(requires)
 	add(provides)
 	add(updates)
-	// Fold in the module's allowlisted hint domains so legitimate undeclared
-	// reads (validator-confirmed, not modeled as Requires) are not blocked.
-	for _, d := range []factDomain{
-		factDomainNumeric, factDomainCall, factDomainSpeculation,
-		factDomainTableShape, factDomainLoopSpec, factDomainGlobal,
-	} {
-		if knownReadContractHints[moduleName+"\x00"+string(d)] {
-			allowed[d] = true
-		}
+	for _, facts := range optionalReads {
+		add(facts)
 	}
 	return allowed
 }

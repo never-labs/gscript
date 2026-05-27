@@ -182,6 +182,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		callABIProvides,
 		nil,
 		"CallABI",
+		analysisFacts(AnalysisFactIntRanges),
 	)
 	guardedConstCallFoldRequires := analysisFacts(AnalysisFactCallABIs)
 	guardedConstCallFoldProvides := analysisFacts(AnalysisFactGuardedConstCallFolds)
@@ -201,17 +202,18 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 	)
 	return []Tier2OptimizerModule{
 		{
-			Name:     "CallABI",
-			Phase:    Tier2PhaseCallLower,
-			Requires: callABIRequires,
-			Provides: callABIProvides,
+			Name:          "CallABI",
+			Phase:         Tier2PhaseCallLower,
+			Requires:      callABIRequires,
+			Provides:      callABIProvides,
+			OptionalReads: analysisFacts(AnalysisFactIntRanges),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return runCallABIModule(fn, ctx, newPassContext(fn, opts, callABIAllowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWithCtx("CallReturnProjection", Tier2PhaseCallLower, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce", Tier2PhaseCallLower, nil, nil, ModularCallFloorReducePass),
-		tier2PassModuleWithCtx("CallResultRangeGuard", Tier2PhaseCallLower, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
+		tier2PassModuleWithCtxOptionalReads("CallResultRangeGuard", Tier2PhaseCallLower, callResultRangeGuardFacts(), nil, analysisFacts(AnalysisFactGlobals), CallResultRangeGuardPassCtx),
 		tier2PassModuleWith("ConstProp", Tier2PhaseCallLower, nil, nil, ConstPropPass),
 		{
 			Name:     "GuardedConstCallFold",
@@ -294,7 +296,7 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWithCtx("CallReturnProjection (post-rewrite)", Tier2PhasePostRewrite, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce (post-rewrite)", Tier2PhasePostRewrite, nil, nil, ModularCallFloorReducePass),
-		tier2PassModuleWithCtx("CallResultRangeGuard (post-rewrite)", Tier2PhasePostRewrite, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
+		tier2PassModuleWithCtxOptionalReads("CallResultRangeGuard (post-rewrite)", Tier2PhasePostRewrite, callResultRangeGuardFacts(), nil, analysisFacts(AnalysisFactGlobals), CallResultRangeGuardPassCtx),
 		tier2PassModuleWith("DCE", Tier2PhasePostRewrite, nil, nil, DCEPass),
 		{
 			Name:     "TypeSpecialize (post-escape)",
@@ -346,7 +348,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		},
 		tier2PassModuleWithCtx("CallReturnProjection (final)", Tier2PhaseFinalCall, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce (final)", Tier2PhaseFinalCall, nil, nil, ModularCallFloorReducePass),
-		tier2PassModuleWithCtx("CallResultRangeGuard (final)", Tier2PhaseFinalCall, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
+		tier2PassModuleWithCtxOptionalReads("CallResultRangeGuard (final)", Tier2PhaseFinalCall, callResultRangeGuardFacts(), nil, analysisFacts(AnalysisFactGlobals), CallResultRangeGuardPassCtx),
 		tier2PassModuleWithCtx("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPassCtx),
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 	}

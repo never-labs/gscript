@@ -7,18 +7,15 @@ import (
 	"testing"
 )
 
-// (read-contract enforcement: see knownReadContractHints in analysis_read_contract.go)
-
 // TestReadContract_ProductionPipeline drives the real Tier 2 pipeline over the
 // benchmark corpus and observes, per optimizer module run, which AnalysisResult
 // fact domains the module accessed through the domain accessors. It compares the
 // accessed set against the domains covered by the module's declared facts
-// (Requires ∪ Provides ∪ Updates) and reports undeclared reads.
+// (Requires ∪ Provides ∪ Updates ∪ OptionalReads) and reports undeclared reads.
 //
-// It ENFORCES by default: any undeclared read NOT in the knownReadContractHints
-// allowlist (validator-confirmed legitimate hints) fails the test. Set
-// GSCRIPT_ENFORCE_READ_CONTRACT=0 to downgrade to report-only while
-// intentionally introducing a new undeclared read.
+// It ENFORCES by default: every optional hint read must be declared on the
+// module contract. Set GSCRIPT_ENFORCE_READ_CONTRACT=0 to downgrade to
+// report-only while intentionally introducing a new undeclared read.
 //
 // Note: a module that declares nothing has an empty allowed set, so every domain
 // it reads is undeclared. Reads performed inside a pass's internally-built
@@ -73,16 +70,9 @@ func TestReadContract_ProductionPipeline(t *testing.T) {
 	t.Logf("undeclared read domains by module (%d distinct module/domain pairs):\n%s",
 		len(report.Findings), FormatReadContractFindings(report))
 
-	if stale := report.StaleHintAllowlistEntries(); len(stale) > 0 {
-		t.Logf("knownReadContractHints entries no longer observed: %v", stale)
-		if enforce {
-			t.Errorf("%d stale read-contract hints; remove them or set GSCRIPT_ENFORCE_READ_CONTRACT=0 while refactoring", len(stale))
-		}
-	}
-
 	unexpected := report.UnexpectedFindings()
 	if len(unexpected) == 0 {
-		t.Logf("all undeclared reads are known legitimate hints; read contract satisfied")
+		t.Logf("read contract satisfied")
 		return
 	}
 	lines := make([]string, 0, len(unexpected))
@@ -90,7 +80,7 @@ func TestReadContract_ProductionPipeline(t *testing.T) {
 		lines = append(lines, f.String())
 	}
 	sort.Strings(lines)
-	msg := "read-contract violations (undeclared reads not in the known-hint allowlist):\n  " +
+	msg := "read-contract violations (undeclared reads missing from module contract):\n  " +
 		joinLines(lines)
 	if enforce {
 		t.Errorf("%d %s", len(unexpected), msg)
