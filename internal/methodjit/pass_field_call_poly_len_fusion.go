@@ -6,12 +6,22 @@ package methodjit
 // shape arm produce the later length value and lets OpFieldPolyLen skip its own
 // shape dispatch when that value is already live.
 func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return fieldCallPolyLenFusionPass(fn, nil)
+	}
+	return fieldCallPolyLenFusionPass(fn, fn.Analysis.TableShapeFacts())
+}
+
+func FieldCallPolyLenFusionPassCtx(ctx *PassContext) (*Function, error) {
+	return fieldCallPolyLenFusionPass(ctx.Func(), ctx.TableShape())
+}
+
+func fieldCallPolyLenFusionPass(fn *Function, tableShapes *TableShapeFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	tableShapes := fn.Analysis.TableShapeFacts()
-	if tableShapes.FieldPolyShapeFactCount() == 0 {
+	if tableShapes == nil || tableShapes.FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	for _, block := range fn.Blocks {
@@ -34,7 +44,7 @@ func FieldCallPolyLenFusionPass(fn *Function) (*Function, error) {
 				if cur == nil || cur.Op != OpFieldPolyLen || len(cur.Args) == 0 || cur.Args[0] == nil || cur.Args[0].ID != call.Args[0].ID {
 					continue
 				}
-				fusions := fieldCallPolyLenFusionCases(fn, call, cur, callCases)
+				fusions := fieldCallPolyLenFusionCases(fn, call, cur, callCases, tableShapes)
 				if len(fusions) == 0 {
 					continue
 				}
@@ -65,7 +75,7 @@ func fieldCallPolyLenFusionBarrier(instr *Instr) bool {
 	}
 }
 
-func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []FieldPolyShapeCase) []FieldCallPolyLenFusion {
+func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []FieldPolyShapeCase, tableShapes *TableShapeFacts) []FieldCallPolyLenFusion {
 	if fn == nil || call == nil || ln == nil || len(callCases) == 0 {
 		return nil
 	}
@@ -73,7 +83,10 @@ func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []Fiel
 	if name == "" {
 		return nil
 	}
-	lenCases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(ln.ID)
+	if tableShapes == nil {
+		return nil
+	}
+	lenCases, _ := tableShapes.FieldPolyShapeCases(ln.ID)
 	if len(lenCases) == 0 {
 		return nil
 	}

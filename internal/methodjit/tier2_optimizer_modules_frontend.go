@@ -318,7 +318,7 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 		tier2PassModuleWithCtx("CallReturnProjection (final)", Tier2PhaseFinalCall, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),
 		tier2PassModuleWith("ModularCallFloorReduce (final)", Tier2PhaseFinalCall, nil, nil, ModularCallFloorReducePass),
 		tier2PassModuleWithCtx("CallResultRangeGuard (final)", Tier2PhaseFinalCall, callResultRangeGuardFacts(), nil, CallResultRangeGuardPassCtx),
-		tier2PassModuleWith("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPass),
+		tier2PassModuleWithCtx("FieldCallPolyLenFusion", Tier2PhaseFinalCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldCallPolyLenFusionPassCtx),
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-final-call)", Tier2PhaseFinalCall, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 	}
 	if os.Getenv("GSCRIPT_FIELD_SHAPE_SPLIT") == "1" {
