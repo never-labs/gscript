@@ -198,6 +198,8 @@ type OpSpec struct {
 	CallFloorSpecFieldShape          bool
 	Tier2LoopCall                    bool
 	Tier2LoopFeedbackVMProtoCall     bool
+	Tier2ResidualCallBlocker         bool
+	Tier2LoopNativeCandidate         bool
 	CallUserArgStart                 int
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
@@ -628,6 +630,12 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opTier2LoopFeedbackVMProtoCallPolicies) {
 			spec.Tier2LoopFeedbackVMProtoCall = opTier2LoopFeedbackVMProtoCallPolicies[op]
+		}
+		if int(op) < len(opTier2ResidualCallBlockerPolicies) {
+			spec.Tier2ResidualCallBlocker = opTier2ResidualCallBlockerPolicies[op]
+		}
+		if int(op) < len(opTier2LoopNativeCandidatePolicies) {
+			spec.Tier2LoopNativeCandidate = opTier2LoopNativeCandidatePolicies[op]
 		}
 		if int(op) < len(opCallUserArgStartPolicies) && opCallUserArgStartPolicies[op].Set {
 			spec.CallUserArgStart = opCallUserArgStartPolicies[op].Start
@@ -1917,6 +1925,15 @@ var opTier2LoopCallPolicies = [...]bool{
 var opTier2LoopFeedbackVMProtoCallPolicies = [...]bool{
 	OpCall:      true,
 	OpCallFloor: true,
+}
+
+var opTier2ResidualCallBlockerPolicies = [...]bool{
+	OpCall:      true,
+	OpCallFloor: true,
+}
+
+var opTier2LoopNativeCandidatePolicies = [...]bool{
+	OpFieldCallFloor: true,
 }
 
 type opCallUserArgStartPolicy struct {

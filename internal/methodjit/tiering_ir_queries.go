@@ -47,7 +47,11 @@ func irHasSelfCall(fn *Function) bool {
 func irHasCall(fn *Function) bool {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr.Op == OpCall || instr.Op == OpCallFloor {
+			if instr == nil {
+				continue
+			}
+			spec, ok := instr.Op.Spec()
+			if ok && spec.Tier2ResidualCallBlocker {
 				return true
 			}
 		}

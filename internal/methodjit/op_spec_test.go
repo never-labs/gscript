@@ -647,6 +647,15 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s Tier2 loop-call feedback VM proto contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCall, OpCallFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.Tier2ResidualCallBlocker {
+			t.Fatalf("%s Tier2 residual-call blocker contract should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpFieldCallFloor.Spec(); !ok || !spec.Tier2LoopNativeCandidate {
+		t.Fatalf("FieldCallFloor Tier2 native-candidate contract should be driven by OpSpec")
+	}
 	for _, tc := range []struct {
 		op    Op
 		start int
