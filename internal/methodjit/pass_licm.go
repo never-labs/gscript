@@ -888,17 +888,11 @@ func licmCallUserArgs(instr *Instr) []*Value {
 	if instr == nil {
 		return nil
 	}
-	switch instr.Op {
-	case OpCall, OpCallFloor:
-		if len(instr.Args) <= 1 {
-			return nil
-		}
-		return instr.Args[1:]
-	case OpFieldCallFloor:
-		return instr.Args
-	default:
+	spec, ok := instr.Op.Spec()
+	if !ok || spec.LICMCallUserArgStart < 0 || len(instr.Args) <= spec.LICMCallUserArgStart {
 		return nil
 	}
+	return instr.Args[spec.LICMCallUserArgStart:]
 }
 
 // canHoistOp returns true if moving an instruction with this op out of

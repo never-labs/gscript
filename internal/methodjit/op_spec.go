@@ -197,6 +197,8 @@ type OpSpec struct {
 	CallFloorSpecStableCallee        bool
 	CallFloorSpecFieldShape          bool
 	Tier2LoopCall                    bool
+	Tier2LoopFeedbackVMProtoCall     bool
+	LICMCallUserArgStart             int
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
 	FloatRegResultBlocked            bool
@@ -241,6 +243,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		MayDeopt:                   mayDeopt,
 		TableArrayGPRInvariantRank: 1,
 		TableArrayKeyArgIndex:      -1,
+		LICMCallUserArgStart:       -1,
 	}
 }
 
@@ -622,6 +625,12 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opTier2LoopCallPolicies) {
 			spec.Tier2LoopCall = opTier2LoopCallPolicies[op]
+		}
+		if int(op) < len(opTier2LoopFeedbackVMProtoCallPolicies) {
+			spec.Tier2LoopFeedbackVMProtoCall = opTier2LoopFeedbackVMProtoCallPolicies[op]
+		}
+		if int(op) < len(opLICMCallUserArgStartPolicies) && opLICMCallUserArgStartPolicies[op].Set {
+			spec.LICMCallUserArgStart = opLICMCallUserArgStartPolicies[op].Start
 		}
 		if int(op) < len(opSpeculativeIntUseCandidatePolicies) {
 			spec.SpeculativeIntUseCandidate = opSpeculativeIntUseCandidatePolicies[op]
@@ -1903,6 +1912,22 @@ var opTier2LoopCallPolicies = [...]bool{
 	OpCall:           true,
 	OpCallFloor:      true,
 	OpFieldCallFloor: true,
+}
+
+var opTier2LoopFeedbackVMProtoCallPolicies = [...]bool{
+	OpCall:      true,
+	OpCallFloor: true,
+}
+
+type opLICMCallUserArgStartPolicy struct {
+	Start int
+	Set   bool
+}
+
+var opLICMCallUserArgStartPolicies = [...]opLICMCallUserArgStartPolicy{
+	OpCall:           {Start: 1, Set: true},
+	OpCallFloor:      {Start: 1, Set: true},
+	OpFieldCallFloor: {Start: 0, Set: true},
 }
 
 var opSpeculativeIntUseCandidatePolicies = [...]bool{

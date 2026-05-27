@@ -641,6 +641,25 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s Tier2 loop-call contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCall, OpCallFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.Tier2LoopFeedbackVMProtoCall {
+			t.Fatalf("%s Tier2 loop-call feedback VM proto contract should be driven by OpSpec", op)
+		}
+	}
+	for _, tc := range []struct {
+		op    Op
+		start int
+	}{
+		{op: OpCall, start: 1},
+		{op: OpCallFloor, start: 1},
+		{op: OpFieldCallFloor, start: 0},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.LICMCallUserArgStart != tc.start {
+			t.Fatalf("%s LICM call-user arg layout should be driven by OpSpec", tc.op)
+		}
+	}
 	for _, op := range []Op{OpAdd, OpSub, OpMul, OpMod, OpLt, OpLe} {
 		spec, ok := op.Spec()
 		if !ok || !spec.SpeculativeIntUseCandidate {
