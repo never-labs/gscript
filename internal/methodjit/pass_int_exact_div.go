@@ -51,25 +51,12 @@ func runIntExactDivisionIfCandidate(fn *Function) (*Function, bool, error) {
 				continue
 			}
 			before := instr.Op
-			switch instr.Op {
-			case OpPhi:
+			if instr.Op == OpPhi {
 				instr.Type = TypeInt
-			case OpAdd, OpAddFloat:
-				instr.Op = OpAddInt
+			} else if narrowed, ok := exactIntNarrowOp(instr.Op); ok && (narrowed != OpDivIntExact || proven[instr.ID]) {
+				instr.Op = narrowed
 				instr.Type = TypeInt
-			case OpSub, OpSubFloat:
-				instr.Op = OpSubInt
-				instr.Type = TypeInt
-			case OpMul, OpMulFloat:
-				instr.Op = OpMulInt
-				instr.Type = TypeInt
-			case OpMod:
-				instr.Op = OpModInt
-				instr.Type = TypeInt
-			case OpDiv, OpDivFloat:
-				if proven[instr.ID] {
-					instr.Op = OpDivIntExact
-					instr.Type = TypeInt
+				if narrowed == OpDivIntExact {
 					instr.Aux2 = 1 // exactness was proven by dominating modulo-zero branch
 				}
 			}
@@ -87,27 +74,28 @@ func runIntExactDivisionIfCandidate(fn *Function) (*Function, bool, error) {
 
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			switch instr.Op {
-			case OpEq, OpLt, OpLe:
-				if len(instr.Args) >= 2 && intArg(instr.Args[0], intPossible) && intArg(instr.Args[1], intPossible) {
-					before := instr.Op
-					switch instr.Op {
-					case OpEq:
-						instr.Op = OpEqInt
-					case OpLt:
-						instr.Op = OpLtInt
-					case OpLe:
-						instr.Op = OpLeInt
-					}
-					instr.Type = TypeBool
-					functionRemarks(fn).Add("IntExactDiv", "changed", block.ID, instr.ID, instr.Op,
-						"specialized comparison after integer narrowing from "+before.String())
-				}
+			narrowed, ok := exactIntNarrowOp(instr.Op)
+			if !ok || narrowed == OpDivIntExact || len(instr.Args) < 2 ||
+				!intArg(instr.Args[0], intPossible) || !intArg(instr.Args[1], intPossible) {
+				continue
 			}
+			if narrowed != OpEqInt && narrowed != OpLtInt && narrowed != OpLeInt {
+				continue
+			}
+			before := instr.Op
+			instr.Op = narrowed
+			instr.Type = TypeBool
+			functionRemarks(fn).Add("IntExactDiv", "changed", block.ID, instr.ID, instr.Op,
+				"specialized comparison after integer narrowing from "+before.String())
 		}
 	}
 
 	return fn, true, nil
+}
+
+func exactIntNarrowOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.ExactIntNarrowOp, ok && spec.ExactIntNarrowOp < OpMax
 }
 
 func findModuloProvenDivisions(fn *Function) map[int]bool {

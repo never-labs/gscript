@@ -896,6 +896,28 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s raw-int specialization target should be %s through OpSpec", tc.generic, tc.raw)
 		}
 	}
+	for _, tc := range []struct {
+		op       Op
+		narrowed Op
+	}{
+		{OpAdd, OpAddInt},
+		{OpAddFloat, OpAddInt},
+		{OpSub, OpSubInt},
+		{OpSubFloat, OpSubInt},
+		{OpMul, OpMulInt},
+		{OpMulFloat, OpMulInt},
+		{OpMod, OpModInt},
+		{OpDiv, OpDivIntExact},
+		{OpDivFloat, OpDivIntExact},
+		{OpEq, OpEqInt},
+		{OpLt, OpLtInt},
+		{OpLe, OpLeInt},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.ExactIntNarrowOp != tc.narrowed {
+			t.Fatalf("%s exact-int narrowing target should be %s through OpSpec", tc.op, tc.narrowed)
+		}
+	}
 	for _, op := range []Op{OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm} {
 		spec, ok := op.Spec()
 		if !ok || !spec.RawIntSpecializationBlocker {

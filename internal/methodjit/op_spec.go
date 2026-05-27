@@ -241,6 +241,7 @@ type OpSpec struct {
 	FieldNumFusionGapSafe            bool
 	RawIntSpecializationBlocker      bool
 	RawIntSpecializedOp              Op
+	ExactIntNarrowOp                 Op
 	BoxedFallbackOp                  Op
 	BoxedFallbackResultUnknown       bool
 	BackendPolicy                    OpBackendPolicy
@@ -259,6 +260,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		TableArrayGPRInvariantRank: 1,
 		TableArrayKeyArgIndex:      -1,
 		CallUserArgStart:           -1,
+		ExactIntNarrowOp:           OpMax,
 		BoxedFallbackOp:            OpMax,
 	}
 }
@@ -746,6 +748,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opRawIntSpecializedOpPolicies) {
 			spec.RawIntSpecializedOp = opRawIntSpecializedOpPolicies[op]
+		}
+		if int(op) < len(opExactIntNarrowOpPolicies) && opExactIntNarrowOpPolicies[op].Set {
+			spec.ExactIntNarrowOp = opExactIntNarrowOpPolicies[op].Op
 		}
 		if int(op) < len(opBoxedFallbackOpPolicies) && opBoxedFallbackOpPolicies[op].Set {
 			spec.BoxedFallbackOp = opBoxedFallbackOpPolicies[op].Op
@@ -2427,6 +2432,26 @@ var opRawIntSpecializedOpPolicies = [...]Op{
 	OpEq:  OpEqInt,
 	OpLt:  OpLtInt,
 	OpLe:  OpLeInt,
+}
+
+type opExactIntNarrowOpPolicy struct {
+	Op  Op
+	Set bool
+}
+
+var opExactIntNarrowOpPolicies = [...]opExactIntNarrowOpPolicy{
+	OpAdd:      {Op: OpAddInt, Set: true},
+	OpAddFloat: {Op: OpAddInt, Set: true},
+	OpSub:      {Op: OpSubInt, Set: true},
+	OpSubFloat: {Op: OpSubInt, Set: true},
+	OpMul:      {Op: OpMulInt, Set: true},
+	OpMulFloat: {Op: OpMulInt, Set: true},
+	OpMod:      {Op: OpModInt, Set: true},
+	OpDiv:      {Op: OpDivIntExact, Set: true},
+	OpDivFloat: {Op: OpDivIntExact, Set: true},
+	OpEq:       {Op: OpEqInt, Set: true},
+	OpLt:       {Op: OpLtInt, Set: true},
+	OpLe:       {Op: OpLeInt, Set: true},
 }
 
 type opBoxedFallbackOpPolicy struct {
