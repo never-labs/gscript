@@ -55,15 +55,8 @@ func fieldNumFusionGapIsSafe(instrs []*Instr) bool {
 		if instr == nil {
 			return false
 		}
-		switch instr.Op {
-		case OpNop,
-			OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString,
-			OpLoadSlot,
-			OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-			OpSqrt, OpFloor, OpFMA, OpFMSUB,
-			OpLtFloat, OpLeFloat:
-			continue
-		default:
+		spec, ok := instr.Op.Spec()
+		if !ok || !spec.FieldNumFusionGapSafe {
 			return false
 		}
 	}

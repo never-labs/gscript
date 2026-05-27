@@ -197,6 +197,9 @@ type OpSpec struct {
 	ExactDivComponent                bool
 	IntNarrowCandidate               bool
 	IntNarrowAllArgsConstraint       bool
+	FieldNumFusionGapSafe            bool
+	RawIntSpecializationBlocker      bool
+	RawIntSpecializedOp              Op
 	BackendPolicy                    OpBackendPolicy
 	SourceFeedbackPolicy             OpSourceFeedbackPolicy
 }
@@ -590,6 +593,15 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opIntNarrowAllArgsConstraintPolicies) {
 			spec.IntNarrowAllArgsConstraint = opIntNarrowAllArgsConstraintPolicies[op]
+		}
+		if int(op) < len(opFieldNumFusionGapSafePolicies) {
+			spec.FieldNumFusionGapSafe = opFieldNumFusionGapSafePolicies[op]
+		}
+		if int(op) < len(opRawIntSpecializationBlockerPolicies) {
+			spec.RawIntSpecializationBlocker = opRawIntSpecializationBlockerPolicies[op]
+		}
+		if int(op) < len(opRawIntSpecializedOpPolicies) {
+			spec.RawIntSpecializedOp = opRawIntSpecializedOpPolicies[op]
 		}
 		if int(op) < len(opSourceFeedbackPolicies) {
 			spec.SourceFeedbackPolicy = opSourceFeedbackPolicies[op]
@@ -1977,6 +1989,46 @@ var opIntNarrowAllArgsConstraintPolicies = [...]bool{
 	OpSubFloat: true,
 	OpMulFloat: true,
 	OpNegInt:   true,
+}
+
+var opFieldNumFusionGapSafePolicies = [...]bool{
+	OpNop:         true,
+	OpConstInt:    true,
+	OpConstFloat:  true,
+	OpConstBool:   true,
+	OpConstNil:    true,
+	OpConstString: true,
+	OpLoadSlot:    true,
+	OpAddFloat:    true,
+	OpSubFloat:    true,
+	OpMulFloat:    true,
+	OpDivFloat:    true,
+	OpNegFloat:    true,
+	OpSqrt:        true,
+	OpFloor:       true,
+	OpFMA:         true,
+	OpFMSUB:       true,
+	OpLtFloat:     true,
+	OpLeFloat:     true,
+}
+
+var opRawIntSpecializationBlockerPolicies = [...]bool{
+	OpAdd: true,
+	OpSub: true,
+	OpMul: true,
+	OpDiv: true,
+	OpMod: true,
+	OpUnm: true,
+}
+
+var opRawIntSpecializedOpPolicies = [...]Op{
+	OpAdd: OpAddInt,
+	OpSub: OpSubInt,
+	OpMul: OpMulInt,
+	OpMod: OpModInt,
+	OpEq:  OpEqInt,
+	OpLt:  OpLtInt,
+	OpLe:  OpLeInt,
 }
 
 var opSourceFeedbackPolicies = [...]OpSourceFeedbackPolicy{

@@ -638,6 +638,35 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s int narrowing constraint contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpNop, OpConstInt, OpLoadSlot, OpAddFloat, OpSqrt, OpLtFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FieldNumFusionGapSafe || !fieldNumFusionGapIsSafe([]*Instr{{Op: op}}) {
+			t.Fatalf("%s field-num fusion gap contract should be driven by OpSpec", op)
+		}
+	}
+	for _, tc := range []struct {
+		generic Op
+		raw     Op
+	}{
+		{OpAdd, OpAddInt},
+		{OpSub, OpSubInt},
+		{OpMul, OpMulInt},
+		{OpMod, OpModInt},
+		{OpEq, OpEqInt},
+		{OpLt, OpLtInt},
+		{OpLe, OpLeInt},
+	} {
+		spec, ok := tc.generic.Spec()
+		if !ok || spec.RawIntSpecializedOp != tc.raw {
+			t.Fatalf("%s raw-int specialization target should be %s through OpSpec", tc.generic, tc.raw)
+		}
+	}
+	for _, op := range []Op{OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RawIntSpecializationBlocker {
+			t.Fatalf("%s raw-int residual blocker should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {
