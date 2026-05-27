@@ -306,8 +306,7 @@ func fieldShapePreEffectInlineInstrSafe(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if ok && spec.FieldShapePreEffectInlineSafe {
+	if opIsFieldShapePreEffectInlineSafe(instr.Op) {
 		return true
 	}
 	return fieldShapeSplitInlineInstrSafe(instr)
@@ -317,16 +316,14 @@ func fieldShapeInlineInstrHasSideEffect(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.FieldShapeInlineSideEffect
+	return opIsFieldShapeInlineSideEffect(instr.Op)
 }
 
 func fieldShapePostEffectInlineInstrSafe(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if ok && spec.FieldShapePostEffectInlineUnsafe {
+	if opIsFieldShapePostEffectInlineUnsafe(instr.Op) {
 		return false
 	}
 	return fieldShapeSplitInlineInstrSafe(instr)

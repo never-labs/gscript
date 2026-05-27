@@ -27,18 +27,18 @@ func forceRawIntSpecializationIR(fn *Function) {
 						changed = true
 					}
 				default:
-					spec, ok := instr.Op.Spec()
-					if !ok || spec.RawIntSpecializedOp == Op(0) {
+					op, ok := rawIntSpecializedOp(instr.Op)
+					if !ok {
 						continue
 					}
 					if allInstrArgsType(instr, TypeInt) {
-						instr.Op = spec.RawIntSpecializedOp
+						instr.Op = op
 						instr.Type = TypeInt
 						changed = true
 					}
-					if specializedSpec, ok := instr.Op.Spec(); ok && specializedSpec.FixedResultType != TypeUnknown {
-						if instr.Type != specializedSpec.FixedResultType {
-							instr.Type = specializedSpec.FixedResultType
+					if typ, ok := fixedResultType(instr.Op); ok {
+						if instr.Type != typ {
+							instr.Type = typ
 							changed = true
 						}
 					}
@@ -62,8 +62,7 @@ func firstResidualRawIntSpecializationGenericNumericGate(fn *Function) GateResul
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			spec, ok := instr.Op.Spec()
-			if ok && spec.RawIntSpecializationBlocker {
+			if opIsRawIntSpecializationBlocker(instr.Op) {
 				return blockGateOp("RawIntSpecializationIR", "raw-int specialization has residual generic numeric op", instr.Op)
 			}
 		}

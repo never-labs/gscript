@@ -480,6 +480,107 @@ func opIsRestartVisibleSideEffect(op Op) bool {
 	return ok && spec.RestartVisibleSideEffect
 }
 
+func opIsTableArrayRegionGlobalBarrier(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayRegionGlobalBarrier
+}
+
+func opIsTableArrayRegionAliasingCall(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayRegionAliasingCall
+}
+
+func opIsTableArrayRegionAliasingAlways(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayRegionAliasingAlways
+}
+
+func opIsTableArrayRegionTableMutation(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayRegionTableMutation
+}
+
+func opIsNativeNumericValueProducer(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NativeNumericValueProducer
+}
+
+func opIsTier2LoopNativeCandidate(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2LoopNativeCandidate
+}
+
+func opIsTier2LoopFeedbackVMProtoCall(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2LoopFeedbackVMProtoCall
+}
+
+func rawIntSpecializedOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.RawIntSpecializedOp, ok && spec.RawIntSpecializedOp != Op(0)
+}
+
+func opIsRawIntSpecializationBlocker(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawIntSpecializationBlocker
+}
+
+func opIsTableArrayGPRInvariant(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayGPRInvariant
+}
+
+func tableArrayGPRInvariantUseMask(op Op) uint8 {
+	spec, ok := op.Spec()
+	if !ok {
+		return 0
+	}
+	return spec.TableArrayGPRInvariantUseMask
+}
+
+func tableArrayGPRInvariantRank(op Op) int {
+	spec, ok := op.Spec()
+	if !ok {
+		return 1
+	}
+	return spec.TableArrayGPRInvariantRank
+}
+
+func opIsStaticTableLenBenignUse(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.StaticTableLenBenignUse
+}
+
+func opIsExactDivComponent(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.ExactDivComponent
+}
+
+func opIsIntNarrowCandidate(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.IntNarrowCandidate
+}
+
+func opHasIntNarrowAllArgsConstraint(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.IntNarrowAllArgsConstraint
+}
+
+func opIsFieldShapePreEffectInlineSafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldShapePreEffectInlineSafe
+}
+
+func opIsFieldShapeInlineSideEffect(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldShapeInlineSideEffect
+}
+
+func opIsFieldShapePostEffectInlineUnsafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FieldShapePostEffectInlineUnsafe
+}
+
 func callUserArgs(instr *Instr) ([]*Value, bool) {
 	if instr == nil {
 		return nil, false

@@ -112,8 +112,7 @@ func isTableArrayGPRInvariant(instr *Instr) bool {
 	if instr == nil || instr.Type != TypeInt {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.TableArrayGPRInvariant
+	return opIsTableArrayGPRInvariant(instr.Op)
 }
 
 func sortTableArrayInvariantCandidates(ids []int, useCounts map[int]int, defs map[int]*Instr) {
@@ -133,11 +132,7 @@ func tableArrayInvariantUseMask(instr *Instr) uint8 {
 	if instr == nil {
 		return 0
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return 0
-	}
-	mask := spec.TableArrayGPRInvariantUseMask
+	mask := tableArrayGPRInvariantUseMask(instr.Op)
 	if instr.Op == OpTableArrayStore && !tableArrayStoreNeedsTablePtr(instr.Aux, instr.Aux2) {
 		mask &^= 1 << 5
 	}
@@ -160,11 +155,7 @@ func tableArrayInvariantRank(instr *Instr) int {
 	if instr == nil {
 		return 1
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return 1
-	}
-	return spec.TableArrayGPRInvariantRank
+	return tableArrayGPRInvariantRank(instr.Op)
 }
 
 func tableArrayInvariantSetHasHeader(ids []int, defs map[int]*Instr) bool {

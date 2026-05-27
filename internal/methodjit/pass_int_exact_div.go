@@ -233,8 +233,7 @@ func isExactDivComponentOp(instr *Instr, provenDiv map[int]bool) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if ok && spec.ExactDivComponent {
+	if opIsExactDivComponent(instr.Op) {
 		return true
 	}
 	switch instr.Op {
@@ -316,7 +315,6 @@ func mayBeIntNarrowed(instr *Instr, provenDiv map[int]bool) bool {
 	if instrIsDirectIntValue(instr) {
 		return true
 	}
-	spec, ok := instr.Op.Spec()
 	switch instr.Op {
 	case OpPhi:
 		return instr.Type == TypeInt || instr.Type == TypeFloat || instr.Type == TypeAny || instr.Type == TypeUnknown
@@ -324,7 +322,7 @@ func mayBeIntNarrowed(instr *Instr, provenDiv map[int]bool) bool {
 		if opNarrowsExactlyTo(instr.Op, OpDivIntExact) {
 			return provenDiv[instr.ID]
 		}
-		return (ok && spec.IntNarrowCandidate) || instr.Type == TypeInt
+		return opIsIntNarrowCandidate(instr.Op) || instr.Type == TypeInt
 	}
 }
 
@@ -335,8 +333,7 @@ func intNarrowConstraintsHold(instr *Instr, possible map[int]bool, provenDiv map
 	if opNarrowsExactlyTo(instr.Op, OpDivIntExact) {
 		return provenDiv[instr.ID] && len(instr.Args) >= 2 && allArgsInt(instr, possible)
 	}
-	spec, ok := instr.Op.Spec()
-	if ok && spec.IntNarrowAllArgsConstraint {
+	if opHasIntNarrowAllArgsConstraint(instr.Op) {
 		return len(instr.Args) > 0 && allArgsInt(instr, possible)
 	}
 	return instr.Type == TypeInt

@@ -92,8 +92,7 @@ func collectStaticTableLenFacts(fn *Function) map[int][]staticTableLenFact {
 					}
 				}
 			default:
-				spec, _ := instr.Op.Spec()
-				if spec.CallLikeFactBarrier {
+				if opIsCallLikeFactBarrier(instr.Op) {
 					for _, arg := range instr.Args {
 						if arg != nil {
 							invalid[arg.ID] = true
@@ -119,8 +118,7 @@ func staticTableLenBenignUse(instr *Instr, tableID int) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || !spec.StaticTableLenBenignUse {
+	if !opIsStaticTableLenBenignUse(instr.Op) {
 		return false
 	}
 	return len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID

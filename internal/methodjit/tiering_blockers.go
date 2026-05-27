@@ -30,8 +30,7 @@ func tier2ValueIsNativeNumeric(v *Value, seen map[int]bool) bool {
 	}
 	seen[v.ID] = true
 
-	spec, ok := v.Def.Op.Spec()
-	if ok && spec.NativeNumericValueProducer {
+	if opIsNativeNumericValueProducer(v.Def.Op) {
 		if len(v.Def.Args) == 0 {
 			return true
 		}
@@ -641,7 +640,7 @@ func allIntLikeArgs(instr *Instr, seen map[int]bool) bool {
 
 func tier2LoopCallIsNativeCandidate(fn *Function, instr *Instr, globals map[string]*vm.FuncProto) bool {
 	if instr != nil {
-		if spec, ok := instr.Op.Spec(); ok && spec.Tier2LoopNativeCandidate {
+		if opIsTier2LoopNativeCandidate(instr.Op) {
 			return true
 		}
 	}
@@ -696,8 +695,7 @@ func tier2LoopCallFeedbackVMProtos(fn *Function, instr *Instr) []*vm.FuncProto {
 	if fn == nil || fn.Proto == nil || instr == nil {
 		return nil
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || !spec.Tier2LoopFeedbackVMProtoCall ||
+	if !opIsTier2LoopFeedbackVMProtoCall(instr.Op) ||
 		len(instr.Args) == 0 || !instr.HasSource ||
 		instr.SourcePC < 0 || instr.SourcePC >= len(fn.Proto.CallSiteFeedback) {
 		return nil
