@@ -115,13 +115,8 @@ func pureNumericValue(v *Value) bool {
 	case TypeInt, TypeFloat:
 		return true
 	case TypeAny, TypeUnknown:
-		switch v.Def.Op {
-		case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm,
-			OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt,
-			OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-			OpNumToFloat, OpPhi, OpLoadSlot:
-			return true
-		}
+		spec, ok := v.Def.Op.Spec()
+		return ok && spec.PureNumericUnknownValue
 	}
 	return false
 }

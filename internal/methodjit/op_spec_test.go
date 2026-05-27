@@ -538,6 +538,24 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s call/concurrency side-effect contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpConstInt, OpConstFloat, OpUnboxInt, OpUnboxFloat, OpAdd, OpMod, OpAddInt, OpAddFloat, OpFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.NativeNumericValueProducer {
+			t.Fatalf("%s native numeric value contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm, OpAddInt, OpDivIntExact, OpAddFloat, OpNumToFloat, OpPhi, OpLoadSlot} {
+		spec, ok := op.Spec()
+		if !ok || !spec.PureNumericUnknownValue {
+			t.Fatalf("%s pure numeric unknown-value contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstInt, OpTableArrayHeader, OpAddInt, OpBoxInt, OpGuardTableKind, OpNop} {
+		spec, ok := op.Spec()
+		if !ok || !spec.TableArraySwapPureBetween || !tableArraySwapPureBetween(&Instr{Op: op}) {
+			t.Fatalf("%s table-array swap pure-between contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {

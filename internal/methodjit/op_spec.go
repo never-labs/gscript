@@ -172,6 +172,9 @@ type OpSpec struct {
 	TableArrayRegionTableMutation    bool
 	RuntimeOverflowBoxable           bool
 	RuntimeGuardRefreshable          bool
+	NativeNumericValueProducer       bool
+	PureNumericUnknownValue          bool
+	TableArraySwapPureBetween        bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -522,6 +525,15 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opRuntimeGuardRefreshablePolicies) {
 			spec.RuntimeGuardRefreshable = opRuntimeGuardRefreshablePolicies[op]
+		}
+		if int(op) < len(opNativeNumericValueProducerPolicies) {
+			spec.NativeNumericValueProducer = opNativeNumericValueProducerPolicies[op]
+		}
+		if int(op) < len(opPureNumericUnknownValuePolicies) {
+			spec.PureNumericUnknownValue = opPureNumericUnknownValuePolicies[op]
+		}
+		if int(op) < len(opTableArraySwapPureBetweenPolicies) {
+			spec.TableArraySwapPureBetween = opTableArraySwapPureBetweenPolicies[op]
 		}
 		return spec, true
 	}
@@ -1614,6 +1626,71 @@ var opRuntimeGuardRefreshablePolicies = [...]bool{
 	OpGuardConstString: true,
 	OpGuardTableKind:   true,
 	OpGuardIntRange:    true,
+}
+
+var opNativeNumericValueProducerPolicies = [...]bool{
+	OpConstInt:   true,
+	OpConstFloat: true,
+	OpUnboxInt:   true,
+	OpUnboxFloat: true,
+	OpAdd:        true,
+	OpSub:        true,
+	OpMul:        true,
+	OpDiv:        true,
+	OpMod:        true,
+	OpUnm:        true,
+	OpAddInt:     true,
+	OpSubInt:     true,
+	OpMulInt:     true,
+	OpModInt:     true,
+	OpNegInt:     true,
+	OpAddFloat:   true,
+	OpSubFloat:   true,
+	OpMulFloat:   true,
+	OpDivFloat:   true,
+	OpNegFloat:   true,
+	OpFloor:      true,
+}
+
+var opPureNumericUnknownValuePolicies = [...]bool{
+	OpAdd:         true,
+	OpSub:         true,
+	OpMul:         true,
+	OpDiv:         true,
+	OpMod:         true,
+	OpUnm:         true,
+	OpAddInt:      true,
+	OpSubInt:      true,
+	OpMulInt:      true,
+	OpModInt:      true,
+	OpDivIntExact: true,
+	OpNegInt:      true,
+	OpAddFloat:    true,
+	OpSubFloat:    true,
+	OpMulFloat:    true,
+	OpDivFloat:    true,
+	OpNegFloat:    true,
+	OpNumToFloat:  true,
+	OpPhi:         true,
+	OpLoadSlot:    true,
+}
+
+var opTableArraySwapPureBetweenPolicies = [...]bool{
+	OpConstInt:         true,
+	OpConstFloat:       true,
+	OpConstBool:        true,
+	OpConstNil:         true,
+	OpTableArrayHeader: true,
+	OpTableArrayLen:    true,
+	OpTableArrayData:   true,
+	OpAddInt:           true,
+	OpSubInt:           true,
+	OpMulInt:           true,
+	OpNegInt:           true,
+	OpBoxInt:           true,
+	OpUnboxInt:         true,
+	OpGuardTableKind:   true,
+	OpNop:              true,
 }
 
 var expandedOpSpecs = buildExpandedOpSpecs()

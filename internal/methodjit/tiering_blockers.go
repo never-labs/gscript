@@ -30,9 +30,14 @@ func tier2ValueIsNativeNumeric(v *Value, seen map[int]bool) bool {
 	}
 	seen[v.ID] = true
 
+	spec, ok := v.Def.Op.Spec()
+	if ok && spec.NativeNumericValueProducer {
+		if len(v.Def.Args) == 0 {
+			return true
+		}
+		return tier2AllValuesNativeNumeric(v.Def.Args, seen)
+	}
 	switch v.Def.Op {
-	case OpConstInt, OpConstFloat, OpUnboxInt, OpUnboxFloat:
-		return true
 	case OpGuardType:
 		t := Type(v.Def.Aux)
 		return t == TypeInt || t == TypeFloat
@@ -40,11 +45,6 @@ func tier2ValueIsNativeNumeric(v *Value, seen map[int]bool) bool {
 		return v.Def.Type == TypeInt && len(v.Def.Args) == 1 &&
 			tier2ValueIsNativeNumeric(v.Def.Args[0], seen)
 	case OpPhi:
-		return tier2AllValuesNativeNumeric(v.Def.Args, seen)
-	case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpFloor:
 		return tier2AllValuesNativeNumeric(v.Def.Args, seen)
 	default:
 		return false

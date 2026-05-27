@@ -215,22 +215,14 @@ func tableArraySwapPureBetween(instr *Instr) bool {
 	if instr == nil {
 		return true
 	}
-	if instr.Op == OpGuardTableKind {
+	spec, ok := instr.Op.Spec()
+	if ok && spec.TableArraySwapPureBetween {
 		return true
 	}
 	if hasSideEffect(instr) {
 		return false
 	}
-	switch instr.Op {
-	case OpConstInt, OpConstFloat, OpConstBool, OpConstNil,
-		OpTableArrayHeader, OpTableArrayLen, OpTableArrayData,
-		OpAddInt, OpSubInt, OpMulInt, OpNegInt,
-		OpBoxInt, OpUnboxInt,
-		OpNop:
-		return true
-	default:
-		return false
-	}
+	return false
 }
 
 func equivalentIntValue(a, b *Value, depth int) bool {
