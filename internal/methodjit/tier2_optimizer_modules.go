@@ -406,18 +406,6 @@ func tier2PassModuleWithCtxUpdates(name string, phase Tier2OptimizerPhase, requi
 	}
 }
 
-func tier2PassModuleWithUpdates(name string, phase Tier2OptimizerPhase, requires, updates []AnalysisFact, pass PassFunc) Tier2OptimizerModule {
-	return Tier2OptimizerModule{
-		Name:     name,
-		Phase:    phase,
-		Requires: requires,
-		Updates:  updates,
-		Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-			return pass(fn)
-		},
-	}
-}
-
 // Tier2OptimizerPhaseGroup is a stable execution unit in the optimizer plan.
 // Builders may contribute modules to the same phase; the phase itself must
 // still execute once.

@@ -131,7 +131,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 			},
 		},
 		tier2PassModuleWith("QuadraticStepStrengthReduction", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, QuadraticStepStrengthReductionPass),
-		tier2PassModuleWithUpdates("RangeAnalysis (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, rangeAnalysisFacts(), RangeAnalysisPass),
+		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 		tier2PassModuleWithCtx("IntAlgebraSimplify", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, IntAlgebraSimplifyPassCtx),
 		tier2PassModuleWith("TableArrayStaticBounds (post-RangeAnalysis)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStaticBoundsPass),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
