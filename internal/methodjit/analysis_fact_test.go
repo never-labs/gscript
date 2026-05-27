@@ -50,19 +50,31 @@ func TestAnalysisFactMetadataMatchesRegistry(t *testing.T) {
 }
 
 func TestAnalysisFactMetadataDeclaresDomainBackedStatus(t *testing.T) {
-	unbacked := map[AnalysisFact]bool{
-		AnalysisFactInlineComplete:       true,
-		AnalysisFactStringConstTables:    true,
-		AnalysisFactStringFormatPatterns: true,
-		AnalysisFactStringSplitSubSpecs:  true,
-	}
 	for fact := range analysisFactMetadata {
 		_, domainBacked := analysisFactDomain[fact]
-		if !domainBacked && !unbacked[fact] {
+		if !domainBacked && !unbackedAnalysisFacts[fact] {
 			t.Fatalf("%s has metadata but is neither domain-backed nor explicitly unbacked", fact)
 		}
-		if domainBacked && unbacked[fact] {
+		if domainBacked && unbackedAnalysisFacts[fact] {
 			t.Fatalf("%s is both domain-backed and explicitly unbacked", fact)
+		}
+	}
+}
+
+func TestUnbackedAnalysisFactsHaveMetadataAndRegistryEntries(t *testing.T) {
+	registered := make(map[AnalysisFact]bool, len(allAnalysisFacts))
+	for _, fact := range allAnalysisFacts {
+		registered[fact] = true
+	}
+	for fact := range unbackedAnalysisFacts {
+		if !registered[fact] {
+			t.Fatalf("%s is unbacked but missing from allAnalysisFacts", fact)
+		}
+		if _, ok := lookupAnalysisFactMetadata(fact); !ok {
+			t.Fatalf("%s is unbacked but missing metadata", fact)
+		}
+		if _, ok := analysisFactDomain[fact]; ok {
+			t.Fatalf("%s is unbacked but has an AnalysisResult domain", fact)
 		}
 	}
 }

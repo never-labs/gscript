@@ -11,6 +11,8 @@ import (
 // tracking which facts have been provided so far. Requires facts must be
 // available before a module runs. Updates facts must also be available; they
 // document refreshes of an existing fact rather than first-time production.
+// OptionalReads are validated facts and count as consumers, but deliberately do
+// not create ordering edges.
 //
 // This is intended to be called at initialization or test time, not in the
 // production hot path.

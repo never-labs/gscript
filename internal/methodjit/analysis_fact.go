@@ -85,6 +85,16 @@ var allAnalysisFacts = []AnalysisFact{
 	AnalysisFactGlobalArrayElementFacts,
 }
 
+// unbackedAnalysisFacts are valid pipeline facts that are not stored in an
+// AnalysisResult domain map. They still participate in dependency validation,
+// but cannot appear in read/write domain observations.
+var unbackedAnalysisFacts = map[AnalysisFact]bool{
+	AnalysisFactInlineComplete:       true,
+	AnalysisFactStringConstTables:    true,
+	AnalysisFactStringFormatPatterns: true,
+	AnalysisFactStringSplitSubSpecs:  true,
+}
+
 var analysisFactMetadata = map[AnalysisFact]AnalysisFactMetadata{
 	AnalysisFactInlineComplete: {
 		Owner:       "frontend",
