@@ -1,6 +1,9 @@
 package methodjit
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -33,11 +36,11 @@ func TestOpSpecDirectAccessStaysBehindQueryBoundary(t *testing.T) {
 			strings.HasPrefix(name, "op_spec_query_") {
 			return nil
 		}
-		src, err := os.ReadFile(path)
+		hasDirectSpecCall, err := fileHasDirectSpecCall(path)
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(src), ".Spec()") {
+		if hasDirectSpecCall {
 			offenders = append(offenders, name)
 		}
 		return nil
@@ -48,6 +51,31 @@ func TestOpSpecDirectAccessStaysBehindQueryBoundary(t *testing.T) {
 	if len(offenders) > 0 {
 		t.Fatalf("Op.Spec() direct access must go through op_spec_query helpers; offenders: %s", strings.Join(offenders, ", "))
 	}
+}
+
+func fileHasDirectSpecCall(path string) (bool, error) {
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
+	if err != nil {
+		return false, err
+	}
+	found := false
+	ast.Inspect(parsed, func(node ast.Node) bool {
+		if found {
+			return false
+		}
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if ok && sel.Sel.Name == "Spec" {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found, nil
 }
 
 func TestOpSpecAggregateFilesStayThin(t *testing.T) {
