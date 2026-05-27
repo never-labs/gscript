@@ -87,6 +87,7 @@ func TestOpSpecAggregateFilesStayThin(t *testing.T) {
 	aggregates := []string{
 		"op_spec.go",
 		"op_spec_policies.go",
+		"op_spec_policy_range.go",
 		"op_spec_policy_type.go",
 		"op_spec_policy_value.go",
 		"op_spec_types.go",
@@ -209,6 +210,7 @@ func TestOpSpecPolicyApplyEntrypointsOnlyOrchestrateSubdomains(t *testing.T) {
 		{"op_spec_policy_backend_apply.go", "applyOpSpecBackendPolicies"},
 		{"op_spec_policy_field_apply.go", "applyOpSpecFieldPolicies"},
 		{"op_spec_policy_numeric_apply.go", "applyOpSpecNumericPolicies"},
+		{"op_spec_policy_range_apply.go", "applyOpSpecRangePolicies"},
 		{"op_spec_policy_table_call_apply.go", "applyOpSpecTableCallPolicies"},
 		{"op_spec_policy_type_apply.go", "applyOpSpecTypePolicies"},
 		{"op_spec_policy_value_apply.go", "applyOpSpecValuePolicies"},
