@@ -191,6 +191,12 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 		nil,
 		"GuardedConstCallFold",
 	)
+	callSiteRuntimeSpecializationAllowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactCallABIs),
+		analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+		nil,
+		"CallSiteRuntimeSpecializationExit",
+	)
 	return []Tier2OptimizerModule{
 		{
 			Name:     "CallABI",
@@ -226,8 +232,8 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Phase:    Tier2PhaseCallLower,
 			Requires: analysisFacts(AnalysisFactCallABIs),
 			Provides: analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return CallSiteRuntimeSpecializationExitPass(specializationGlobals)(fn)
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				return CallSiteRuntimeSpecializationExitPassCtx(specializationGlobals)(newPassContext(fn, opts, callSiteRuntimeSpecializationAllowed, passContextEnforce))
 			},
 		},
 	}
@@ -289,6 +295,12 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 }
 
 func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+	callSiteRuntimeSpecializationFinalAllowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactCallABIs),
+		nil,
+		analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+		"CallSiteRuntimeSpecializationExit (final)",
+	)
 	modules := []Tier2OptimizerModule{
 		{
 			Name:     "CallABI (final)",
@@ -311,8 +323,8 @@ func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tie
 			Phase:    Tier2PhaseFinalCall,
 			Requires: analysisFacts(AnalysisFactCallABIs),
 			Updates:  analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return CallSiteRuntimeSpecializationExitPass(specializationGlobals)(fn)
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				return CallSiteRuntimeSpecializationExitPassCtx(specializationGlobals)(newPassContext(fn, opts, callSiteRuntimeSpecializationFinalAllowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWithCtx("CallReturnProjection (final)", Tier2PhaseFinalCall, callReturnProjectionFacts(), nil, CallReturnProjectionPassCtx),

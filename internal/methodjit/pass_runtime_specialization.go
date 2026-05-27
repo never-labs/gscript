@@ -8,15 +8,27 @@ const callSiteRuntimeSpecializationMinStableObservations = 2
 
 func CallSiteRuntimeSpecializationExitPass(globals map[string]*vm.FuncProto) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return AnnotateCallSiteRuntimeSpecializationExits(fn, globals), nil
+		return annotateCallSiteRuntimeSpecializationExits(fn, globals, functionCallFacts(fn)), nil
+	}
+}
+
+func CallSiteRuntimeSpecializationExitPassCtx(globals map[string]*vm.FuncProto) CtxPassFunc {
+	return func(ctx *PassContext) (*Function, error) {
+		return annotateCallSiteRuntimeSpecializationExits(ctx.Func(), globals, ctx.Call()), nil
 	}
 }
 
 func AnnotateCallSiteRuntimeSpecializationExits(fn *Function, globals map[string]*vm.FuncProto) *Function {
+	return annotateCallSiteRuntimeSpecializationExits(fn, globals, functionCallFacts(fn))
+}
+
+func annotateCallSiteRuntimeSpecializationExits(fn *Function, globals map[string]*vm.FuncProto, callFacts *CallFacts) *Function {
 	if fn == nil {
 		return fn
 	}
-	callFacts := fn.Analysis.CallFacts()
+	if callFacts == nil {
+		return fn
+	}
 	specializations := make(map[int]bool)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
