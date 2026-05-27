@@ -14,11 +14,11 @@ import "math"
 //
 // Structure recognized:
 //   - A loop header block has a Phi at the start.
-//   - One of the phi's inputs is an OpAdd/OpAddInt with Aux2=1 (emitted by
+//   - One of the phi's inputs is an add-like op with Aux2=1 (emitted by
 //     FORLOOP back-edge), whose first arg is the phi itself.
-//   - The block containing this back-edge add also contains an OpLe/OpLeInt
+//   - The block containing this back-edge add also contains a <= comparison
 //     whose first arg is the back-edge add; its second arg is the limit.
-//   - The other phi input is the loop-entry value: either an OpSub/OpSubInt
+//   - The other phi input is the loop-entry value: either a sub-like op
 //     with Aux2=1 (emitted by FORPREP), or a direct ConstInt when ConstProp
 //     has already folded the subtraction.
 //
@@ -39,7 +39,7 @@ func seedLoopRanges(fn *Function, ranges map[int]intRange) {
 					continue
 				}
 				def := arg.Def
-				if (def.Op == OpAdd || def.Op == OpAddInt) && def.Aux2 == 1 &&
+				if opIsBoxedOrFallback(def.Op, OpAdd) && def.Aux2 == 1 &&
 					len(def.Args) >= 1 && def.Args[0] != nil && def.Args[0].ID == instr.ID {
 					backAdd = def
 					continue
@@ -63,8 +63,7 @@ func seedLoopRanges(fn *Function, ranges map[int]intRange) {
 			var initOk bool
 			if initialArg.Def != nil {
 				def := initialArg.Def
-				switch def.Op {
-				case OpSub, OpSubInt:
+				if opIsBoxedOrFallback(def.Op, OpSub) {
 					if def.Aux2 == 1 && len(def.Args) >= 2 {
 						s, ok1 := constIntFromValue(def.Args[0])
 						k, ok2 := constIntFromValue(def.Args[1])
@@ -73,7 +72,7 @@ func seedLoopRanges(fn *Function, ranges map[int]intRange) {
 							initOk = true
 						}
 					}
-				case OpConstInt:
+				} else if def.Op == OpConstInt {
 					initialCounter = def.Aux
 					initOk = true
 				}
@@ -82,13 +81,14 @@ func seedLoopRanges(fn *Function, ranges map[int]intRange) {
 				continue
 			}
 
-			// Find the limit: look for OpLe/OpLeInt in backAdd's block whose
+			// Find the limit: look for a <= comparison in backAdd's block whose
 			// first arg is backAdd and whose second arg is a ConstInt.
 			var limitVal int64
 			var limitOk bool
 			if backAdd.Block != nil {
 				for _, bi := range backAdd.Block.Instrs {
-					if bi.Op != OpLe && bi.Op != OpLeInt {
+					strict, ok := orderedRangeRefineKind(bi.Op)
+					if !ok || strict {
 						continue
 					}
 					if len(bi.Args) < 2 {
@@ -270,8 +270,7 @@ func forwardStepFromPhi(instr *Instr, phiID int) (int64, bool) {
 	if lin, ok := linearExprOfPhi(instr.Value(), phiID); ok && lin.scale == 1 && lin.offset != 0 {
 		return lin.offset, true
 	}
-	switch instr.Op {
-	case OpAdd, OpAddInt:
+	if opIsBoxedOrFallback(instr.Op, OpAdd) {
 		if len(instr.Args) < 2 {
 			return 0, false
 		}
@@ -285,7 +284,7 @@ func forwardStepFromPhi(instr *Instr, phiID int) (int64, bool) {
 				return c, true
 			}
 		}
-	case OpSub, OpSubInt:
+	} else if opIsBoxedOrFallback(instr.Op, OpSub) {
 		if len(instr.Args) < 2 {
 			return 0, false
 		}
@@ -325,14 +324,11 @@ func guardedUpperBound(cond *Instr, phi *Instr, ranges map[int]intRange) (int64,
 	if cond == nil || len(cond.Args) < 2 {
 		return 0, false
 	}
-	switch cond.Op {
-	case OpLe, OpLeInt:
-		return compareUpperBound(cond.Args[0], cond.Args[1], phi, ranges, false)
-	case OpLt, OpLtInt:
-		return compareUpperBound(cond.Args[0], cond.Args[1], phi, ranges, true)
-	default:
+	strict, ok := orderedRangeRefineKind(cond.Op)
+	if !ok {
 		return 0, false
 	}
+	return compareUpperBound(cond.Args[0], cond.Args[1], phi, ranges, strict)
 }
 
 func compareUpperBound(lhs, rhs *Value, phi *Instr, ranges map[int]intRange, strict bool) (int64, bool) {
@@ -356,10 +352,10 @@ func valueIntUpperBound(v *Value, ranges map[int]intRange) (int64, bool) {
 	if c, ok := constIntFromValue(v); ok {
 		return c, true
 	}
-	switch v.Def.Op {
-	case OpGuardIntRange:
+	if v.Def.Op == OpGuardIntRange {
 		return v.Def.Aux2, true
-	case OpAdd, OpAddInt:
+	}
+	if opIsBoxedOrFallback(v.Def.Op, OpAdd) {
 		if len(v.Def.Args) < 2 {
 			return 0, false
 		}
@@ -373,7 +369,7 @@ func valueIntUpperBound(v *Value, ranges map[int]intRange) (int64, bool) {
 				return satAdd(upper, c), true
 			}
 		}
-	case OpSub, OpSubInt:
+	} else if opIsBoxedOrFallback(v.Def.Op, OpSub) {
 		if len(v.Def.Args) < 2 {
 			return 0, false
 		}
@@ -416,8 +412,7 @@ func linearExprOfPhi(v *Value, phiID int) (phiLinearExpr, bool) {
 		return phiLinearExpr{scale: 1}, true
 	}
 	instr := v.Def
-	switch instr.Op {
-	case OpAdd, OpAddInt:
+	if opIsBoxedOrFallback(instr.Op, OpAdd) {
 		if len(instr.Args) < 2 {
 			return phiLinearExpr{}, false
 		}
@@ -433,7 +428,7 @@ func linearExprOfPhi(v *Value, phiID int) (phiLinearExpr, bool) {
 				return lin, true
 			}
 		}
-	case OpSub, OpSubInt:
+	} else if opIsBoxedOrFallback(instr.Op, OpSub) {
 		if len(instr.Args) < 2 {
 			return phiLinearExpr{}, false
 		}
@@ -452,7 +447,7 @@ func squareExprOfPhi(v *Value, phiID int) (phiLinearExpr, bool) {
 		return phiLinearExpr{}, false
 	}
 	instr := v.Def
-	if instr.Op != OpMul && instr.Op != OpMulInt || len(instr.Args) < 2 {
+	if !opIsBoxedOrFallback(instr.Op, OpMul) || len(instr.Args) < 2 {
 		return phiLinearExpr{}, false
 	}
 	left, ok1 := linearExprOfPhi(instr.Args[0], phiID)
@@ -516,9 +511,8 @@ func markConvergingInductionSafe(fn *Function, safe map[int]bool) {
 		if cond == nil || len(cond.Args) < 2 {
 			continue
 		}
-		switch cond.Op {
-		case OpLt, OpLtInt:
-		default:
+		strict, ok := orderedRangeRefineKind(cond.Op)
+		if !ok || !strict {
 			continue
 		}
 		leftPhi := headerPhiValue(cond.Args[0], header)
