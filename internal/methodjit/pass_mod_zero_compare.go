@@ -1,5 +1,7 @@
 package methodjit
 
+var modZeroComparePassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntModNonZeroDivisor), nil, nil, "ModZeroCompare")
+
 // ModZeroComparePass rewrites integer modulo-zero comparisons into a boolean
 // divisibility test. For x % c == 0, Lua's sign-adjusted modulo and ARM64's
 // truncating remainder agree on the zero case, so codegen can skip the full
@@ -7,8 +9,7 @@ package methodjit
 func ModZeroComparePass(fn *Function) (*Function, error) {
 	// Delegate through a non-enforcing PassContext so the single body lives in
 	// the ctx form; direct callers keep the plain PassFunc signature.
-	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntModNonZeroDivisor), nil, nil, "ModZeroCompare")
-	return ModZeroComparePassCtx(newPassContext(fn, nil, allowed, false))
+	return ModZeroComparePassCtx(newPassContext(fn, nil, modZeroComparePassAllowedDomains, false))
 }
 
 // ModZeroComparePassCtx is the domain-scoped form of ModZeroComparePass. It is

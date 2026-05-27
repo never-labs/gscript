@@ -1,12 +1,13 @@
 package methodjit
 
+var observedParamRangeGuardPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "ObservedParamRangeGuard")
+
 // ObservedParamRangeGuardPass adds entry range guards for integer parameters
 // with stable runtime argument-range feedback. This gives RangeAnalysis concrete
 // callsite-sized bounds for arithmetic derived from non-loop parameters while
 // preserving semantics through normal guard deoptimization on mismatch.
 func ObservedParamRangeGuardPass(fn *Function) (*Function, error) {
-	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "ObservedParamRangeGuard")
-	return ObservedParamRangeGuardPassCtx(newPassContext(fn, nil, allowed, false))
+	return ObservedParamRangeGuardPassCtx(newPassContext(fn, nil, observedParamRangeGuardPassAllowedDomains, false))
 }
 
 func ObservedParamRangeGuardPassCtx(ctx *PassContext) (*Function, error) {

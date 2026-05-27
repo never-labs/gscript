@@ -1,5 +1,7 @@
 package methodjit
 
+var intAlgebraSimplifyPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "IntAlgebraSimplify")
+
 // IntAlgebraSimplifyPass removes checked integer add/sub pairs that cancel
 // each other after RangeAnalysis has proven both checked operations int48-safe.
 func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
@@ -9,8 +11,7 @@ func IntAlgebraSimplifyPass(fn *Function) (*Function, error) {
 	fn.ensureAnalysis()
 	// Delegate through a non-enforcing PassContext so the single body lives in
 	// the ctx form; direct callers keep the plain PassFunc signature.
-	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "IntAlgebraSimplify")
-	return IntAlgebraSimplifyPassCtx(newPassContext(fn, nil, allowed, false))
+	return IntAlgebraSimplifyPassCtx(newPassContext(fn, nil, intAlgebraSimplifyPassAllowedDomains, false))
 }
 
 // IntAlgebraSimplifyPassCtx is the domain-scoped form of IntAlgebraSimplifyPass.

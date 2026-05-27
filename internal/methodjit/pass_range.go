@@ -28,6 +28,8 @@
 
 package methodjit
 
+var rangeAnalysisPassAllowedDomains = allowedDomainsForModule(nil, rangeAnalysisFacts(), nil, "RangeAnalysis")
+
 // RangeAnalysisPass computes integer ranges across the IR and marks every
 // AddInt/SubInt/MulInt/DivIntExact/NegInt whose range provably fits in signed int48.
 // It also records ModInt facts whose operands make the native ARM64 remainder
@@ -40,8 +42,7 @@ func RangeAnalysisPass(fn *Function) (*Function, error) {
 	// Delegate through a non-enforcing PassContext so the single body lives in
 	// the ctx form; direct callers (tests, the post-IntExactDivision skip path)
 	// keep the plain PassFunc signature.
-	allowed := allowedDomainsForModule(nil, rangeAnalysisFacts(), nil, "RangeAnalysis")
-	return RangeAnalysisPassCtx(newPassContext(fn, nil, allowed, false))
+	return RangeAnalysisPassCtx(newPassContext(fn, nil, rangeAnalysisPassAllowedDomains, false))
 }
 
 // RangeAnalysisPassCtx is the domain-scoped form of RangeAnalysisPass. It

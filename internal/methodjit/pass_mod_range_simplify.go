@@ -1,5 +1,7 @@
 package methodjit
 
+var modRangeSimplifyPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "ModRangeSimplify")
+
 // ModRangeSimplifyPass removes integer modulo operations that range analysis
 // proves are identity operations. It is deliberately conservative: it only
 // rewrites positive constant divisors and non-negative dividends whose maximum
@@ -11,8 +13,7 @@ func ModRangeSimplifyPass(fn *Function) (*Function, error) {
 	fn.ensureAnalysis()
 	// Delegate through a non-enforcing PassContext so the single body lives in
 	// the ctx form; direct callers keep the plain PassFunc signature.
-	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "ModRangeSimplify")
-	return ModRangeSimplifyPassCtx(newPassContext(fn, nil, allowed, false))
+	return ModRangeSimplifyPassCtx(newPassContext(fn, nil, modRangeSimplifyPassAllowedDomains, false))
 }
 
 // ModRangeSimplifyPassCtx is the domain-scoped form of ModRangeSimplifyPass. It

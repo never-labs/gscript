@@ -6,14 +6,15 @@ const (
 	singleLoopParamRangeMax         int64 = 1 << 30
 )
 
+var loopBoundRangeGuardPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "LoopBoundRangeGuard")
+
 // LoopBoundRangeGuardPass adds a narrow entry range guard for integer
 // parameters used as loop bounds. The guard feeds RangeAnalysis, which can then
 // prove loop-bound-derived arithmetic fits in the int48 payload range and skip
 // per-op overflow checks in hot numeric/table-building specializations. Guard misses
 // deopt to the interpreter, preserving correctness for wider inputs.
 func LoopBoundRangeGuardPass(fn *Function) (*Function, error) {
-	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactSpecDependencyProtos), nil, nil, "LoopBoundRangeGuard")
-	return LoopBoundRangeGuardPassCtx(newPassContext(fn, nil, allowed, false))
+	return LoopBoundRangeGuardPassCtx(newPassContext(fn, nil, loopBoundRangeGuardPassAllowedDomains, false))
 }
 
 func LoopBoundRangeGuardPassCtx(ctx *PassContext) (*Function, error) {

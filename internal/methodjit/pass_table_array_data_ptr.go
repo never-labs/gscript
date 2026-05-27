@@ -1,5 +1,7 @@
 package methodjit
 
+var tableArrayDataPtrFactPassAllowedDomains = allowedDomainsForModule(nil, analysisFacts(AnalysisFactTableArrayDataPtrs), nil, "TableArrayDataPtrFact")
+
 // TableArrayDataPtrFactPass records the explicit raw data-pointer ABI facts
 // behind the lowered typed-array shape:
 //
@@ -12,8 +14,7 @@ package methodjit
 // a boxed integer. The fact is generic for all typed table arrays; it does not
 // depend on a fixed source-program pattern.
 func TableArrayDataPtrFactPass(fn *Function) (*Function, error) {
-	allowed := allowedDomainsForModule(nil, analysisFacts(AnalysisFactTableArrayDataPtrs), nil, "TableArrayDataPtrFact")
-	return TableArrayDataPtrFactPassCtx(newPassContext(fn, nil, allowed, false))
+	return TableArrayDataPtrFactPassCtx(newPassContext(fn, nil, tableArrayDataPtrFactPassAllowedDomains, false))
 }
 
 func TableArrayDataPtrFactPassCtx(ctx *PassContext) (*Function, error) {

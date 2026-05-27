@@ -1,5 +1,7 @@
 package methodjit
 
+var overflowBoxingPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "OverflowBoxing")
+
 // OverflowBoxingPass backs unsafe integer arithmetic out of the raw-int
 // representation after RangeAnalysis has identified which ops are int48-safe.
 //
@@ -19,8 +21,7 @@ func OverflowBoxingPassWith(forceBoxIntIDs map[int]bool) PassFunc {
 	return func(fn *Function) (*Function, error) {
 		// Delegate through a non-enforcing PassContext so the single body lives
 		// in the ctx form; direct callers keep the plain PassFunc signature.
-		allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "OverflowBoxing")
-		return overflowBoxingPassCtx(newPassContext(fn, nil, allowed, false), forceBoxIntIDs)
+		return overflowBoxingPassCtx(newPassContext(fn, nil, overflowBoxingPassAllowedDomains, false), forceBoxIntIDs)
 	}
 }
 
