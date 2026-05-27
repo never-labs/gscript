@@ -25,14 +25,7 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 			Updates:  fixedShapeTableFacts(),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				allowed := allowedDomainsForModule(nil, nil, fixedShapeTableFacts(), "FixedShapeTableFacts")
-				return FixedShapeTableFactsPassCtx(FixedShapeTableFactsConfig{
-					Globals:               globals,
-					ArgFacts:              optsFixedShapeArgFacts(opts),
-					ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
-					ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
-					ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
-					EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
-				})(newPassContext(fn, opts, allowed, passContextEnforce))
+				return FixedShapeTableFactsPassCtx(fixedShapeTableFactsConfigFromOpts(globals, opts))(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("LoadElimination", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, LoadEliminationPass),
@@ -67,6 +60,17 @@ func tier2TableArrayNativeLoweringModules() []Tier2OptimizerModule {
 	}
 }
 
+func fixedShapeTableFactsConfigFromOpts(globals map[string]*vm.FuncProto, opts *Tier2PipelineOpts) FixedShapeTableFactsConfig {
+	return FixedShapeTableFactsConfig{
+		Globals:               globals,
+		ArgFacts:              optsFixedShapeArgFacts(opts),
+		ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
+		ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
+		ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
+		EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
+	}
+}
+
 func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
 		tier2PassModuleWith("TableArrayStoreLower", Tier2PhaseTableFieldLower, nil, nil, TableArrayStoreLowerPass),
@@ -89,14 +93,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				requires := analysisFacts(AnalysisFactIntRanges)
 				allowed := allowedDomainsForModule(requires, nil, fixedShapeTableFacts(), "FixedShapeTableFacts (post-FieldSvalsLower)")
-				return FixedShapeTableFactsPassCtx(FixedShapeTableFactsConfig{
-					Globals:               globals,
-					ArgFacts:              optsFixedShapeArgFacts(opts),
-					ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
-					ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
-					ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
-					EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
-				})(newPassContext(fn, opts, allowed, passContextEnforce))
+				return FixedShapeTableFactsPassCtx(fixedShapeTableFactsConfigFromOpts(globals, opts))(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWithCtx("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, GuardFieldCalleePassCtx),
