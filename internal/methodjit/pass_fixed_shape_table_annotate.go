@@ -132,7 +132,7 @@ func tableKeyProvenString(fn *Function, instr *Instr, key *Value) bool {
 }
 
 func annotateFixedShapeFieldLoad(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) bool {
-	if instr == nil || (instr.Op != OpFieldLoad && instr.Op != OpFieldLoadNumToFloat) || len(instr.Args) == 0 || instr.Args[0] == nil {
+	if instr == nil || !opIsFieldSlotLoad(instr.Op) || len(instr.Args) == 0 || instr.Args[0] == nil {
 		return false
 	}
 	svals := instr.Args[0].Def

@@ -110,12 +110,12 @@ func promoteLoopPairs(fn *Function, li *loopInfo, hdr *Block, ph *Block) {
 				if len(instr.Args) >= 1 {
 					wideKill[instr.Args[0].ID] = true
 				}
-			case instr.Op == OpGetField || instr.Op == OpFieldLoad || instr.Op == OpFieldLoadNumToFloat:
+			case opIsFieldRead(instr.Op) || opIsFieldSlotLoad(instr.Op):
 				if len(instr.Args) < 1 {
 					continue
 				}
 				p := getPair(instr.Args[0].ID, instr.Aux)
-				if instr.Op != OpGetField {
+				if opIsFieldSlotLoad(instr.Op) {
 					p.lowered = true
 				}
 				p.gets = append(p.gets, instr)

@@ -357,7 +357,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 			// FieldLoad reads a fixed-shape svals slot after FieldSvalsLower.
 			// It is safe to hoist across stores to other fields on the same
 			// svals pointer, but not across a store to the same field.
-			if instr.Op == OpFieldLoad || instr.Op == OpFieldLoadNumToFloat {
+			if opIsFieldSlotLoad(instr.Op) {
 				if len(instr.Args) >= 1 {
 					key := canonicalFieldSlotKey(instr.Args[0], instr.Aux)
 					if fieldStores[key] {

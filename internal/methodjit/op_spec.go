@@ -216,6 +216,7 @@ type OpSpec struct {
 	ConstantPhiBranchThreadPure      bool
 	NeedsTier2FieldCache             bool
 	FieldRead                        bool
+	FieldSlotLoad                    bool
 	BoolTableFillBodyBenign          bool
 	BoolTableFillStore               bool
 	BoolTableCountLoadBodyBenign     bool
@@ -652,6 +653,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opFieldReadPolicies) {
 			spec.FieldRead = opFieldReadPolicies[op]
+		}
+		if int(op) < len(opFieldSlotLoadPolicies) {
+			spec.FieldSlotLoad = opFieldSlotLoadPolicies[op]
 		}
 		if int(op) < len(opBoolTableFillBodyBenignPolicies) {
 			spec.BoolTableFillBodyBenign = opBoolTableFillBodyBenignPolicies[op]
@@ -1983,6 +1987,11 @@ var opNeedsTier2FieldCachePolicies = [...]bool{
 var opFieldReadPolicies = [...]bool{
 	OpGetField:           true,
 	OpGetFieldNumToFloat: true,
+}
+
+var opFieldSlotLoadPolicies = [...]bool{
+	OpFieldLoad:           true,
+	OpFieldLoadNumToFloat: true,
 }
 
 var opBoolTableFillBodyBenignPolicies = [...]bool{
