@@ -103,13 +103,14 @@ func tier2ValueIsAdditiveIntLike(v *Value, seen map[int]bool) bool {
 			tier2ValueIsAdditiveIntLike(v.Def.Args[0], seen)
 	case OpPhi:
 		return tier2AllValuesAdditiveIntLike(v.Def.Args, seen)
-	case OpAdd, OpAddInt:
-		return tier2SmallConstPlusAdditive(v.Def.Args, seen)
-	case OpSub, OpSubInt:
-		return tier2AdditiveMinusSmallConst(v.Def.Args, seen)
-	default:
-		return false
 	}
+	if opIsBoxedOrFallback(v.Def.Op, OpAdd) {
+		return tier2SmallConstPlusAdditive(v.Def.Args, seen)
+	}
+	if opIsBoxedOrFallback(v.Def.Op, OpSub) {
+		return tier2AdditiveMinusSmallConst(v.Def.Args, seen)
+	}
+	return false
 }
 
 func tier2AllValuesAdditiveIntLike(values []*Value, seen map[int]bool) bool {
@@ -607,15 +608,21 @@ func isIntLikeTableKey(v *Value, seen map[int]bool) bool {
 	switch v.Def.Op {
 	case OpConstInt, OpUnboxInt:
 		return true
-	case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact:
-		return allIntLikeArgs(v.Def, seen)
-	case OpAdd, OpSub, OpMul, OpMod:
-		return allIntLikeArgs(v.Def, seen)
 	case OpPhi:
 		return allIntLikeArgs(v.Def, seen)
-	default:
-		return false
 	}
+	if opIsIntLikeTableKeyArithmetic(v.Def.Op) {
+		return allIntLikeArgs(v.Def, seen)
+	}
+	return false
+}
+
+func opIsIntLikeTableKeyArithmetic(op Op) bool {
+	return op == OpDivIntExact ||
+		opIsBoxedOrFallback(op, OpAdd) ||
+		opIsBoxedOrFallback(op, OpSub) ||
+		opIsBoxedOrFallback(op, OpMul) ||
+		opIsBoxedOrFallback(op, OpMod)
 }
 
 func allIntLikeArgs(instr *Instr, seen map[int]bool) bool {
