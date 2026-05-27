@@ -467,12 +467,8 @@ func isInt48RuntimeValue(instr *Instr) bool {
 	if instr == nil || instr.Type != TypeInt {
 		return false
 	}
-	switch instr.Op {
-	case OpConstInt, OpGuardType, OpGuardIntRange, OpLoadSlot, OpUnboxInt:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.Int48RuntimeValue
 }
 
 func isqrt64(v int64) int64 {

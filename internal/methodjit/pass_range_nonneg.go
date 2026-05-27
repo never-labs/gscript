@@ -40,13 +40,8 @@ func opCanDeriveNonNegative(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpConstInt, OpLen, OpTableArrayLen, OpGuardIntRange,
-		OpAddInt, OpMulInt, OpModInt, OpDivIntExact, OpPhi, OpBoxInt, OpUnboxInt:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.NonNegativeDerivationCandidate
 }
 
 func instrDerivesNonNegative(instr *Instr, facts map[int]bool, ranges map[int]intRange) bool {

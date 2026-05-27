@@ -834,14 +834,6 @@ func floatReductionBodyHasDivFloat(body *Block) bool {
 }
 
 func isUnrollCloneableOp(op Op) bool {
-	switch op {
-	case OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpSqrt, OpFloor, OpFMA, OpFMSUB,
-		OpNumToFloat, OpGuardType, OpGuardIntRange, OpGuardNonNil, OpGuardTruthy,
-		OpMatrixLoadFAt, OpMatrixLoadFRow, OpMatrixLoadFRowConst, OpTableArrayLoad, OpTableArrayNestedLoad:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.UnrollCloneable
 }

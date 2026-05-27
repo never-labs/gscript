@@ -203,14 +203,8 @@ func instrUsesConstPool(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen,
-		OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber,
-		OpGuardConstString:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.ConstPoolUser
 }
 
 // isNumericStaticSelfCall (R124) returns true when this OpCall can use

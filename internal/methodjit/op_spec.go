@@ -157,6 +157,11 @@ type OpSpec struct {
 	BoxableIntArithmetic             bool
 	UnsafeIntArithmeticCandidate     bool
 	ExactDivAllowedExternalUse       bool
+	NonNegativeDerivationCandidate   bool
+	Int48RuntimeValue                bool
+	FusableComparison                bool
+	ConstPoolUser                    bool
+	UnrollCloneable                  bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -445,6 +450,21 @@ func (op Op) Spec() (OpSpec, bool) {
 		}
 		if int(op) < len(opExactDivAllowedExternalUsePolicies) {
 			spec.ExactDivAllowedExternalUse = opExactDivAllowedExternalUsePolicies[op]
+		}
+		if int(op) < len(opNonNegativeDerivationCandidatePolicies) {
+			spec.NonNegativeDerivationCandidate = opNonNegativeDerivationCandidatePolicies[op]
+		}
+		if int(op) < len(opInt48RuntimeValuePolicies) {
+			spec.Int48RuntimeValue = opInt48RuntimeValuePolicies[op]
+		}
+		if int(op) < len(opFusableComparisonPolicies) {
+			spec.FusableComparison = opFusableComparisonPolicies[op]
+		}
+		if int(op) < len(opConstPoolUserPolicies) {
+			spec.ConstPoolUser = opConstPoolUserPolicies[op]
+		}
+		if int(op) < len(opUnrollCloneablePolicies) {
+			spec.UnrollCloneable = opUnrollCloneablePolicies[op]
 		}
 		return spec, true
 	}
@@ -1366,4 +1386,81 @@ var opExactDivAllowedExternalUsePolicies = [...]bool{
 	OpGuardType:     true,
 	OpGuardIntRange: true,
 	OpBranch:        true,
+}
+
+var opNonNegativeDerivationCandidatePolicies = [...]bool{
+	OpConstInt:      true,
+	OpLen:           true,
+	OpTableArrayLen: true,
+	OpGuardIntRange: true,
+	OpAddInt:        true,
+	OpMulInt:        true,
+	OpModInt:        true,
+	OpDivIntExact:   true,
+	OpPhi:           true,
+	OpBoxInt:        true,
+	OpUnboxInt:      true,
+}
+
+var opInt48RuntimeValuePolicies = [...]bool{
+	OpConstInt:      true,
+	OpGuardType:     true,
+	OpGuardIntRange: true,
+	OpLoadSlot:      true,
+	OpUnboxInt:      true,
+}
+
+var opFusableComparisonPolicies = [...]bool{
+	OpEq:         true,
+	OpLtInt:      true,
+	OpLeInt:      true,
+	OpEqInt:      true,
+	OpModZeroInt: true,
+	OpLtFloat:    true,
+	OpLeFloat:    true,
+}
+
+var opConstPoolUserPolicies = [...]bool{
+	OpConstString:             true,
+	OpStringConstLookup:       true,
+	OpStringFormatInt:         true,
+	OpStringFormatConst:       true,
+	OpStringFormatConstLen:    true,
+	OpStringSplitPart:         true,
+	OpStringSplitSubstr:       true,
+	OpStringSplitSubstrNumber: true,
+	OpGuardConstString:        true,
+}
+
+var opUnrollCloneablePolicies = [...]bool{
+	OpConstInt:             true,
+	OpConstFloat:           true,
+	OpConstBool:            true,
+	OpConstNil:             true,
+	OpConstString:          true,
+	OpAddInt:               true,
+	OpSubInt:               true,
+	OpMulInt:               true,
+	OpModInt:               true,
+	OpDivIntExact:          true,
+	OpNegInt:               true,
+	OpAddFloat:             true,
+	OpSubFloat:             true,
+	OpMulFloat:             true,
+	OpDivFloat:             true,
+	OpNegFloat:             true,
+	OpSqrt:                 true,
+	OpFloor:                true,
+	OpFMA:                  true,
+	OpFMSUB:                true,
+	OpNumToFloat:           true,
+	OpGuardType:            true,
+	OpGuardIntRange:        true,
+	OpGuardNonNil:          true,
+	OpGuardTruthy:          true,
+	OpMatrixLoadFAt:        true,
+	OpMatrixLoadFRow:       true,
+	OpMatrixLoadFRowConst:  true,
+	OpTableArrayLoad:       true,
+	OpTableArrayNestedLoad: true,
 }

@@ -48,11 +48,8 @@ func computeTailCalls(fn *Function) map[int]bool {
 // isFusableComparison returns true for comparison ops that can be fused
 // with an immediately-following Branch (emit CMP/FCMP + B.cc).
 func isFusableComparison(op Op) bool {
-	switch op {
-	case OpEq, OpLtInt, OpLeInt, OpEqInt, OpModZeroInt, OpLtFloat, OpLeFloat:
-		return true
-	}
-	return false
+	spec, ok := op.Spec()
+	return ok && spec.FusableComparison
 }
 
 func computeFusedComparisons(fn *Function) map[int]bool {

@@ -459,6 +459,39 @@ func TestIntArithmeticContractsLiveInOpSpec(t *testing.T) {
 	}
 }
 
+func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
+	for _, op := range []Op{OpConstInt, OpLen, OpTableArrayLen, OpGuardIntRange, OpAddInt, OpMulInt, OpModInt, OpDivIntExact, OpPhi, OpBoxInt, OpUnboxInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.NonNegativeDerivationCandidate || !opCanDeriveNonNegative(&Instr{Op: op}) {
+			t.Fatalf("%s non-negative derivation contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstInt, OpGuardType, OpGuardIntRange, OpLoadSlot, OpUnboxInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.Int48RuntimeValue || !isInt48RuntimeValue(&Instr{Op: op, Type: TypeInt}) {
+			t.Fatalf("%s int48 runtime-value contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpEq, OpLtInt, OpLeInt, OpEqInt, OpModZeroInt, OpLtFloat, OpLeFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FusableComparison || !isFusableComparison(op) {
+			t.Fatalf("%s fusable comparison contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen, OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber, OpGuardConstString} {
+		spec, ok := op.Spec()
+		if !ok || !spec.ConstPoolUser || !instrUsesConstPool(&Instr{Op: op}) {
+			t.Fatalf("%s const-pool contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstInt, OpAddInt, OpDivFloat, OpSqrt, OpNumToFloat, OpGuardType, OpMatrixLoadFAt, OpTableArrayLoad} {
+		spec, ok := op.Spec()
+		if !ok || !spec.UnrollCloneable || !isUnrollCloneableOp(op) {
+			t.Fatalf("%s unroll cloneability contract should be driven by OpSpec", op)
+		}
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}
