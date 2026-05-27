@@ -43,6 +43,14 @@ func orderedRangeRefineKind(op Op) (strict bool, ok bool) {
 	}
 }
 
+func rangeRefineKind(op Op) OpRangeRefineKind {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpRangeRefineNone
+	}
+	return spec.RangeRefineKind
+}
+
 func exactIntNarrowOp(op Op) (Op, bool) {
 	spec, ok := op.Spec()
 	return spec.ExactIntNarrowOp, ok && spec.ExactIntNarrowOp < OpMax
@@ -478,6 +486,32 @@ func opIsNativeReplayMayExit(op Op) bool {
 func opIsRestartVisibleSideEffect(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.RestartVisibleSideEffect
+}
+
+func nonNegativeDerivationKind(op Op) OpNonNegativeDerivationKind {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpNonNegativeNone
+	}
+	return spec.NonNegativeDerivationKind
+}
+
+func opBackendPolicy(op Op) OpBackendPolicy {
+	spec, ok := op.Spec()
+	if !ok {
+		return 0
+	}
+	return spec.BackendPolicy
+}
+
+func opIsFusableComparison(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FusableComparison
+}
+
+func opIsTier2LoopCall(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2LoopCall
 }
 
 func opIsTableArrayRegionGlobalBarrier(op Op) bool {

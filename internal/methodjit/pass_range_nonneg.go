@@ -40,11 +40,7 @@ func instrDerivesNonNegative(instr *Instr, facts map[int]bool, ranges map[int]in
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return false
-	}
-	switch spec.NonNegativeDerivationKind {
+	switch nonNegativeDerivationKind(instr.Op) {
 	case OpNonNegativeConstIntAux:
 		return instr.Aux >= 0
 	case OpNonNegativeAlways:

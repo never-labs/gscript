@@ -11,11 +11,7 @@ func refineBranchEnvs(condValue *Value, trueEnv, falseEnv map[int]intRange) {
 		return
 	}
 	cond := condValue.Def
-	spec, ok := cond.Op.Spec()
-	if !ok {
-		return
-	}
-	switch spec.RangeRefineKind {
+	switch rangeRefineKind(cond.Op) {
 	case OpRangeRefineLessThan:
 		refineComparison(cond.Args[0], cond.Args[1], trueEnv, falseEnv, true)
 	case OpRangeRefineLessEqual:

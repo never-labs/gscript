@@ -137,19 +137,14 @@ func instrPreservesTableArrayBoundedKeys(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.BackendPolicy&OpBackendPreservesTableArrayBounds != 0
+	return opBackendPolicy(instr.Op)&OpBackendPreservesTableArrayBounds != 0
 }
 
 func instrPreservesFieldSvalsCache(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return false
-	}
-	policy := spec.BackendPolicy
+	policy := opBackendPolicy(instr.Op)
 	return policy&OpBackendPreservesFieldSvalsCache != 0 ||
 		(policy&OpBackendPreservesFieldSvalsCacheForFloatResult != 0 && instr.Type == TypeFloat)
 }
@@ -158,11 +153,7 @@ func instrPreservesScratchFPRCache(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return false
-	}
-	policy := spec.BackendPolicy
+	policy := opBackendPolicy(instr.Op)
 	return policy&OpBackendPreservesScratchFPRCache != 0 ||
 		(policy&OpBackendPreservesScratchFPRCacheForFloatResult != 0 && instr.Type == TypeFloat)
 }

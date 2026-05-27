@@ -311,8 +311,7 @@ func nonNativeCallsConfinedToPrefixLoopsBeforeCallFreeHotLoop(fn *Function, glob
 }
 
 func tier2LoopCallOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.Tier2LoopCall
+	return opIsTier2LoopCall(op)
 }
 
 func loopRangesHavePrefixBlockersBeforeHotCallFreeLoop(ranges []tier2LoopRange) bool {
