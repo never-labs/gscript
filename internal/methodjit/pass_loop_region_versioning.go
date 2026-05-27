@@ -308,8 +308,8 @@ func loopRegionStructuralHazard(fn *Function, body map[int]bool) (*Instr, bool) 
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpSelf, OpSetTable, OpAppend, OpSetList, OpTableBoolArrayFill:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.TableArrayRegionGlobalBarrier {
 				return instr, true
 			}
 		}
@@ -330,14 +330,18 @@ func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArr
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpCall, OpCallFloor, OpFieldCallFloor:
+			spec, ok := instr.Op.Spec()
+			if !ok {
+				continue
+			}
+			switch {
+			case spec.TableArrayRegionAliasingCall:
 				if licmLoopCallMayMutateValue(fn, []*Instr{instr}, table) {
 					return instr
 				}
-			case OpResume, OpSelf:
+			case spec.TableArrayRegionAliasingAlways:
 				return instr
-			case OpSetTable, OpAppend, OpSetList, OpTableBoolArrayFill:
+			case spec.TableArrayRegionTableMutation:
 				if len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == fact.TableID {
 					return instr
 				}

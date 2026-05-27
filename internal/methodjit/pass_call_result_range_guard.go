@@ -98,12 +98,11 @@ func callFloorResultModuloReduced(fn *Function, instr *Instr, uses map[int]int) 
 }
 
 func callResultRangeGuardCandidate(instr *Instr) bool {
-	switch instr.Op {
-	case OpCall, OpCallFloor, OpFieldCallFloor:
-		return true
-	default:
+	if instr == nil {
 		return false
 	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.CallResultRangeGuardCandidate
 }
 
 func stableCallResultRange(fb vm.CallSiteFeedback) (int64, int64, bool) {
@@ -185,9 +184,8 @@ func callResultHasIntegerUse(fn *Function, valueID int) bool {
 			if user == nil {
 				continue
 			}
-			switch user.Op {
-			case OpAdd, OpSub, OpMul, OpMod, OpLt, OpLe:
-			default:
+			spec, ok := user.Op.Spec()
+			if !ok || !spec.SpeculativeIntUseCandidate {
 				continue
 			}
 			for _, arg := range user.Args {

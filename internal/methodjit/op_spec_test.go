@@ -490,6 +490,36 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s unroll cloneability contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.CallResultRangeGuardCandidate || !callResultRangeGuardCandidate(&Instr{Op: op}) {
+			t.Fatalf("%s call-result range guard contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpAdd, OpSub, OpMul, OpMod, OpLt, OpLe} {
+		spec, ok := op.Spec()
+		if !ok || !spec.SpeculativeIntUseCandidate {
+			t.Fatalf("%s speculative int-use contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat, OpUnboxFloat, OpBoxFloat} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FloatRegResult || !needsFloatReg(&Instr{Op: op}) {
+			t.Fatalf("%s float-register result contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstInt, OpLoadSlot, OpGuardType, OpGuardIntRange, OpCall, OpCallFloor, OpFieldCallFloor, OpPhi, OpTableArrayHeader, OpTableArrayLen, OpTableArrayData} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RawIntCarryValue || !isRawIntCarryValue(&Instr{Op: op, Type: TypeInt}) {
+			t.Fatalf("%s raw-int carry contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpSelf, OpSetTable, OpAppend, OpSetList, OpTableBoolArrayFill} {
+		spec, ok := op.Spec()
+		if !ok || !spec.TableArrayRegionGlobalBarrier {
+			t.Fatalf("%s table-array region global barrier should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {

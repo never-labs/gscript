@@ -42,13 +42,8 @@ func isRawIntCarryValue(instr *Instr) bool {
 	if isRawIntOp(instr.Op) {
 		return true
 	}
-	switch instr.Op {
-	case OpConstInt, OpLoadSlot, OpGuardType, OpGuardIntRange, OpCall, OpCallFloor, OpFieldCallFloor, OpPhi,
-		OpTableArrayHeader, OpTableArrayLen, OpTableArrayData:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.RawIntCarryValue
 }
 
 func isSinglePredRawCarryValue(instr *Instr) bool {

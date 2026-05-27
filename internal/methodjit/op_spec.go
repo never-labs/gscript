@@ -162,6 +162,14 @@ type OpSpec struct {
 	FusableComparison                bool
 	ConstPoolUser                    bool
 	UnrollCloneable                  bool
+	CallResultRangeGuardCandidate    bool
+	SpeculativeIntUseCandidate       bool
+	FloatRegResult                   bool
+	RawIntCarryValue                 bool
+	TableArrayRegionGlobalBarrier    bool
+	TableArrayRegionAliasingCall     bool
+	TableArrayRegionAliasingAlways   bool
+	TableArrayRegionTableMutation    bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -328,7 +336,24 @@ var opSpecs = [...]OpSpec{
 	OpNop:                           opSpec("Nop", OpEmitterSpecial, OpArgNone, OpSideEffectNone, false),
 }
 
+func buildExpandedOpSpecs() [OpMax]OpSpec {
+	var out [OpMax]OpSpec
+	for op := Op(0); op < OpMax; op++ {
+		if spec, ok := buildOpSpec(op); ok {
+			out[op] = spec
+		}
+	}
+	return out
+}
+
 func (op Op) Spec() (OpSpec, bool) {
+	if int(op) < len(expandedOpSpecs) && expandedOpSpecs[op].Name != "" {
+		return expandedOpSpecs[op], true
+	}
+	return OpSpec{}, false
+}
+
+func buildOpSpec(op Op) (OpSpec, bool) {
 	if int(op) < len(opSpecs) && opSpecs[op].Name != "" {
 		spec := opSpecs[op]
 		if int(op) < len(opBackendPolicies) {
@@ -465,6 +490,30 @@ func (op Op) Spec() (OpSpec, bool) {
 		}
 		if int(op) < len(opUnrollCloneablePolicies) {
 			spec.UnrollCloneable = opUnrollCloneablePolicies[op]
+		}
+		if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
+			spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
+		}
+		if int(op) < len(opSpeculativeIntUseCandidatePolicies) {
+			spec.SpeculativeIntUseCandidate = opSpeculativeIntUseCandidatePolicies[op]
+		}
+		if int(op) < len(opFloatRegResultPolicies) {
+			spec.FloatRegResult = opFloatRegResultPolicies[op]
+		}
+		if int(op) < len(opRawIntCarryValuePolicies) {
+			spec.RawIntCarryValue = opRawIntCarryValuePolicies[op]
+		}
+		if int(op) < len(opTableArrayRegionGlobalBarrierPolicies) {
+			spec.TableArrayRegionGlobalBarrier = opTableArrayRegionGlobalBarrierPolicies[op]
+		}
+		if int(op) < len(opTableArrayRegionAliasingCallPolicies) {
+			spec.TableArrayRegionAliasingCall = opTableArrayRegionAliasingCallPolicies[op]
+		}
+		if int(op) < len(opTableArrayRegionAliasingAlwaysPolicies) {
+			spec.TableArrayRegionAliasingAlways = opTableArrayRegionAliasingAlwaysPolicies[op]
+		}
+		if int(op) < len(opTableArrayRegionTableMutationPolicies) {
+			spec.TableArrayRegionTableMutation = opTableArrayRegionTableMutationPolicies[op]
 		}
 		return spec, true
 	}
@@ -1464,3 +1513,75 @@ var opUnrollCloneablePolicies = [...]bool{
 	OpTableArrayLoad:       true,
 	OpTableArrayNestedLoad: true,
 }
+
+var opCallResultRangeGuardCandidatePolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+}
+
+var opSpeculativeIntUseCandidatePolicies = [...]bool{
+	OpAdd: true,
+	OpSub: true,
+	OpMul: true,
+	OpMod: true,
+	OpLt:  true,
+	OpLe:  true,
+}
+
+var opFloatRegResultPolicies = [...]bool{
+	OpConstFloat: true,
+	OpAddFloat:   true,
+	OpSubFloat:   true,
+	OpMulFloat:   true,
+	OpDivFloat:   true,
+	OpNegFloat:   true,
+	OpUnboxFloat: true,
+	OpBoxFloat:   true,
+}
+
+var opRawIntCarryValuePolicies = [...]bool{
+	OpConstInt:         true,
+	OpLoadSlot:         true,
+	OpGuardType:        true,
+	OpGuardIntRange:    true,
+	OpCall:             true,
+	OpCallFloor:        true,
+	OpFieldCallFloor:   true,
+	OpPhi:              true,
+	OpTableArrayHeader: true,
+	OpTableArrayLen:    true,
+	OpTableArrayData:   true,
+}
+
+var opTableArrayRegionGlobalBarrierPolicies = [...]bool{
+	OpCall:               true,
+	OpCallFloor:          true,
+	OpFieldCallFloor:     true,
+	OpResume:             true,
+	OpSelf:               true,
+	OpSetTable:           true,
+	OpAppend:             true,
+	OpSetList:            true,
+	OpTableBoolArrayFill: true,
+}
+
+var opTableArrayRegionAliasingCallPolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+}
+
+var opTableArrayRegionAliasingAlwaysPolicies = [...]bool{
+	OpResume: true,
+	OpSelf:   true,
+}
+
+var opTableArrayRegionTableMutationPolicies = [...]bool{
+	OpSetTable:           true,
+	OpAppend:             true,
+	OpSetList:            true,
+	OpTableBoolArrayFill: true,
+}
+
+var expandedOpSpecs = buildExpandedOpSpecs()

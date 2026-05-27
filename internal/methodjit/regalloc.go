@@ -691,6 +691,9 @@ func freeDeadValues(block *Block, instrIdx int, alloc *RegAllocation, gprs, fprs
 // Note: Float COMPARISON ops (OpLtFloat, OpLeFloat) produce boolean results
 // (NaN-boxed bool), NOT float results, so they should NOT get FPR allocations.
 func needsFloatReg(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
 	// Comparisons produce bools, not floats, regardless of operand type.
 	switch instr.Op {
 	case OpLtFloat, OpLeFloat, OpComplexEscapeInSet:
@@ -699,12 +702,8 @@ func needsFloatReg(instr *Instr) bool {
 	if instr.Type == TypeFloat {
 		return true
 	}
-	switch instr.Op {
-	case OpConstFloat, OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpUnboxFloat, OpBoxFloat:
-		return true
-	}
-	return false
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FloatRegResult
 }
 
 // computeLastUse computes, for every value ID, the ID of the instruction that
