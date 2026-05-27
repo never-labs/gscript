@@ -41,12 +41,26 @@ func knownAnalysisFactsForTest() []AnalysisFact {
 		AnalysisFactStringSplitSubSpecs,
 		AnalysisFactInt48Safe,
 		AnalysisFactIntRanges,
+		AnalysisFactProfiledIntRanges,
 		AnalysisFactIntNonNegative,
 		AnalysisFactIntModNonZeroDivisor,
 		AnalysisFactIntModNoSignAdjust,
 		AnalysisFactTableArrayDataPtrs,
+		AnalysisFactTableArrayBoundsSafe,
+		AnalysisFactLoopTableArrayFacts,
 		AnalysisFactShapeFieldTypeElided,
 		AnalysisFactRecordArrayLoopSpecialization,
 		AnalysisFactRecordArrayLoopCaches,
+		AnalysisFactGlobals,
+		AnalysisFactNumericGlobalValues,
+		AnalysisFactGlobalArrayElementFacts,
+	}
+}
+
+func TestAnalysisFactDomainMappingsHaveMetadata(t *testing.T) {
+	for fact := range analysisFactDomain {
+		if _, ok := lookupAnalysisFactMetadata(fact); !ok {
+			t.Fatalf("%s has a fact-domain mapping but no metadata", fact)
+		}
 	}
 }

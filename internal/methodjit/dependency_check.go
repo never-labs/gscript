@@ -28,13 +28,11 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 		ref := dependencyModuleRef(module)
 		moduleRefs[ref] = true
 		for _, fact := range module.Provides {
+			validateDeclaredAnalysisFact(ref, "provides", fact, &issues)
 			if _, ok := provided[fact]; !ok {
 				provided[fact] = ref
 			}
 			providersByFact[fact] = append(providersByFact[fact], ref)
-			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
-				issues = append(issues, fmt.Sprintf("%s provides unregistered fact %s", ref, fact))
-			}
 		}
 	}
 
@@ -42,27 +40,21 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 		ref := dependencyModuleRef(module)
 		for _, fact := range module.Requires {
 			consumed[fact] = true
-			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
-				issues = append(issues, fmt.Sprintf("%s requires unregistered fact %s", ref, fact))
-			}
+			validateDeclaredAnalysisFact(ref, "requires", fact, &issues)
 			if provider, ok := provided[fact]; ok && provider != ref {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}
 		}
 		for _, fact := range module.Updates {
 			consumed[fact] = true
-			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
-				issues = append(issues, fmt.Sprintf("%s updates unregistered fact %s", ref, fact))
-			}
+			validateDeclaredAnalysisFact(ref, "updates", fact, &issues)
 			if provider, ok := provided[fact]; ok && provider != ref {
 				moduleDeps[ref] = append(moduleDeps[ref], provider)
 			}
 		}
 		for _, fact := range module.OptionalReads {
 			consumed[fact] = true
-			if _, ok := lookupAnalysisFactMetadata(fact); !ok {
-				issues = append(issues, fmt.Sprintf("%s optional-reads unregistered fact %s", ref, fact))
-			}
+			validateDeclaredAnalysisFact(ref, "optional-reads", fact, &issues)
 		}
 	}
 
@@ -166,6 +158,13 @@ func dependencyPlanModules(plan Tier2OptimizerPlan) []Tier2OptimizerModule {
 		modules = append(modules, group.Modules...)
 	}
 	return modules
+}
+
+func validateDeclaredAnalysisFact(moduleRef, relation string, fact AnalysisFact, issues *[]string) {
+	if _, ok := lookupAnalysisFactMetadata(fact); ok {
+		return
+	}
+	*issues = append(*issues, fmt.Sprintf("%s %s unregistered fact %s", moduleRef, relation, fact))
 }
 
 func dependencyModuleRef(module Tier2OptimizerModule) string {
