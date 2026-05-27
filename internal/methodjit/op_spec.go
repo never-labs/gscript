@@ -193,6 +193,9 @@ type OpSpec struct {
 	BoolTableCountIncrementBenign    bool
 	BoolTableCountIncrement          bool
 	CallResultRangeGuardCandidate    bool
+	ModuloReducibleCallFloor         bool
+	CallFloorSpecStableCallee        bool
+	CallFloorSpecFieldShape          bool
 	Tier2LoopCall                    bool
 	SpeculativeIntUseCandidate       bool
 	FloatRegResult                   bool
@@ -607,6 +610,15 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
 			spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
+		}
+		if int(op) < len(opModuloReducibleCallFloorPolicies) {
+			spec.ModuloReducibleCallFloor = opModuloReducibleCallFloorPolicies[op]
+		}
+		if int(op) < len(opCallFloorSpecStableCalleePolicies) {
+			spec.CallFloorSpecStableCallee = opCallFloorSpecStableCalleePolicies[op]
+		}
+		if int(op) < len(opCallFloorSpecFieldShapePolicies) {
+			spec.CallFloorSpecFieldShape = opCallFloorSpecFieldShapePolicies[op]
 		}
 		if int(op) < len(opTier2LoopCallPolicies) {
 			spec.Tier2LoopCall = opTier2LoopCallPolicies[op]
@@ -1871,6 +1883,19 @@ var opBoolTableCountIncrementPolicies = [...]bool{
 var opCallResultRangeGuardCandidatePolicies = [...]bool{
 	OpCall:           true,
 	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+}
+
+var opModuloReducibleCallFloorPolicies = [...]bool{
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+}
+
+var opCallFloorSpecStableCalleePolicies = [...]bool{
+	OpCallFloor: true,
+}
+
+var opCallFloorSpecFieldShapePolicies = [...]bool{
 	OpFieldCallFloor: true,
 }
 

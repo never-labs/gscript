@@ -75,12 +75,8 @@ func isModuloReducibleCallFloor(instr *Instr) bool {
 	if instr == nil || instr.Type != TypeInt {
 		return false
 	}
-	switch instr.Op {
-	case OpCallFloor, OpFieldCallFloor:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.ModuloReducibleCallFloor
 }
 
 func insertModuloReductionAfterProducer(fn *Function, block *Block, producer *Instr, divisor *Value) (*Instr, bool) {

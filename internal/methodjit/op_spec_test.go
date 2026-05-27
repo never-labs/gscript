@@ -623,6 +623,18 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s call-result range guard contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpCallFloor, OpFieldCallFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.ModuloReducibleCallFloor || !isModuloReducibleCallFloor(&Instr{Op: op, Type: TypeInt}) {
+			t.Fatalf("%s modulo-reducible floor-call contract should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpCallFloor.Spec(); !ok || !spec.CallFloorSpecStableCallee {
+		t.Fatalf("CallFloor stable-callee range speculation contract should be driven by OpSpec")
+	}
+	if spec, ok := OpFieldCallFloor.Spec(); !ok || !spec.CallFloorSpecFieldShape {
+		t.Fatalf("FieldCallFloor field-shape range speculation contract should be driven by OpSpec")
+	}
 	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
 		spec, ok := op.Spec()
 		if !ok || !spec.Tier2LoopCall || !tier2LoopCallOp(op) {
