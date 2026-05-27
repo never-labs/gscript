@@ -603,6 +603,23 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s call-like fact barrier contract should be driven by OpSpec", op)
 		}
 	}
+	for _, tc := range []struct {
+		op     Op
+		policy OpSourceFeedbackPolicy
+	}{
+		{OpGetField, OpSourceFeedbackGetField},
+		{OpGetFieldNumToFloat, OpSourceFeedbackGetField},
+		{OpSetField, OpSourceFeedbackSetField},
+		{OpGetTable, OpSourceFeedbackGetTable},
+		{OpSetTable, OpSourceFeedbackSetTable},
+		{OpAdd, OpSourceFeedbackResultType},
+		{OpLe, OpSourceFeedbackResultType},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.SourceFeedbackPolicy != tc.policy {
+			t.Fatalf("%s source-feedback policy should be driven by OpSpec", tc.op)
+		}
+	}
 }
 
 func TestOpsByEmitterFamily(t *testing.T) {

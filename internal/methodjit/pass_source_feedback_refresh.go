@@ -25,16 +25,20 @@ func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 			if instr == nil || !instr.HasSource || instr.SourceProto == nil || instr.SourcePC < 0 {
 				continue
 			}
-			switch instr.Op {
-			case OpGetField, OpGetFieldNumToFloat:
+			spec, ok := instr.Op.Spec()
+			if !ok {
+				continue
+			}
+			switch spec.SourceFeedbackPolicy {
+			case OpSourceFeedbackGetField:
 				sourceFeedbackRefreshGetField(fn, block, instr)
-			case OpSetField:
+			case OpSourceFeedbackSetField:
 				sourceFeedbackRefreshSetField(fn, block, instr)
-			case OpGetTable:
+			case OpSourceFeedbackGetTable:
 				sourceFeedbackRefreshGetTable(fn, block, instr)
-			case OpSetTable:
+			case OpSourceFeedbackSetTable:
 				sourceFeedbackRefreshSetTable(fn, block, instr)
-			case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm, OpEq, OpLt, OpLe:
+			case OpSourceFeedbackResultType:
 				sourceFeedbackRefreshResultType(fn, block, instr)
 			}
 		}

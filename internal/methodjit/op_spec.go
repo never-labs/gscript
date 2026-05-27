@@ -108,6 +108,17 @@ const (
 	OpBackendPreservesScratchFPRCacheForFloatResult
 )
 
+type OpSourceFeedbackPolicy uint8
+
+const (
+	OpSourceFeedbackNone     OpSourceFeedbackPolicy = 0
+	OpSourceFeedbackGetField OpSourceFeedbackPolicy = 1 << iota
+	OpSourceFeedbackSetField
+	OpSourceFeedbackGetTable
+	OpSourceFeedbackSetTable
+	OpSourceFeedbackResultType
+)
+
 // OpSpec is the lightweight metadata contract for an IR op.
 type OpSpec struct {
 	Name                             string
@@ -184,6 +195,7 @@ type OpSpec struct {
 	TableMutationFirstArg            bool
 	CallLikeFactBarrier              bool
 	BackendPolicy                    OpBackendPolicy
+	SourceFeedbackPolicy             OpSourceFeedbackPolicy
 }
 
 func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSideEffect, mayDeopt bool) OpSpec {
@@ -566,6 +578,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opCallLikeFactBarrierPolicies) {
 			spec.CallLikeFactBarrier = opCallLikeFactBarrierPolicies[op]
+		}
+		if int(op) < len(opSourceFeedbackPolicies) {
+			spec.SourceFeedbackPolicy = opSourceFeedbackPolicies[op]
 		}
 		return spec, true
 	}
@@ -1899,6 +1914,23 @@ var opCallLikeFactBarrierPolicies = [...]bool{
 	OpGo:             true,
 	OpSend:           true,
 	OpRecv:           true,
+}
+
+var opSourceFeedbackPolicies = [...]OpSourceFeedbackPolicy{
+	OpGetField:           OpSourceFeedbackGetField,
+	OpGetFieldNumToFloat: OpSourceFeedbackGetField,
+	OpSetField:           OpSourceFeedbackSetField,
+	OpGetTable:           OpSourceFeedbackGetTable,
+	OpSetTable:           OpSourceFeedbackSetTable,
+	OpAdd:                OpSourceFeedbackResultType,
+	OpSub:                OpSourceFeedbackResultType,
+	OpMul:                OpSourceFeedbackResultType,
+	OpDiv:                OpSourceFeedbackResultType,
+	OpMod:                OpSourceFeedbackResultType,
+	OpUnm:                OpSourceFeedbackResultType,
+	OpEq:                 OpSourceFeedbackResultType,
+	OpLt:                 OpSourceFeedbackResultType,
+	OpLe:                 OpSourceFeedbackResultType,
 }
 
 var expandedOpSpecs = buildExpandedOpSpecs()
