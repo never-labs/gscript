@@ -20,7 +20,7 @@ func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *Numer
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	mutations := collectFieldLenMutations(fn)
+	mutations := collectFieldLenMutations(fn, tableShapes)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr == nil || instr.Op != OpLen || len(instr.Args) < 1 || instr.Args[0] == nil || instr.Args[0].Def == nil {
@@ -31,7 +31,7 @@ func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *Numer
 			}
 			get := unwrapFieldLenInput(instr.Args[0]).Def
 			if get != nil && get.Op == OpGetField && len(get.Args) >= 1 && get.Args[0] != nil {
-				lens, ok := constStringFieldLensFromPreds(fn, block, get.Args[0].ID, get.Aux)
+				lens, ok := constStringFieldLensFromPreds(fn, tableShapes, block, get.Args[0].ID, get.Aux)
 				if ok && len(lens) == len(block.Preds) {
 					if allInt64Equal(lens) {
 						instr.Op = OpConstInt
@@ -62,7 +62,7 @@ func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *Numer
 					continue
 				}
 			}
-			if foldProfiledExactLen(fn, block, instr, mutations, numeric) {
+			if foldProfiledExactLen(fn, tableShapes, block, instr, mutations, numeric) {
 				continue
 			}
 		}
@@ -86,7 +86,7 @@ func profiledStringLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numer
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	mutations := collectFieldLenMutations(fn)
+	mutations := collectFieldLenMutations(fn, tableShapes)
 	fieldLoadLens := fieldLoadExactLenFacts(fn, mutations, tableShapes)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
@@ -96,7 +96,7 @@ func profiledStringLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numer
 			if foldExactLenFromMap(fn, block, instr, fieldLoadLens) {
 				continue
 			}
-			if foldProfiledExactLen(fn, block, instr, mutations, numeric) {
+			if foldProfiledExactLen(fn, tableShapes, block, instr, mutations, numeric) {
 				continue
 			}
 			foldPhiStringLen(fn, block, instr, numeric)
@@ -185,11 +185,11 @@ func foldExactLenFromMap(fn *Function, block *Block, lenInstr *Instr, lens map[i
 	return true
 }
 
-func foldProfiledExactLen(fn *Function, block *Block, lenInstr *Instr, mutations fieldLenMutationIndex, numeric *NumericFacts) bool {
+func foldProfiledExactLen(fn *Function, tableShapes *TableShapeFacts, block *Block, lenInstr *Instr, mutations fieldLenMutationIndex, numeric *NumericFacts) bool {
 	if fn == nil || lenInstr == nil || len(lenInstr.Args) == 0 || lenInstr.Args[0] == nil {
 		return false
 	}
-	if profiledLenFoldReadsMutatedField(fn, lenInstr.Args[0], mutations) {
+	if profiledLenFoldReadsMutatedField(fn, tableShapes, lenInstr.Args[0], mutations) {
 		return false
 	}
 	if numeric == nil {
@@ -351,13 +351,13 @@ func unwrapFieldLenInput(v *Value) *Value {
 	return v
 }
 
-func constStringFieldLensFromPreds(fn *Function, block *Block, tableID int, fieldAux int64) ([]int64, bool) {
+func constStringFieldLensFromPreds(fn *Function, tableShapes *TableShapeFacts, block *Block, tableID int, fieldAux int64) ([]int64, bool) {
 	if fn == nil || block == nil || len(block.Preds) == 0 {
 		return nil, false
 	}
 	out := make([]int64, len(block.Preds))
 	for _, pred := range block.Preds {
-		n, ok := lastConstStringStoreLen(fn, pred, tableID, fieldAux)
+		n, ok := lastConstStringStoreLen(fn, tableShapes, pred, tableID, fieldAux)
 		if !ok {
 			return nil, false
 		}
@@ -414,7 +414,7 @@ func insertFieldLenPhi(fn *Function, block *Block, lens []int64) *Instr {
 	insertAtTopAfterPhis(block, phi)
 	return phi
 }
-func lastConstStringStoreLen(fn *Function, block *Block, tableID int, fieldAux int64) (int64, bool) {
+func lastConstStringStoreLen(fn *Function, tableShapes *TableShapeFacts, block *Block, tableID int, fieldAux int64) (int64, bool) {
 	if fn == nil || fn.Proto == nil || block == nil {
 		return 0, false
 	}
@@ -427,7 +427,7 @@ func lastConstStringStoreLen(fn *Function, block *Block, tableID int, fieldAux i
 			instr.Args[0] != nil && instr.Args[0].ID == tableID {
 			return constStringLen(fn, instr.Args[1])
 		}
-		if fieldStoreMatchesField(fn, instr, tableID, fieldAux) {
+		if fieldStoreMatchesField(fn, tableShapes, instr, tableID, fieldAux) {
 			return constStringLen(fn, instr.Args[1])
 		}
 		if fieldLenFoldBarrier(instr) {
@@ -447,7 +447,7 @@ func fieldLenFoldBarrier(instr *Instr) bool {
 	}
 }
 
-func fieldStoreMatchesField(fn *Function, instr *Instr, tableID int, fieldAux int64) bool {
+func fieldStoreMatchesField(fn *Function, tableShapes *TableShapeFacts, instr *Instr, tableID int, fieldAux int64) bool {
 	if fn == nil || instr == nil || instr.Op != OpFieldStore || len(instr.Args) < 2 || instr.Args[0] == nil {
 		return false
 	}
@@ -455,7 +455,7 @@ func fieldStoreMatchesField(fn *Function, instr *Instr, tableID int, fieldAux in
 	if svals == nil || svals.Op != OpFieldSvals || len(svals.Args) == 0 || svals.Args[0] == nil || svals.Args[0].ID != tableID {
 		return false
 	}
-	fact, ok := fixedShapeFactForFieldSvals(fn, nil, svals)
+	fact, ok := fixedShapeFactForFieldSvals(tableShapes, nil, svals)
 	if !ok || fact.ShapeID == 0 || fact.ShapeID != uint32(svals.Aux) {
 		return false
 	}
@@ -490,7 +490,7 @@ func (idx fieldLenMutationIndex) mutates(shape uint32, name string) bool {
 	return false
 }
 
-func collectFieldLenMutations(fn *Function) fieldLenMutationIndex {
+func collectFieldLenMutations(fn *Function, tableShapes *TableShapeFacts) fieldLenMutationIndex {
 	idx := fieldLenMutationIndex{
 		byName:      make(map[string]bool),
 		byShapeName: make(map[fieldLenShapeName]bool),
@@ -518,7 +518,7 @@ func collectFieldLenMutations(fn *Function) fieldLenMutationIndex {
 				if svals == nil || svals.Op != OpFieldSvals {
 					continue
 				}
-				fact, ok := fixedShapeFactForFieldSvals(fn, nil, svals)
+				fact, ok := fixedShapeFactForFieldSvals(tableShapes, nil, svals)
 				if !ok || fact.ShapeID == 0 || fact.ShapeID != uint32(svals.Aux) {
 					continue
 				}
@@ -537,7 +537,7 @@ func collectFieldLenMutations(fn *Function) fieldLenMutationIndex {
 	return idx
 }
 
-func profiledLenFoldReadsMutatedField(fn *Function, v *Value, mutations fieldLenMutationIndex) bool {
+func profiledLenFoldReadsMutatedField(fn *Function, tableShapes *TableShapeFacts, v *Value, mutations fieldLenMutationIndex) bool {
 	if fn == nil || v == nil || v.Def == nil || !mutations.hasMutations {
 		return false
 	}
@@ -556,7 +556,7 @@ func profiledLenFoldReadsMutatedField(fn *Function, v *Value, mutations fieldLen
 		if svals == nil || svals.Op != OpFieldSvals {
 			return false
 		}
-		fact, ok := fixedShapeFactForFieldSvals(fn, nil, svals)
+		fact, ok := fixedShapeFactForFieldSvals(tableShapes, nil, svals)
 		if !ok || fact.ShapeID == 0 || fact.ShapeID != uint32(svals.Aux) {
 			return false
 		}

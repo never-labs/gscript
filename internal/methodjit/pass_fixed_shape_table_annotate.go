@@ -12,12 +12,12 @@ import (
 	"github.com/gscript/gscript/internal/vm"
 )
 
-func annotateFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact) {
+func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact) {
 	mutableFields := collectFixedShapeMutableFields(fn)
-	mutableRanges := collectFixedShapeMutableFieldRanges(fn, facts, mutableFields)
+	mutableRanges := collectFixedShapeMutableFieldRanges(fn, tableShapes, facts, mutableFields)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if annotateFixedShapeFieldLoad(fn, block, instr, facts, mutableFields, mutableRanges) {
+			if annotateFixedShapeFieldLoad(fn, tableShapes, block, instr, facts, mutableFields, mutableRanges) {
 				continue
 			}
 			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
@@ -129,7 +129,7 @@ func tableKeyProvenString(fn *Function, instr *Instr, key *Value) bool {
 	return instr.SourcePC < len(proto.Feedback) && proto.Feedback[instr.SourcePC].Right == vm.FBString
 }
 
-func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) bool {
+func annotateFixedShapeFieldLoad(fn *Function, tableShapes *TableShapeFacts, block *Block, instr *Instr, facts map[int]FixedShapeTableFact, mutableFields map[uint32]map[int]bool, mutableRanges map[uint32]map[int]intRange) bool {
 	if instr == nil || (instr.Op != OpFieldLoad && instr.Op != OpFieldLoadNumToFloat) || len(instr.Args) == 0 || instr.Args[0] == nil {
 		return false
 	}
@@ -137,7 +137,7 @@ func annotateFixedShapeFieldLoad(fn *Function, block *Block, instr *Instr, facts
 	if svals == nil || svals.Op != OpFieldSvals || len(svals.Args) == 0 || svals.Args[0] == nil {
 		return true
 	}
-	fact, ok := fixedShapeFactForFieldSvals(fn, facts, svals)
+	fact, ok := fixedShapeFactForFieldSvals(tableShapes, facts, svals)
 	if !ok || fact.ShapeID == 0 || fact.ShapeID != uint32(svals.Aux) {
 		return true
 	}
@@ -215,7 +215,7 @@ func collectFixedShapeMutableFields(fn *Function) map[uint32]map[int]bool {
 	return mutable
 }
 
-func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeTableFact, mutable map[uint32]map[int]bool) map[uint32]map[int]intRange {
+func collectFixedShapeMutableFieldRanges(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, mutable map[uint32]map[int]bool) map[uint32]map[int]intRange {
 	out := make(map[uint32]map[int]intRange)
 	if fn == nil || len(mutable) == 0 || !fixedShapeMutableRangeFactsSafeFunction(fn) {
 		return out
@@ -266,8 +266,8 @@ func collectFixedShapeMutableFieldRanges(fn *Function, facts map[int]FixedShapeT
 			}
 		}
 	}
-	if fn.Analysis != nil {
-		fn.Analysis.TableShapeFacts().ForEachFieldPolyShapeCatalogFact(func(_ uint32, fact FixedShapeTableFact) bool {
+	if tableShapes != nil {
+		tableShapes.ForEachFieldPolyShapeCatalogFact(func(_ uint32, fact FixedShapeTableFact) bool {
 			if fact.ShapeID == 0 {
 				return true
 			}
@@ -530,7 +530,7 @@ func fixedShapeFieldMayMutate(mutable map[uint32]map[int]bool, shapeID uint32, f
 	return mutable[shapeID][fieldIdx]
 }
 
-func fixedShapeFactForFieldSvals(fn *Function, facts map[int]FixedShapeTableFact, svals *Instr) (FixedShapeTableFact, bool) {
+func fixedShapeFactForFieldSvals(tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, svals *Instr) (FixedShapeTableFact, bool) {
 	if svals == nil || len(svals.Args) == 0 || svals.Args[0] == nil || svals.Aux == 0 {
 		return FixedShapeTableFact{}, false
 	}
@@ -538,8 +538,7 @@ func fixedShapeFactForFieldSvals(fn *Function, facts map[int]FixedShapeTableFact
 	if fact, ok := facts[svals.Args[0].ID]; ok && fact.ShapeID == shapeID {
 		return fact, true
 	}
-	if fn != nil {
-		tableShapes := fn.Analysis.TableShapeFacts()
+	if tableShapes != nil {
 		if fact, ok := tableShapes.FieldPolyShapeCatalogFact(shapeID); ok && fact.ShapeID == shapeID {
 			return fact, true
 		}
