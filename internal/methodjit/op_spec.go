@@ -165,6 +165,7 @@ type OpSpec struct {
 	GlobalConstUnsafe                bool
 	NestedCallLike                   bool
 	LoadElimConstCSE                 bool
+	LiteralConst                     bool
 	LoadElimPureCSE                  bool
 	LoadElimShapeFactKiller          bool
 	NoSSAResult                      bool
@@ -500,6 +501,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opLoadElimConstCSEPolicies) {
 			spec.LoadElimConstCSE = opLoadElimConstCSEPolicies[op]
+		}
+		if int(op) < len(opLiteralConstPolicies) {
+			spec.LiteralConst = opLiteralConstPolicies[op]
 		}
 		if int(op) < len(opLoadElimPureCSEPolicies) {
 			spec.LoadElimPureCSE = opLoadElimPureCSEPolicies[op]
@@ -1237,6 +1241,14 @@ var opNestedCallLikePolicies = [...]bool{
 }
 
 var opLoadElimConstCSEPolicies = [...]bool{
+	OpConstInt:    true,
+	OpConstFloat:  true,
+	OpConstBool:   true,
+	OpConstNil:    true,
+	OpConstString: true,
+}
+
+var opLiteralConstPolicies = [...]bool{
 	OpConstInt:    true,
 	OpConstFloat:  true,
 	OpConstBool:   true,

@@ -263,8 +263,7 @@ func fieldShapeLoopPreInlineUnsafeReason(calleeFn *Function) string {
 				continue
 			}
 			if instr.Op == OpReturn || instr.Op == OpLoadSlot || instr.Op == OpStoreSlot ||
-				instr.Op == OpConstInt || instr.Op == OpConstFloat || instr.Op == OpConstBool ||
-				instr.Op == OpConstNil || instr.Op == OpConstString {
+				opIsLiteralConst(instr.Op) {
 				continue
 			}
 			if !seenSideEffect && fieldShapePreEffectInlineInstrSafe(instr) {

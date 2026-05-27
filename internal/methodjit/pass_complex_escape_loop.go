@@ -115,9 +115,7 @@ func materializeConstArgsInBlock(fn *Function, block *Block, args []*Value) ([]*
 		if arg == nil || arg.Def == nil {
 			continue
 		}
-		switch arg.Def.Op {
-		case OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString:
-		default:
+		if !opIsLiteralConst(arg.Def.Op) {
 			continue
 		}
 		clone := &Instr{

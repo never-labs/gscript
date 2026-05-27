@@ -572,6 +572,11 @@ func opIsFieldRead(op Op) bool {
 	return ok && spec.FieldRead
 }
 
+func opIsLiteralConst(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.LiteralConst
+}
+
 func fieldSvalsStoreLowerable(instr *Instr) bool {
 	if instr == nil || instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil || instr.Aux2 == 0 {
 		return false

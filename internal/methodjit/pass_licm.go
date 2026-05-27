@@ -275,7 +275,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 	// Seed 2: in-loop constants with no args are invariant.
 	for _, loc := range inLoop {
 		op := loc.instr.Op
-		if op == OpConstInt || op == OpConstFloat || op == OpConstBool || op == OpConstNil {
+		if opIsLiteralConst(op) && op != OpConstString {
 			invariant[loc.instr.ID] = true
 		}
 	}

@@ -296,6 +296,9 @@ func TestLoadElimContractsLiveInOpSpec(t *testing.T) {
 		if !spec.LoadElimConstCSE || !loadElimConstCSE(&Instr{Op: op}) {
 			t.Fatalf("%s const CSE contract should be driven by OpSpec", op)
 		}
+		if !spec.LiteralConst || !opIsLiteralConst(op) {
+			t.Fatalf("%s literal-const contract should be driven by OpSpec", op)
+		}
 	}
 
 	pureOps := []Op{OpAddInt, OpDivIntExact, OpNumToFloat, OpSqrt, OpModZeroInt, OpTableShapeID}
