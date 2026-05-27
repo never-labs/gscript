@@ -117,8 +117,7 @@ func identifyVirtualAllocsWithRemarks(fn *Function, remarks *OptimizationRemarks
 
 				// Rule 1: determine whether this use is OK or
 				// escapes the allocation.
-				switch instr.Op {
-				case OpGetField, OpGetFieldNumToFloat:
+				if opIsFieldRead(instr.Op) {
 					if argIdx != 0 {
 						kill(arg.ID, "table is used as a field key or value")
 						continue
@@ -128,6 +127,9 @@ func identifyVirtualAllocsWithRemarks(fn *Function, remarks *OptimizationRemarks
 						continue
 					}
 					cand.fieldUses = append(cand.fieldUses, instr.ID)
+					continue
+				}
+				switch instr.Op {
 
 				case OpSetField:
 					if argIdx != 0 {
@@ -289,7 +291,7 @@ func identifyVirtualPhis(fn *Function, candidates map[int]*virtualAllocInfo) map
 						if use == nil || use.ID != instr.ID {
 							continue
 						}
-						if (ins2.Op == OpGetField || ins2.Op == OpGetFieldNumToFloat) && ui == 0 {
+						if opIsFieldRead(ins2.Op) && ui == 0 {
 							continue
 						}
 						allowedUse = false
@@ -435,7 +437,7 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 	// Step 4: rewrite all GetField(vphi.phiID, Aux=F) uses.
 	for _, b := range fn.Blocks {
 		for _, ins := range b.Instrs {
-			if (ins.Op != OpGetField && ins.Op != OpGetFieldNumToFloat) || len(ins.Args) < 1 {
+			if !opIsFieldRead(ins.Op) || len(ins.Args) < 1 {
 				continue
 			}
 			if ins.Args[0].ID != vphi.phiID {
@@ -582,7 +584,7 @@ func hasFixedTableScalarReplacementCandidate(fn *Function) bool {
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || (instr.Op != OpGetField && instr.Op != OpGetFieldNumToFloat) || len(instr.Args) == 0 || instr.Args[0] == nil {
+			if instr == nil || !opIsFieldRead(instr.Op) || len(instr.Args) == 0 || instr.Args[0] == nil {
 				continue
 			}
 			if fixedTables[instr.Args[0].ID] {
@@ -687,7 +689,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 		// and collect the final value for each field written in the allocation
 		// block. Dominated successor reads observe this end-of-block map.
 		for _, instr := range block.Instrs {
-			if (instr.Op == OpGetField || instr.Op == OpGetFieldNumToFloat) && len(instr.Args) >= 1 &&
+			if opIsFieldRead(instr.Op) && len(instr.Args) >= 1 &&
 				instr.Args[0].ID == allocID {
 				name := fieldNameFromAux(fn, instr.Aux)
 				if name == "" {
@@ -715,7 +717,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 					continue
 				}
 				for _, instr := range useBlock.Instrs {
-					if (instr.Op != OpGetField && instr.Op != OpGetFieldNumToFloat) || len(instr.Args) < 1 ||
+					if !opIsFieldRead(instr.Op) || len(instr.Args) < 1 ||
 						instr.Args[0].ID != allocID {
 						continue
 					}
@@ -762,7 +764,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 				instr.Args = nil
 				instr.Aux = 0
 
-			case (instr.Op == OpGetField || instr.Op == OpGetFieldNumToFloat) && len(instr.Args) >= 1 &&
+			case opIsFieldRead(instr.Op) && len(instr.Args) >= 1 &&
 				instr.Args[0].ID == allocID:
 				name := fieldNameFromAux(fn, instr.Aux)
 				if name == "" {
@@ -792,7 +794,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 				continue
 			}
 			for _, instr := range useBlock.Instrs {
-				if (instr.Op != OpGetField && instr.Op != OpGetFieldNumToFloat) || len(instr.Args) < 1 ||
+				if !opIsFieldRead(instr.Op) || len(instr.Args) < 1 ||
 					instr.Args[0].ID != allocID {
 					continue
 				}
@@ -885,13 +887,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 					if arg == nil || arg.ID != alloc.ID {
 						continue
 					}
-					switch instr.Op {
-					case OpSetField:
-						if alloc.Op != OpNewTable || argIdx != 0 || !partialMaterializeContainsStore(ctor.stores, instr) {
-							ok = false
-							break
-						}
-					case OpGetField, OpGetFieldNumToFloat:
+					if opIsFieldRead(instr.Op) {
 						if argIdx != 0 {
 							ok = false
 							break
@@ -906,6 +902,14 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 							break
 						}
 						reads = append(reads, instr)
+						continue
+					}
+					switch instr.Op {
+					case OpSetField:
+						if alloc.Op != OpNewTable || argIdx != 0 || !partialMaterializeContainsStore(ctor.stores, instr) {
+							ok = false
+							break
+						}
 					case OpCall:
 						if argIdx == 0 {
 							ok = false
@@ -1208,8 +1212,11 @@ func calleeArgFieldsReadonly(proto *vm.FuncProto, paramIdx int) bool {
 				if arg == nil || !tracked[arg.ID] {
 					continue
 				}
+				if opIsFieldRead(instr.Op) {
+					continue
+				}
 				switch instr.Op {
-				case OpGetField, OpGetFieldNumToFloat, OpGetTable, OpLen, OpReturn:
+				case OpGetTable, OpLen, OpReturn:
 					continue
 				case OpSetTable:
 					if argIdx == 0 {

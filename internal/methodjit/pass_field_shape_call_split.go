@@ -481,7 +481,7 @@ func fieldShapeSplitInlineInstrSafe(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	if instr.Op == OpGetField || instr.Op == OpGetFieldNumToFloat {
+	if opIsFieldRead(instr.Op) {
 		return instr.Aux2 != 0
 	}
 	if instr.Op == OpSetField {
