@@ -9,15 +9,27 @@ import (
 
 func GuardedConstCallFoldPass(globals map[string]*vm.FuncProto) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return AnnotateGuardedConstCallFolds(fn, globals), nil
+		return annotateGuardedConstCallFolds(fn, globals, functionCallFacts(fn)), nil
+	}
+}
+
+func GuardedConstCallFoldPassCtx(globals map[string]*vm.FuncProto) CtxPassFunc {
+	return func(ctx *PassContext) (*Function, error) {
+		return annotateGuardedConstCallFolds(ctx.Func(), globals, ctx.Call()), nil
 	}
 }
 
 func AnnotateGuardedConstCallFolds(fn *Function, globals map[string]*vm.FuncProto) *Function {
+	return annotateGuardedConstCallFolds(fn, globals, functionCallFacts(fn))
+}
+
+func annotateGuardedConstCallFolds(fn *Function, globals map[string]*vm.FuncProto, callFacts *CallFacts) *Function {
 	if fn == nil || fn.Proto == nil || len(globals) == 0 {
 		return fn
 	}
-	callFacts := fn.Analysis.CallFacts()
+	if callFacts == nil {
+		return fn
+	}
 	stableInts := collectProtocolStableIntGlobals(fn)
 	folds := make(map[int]GuardedConstCallFoldFact)
 	for _, block := range fn.Blocks {

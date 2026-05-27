@@ -185,6 +185,12 @@ func tier2PostInlinePassModuleWith(name string, provides []AnalysisFact, pass Pa
 }
 
 func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
+	guardedConstCallFoldAllowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactCallABIs),
+		analysisFacts(AnalysisFactGuardedConstCallFolds),
+		nil,
+		"GuardedConstCallFold",
+	)
 	return []Tier2OptimizerModule{
 		{
 			Name:     "CallABI",
@@ -211,8 +217,8 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Phase:    Tier2PhaseCallLower,
 			Requires: analysisFacts(AnalysisFactCallABIs),
 			Provides: analysisFacts(AnalysisFactGuardedConstCallFolds),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return GuardedConstCallFoldPass(specializationGlobals)(fn)
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				return GuardedConstCallFoldPassCtx(specializationGlobals)(newPassContext(fn, opts, guardedConstCallFoldAllowed, passContextEnforce))
 			},
 		},
 		{
