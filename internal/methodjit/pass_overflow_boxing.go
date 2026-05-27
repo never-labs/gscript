@@ -17,8 +17,36 @@ func OverflowBoxingPass(fn *Function) (*Function, error) {
 
 func OverflowBoxingPassWith(forceBoxIntIDs map[int]bool) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return overflowBoxingPass(fn, forceBoxIntIDs)
+		// Delegate through a non-enforcing PassContext so the single body lives
+		// in the ctx form; direct callers keep the plain PassFunc signature.
+		allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "OverflowBoxing")
+		return overflowBoxingPassCtx(newPassContext(fn, nil, allowed, false), forceBoxIntIDs)
 	}
+}
+
+// OverflowBoxingPassCtx is the domain-scoped form of OverflowBoxing. It reaches
+// the IR via ctx.Func() and integer-range/int48-safety facts via ctx.Numeric()
+// (consumed by the unsafe-arithmetic and non-negative-step predicates); it
+// touches no other fact domain. The force-box id set comes from the pipeline
+// options.
+func OverflowBoxingPassCtx(ctx *PassContext) (*Function, error) {
+	var force map[int]bool
+	if opts := ctx.Opts(); opts != nil {
+		force = opts.ForceBoxIntIDs
+	}
+	return overflowBoxingPassCtx(ctx, force)
+}
+
+func overflowBoxingPassCtx(ctx *PassContext, forceBoxIntIDs map[int]bool) (*Function, error) {
+	fn := ctx.Func()
+	if fn == nil {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	// Reach the declared numeric domain through the gated accessor; the
+	// int48-safety/range predicates below consume it.
+	_ = ctx.Numeric()
+	return overflowBoxingPass(fn, forceBoxIntIDs)
 }
 
 // LateModuloMultiplyOverflowBoxingPass repairs a narrow late-pipeline hazard:

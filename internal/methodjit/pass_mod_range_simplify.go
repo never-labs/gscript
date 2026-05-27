@@ -9,7 +9,22 @@ func ModRangeSimplifyPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	numeric := fn.Analysis.NumericFacts()
+	// Delegate through a non-enforcing PassContext so the single body lives in
+	// the ctx form; direct callers keep the plain PassFunc signature.
+	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntRanges), nil, nil, "ModRangeSimplify")
+	return ModRangeSimplifyPassCtx(newPassContext(fn, nil, allowed, false))
+}
+
+// ModRangeSimplifyPassCtx is the domain-scoped form of ModRangeSimplifyPass. It
+// reaches the IR via ctx.Func() and integer ranges via ctx.Numeric(); it
+// touches no other fact domain.
+func ModRangeSimplifyPassCtx(ctx *PassContext) (*Function, error) {
+	fn := ctx.Func()
+	if fn == nil || len(fn.Blocks) == 0 {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	numeric := ctx.Numeric()
 	if len(numeric.IntRangeMap()) == 0 {
 		return fn, nil
 	}

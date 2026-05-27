@@ -5,6 +5,18 @@ package methodjit
 // truncating remainder agree on the zero case, so codegen can skip the full
 // modulo sequence and use a bit test for power-of-two constants.
 func ModZeroComparePass(fn *Function) (*Function, error) {
+	// Delegate through a non-enforcing PassContext so the single body lives in
+	// the ctx form; direct callers keep the plain PassFunc signature.
+	allowed := allowedDomainsForModule(analysisFacts(AnalysisFactIntModNonZeroDivisor), nil, nil, "ModZeroCompare")
+	return ModZeroComparePassCtx(newPassContext(fn, nil, allowed, false))
+}
+
+// ModZeroComparePassCtx is the domain-scoped form of ModZeroComparePass. It is
+// a pure IR rewrite reached via ctx.Func() and consults no analysis fact
+// domain; its declared AnalysisFactIntModNonZeroDivisor (numeric) keeps it
+// ordered after the modulo facts are established.
+func ModZeroComparePassCtx(ctx *PassContext) (*Function, error) {
+	fn := ctx.Func()
 	if fn == nil {
 		return fn, nil
 	}

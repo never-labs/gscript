@@ -16,6 +16,19 @@ func IntExactDivisionPass(fn *Function) (*Function, error) {
 	return out, err
 }
 
+// IntExactDivisionPassCtx is the domain-scoped form of IntExactDivision. It is a
+// pure IR transform reached via ctx.Func() — it computes dominators and use/def
+// maps directly from the IR and consults no analysis fact domain. It records
+// whether it rewrote anything in the pipeline options so the following
+// RangeAnalysis can skip when nothing changed.
+func IntExactDivisionPassCtx(ctx *PassContext) (*Function, error) {
+	out, changed, err := runIntExactDivisionIfCandidate(ctx.Func())
+	if opts := ctx.Opts(); opts != nil {
+		opts.LastPassChanged = changed
+	}
+	return out, err
+}
+
 func runIntExactDivisionIfCandidate(fn *Function) (*Function, bool, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, false, nil
