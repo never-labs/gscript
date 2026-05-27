@@ -59,14 +59,6 @@ func fieldCallPolyLenFusionPass(fn *Function, tableShapes *TableShapeFacts) (*Fu
 	return fn, nil
 }
 
-func fieldCallPolyLenFusionBarrier(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.FieldCallPolyLenFusionBarrier
-}
-
 func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []FieldPolyShapeCase, tableShapes *TableShapeFacts) []FieldCallPolyLenFusion {
 	if fn == nil || call == nil || ln == nil || len(callCases) == 0 {
 		return nil

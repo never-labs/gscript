@@ -135,6 +135,27 @@ func opIsCallLikeFactBarrier(op Op) bool {
 	return ok && spec.CallLikeFactBarrier
 }
 
+func opIsTableMutationFirstArg(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableMutationFirstArg
+}
+
+func fieldLenFoldBarrier(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldLenFoldBarrier
+}
+
+func fieldCallPolyLenFusionBarrier(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldCallPolyLenFusionBarrier
+}
+
 func guardProvenByProducer(v *Value, guardType Type) bool {
 	if v == nil || v.Def == nil || guardType == TypeUnknown {
 		return false
@@ -146,6 +167,37 @@ func guardProvenByProducer(v *Value, guardType Type) bool {
 func fixedResultType(op Op) (Type, bool) {
 	spec, ok := op.Spec()
 	return spec.FixedResultType, ok && spec.FixedResultType != TypeUnknown
+}
+
+func isRawIntOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawIntResult
+}
+
+func isRawTablePtrOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawTablePtrResult
+}
+
+func isRawTablePtrValue(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	if isRawTablePtrOp(instr.Op) {
+		return true
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.TableResultRawTablePtr && instr.Type == TypeTable
+}
+
+func isRawDataPtrOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawDataPtrResult
+}
+
+func isRawFloatOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawFloatResult
 }
 
 func isModuloReducibleCallFloor(instr *Instr) bool {

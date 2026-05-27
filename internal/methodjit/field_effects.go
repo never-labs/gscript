@@ -32,7 +32,6 @@ func SummarizeFieldEffects(proto *vm.FuncProto) FieldEffectSummary {
 			if instr == nil {
 				continue
 			}
-			spec, ok := instr.Op.Spec()
 			switch {
 			case instr.Op == OpSetField:
 				param, ok := fieldEffectParamBase(instr)
@@ -48,11 +47,11 @@ func SummarizeFieldEffects(proto *vm.FuncProto) FieldEffectSummary {
 					s.ParamWrites[param] = make(map[string]bool)
 				}
 				s.ParamWrites[param][name] = true
-			case ok && spec.TableMutationFirstArg:
+			case opIsTableMutationFirstArg(instr.Op):
 				if param, ok := fieldEffectParamBase(instr); ok {
 					s.UnknownParamMutation[param] = true
 				}
-			case ok && spec.CallLikeFactBarrier:
+			case opIsCallLikeFactBarrier(instr.Op):
 				s.HasCall = true
 			}
 		}

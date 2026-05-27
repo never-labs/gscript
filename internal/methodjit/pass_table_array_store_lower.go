@@ -78,8 +78,7 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 			continue
 
 		default:
-			spec, ok := instr.Op.Spec()
-			if ok && spec.TableMutationFirstArg {
+			if opIsTableMutationFirstArg(instr.Op) {
 				if instr.Op == OpTableArrayStore {
 					// This store is structural-preserving on its continuing path.
 					continue
@@ -89,7 +88,7 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 				}
 				continue
 			}
-			if ok && spec.CallLikeFactBarrier {
+			if opIsCallLikeFactBarrier(instr.Op) {
 				facts.Reset()
 			}
 		}

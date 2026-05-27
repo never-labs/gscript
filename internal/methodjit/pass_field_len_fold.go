@@ -436,14 +436,6 @@ func lastConstStringStoreLen(fn *Function, tableShapes *TableShapeFacts, block *
 	return 0, false
 }
 
-func fieldLenFoldBarrier(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.FieldLenFoldBarrier
-}
-
 func fieldStoreMatchesField(fn *Function, tableShapes *TableShapeFacts, instr *Instr, tableID int, fieldAux int64) bool {
 	if fn == nil || instr == nil || instr.Op != OpFieldStore || len(instr.Args) < 2 || instr.Args[0] == nil {
 		return false

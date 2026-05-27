@@ -102,11 +102,10 @@ func promoteLoopPairs(fn *Function, li *loopInfo, hdr *Block, ph *Block) {
 	}
 	for _, b := range bodyList {
 		for _, instr := range b.Instrs {
-			spec, ok := instr.Op.Spec()
 			switch {
-			case ok && spec.CallLikeFactBarrier:
+			case opIsCallLikeFactBarrier(instr.Op):
 				hasLoopCall = true
-			case ok && spec.TableMutationFirstArg:
+			case opIsTableMutationFirstArg(instr.Op):
 				if len(instr.Args) >= 1 {
 					wideKill[instr.Args[0].ID] = true
 				}

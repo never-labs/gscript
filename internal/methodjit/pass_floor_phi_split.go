@@ -99,8 +99,8 @@ func floorPhiValueType(v *Value) Type {
 	if v == nil || v.Def == nil {
 		return TypeUnknown
 	}
-	if spec, ok := v.Def.Op.Spec(); ok && spec.FixedResultType != TypeUnknown {
-		return spec.FixedResultType
+	if typ, ok := fixedResultType(v.Def.Op); ok {
+		return typ
 	}
 	if v.Def.Type != TypeUnknown && v.Def.Type != TypeAny {
 		return v.Def.Type

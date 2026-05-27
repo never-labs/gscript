@@ -749,38 +749,3 @@ func sortedLoopFPRegEntryIDs(m map[int]loopFPRegEntry) []int {
 	}
 	return ids
 }
-
-// isRawIntOp returns true if the op produces a raw int64 result
-// (stored via storeRawInt rather than storeResultNB).
-func isRawIntOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.RawIntResult
-}
-
-func isRawTablePtrOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.RawTablePtrResult
-}
-
-func isRawTablePtrValue(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	if isRawTablePtrOp(instr.Op) {
-		return true
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.TableResultRawTablePtr && instr.Type == TypeTable
-}
-
-func isRawDataPtrOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.RawDataPtrResult
-}
-
-// isRawFloatOp returns true if the op produces a raw float64 result
-// (stored via storeRawFloat in an FPR).
-func isRawFloatOp(op Op) bool {
-	spec, ok := op.Spec()
-	return ok && spec.RawFloatResult
-}
