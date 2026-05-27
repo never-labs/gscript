@@ -422,6 +422,21 @@ func TestBackendAndLoopContractsLiveInOpSpec(t *testing.T) {
 				tc.op, spec.TableArrayGPRInvariantRank, spec.TableArrayGPRInvariantUseMask, tc.rank, tc.mask)
 		}
 	}
+	for _, tc := range []struct {
+		op  Op
+		arg int
+	}{
+		{OpTableArrayLoad, 2},
+		{OpTableArrayStore, 3},
+		{OpTableArraySwap, 1},
+		{OpTableArraySwapPairs, 1},
+		{OpTableArrayNestedLoad, 3},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.TableArrayKeyArgIndex != tc.arg {
+			t.Fatalf("%s table-array key arg = %d, want %d", tc.op, spec.TableArrayKeyArgIndex, tc.arg)
+		}
+	}
 }
 
 func TestTypeAndBarrierContractsLiveInOpSpec(t *testing.T) {
@@ -503,10 +518,22 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s fusable comparison contract should be driven by OpSpec", op)
 		}
 	}
+	for _, op := range []Op{OpLtInt, OpLeInt, OpEqInt} {
+		spec, ok := op.Spec()
+		if !ok || !spec.LoopBoundComparison {
+			t.Fatalf("%s loop-bound comparison contract should be driven by OpSpec", op)
+		}
+	}
 	for _, op := range []Op{OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen, OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber, OpGuardConstString} {
 		spec, ok := op.Spec()
 		if !ok || !spec.ConstPoolUser || !instrUsesConstPool(&Instr{Op: op}) {
 			t.Fatalf("%s const-pool contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen, OpStringSplitPart, OpStringSplitSubstr, OpGuardConstString, OpGuardCalleeProto} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RawStringResult {
+			t.Fatalf("%s raw-string result contract should be driven by OpSpec", op)
 		}
 	}
 	for _, op := range []Op{OpConstInt, OpAddInt, OpDivFloat, OpSqrt, OpNumToFloat, OpGuardType, OpMatrixLoadFAt, OpTableArrayLoad} {
@@ -626,6 +653,12 @@ func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
 		spec, ok := op.Spec()
 		if !ok || !spec.CallLikeFactBarrier {
 			t.Fatalf("%s call-like fact barrier contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpCall, OpCallFloor, OpFieldCallFloor} {
+		spec, ok := op.Spec()
+		if !ok || !spec.RawCarryClobber {
+			t.Fatalf("%s raw-carry clobber contract should be driven by OpSpec", op)
 		}
 	}
 	for _, tc := range []struct {

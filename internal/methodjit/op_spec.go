@@ -153,6 +153,7 @@ type OpSpec struct {
 	TableArrayGPRInvariant           bool
 	TableArrayGPRInvariantRank       int
 	TableArrayGPRInvariantUseMask    uint8
+	TableArrayKeyArgIndex            int
 	LICMHoistable                    bool
 	LICMInterestingMiss              bool
 	LICMIntArith                     bool
@@ -173,7 +174,9 @@ type OpSpec struct {
 	NonNegativeDerivationCandidate   bool
 	Int48RuntimeValue                bool
 	FusableComparison                bool
+	LoopBoundComparison              bool
 	ConstPoolUser                    bool
+	RawStringResult                  bool
 	UnrollCloneable                  bool
 	CallResultRangeGuardCandidate    bool
 	SpeculativeIntUseCandidate       bool
@@ -196,6 +199,7 @@ type OpSpec struct {
 	FieldFactWideKiller              bool
 	TableMutationFirstArg            bool
 	CallLikeFactBarrier              bool
+	RawCarryClobber                  bool
 	ExactDivComponent                bool
 	IntNarrowCandidate               bool
 	IntNarrowAllArgsConstraint       bool
@@ -215,6 +219,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		EmitterFamily:              family,
 		MayDeopt:                   mayDeopt,
 		TableArrayGPRInvariantRank: 1,
+		TableArrayKeyArgIndex:      -1,
 	}
 }
 
@@ -465,6 +470,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		if int(op) < len(opTableArrayGPRInvariantUseMaskPolicies) {
 			spec.TableArrayGPRInvariantUseMask = opTableArrayGPRInvariantUseMaskPolicies[op]
 		}
+		if int(op) < len(opTableArrayKeyArgIndexPolicies) && opTableArrayKeyArgIndexPolicies[op] != 0 {
+			spec.TableArrayKeyArgIndex = int(opTableArrayKeyArgIndexPolicies[op]) - 1
+		}
 		if int(op) < len(opLICMHoistablePolicies) {
 			spec.LICMHoistable = opLICMHoistablePolicies[op]
 		}
@@ -525,8 +533,14 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		if int(op) < len(opFusableComparisonPolicies) {
 			spec.FusableComparison = opFusableComparisonPolicies[op]
 		}
+		if int(op) < len(opLoopBoundComparisonPolicies) {
+			spec.LoopBoundComparison = opLoopBoundComparisonPolicies[op]
+		}
 		if int(op) < len(opConstPoolUserPolicies) {
 			spec.ConstPoolUser = opConstPoolUserPolicies[op]
+		}
+		if int(op) < len(opRawStringResultPolicies) {
+			spec.RawStringResult = opRawStringResultPolicies[op]
 		}
 		if int(op) < len(opUnrollCloneablePolicies) {
 			spec.UnrollCloneable = opUnrollCloneablePolicies[op]
@@ -593,6 +607,9 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 		}
 		if int(op) < len(opCallLikeFactBarrierPolicies) {
 			spec.CallLikeFactBarrier = opCallLikeFactBarrierPolicies[op]
+		}
+		if int(op) < len(opRawCarryClobberPolicies) {
+			spec.RawCarryClobber = opRawCarryClobberPolicies[op]
 		}
 		if int(op) < len(opExactDivComponentPolicies) {
 			spec.ExactDivComponent = opExactDivComponentPolicies[op]
@@ -1205,6 +1222,14 @@ var opTableArrayGPRInvariantUseMaskPolicies = [...]uint8{
 	OpMatrixStoreFAt:       1<<0 | 1<<1,
 }
 
+var opTableArrayKeyArgIndexPolicies = [...]uint8{
+	OpTableArrayLoad:       3,
+	OpTableArrayStore:      4,
+	OpTableArraySwap:       2,
+	OpTableArraySwapPairs:  2,
+	OpTableArrayNestedLoad: 4,
+}
+
 var opLICMHoistablePolicies = [...]bool{
 	OpConstInt:            true,
 	OpConstFloat:          true,
@@ -1594,6 +1619,12 @@ var opFusableComparisonPolicies = [...]bool{
 	OpLeFloat:    true,
 }
 
+var opLoopBoundComparisonPolicies = [...]bool{
+	OpLtInt: true,
+	OpLeInt: true,
+	OpEqInt: true,
+}
+
 var opConstPoolUserPolicies = [...]bool{
 	OpConstString:             true,
 	OpStringConstLookup:       true,
@@ -1604,6 +1635,18 @@ var opConstPoolUserPolicies = [...]bool{
 	OpStringSplitSubstr:       true,
 	OpStringSplitSubstrNumber: true,
 	OpGuardConstString:        true,
+}
+
+var opRawStringResultPolicies = [...]bool{
+	OpConstString:          true,
+	OpStringConstLookup:    true,
+	OpStringFormatInt:      true,
+	OpStringFormatConst:    true,
+	OpStringFormatConstLen: true,
+	OpStringSplitPart:      true,
+	OpStringSplitSubstr:    true,
+	OpGuardConstString:     true,
+	OpGuardCalleeProto:     true,
 }
 
 var opUnrollCloneablePolicies = [...]bool{
@@ -1963,6 +2006,12 @@ var opCallLikeFactBarrierPolicies = [...]bool{
 	OpGo:             true,
 	OpSend:           true,
 	OpRecv:           true,
+}
+
+var opRawCarryClobberPolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
 }
 
 var opExactDivComponentPolicies = [...]bool{

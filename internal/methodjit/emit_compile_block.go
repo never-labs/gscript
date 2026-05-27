@@ -807,19 +807,11 @@ func tableArrayKeyUsesInBlock(block *Block) map[int]bool {
 		if instr == nil {
 			continue
 		}
-		var keyArg int
-		switch instr.Op {
-		case OpTableArrayLoad:
-			keyArg = 2
-		case OpTableArrayStore:
-			keyArg = 3
-		case OpTableArraySwap, OpTableArraySwapPairs:
-			keyArg = 1
-		case OpTableArrayNestedLoad:
-			keyArg = 3
-		default:
+		spec, ok := instr.Op.Spec()
+		if !ok || spec.TableArrayKeyArgIndex < 0 {
 			continue
 		}
+		keyArg := spec.TableArrayKeyArgIndex
 		if keyArg >= 0 && keyArg < len(instr.Args) && instr.Args[keyArg] != nil {
 			out[instr.Args[keyArg].ID] = true
 		}
@@ -836,7 +828,7 @@ func singlePredRawValueClobberedAfter(block *Block, defIndex int, reg int, alloc
 		if instr == nil {
 			continue
 		}
-		if instr.Op == OpCall || instr.Op == OpCallFloor || instr.Op == OpFieldCallFloor {
+		if spec, ok := instr.Op.Spec(); ok && spec.RawCarryClobber {
 			return true
 		}
 		if pr, ok := alloc.ValueRegs[instr.ID]; ok && !pr.IsFloat && pr.Reg == reg {

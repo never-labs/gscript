@@ -6,8 +6,8 @@
 
 package methodjit
 
-// collectLoopBoundGPRs scans a loop header block for int comparison ops
-// (LeInt, LtInt, EqInt) and returns value IDs of non-phi, GPR-allocated
+// collectLoopBoundGPRs scans a loop header block for loop-bound comparison ops
+// and returns value IDs of non-phi, GPR-allocated
 // arguments (e.g., loop bounds from LoadSlot). These are candidates for
 // carrying across the loop body to avoid eviction and per-iteration reloads.
 func collectLoopBoundGPRs(hdr *Block, alloc *RegAllocation) []int {
@@ -22,7 +22,8 @@ func collectLoopBoundGPRs(hdr *Block, alloc *RegAllocation) []int {
 	}
 	var bounds []int
 	for _, instr := range hdr.Instrs {
-		if instr.Op != OpLeInt && instr.Op != OpLtInt && instr.Op != OpEqInt {
+		spec, ok := instr.Op.Spec()
+		if !ok || !spec.LoopBoundComparison {
 			continue
 		}
 		for _, arg := range instr.Args {
