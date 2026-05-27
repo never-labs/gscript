@@ -149,6 +149,81 @@ func TestValidateDependencyOrderRejectsUnregisteredUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateDependencyOrderRejectsRequiredOptionalOverlap(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:          "AmbiguousReader",
+				Phase:         Tier2PhaseEarlyCanonical,
+				Requires:      analysisFacts(AnalysisFactGlobals),
+				OptionalReads: analysisFacts(AnalysisFactGlobals),
+				Run:           func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected required/optional overlap error, got nil")
+	}
+	if !strings.Contains(err.Error(), "both required and optional") {
+		t.Fatalf("error should report required/optional overlap, got: %v", err)
+	}
+}
+
+func TestValidateDependencyOrderRejectsProvidedOptionalOverlap(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:          "AmbiguousProvider",
+				Phase:         Tier2PhaseEarlyCanonical,
+				Provides:      analysisFacts(AnalysisFactGlobals),
+				OptionalReads: analysisFacts(AnalysisFactGlobals),
+				Run:           func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected provided/optional overlap error, got nil")
+	}
+	if !strings.Contains(err.Error(), "both provided and optional") {
+		t.Fatalf("error should report provided/optional overlap, got: %v", err)
+	}
+}
+
+func TestValidateDependencyOrderRejectsUpdatedOptionalOverlap(t *testing.T) {
+	plan := Tier2OptimizerPlan{
+		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},
+		Modules: []Tier2OptimizerModule{
+			{
+				Name:     "Provider",
+				Phase:    Tier2PhaseEarlyCanonical,
+				Provides: analysisFacts(AnalysisFactGlobals),
+				Run:      func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+			{
+				Name:          "AmbiguousUpdater",
+				Phase:         Tier2PhaseEarlyCanonical,
+				Updates:       analysisFacts(AnalysisFactGlobals),
+				OptionalReads: analysisFacts(AnalysisFactGlobals),
+				Run:           func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) { return fn, nil },
+			},
+		},
+	}
+
+	err := ValidateDependencyOrder(plan)
+	if err == nil {
+		t.Fatal("expected updated/optional overlap error, got nil")
+	}
+	if !strings.Contains(err.Error(), "both updated and optional") {
+		t.Fatalf("error should report updated/optional overlap, got: %v", err)
+	}
+}
+
 func TestValidateDependencyOrderRejectsSelfDependency(t *testing.T) {
 	plan := Tier2OptimizerPlan{
 		Phases: []Tier2OptimizerPhase{Tier2PhaseEarlyCanonical},

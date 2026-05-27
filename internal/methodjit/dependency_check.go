@@ -77,6 +77,8 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 	for _, module := range modules {
 		ref := dependencyModuleRef(module)
 		provides := factSet(module.Provides)
+		requires := factSet(module.Requires)
+		updates := factSet(module.Updates)
 		for _, fact := range module.Requires {
 			if provides[fact] {
 				issues = append(issues, fmt.Sprintf("%s has self-dependency on fact %s", ref, fact))
@@ -85,6 +87,16 @@ func ValidateDependencyOrder(plan Tier2OptimizerPlan) error {
 		for _, fact := range module.Updates {
 			if provides[fact] {
 				issues = append(issues, fmt.Sprintf("%s both provides and updates fact %s", ref, fact))
+			}
+		}
+		for _, fact := range module.OptionalReads {
+			switch {
+			case requires[fact]:
+				issues = append(issues, fmt.Sprintf("%s declares fact %s as both required and optional", ref, fact))
+			case provides[fact]:
+				issues = append(issues, fmt.Sprintf("%s declares fact %s as both provided and optional", ref, fact))
+			case updates[fact]:
+				issues = append(issues, fmt.Sprintf("%s declares fact %s as both updated and optional", ref, fact))
 			}
 		}
 	}
