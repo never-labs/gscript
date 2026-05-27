@@ -144,6 +144,18 @@ func TestTier2OptimizerPlanCoversModulePhases(t *testing.T) {
 	}
 }
 
+func TestTier2ProductionModulesUseContextRunner(t *testing.T) {
+	plan := newTier2OptimizerPlan(&Tier2OptimizerContext{InlineMaxSize: 40})
+	for _, module := range plan.Modules {
+		if module.RunWithContext == nil {
+			t.Fatalf("production module %s/%s does not use RunWithContext", module.Phase, module.Name)
+		}
+		if module.Run != nil {
+			t.Fatalf("production module %s/%s still uses legacy Run entry", module.Phase, module.Name)
+		}
+	}
+}
+
 func TestRunTier2PipelineCreatesPipelineDataWithDependencyRegistry(t *testing.T) {
 	registry := NewModuleRegistry()
 
