@@ -111,68 +111,87 @@ func FixedShapeTableFactsPass(globals map[string]*vm.FuncProto) PassFunc {
 // FixedShapeTableFactsPassWith is the configurable fixed-shape pass entry.
 func FixedShapeTableFactsPassWith(config FixedShapeTableFactsConfig) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		if fn == nil || len(fn.Blocks) == 0 {
-			return fn, nil
+		if fn == nil {
+			return fixedShapeTableFactsPass(fn, config, nil, nil)
 		}
 		fn.ensureAnalysis()
-		tableShapes := fn.Analysis.TableShapeFacts()
-		numeric := fn.Analysis.NumericFacts()
-		facts := inferLocalFixedShapeTables(fn)
-		if len(facts) == 0 {
-			facts = make(map[int]FixedShapeTableFact)
-		}
-		seedGuardedFixedShapeArgFacts(fn, tableShapes, facts, config.ArgFacts)
-		seedGuardedFixedShapeArrayElementArgFacts(fn, facts, config.ArrayElementArgFacts)
-		seedGuardedPolyShapeArgFacts(fn, tableShapes, config.ArgPolyFacts)
-		seedGuardedPolyShapeArrayElementArgFacts(fn, tableShapes, facts, config.ArrayElementPolyFacts)
-		seedProfiledDynamicTableValueFacts(fn, facts)
-		if config.EntryGuardedArgs {
-			markEntryGuardedFixedShapeArgFacts(fn, tableShapes, facts, tableShapes.FixedShapeArgFactMap())
-		}
-		propagateFixedShapePhiFacts(fn, facts)
+		return fixedShapeTableFactsPass(fn, config, fn.Analysis.TableShapeFacts(), fn.Analysis.NumericFacts())
+	}
+}
 
-		for _, block := range fn.Blocks {
-			for _, instr := range block.Instrs {
-				if instr.Op != OpCall {
-					continue
-				}
-				_, callee := resolveCallee(instr, fn, InlineConfig{Globals: config.Globals})
-				if callee == nil {
-					continue
-				}
-				fact, ok := AnalyzeFixedShapeReturnFact(callee)
-				if !ok {
-					continue
-				}
-				facts[instr.ID] = fact
-				if instr.Type == TypeAny || instr.Type == TypeUnknown {
-					instr.Type = TypeTable
-				}
-				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
-					fmt.Sprintf("call result carries fixed table shape %v", fact.FieldNames))
-			}
+func FixedShapeTableFactsPassCtx(config FixedShapeTableFactsConfig) CtxPassFunc {
+	return func(ctx *PassContext) (*Function, error) {
+		fn := ctx.Func()
+		if fn != nil {
+			fn.ensureAnalysis()
 		}
-		seedLocalStringMapValueFacts(fn, facts)
-		seedLocalFieldTableFacts(fn, facts)
-		arrayElementFacts := inferLocalArrayElementTableFacts(fn, facts)
-		seedLocalArrayElementTableFacts(fn, facts, arrayElementFacts)
+		return fixedShapeTableFactsPass(fn, config, ctx.TableShape(), ctx.Numeric())
+	}
+}
 
-		if len(facts) == 0 && tableShapes.FieldPolyShapeFactCount() == 0 {
-			return fn, nil
-		}
-		tableShapes.SetFixedShapeTables(facts)
-		annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
-		propagateFixedShapePhiFacts(fn, facts)
-		annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
-		annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
-		propagateFixedShapePhiFacts(fn, facts)
-		annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
-		annotateFixedShapeSetFields(fn, facts)
-		propagateShapeCacheFromSetFieldToGetField(fn, facts)
-		annotateFixedShapeArrayElementAccesses(fn, numeric, facts)
-		forwardFixedShapeGetFields(fn, facts)
+func fixedShapeTableFactsPass(fn *Function, config FixedShapeTableFactsConfig, tableShapes *TableShapeFacts, numeric *NumericFacts) (*Function, error) {
+	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
+	facts := inferLocalFixedShapeTables(fn)
+	if len(facts) == 0 {
+		facts = make(map[int]FixedShapeTableFact)
+	}
+	seedGuardedFixedShapeArgFacts(fn, tableShapes, facts, config.ArgFacts)
+	seedGuardedFixedShapeArrayElementArgFacts(fn, facts, config.ArrayElementArgFacts)
+	seedGuardedPolyShapeArgFacts(fn, tableShapes, config.ArgPolyFacts)
+	seedGuardedPolyShapeArrayElementArgFacts(fn, tableShapes, facts, config.ArrayElementPolyFacts)
+	seedProfiledDynamicTableValueFacts(fn, facts)
+	if config.EntryGuardedArgs && tableShapes != nil {
+		markEntryGuardedFixedShapeArgFacts(fn, tableShapes, facts, tableShapes.FixedShapeArgFactMap())
+	}
+	propagateFixedShapePhiFacts(fn, facts)
+
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op != OpCall {
+				continue
+			}
+			_, callee := resolveCallee(instr, fn, InlineConfig{Globals: config.Globals})
+			if callee == nil {
+				continue
+			}
+			fact, ok := AnalyzeFixedShapeReturnFact(callee)
+			if !ok {
+				continue
+			}
+			facts[instr.ID] = fact
+			if instr.Type == TypeAny || instr.Type == TypeUnknown {
+				instr.Type = TypeTable
+			}
+			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+				fmt.Sprintf("call result carries fixed table shape %v", fact.FieldNames))
+		}
+	}
+	seedLocalStringMapValueFacts(fn, facts)
+	seedLocalFieldTableFacts(fn, facts)
+	arrayElementFacts := inferLocalArrayElementTableFacts(fn, facts)
+	seedLocalArrayElementTableFacts(fn, facts, arrayElementFacts)
+
+	if tableShapes == nil {
+		return fn, nil
+	}
+	if len(facts) == 0 && tableShapes.FieldPolyShapeFactCount() == 0 {
+		return fn, nil
+	}
+	tableShapes.SetFixedShapeTables(facts)
+	annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
+	propagateFixedShapePhiFacts(fn, facts)
+	annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
+	annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
+	propagateFixedShapePhiFacts(fn, facts)
+	annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
+	annotateFixedShapeSetFields(fn, facts)
+	propagateShapeCacheFromSetFieldToGetField(fn, facts)
+	annotateFixedShapeArrayElementAccesses(fn, numeric, facts)
+	forwardFixedShapeGetFields(fn, facts)
+	return fn, nil
 }
 
 func fixedShapeContainsString(values []string, want string) bool {

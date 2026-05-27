@@ -64,15 +64,16 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 			Phase:    Tier2PhaseEarlyCanonical,
 			Requires: nil,
 			Provides: fixedShapeTableFacts(),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				allowed := allowedDomainsForModule(nil, fixedShapeTableFacts(), nil, "FixedShapeTableFacts (pre-inline)")
+				return FixedShapeTableFactsPassCtx(FixedShapeTableFactsConfig{
 					Globals:               globals,
 					ArgFacts:              optsFixedShapeArgFacts(opts),
 					ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
 					ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
 					ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
 					EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
-				})(fn)
+				})(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 	}
@@ -140,14 +141,15 @@ func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tie
 				if ctx == nil || !ctx.InlineApplied {
 					return fn, nil
 				}
-				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
+				allowed := allowedDomainsForModule(nil, nil, fixedShapeTableFacts(), "FixedShapeTableFacts (post-inline)")
+				return FixedShapeTableFactsPassCtx(FixedShapeTableFactsConfig{
 					Globals:               globals,
 					ArgFacts:              optsFixedShapeArgFacts(opts),
 					ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
 					ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
 					ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
 					EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
-				})(fn)
+				})(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 	}

@@ -167,6 +167,7 @@ var knownReadContractHints = map[string]bool{
 	"EscapeAnalysis (post-fixed-table-lowering)\x00global": true,
 	"FieldLenFold\x00numeric":                              true,
 	"FixedShapeTableFacts\x00numeric":                      true,
+	"FixedShapeTableFacts (post-inline)\x00numeric":        true,
 	"FixedShapeTableFacts (pre-inline)\x00numeric":         true,
 	"LICM\x00global":                                       true,
 	"LICM (post-MatrixRowPtrFactoring)\x00global":          true,

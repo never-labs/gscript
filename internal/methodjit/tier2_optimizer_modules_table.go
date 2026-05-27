@@ -23,15 +23,16 @@ func tier2TableObjectPreparationModules(globals map[string]*vm.FuncProto) []Tier
 			Phase:    Tier2PhaseTableObjectPrep,
 			Requires: nil,
 			Updates:  fixedShapeTableFacts(),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				allowed := allowedDomainsForModule(nil, nil, fixedShapeTableFacts(), "FixedShapeTableFacts")
+				return FixedShapeTableFactsPassCtx(FixedShapeTableFactsConfig{
 					Globals:               globals,
 					ArgFacts:              optsFixedShapeArgFacts(opts),
 					ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
 					ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
 					ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
 					EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
-				})(fn)
+				})(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("LoadElimination", Tier2PhaseTableObjectPrep, analysisFacts(AnalysisFactFixedShapeTables), nil, LoadEliminationPass),
@@ -85,15 +86,17 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 			Phase:    Tier2PhaseTableFieldLower,
 			Requires: analysisFacts(AnalysisFactIntRanges),
 			Updates:  fixedShapeTableFacts(),
-			Run: func(fn *Function, opts *Tier2PipelineOpts) (*Function, error) {
-				return FixedShapeTableFactsPassWith(FixedShapeTableFactsConfig{
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				requires := analysisFacts(AnalysisFactIntRanges)
+				allowed := allowedDomainsForModule(requires, nil, fixedShapeTableFacts(), "FixedShapeTableFacts (post-FieldSvalsLower)")
+				return FixedShapeTableFactsPassCtx(FixedShapeTableFactsConfig{
 					Globals:               globals,
 					ArgFacts:              optsFixedShapeArgFacts(opts),
 					ArgPolyFacts:          optsFixedShapeArgPolyFacts(opts),
 					ArrayElementArgFacts:  optsFixedShapeArrayElementArgFacts(opts),
 					ArrayElementPolyFacts: optsFixedShapeArrayElementPolyFacts(opts),
 					EntryGuardedArgs:      optsFixedShapeEntryGuards(opts),
-				})(fn)
+				})(newPassContext(fn, opts, allowed, passContextEnforce))
 			},
 		},
 		tier2PassModuleWithCtx("GuardFieldCallee (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, GuardFieldCalleePassCtx),
