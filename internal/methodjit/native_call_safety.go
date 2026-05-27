@@ -74,8 +74,7 @@ func tier2NativeCallCalleeResumeSafe(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			spec, ok := instr.Op.Spec()
-			if ok && spec.NativeCalleeResumeUnsafe {
+			if opIsNativeCalleeResumeUnsafe(instr.Op) {
 				return false
 			}
 		}
@@ -87,17 +86,13 @@ func tier2InstrHasNativeVisibleSideEffect(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok {
-		return false
-	}
-	if spec.NativeReplayVisibleTableMutation {
+	if opIsNativeReplayVisibleTableMutation(instr.Op) {
 		if len(instr.Args) == 0 {
 			return true
 		}
 		return !tier2ValueIsLocalTableAllocation(instr.Args[0], make(map[int]bool))
 	}
-	return spec.NativeReplayVisibleSideEffect
+	return opIsNativeReplayVisibleSideEffect(instr.Op)
 }
 
 func tier2ValueIsLocalTableAllocation(v *Value, seen map[int]bool) bool {
@@ -130,6 +125,5 @@ func tier2OpMayExitForNativeReplay(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.NativeReplayMayExit
+	return opIsNativeReplayMayExit(instr.Op)
 }

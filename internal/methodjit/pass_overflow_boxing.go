@@ -139,8 +139,7 @@ func isBoxableIntArithmetic(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.BoxableIntArithmetic
+	return opIsBoxableIntArithmetic(instr.Op)
 }
 
 func forceBoxIntArithmeticOnly(fn *Function, force map[int]bool) *Function {
@@ -196,14 +195,14 @@ func applyBoxedFallback(instr *Instr) bool {
 		instr.Type = TypeUnknown
 		return true
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || spec.BoxedFallbackOp >= OpMax {
+	op, ok := boxedFallbackOp(instr.Op)
+	if !ok {
 		return false
 	}
-	instr.Op = spec.BoxedFallbackOp
-	if spec.BoxedFallbackResultUnknown {
+	if opHasBoxedFallbackUnknownResult(instr.Op) {
 		instr.Type = TypeUnknown
 	}
+	instr.Op = op
 	return true
 }
 
@@ -641,8 +640,7 @@ func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if !ok || !spec.UnsafeIntArithmeticCandidate {
+	if !opIsUnsafeIntArithmeticCandidate(instr.Op) {
 		return false
 	}
 	switch instr.Op {

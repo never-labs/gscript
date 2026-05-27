@@ -196,8 +196,7 @@ func (tm *TieringManager) osrWouldInlineVarargInLoop(proto *vm.FuncProto, profil
 func hasRestartVisibleSideEffect(fn *Function) bool {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			spec, ok := instr.Op.Spec()
-			if ok && spec.RestartVisibleSideEffect {
+			if opIsRestartVisibleSideEffect(instr.Op) {
 				return true
 			}
 		}

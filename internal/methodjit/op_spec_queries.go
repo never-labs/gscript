@@ -425,6 +425,61 @@ func opIsTier2ResidualCallBlocker(op Op) bool {
 	return ok && spec.Tier2ResidualCallBlocker
 }
 
+func opIsBoxableIntArithmetic(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoxableIntArithmetic
+}
+
+func boxedFallbackOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.BoxedFallbackOp, ok && spec.BoxedFallbackOp < OpMax
+}
+
+func opHasBoxedFallbackUnknownResult(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.BoxedFallbackResultUnknown
+}
+
+func opIsUnsafeIntArithmeticCandidate(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.UnsafeIntArithmeticCandidate
+}
+
+func opIsRuntimeOverflowBoxable(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RuntimeOverflowBoxable
+}
+
+func opIsRuntimeGuardRefreshable(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RuntimeGuardRefreshable
+}
+
+func opIsNativeCalleeResumeUnsafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NativeCalleeResumeUnsafe
+}
+
+func opIsNativeReplayVisibleTableMutation(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NativeReplayVisibleTableMutation
+}
+
+func opIsNativeReplayVisibleSideEffect(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NativeReplayVisibleSideEffect
+}
+
+func opIsNativeReplayMayExit(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NativeReplayMayExit
+}
+
+func opIsRestartVisibleSideEffect(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RestartVisibleSideEffect
+}
+
 func callUserArgs(instr *Instr) ([]*Value, bool) {
 	if instr == nil {
 		return nil, false

@@ -517,8 +517,7 @@ func tier2IntOverflowOpCanBox(op string) bool {
 	if !ok {
 		return false
 	}
-	spec, ok := irOp.Spec()
-	return ok && spec.RuntimeOverflowBoxable
+	return opIsRuntimeOverflowBoxable(irOp)
 }
 
 func tier2NeedsNativeStackReserve(cf *CompiledFunction) bool {
@@ -606,8 +605,7 @@ func tier2GuardOpCanRefresh(op string) bool {
 	if !ok {
 		return false
 	}
-	spec, ok := irOp.Spec()
-	return ok && spec.RuntimeGuardRefreshable
+	return opIsRuntimeGuardRefreshable(irOp)
 }
 
 func (tm *TieringManager) applyTier2DeoptAction(proto *vm.FuncProto, action Tier2DeoptAction) {
