@@ -199,14 +199,6 @@ func (ec *emitContext) fnUsesConstPool() bool {
 	return false
 }
 
-func instrUsesConstPool(instr *Instr) bool {
-	if instr == nil {
-		return false
-	}
-	spec, ok := instr.Op.Spec()
-	return ok && spec.ConstPoolUser
-}
-
 // isNumericStaticSelfCall (R124) returns true when this OpCall can use
 // the numeric self-call fast path: static-self (R110), proto qualifies
 // for numeric (R121), all args are int-typed.

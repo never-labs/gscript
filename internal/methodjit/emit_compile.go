@@ -595,7 +595,7 @@ func ensureTier2FieldCachesForFunction(fn *Function) {
 			if instr == nil || instr.SourcePC < 0 {
 				continue
 			}
-			if spec, ok := instr.Op.Spec(); ok && spec.NeedsTier2FieldCache {
+			if opNeedsTier2FieldCache(instr.Op) {
 				ensureFieldCache(fn.Proto)
 				return
 			}
@@ -659,8 +659,7 @@ func instrMayDirectDeoptWithoutFullFlush(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	spec, ok := instr.Op.Spec()
-	if ok && spec.DirectDeoptWithoutFullFlush {
+	if opMayDirectDeoptWithoutFullFlush(instr.Op) {
 		return true
 	}
 	return instr.Op == OpGetField && instr.Type == TypeFloat

@@ -190,7 +190,7 @@ func functionHasNoTableMetatableMutationSurface(fn *Function) bool {
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if spec, ok := instr.Op.Spec(); ok && spec.TableMetatableMutationBarrier {
+			if opIsTableMetatableMutationBarrier(instr.Op) {
 				return false
 			}
 		}

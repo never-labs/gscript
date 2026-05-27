@@ -234,7 +234,7 @@ func allowNestedFloatPhiOverride(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			if spec, ok := instr.Op.Spec(); ok && spec.NestedFloatPhiOverrideSafe {
+			if opIsNestedFloatPhiOverrideSafe(instr.Op) {
 				continue
 			}
 			return false

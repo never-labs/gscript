@@ -581,6 +581,84 @@ func opIsFieldShapePostEffectInlineUnsafe(op Op) bool {
 	return ok && spec.FieldShapePostEffectInlineUnsafe
 }
 
+func opNeedsTier2FieldCache(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NeedsTier2FieldCache
+}
+
+func opMayDirectDeoptWithoutFullFlush(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.DirectDeoptWithoutFullFlush
+}
+
+func tableArrayKeyArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.TableArrayKeyArgIndex, ok && spec.TableArrayKeyArgIndex >= 0
+}
+
+func opIsFloatReductionWideUnrollBarrier(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FloatReductionWideUnrollBarrier
+}
+
+func opIsFloatReductionLatencyUnrollSeed(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FloatReductionLatencyUnrollSeed
+}
+
+func opIsFloatReductionLatencyUnrollBlock(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FloatReductionLatencyUnrollBlock
+}
+
+func opIsFloatReductionDivOp(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.FloatReductionDivOp
+}
+
+func opIsTableMetatableMutationBarrier(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableMetatableMutationBarrier
+}
+
+func instrUsesConstPool(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.ConstPoolUser
+}
+
+func opIsInt48SafeRangeCandidate(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Int48SafeRangeCandidate
+}
+
+func opHasRawStringResult(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawStringResult
+}
+
+func opIsNestedFloatPhiOverrideSafe(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.NestedFloatPhiOverrideSafe
+}
+
+func opIsLoopBoundComparison(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.LoopBoundComparison
+}
+
+func opIsDynamicStringQueryCacheKey(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.DynamicStringQueryCacheKey
+}
+
+func opIsRawFloatValueProducer(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.RawFloatValueProducer
+}
+
 func callUserArgs(instr *Instr) ([]*Value, bool) {
 	if instr == nil {
 		return nil, false

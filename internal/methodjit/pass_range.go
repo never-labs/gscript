@@ -100,8 +100,7 @@ func RangeAnalysisPassCtx(ctx *PassContext) (*Function, error) {
 	// Phase C: populate Int48Safe for int-arithmetic ops whose range fits.
 	safe := make(map[int]bool, len(intInstrs))
 	for _, instr := range intInstrs {
-		spec, ok := instr.Op.Spec()
-		if ok && spec.Int48SafeRangeCandidate {
+		if opIsInt48SafeRangeCandidate(instr.Op) {
 			if r, ok := ranges[instr.ID]; ok && r.fitsInt48() {
 				safe[instr.ID] = true
 			}

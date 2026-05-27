@@ -149,8 +149,7 @@ func lenArgKnownRawString(v *Value) bool {
 	if v.Def.Type == TypeString {
 		return true
 	}
-	spec, ok := v.Def.Op.Spec()
-	return ok && spec.RawStringResult
+	return opHasRawStringResult(v.Def.Op)
 }
 
 func (ec *emitContext) emitRawStringLenNative(instr *Instr) {

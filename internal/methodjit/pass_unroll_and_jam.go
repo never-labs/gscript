@@ -797,7 +797,7 @@ func floatReductionBodyCanUseWideUnroll(body *Block) bool {
 		return false
 	}
 	for _, instr := range body.Instrs[:len(body.Instrs)-1] {
-		if spec, ok := instr.Op.Spec(); ok && spec.FloatReductionWideUnrollBarrier {
+		if opIsFloatReductionWideUnrollBarrier(instr.Op) {
 			return false
 		}
 	}
@@ -810,14 +810,10 @@ func floatReductionBodyCanUseLatencyWideUnroll(body *Block) bool {
 	}
 	hasSqrt := false
 	for _, instr := range body.Instrs[:len(body.Instrs)-1] {
-		spec, ok := instr.Op.Spec()
-		if !ok {
-			continue
-		}
-		if spec.FloatReductionLatencyUnrollSeed {
+		if opIsFloatReductionLatencyUnrollSeed(instr.Op) {
 			hasSqrt = true
 		}
-		if spec.FloatReductionLatencyUnrollBlock {
+		if opIsFloatReductionLatencyUnrollBlock(instr.Op) {
 			return false
 		}
 	}
@@ -829,7 +825,7 @@ func floatReductionBodyHasDivFloat(body *Block) bool {
 		return false
 	}
 	for _, instr := range body.Instrs[:len(body.Instrs)-1] {
-		if spec, ok := instr.Op.Spec(); ok && spec.FloatReductionDivOp {
+		if opIsFloatReductionDivOp(instr.Op) {
 			return true
 		}
 	}

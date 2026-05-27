@@ -807,11 +807,10 @@ func tableArrayKeyUsesInBlock(block *Block) map[int]bool {
 		if instr == nil {
 			continue
 		}
-		spec, ok := instr.Op.Spec()
-		if !ok || spec.TableArrayKeyArgIndex < 0 {
+		keyArg, ok := tableArrayKeyArgIndex(instr.Op)
+		if !ok {
 			continue
 		}
-		keyArg := spec.TableArrayKeyArgIndex
 		if keyArg >= 0 && keyArg < len(instr.Args) && instr.Args[keyArg] != nil {
 			out[instr.Args[keyArg].ID] = true
 		}

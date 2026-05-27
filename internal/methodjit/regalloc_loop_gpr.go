@@ -22,8 +22,7 @@ func collectLoopBoundGPRs(hdr *Block, alloc *RegAllocation) []int {
 	}
 	var bounds []int
 	for _, instr := range hdr.Instrs {
-		spec, ok := instr.Op.Spec()
-		if !ok || !spec.LoopBoundComparison {
+		if !opIsLoopBoundComparison(instr.Op) {
 			continue
 		}
 		for _, arg := range instr.Args {

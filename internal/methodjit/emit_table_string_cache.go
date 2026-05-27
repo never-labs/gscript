@@ -452,8 +452,7 @@ func dynamicStringQueryCacheUseful(instr *Instr) bool {
 	if instr == nil || len(instr.Args) < 2 || instr.Args[1] == nil || instr.Args[1].Def == nil {
 		return false
 	}
-	spec, ok := instr.Args[1].Def.Op.Spec()
-	return ok && spec.DynamicStringQueryCacheKey
+	return opIsDynamicStringQueryCacheKey(instr.Args[1].Def.Op)
 }
 
 func (ec *emitContext) emitNativeStringQueryCacheSlot(dst, tmp jit.Reg) {

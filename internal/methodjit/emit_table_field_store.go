@@ -273,8 +273,7 @@ func (ec *emitContext) setFieldValueMayBeRawFloat(v *Value) bool {
 	if v.Def.Type == TypeFloat {
 		return true
 	}
-	spec, ok := v.Def.Op.Spec()
-	return ok && spec.RawFloatValueProducer
+	return opIsRawFloatValueProducer(v.Def.Op)
 }
 
 type fieldStoreValue struct {
