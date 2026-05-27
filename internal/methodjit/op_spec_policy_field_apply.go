@@ -1,6 +1,12 @@
 package methodjit
 
 func applyOpSpecFieldPolicies(op Op, spec *OpSpec) {
+	applyOpSpecFieldInlinePolicies(op, spec)
+	applyOpSpecFieldGlobalPolicies(op, spec)
+	applyOpSpecFieldLoadPolicies(op, spec)
+}
+
+func applyOpSpecFieldInlinePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldShapeSplitInlineSafePolicies) {
 		spec.FieldShapeSplitInlineSafe = opFieldShapeSplitInlineSafePolicies[op]
 	}
@@ -13,12 +19,18 @@ func applyOpSpecFieldPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldShapePostEffectInlineUnsafePolicies) {
 		spec.FieldShapePostEffectInlineUnsafe = opFieldShapePostEffectInlineUnsafePolicies[op]
 	}
+}
+
+func applyOpSpecFieldGlobalPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opGlobalConstUnsafePolicies) {
 		spec.GlobalConstUnsafe = opGlobalConstUnsafePolicies[op]
 	}
 	if int(op) < len(opNestedCallLikePolicies) {
 		spec.NestedCallLike = opNestedCallLikePolicies[op]
 	}
+}
+
+func applyOpSpecFieldLoadPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opLoadElimConstCSEPolicies) {
 		spec.LoadElimConstCSE = opLoadElimConstCSEPolicies[op]
 	}

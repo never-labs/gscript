@@ -192,6 +192,65 @@ func TestOpSpecBuildOnlyOrchestratesPolicyDomains(t *testing.T) {
 	}
 }
 
+func TestOpSpecPolicyApplyEntrypointsOnlyOrchestrateSubdomains(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	dir := filepath.Dir(file)
+	cases := []struct {
+		file string
+		fn   string
+	}{
+		{"op_spec_policy_backend_apply.go", "applyOpSpecBackendPolicies"},
+		{"op_spec_policy_field_apply.go", "applyOpSpecFieldPolicies"},
+		{"op_spec_policy_numeric_apply.go", "applyOpSpecNumericPolicies"},
+		{"op_spec_policy_table_call_apply.go", "applyOpSpecTableCallPolicies"},
+		{"op_spec_policy_type_apply.go", "applyOpSpecTypePolicies"},
+	}
+	for _, tc := range cases {
+		hasPolicyIndex, err := funcHasPolicyTableIndex(filepath.Join(dir, tc.file), tc.fn)
+		if err != nil {
+			t.Fatalf("scan %s.%s: %v", tc.file, tc.fn, err)
+		}
+		if hasPolicyIndex {
+			t.Fatalf("%s.%s should orchestrate subdomain apply functions, not index policy tables directly", tc.file, tc.fn)
+		}
+	}
+}
+
+func funcHasPolicyTableIndex(path, funcName string) (bool, error) {
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
+	if err != nil {
+		return false, err
+	}
+	for _, decl := range parsed.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != funcName {
+			continue
+		}
+		found := false
+		ast.Inspect(fn.Body, func(node ast.Node) bool {
+			if found {
+				return false
+			}
+			index, ok := node.(*ast.IndexExpr)
+			if !ok {
+				return true
+			}
+			ident, ok := index.X.(*ast.Ident)
+			if ok && strings.HasSuffix(ident.Name, "Policies") {
+				found = true
+				return false
+			}
+			return true
+		})
+		return found, nil
+	}
+	return false, os.ErrNotExist
+}
+
 func countLines(src []byte) int {
 	if len(src) == 0 {
 		return 0

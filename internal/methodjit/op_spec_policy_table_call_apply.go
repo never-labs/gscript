@@ -1,6 +1,14 @@
 package methodjit
 
 func applyOpSpecTableCallPolicies(op Op, spec *OpSpec) {
+	applyOpSpecTableCallFieldPolicies(op, spec)
+	applyOpSpecTableCallBoolPolicies(op, spec)
+	applyOpSpecTableCallCallPolicies(op, spec)
+	applyOpSpecTableCallNumericPolicies(op, spec)
+	applyOpSpecTableCallBarrierPolicies(op, spec)
+}
+
+func applyOpSpecTableCallFieldPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opNeedsTier2FieldCachePolicies) {
 		spec.NeedsTier2FieldCache = opNeedsTier2FieldCachePolicies[op]
 	}
@@ -13,6 +21,9 @@ func applyOpSpecTableCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldWritePolicies) {
 		spec.FieldWrite = opFieldWritePolicies[op]
 	}
+}
+
+func applyOpSpecTableCallBoolPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opBoolTableFillBodyBenignPolicies) {
 		spec.BoolTableFillBodyBenign = opBoolTableFillBodyBenignPolicies[op]
 	}
@@ -31,6 +42,9 @@ func applyOpSpecTableCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opBoolTableCountIncrementPolicies) {
 		spec.BoolTableCountIncrement = opBoolTableCountIncrementPolicies[op]
 	}
+}
+
+func applyOpSpecTableCallCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opCallResultRangeGuardCandidatePolicies) {
 		spec.CallResultRangeGuardCandidate = opCallResultRangeGuardCandidatePolicies[op]
 	}
@@ -58,6 +72,9 @@ func applyOpSpecTableCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opCallUserArgStartPolicies) && opCallUserArgStartPolicies[op].Set {
 		spec.CallUserArgStart = opCallUserArgStartPolicies[op].Start
 	}
+}
+
+func applyOpSpecTableCallNumericPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opSpeculativeIntUseCandidatePolicies) {
 		spec.SpeculativeIntUseCandidate = opSpeculativeIntUseCandidatePolicies[op]
 	}
@@ -70,6 +87,9 @@ func applyOpSpecTableCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opRawIntCarryValuePolicies) {
 		spec.RawIntCarryValue = opRawIntCarryValuePolicies[op]
 	}
+}
+
+func applyOpSpecTableCallBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTableResultRawTablePtrPolicies) {
 		spec.TableResultRawTablePtr = opTableResultRawTablePtrPolicies[op]
 	}
