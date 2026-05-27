@@ -101,13 +101,14 @@ func overflowBoxingPass(fn *Function, forceBoxIntIDs map[int]bool) (*Function, e
 				if boxed[instr.ID] {
 					continue
 				}
-				switch instr.Op {
-				case OpPhi:
+				if instr.Op == OpPhi {
 					if !overflowCheckedRaw[instr.ID] && anyArgBoxed(instr, boxed) {
 						boxed[instr.ID] = true
 						changed = true
 					}
-				case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt:
+					continue
+				}
+				if isBoxableIntArithmetic(instr) {
 					if anyArgBoxed(instr, boxed) ||
 						(loopCarriedDeps[instr.ID] &&
 							!overflowCheckedRaw[instr.ID] &&
@@ -158,13 +159,14 @@ func forceBoxIntArithmeticOnly(fn *Function, force map[int]bool) *Function {
 				if instr == nil || boxed[instr.ID] {
 					continue
 				}
-				switch instr.Op {
-				case OpPhi:
+				if instr.Op == OpPhi {
 					if anyArgBoxed(instr, boxed) {
 						boxed[instr.ID] = true
 						changed = true
 					}
-				case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt:
+					continue
+				}
+				if isBoxableIntArithmetic(instr) && instr.Op != OpDivIntExact {
 					if anyArgBoxed(instr, boxed) {
 						boxed[instr.ID] = true
 						changed = true
@@ -623,8 +625,7 @@ func collectPhiArithmeticDeps(fn *Function) map[int]bool {
 		if instr == nil {
 			continue
 		}
-		switch instr.Op {
-		case OpPhi, OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt:
+		if instr.Op == OpPhi || isBoxableIntArithmetic(instr) {
 			deps[id] = true
 			for _, arg := range instr.Args {
 				if arg != nil {
