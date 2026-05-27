@@ -6,11 +6,22 @@ import "fmt"
 // constants/phis when existing shape-split control flow already proves the
 // receiver shape on every incoming edge.
 func FieldPolyLenPhiPass(fn *Function) (*Function, error) {
+	if fn == nil || fn.Analysis == nil {
+		return fieldPolyLenPhiPass(fn, nil)
+	}
+	return fieldPolyLenPhiPass(fn, fn.Analysis.TableShapeFacts())
+}
+
+func FieldPolyLenPhiPassCtx(ctx *PassContext) (*Function, error) {
+	return fieldPolyLenPhiPass(ctx.Func(), ctx.TableShape())
+}
+
+func fieldPolyLenPhiPass(fn *Function, tableShapes *TableShapeFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	if fn.Analysis.TableShapeFacts().FieldPolyShapeFactCount() == 0 {
+	if tableShapes == nil || tableShapes.FieldPolyShapeFactCount() == 0 {
 		return fn, nil
 	}
 	changed := false
@@ -22,7 +33,7 @@ func FieldPolyLenPhiPass(fn *Function) (*Function, error) {
 			if instr == nil || instr.Op != OpFieldPolyLen || len(instr.Args) == 0 || instr.Args[0] == nil {
 				continue
 			}
-			lens := fieldPolyLenExactLens(fn, instr)
+			lens := fieldPolyLenExactLens(fn, instr, tableShapes)
 			if len(lens) < 2 {
 				continue
 			}
@@ -64,13 +75,16 @@ type fieldPolyLenPhiContext struct {
 	active  map[int]bool
 }
 
-func fieldPolyLenExactLens(fn *Function, instr *Instr) map[uint32]int64 {
+func fieldPolyLenExactLens(fn *Function, instr *Instr, tableShapes *TableShapeFacts) map[uint32]int64 {
 	out := make(map[uint32]int64)
 	name := fieldNameFromAux(fn, instr.Aux)
 	if name == "" {
 		return nil
 	}
-	cases, _ := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(instr.ID)
+	if tableShapes == nil {
+		return nil
+	}
+	cases, _ := tableShapes.FieldPolyShapeCases(instr.ID)
 	for _, c := range cases {
 		r, ok := c.ReceiverFact.FieldLenRanges[name]
 		if c.ShapeID == 0 || !ok || !r.known || r.min != r.max {
