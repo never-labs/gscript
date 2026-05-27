@@ -29,7 +29,8 @@ func TestOpSpecDirectAccessStaysBehindQueryBoundary(t *testing.T) {
 			return nil
 		}
 		name := filepath.Base(path)
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || allowed[name] {
+		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || allowed[name] ||
+			strings.HasPrefix(name, "op_spec_query_") {
 			return nil
 		}
 		src, err := os.ReadFile(path)
@@ -45,6 +46,6 @@ func TestOpSpecDirectAccessStaysBehindQueryBoundary(t *testing.T) {
 		t.Fatalf("scan methodjit sources: %v", err)
 	}
 	if len(offenders) > 0 {
-		t.Fatalf("Op.Spec() direct access must go through op_spec_queries.go; offenders: %s", strings.Join(offenders, ", "))
+		t.Fatalf("Op.Spec() direct access must go through op_spec_query helpers; offenders: %s", strings.Join(offenders, ", "))
 	}
 }
