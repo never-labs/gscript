@@ -109,10 +109,15 @@ func TestOpSpecDomainFilesStayFocused(t *testing.T) {
 	}
 	dir := filepath.Dir(file)
 	limits := map[string]int{
-		"op_spec_base.go":     250,
-		"op_spec_build.go":    500,
-		"op_spec_registry.go": 100,
-		"op_spec_types.go":    400,
+		"op_spec_base.go":                       250,
+		"op_spec_build.go":                      500,
+		"op_spec_emit_dispatch_ast_test.go":     100,
+		"op_spec_emit_dispatch_helpers_test.go": 350,
+		"op_spec_emit_dispatch_test.go":         200,
+		"op_spec_integrity_test.go":             200,
+		"op_spec_policy_registry_test.go":       180,
+		"op_spec_registry.go":                   100,
+		"op_spec_types.go":                      400,
 	}
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -128,6 +133,8 @@ func TestOpSpecDomainFilesStayFocused(t *testing.T) {
 		case strings.HasPrefix(name, "op_spec_policy_") && strings.HasSuffix(name, ".go"):
 			limit = 350
 		case strings.HasPrefix(name, "op_spec_query_") && strings.HasSuffix(name, ".go"):
+			limit = 250
+		case strings.HasPrefix(name, "op_spec_contract_") && strings.HasSuffix(name, "_test.go"):
 			limit = 250
 		default:
 			return nil
