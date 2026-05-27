@@ -115,8 +115,8 @@ func globalConstFunctionSafe(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpCall, OpResume, OpYield, OpSelf, OpSetGlobal, OpSetUpval, OpGo, OpSend, OpRecv:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.GlobalConstUnsafe {
 				return false
 			}
 		}

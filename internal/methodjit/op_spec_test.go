@@ -161,6 +161,131 @@ func TestNativeReplayContractsLiveInOpSpec(t *testing.T) {
 	}
 }
 
+func TestRestartVisibleSideEffectContractLivesInOpSpec(t *testing.T) {
+	visible := []Op{OpCall, OpSetTable, OpSetGlobal, OpNewTable, OpSelf, OpVararg, OpLen, OpTForLoop}
+	for _, op := range visible {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.RestartVisibleSideEffect {
+			t.Fatalf("%s should be marked restart-visible by OpSpec", op)
+		}
+		fn := &Function{Blocks: []*Block{{Instrs: []*Instr{{Op: op}}}}}
+		if !hasRestartVisibleSideEffect(fn) {
+			t.Fatalf("%s restart-visible query should be driven by OpSpec", op)
+		}
+	}
+
+	pure := []Op{OpAddInt, OpConstInt, OpTableArrayLoad, OpGetField}
+	for _, op := range pure {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if spec.RestartVisibleSideEffect {
+			t.Fatalf("%s should not be restart-visible by OpSpec", op)
+		}
+		fn := &Function{Blocks: []*Block{{Instrs: []*Instr{{Op: op}}}}}
+		if hasRestartVisibleSideEffect(fn) {
+			t.Fatalf("%s restart-visible query should be false through OpSpec", op)
+		}
+	}
+}
+
+func TestFieldShapeInlineContractsLiveInOpSpec(t *testing.T) {
+	splitSafe := []Op{OpConstInt, OpAddInt, OpFieldLoad, OpGuardType, OpBranch, OpPhi, OpTableArrayLoad}
+	for _, op := range splitSafe {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.FieldShapeSplitInlineSafe {
+			t.Fatalf("%s should be field-shape split-inline-safe by OpSpec", op)
+		}
+		if !fieldShapeSplitInlineInstrSafe(&Instr{Op: op}) {
+			t.Fatalf("%s split-inline safety query should be driven by OpSpec", op)
+		}
+	}
+
+	if fieldShapeSplitInlineInstrSafe(&Instr{Op: OpGetField}) {
+		t.Fatalf("GetField without Aux2 should keep its instr-specific split-inline guard")
+	}
+	if !fieldShapeSplitInlineInstrSafe(&Instr{Op: OpGetField, Aux2: 1}) {
+		t.Fatalf("GetField with Aux2 should keep its instr-specific split-inline allowance")
+	}
+
+	preSafe := []Op{OpGetField, OpSetTable, OpAdd, OpLen}
+	for _, op := range preSafe {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.FieldShapePreEffectInlineSafe || !fieldShapePreEffectInlineInstrSafe(&Instr{Op: op}) {
+			t.Fatalf("%s pre-effect inline safety should be driven by OpSpec", op)
+		}
+	}
+
+	sideEffects := []Op{OpFieldStore, OpTableArrayStore, OpSetField, OpSetTable}
+	for _, op := range sideEffects {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.FieldShapeInlineSideEffect || !fieldShapeInlineInstrHasSideEffect(&Instr{Op: op}) {
+			t.Fatalf("%s inline side-effect contract should be driven by OpSpec", op)
+		}
+	}
+
+	postUnsafe := []Op{OpSetField, OpGetField, OpSetTable, OpCall}
+	for _, op := range postUnsafe {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.FieldShapePostEffectInlineUnsafe || fieldShapePostEffectInlineInstrSafe(&Instr{Op: op, Aux2: 1}) {
+			t.Fatalf("%s post-effect unsafe contract should be driven by OpSpec", op)
+		}
+	}
+}
+
+func TestGlobalConstAndNestedCallContractsLiveInOpSpec(t *testing.T) {
+	globalUnsafe := []Op{OpCall, OpResume, OpYield, OpSelf, OpSetGlobal, OpSetUpval, OpGo, OpSend, OpRecv}
+	for _, op := range globalUnsafe {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.GlobalConstUnsafe {
+			t.Fatalf("%s should be global-const-unsafe by OpSpec", op)
+		}
+		fn := &Function{Blocks: []*Block{{Instrs: []*Instr{{Op: op}}}}}
+		if globalConstFunctionSafe(fn) {
+			t.Fatalf("%s global const safety should be driven by OpSpec", op)
+		}
+	}
+
+	nestedCallLike := []Op{OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpTForCall, OpGo}
+	for _, op := range nestedCallLike {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.NestedCallLike {
+			t.Fatalf("%s should be nested-call-like by OpSpec", op)
+		}
+		fn := &Function{Blocks: []*Block{{Instrs: []*Instr{{Op: op}}}}}
+		if !irHasNestedCallLike(fn) {
+			t.Fatalf("%s nested call query should be driven by OpSpec", op)
+		}
+	}
+
+	fn := &Function{Blocks: []*Block{{Instrs: []*Instr{{Op: OpAddInt}}}}}
+	if !globalConstFunctionSafe(fn) || irHasNestedCallLike(fn) {
+		t.Fatalf("pure op should be safe for global const and not nested-call-like")
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}

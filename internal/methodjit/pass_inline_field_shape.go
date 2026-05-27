@@ -307,37 +307,28 @@ func fieldShapePreEffectInlineInstrSafe(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpGetField, OpGetFieldNumToFloat, OpGetTable, OpSetTable:
+	spec, ok := instr.Op.Spec()
+	if ok && spec.FieldShapePreEffectInlineSafe {
 		return true
-	case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm, OpLen, OpFloor, OpNumToFloat:
-		return true
-	default:
-		return fieldShapeSplitInlineInstrSafe(instr)
 	}
+	return fieldShapeSplitInlineInstrSafe(instr)
 }
 
 func fieldShapeInlineInstrHasSideEffect(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpFieldStore, OpTableArrayStore, OpSetField, OpSetTable:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldShapeInlineSideEffect
 }
 
 func fieldShapePostEffectInlineInstrSafe(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpSetField, OpGetField, OpGetFieldNumToFloat, OpSetTable, OpGetTable,
-		OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf:
+	spec, ok := instr.Op.Spec()
+	if ok && spec.FieldShapePostEffectInlineUnsafe {
 		return false
-	default:
-		return fieldShapeSplitInlineInstrSafe(instr)
 	}
+	return fieldShapeSplitInlineInstrSafe(instr)
 }

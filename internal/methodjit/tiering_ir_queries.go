@@ -64,8 +64,8 @@ func irHasNestedCallLike(fn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpTForCall, OpGo:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.NestedCallLike {
 				return true
 			}
 		}

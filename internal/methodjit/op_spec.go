@@ -123,6 +123,13 @@ type OpSpec struct {
 	NativeReplayVisibleSideEffect    bool
 	NativeReplayVisibleTableMutation bool
 	NativeCalleeResumeUnsafe         bool
+	RestartVisibleSideEffect         bool
+	FieldShapeSplitInlineSafe        bool
+	FieldShapePreEffectInlineSafe    bool
+	FieldShapeInlineSideEffect       bool
+	FieldShapePostEffectInlineUnsafe bool
+	GlobalConstUnsafe                bool
+	NestedCallLike                   bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -309,6 +316,27 @@ func (op Op) Spec() (OpSpec, bool) {
 		}
 		if int(op) < len(opNativeCalleeResumeUnsafePolicies) {
 			spec.NativeCalleeResumeUnsafe = opNativeCalleeResumeUnsafePolicies[op]
+		}
+		if int(op) < len(opRestartVisibleSideEffectPolicies) {
+			spec.RestartVisibleSideEffect = opRestartVisibleSideEffectPolicies[op]
+		}
+		if int(op) < len(opFieldShapeSplitInlineSafePolicies) {
+			spec.FieldShapeSplitInlineSafe = opFieldShapeSplitInlineSafePolicies[op]
+		}
+		if int(op) < len(opFieldShapePreEffectInlineSafePolicies) {
+			spec.FieldShapePreEffectInlineSafe = opFieldShapePreEffectInlineSafePolicies[op]
+		}
+		if int(op) < len(opFieldShapeInlineSideEffectPolicies) {
+			spec.FieldShapeInlineSideEffect = opFieldShapeInlineSideEffectPolicies[op]
+		}
+		if int(op) < len(opFieldShapePostEffectInlineUnsafePolicies) {
+			spec.FieldShapePostEffectInlineUnsafe = opFieldShapePostEffectInlineUnsafePolicies[op]
+		}
+		if int(op) < len(opGlobalConstUnsafePolicies) {
+			spec.GlobalConstUnsafe = opGlobalConstUnsafePolicies[op]
+		}
+		if int(op) < len(opNestedCallLikePolicies) {
+			spec.NestedCallLike = opNestedCallLikePolicies[op]
 		}
 		return spec, true
 	}
@@ -606,4 +634,134 @@ var opNativeCalleeResumeUnsafePolicies = [...]bool{
 	OpGo:        true,
 	OpSend:      true,
 	OpRecv:      true,
+}
+
+var opRestartVisibleSideEffectPolicies = [...]bool{
+	OpCall:                true,
+	OpSetGlobal:           true,
+	OpSetTable:            true,
+	OpTableArrayStore:     true,
+	OpTableArraySwap:      true,
+	OpTableArraySwapPairs: true,
+	OpSetField:            true,
+	OpNewTable:            true,
+	OpNewFixedTable:       true,
+	OpSetList:             true,
+	OpAppend:              true,
+	OpSelf:                true,
+	OpSetUpval:            true,
+	OpGo:                  true,
+	OpMakeChan:            true,
+	OpSend:                true,
+	OpRecv:                true,
+	OpClosure:             true,
+	OpClose:               true,
+	OpVararg:              true,
+	OpConcat:              true,
+	OpLen:                 true,
+	OpPow:                 true,
+	OpTForCall:            true,
+	OpTForLoop:            true,
+}
+
+var opFieldShapeSplitInlineSafePolicies = [...]bool{
+	OpConstInt:              true,
+	OpConstFloat:            true,
+	OpConstBool:             true,
+	OpConstNil:              true,
+	OpConstString:           true,
+	OpAddInt:                true,
+	OpSubInt:                true,
+	OpMulInt:                true,
+	OpModInt:                true,
+	OpNegInt:                true,
+	OpAddFloat:              true,
+	OpSubFloat:              true,
+	OpMulFloat:              true,
+	OpDivFloat:              true,
+	OpNegFloat:              true,
+	OpEqInt:                 true,
+	OpLtInt:                 true,
+	OpLeInt:                 true,
+	OpEqString:              true,
+	OpLtFloat:               true,
+	OpLeFloat:               true,
+	OpFloor:                 true,
+	OpNumToFloat:            true,
+	OpFieldSvals:            true,
+	OpFieldLoad:             true,
+	OpFieldLoadNumToFloat:   true,
+	OpFieldPolyLen:          true,
+	OpGuardType:             true,
+	OpGuardIntRange:         true,
+	OpGuardCalleeProto:      true,
+	OpGuardFieldCalleeProto: true,
+	OpBranch:                true,
+	OpJump:                  true,
+	OpPhi:                   true,
+	OpFieldStore:            true,
+	OpTableArrayHeader:      true,
+	OpTableArrayLen:         true,
+	OpTableArrayData:        true,
+	OpTableArrayLoad:        true,
+	OpTableArrayStore:       true,
+}
+
+var opFieldShapePreEffectInlineSafePolicies = [...]bool{
+	OpGetField:           true,
+	OpGetFieldNumToFloat: true,
+	OpGetTable:           true,
+	OpSetTable:           true,
+	OpAdd:                true,
+	OpSub:                true,
+	OpMul:                true,
+	OpDiv:                true,
+	OpMod:                true,
+	OpUnm:                true,
+	OpLen:                true,
+	OpFloor:              true,
+	OpNumToFloat:         true,
+}
+
+var opFieldShapeInlineSideEffectPolicies = [...]bool{
+	OpFieldStore:      true,
+	OpTableArrayStore: true,
+	OpSetField:        true,
+	OpSetTable:        true,
+}
+
+var opFieldShapePostEffectInlineUnsafePolicies = [...]bool{
+	OpSetField:           true,
+	OpGetField:           true,
+	OpGetFieldNumToFloat: true,
+	OpSetTable:           true,
+	OpGetTable:           true,
+	OpCall:               true,
+	OpCallFloor:          true,
+	OpFieldCallFloor:     true,
+	OpResume:             true,
+	OpYield:              true,
+	OpSelf:               true,
+}
+
+var opGlobalConstUnsafePolicies = [...]bool{
+	OpCall:      true,
+	OpResume:    true,
+	OpYield:     true,
+	OpSelf:      true,
+	OpSetGlobal: true,
+	OpSetUpval:  true,
+	OpGo:        true,
+	OpSend:      true,
+	OpRecv:      true,
+}
+
+var opNestedCallLikePolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+	OpResume:         true,
+	OpYield:          true,
+	OpTForCall:       true,
+	OpGo:             true,
 }

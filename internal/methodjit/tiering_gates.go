@@ -196,18 +196,8 @@ func (tm *TieringManager) osrWouldInlineVarargInLoop(proto *vm.FuncProto, profil
 func hasRestartVisibleSideEffect(fn *Function) bool {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			switch instr.Op {
-			case OpCall,
-				OpSetGlobal,
-				OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpSetField,
-				OpNewTable, OpNewFixedTable, OpSetList, OpAppend,
-				OpSelf,
-				OpSetUpval,
-				OpGo, OpMakeChan, OpSend, OpRecv,
-				OpClosure, OpClose,
-				OpVararg,
-				OpConcat, OpLen, OpPow,
-				OpTForCall, OpTForLoop:
+			spec, ok := instr.Op.Spec()
+			if ok && spec.RestartVisibleSideEffect {
 				return true
 			}
 		}

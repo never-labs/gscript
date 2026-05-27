@@ -487,33 +487,12 @@ func fieldShapeSplitInlineInstrSafe(instr *Instr) bool {
 	if instr.Op == OpSetField {
 		return fieldSvalsSetFieldPreservesShape(instr)
 	}
-	if instr.Op == OpBranch || instr.Op == OpJump || instr.Op == OpPhi {
-		return true
-	}
-	if instr.Op == OpFieldStore {
-		return true
-	}
-	if instr.Op == OpTableArrayHeader || instr.Op == OpTableArrayLen ||
-		instr.Op == OpTableArrayData || instr.Op == OpTableArrayLoad ||
-		instr.Op == OpTableArrayStore {
-		return true
-	}
 	return fieldShapeSplitInlineOpSafe(instr.Op)
 }
 
 func fieldShapeSplitInlineOpSafe(op Op) bool {
-	switch op {
-	case OpConstInt, OpConstFloat, OpConstBool, OpConstNil, OpConstString,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpEqInt, OpLtInt, OpLeInt, OpEqString, OpLtFloat, OpLeFloat,
-		OpFloor, OpNumToFloat, OpFieldSvals, OpFieldLoad, OpFieldLoadNumToFloat,
-		OpFieldPolyLen,
-		OpGuardType, OpGuardIntRange, OpGuardCalleeProto, OpGuardFieldCalleeProto:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.FieldShapeSplitInlineSafe
 }
 
 func fieldPolyShapeCaseAux2(c FieldPolyShapeCase) int64 {
