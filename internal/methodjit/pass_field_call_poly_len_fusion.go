@@ -63,15 +63,8 @@ func fieldCallPolyLenFusionBarrier(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpSetField, OpSetTable, OpSetList, OpAppend, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix,
-		OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf, OpGo, OpSend, OpRecv,
-		OpReturn, OpJump, OpBranch:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldCallPolyLenFusionBarrier
 }
 
 func fieldCallPolyLenFusionCases(fn *Function, call, ln *Instr, callCases []FieldPolyShapeCase, tableShapes *TableShapeFacts) []FieldCallPolyLenFusion {

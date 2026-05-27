@@ -483,12 +483,8 @@ func (ts *typeSpecializer) wouldInsertNumToFloat(instr *Instr) bool {
 }
 
 func isGenericSpecializableOp(op Op) bool {
-	switch op {
-	case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm, OpEq, OpLt, OpLe:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.GenericSpecializable
 }
 
 // typeSpecializer holds the inferred type map and does specialization.
@@ -1063,12 +1059,8 @@ func (ts *typeSpecializer) insertNumToFloatConversions(fn *Function) {
 }
 
 func shouldInsertNumToFloat(op Op) bool {
-	switch op {
-	case OpAdd, OpSub, OpMul, OpDiv, OpLt, OpLe:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.NumToFloatInsertCandidate
 }
 
 func isUnknownNumericCandidate(t Type) bool {
@@ -1211,13 +1203,8 @@ func (ts *typeSpecializer) valueFlowsBackThroughIntRecurrence(id, phiID int, use
 }
 
 func isIntRecurrenceOp(op Op) bool {
-	switch op {
-	case OpAdd, OpSub, OpMul, OpMod,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.IntRecurrence
 }
 
 func (ts *typeSpecializer) intRecurrenceArgsOK(instr *Instr, recurrenceID int) bool {
@@ -1276,14 +1263,8 @@ func replaceValueUses(fn *Function, oldID int, newVal *Value, exceptID int) {
 
 // isNumericOp returns true for ops that require numeric operands.
 func isNumericOp(op Op) bool {
-	switch op {
-	case OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm,
-		OpAddInt, OpSubInt, OpMulInt, OpModInt, OpNegInt,
-		OpAddFloat, OpSubFloat, OpMulFloat, OpDivFloat, OpNegFloat,
-		OpLt, OpLe, OpLtInt, OpLeInt, OpLtFloat, OpLeFloat:
-		return true
-	}
-	return false
+	spec, ok := op.Spec()
+	return ok && spec.NumericOperand
 }
 
 // specialize replaces a generic op with its type-specialized variant if

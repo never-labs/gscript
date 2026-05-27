@@ -437,13 +437,11 @@ func lastConstStringStoreLen(fn *Function, tableShapes *TableShapeFacts, block *
 }
 
 func fieldLenFoldBarrier(instr *Instr) bool {
-	switch instr.Op {
-	case OpCall, OpSetField, OpFieldStore, OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpSetGlobal, OpSetUpval, OpAppend, OpSetList:
-		return true
-	default:
+	if instr == nil {
 		return false
 	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldLenFoldBarrier
 }
 
 func fieldStoreMatchesField(fn *Function, tableShapes *TableShapeFacts, instr *Instr, tableID int, fieldAux int64) bool {

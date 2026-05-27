@@ -288,13 +288,8 @@ func componentHasObservableUse(component map[int]bool, uses map[int][]*Instr) bo
 }
 
 func isExactDivAllowedExternalUse(op Op) bool {
-	switch op {
-	case OpEq, OpLt, OpLe, OpEqInt, OpLtInt, OpLeInt,
-		OpGuardType, OpGuardIntRange, OpBranch:
-		return true
-	default:
-		return false
-	}
+	spec, ok := op.Spec()
+	return ok && spec.ExactDivAllowedExternalUse
 }
 
 func buildInstrDefs(fn *Function) map[int]*Instr {

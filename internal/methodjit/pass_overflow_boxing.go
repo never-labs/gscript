@@ -166,12 +166,8 @@ func isBoxableIntArithmetic(instr *Instr) bool {
 	if instr == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.BoxableIntArithmetic
 }
 
 func forceBoxIntArithmeticOnly(fn *Function, force map[int]bool) *Function {
@@ -676,6 +672,10 @@ func collectPhiArithmeticDeps(fn *Function) map[int]bool {
 
 func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
 	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	if !ok || !spec.UnsafeIntArithmeticCandidate {
 		return false
 	}
 	switch instr.Op {

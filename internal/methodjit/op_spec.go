@@ -146,6 +146,17 @@ type OpSpec struct {
 	PureNumericInline                bool
 	NativeEffectLoopInline           bool
 	DirectDeoptWithoutFullFlush      bool
+	GenericSpecializable             bool
+	NumToFloatInsertCandidate        bool
+	IntRecurrence                    bool
+	NumericOperand                   bool
+	FieldSvalsCrossBlockBarrier      bool
+	FieldSvalsGlobalBarrier          bool
+	FieldLenFoldBarrier              bool
+	FieldCallPolyLenFusionBarrier    bool
+	BoxableIntArithmetic             bool
+	UnsafeIntArithmeticCandidate     bool
+	ExactDivAllowedExternalUse       bool
 	BackendPolicy                    OpBackendPolicy
 }
 
@@ -401,6 +412,39 @@ func (op Op) Spec() (OpSpec, bool) {
 		}
 		if int(op) < len(opDirectDeoptWithoutFullFlushPolicies) {
 			spec.DirectDeoptWithoutFullFlush = opDirectDeoptWithoutFullFlushPolicies[op]
+		}
+		if int(op) < len(opGenericSpecializablePolicies) {
+			spec.GenericSpecializable = opGenericSpecializablePolicies[op]
+		}
+		if int(op) < len(opNumToFloatInsertCandidatePolicies) {
+			spec.NumToFloatInsertCandidate = opNumToFloatInsertCandidatePolicies[op]
+		}
+		if int(op) < len(opIntRecurrencePolicies) {
+			spec.IntRecurrence = opIntRecurrencePolicies[op]
+		}
+		if int(op) < len(opNumericOperandPolicies) {
+			spec.NumericOperand = opNumericOperandPolicies[op]
+		}
+		if int(op) < len(opFieldSvalsCrossBlockBarrierPolicies) {
+			spec.FieldSvalsCrossBlockBarrier = opFieldSvalsCrossBlockBarrierPolicies[op]
+		}
+		if int(op) < len(opFieldSvalsGlobalBarrierPolicies) {
+			spec.FieldSvalsGlobalBarrier = opFieldSvalsGlobalBarrierPolicies[op]
+		}
+		if int(op) < len(opFieldLenFoldBarrierPolicies) {
+			spec.FieldLenFoldBarrier = opFieldLenFoldBarrierPolicies[op]
+		}
+		if int(op) < len(opFieldCallPolyLenFusionBarrierPolicies) {
+			spec.FieldCallPolyLenFusionBarrier = opFieldCallPolyLenFusionBarrierPolicies[op]
+		}
+		if int(op) < len(opBoxableIntArithmeticPolicies) {
+			spec.BoxableIntArithmetic = opBoxableIntArithmeticPolicies[op]
+		}
+		if int(op) < len(opUnsafeIntArithmeticCandidatePolicies) {
+			spec.UnsafeIntArithmeticCandidate = opUnsafeIntArithmeticCandidatePolicies[op]
+		}
+		if int(op) < len(opExactDivAllowedExternalUsePolicies) {
+			spec.ExactDivAllowedExternalUse = opExactDivAllowedExternalUsePolicies[op]
 		}
 		return spec, true
 	}
@@ -1169,4 +1213,157 @@ var opDirectDeoptWithoutFullFlushPolicies = [...]bool{
 	OpTableArraySwap:           true,
 	OpTableArraySwapPairs:      true,
 	OpTableArrayNestedLoad:     true,
+}
+
+var opGenericSpecializablePolicies = [...]bool{
+	OpAdd: true,
+	OpSub: true,
+	OpMul: true,
+	OpDiv: true,
+	OpMod: true,
+	OpUnm: true,
+	OpEq:  true,
+	OpLt:  true,
+	OpLe:  true,
+}
+
+var opNumToFloatInsertCandidatePolicies = [...]bool{
+	OpAdd: true,
+	OpSub: true,
+	OpMul: true,
+	OpDiv: true,
+	OpLt:  true,
+	OpLe:  true,
+}
+
+var opIntRecurrencePolicies = [...]bool{
+	OpAdd:    true,
+	OpSub:    true,
+	OpMul:    true,
+	OpMod:    true,
+	OpAddInt: true,
+	OpSubInt: true,
+	OpMulInt: true,
+	OpModInt: true,
+}
+
+var opNumericOperandPolicies = [...]bool{
+	OpAdd:      true,
+	OpSub:      true,
+	OpMul:      true,
+	OpDiv:      true,
+	OpMod:      true,
+	OpUnm:      true,
+	OpAddInt:   true,
+	OpSubInt:   true,
+	OpMulInt:   true,
+	OpModInt:   true,
+	OpNegInt:   true,
+	OpAddFloat: true,
+	OpSubFloat: true,
+	OpMulFloat: true,
+	OpDivFloat: true,
+	OpNegFloat: true,
+	OpLt:       true,
+	OpLe:       true,
+	OpLtInt:    true,
+	OpLeInt:    true,
+	OpLtFloat:  true,
+	OpLeFloat:  true,
+}
+
+var opFieldSvalsCrossBlockBarrierPolicies = [...]bool{
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+	OpResume:         true,
+	OpYield:          true,
+	OpSelf:           true,
+	OpSetGlobal:      true,
+	OpSetUpval:       true,
+	OpSetTable:       true,
+	OpSetList:        true,
+	OpAppend:         true,
+}
+
+var opFieldSvalsGlobalBarrierPolicies = [...]bool{
+	OpSetTable:       true,
+	OpSetList:        true,
+	OpAppend:         true,
+	OpCall:           true,
+	OpCallFloor:      true,
+	OpFieldCallFloor: true,
+	OpResume:         true,
+	OpYield:          true,
+	OpSelf:           true,
+	OpSetGlobal:      true,
+	OpSetUpval:       true,
+}
+
+var opFieldLenFoldBarrierPolicies = [...]bool{
+	OpCall:                true,
+	OpSetField:            true,
+	OpFieldStore:          true,
+	OpSetTable:            true,
+	OpTableArrayStore:     true,
+	OpTableArraySwap:      true,
+	OpTableArraySwapPairs: true,
+	OpSetGlobal:           true,
+	OpSetUpval:            true,
+	OpAppend:              true,
+	OpSetList:             true,
+}
+
+var opFieldCallPolyLenFusionBarrierPolicies = [...]bool{
+	OpSetField:                   true,
+	OpSetTable:                   true,
+	OpSetList:                    true,
+	OpAppend:                     true,
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpCall:                       true,
+	OpCallFloor:                  true,
+	OpFieldCallFloor:             true,
+	OpResume:                     true,
+	OpYield:                      true,
+	OpSelf:                       true,
+	OpGo:                         true,
+	OpSend:                       true,
+	OpRecv:                       true,
+	OpReturn:                     true,
+	OpJump:                       true,
+	OpBranch:                     true,
+}
+
+var opBoxableIntArithmeticPolicies = [...]bool{
+	OpAddInt:      true,
+	OpSubInt:      true,
+	OpMulInt:      true,
+	OpModInt:      true,
+	OpDivIntExact: true,
+	OpNegInt:      true,
+}
+
+var opUnsafeIntArithmeticCandidatePolicies = [...]bool{
+	OpAddInt:      true,
+	OpSubInt:      true,
+	OpMulInt:      true,
+	OpNegInt:      true,
+	OpDivIntExact: true,
+}
+
+var opExactDivAllowedExternalUsePolicies = [...]bool{
+	OpEq:            true,
+	OpLt:            true,
+	OpLe:            true,
+	OpEqInt:         true,
+	OpLtInt:         true,
+	OpLeInt:         true,
+	OpGuardType:     true,
+	OpGuardIntRange: true,
+	OpBranch:        true,
 }

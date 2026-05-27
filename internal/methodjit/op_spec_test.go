@@ -399,6 +399,66 @@ func TestBackendAndLoopContractsLiveInOpSpec(t *testing.T) {
 	}
 }
 
+func TestTypeAndBarrierContractsLiveInOpSpec(t *testing.T) {
+	for _, op := range []Op{OpAdd, OpSub, OpMul, OpDiv, OpMod, OpUnm, OpEq, OpLt, OpLe} {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.GenericSpecializable || !isGenericSpecializableOp(op) {
+			t.Fatalf("%s generic specialization contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpAdd, OpSub, OpMul, OpDiv, OpLt, OpLe} {
+		if !shouldInsertNumToFloat(op) {
+			t.Fatalf("%s NumToFloat insertion contract should be driven by OpSpec", op)
+		}
+	}
+	if !isIntRecurrenceOp(OpAddInt) || !isNumericOp(OpAddFloat) {
+		t.Fatalf("type-specialization recurrence/numeric contracts should be driven by OpSpec")
+	}
+
+	for _, op := range []Op{OpCall, OpSetTable, OpSetList, OpAppend} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FieldSvalsCrossBlockBarrier || !crossBlockFieldSvalsGlobalBarrier(&Instr{Op: op}) {
+			t.Fatalf("%s cross-block FieldSvals barrier should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpSetTable, OpCall, OpSetGlobal} {
+		spec, ok := op.Spec()
+		if !ok || !spec.FieldSvalsGlobalBarrier || !fieldSvalsGlobalBarrier(&Instr{Op: op}) {
+			t.Fatalf("%s FieldSvals global barrier should be driven by OpSpec", op)
+		}
+	}
+	if !fieldLenFoldBarrier(&Instr{Op: OpSetTable}) || !fieldCallPolyLenFusionBarrier(&Instr{Op: OpGo}) {
+		t.Fatalf("field length barrier contracts should be driven by OpSpec")
+	}
+}
+
+func TestIntArithmeticContractsLiveInOpSpec(t *testing.T) {
+	for _, op := range []Op{OpAddInt, OpSubInt, OpMulInt, OpModInt, OpDivIntExact, OpNegInt} {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%s has no OpSpec", op)
+		}
+		if !spec.BoxableIntArithmetic || !isBoxableIntArithmetic(&Instr{Op: op}) {
+			t.Fatalf("%s boxable int arithmetic contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpAddInt, OpSubInt, OpMulInt, OpNegInt, OpDivIntExact} {
+		spec, ok := op.Spec()
+		if !ok || !spec.UnsafeIntArithmeticCandidate {
+			t.Fatalf("%s unsafe int arithmetic candidate should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpEq, OpLt, OpLe, OpEqInt, OpLtInt, OpLeInt, OpGuardType, OpGuardIntRange, OpBranch} {
+		spec, ok := op.Spec()
+		if !ok || !spec.ExactDivAllowedExternalUse || !isExactDivAllowedExternalUse(op) {
+			t.Fatalf("%s exact-div external-use contract should be driven by OpSpec", op)
+		}
+	}
+}
+
 func TestOpsByEmitterFamily(t *testing.T) {
 	got := OpsByEmitterFamily(OpEmitterControl)
 	want := []Op{OpJump, OpBranch, OpReturn, OpTestSet}

@@ -292,13 +292,8 @@ func crossBlockFieldSvalsGlobalBarrier(instr *Instr) bool {
 	if instr == nil {
 		return true
 	}
-	switch instr.Op {
-	case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf, OpSetGlobal, OpSetUpval,
-		OpSetTable, OpSetList, OpAppend:
-		return true
-	default:
-		return false
-	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldSvalsCrossBlockBarrier
 }
 
 func crossBlockExistingFieldSvalsLower(fn *Function) bool {
@@ -590,19 +585,16 @@ func fieldSvalsGlobalBarrier(instr *Instr) bool {
 	if instr.Op.IsTerminator() {
 		return true
 	}
-	switch instr.Op {
-	case OpSetField:
+	if instr.Op == OpSetField {
 		return len(instr.Args) == 0 || instr.Args[0] == nil
-	case OpSetTable, OpSetList, OpAppend:
-		return true
+	}
+	switch instr.Op {
 	case OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
 		OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix:
 		return len(instr.Args) == 0 || instr.Args[0] == nil
-	case OpCall, OpCallFloor, OpFieldCallFloor, OpResume, OpYield, OpSelf, OpSetGlobal, OpSetUpval:
-		return true
-	default:
-		return false
 	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldSvalsGlobalBarrier
 }
 
 func fieldSvalsMutationTableID(instr *Instr) (int, bool) {
