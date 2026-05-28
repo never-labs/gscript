@@ -119,7 +119,11 @@ func prepareFieldShapeInlineCalleeWithReason(calleeFn *Function, c FieldPolyShap
 }
 
 func fieldShapeInlineSplitEligibilitySummary(fn *Function, instr *Instr, config InlineConfig, block *Block) string {
-	cases := fieldShapeCalleeCases(fn, instr)
+	return fieldShapeInlineSplitEligibilitySummaryWithFacts(fn, instr, config, block, functionTableShapeFacts(fn))
+}
+
+func fieldShapeInlineSplitEligibilitySummaryWithFacts(fn *Function, instr *Instr, config InlineConfig, block *Block, tableShapes *TableShapeFacts) string {
+	cases := fieldShapeCalleeCasesWithFacts(fn, tableShapes, instr)
 	if len(cases) < 2 {
 		return ""
 	}

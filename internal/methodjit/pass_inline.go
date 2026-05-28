@@ -50,6 +50,7 @@ type InlineConfig struct {
 	Globals                  map[string]*vm.FuncProto // global function name -> proto
 	GlobalFacts              *GlobalFacts             // optional diagnostics/oracle fact sink for residual calls
 	SpeculationFacts         *SpeculationFacts        // optional spec-dependency fact sink for inlined callees
+	TableShapes              *TableShapeFacts         // optional field-shape facts for feedback-driven callee resolution
 	MaxSize                  int                      // max callee bytecode count (default 30)
 	MaxRecursion             int                      // max inlining depth for self/mutually-recursive callees (0 = no recursive inlining)
 	MaxCumulativeSize        int                      // R166: V8-style cumulative-bytecode cap across all inlines in this compilation (0 = unbounded, preserves R73 behavior)
@@ -85,6 +86,7 @@ func InlinePassWith(config InlineConfig) PassFunc {
 	// isRecursive-veto behavior). Callers that want bounded recursive
 	// inlining set this explicitly (e.g., 2 for Tier 2).
 	return func(fn *Function) (*Function, error) {
+		config = inlineConfigWithDefaults(fn, config)
 		// Expose globals to the IR correctness oracle so it can resolve
 		// residual cross-function calls left behind by bounded recursive
 		// inlining. Production code paths don't read this fact.
@@ -121,6 +123,17 @@ func InlinePassWith(config InlineConfig) PassFunc {
 		}
 		return fn, nil
 	}
+}
+
+func inlineConfigWithDefaults(fn *Function, config InlineConfig) InlineConfig {
+	if fn == nil {
+		return config
+	}
+	fn.ensureAnalysis()
+	if config.TableShapes == nil {
+		config.TableShapes = functionTableShapeFacts(fn)
+	}
+	return config
 }
 
 // inlineCalls is the main inlining driver. It scans the caller for OpCall
@@ -175,21 +188,21 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 		var fieldShapeCase FieldPolyShapeCase
 		hasFieldShapeCase := false
 		if calleeProto == nil {
-			if feedbackCallee, closure, ok := inlineFeedbackCallee(fn, instr); ok {
+			if feedbackCallee, closure, ok := inlineFeedbackCalleeWithFacts(fn, instr, config.TableShapes); ok {
 				calleeName = feedbackCallee.Name
 				calleeProto = feedbackCallee
 				guardedFeedbackCallee = true
 				guardedFeedbackClosure = closure
-				if c, ok := inlineFeedbackFieldShapeCase(fn, instr); ok {
+				if c, ok := inlineFeedbackFieldShapeCaseWithFacts(fn, instr, config.TableShapes); ok {
 					fieldShapeCase = c
 					hasFieldShapeCase = true
 				}
 			}
 		}
 		if calleeProto == nil {
-			if summary := fieldShapeCalleeSummary(fn, instr); summary != "" {
+			if summary := fieldShapeCalleeSummaryWithFacts(fn, config.TableShapes, instr); summary != "" {
 				if remarks := functionRemarks(fn); remarks != nil {
-					if splitSummary := fieldShapeInlineSplitEligibilitySummary(fn, instr, config, block); splitSummary != "" {
+					if splitSummary := fieldShapeInlineSplitEligibilitySummaryWithFacts(fn, instr, config, block, config.TableShapes); splitSummary != "" {
 						summary = summary + "; split eligibility: " + splitSummary
 					}
 					remarks.Add("Inline", "missed", block.ID, instr.ID, instr.Op,

@@ -105,6 +105,7 @@ func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tie
 					Globals:                  globals,
 					GlobalFacts:              passCtx.Global(),
 					SpeculationFacts:         passCtx.Speculation(),
+					TableShapes:              passCtx.TableShape(),
 					MaxSize:                  maxSize,
 					MaxRecursion:             8,
 					MaxCumulativeSize:        120,

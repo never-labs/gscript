@@ -25,13 +25,17 @@ func inlineFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool)
 }
 
 func inlineFeedbackCallee(fn *Function, instr *Instr) (*vm.FuncProto, uintptr, bool) {
+	return inlineFeedbackCalleeWithFacts(fn, instr, functionTableShapeFacts(fn))
+}
+
+func inlineFeedbackCalleeWithFacts(fn *Function, instr *Instr, tableShapes *TableShapeFacts) (*vm.FuncProto, uintptr, bool) {
 	if proto, ok := callABIFeedbackCalleeProto(fn, instr); ok && proto != nil {
 		if closure, closureProto, closureOK := inlineFeedbackVMClosure(fn, instr); closureOK && closureProto == proto {
 			return proto, closure, true
 		}
 		return proto, 0, true
 	}
-	if c, ok := inlineFeedbackFieldShapeCase(fn, instr); ok && c.VMProto != nil {
+	if c, ok := inlineFeedbackFieldShapeCaseWithFacts(fn, instr, tableShapes); ok && c.VMProto != nil {
 		return c.VMProto, 0, true
 	}
 	return nil, 0, false
@@ -46,7 +50,11 @@ func inlineFeedbackVMClosure(fn *Function, instr *Instr) (uintptr, *vm.FuncProto
 }
 
 func inlineFeedbackFieldShapeCase(fn *Function, instr *Instr) (FieldPolyShapeCase, bool) {
-	cases := fieldShapeCalleeCases(fn, instr)
+	return inlineFeedbackFieldShapeCaseWithFacts(fn, instr, functionTableShapeFacts(fn))
+}
+
+func inlineFeedbackFieldShapeCaseWithFacts(fn *Function, instr *Instr, tableShapes *TableShapeFacts) (FieldPolyShapeCase, bool) {
+	cases := fieldShapeCalleeCasesWithFacts(fn, tableShapes, instr)
 	if len(cases) != 1 || cases[0].VMProto == nil {
 		return FieldPolyShapeCase{}, false
 	}
