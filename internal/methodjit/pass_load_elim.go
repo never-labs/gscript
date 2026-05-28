@@ -183,21 +183,38 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				}
 			}
 
+			if !handled && opIsGlobalRead(instr.Op) {
+				// R53: globals are read-only for the body of a function in
+				// nearly all GScript code. Two reads of globals[i] in the
+				// same block return the same runtime pointer. CSE.
+				if origID, ok := globalAvail[instr.Aux]; ok {
+					origInstr := instrByID[origID]
+					replaceAllUses(fn, instr.ID, origInstr)
+					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+						"reused earlier GetGlobal result")
+				} else {
+					globalAvail[instr.Aux] = instr.ID
+				}
+				handled = true
+			}
+
+			if !handled && opIsGlobalWrite(instr.Op) {
+				// SetGlobal on globals[i] kills the matching cache entry.
+				if _, ok := globalAvail[instr.Aux]; ok {
+					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+						"SetGlobal invalidated cached global value")
+				}
+				delete(globalAvail, instr.Aux)
+				for key := range globalConstGuardAvail {
+					if key.constIdx == instr.Aux {
+						delete(globalConstGuardAvail, key)
+					}
+				}
+				handled = true
+			}
+
 			if !handled {
 				switch instr.Op {
-				case OpGetGlobal:
-					// R53: globals are read-only for the body of a function in
-					// nearly all GScript code. Two reads of globals[i] in the
-					// same block return the same runtime pointer. CSE.
-					if origID, ok := globalAvail[instr.Aux]; ok {
-						origInstr := instrByID[origID]
-						replaceAllUses(fn, instr.ID, origInstr)
-						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"reused earlier GetGlobal result")
-					} else {
-						globalAvail[instr.Aux] = instr.ID
-					}
-
 				case OpMatrixFlat:
 					if len(instr.Args) < 1 {
 						continue
@@ -222,19 +239,6 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 							"reused earlier MatrixStride result")
 					} else {
 						matrixStrideAvail[instr.Args[0].ID] = instr.ID
-					}
-
-				case OpSetGlobal:
-					// SetGlobal on globals[i] kills the matching cache entry.
-					if _, ok := globalAvail[instr.Aux]; ok {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"SetGlobal invalidated cached global value")
-					}
-					delete(globalAvail, instr.Aux)
-					for key := range globalConstGuardAvail {
-						if key.constIdx == instr.Aux {
-							delete(globalConstGuardAvail, key)
-						}
 					}
 
 				case OpGetField:
