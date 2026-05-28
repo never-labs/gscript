@@ -89,10 +89,27 @@ func buildJSONLib() *Table {
 		return []Value{r0, r1}, nil
 	}, jsonDecode)
 
-	// json.pretty(value [, indent]) -> pretty-printed JSON string
-	set("pretty", func(args []Value) ([]Value, error) {
+	// json.valid(str) -> bool
+	jsonValid := func(v Value) (Value, error) {
+		if !v.IsString() {
+			return NilValue(), fmt.Errorf("bad argument #1 to 'json.valid' (string expected)")
+		}
+		return BoolValue(json.Valid([]byte(v.Str()))), nil
+	}
+	setFastArg1("valid", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'json.pretty'")
+			return nil, fmt.Errorf("bad argument #1 to 'json.valid'")
+		}
+		v, err := jsonValid(args[0])
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, jsonValid)
+
+	jsonPretty := func(name string, args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'json.%s'", name)
 		}
 		indent := "  " // default 2 spaces
 		if len(args) >= 2 && args[1].IsString() {
@@ -101,9 +118,19 @@ func buildJSONLib() *Table {
 		goVal := jsonGScriptToGo(args[0])
 		data, err := json.MarshalIndent(goVal, "", indent)
 		if err != nil {
-			return nil, fmt.Errorf("json.pretty: %v", err)
+			return nil, fmt.Errorf("json.%s: %v", name, err)
 		}
 		return []Value{StringValue(string(data))}, nil
+	}
+
+	// json.pretty(value [, indent]) -> pretty-printed JSON string
+	set("pretty", func(args []Value) ([]Value, error) {
+		return jsonPretty("pretty", args)
+	})
+
+	// json.indent(value [, indent]) -> pretty-printed JSON string
+	set("indent", func(args []Value) ([]Value, error) {
+		return jsonPretty("indent", args)
 	})
 
 	return t

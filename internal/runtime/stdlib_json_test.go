@@ -224,6 +224,44 @@ func TestJSONDecodeError(t *testing.T) {
 }
 
 // ==================================================================
+// JSON valid tests
+// ==================================================================
+
+func TestJSONValid(t *testing.T) {
+	interp := jsonInterp(t, `
+		object := json.valid("{\"name\":\"test\",\"age\":30}")
+		array := json.valid("[1, true, null]")
+		stringValue := json.valid("\"hello\"")
+	`)
+	if !interp.GetGlobal("object").Bool() {
+		t.Errorf("expected object JSON to be valid")
+	}
+	if !interp.GetGlobal("array").Bool() {
+		t.Errorf("expected array JSON to be valid")
+	}
+	if !interp.GetGlobal("stringValue").Bool() {
+		t.Errorf("expected string JSON to be valid")
+	}
+}
+
+func TestJSONValidRejectsInvalidInput(t *testing.T) {
+	interp := jsonInterp(t, `
+		malformed := json.valid("{")
+		trailing := json.valid("{} []")
+		empty := json.valid("")
+	`)
+	if interp.GetGlobal("malformed").Bool() {
+		t.Errorf("expected malformed JSON to be invalid")
+	}
+	if interp.GetGlobal("trailing").Bool() {
+		t.Errorf("expected trailing data to be invalid")
+	}
+	if interp.GetGlobal("empty").Bool() {
+		t.Errorf("expected empty string to be invalid")
+	}
+}
+
+// ==================================================================
 // JSON pretty tests
 // ==================================================================
 
@@ -246,6 +284,27 @@ func TestJSONPrettyCustomIndent(t *testing.T) {
 	s := v.Str()
 	if !strings.Contains(s, "    ") {
 		t.Errorf("expected 4-space indentation, got %v", s)
+	}
+}
+
+func TestJSONIndentDefault(t *testing.T) {
+	interp := jsonInterp(t, `result := json.indent({a: 1})`)
+	v := interp.GetGlobal("result")
+	s := v.Str()
+	if !strings.Contains(s, "\n") {
+		t.Errorf("expected indented JSON with newlines, got %v", s)
+	}
+	if !strings.Contains(s, "  ") {
+		t.Errorf("expected 2-space indentation, got %v", s)
+	}
+}
+
+func TestJSONIndentCustomIndent(t *testing.T) {
+	interp := jsonInterp(t, `result := json.indent({a: 1}, "\t")`)
+	v := interp.GetGlobal("result")
+	s := v.Str()
+	if !strings.Contains(s, "\t") {
+		t.Errorf("expected tab indentation, got %v", s)
 	}
 }
 
