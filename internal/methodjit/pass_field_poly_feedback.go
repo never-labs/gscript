@@ -60,11 +60,17 @@ func runtimeFieldPolyShapeCasesFromFeedback(fn *Function, instr *Instr) ([]Field
 }
 
 func getFieldReceiverFixedShapeFact(fn *Function, instr *Instr) (FixedShapeTableFact, int, bool) {
+	return getFieldReceiverFixedShapeFactWithFacts(fn, functionTableShapeFacts(fn), instr)
+}
+
+func getFieldReceiverFixedShapeFactWithFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr) (FixedShapeTableFact, int, bool) {
 	if fn == nil || instr == nil || !opIsFieldRead(instr.Op) || len(instr.Args) == 0 || instr.Args[0] == nil {
 		return FixedShapeTableFact{}, 0, false
 	}
-	shapes := functionTableShapeFacts(fn)
-	facts := shapes.FixedShapeTableMap()
+	if tableShapes == nil {
+		return FixedShapeTableFact{}, 0, false
+	}
+	facts := tableShapes.FixedShapeTableMap()
 	if len(facts) == 0 {
 		return FixedShapeTableFact{}, 0, false
 	}
