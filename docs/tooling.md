@@ -198,7 +198,10 @@ path/to/file.gs: GS1001 error: parse error: parse error at 1:6: expected ...
 ```
 
 `--format=json` writes a JSON diagnostics array to stdout. Each diagnostic has
-the stable machine-readable fields `file`, `code`, `severity`, and `message`:
+the stable machine-readable fields `file`, `code`, `severity`, and `message`.
+When the lexer/parser error text includes a source position, JSON diagnostics
+also include one-based `line` and `column` fields. Text output remains unchanged
+for compatibility.
 
 ```json
 [
@@ -206,7 +209,9 @@ the stable machine-readable fields `file`, `code`, `severity`, and `message`:
     "file": "path/to/file.gs",
     "code": "GS1001",
     "severity": "error",
-    "message": "parse error: parse error at 1:6: expected ..."
+    "message": "parse error: parse error at 1:6: expected ...",
+    "line": 1,
+    "column": 6
   }
 ]
 ```

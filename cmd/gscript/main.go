@@ -10,9 +10,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	goruntime "runtime"
 	"runtime/pprof"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/gscript/gscript/internal/lexer"
@@ -314,8 +316,36 @@ type lintDiagnostic struct {
 	Code     string `json:"code"`
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
+	Line     int    `json:"line,omitempty"`
+	Column   int    `json:"column,omitempty"`
 
 	text string
+}
+
+var lintDiagnosticPositionRE = regexp.MustCompile(`(?:^|[^0-9])([0-9]+):([0-9]+)(?:[^0-9]|$)`)
+
+func newLintDiagnostic(file, code, severity string, err error) lintDiagnostic {
+	diagnostic := lintDiagnostic{
+		File:     file,
+		Code:     code,
+		Severity: severity,
+		Message:  err.Error(),
+	}
+	diagnostic.Line, diagnostic.Column = parseLintDiagnosticPosition(diagnostic.Message)
+	return diagnostic
+}
+
+func parseLintDiagnosticPosition(message string) (int, int) {
+	match := lintDiagnosticPositionRE.FindStringSubmatch(message)
+	if match == nil {
+		return 0, 0
+	}
+	line, lineErr := strconv.Atoi(match[1])
+	column, columnErr := strconv.Atoi(match[2])
+	if lineErr != nil || columnErr != nil {
+		return 0, 0
+	}
+	return line, column
 }
 
 func runLintCommand(args []string, outw, errw io.Writer) int {
@@ -339,23 +369,14 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 	for _, path := range paths {
 		files, err := gscriptFiles(path)
 		if err != nil {
-			diagnostics = append(diagnostics, lintDiagnostic{
-				File:     path,
-				Code:     "GS0001",
-				Severity: "error",
-				Message:  err.Error(),
-				text:     fmt.Sprintf("%s: %v", path, err),
-			})
+			diagnostic := newLintDiagnostic(path, "GS0001", "error", err)
+			diagnostic.text = fmt.Sprintf("%s: %v", path, err)
+			diagnostics = append(diagnostics, diagnostic)
 			continue
 		}
 		for _, filename := range files {
 			if err := parseGScriptFile(filename); err != nil {
-				diagnostics = append(diagnostics, lintDiagnostic{
-					File:     filename,
-					Code:     "GS1001",
-					Severity: "error",
-					Message:  err.Error(),
-				})
+				diagnostics = append(diagnostics, newLintDiagnostic(filename, "GS1001", "error", err))
 			}
 		}
 	}

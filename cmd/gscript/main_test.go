@@ -344,6 +344,53 @@ func TestLintJSONReportsSyntaxErrors(t *testing.T) {
 	if !strings.Contains(got.Message, "parse error") {
 		t.Fatalf("diagnostic message = %q, want parse error", got.Message)
 	}
+	if got.Line != 1 {
+		t.Fatalf("diagnostic line = %d, want 1", got.Line)
+	}
+	if got.Column != 6 {
+		t.Fatalf("diagnostic column = %d, want 6", got.Column)
+	}
+}
+
+func TestLintJSONReportsLexerErrorPosition(t *testing.T) {
+	dir := t.TempDir()
+	badPath := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(badPath, []byte("\"unterminated\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format=json", badPath}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runLintCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+
+	var diagnostics []lintDiagnostic
+	if err := json.Unmarshal(stdout.Bytes(), &diagnostics); err != nil {
+		t.Fatalf("stdout is not JSON diagnostics: %v; stdout = %q", err, stdout.String())
+	}
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics len = %d, want 1: %#v", len(diagnostics), diagnostics)
+	}
+	got := diagnostics[0]
+	if got.File != badPath {
+		t.Fatalf("diagnostic file = %q, want %q", got.File, badPath)
+	}
+	if got.Code != "GS1001" {
+		t.Fatalf("diagnostic code = %q, want GS1001", got.Code)
+	}
+	if !strings.Contains(got.Message, "lexer error") {
+		t.Fatalf("diagnostic message = %q, want lexer error", got.Message)
+	}
+	if got.Line != 1 {
+		t.Fatalf("diagnostic line = %d, want 1", got.Line)
+	}
+	if got.Column != 1 {
+		t.Fatalf("diagnostic column = %d, want 1", got.Column)
+	}
 }
 
 func TestLintJSONReportsEmptyDiagnosticsOnSuccess(t *testing.T) {
