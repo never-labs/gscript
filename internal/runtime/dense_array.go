@@ -202,6 +202,13 @@ func (a *DenseArray) Slice(start, end int) (*DenseArray, error) {
 }
 
 func (a *DenseArray) Filter(mask *DenseArray) (*DenseArray, error) {
+	if mask == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	return a.filterKnownCount(mask, denseArrayBoolCount(mask.bools))
+}
+
+func (a *DenseArray) filterKnownCount(mask *DenseArray, count int) (*DenseArray, error) {
 	if a == nil || mask == nil {
 		return nil, ErrDenseArrayOperand
 	}
@@ -213,7 +220,7 @@ func (a *DenseArray) Filter(mask *DenseArray) (*DenseArray, error) {
 	}
 	switch a.dtype {
 	case DenseArrayF64:
-		out := make([]float64, denseArrayBoolCount(mask.bools))
+		out := make([]float64, count)
 		j := 0
 		for i, keep := range mask.bools {
 			if keep {
@@ -223,7 +230,7 @@ func (a *DenseArray) Filter(mask *DenseArray) (*DenseArray, error) {
 		}
 		return &DenseArray{dtype: DenseArrayF64, f64: out}, nil
 	case DenseArrayI64:
-		out := make([]int64, denseArrayBoolCount(mask.bools))
+		out := make([]int64, count)
 		j := 0
 		for i, keep := range mask.bools {
 			if keep {
@@ -233,7 +240,7 @@ func (a *DenseArray) Filter(mask *DenseArray) (*DenseArray, error) {
 		}
 		return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
 	case DenseArrayBool:
-		out := make([]bool, denseArrayBoolCount(mask.bools))
+		out := make([]bool, count)
 		j := 0
 		for i, keep := range mask.bools {
 			if keep {
