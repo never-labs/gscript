@@ -72,6 +72,18 @@ Until the GScript typed-array/SoA backend is merged, the checked-in harness uses
 Go-side references for the expected storage paths and marks every JSON row with
 `backend_status=pending_gscript_typed_array_soa_backend`.
 
+SoA must be measured on two classes of workload:
+
+- full-record workloads such as particle integration, where every iteration
+  touches most columns and AoS may legitimately win through record locality;
+- column-subset workloads such as `particle_subset_x`, where a hot loop touches
+  only a few columns and SoA should win through dense contiguous access.
+
+The first native SoA kernel layer is `soa.addScaled`, `soa.affine`, and
+`soa.sum`: these execute fused column loops over stable dense columns. They are
+the semantic target for later ARM64/NEON emission; until then they provide the
+portable native baseline that JIT lowering must match or beat.
+
 Runnable entry points:
 
 ```bash

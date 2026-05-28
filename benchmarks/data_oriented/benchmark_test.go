@@ -20,6 +20,22 @@ func BenchmarkParticleIntegrationSoA(b *testing.B) {
 	}
 }
 
+func BenchmarkParticleSubsetXAoS(b *testing.B) {
+	ps := NewParticlesAoS(DefaultParticles)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = IntegrateXAoS(ps, DefaultSteps, 0.016)
+	}
+}
+
+func BenchmarkParticleSubsetXSoA(b *testing.B) {
+	ps := NewParticlesSoA(DefaultParticles)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = IntegrateXSoA(ps, DefaultSteps, 0.016)
+	}
+}
+
 func BenchmarkVectorNormalizeAoS(b *testing.B) {
 	vs := NewVec3AoS(DefaultVectors)
 	b.ResetTimer()

@@ -51,6 +51,8 @@ func main() {
 	results := []result{
 		measureParticleAoS(*particles, *steps, *repeats),
 		measureParticleSoA(*particles, *steps, *repeats),
+		measureParticleSubsetXAoS(*particles, *steps, *repeats),
+		measureParticleSubsetXSoA(*particles, *steps, *repeats),
 		measureNormalizeAoS(*vectors, *repeats),
 		measureNormalizeSoA(*vectors, *repeats),
 	}
@@ -94,6 +96,30 @@ func measureParticleSoA(n, steps, repeats int) result {
 	seconds := time.Since(start).Seconds()
 	items := float64(n * steps * repeats)
 	return makeResult("particle_integration", "soa", "go_reference_slice_columns", n, steps, repeats, seconds, items, checksum)
+}
+
+func measureParticleSubsetXAoS(n, steps, repeats int) result {
+	ps := dataoriented.NewParticlesAoS(n)
+	var checksum float64
+	start := time.Now()
+	for i := 0; i < repeats; i++ {
+		checksum = dataoriented.IntegrateXAoS(ps, steps, 0.016)
+	}
+	seconds := time.Since(start).Seconds()
+	items := float64(n * steps * repeats)
+	return makeResult("particle_subset_x", "aos", "go_reference_struct_slice", n, steps, repeats, seconds, items, checksum)
+}
+
+func measureParticleSubsetXSoA(n, steps, repeats int) result {
+	ps := dataoriented.NewParticlesSoA(n)
+	var checksum float64
+	start := time.Now()
+	for i := 0; i < repeats; i++ {
+		checksum = dataoriented.IntegrateXSoA(ps, steps, 0.016)
+	}
+	seconds := time.Since(start).Seconds()
+	items := float64(n * steps * repeats)
+	return makeResult("particle_subset_x", "soa", "go_reference_slice_columns", n, steps, repeats, seconds, items, checksum)
 }
 
 func measureNormalizeAoS(n, repeats int) result {

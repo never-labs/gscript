@@ -99,6 +99,24 @@ func IntegrateSoA(ps ParticlesSoA, steps int, dt float64) float64 {
 	return ChecksumParticlesSoA(ps)
 }
 
+func IntegrateXAoS(ps []ParticleAoS, steps int, dt float64) float64 {
+	for step := 0; step < steps; step++ {
+		for i := range ps {
+			ps[i].X += ps[i].VX * dt
+		}
+	}
+	return ChecksumParticlesAoS(ps)
+}
+
+func IntegrateXSoA(ps ParticlesSoA, steps int, dt float64) float64 {
+	for step := 0; step < steps; step++ {
+		for i := range ps.X {
+			ps.X[i] += ps.VX[i] * dt
+		}
+	}
+	return ChecksumParticlesSoA(ps)
+}
+
 func ChecksumParticlesAoS(ps []ParticleAoS) float64 {
 	sum := 0.0
 	for i := range ps {

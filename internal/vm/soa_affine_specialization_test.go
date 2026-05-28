@@ -121,6 +121,47 @@ func rewrite_columns(records, mul, add) {
 	}
 }
 
+func TestSoAColumnAffineUpdateSupportsI64SourceColumn(t *testing.T) {
+	proto, v := compileSpectralSpecializationTestProgram(t, soaAffineUpdateSource)
+	defer v.Close()
+	affine := findTestProtoByName(proto, "affine_update")
+	if affine == nil {
+		t.Fatal("missing affine_update proto")
+	}
+	requireRuntimeSpecializationInfo(t, RecognizedCallSiteRuntimeSpecializations(affine), "soa_column_affine_update")
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatal(err)
+	}
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x": runtime.NewDenseArrayI64([]int64{2, 4, 8}),
+		"y": runtime.NewDenseArrayF64([]float64{0, 0, 0}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.CallValue(v.GetGlobal("affine_update"), []runtime.Value{
+		runtime.SoAValue(soa),
+		runtime.FloatValue(0.5),
+		runtime.FloatValue(1),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	yCol, ok := soa.Column("y")
+	if !ok {
+		t.Fatal("missing y column")
+	}
+	y, ok := yCol.F64()
+	if !ok {
+		t.Fatal("y is not f64")
+	}
+	want := []float64{2, 3, 5}
+	for i, got := range y {
+		if got != want[i] {
+			t.Fatalf("y[%d] = %v, want %v", i, got, want[i])
+		}
+	}
+}
+
 func TestDenseArrayVMIndexFallbackForSoAKernel(t *testing.T) {
 	src := `
 func affine_update_fallback(cols, scale, bias) {
@@ -153,6 +194,103 @@ func affine_update_fallback(cols, scale, bias) {
 	_, y := testSoAColumns(t, soa)
 	if y[0] != 7 || y[1] != 11 {
 		t.Fatalf("fallback y = %v, want [7 11]", y)
+	}
+}
+
+func BenchmarkSoAStdlibAddScaledFastArg(b *testing.B) {
+	src := `
+func add_scaled_kernel(cols, scale) {
+    soa.addScaled(cols, "x", "y", scale)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "add_scaled_kernel")
+	defer v.Close()
+	soa := mustBenchSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.FloatValue(1.00001)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	x, _ := testSoAColumns(b, soa)
+	benchmarkFloatSink = x[len(x)-1]
+}
+
+func BenchmarkDenseArrayAddScaledVMFallback(b *testing.B) {
+	src := `
+func add_scaled_loop(cols, scale) {
+    src := soa.column(cols, "y")
+    dst := soa.column(cols, "x")
+    n := soa.len(cols)
+    for i := 1; i <= n; i++ {
+        dst[i] = dst[i] + src[i] * scale
+    }
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "add_scaled_loop")
+	defer v.Close()
+	soa := mustBenchSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.FloatValue(1.00001)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	x, _ := testSoAColumns(b, soa)
+	benchmarkFloatSink = x[len(x)-1]
+}
+
+func BenchmarkSoAStdlibSumFastArg(b *testing.B) {
+	src := `
+func sum_kernel(cols) {
+    return soa.sum(cols, "x")
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "sum_kernel")
+	defer v.Close()
+	soa := mustBenchSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = results[0].Number()
+	}
+}
+
+func BenchmarkDenseArraySumVMFallback(b *testing.B) {
+	src := `
+func sum_loop(cols) {
+    xs := soa.column(cols, "x")
+    n := soa.len(cols)
+    total := 0.0
+    for i := 1; i <= n; i++ {
+        total = total + xs[i]
+    }
+    return total
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "sum_loop")
+	defer v.Close()
+	soa := mustBenchSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = results[0].Number()
 	}
 }
 
