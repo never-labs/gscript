@@ -192,6 +192,8 @@ Current implementation status:
 - `soa.sumWhere`, `soa.minWhere`, `soa.meanWhere`, `soa.maxWhere`,
   `soa.countWhere`, and `soa.statsWhere` reduce over mask-true rows without
   materializing a filtered SoA first;
+- `soa.scan` and `soa.scanInto` compute inclusive prefix sums for numeric
+  columns;
 - `soa.dot` and `soa.dotWhere` provide vector-style numeric products over
   dense columns without row materialization;
 - `soa.mask` builds reusable bool dense masks from scalar or column
@@ -244,6 +246,8 @@ Current API contract:
 | `soa.affineWhere(s, dst, src, scale, mask, bias)` | In-place masked affine kernel that updates only mask-true rows. |
 | `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
+| `soa.scan(s, column)` | Returns an inclusive prefix sum dense array for a numeric column. |
+| `soa.scanInto(s, dst, src)` | Writes an inclusive prefix sum from `src` into `dst`. |
 | `soa.dot(s, left, right)` | Computes the dot product of two numeric dense columns. |
 | `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |
 | `soa.dotWhere(s, left, right, mask)` | Computes a masked dot product over mask-true rows. |
@@ -265,6 +269,7 @@ Hot path guidance:
 - use `soa.row` and `soa.setRow` for boundary conversion, debugging, and tests;
 - batch independent column updates with `soa.affineMany` rather than repeated
   row materialization;
+- use `soa.scan` and `soa.scanInto` for prefix sums and offset generation;
 - use `soa.dot` and `soa.dotWhere` for vector-style products;
 - for masked aggregates, prefer `soa.sumWhere` or `soa.statsWhere` over
   `soa.filter` plus a later aggregate when the compacted rows are not needed;

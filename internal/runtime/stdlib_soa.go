@@ -499,6 +499,38 @@ func buildSoALib() *Table {
 		return []Value{v}, nil
 	}, soaSumWhereValue)
 
+	setFastArg2("scan", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.scan", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.scan: argument 2 must be a string")
+		}
+		out, err := s.Scan(args[1].Str())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{DenseArrayValue(out)}, nil
+	}, soaScanValue)
+
+	setFastArg3("scanInto", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.scanInto", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.scanInto: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsString() {
+			return nil, fmt.Errorf("soa.scanInto: argument 3 must be a string")
+		}
+		if err := s.ScanInto(args[1].Str(), args[2].Str()); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaScanIntoValue)
+
 	setFastArg3("dot", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.dot", args, 0)
 		if err != nil {
@@ -1074,6 +1106,36 @@ func soaScatterIntoValue(soaValue, dstValue, indicesValue, valuesValue Value) (V
 
 func soaSumWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
 	return soaMaskedAggregateValue("soa.sumWhere", soaValue, columnValue, maskValue, (*SoA).SumWhere)
+}
+
+func soaScanValue(soaValue, columnValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.scan: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.scan: argument 2 must be a string")
+	}
+	out, err := soaValue.SoA().Scan(columnValue.Str())
+	if err != nil {
+		return NilValue(), err
+	}
+	return DenseArrayValue(out), nil
+}
+
+func soaScanIntoValue(soaValue, dstValue, srcValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.scanInto: argument 1 must be soa")
+	}
+	if !dstValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.scanInto: argument 2 must be a string")
+	}
+	if !srcValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.scanInto: argument 3 must be a string")
+	}
+	if err := soaValue.SoA().ScanInto(dstValue.Str(), srcValue.Str()); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
 }
 
 func soaDotValue(soaValue, leftValue, rightValue Value) (Value, error) {
