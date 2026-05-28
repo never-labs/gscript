@@ -75,6 +75,7 @@ type OpSpec struct {
 	LICMHoistable               bool
 	LICMInterestingMiss         bool
 	LICMIntArith                bool
+	LICMLoopEffectRole          OpLICMLoopEffectRole
 	PureNumericInline           bool
 	NativeEffectLoopInline      bool
 	DirectDeoptWithoutFullFlush bool

@@ -57,6 +57,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opLICMHoistablePolicies", opLICMHoistablePolicies},
 		{"opLICMInterestingMissPolicies", opLICMInterestingMissPolicies},
 		{"opLICMIntArithPolicies", opLICMIntArithPolicies},
+		{"opLICMLoopEffectRolePolicies", opLICMLoopEffectRolePolicies},
 		{"opPureNumericInlinePolicies", opPureNumericInlinePolicies},
 		{"opNativeEffectLoopInlinePolicies", opNativeEffectLoopInlinePolicies},
 		{"opDirectDeoptWithoutFullFlushPolicies", opDirectDeoptWithoutFullFlushPolicies},

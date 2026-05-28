@@ -96,3 +96,18 @@ var opLICMIntArithPolicies = [...]bool{
 	OpDivIntExact: true,
 	OpNegInt:      true,
 }
+
+var opLICMLoopEffectRolePolicies = [...]OpLICMLoopEffectRole{
+	OpSetField:        OpLICMLoopEffectFieldWrite,
+	OpFieldStore:      OpLICMLoopEffectFieldSlotWrite,
+	OpSetTable:        OpLICMLoopEffectTableShapeWrite,
+	OpTableArrayStore: OpLICMLoopEffectArrayElementWrite,
+	OpTableArraySwap:  OpLICMLoopEffectArrayElementWrite,
+	OpAppend:          OpLICMLoopEffectTableArrayWrite,
+	OpSetList:         OpLICMLoopEffectTableArrayWrite,
+	OpSetGlobal:       OpLICMLoopEffectGlobalWrite,
+	OpSetUpval:        OpLICMLoopEffectUpvalueWrite,
+	OpCall:            OpLICMLoopEffectCall,
+	OpResume:          OpLICMLoopEffectResume,
+	OpSelf:            OpLICMLoopEffectSelf,
+}

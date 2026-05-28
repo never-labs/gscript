@@ -1,0 +1,17 @@
+package methodjit
+
+type OpLICMLoopEffectRole uint8
+
+const (
+	OpLICMLoopEffectNone OpLICMLoopEffectRole = iota
+	OpLICMLoopEffectFieldWrite
+	OpLICMLoopEffectFieldSlotWrite
+	OpLICMLoopEffectTableShapeWrite
+	OpLICMLoopEffectArrayElementWrite
+	OpLICMLoopEffectTableArrayWrite
+	OpLICMLoopEffectGlobalWrite
+	OpLICMLoopEffectUpvalueWrite
+	OpLICMLoopEffectCall
+	OpLICMLoopEffectResume
+	OpLICMLoopEffectSelf
+)

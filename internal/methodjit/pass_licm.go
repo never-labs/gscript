@@ -218,55 +218,50 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 	var loopCalls []*Instr
 	for _, b := range bodyList {
 		for _, instr := range b.Instrs {
-			switch instr.Op {
-			case OpSetField:
+			switch opLICMLoopEffectRole(instr.Op) {
+			case OpLICMLoopEffectFieldWrite:
 				if len(instr.Args) >= 1 {
 					setFields[loadKey{objID: instr.Args[0].ID, fieldAux: instr.Aux}] = true
 					shapeMutatingTables[instr.Args[0].ID] = true
 				}
-			case OpFieldStore:
+			case OpLICMLoopEffectFieldSlotWrite:
 				if len(instr.Args) >= 1 {
 					fieldStores[canonicalFieldSlotKey(instr.Args[0], instr.Aux)] = true
 				}
-			case OpSetTable:
+			case OpLICMLoopEffectTableShapeWrite:
 				// SetTable uses dynamic keys — conservatively kills all fields on that obj.
 				// Use fieldAux = -1 as sentinel for "any field on this obj".
 				if len(instr.Args) >= 1 {
 					setFields[loadKey{objID: instr.Args[0].ID, fieldAux: -1}] = true
 					shapeMutatingTables[instr.Args[0].ID] = true
 				}
-			case OpTableArrayStore, OpTableArraySwap:
+			case OpLICMLoopEffectArrayElementWrite:
 				// Checked typed-array stores preserve table kind/len/data but
 				// still mutate elements, so invariant GetTable loads cannot
 				// move across them.
 				if len(instr.Args) >= 1 {
 					arrayElementWrites[loadKey{objID: instr.Args[0].ID, fieldAux: -1}] = true
 				}
-			case OpAppend:
-				// table.insert mutates the table's array part.
+			case OpLICMLoopEffectTableArrayWrite:
+				// Append/SetList mutate the table's array part.
 				if len(instr.Args) >= 1 {
 					setFields[loadKey{objID: instr.Args[0].ID, fieldAux: -1}] = true
 				}
-			case OpSetList:
-				// table.setlist mutates the table's array part.
-				if len(instr.Args) >= 1 {
-					setFields[loadKey{objID: instr.Args[0].ID, fieldAux: -1}] = true
-				}
-			case OpSetGlobal:
+			case OpLICMLoopEffectGlobalWrite:
 				setGlobals[instr.Aux] = true
-			case OpSetUpval:
+			case OpLICMLoopEffectUpvalueWrite:
 				if len(instr.Args) >= 2 {
 					setUpvals[upvalueKey{closureID: instr.Args[1].ID, upval: instr.Aux}] = true
 				}
-			case OpCall:
+			case OpLICMLoopEffectCall:
 				if !isPureLoopInvariantCall(fn, instr, seededGlobals) {
 					loopCalls = append(loopCalls, instr)
 				}
-			case OpResume:
+			case OpLICMLoopEffectResume:
 				if !isPureNumericLoopCall(fn, instr, seededGlobals) {
 					loopCalls = append(loopCalls, instr)
 				}
-			case OpSelf:
+			case OpLICMLoopEffectSelf:
 				loopCalls = append(loopCalls, instr)
 			}
 		}
