@@ -13,6 +13,39 @@ type OracleUnsupportedError struct {
 	Reasons map[Op]string
 }
 
+type OracleSupportSummary struct {
+	BySupport map[OpOracleSupport][]Op
+	Reasons   map[Op]string
+}
+
+func ClassifyOracleSupport(fn *Function) (OracleSupportSummary, error) {
+	if fn == nil {
+		return OracleSupportSummary{}, fmt.Errorf("IR interpreter oracle: nil function")
+	}
+	summary := OracleSupportSummary{
+		BySupport: make(map[OpOracleSupport][]Op),
+		Reasons:   make(map[Op]string),
+	}
+	seen := make(map[Op]bool)
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || seen[instr.Op] {
+				continue
+			}
+			seen[instr.Op] = true
+			support := opOracleSupport(instr.Op)
+			summary.BySupport[support] = append(summary.BySupport[support], instr.Op)
+			if support == OpOracleUnsupported {
+				summary.Reasons[instr.Op] = opOracleUnsupportedReason(instr.Op)
+			}
+		}
+	}
+	return summary, nil
+}
+
 func (e *OracleUnsupportedError) Error() string {
 	names := make([]string, 0, len(e.Ops))
 	for _, op := range e.Ops {
@@ -34,29 +67,13 @@ func (e *OracleUnsupportedError) Is(target error) bool {
 }
 
 func ValidateOracleSupport(fn *Function) error {
-	if fn == nil {
-		return fmt.Errorf("IR interpreter oracle: nil function")
+	summary, err := ClassifyOracleSupport(fn)
+	if err != nil {
+		return err
 	}
-	seen := make(map[Op]bool)
-	var unsupported []Op
-	reasons := make(map[Op]string)
-	for _, block := range fn.Blocks {
-		if block == nil {
-			continue
-		}
-		for _, instr := range block.Instrs {
-			if instr == nil || seen[instr.Op] {
-				continue
-			}
-			seen[instr.Op] = true
-			if opOracleSupport(instr.Op) == OpOracleUnsupported {
-				unsupported = append(unsupported, instr.Op)
-				reasons[instr.Op] = opOracleUnsupportedReason(instr.Op)
-			}
-		}
-	}
+	unsupported := summary.BySupport[OpOracleUnsupported]
 	if len(unsupported) > 0 {
-		return &OracleUnsupportedError{Ops: unsupported, Reasons: reasons}
+		return &OracleUnsupportedError{Ops: unsupported, Reasons: summary.Reasons}
 	}
 	return nil
 }

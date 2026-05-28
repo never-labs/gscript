@@ -78,6 +78,62 @@ func TestValidateOracleSupportRejectsUnsupportedOpsWithReasons(t *testing.T) {
 	}
 }
 
+func TestClassifyOracleSupportGroupsOpsFromOpSpec(t *testing.T) {
+	fn := &Function{
+		Blocks: []*Block{
+			{
+				Instrs: []*Instr{
+					{Op: OpConstInt},
+					{Op: OpPhi},
+					{Op: OpYield},
+					{Op: OpYield},
+				},
+			},
+			{
+				Instrs: []*Instr{
+					{Op: OpReturn},
+				},
+			},
+		},
+	}
+	summary, err := ClassifyOracleSupport(fn)
+	if err != nil {
+		t.Fatalf("ClassifyOracleSupport: %v", err)
+	}
+	assertOracleSummaryHasOp(t, summary, OpOracleExecutable, OpConstInt)
+	assertOracleSummaryHasOp(t, summary, OpOraclePseudo, OpPhi)
+	assertOracleSummaryHasOp(t, summary, OpOracleUnsupported, OpYield)
+	assertOracleSummaryHasOp(t, summary, OpOracleTerminator, OpReturn)
+	if got := countOracleSummaryOp(summary, OpYield); got != 1 {
+		t.Fatalf("OpYield classified %d times, want once", got)
+	}
+	if got := summary.Reasons[OpYield]; got != "coroutine" {
+		t.Fatalf("OpYield reason = %q, want coroutine", got)
+	}
+}
+
+func assertOracleSummaryHasOp(t *testing.T, summary OracleSupportSummary, support OpOracleSupport, op Op) {
+	t.Helper()
+	for _, got := range summary.BySupport[support] {
+		if got == op {
+			return
+		}
+	}
+	t.Fatalf("oracle summary missing %s in %s: %v", op, support, summary.BySupport[support])
+}
+
+func countOracleSummaryOp(summary OracleSupportSummary, op Op) int {
+	count := 0
+	for _, ops := range summary.BySupport {
+		for _, got := range ops {
+			if got == op {
+				count++
+			}
+		}
+	}
+	return count
+}
+
 func interpExecInstrHandledOps(path string) (map[Op]bool, error) {
 	fileSet := token.NewFileSet()
 	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
