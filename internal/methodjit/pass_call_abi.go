@@ -442,7 +442,7 @@ func collectStableGlobalArrayElementFactsWithFacts(fn *Function, tableShapes *Ta
 	states := make(map[string]state)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpSetGlobal || len(instr.Args) == 0 || instr.Args[0] == nil {
+			if instr == nil || !opIsGlobalWrite(instr.Op) || len(instr.Args) == 0 || instr.Args[0] == nil {
 				continue
 			}
 			name := protoConstString(fn.Proto, int(instr.Aux))
@@ -761,7 +761,7 @@ func callABIIsStaticSelfCall(fn *Function, instr *Instr) bool {
 		return false
 	}
 	fnArg := instr.Args[0]
-	if fnArg == nil || fnArg.Def == nil || fnArg.Def.Op != OpGetGlobal {
+	if fnArg == nil || fnArg.Def == nil || !opIsGlobalRead(fnArg.Def.Op) {
 		return false
 	}
 	constIdx := int(fnArg.Def.Aux)
