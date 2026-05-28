@@ -99,20 +99,14 @@ func tableArrayStaticBoundsAccessOperands(instr *Instr) (*Value, *Value, bool) {
 	if instr == nil {
 		return nil, nil, false
 	}
-	switch instr.Op {
-	case OpTableArrayLoad:
-		if len(instr.Args) < 3 {
-			return nil, nil, false
-		}
-		return instr.Args[1], instr.Args[2], true
-	case OpTableArrayStore:
-		if len(instr.Args) < 4 {
-			return nil, nil, false
-		}
-		return instr.Args[2], instr.Args[3], true
-	default:
+	layout, ok := tableArrayAccessLayoutForOp(instr.Op)
+	if !ok || layout.LenArg < 0 || layout.KeyArg < 0 {
 		return nil, nil, false
 	}
+	if len(instr.Args) <= layout.LenArg || len(instr.Args) <= layout.KeyArg {
+		return nil, nil, false
+	}
+	return instr.Args[layout.LenArg], instr.Args[layout.KeyArg], true
 }
 
 type tableArrayLenGuardFact struct {
