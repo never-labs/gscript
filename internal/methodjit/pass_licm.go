@@ -55,10 +55,10 @@ func LICMPassCtx(ctx *PassContext) (*Function, error) {
 	if globalFacts := ctx.Global(); globalFacts != nil {
 		globals = globalFacts.GlobalsMap()
 	}
-	return licmPass(ctx.Func(), globals)
+	return licmPass(ctx.Func(), globals, ctx.Call())
 }
 
-func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto) (*Function, error) {
+func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -107,7 +107,7 @@ func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto) (*Function, 
 			// blocks). Skip defensively.
 			continue
 		}
-		hoistOneLoop(fn, li, hdr, seededGlobals)
+		hoistOneLoop(fn, li, hdr, seededGlobals, callFacts)
 	}
 
 	if errs := Validate(fn); len(errs) > 0 {
@@ -143,7 +143,7 @@ func loopDepths(li *loopInfo) map[int]int {
 
 // hoistOneLoop performs LICM for a single loop identified by its header.
 // Assumes li reflects the current state of fn.
-func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[string]*vm.FuncProto) {
+func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts) {
 	bodyBlocks := li.headerBlocks[hdr.ID]
 	if bodyBlocks == nil {
 		return
@@ -254,11 +254,11 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 					setUpvals[upvalueKey{closureID: instr.Args[1].ID, upval: instr.Aux}] = true
 				}
 			case OpLICMLoopEffectCall:
-				if !isPureLoopInvariantCall(fn, instr, seededGlobals) {
+				if !isPureLoopInvariantCall(fn, instr, seededGlobals, callFacts) {
 					loopCalls = append(loopCalls, instr)
 				}
 			case OpLICMLoopEffectResume:
-				if !isPureNumericLoopCall(fn, instr, seededGlobals) {
+				if !isPureNumericLoopCall(fn, instr, seededGlobals, callFacts) {
 					loopCalls = append(loopCalls, instr)
 				}
 			case OpLICMLoopEffectSelf:
@@ -288,7 +288,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 				continue
 			}
 			if instr.Op == OpCall {
-				if !isPureLoopInvariantCall(fn, instr, seededGlobals) {
+				if !isPureLoopInvariantCall(fn, instr, seededGlobals, callFacts) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"call is not loop-invariant and pure")
 					continue
@@ -654,11 +654,14 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 	insertBlockBefore(fn, ph, hdr)
 }
 
-func isPureNumericLoopCall(fn *Function, call *Instr, seededGlobals map[string]*vm.FuncProto) bool {
+func isPureNumericLoopCall(fn *Function, call *Instr, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts) bool {
 	if fn == nil || call == nil || call.Op != OpCall {
 		return false
 	}
-	desc, hasDesc := functionCallFacts(fn).CallABI(call.ID)
+	if callFacts == nil {
+		return false
+	}
+	desc, hasDesc := callFacts.CallABI(call.ID)
 	if !hasDesc || desc.Callee == nil || desc.NumRets != 1 || !desc.RawIntReturn {
 		return false
 	}
@@ -680,8 +683,8 @@ func isPureNumericLoopCall(fn *Function, call *Instr, seededGlobals map[string]*
 	return pureNumericInlineRejectReason(calleeFn) == ""
 }
 
-func isPureLoopInvariantCall(fn *Function, call *Instr, seededGlobals map[string]*vm.FuncProto) bool {
-	if isPureNumericLoopCall(fn, call, seededGlobals) {
+func isPureLoopInvariantCall(fn *Function, call *Instr, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts) bool {
+	if isPureNumericLoopCall(fn, call, seededGlobals, callFacts) {
 		return true
 	}
 	if fn == nil || call == nil || call.Op != OpCall || !callABIHasExactResultShape(fn, call, 1) {
