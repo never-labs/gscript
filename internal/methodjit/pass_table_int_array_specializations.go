@@ -108,10 +108,7 @@ func insertSpecializationBranch(preheader, success, fallback *Block, specializat
 	term := blockTerminator(preheader)
 	insertAt := len(preheader.Instrs) - 1
 	preheader.Instrs = append(preheader.Instrs[:insertAt], append([]*Instr{specialization}, preheader.Instrs[insertAt:]...)...)
-	term.Op = OpBranch
-	term.Args = []*Value{specialization.Value()}
-	term.Aux = int64(success.ID)
-	term.Aux2 = int64(fallback.ID)
+	rewriteInstrToBranch(term, specialization.Value(), success.ID, fallback.ID)
 	preheader.Succs = []*Block{success, fallback}
 	copyPhiArgsForNewPred(success, fallback, preheader)
 	addPredIfMissing(success, preheader)

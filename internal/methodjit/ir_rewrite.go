@@ -29,3 +29,7 @@ func rewriteInstrToConstFloatBits(instr *Instr, bits uint64) {
 func rewriteInstrToConstNil(instr *Instr) {
 	rewriteInstr(instr, OpConstNil, TypeNil, nil, 0, 0)
 }
+
+func rewriteInstrToBranch(instr *Instr, cond *Value, trueBlockID, falseBlockID int) {
+	rewriteInstr(instr, OpBranch, TypeUnknown, []*Value{cond}, int64(trueBlockID), int64(falseBlockID))
+}
