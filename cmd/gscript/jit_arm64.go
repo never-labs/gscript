@@ -35,6 +35,11 @@ func cliEnableJIT(bvm *bytecodevm.VM, opts jitCLIOptions) (jitStatsReporter, err
 	return reporter, nil
 }
 
+func cliPrintMethodJITOpAudit(w io.Writer) error {
+	_, err := fmt.Fprint(w, methodjit.FormatOpAuditMatrix())
+	return err
+}
+
 // tieringManagerReporter adapts *methodjit.TieringManager to the jitStatsReporter
 // interface used by the CLI's -jit-stats flag.
 type tieringManagerReporter struct {
