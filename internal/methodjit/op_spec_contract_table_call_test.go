@@ -49,7 +49,7 @@ func TestTableCallContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s bool-count load-body benign contract should be driven by OpSpec", op)
 		}
 	}
-	if spec, ok := OpTableArrayLoad.Spec(); !ok || !spec.BoolTableCountLoad {
+	if spec, ok := OpTableArrayLoad.Spec(); !ok || !spec.BoolTableCountLoad || spec.TableArrayKeyArgIndex != 2 {
 		t.Fatalf("TableArrayLoad bool-count load contract should be driven by OpSpec")
 	}
 	for _, op := range []Op{OpNop, OpJump, OpConstInt} {

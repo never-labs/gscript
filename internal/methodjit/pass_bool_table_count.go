@@ -153,10 +153,11 @@ func boolCountLoopLoad(block *Block, key *Value) (*Instr, *Value, bool) {
 		if opIsBoolTableCountLoadBodyBenign(instr.Op) {
 			continue
 		}
-		if !opIsBoolTableCountLoad(instr.Op) || len(instr.Args) < 3 || instr.Type != TypeBool {
+		keyArg, ok := tableArrayKeyArgIndex(instr.Op)
+		if !opIsBoolTableCountLoad(instr.Op) || !ok || len(instr.Args) <= keyArg || instr.Type != TypeBool {
 			return nil, nil, false
 		}
-		if load != nil || instr.Args[2] == nil || key == nil || instr.Args[2].ID != key.ID {
+		if load != nil || instr.Args[keyArg] == nil || key == nil || instr.Args[keyArg].ID != key.ID {
 			return nil, nil, false
 		}
 		table, ok := tableArrayLoadTableValue(instr)
