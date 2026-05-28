@@ -37,8 +37,10 @@ Supporting audit docs:
 
 ## Required Commands
 
-These are the current best known commands. They should be promoted into a
-single CI workflow or release script once their outputs are stable.
+These are the current best known commands. The quick subset is the repository
+CI recipe for pull requests, `main` pushes, version tag pushes, and manual
+release-gate runs; hosted workflow files can call the same commands when the
+publishing credentials permit workflow updates.
 
 The local release-gate entrypoint is:
 
@@ -63,6 +65,22 @@ contract check without the long benchmark passes. Use
 the current checkout. If LuaJIT is unavailable, benchmark commands that support
 it are run with `--no-luajit`; if optional tools such as `pytest` are absent,
 the script reports that clearly instead of failing before the Go gates run.
+
+### CI Quick Gates
+
+The minimum CI gate is intentionally small and does not publish release
+artifacts:
+
+```bash
+go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1
+bash scripts/production_check.sh --quick
+go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
+```
+
+These commands cover fast Go correctness, the repository-owned production
+preflight, and the release matrix metadata gate. A version tag is not
+releasable until the full local checklist below has also been run and archived
+with the release evidence.
 
 ### Correctness
 

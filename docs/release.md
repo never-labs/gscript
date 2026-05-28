@@ -173,19 +173,34 @@ the command, timing source, repeat count, and checksum status.
     `benchmarks/data/baseline.json` in a follow-up commit with the archived
     guard output.
 
-## CI Roadmap
+## CI And Release Gates
 
-There is no `.github` workflow in this checkout, so CI should be added as a
-release-engineering milestone:
+The minimum release-engineering CI recipe is the command set below. It does not
+publish binaries. Hosted CI should run it on every pull request, `main` push,
+version tag push, and manual release-gate run.
 
-- PR workflow: format/build/test on supported host platforms.
+The required CI jobs are:
+
+| Job | Command | Purpose |
+|---|---|---|
+| `go test quick` | `go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1` | Fast coverage for public API, CLI package, parser/runtime/VM, and core implementation packages. |
+| `production_check --quick` | `bash scripts/production_check.sh --quick` | Repository-owned preflight that mirrors the quick production checklist. |
+| `release matrix gate` | `go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1` | Metadata gate for feature matrix coverage, release matrix refs, official-case ledgers, and stdlib contract linkage. |
+
+Tag-triggered runs are release gates only. Artifact packaging, checksum
+generation, SBOM creation, draft-release upload, and binary publishing remain
+manual until those steps have reproducible scripts and reviewed artifact
+retention policy.
+
+Future CI milestones:
+
 - JIT workflow: run ARM64 JIT tests on a `darwin/arm64` or other supported ARM64
   runner.
 - Benchmark workflow: scheduled regression guard with archived JSON/Markdown.
 - Release workflow: tag-triggered artifact build, checksum generation, and
-  upload.
+  upload after the build script is stable.
 - Manual publish workflow: run release-candidate performance reports and attach
   them to the draft release.
 
-CI should never auto-update baselines. Baseline promotion requires a reviewed
+CI must never auto-update baselines. Baseline promotion requires a reviewed
 publish-grade run and an explicit commit.
