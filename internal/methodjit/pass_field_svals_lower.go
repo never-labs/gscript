@@ -74,7 +74,8 @@ func fieldSvalsLowerPass(fn *Function, registry *CompilationDependencyRegistry) 
 				}
 				recordFieldSvalsShapeDependency(registry, shapeID)
 				if svals := cache[key]; svals != nil {
-					instr.Op = OpFieldStore
+					lowered, _ := fieldSvalsLoweredOp(instr.Op)
+					instr.Op = lowered
 					instr.Type = TypeUnknown
 					instr.Args = []*Value{svals.Value(), instr.Args[1]}
 					instr.Aux = int64(fieldIdx)
@@ -107,11 +108,8 @@ func fieldSvalsLowerPass(fn *Function, registry *CompilationDependencyRegistry) 
 					fmt.Sprintf("created shared svals pointer for table v%d shape %d", key.tableID, key.shapeID))
 			}
 			recordFieldSvalsShapeDependency(registry, shapeID)
-			if instr.Op == OpGetFieldNumToFloat {
-				instr.Op = OpFieldLoadNumToFloat
-			} else {
-				instr.Op = OpFieldLoad
-			}
+			lowered, _ := fieldSvalsLoweredOp(instr.Op)
+			instr.Op = lowered
 			instr.Args = []*Value{svals.Value()}
 			instr.Aux = int64(fieldIdx)
 			instr.Aux2 = 0
@@ -211,11 +209,8 @@ func crossBlockFieldSvalsLower(fn *Function, registry *CompilationDependencyRegi
 		recordFieldSvalsShapeDependency(registry, key.shapeID)
 		for _, use := range uses {
 			fieldIdx := int(int32(use.instr.Aux2 & 0xFFFFFFFF))
-			if use.instr.Op == OpGetFieldNumToFloat {
-				use.instr.Op = OpFieldLoadNumToFloat
-			} else {
-				use.instr.Op = OpFieldLoad
-			}
+			lowered, _ := fieldSvalsLoweredOp(use.instr.Op)
+			use.instr.Op = lowered
 			use.instr.Args = []*Value{svals.Value()}
 			use.instr.Aux = int64(fieldIdx)
 			use.instr.Aux2 = 0
@@ -318,32 +313,19 @@ func crossBlockExistingFieldSvalsLower(fn *Function) bool {
 			if svals == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpGetField:
-				instr.Op = OpFieldLoad
-				instr.Args = []*Value{svals.Value()}
+			if lowered, ok := fieldSvalsLoweredOp(instr.Op); ok {
+				instr.Op = lowered
+				if lowered == OpFieldStore {
+					instr.Type = TypeUnknown
+					instr.Args = []*Value{svals.Value(), instr.Args[1]}
+				} else {
+					instr.Args = []*Value{svals.Value()}
+				}
 				instr.Aux = int64(fieldIdx)
 				instr.Aux2 = 0
 				changed = true
 				functionRemarks(fn).Add("FieldSvalsLower", "changed", block.ID, instr.ID, instr.Op,
-					fmt.Sprintf("lowered cross-block fixed-shape field load via existing svals v%d field %d", svals.ID, fieldIdx))
-			case OpGetFieldNumToFloat:
-				instr.Op = OpFieldLoadNumToFloat
-				instr.Args = []*Value{svals.Value()}
-				instr.Aux = int64(fieldIdx)
-				instr.Aux2 = 0
-				changed = true
-				functionRemarks(fn).Add("FieldSvalsLower", "changed", block.ID, instr.ID, instr.Op,
-					fmt.Sprintf("lowered cross-block fixed-shape numeric field load via existing svals v%d field %d", svals.ID, fieldIdx))
-			case OpSetField:
-				instr.Op = OpFieldStore
-				instr.Type = TypeUnknown
-				instr.Args = []*Value{svals.Value(), instr.Args[1]}
-				instr.Aux = int64(fieldIdx)
-				instr.Aux2 = 0
-				changed = true
-				functionRemarks(fn).Add("FieldSvalsLower", "changed", block.ID, instr.ID, instr.Op,
-					fmt.Sprintf("lowered cross-block fixed-shape field store via existing svals v%d field %d", svals.ID, fieldIdx))
+					fmt.Sprintf("lowered cross-block fixed-shape field access via existing svals v%d field %d", svals.ID, fieldIdx))
 			}
 		}
 	}

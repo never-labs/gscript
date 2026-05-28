@@ -75,6 +75,9 @@ func applyOpSpecFieldSvalsBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldSvalsFirstArgMutationBarrierPolicies) {
 		spec.FieldSvalsFirstArgMutationBarrier = opFieldSvalsFirstArgMutationBarrierPolicies[op]
 	}
+	if int(op) < len(opFieldSvalsLoweredOpPolicies) && opFieldSvalsLoweredOpPolicies[op] != OpConstInt {
+		spec.FieldSvalsLoweredOp = opFieldSvalsLoweredOpPolicies[op]
+	}
 }
 
 func applyOpSpecFieldLenBarrierPolicies(op Op, spec *OpSpec) {

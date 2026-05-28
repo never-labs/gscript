@@ -15,6 +15,11 @@ func opIsFieldWrite(op Op) bool {
 	return ok && spec.FieldWrite
 }
 
+func fieldSvalsLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.FieldSvalsLoweredOp, ok && spec.FieldSvalsLoweredOp != OpMax
+}
+
 func opIsLiteralConst(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.LiteralConst

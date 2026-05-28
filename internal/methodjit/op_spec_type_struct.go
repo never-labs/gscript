@@ -91,6 +91,7 @@ type OpSpec struct {
 	FieldSvalsCrossBlockBarrier       bool
 	FieldSvalsGlobalBarrier           bool
 	FieldSvalsFirstArgMutationBarrier bool
+	FieldSvalsLoweredOp               Op
 	FieldLenFoldBarrier               bool
 	FieldCallPolyLenFusionBarrier     bool
 
