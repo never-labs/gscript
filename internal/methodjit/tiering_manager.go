@@ -69,6 +69,7 @@ type TieringManager struct {
 	exitStats          exitStatsCollector
 	exitProfile        tier2ExitProfileCollector
 	recompileQueue     tier2RecompileQueue
+	tier2Active        map[*vm.FuncProto]int
 	specDependents     map[*vm.FuncProto]map[*vm.FuncProto]bool
 	tier2GuardSuppress map[*vm.FuncProto]map[int]map[string]bool
 	tier2GuardFailures map[*vm.FuncProto]map[int]map[string]uint64
@@ -116,6 +117,7 @@ func NewTieringManager() *TieringManager {
 		tier2Failed:        make(map[*vm.FuncProto]bool),
 		tier2FailReason:    make(map[*vm.FuncProto]string),
 		tier2InvalidReason: make(map[*vm.FuncProto]string),
+		tier2Active:        make(map[*vm.FuncProto]int),
 		specDependents:     make(map[*vm.FuncProto]map[*vm.FuncProto]bool),
 		tier2GuardSuppress: make(map[*vm.FuncProto]map[int]map[string]bool),
 		tier2GuardFailures: make(map[*vm.FuncProto]map[int]map[string]uint64),
@@ -760,6 +762,13 @@ func (tm *TieringManager) promoteTier2(proto *vm.FuncProto) interface{} {
 	}
 	t2, err := tm.compileTier2(proto)
 	if err != nil {
+		if isTier2CompileDelayError(err) {
+			tm.traceEvent("fallback", "tier1", proto, map[string]any{
+				"reason": err.Error(),
+				"target": "tier1",
+			})
+			return t1
+		}
 		tm.markTier2Failed(proto, err.Error())
 		tm.disableTier1FeedbackForNoTier2(proto)
 		tm.traceEvent("fallback", "tier1", proto, map[string]any{
@@ -898,6 +907,18 @@ func (tm *TieringManager) handleOSRWithResultBuffer(regs []runtime.Value, base i
 	tm.ensureRawIntLoopCallees(proto)
 	t2, err := tm.compileTier2(proto)
 	if err != nil {
+		if isTier2CompileDelayError(err) {
+			tm.tier1.SetOSRCounter(proto, -1)
+			tm.traceEvent("fallback", "tier1", proto, map[string]any{
+				"reason": err.Error(),
+				"target": "tier1",
+			})
+			t1 := tm.tier1.TryCompile(proto)
+			if t1 == nil {
+				return nil, fmt.Errorf("tiering: OSR delayed fallback failed: no Tier 1 code")
+			}
+			return tm.tier1.ExecuteWithResultBuffer(t1, regs, base, proto, retBuf)
+		}
 		// Tier 2 compilation failed. Disable OSR for this function and
 		// re-run at Tier 1 from the start with OSR disabled.
 		tm.markTier2Failed(proto, err.Error())

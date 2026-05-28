@@ -8,6 +8,7 @@ package methodjit
 
 import (
 	"fmt"
+	"unsafe"
 
 	"github.com/gscript/gscript/internal/jit"
 	"github.com/gscript/gscript/internal/runtime"
@@ -94,6 +95,9 @@ func (ec *emitContext) emitSetField(instr *Instr) {
 
 	// No field cache or invalid: use table-exit fallback.
 	if shapeID == 0 || instr.Aux2 == 0 {
+		if ec.emitSetFieldAppendShapeCases(instr) {
+			return
+		}
 		if ec.emitSetFieldDynamicCache(instr) {
 			return
 		}
@@ -191,6 +195,89 @@ func (ec *emitContext) emitSetField(instr *Instr) {
 	asm.Label(doneLabel)
 }
 
+func (ec *emitContext) emitSetFieldAppendShapeCases(instr *Instr) bool {
+	if ec == nil || instr == nil || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil {
+		return false
+	}
+	cases := fixedShapeAppendSetFieldCases(ec.fn, instr)
+	if len(cases) == 0 {
+		return false
+	}
+	asm := ec.asm
+	tblValueID := instr.Args[0].ID
+	valueID := instr.Args[1].ID
+	missLabel := ec.uniqueLabel("setfield_append_shape_miss")
+	doneLabel := ec.uniqueLabel("setfield_append_shape_done")
+
+	if ec.tableValueAlreadyChecked(tblValueID) || ec.valueReprOf(tblValueID) == valueReprRawTablePtr {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else {
+		ec.resolveValueToReg(tblValueID, jit.X0)
+		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
+		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
+	}
+	asm.CBZ(jit.X0, missLabel)
+	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
+
+	for _, c := range cases {
+		if c.PreShapeID == 0 || c.PostShapeID == 0 || c.PostShape == nil || c.FieldIdx < 0 {
+			continue
+		}
+		nextLabel := ec.uniqueLabel("setfield_append_shape_next")
+		emitCMPWConst(asm, jit.X1, jit.X2, int64(c.PreShapeID))
+		asm.BCond(jit.CondNE, nextLabel)
+		asm.LDR(jit.X9, jit.X0, jit.TableOffSmap)
+		asm.CBNZ(jit.X9, missLabel)
+		asm.LDR(jit.X9, jit.X0, jit.TableOffLazyTree)
+		asm.CBNZ(jit.X9, missLabel)
+		asm.LDR(jit.X9, jit.X0, jit.TableOffSvalsLen)
+		asm.LoadImm64(jit.X4, int64(c.FieldIdx))
+		asm.CMPreg(jit.X4, jit.X9)
+		asm.BCond(jit.CondNE, missLabel)
+		asm.CMPimm(jit.X4, runtime.SmallFieldCap)
+		asm.BCond(jit.CondGE, missLabel)
+		asm.LDR(jit.X10, jit.X0, jit.TableOffSvals+16)
+		asm.CMPreg(jit.X4, jit.X10)
+		asm.BCond(jit.CondGE, missLabel)
+		ec.resolveValueToReg(valueID, jit.X6)
+		asm.LoadImm64(jit.X7, nb64(jit.NB_ValNil))
+		asm.CMPreg(jit.X6, jit.X7)
+		asm.BCond(jit.CondEQ, missLabel)
+		asm.LDR(jit.X3, jit.X0, jit.TableOffSvals)
+		asm.STRreg(jit.X6, jit.X3, jit.X4)
+		ec.emitBumpTableStringLookupVersion(jit.X0, jit.X7)
+		asm.ADDimm(jit.X9, jit.X9, 1)
+		asm.STR(jit.X9, jit.X0, jit.TableOffSvalsLen)
+		asm.LoadImm64(jit.X5, int64(c.PostShapeID))
+		asm.STRW(jit.X5, jit.X0, jit.TableOffShapeID)
+		asm.LoadImm64(jit.X8, int64(uintptr(unsafe.Pointer(c.PostShape))))
+		asm.STR(jit.X8, jit.X0, jit.TableOffShape)
+		asm.LDR(jit.X7, jit.X8, shapeOffFieldKeys)
+		asm.STR(jit.X7, jit.X0, jit.TableOffSkeys)
+		asm.LDR(jit.X7, jit.X8, shapeOffFieldKeysLen)
+		asm.STR(jit.X7, jit.X0, jit.TableOffSkeysLen)
+		asm.LDR(jit.X7, jit.X8, shapeOffFieldKeysCap)
+		asm.STR(jit.X7, jit.X0, jit.TableOffSkeys+16)
+		asm.MOVimm16(jit.X7, 1)
+		asm.STRB(jit.X7, jit.X0, jit.TableOffKeysDirty)
+		asm.B(doneLabel)
+		asm.Label(nextLabel)
+	}
+	asm.B(missLabel)
+
+	asm.Label(missLabel)
+	savedReprs := ec.snapshotValueReprs()
+	ec.emitSetFieldExit(instr)
+	ec.emitUnboxRawIntRegs(savedReprs)
+	ec.restoreValueReprSnapshot(savedReprs)
+
+	asm.Label(doneLabel)
+	return true
+}
+
 func (ec *emitContext) emitSetFieldDynamicCache(instr *Instr) bool {
 	if instr == nil || instr.SourcePC < 0 || len(instr.Args) < 2 {
 		return false
@@ -227,7 +314,8 @@ func (ec *emitContext) emitSetFieldDynamicCache(instr *Instr) bool {
 	asm.CBZ(jit.X0, deoptLabel)
 	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
 	asm.CMPreg(jit.X1, jit.X5)
-	asm.BCond(jit.CondNE, deoptLabel)
+	appendLabel := ec.uniqueLabel("setfield_dyn_append")
+	asm.BCond(jit.CondNE, appendLabel)
 	asm.LDR(jit.X1, jit.X0, jit.TableOffSvalsLen)
 	asm.CMPreg(jit.X4, jit.X1)
 	asm.BCond(jit.CondGE, deoptLabel)
@@ -248,6 +336,55 @@ func (ec *emitContext) emitSetFieldDynamicCache(instr *Instr) bool {
 		asm.STRreg(jit.X6, jit.X1, jit.X4)
 	}
 	ec.emitBumpTableStringLookupVersion(jit.X0, jit.X7)
+	asm.B(doneLabel)
+
+	asm.Label(appendLabel)
+	asm.LDRW(jit.X8, jit.X3, fieldCacheEntryOffAppendShapeID)
+	asm.CMPreg(jit.X1, jit.X8)
+	asm.BCond(jit.CondNE, deoptLabel)
+	asm.LDR(jit.X8, jit.X3, fieldCacheEntryOffAppendShape)
+	asm.CBZ(jit.X8, deoptLabel)
+	asm.LDR(jit.X9, jit.X0, jit.TableOffSmap)
+	asm.CBNZ(jit.X9, deoptLabel)
+	asm.LDR(jit.X9, jit.X0, jit.TableOffLazyTree)
+	asm.CBNZ(jit.X9, deoptLabel)
+	asm.LDR(jit.X9, jit.X0, jit.TableOffSvalsLen)
+	asm.CMPreg(jit.X4, jit.X9)
+	asm.BCond(jit.CondNE, deoptLabel)
+	asm.CMPimm(jit.X4, runtime.SmallFieldCap)
+	asm.BCond(jit.CondGE, deoptLabel)
+	asm.LDR(jit.X10, jit.X0, jit.TableOffSvals+16)
+	asm.CMPreg(jit.X4, jit.X10)
+	asm.BCond(jit.CondGE, deoptLabel)
+	asm.LDR(jit.X1, jit.X0, jit.TableOffSvals)
+	if ec.setFieldValueMayBeRawFloat(instr.Args[1]) || ec.hasFPReg(valueID) {
+		valStore := ec.prepareFieldStoreValue(valueID)
+		if valStore.isFPR {
+			asm.FSTRdReg(valStore.fpr, jit.X1, jit.X4)
+		} else {
+			ec.resolveValueToReg(valueID, jit.X6)
+			asm.STRreg(jit.X6, jit.X1, jit.X4)
+		}
+	} else {
+		ec.resolveValueToReg(valueID, jit.X6)
+		asm.LoadImm64(jit.X7, nb64(jit.NB_ValNil))
+		asm.CMPreg(jit.X6, jit.X7)
+		asm.BCond(jit.CondEQ, deoptLabel)
+		asm.STRreg(jit.X6, jit.X1, jit.X4)
+	}
+	ec.emitBumpTableStringLookupVersion(jit.X0, jit.X7)
+	asm.ADDimm(jit.X9, jit.X9, 1)
+	asm.STR(jit.X9, jit.X0, jit.TableOffSvalsLen)
+	asm.STRW(jit.X5, jit.X0, jit.TableOffShapeID)
+	asm.STR(jit.X8, jit.X0, jit.TableOffShape)
+	asm.LDR(jit.X7, jit.X8, shapeOffFieldKeys)
+	asm.STR(jit.X7, jit.X0, jit.TableOffSkeys)
+	asm.LDR(jit.X7, jit.X8, shapeOffFieldKeysLen)
+	asm.STR(jit.X7, jit.X0, jit.TableOffSkeysLen)
+	asm.LDR(jit.X7, jit.X8, shapeOffFieldKeysCap)
+	asm.STR(jit.X7, jit.X0, jit.TableOffSkeys+16)
+	asm.MOVimm16(jit.X7, 1)
+	asm.STRB(jit.X7, jit.X0, jit.TableOffKeysDirty)
 	asm.B(doneLabel)
 
 	asm.Label(deoptLabel)

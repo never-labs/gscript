@@ -207,6 +207,33 @@ func recordFixedShapeCatalogFact(tableShapes *TableShapeFacts, fact FixedShapeTa
 	tableShapes.RecordFixedShapeCatalogFact(fact)
 }
 
+func seedRuntimeFieldPolyCacheFacts(fn *Function, tableShapes *TableShapeFacts) {
+	if fn == nil || tableShapes == nil {
+		return
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || !opIsFieldRead(instr.Op) || tableShapes.HasFieldPolyShapeCases(instr.ID) {
+				continue
+			}
+			cases, typ := runtimeFieldPolyShapeCasesFromFeedback(fn, instr)
+			if len(cases) < 2 {
+				continue
+			}
+			tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
+			instr.Aux2 = 0
+			if typ != TypeUnknown && typ != TypeAny && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
+				instr.Type = typ
+			}
+			functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+				fmt.Sprintf("seeded runtime polymorphic field cache with %d shapes", len(cases)))
+		}
+	}
+}
+
 func guardedFixedShapePolyFacts(facts []FixedShapeTableFact) []FixedShapeTableFact {
 	if len(facts) < 2 {
 		return nil

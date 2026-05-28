@@ -94,6 +94,45 @@ func TestSourceFeedbackRefresh_RestoresInlinedGetFieldShapeAndType(t *testing.T)
 	}
 }
 
+func TestSourceFeedbackRefresh_RestoresRuntimeFieldPolyShapeCases(t *testing.T) {
+	source := &vm.FuncProto{
+		Code:                make([]uint32, 3),
+		Constants:           []runtime.Value{runtime.StringValue("kind")},
+		FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
+		FieldPolyCache:      make([]runtime.FieldPolyCacheEntry, 3*runtime.FieldPolyCacheWays),
+	}
+	source.FieldAccessFeedback[1].ObserveFieldCache(runtime.FieldCacheEntry{
+		ShapeID:  42,
+		FieldIdx: 0,
+	}, runtime.IntValue(7), vm.TableAccessKindGet)
+	slot := runtime.FieldPolyCacheSlot(source.FieldPolyCache, 1)
+	slot[0] = runtime.FieldPolyCacheEntry{ShapeID: 42, FieldIdx: 0}
+	slot[1] = runtime.FieldPolyCacheEntry{ShapeID: 77, FieldIdx: 0}
+
+	fn := &Function{Proto: source}
+	b := &Block{ID: 0}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
+	get := &Instr{ID: fn.newValueID(), Op: OpGetField, Type: TypeAny, Args: []*Value{tbl.Value()}, Aux: 0, Aux2: 123, Block: b}
+	get.setSourceFromPC(source, 1)
+	b.Instrs = []*Instr{tbl, get}
+
+	if _, err := SourceFeedbackRefreshPass(fn); err != nil {
+		t.Fatalf("SourceFeedbackRefreshPass: %v", err)
+	}
+	cases, ok := fn.Analysis.TableShapeFacts().FieldPolyShapeCases(get.ID)
+	if !ok || len(cases) != 2 {
+		t.Fatalf("expected two runtime field poly cases, got %#v ok=%v", cases, ok)
+	}
+	if get.Aux2 != 0 {
+		t.Fatalf("GetField Aux2=%d want cleared poly shape facts", get.Aux2)
+	}
+	if get.Type != TypeInt {
+		t.Fatalf("GetField Type=%s want int", get.Type)
+	}
+}
+
 func TestSourceFeedbackRefresh_RestoresInlinedSetFieldShape(t *testing.T) {
 	source := &vm.FuncProto{
 		Code:                make([]uint32, 3),

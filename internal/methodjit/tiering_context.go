@@ -85,6 +85,22 @@ func syncTableStringKeyCacheContext(ctx *ExecContext, proto *vm.FuncProto) {
 	}
 }
 
+func syncFieldCacheContext(ctx *ExecContext, proto *vm.FuncProto) {
+	if ctx == nil {
+		return
+	}
+	if proto != nil && len(proto.FieldCache) > 0 {
+		ctx.BaselineFieldCache = uintptr(unsafe.Pointer(&proto.FieldCache[0]))
+	} else {
+		ctx.BaselineFieldCache = 0
+	}
+	if proto != nil && len(proto.FieldPolyCache) > 0 {
+		ctx.BaselineFieldPolyCache = uintptr(unsafe.Pointer(&proto.FieldPolyCache[0]))
+	} else {
+		ctx.BaselineFieldPolyCache = 0
+	}
+}
+
 func (tm *TieringManager) ensureTier2RegisterBudget(cf *CompiledFunction, regs []runtime.Value, base int, proto *vm.FuncProto) []runtime.Value {
 	if cf == nil || proto == nil || tm.callVM == nil {
 		return regs

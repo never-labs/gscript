@@ -311,7 +311,11 @@ func newTableFromCtor2Shape(ctor *SmallTableCtor2, shape *Shape, val1, val2 Valu
 func NewTableFromCtorN(ctor *SmallTableCtorN, vals []Value) *Table {
 	if ctor != nil && ctor.Shape != nil && len(vals) >= len(ctor.Keys) {
 		n := len(ctor.Keys)
-		t, svals := DefaultHeap.AllocTableWithSvals(n)
+		capacity := n
+		if capacity < smallFieldCap {
+			capacity++
+		}
+		t, svals := DefaultHeap.AllocTableWithSvals(capacity)
 		t.svals = svals[:n]
 		for i := 0; i < n; i++ {
 			v := vals[i]
@@ -341,14 +345,75 @@ func NewTableFromCtorNNonNil(ctor *SmallTableCtorN, vals []Value) *Table {
 // shape-field type feedback. Native code overwrites every field before the
 // object is exposed to program code.
 func NewTableFromCtorNNonNilCache(ctor *SmallTableCtorN, vals []Value) *Table {
-	return newTableFromCtorNNonNil(ctor, vals, false)
+	capacity := 0
+	if ctor != nil {
+		capacity = len(ctor.Keys)
+		if capacity < smallFieldCap {
+			capacity++
+		}
+	}
+	return newTableFromCtorNNonNilWithCapacity(ctor, vals, capacity, false)
+}
+
+// NewTableFromCtorNMaskCache constructs a fixed-shape cache placeholder for a
+// constructor where mask marks the non-nil source fields. Native code overwrites
+// every retained field before exposing the object.
+func NewTableFromCtorNMaskCache(ctor *SmallTableCtorN, vals []Value, mask uint64) *Table {
+	if ctor == nil || ctor.Shape == nil || len(ctor.Keys) == 0 || len(ctor.Keys) > 64 {
+		return NewTableFromCtorN(ctor, vals)
+	}
+	nonNil := 0
+	for i := 0; i < len(ctor.Keys); i++ {
+		if mask&(uint64(1)<<uint(i)) != 0 {
+			nonNil++
+		}
+	}
+	if nonNil == 0 {
+		return NewEmptyTable()
+	}
+	if nonNil == len(ctor.Keys) {
+		return NewTableFromCtorNNonNilCache(ctor, vals)
+	}
+	sparse := SmallTableCtorNForMask(ctor, mask)
+	if sparse.Shape == nil {
+		return NewTableFromCtorN(ctor, vals)
+	}
+	return newTableFromSparseCtorNWithCapacity(&sparse, vals, mask, nonNil, len(ctor.Keys), false)
+}
+
+// SmallTableCtorNForMask returns the canonical sparse constructor for the
+// ordered subset of ctor.Keys selected by mask.
+func SmallTableCtorNForMask(ctor *SmallTableCtorN, mask uint64) SmallTableCtorN {
+	if ctor == nil || ctor.Shape == nil || len(ctor.Keys) == 0 || len(ctor.Keys) > 64 {
+		return SmallTableCtorN{}
+	}
+	key := sparseCtorNKey{shapeID: ctor.shapeID, mask: mask}
+	if cached, ok := sparseCtorNCache.Load(key); ok {
+		return cached.(SmallTableCtorN)
+	}
+	keys := make([]string, 0, len(ctor.Keys))
+	for i, name := range ctor.Keys {
+		if mask&(uint64(1)<<uint(i)) != 0 {
+			keys = append(keys, name)
+		}
+	}
+	sparse := NewSmallTableCtorN(keys)
+	if sparse.Shape == nil {
+		return SmallTableCtorN{}
+	}
+	actual, _ := sparseCtorNCache.LoadOrStore(key, sparse)
+	return actual.(SmallTableCtorN)
 }
 
 func newTableFromCtorNNonNil(ctor *SmallTableCtorN, vals []Value, observeTypes bool) *Table {
 	if ctor == nil || ctor.Shape == nil || len(vals) < len(ctor.Keys) {
 		return NewTableFromCtorN(ctor, vals)
 	}
-	return newTableFromCtorNNonNilWithCapacity(ctor, vals, len(ctor.Keys), observeTypes)
+	capacity := len(ctor.Keys)
+	if capacity < smallFieldCap {
+		capacity++
+	}
+	return newTableFromCtorNNonNilWithCapacity(ctor, vals, capacity, observeTypes)
 }
 
 func newTableFromCtorNNonNilWithCapacity(ctor *SmallTableCtorN, vals []Value, capacity int, observeTypes bool) *Table {
@@ -396,24 +461,9 @@ func newTableFromCtorNFallback(ctor *SmallTableCtorN, vals []Value) *Table {
 		case len(ctor.Keys):
 			return newTableFromCtorNNonNil(ctor, vals, true)
 		default:
-			key := sparseCtorNKey{shapeID: ctor.shapeID, mask: mask}
-			cached, ok := sparseCtorNCache.Load(key)
-			var sparse SmallTableCtorN
-			if ok {
-				sparse = cached.(SmallTableCtorN)
-			} else {
-				keys := make([]string, 0, nonNil)
-				for i := 0; i < n; i++ {
-					if mask&(uint64(1)<<uint(i)) != 0 {
-						keys = append(keys, ctor.Keys[i])
-					}
-				}
-				sparse = NewSmallTableCtorN(keys)
-				if sparse.Shape == nil {
-					break
-				}
-				actual, _ := sparseCtorNCache.LoadOrStore(key, sparse)
-				sparse = actual.(SmallTableCtorN)
+			sparse := SmallTableCtorNForMask(ctor, mask)
+			if sparse.Shape == nil {
+				break
 			}
 			return newTableFromSparseCtorNWithCapacity(&sparse, vals, mask, nonNil, len(ctor.Keys), true)
 		}

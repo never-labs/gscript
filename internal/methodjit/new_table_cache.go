@@ -17,11 +17,14 @@ const (
 	// larger refill batch cuts exit-resume frequency without growing array caches.
 	// fixedTableCacheBatch is the cold prewarm size kept small enough that a
 	// short-lived script does not pay big up-front allocation.
-	// fixedTableCacheRefillBatch is the steady-state refill size; once a
-	// monomorphic fixed-record site has fired once, future refills hand back
-	// a larger slab so refill-driven Tier 2 exits become rare.
+	// fixedTableCacheRefillBatch is the steady-state refill size for small
+	// fixed constructors. fixedTableNRefillBatch is larger because N-field
+	// object-literal builders commonly sit inside row/object construction loops;
+	// once runtime feedback proves the shape, a larger refill avoids repeated
+	// exit-resume allocation without paying that cost at cold compile time.
 	fixedTableCacheBatch          = 1024
 	fixedTableCacheRefillBatch    = 8192
+	fixedTableNRefillBatch        = 131072
 	newTableCacheMaxBatch         = 512
 	newTableCacheTargetBytes      = 4 << 20
 	newTableCacheLargeTargetBytes = 16 << 20
@@ -36,16 +39,30 @@ type newTableCacheEntry struct {
 	EmptyValues []runtime.Value
 	EmptyRoots  []unsafe.Pointer
 	EmptyPos    int64
+	Sparse      []newTableSparseCacheEntry
+}
+
+type newTableSparseCacheEntry struct {
+	Mask   uint64
+	Values []runtime.Value
+	Roots  []unsafe.Pointer
+	Pos    int64
 }
 
 var (
-	newTableCacheEntrySize           = int(unsafe.Sizeof(newTableCacheEntry{}))
-	newTableCacheEntryValuesOff      = int(unsafe.Offsetof(newTableCacheEntry{}.Values))
-	newTableCacheEntryLenOff         = newTableCacheEntryValuesOff + int(unsafe.Sizeof(uintptr(0)))
-	newTableCacheEntryPosOff         = int(unsafe.Offsetof(newTableCacheEntry{}.Pos))
-	newTableCacheEntryEmptyValuesOff = int(unsafe.Offsetof(newTableCacheEntry{}.EmptyValues))
-	newTableCacheEntryEmptyLenOff    = newTableCacheEntryEmptyValuesOff + int(unsafe.Sizeof(uintptr(0)))
-	newTableCacheEntryEmptyPosOff    = int(unsafe.Offsetof(newTableCacheEntry{}.EmptyPos))
+	newTableCacheEntrySize            = int(unsafe.Sizeof(newTableCacheEntry{}))
+	newTableSparseCacheEntrySize      = int(unsafe.Sizeof(newTableSparseCacheEntry{}))
+	newTableCacheEntryValuesOff       = int(unsafe.Offsetof(newTableCacheEntry{}.Values))
+	newTableCacheEntryLenOff          = newTableCacheEntryValuesOff + int(unsafe.Sizeof(uintptr(0)))
+	newTableCacheEntryPosOff          = int(unsafe.Offsetof(newTableCacheEntry{}.Pos))
+	newTableCacheEntryEmptyValuesOff  = int(unsafe.Offsetof(newTableCacheEntry{}.EmptyValues))
+	newTableCacheEntryEmptyLenOff     = newTableCacheEntryEmptyValuesOff + int(unsafe.Sizeof(uintptr(0)))
+	newTableCacheEntryEmptyPosOff     = int(unsafe.Offsetof(newTableCacheEntry{}.EmptyPos))
+	newTableCacheEntrySparseOff       = int(unsafe.Offsetof(newTableCacheEntry{}.Sparse))
+	newTableSparseCacheEntryMaskOff   = int(unsafe.Offsetof(newTableSparseCacheEntry{}.Mask))
+	newTableSparseCacheEntryValuesOff = int(unsafe.Offsetof(newTableSparseCacheEntry{}.Values))
+	newTableSparseCacheEntryLenOff    = newTableSparseCacheEntryValuesOff + int(unsafe.Sizeof(uintptr(0)))
+	newTableSparseCacheEntryPosOff    = int(unsafe.Offsetof(newTableSparseCacheEntry{}.Pos))
 )
 
 func newTableCacheSlotsForFunction(fn *Function) []newTableCacheEntry {
@@ -136,6 +153,7 @@ func prewarmFixedTableNCacheEntry(entry *newTableCacheEntry, ctor *runtime.Small
 		entry.Values[i] = runtime.FreshTableValue(t)
 	}
 	entry.Pos = 0
+	prewarmFixedTableNSparseSingleNilEntries(entry, ctor, batch, seed)
 }
 
 func prewarmFixedRecordNCacheEntry(entry *newTableCacheEntry, ctor *runtime.SmallTableCtorN, batch int, seed []runtime.Value) {
@@ -195,6 +213,56 @@ func normalizeFixedTableSeed(seed []runtime.Value, n int) []runtime.Value {
 		out[i] = runtime.IntValue(0)
 	}
 	return out
+}
+
+func prewarmFixedTableNSparseSingleNilEntries(entry *newTableCacheEntry, ctor *runtime.SmallTableCtorN, batch int, seed []runtime.Value) {
+	if entry == nil || ctor == nil || ctor.Shape == nil || len(ctor.Keys) <= 2 || len(ctor.Keys) > runtime.SmallFieldCap || batch <= 1 {
+		return
+	}
+	n := len(ctor.Keys)
+	seed = normalizeFixedTableSeed(seed, n)
+	if len(entry.Sparse) < n {
+		entry.Sparse = make([]newTableSparseCacheEntry, n)
+	}
+	for omitted := 0; omitted < n; omitted++ {
+		mask := fixedTableMaskExcept(n, omitted)
+		prewarmFixedTableNMaskCacheEntry(&entry.Sparse[omitted], ctor, mask, batch, seed)
+	}
+}
+
+func prewarmFixedTableNMaskCacheEntry(entry *newTableSparseCacheEntry, ctor *runtime.SmallTableCtorN, mask uint64, batch int, seed []runtime.Value) {
+	if entry == nil || ctor == nil || batch <= 1 {
+		return
+	}
+	if len(entry.Values) > 0 {
+		return
+	}
+	entry.Mask = mask
+	entry.Values = make([]runtime.Value, batch)
+	if entry.Roots == nil {
+		entry.Roots = make([]unsafe.Pointer, 0, 4)
+	} else {
+		entry.Roots = entry.Roots[:0]
+	}
+	for i := range entry.Values {
+		t := runtime.NewTableFromCtorNMaskCache(ctor, seed, mask)
+		entry.addRoot(t)
+		entry.Values[i] = runtime.FreshTableValue(t)
+	}
+	entry.Pos = 0
+}
+
+func fixedTableMaskExcept(n, omitted int) uint64 {
+	if n <= 0 || n > 64 || omitted < 0 || omitted >= n {
+		return 0
+	}
+	mask := uint64(0)
+	for i := 0; i < n; i++ {
+		if i != omitted {
+			mask |= uint64(1) << uint(i)
+		}
+	}
+	return mask
 }
 
 func prewarmNewTableCacheEntry(entry *newTableCacheEntry, arrayHint, hashHint int, kind runtime.ArrayKind, denseMixed bool, batch int) {
@@ -602,8 +670,19 @@ func allocateFixedTable2EmptyWithCache(caches []newTableCacheEntry, instrID int)
 }
 
 func allocateFixedTableNWithCache(caches []newTableCacheEntry, instrID int, ctor *runtime.SmallTableCtorN, vals []runtime.Value) *runtime.Table {
-	if cacheableSmallCtorN(ctor) && instrID >= 0 && instrID < len(caches) && fixedTableValuesAllNonNil(vals) {
-		return allocateFixedTableNFullWithCache(caches, instrID, ctor, vals)
+	if cacheableSmallCtorN(ctor) && instrID >= 0 && instrID < len(caches) {
+		mask, ok := fixedTableValuesMask(vals, len(ctor.Keys))
+		if ok {
+			fullMask := fixedTableFullMask(len(ctor.Keys))
+			switch mask {
+			case fullMask:
+				return allocateFixedTableNFullWithCache(caches, instrID, ctor, vals)
+			case 0:
+				return runtime.NewTableFromCtorN(ctor, vals)
+			default:
+				return allocateFixedTableNMaskWithCache(caches, instrID, ctor, vals, mask)
+			}
+		}
 	}
 	return runtime.NewTableFromCtorN(ctor, vals)
 }
@@ -632,13 +711,36 @@ func fixedTableValuesAllNonNil(vals []runtime.Value) bool {
 	return true
 }
 
+func fixedTableValuesMask(vals []runtime.Value, n int) (uint64, bool) {
+	if n <= 0 || n > 64 || len(vals) < n {
+		return 0, false
+	}
+	var mask uint64
+	for i := 0; i < n; i++ {
+		if !vals[i].IsNil() {
+			mask |= uint64(1) << uint(i)
+		}
+	}
+	return mask, true
+}
+
+func fixedTableFullMask(n int) uint64 {
+	if n <= 0 {
+		return 0
+	}
+	if n >= 64 {
+		return ^uint64(0)
+	}
+	return (uint64(1) << uint(n)) - 1
+}
+
 func allocateFixedTableNFullWithCache(caches []newTableCacheEntry, instrID int, ctor *runtime.SmallTableCtorN, vals []runtime.Value) *runtime.Table {
 	tbl := runtime.NewTableFromCtorNNonNil(ctor, vals)
 	entry := &caches[instrID]
 	if entry.Pos < int64(len(entry.Values)) {
 		return tbl
 	}
-	keep := fixedTableCacheRefillBatch - 1
+	keep := fixedTableNRefillBatch - 1
 	if cap(entry.Values) < keep {
 		entry.Values = make([]runtime.Value, keep)
 	} else {
@@ -656,6 +758,81 @@ func allocateFixedTableNFullWithCache(caches []newTableCacheEntry, instrID int, 
 	}
 	entry.Pos = 0
 	return tbl
+}
+
+func allocateFixedTableNMaskWithCache(caches []newTableCacheEntry, instrID int, ctor *runtime.SmallTableCtorN, vals []runtime.Value, mask uint64) *runtime.Table {
+	tbl := runtime.NewTableFromCtorNMaskCache(ctor, vals, mask)
+	entry := &caches[instrID]
+	sparse := fixedTableSparseCacheEntryForMask(entry, mask, len(ctor.Keys))
+	if sparse == nil {
+		return tbl
+	}
+	if sparse.Pos < int64(len(sparse.Values)) {
+		return tbl
+	}
+	keep := fixedTableCacheRefillBatch - 1
+	if cap(sparse.Values) < keep {
+		sparse.Values = make([]runtime.Value, keep)
+	} else {
+		sparse.Values = sparse.Values[:keep]
+	}
+	if sparse.Roots == nil {
+		sparse.Roots = make([]unsafe.Pointer, 0, 4)
+	} else {
+		sparse.Roots = sparse.Roots[:0]
+	}
+	for i := range sparse.Values {
+		t := runtime.NewTableFromCtorNMaskCache(ctor, vals, mask)
+		sparse.addRoot(t)
+		sparse.Values[i] = runtime.FreshTableValue(t)
+	}
+	sparse.Pos = 0
+	return tbl
+}
+
+func fixedTableSparseCacheEntryForMask(entry *newTableCacheEntry, mask uint64, n int) *newTableSparseCacheEntry {
+	if entry == nil || n <= 0 || n > 64 || mask == 0 || mask == fixedTableFullMask(n) {
+		return nil
+	}
+	omitted := fixedTableSingleOmittedIndex(mask, n)
+	if omitted >= 0 {
+		if len(entry.Sparse) < n {
+			next := make([]newTableSparseCacheEntry, n)
+			copy(next, entry.Sparse)
+			entry.Sparse = next
+		}
+		slot := &entry.Sparse[omitted]
+		if slot.Mask == 0 {
+			slot.Mask = mask
+		}
+		if slot.Mask == mask {
+			return slot
+		}
+	}
+	for i := range entry.Sparse {
+		if entry.Sparse[i].Mask == mask {
+			return &entry.Sparse[i]
+		}
+	}
+	entry.Sparse = append(entry.Sparse, newTableSparseCacheEntry{Mask: mask})
+	return &entry.Sparse[len(entry.Sparse)-1]
+}
+
+func fixedTableSingleOmittedIndex(mask uint64, n int) int {
+	full := fixedTableFullMask(n)
+	if mask == 0 || mask == full {
+		return -1
+	}
+	missing := full &^ mask
+	if missing == 0 || missing&(missing-1) != 0 {
+		return -1
+	}
+	for i := 0; i < n; i++ {
+		if missing == uint64(1)<<uint(i) {
+			return i
+		}
+	}
+	return -1
 }
 
 func allocateFixedRecordNFullWithCache(caches []newTableCacheEntry, instrID int, ctor *runtime.SmallTableCtorN, vals []runtime.Value) runtime.Value {
@@ -705,4 +882,17 @@ func (entry *newTableCacheEntry) addRootTo(t *runtime.Table, roots *[]unsafe.Poi
 		}
 	}
 	*roots = append(*roots, root)
+}
+
+func (entry *newTableSparseCacheEntry) addRoot(t *runtime.Table) {
+	root := runtime.TableGCRoot(t)
+	if root == nil {
+		return
+	}
+	for _, existing := range entry.Roots {
+		if existing == root {
+			return
+		}
+	}
+	entry.Roots = append(entry.Roots, root)
 }

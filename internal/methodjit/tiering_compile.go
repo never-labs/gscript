@@ -3,12 +3,30 @@
 package methodjit
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/gscript/gscript/internal/vm"
 )
+
+type tier2CompileDelayError struct {
+	reason string
+}
+
+func (e tier2CompileDelayError) Error() string {
+	return e.reason
+}
+
+func newTier2CompileDelayError(reason string) error {
+	return tier2CompileDelayError{reason: reason}
+}
+
+func isTier2CompileDelayError(err error) bool {
+	var delay tier2CompileDelayError
+	return errors.As(err, &delay)
+}
 
 func (tm *TieringManager) compileTier2(proto *vm.FuncProto) (cf *CompiledFunction, retErr error) {
 	started := time.Now()
@@ -36,6 +54,17 @@ func (tm *TieringManager) compileTier2(proto *vm.FuncProto) (cf *CompiledFunctio
 		}
 		durationNanos := int64(time.Since(started))
 		if retErr != nil {
+			if isTier2CompileDelayError(retErr) {
+				tm.traceEvent("tier2_defer", "tier2", proto, map[string]any{
+					"attempt":                attempt,
+					"reason":                 retErr.Error(),
+					"compile_duration_nanos": durationNanos,
+				})
+				if trace != nil && !recordedWarmDump {
+					tm.recordWarmDumpCompile(proto, trace, cf, retErr)
+				}
+				return
+			}
 			tm.markTier2Failed(proto, retErr.Error())
 			tm.traceEvent("tier2_fail", "tier2", proto, map[string]any{
 				"attempt":                attempt,
@@ -93,7 +122,9 @@ func (tm *TieringManager) CompileTier2(proto *vm.FuncProto) error {
 	if abi := AnalyzeTypedSelfABI(proto); abi.Eligible {
 		t2, err := tm.compileTier2(proto)
 		if err != nil {
-			tm.markTier2Failed(proto, err.Error())
+			if !isTier2CompileDelayError(err) {
+				tm.markTier2Failed(proto, err.Error())
+			}
 			return err
 		}
 		tm.markTier2Compiled(proto, t2)
@@ -105,7 +136,9 @@ func (tm *TieringManager) CompileTier2(proto *vm.FuncProto) error {
 	}
 	t2, err := tm.compileTier2(proto)
 	if err != nil {
-		tm.markTier2Failed(proto, err.Error())
+		if !isTier2CompileDelayError(err) {
+			tm.markTier2Failed(proto, err.Error())
+		}
 		return err
 	}
 	tm.markTier2Compiled(proto, t2)
@@ -391,10 +424,18 @@ func (tm *TieringManager) compileTier2Pipeline(proto *vm.FuncProto, trace *Tier2
 						"non-native OpCall remains inside loop after inlining")
 					return fmt.Errorf("tier2: has OpCall inside loop (performance-blocked), staying at Tier 1")
 				}
+				if gate := firstTableArrayObjectFieldLoadBlockerGate(fn); !gate.Allowed {
+					remarks.Add("Tier2Gate", "blocked", 0, 0, gate.Op,
+						gate.Reason)
+					return fmt.Errorf("tier2: %s, staying at Tier 1", gate.Reason)
+				}
 			}
 			if gate := firstLoopCarriedObjectGraphBlockerGate(fn); !gate.Allowed {
 				remarks.Add("Tier2Gate", "blocked", 0, 0, gate.Op,
 					fmt.Sprintf("candidate has unsupported loop-carried object graph mutation %s", gate.Op))
+				if tier2LoopCarriedObjectGraphNeedsRuntimeFeedback(fn) {
+					return newTier2CompileDelayError(fmt.Sprintf("tier2: loop-carried object graph mutation %s needs runtime shape feedback, deferring Tier 2", gate.Op))
+				}
 				return fmt.Errorf("tier2: has loop-carried object graph mutation %s (unsupported), staying at Tier 1", gate.Op)
 			}
 		}

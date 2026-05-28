@@ -52,6 +52,16 @@ func sourceFeedbackRefreshGetField(fn *Function, block *Block, instr *Instr) {
 		}
 		return
 	}
+	if cases, typ := runtimeFieldPolyShapeCasesFromFeedback(fn, instr); len(cases) >= 2 {
+		functionTableShapeFacts(fn).RecordFieldPolyShapeCases(instr.ID, cases)
+		instr.Aux2 = 0
+		if typ != TypeUnknown && typ != TypeAny && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
+			instr.Type = typ
+		}
+		functionRemarks(fn).Add("SourceFeedbackRefresh", "changed", block.ID, instr.ID, instr.Op,
+			fmt.Sprintf("restored source polymorphic field cache with %d shapes", len(cases)))
+		return
+	}
 	if aux2 := sourceFeedbackFieldShapeAux2(instr.SourceProto, instr.SourcePC); aux2 != 0 && instr.Aux2 == 0 {
 		instr.Aux2 = aux2
 		functionRemarks(fn).Add("SourceFeedbackRefresh", "changed", block.ID, instr.ID, instr.Op,

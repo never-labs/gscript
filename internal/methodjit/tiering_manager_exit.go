@@ -282,6 +282,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 				if tier2TableExitFieldCachePC(proto, pc, vm.OP_GETFIELD, constIdx) {
 					ensureFieldCache(proto)
 					ensureFieldPolyCache(proto)
+					syncFieldCacheContext(ctx, proto)
 					result = tblVal.Table().RawGetStringCachedPoly(
 						fieldName,
 						&proto.FieldCache[pc],
@@ -329,6 +330,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 				}
 				if tier2TableExitFieldCachePC(proto, pc, vm.OP_SETFIELD, constIdx) {
 					ensureFieldCache(proto)
+					syncFieldCacheContext(ctx, proto)
 					tblVal.Table().RawSetStringCached(fieldName, valVal, &proto.FieldCache[pc])
 					if proto.FieldAccessFeedback != nil && pc < len(proto.FieldAccessFeedback) {
 						proto.FieldAccessFeedback[pc].ObserveFieldCache(proto.FieldCache[pc], valVal, 2)

@@ -207,10 +207,30 @@ func (ec *emitContext) emitNewFixedTableNCacheFastPath(instr *Instr, doneLabel, 
 	}
 	asm := ec.asm
 
+	if ec.emitNewFixedTableNConstNilMaskCacheFastPath(instr, ctor, doneLabel, missLabel) {
+		return true
+	}
+
 	nilBits := nb64(jit.NB_ValNil)
 	nilReg := ec.reusableFixedTableNNilReg(instr)
 	if nilReg != jit.XZR {
 		asm.LoadImm64(nilReg, nilBits)
+	}
+	sparseNilLabel := ""
+	sparseNilArg := singleRuntimeNullableFixedTableArg(instr)
+	if sparseNilArg >= 0 {
+		mask := fixedTableMaskExcept(len(instr.Args), sparseNilArg)
+		if sparse := runtime.SmallTableCtorNForMask(ctor, mask); sparse.Shape != nil {
+			sparseNilLabel = ec.uniqueLabel("newfixedn_sparse_nil")
+			ec.resolveValueToReg(instr.Args[sparseNilArg].ID, jit.X5)
+			if nilReg != jit.XZR {
+				asm.CMPreg(jit.X5, nilReg)
+			} else {
+				asm.LoadImm64(jit.X6, nilBits)
+				asm.CMPreg(jit.X5, jit.X6)
+			}
+			asm.BCond(jit.CondEQ, sparseNilLabel)
+		}
 	}
 	for _, arg := range instr.Args {
 		if fixedTableArgProvenNonNil(arg) {
@@ -276,6 +296,192 @@ func (ec *emitContext) emitNewFixedTableNCacheFastPath(instr *Instr, doneLabel, 
 		asm.STR(jit.X5, jit.X2, i*jit.ValueSize)
 	}
 	ec.storeResultNB(jit.X0, instr.ID)
+	asm.B(doneLabel)
+	if sparseNilLabel != "" {
+		asm.Label(sparseNilLabel)
+		ec.emitNewFixedTableNSparseMaskCacheResult(instr, ctor, sparseNilArg, doneLabel, missLabel)
+	}
+	return true
+}
+
+func singleRuntimeNullableFixedTableArg(instr *Instr) int {
+	if instr == nil {
+		return -1
+	}
+	idx := -1
+	for i, arg := range instr.Args {
+		if fixedTableArgProvenNonNil(arg) {
+			continue
+		}
+		if idx >= 0 {
+			return -1
+		}
+		idx = i
+	}
+	return idx
+}
+
+func (ec *emitContext) emitNewFixedTableNSparseMaskCacheResult(instr *Instr, ctor *runtime.SmallTableCtorN, omitted int, doneLabel, missLabel string) {
+	if ec == nil || instr == nil || ctor == nil || omitted < 0 || omitted >= len(instr.Args) {
+		ec.emitDeopt(instr)
+		return
+	}
+	mask := fixedTableMaskExcept(len(instr.Args), omitted)
+	sparse := runtime.SmallTableCtorNForMask(ctor, mask)
+	if sparse.Shape == nil {
+		ec.emitDeopt(instr)
+		return
+	}
+	asm := ec.asm
+	cacheBase := uintptr(unsafe.Pointer(&ec.newTableCaches[0]))
+	entryOff := instr.ID * newTableCacheEntrySize
+	asm.LoadImm64(jit.X2, int64(cacheBase))
+	if entryOff > 0 {
+		if entryOff <= 4095 {
+			asm.ADDimm(jit.X2, jit.X2, uint16(entryOff))
+		} else {
+			asm.LoadImm64(jit.X3, int64(entryOff))
+			asm.ADDreg(jit.X2, jit.X2, jit.X3)
+		}
+	}
+
+	asm.LDR(jit.X0, jit.X2, newTableCacheEntrySparseOff)
+	asm.CBZ(jit.X0, missLabel)
+	asm.LDR(jit.X3, jit.X2, newTableCacheEntrySparseOff+int(unsafe.Sizeof(uintptr(0))))
+	asm.CMPimm(jit.X3, uint16(omitted+1))
+	asm.BCond(jit.CondLT, missLabel)
+	if omitted > 0 {
+		asm.LoadImm64(jit.X3, int64(omitted*newTableSparseCacheEntrySize))
+		asm.ADDreg(jit.X0, jit.X0, jit.X3)
+	}
+	asm.LoadImm64(jit.X3, int64(mask))
+	asm.LDR(jit.X4, jit.X0, newTableSparseCacheEntryMaskOff)
+	asm.CMPreg(jit.X4, jit.X3)
+	asm.BCond(jit.CondNE, missLabel)
+	asm.LDR(jit.X3, jit.X0, newTableSparseCacheEntryValuesOff)
+	asm.CBZ(jit.X3, missLabel)
+	asm.LDR(jit.X4, jit.X0, newTableSparseCacheEntryPosOff)
+	asm.LDR(jit.X5, jit.X0, newTableSparseCacheEntryLenOff)
+	asm.CMPreg(jit.X4, jit.X5)
+	asm.BCond(jit.CondGE, missLabel)
+	asm.LDRreg(jit.X6, jit.X3, jit.X4)
+	asm.ADDimm(jit.X4, jit.X4, 1)
+	asm.STR(jit.X4, jit.X0, newTableSparseCacheEntryPosOff)
+
+	jit.EmitExtractPtr(asm, jit.X1, jit.X6)
+	asm.LDR(jit.X2, jit.X1, jit.TableOffSvals)
+	dst := 0
+	for i, arg := range instr.Args {
+		if i == omitted {
+			continue
+		}
+		ec.resolveValueToReg(arg.ID, jit.X5)
+		if !ec.emitNewFixedTableValueTypeGuard(sparse.Shape.ID, dst, arg, jit.X5, missLabel) {
+			ec.emitDeopt(instr)
+			return
+		}
+		asm.STR(jit.X5, jit.X2, dst*jit.ValueSize)
+		dst++
+	}
+	ec.storeResultNB(jit.X6, instr.ID)
+	asm.B(doneLabel)
+}
+
+func (ec *emitContext) emitNewFixedTableNConstNilMaskCacheFastPath(instr *Instr, ctor *runtime.SmallTableCtorN, doneLabel, missLabel string) bool {
+	if ec == nil || instr == nil || ctor == nil || ctor.Shape == nil || len(instr.Args) != len(ctor.Keys) {
+		return false
+	}
+	if len(instr.Args) <= 2 || len(instr.Args) > runtime.SmallFieldCap {
+		return false
+	}
+	omitted := -1
+	for i, arg := range instr.Args {
+		if isConstNilValue(arg) {
+			if omitted >= 0 {
+				return false
+			}
+			omitted = i
+		}
+	}
+	if omitted < 0 {
+		return false
+	}
+	mask := fixedTableMaskExcept(len(instr.Args), omitted)
+	sparse := runtime.SmallTableCtorNForMask(ctor, mask)
+	if sparse.Shape == nil {
+		return false
+	}
+
+	asm := ec.asm
+	nilBits := nb64(jit.NB_ValNil)
+	nilReg := ec.reusableFixedTableNNilReg(instr)
+	if nilReg != jit.XZR {
+		asm.LoadImm64(nilReg, nilBits)
+	}
+	for i, arg := range instr.Args {
+		if i == omitted || fixedTableArgProvenNonNil(arg) {
+			continue
+		}
+		ec.resolveValueToReg(arg.ID, jit.X5)
+		if nilReg != jit.XZR {
+			asm.CMPreg(jit.X5, nilReg)
+		} else {
+			asm.LoadImm64(jit.X6, nilBits)
+			asm.CMPreg(jit.X5, jit.X6)
+		}
+		asm.BCond(jit.CondEQ, missLabel)
+	}
+
+	cacheBase := uintptr(unsafe.Pointer(&ec.newTableCaches[0]))
+	entryOff := instr.ID * newTableCacheEntrySize
+	asm.LoadImm64(jit.X2, int64(cacheBase))
+	if entryOff > 0 {
+		if entryOff <= 4095 {
+			asm.ADDimm(jit.X2, jit.X2, uint16(entryOff))
+		} else {
+			asm.LoadImm64(jit.X3, int64(entryOff))
+			asm.ADDreg(jit.X2, jit.X2, jit.X3)
+		}
+	}
+
+	asm.LDR(jit.X0, jit.X2, newTableCacheEntrySparseOff)
+	asm.CBZ(jit.X0, missLabel)
+	asm.LDR(jit.X3, jit.X2, newTableCacheEntrySparseOff+int(unsafe.Sizeof(uintptr(0))))
+	asm.CMPimm(jit.X3, uint16(omitted+1))
+	asm.BCond(jit.CondLT, missLabel)
+	if omitted > 0 {
+		asm.LoadImm64(jit.X3, int64(omitted*newTableSparseCacheEntrySize))
+		asm.ADDreg(jit.X0, jit.X0, jit.X3)
+	}
+	asm.LoadImm64(jit.X3, int64(mask))
+	asm.LDR(jit.X4, jit.X0, newTableSparseCacheEntryMaskOff)
+	asm.CMPreg(jit.X4, jit.X3)
+	asm.BCond(jit.CondNE, missLabel)
+	asm.LDR(jit.X3, jit.X0, newTableSparseCacheEntryValuesOff)
+	asm.CBZ(jit.X3, missLabel)
+	asm.LDR(jit.X4, jit.X0, newTableSparseCacheEntryPosOff)
+	asm.LDR(jit.X5, jit.X0, newTableSparseCacheEntryLenOff)
+	asm.CMPreg(jit.X4, jit.X5)
+	asm.BCond(jit.CondGE, missLabel)
+	asm.LDRreg(jit.X6, jit.X3, jit.X4)
+	asm.ADDimm(jit.X4, jit.X4, 1)
+	asm.STR(jit.X4, jit.X0, newTableSparseCacheEntryPosOff)
+
+	jit.EmitExtractPtr(asm, jit.X1, jit.X6)
+	asm.LDR(jit.X2, jit.X1, jit.TableOffSvals)
+	dst := 0
+	for i, arg := range instr.Args {
+		if i == omitted {
+			continue
+		}
+		ec.resolveValueToReg(arg.ID, jit.X5)
+		if !ec.emitNewFixedTableValueTypeGuard(sparse.Shape.ID, dst, arg, jit.X5, missLabel) {
+			return false
+		}
+		asm.STR(jit.X5, jit.X2, dst*jit.ValueSize)
+		dst++
+	}
+	ec.storeResultNB(jit.X6, instr.ID)
 	asm.B(doneLabel)
 	return true
 }

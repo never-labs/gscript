@@ -421,6 +421,10 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 	if hasCall {
 		callCache = make([]uint64, len(code)*baselineCallCacheStride)
 	}
+	if hasFieldOps {
+		ensureFieldCache(proto)
+		ensureFieldPolyCache(proto)
+	}
 
 	// Get the direct entry offset for native BLR calls.
 	directEntryOff := asm.LabelOffset("direct_entry")

@@ -141,6 +141,7 @@ func fixedShapeTableFactsPass(fn *Function, config FixedShapeTableFactsConfig, t
 	seedGuardedPolyShapeArgFacts(fn, tableShapes, config.ArgPolyFacts)
 	seedGuardedPolyShapeArrayElementArgFacts(fn, tableShapes, facts, config.ArrayElementPolyFacts)
 	seedProfiledDynamicTableValueFacts(fn, facts)
+	seedRuntimeFieldPolyCacheFacts(fn, tableShapes)
 	if config.EntryGuardedArgs && tableShapes != nil {
 		markEntryGuardedFixedShapeArgFacts(fn, tableShapes, facts, tableShapes.FixedShapeArgFactMap())
 	}

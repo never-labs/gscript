@@ -9,6 +9,7 @@ package methodjit
 import (
 	"fmt"
 
+	"github.com/gscript/gscript/internal/runtime"
 	"github.com/gscript/gscript/internal/vm"
 )
 
@@ -40,7 +41,13 @@ func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, num
 			if !ok {
 				continue
 			}
-			if instr.Aux2 == 0 {
+			if cases := fixedShapeSparseFieldCases(fn, facts, fact, name, idx); len(cases) >= 2 {
+				tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
+				instr.Aux2 = 0
+				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+					fmt.Sprintf("prefilled sparse fixed-shape field cache for %q with %d shapes", name, len(cases)))
+			}
+			if instr.Aux2 == 0 && !tableShapes.HasFieldPolyShapeCases(instr.ID) {
 				instr.Aux2 = int64(fact.ShapeID)<<32 | int64(uint32(idx))
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("prefilled fixed-shape field cache for %q", name))
@@ -743,9 +750,19 @@ func propagateShapeCacheFromSetFieldToGetField(fn *Function, facts map[int]Fixed
 	}
 
 	// Now annotate GetField instructions that don't yet have a shape cache.
+	tableShapes := functionTableShapeFacts(fn)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 != 0 {
+				if instr.Op == OpSetField && instr.Aux2 == 0 {
+					if cases := fixedShapeAppendSetFieldCases(fn, instr); len(cases) > 0 {
+						functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+							fmt.Sprintf("prefilled append-shape setfield cache with %d shapes", len(cases)))
+					}
+				}
+				continue
+			}
+			if tableShapes.HasFieldPolyShapeCases(instr.ID) {
 				continue
 			}
 			shapeID, ok := tableShapeID[instr.Args[0].ID]
@@ -779,6 +796,118 @@ func propagateShapeCacheFromSetFieldToGetField(fn *Function, facts map[int]Fixed
 
 func fixedShapeTableFactHasUsableTableFact(fact FixedShapeTableFact) bool {
 	return fact.ShapeID != 0 || fact.ArrayElementType != TypeUnknown || fact.ArrayElementRange.known || fact.StringValueFact != nil
+}
+
+func fixedShapeSparseFieldCases(fn *Function, facts map[int]FixedShapeTableFact, fact FixedShapeTableFact, name string, fieldIdx int) []FieldPolyShapeCase {
+	if fact.ShapeID == 0 || len(fact.FieldNames) < 2 || len(fact.FieldNames) > 8 || fieldIdx < 0 || fieldIdx >= len(fact.FieldNames) {
+		return nil
+	}
+	if fact.FieldValueIDs == nil {
+		return nil
+	}
+	required := uint64(0)
+	for i, field := range fact.FieldNames {
+		if typ, ok := fact.FieldTypes[field]; ok && typ != TypeUnknown && typ != TypeAny && typ != TypeNil {
+			required |= uint64(1) << uint(i)
+		}
+	}
+	targetBit := uint64(1) << uint(fieldIdx)
+	if required&targetBit == 0 {
+		return nil
+	}
+	allMask := uint64(1)<<uint(len(fact.FieldNames)) - 1
+	appendFields := fixedShapeOptionalAppendFields(fn, facts, fact)
+	cases := make([]FieldPolyShapeCase, 0, 4)
+	seen := make(map[uint32]bool)
+	for mask := uint64(1); mask <= allMask; mask++ {
+		if mask&required != required || mask&targetBit == 0 {
+			continue
+		}
+		appendCombos := 1 << uint(len(appendFields))
+		for appendMask := 0; appendMask < appendCombos; appendMask++ {
+			keys := make([]string, 0, len(fact.FieldNames)+len(appendFields))
+			compactIdx := -1
+			for i, field := range fact.FieldNames {
+				if mask&(uint64(1)<<uint(i)) == 0 {
+					continue
+				}
+				if i == fieldIdx {
+					compactIdx = len(keys)
+				}
+				keys = append(keys, field)
+			}
+			if compactIdx < 0 {
+				continue
+			}
+			for i, field := range appendFields {
+				if appendMask&(1<<uint(i)) != 0 {
+					keys = append(keys, field)
+				}
+			}
+			shapeID := runtime.GetShapeID(keys)
+			if shapeID == 0 || seen[shapeID] {
+				continue
+			}
+			seen[shapeID] = true
+			caseFact := cloneFixedShapeTableFact(fact)
+			caseFact.ShapeID = shapeID
+			caseFact.FieldNames = keys
+			cases = append(cases, FieldPolyShapeCase{
+				ShapeID:      shapeID,
+				Count:        1,
+				FieldIdx:     compactIdx,
+				Type:         fact.FieldTypes[name],
+				ReceiverFact: caseFact,
+			})
+			if len(cases) >= runtime.FieldPolyCacheWays {
+				break
+			}
+		}
+		if len(cases) >= runtime.FieldPolyCacheWays {
+			break
+		}
+	}
+	if len(cases) < 2 {
+		return nil
+	}
+	return cases
+}
+
+func fixedShapeOptionalAppendFields(fn *Function, facts map[int]FixedShapeTableFact, fact FixedShapeTableFact) []string {
+	if fn == nil || fact.ShapeID == 0 || len(facts) == 0 {
+		return nil
+	}
+	known := make(map[string]bool, len(fact.FieldNames))
+	for _, field := range fact.FieldNames {
+		known[field] = true
+	}
+	seen := make(map[string]bool)
+	var out []string
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[0] == nil {
+				continue
+			}
+			if recvFact, ok := facts[instr.Args[0].ID]; ok {
+				if recvFact.ShapeID != fact.ShapeID || !recvFact.sameShape(fact) {
+					continue
+				}
+			}
+			field := fixedShapeFieldNameFromAux(fn, instr)
+			if field == "" || known[field] || seen[field] {
+				continue
+			}
+			seen[field] = true
+			out = append(out, field)
+			if len(out) >= 2 {
+				return out
+			}
+		}
+	}
+	return out
 }
 
 func fixedShapeFieldNameFromAux(fn *Function, instr *Instr) string {

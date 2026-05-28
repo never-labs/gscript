@@ -148,7 +148,12 @@ func (tm *TieringManager) recordTier2ExitProfile(proto *vm.FuncProto, cf *Compil
 	site.RefreshGuardDelta = current.Version.GuardCount - site.VersionGuards
 	if tm.recompileQueue.enqueue(proto, "exit_profile_feedback_matured", site) {
 		tm.exitProfile.markQueued(proto, current)
-		tm.clearTier2Install(proto)
+		installState := "cleared"
+		if tm.tier2Active != nil && tm.tier2Active[proto] > 0 {
+			installState = "deferred"
+		} else {
+			tm.clearTier2Install(proto)
+		}
 		tm.traceEvent("tier2_recompile_queued", "tier2", proto, map[string]any{
 			"reason":        "exit_profile_feedback_matured",
 			"pc":            site.PC,
@@ -157,7 +162,7 @@ func (tm *TieringManager) recordTier2ExitProfile(proto *vm.FuncProto, cf *Compil
 			"guards_before": cf.SpecializationVersion.GuardCount,
 			"guards_after":  current.Version.GuardCount,
 			"version_after": fmt.Sprintf("%x", current.Version.Hash),
-			"install":       "cleared",
+			"install":       installState,
 		})
 	}
 }

@@ -366,11 +366,119 @@ func firstLoopCarriedObjectGraphBlockerGate(fn *Function) GateResult {
 				}
 			}
 			if hasNilSeed && hasLoopAllocation {
+				if tier2LoopCarriedSetFieldHasRuntimeFallback(fn, instr) {
+					continue
+				}
 				return blockGateOp("LoopObjectGraph", "loop-carried object graph mutation remains inside loop", instr.Op)
 			}
 		}
 	}
 	return allowGate("LoopObjectGraph", "no loop-carried object graph mutation")
+}
+
+func firstTableArrayObjectFieldLoadBlockerGate(fn *Function) GateResult {
+	if fn == nil {
+		return allowGate("TableArrayObjectFieldLoad", "no function")
+	}
+	li := computeLoopInfo(fn)
+	for _, block := range fn.Blocks {
+		if block == nil || !li.loopBlocks[block.ID] {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil {
+				continue
+			}
+			receiver := instr.Args[0].Def
+			if receiver == nil {
+				continue
+			}
+			switch receiver.Op {
+			case OpTableArrayLoad, OpTableArrayNestedLoad:
+				if fact, idx, ok := getFieldReceiverFixedShapeFact(fn, instr); ok && fact.ShapeID != 0 && idx >= 0 {
+					continue
+				}
+				return blockGateOp("TableArrayObjectFieldLoad", "table-array object field load needs restart-safe field continuation", instr.Op)
+			}
+		}
+	}
+	return allowGate("TableArrayObjectFieldLoad", "no table-array object field load blocker")
+}
+
+func tier2LoopCarriedSetFieldHasRuntimeFallback(fn *Function, instr *Instr) bool {
+	if !tier2LoopCarriedSetFieldCanUseRuntimeFallback(fn, instr) {
+		return false
+	}
+	if len(fn.Proto.FieldCache) != 0 && instr.SourcePC < len(fn.Proto.FieldCache) {
+		entry := fn.Proto.FieldCache[instr.SourcePC]
+		if entry.ShapeID != 0 && entry.FieldIdx >= 0 && entry.FieldIdx < runtime.SmallFieldCap {
+			return true
+		}
+	}
+	return false
+}
+
+func tier2LoopCarriedObjectGraphNeedsRuntimeFeedback(fn *Function) bool {
+	if fn == nil {
+		return false
+	}
+	li := computeLoopInfo(fn)
+	for _, block := range fn.Blocks {
+		if block == nil || !li.loopBlocks[block.ID] {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if instr == nil || instr.Op != OpSetField || len(instr.Args) == 0 || instr.Args[0] == nil {
+				continue
+			}
+			receiver := instr.Args[0].Def
+			if receiver == nil || receiver.Op != OpPhi {
+				continue
+			}
+			hasNilSeed := false
+			hasLoopAllocation := false
+			for _, arg := range receiver.Args {
+				if arg == nil || arg.Def == nil {
+					continue
+				}
+				if arg.Def.Op == OpConstNil {
+					hasNilSeed = true
+					continue
+				}
+				if arg.Def.Block == nil || !li.loopBlocks[arg.Def.Block.ID] {
+					continue
+				}
+				if arg.Def.Op == OpNewTable || arg.Def.Op == OpNewFixedTable {
+					hasLoopAllocation = true
+				}
+			}
+			if hasNilSeed && hasLoopAllocation && tier2LoopCarriedSetFieldCanUseRuntimeFallback(fn, instr) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func tier2LoopCarriedSetFieldCanUseRuntimeFallback(fn *Function, instr *Instr) bool {
+	if fn == nil || fn.Proto == nil || instr == nil || instr.Op != OpSetField || len(instr.Args) < 2 {
+		return false
+	}
+	if !valueProvenNonNil(instr.Args[1]) {
+		return false
+	}
+	if !instr.HasSource || instr.SourcePC < 0 || instr.SourcePC >= len(fn.Proto.Code) {
+		return false
+	}
+	inst := fn.Proto.Code[instr.SourcePC]
+	if vm.DecodeOp(inst) != vm.OP_SETFIELD {
+		return false
+	}
+	constIdx := vm.DecodeB(inst)
+	if constIdx != int(instr.Aux) || constIdx < 0 || constIdx >= len(fn.Proto.Constants) || !fn.Proto.Constants[constIdx].IsString() {
+		return false
+	}
+	return true
 }
 
 func hasReadWriteGlobalInSameLoop(fn *Function) bool {

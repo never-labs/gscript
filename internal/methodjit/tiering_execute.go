@@ -26,6 +26,18 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 	if tm.callVM != nil {
 		regs = tm.ensureTier2RegisterBudget(cf, regs, base, proto)
 	}
+	if proto != nil {
+		if tm.tier2Active == nil {
+			tm.tier2Active = make(map[*vm.FuncProto]int)
+		}
+		tm.tier2Active[proto]++
+		defer func() {
+			tm.tier2Active[proto]--
+			if tm.tier2Active[proto] <= 0 {
+				delete(tm.tier2Active, proto)
+			}
+		}()
+	}
 
 	// Ensure register space.
 	needed := base + cf.numRegs
@@ -162,54 +174,17 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			ctx.BaselineClosurePtr = uintptr(unsafe.Pointer(cl))
 		}
 	}
-	refreshCFContext := func(next *CompiledFunction) bool {
-		if next == nil {
-			return false
-		}
-		needed := base + next.numRegs
-		if needed > len(regs) {
-			if tm.callVM == nil {
-				return false
-			}
-			regs = tm.callVM.EnsureRegs(needed)
-		}
-		oldNumRegs := cf.numRegs
-		cf = next
-		for i := base + oldNumRegs; i < base+cf.numRegs && i < len(regs); i++ {
-			regs[i] = runtime.NilValue()
-		}
-		ctx.Regs = uintptr(unsafe.Pointer(&regs[base]))
-		ctx.RegsBase = uintptr(unsafe.Pointer(&regs[0]))
-		ctx.RegsEnd = ctx.RegsBase + uintptr(len(regs)*jit.ValueSize)
-		ctx.RawSelfRegsEnd = rawSelfRegsEnd(ctx.Regs, ctx.RegsEnd, cf.numRegs)
-		if len(cf.GlobalCache) > 0 {
-			ctx.Tier2GlobalCache = uintptr(unsafe.Pointer(&cf.GlobalCache[0]))
-			ctx.Tier2GlobalCacheGen = uintptr(unsafe.Pointer(&cf.GlobalCacheGen))
-		} else {
-			ctx.Tier2GlobalCache = 0
-			ctx.Tier2GlobalCacheGen = 0
-		}
-		if len(cf.CallCache) > 0 {
-			ctx.Tier2CallCache = uintptr(unsafe.Pointer(&cf.CallCache[0]))
-		} else {
-			ctx.Tier2CallCache = 0
-		}
-		refreshTier2GlobalContext()
-		exitCheck = newExitResumeCheckState(cf)
-		ctx.ExitResumeCheckShadow = exitCheck.shadowPtr()
-		return true
-	}
+	midRunRefreshDeferred := false
 	tryMidRunRefresh := func(currentResumeOff int) int {
-		nextCF, nextResumeOff, switched := tm.tryMidRunTier2Refresh(proto, cf, ctx)
-		if !switched {
-			tm.retireStaleTier2AfterFeedback(proto, cf)
+		if midRunRefreshDeferred {
 			return currentResumeOff
 		}
-		if !refreshCFContext(nextCF) {
-			tm.retireStaleTier2AfterFeedback(proto, cf)
+		current := tm.currentTier2SpeculationProfile(proto)
+		if !tm.recompile.ShouldRefreshProfileForProto(proto, cf, current) {
 			return currentResumeOff
 		}
-		return nextResumeOff
+		midRunRefreshDeferred = true
+		return currentResumeOff
 	}
 	syncNativeGlobals := func() {
 		if tm.callVM == nil || len(cf.NativeSetGlobals) == 0 || len(cf.GlobalIndexByConst) == 0 {
@@ -221,6 +196,10 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 	var r154_exitCount int
 	for {
 		ctx.CallMode = 0
+		if tm.envR154Trace {
+			fmt.Fprintf(os.Stderr, "[R154] before CallJIT proto=%q codePtr=%#x codeBase=%#x cf=%p version=%x exit=%d resumePass=%d tableID=%d\n",
+				proto.Name, codePtr, uintptr(cf.Code.Ptr()), cf, cf.SpecializationVersion.Hash, ctx.ExitCode, ctx.ResumeNumericPass, ctx.TableExitID)
+		}
 		if tm.perfStatsEnabled {
 			start := time.Now()
 			jit.CallJIT(codePtr, ctxPtr)
@@ -247,6 +226,9 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 		switch ctx.ExitCode {
 		case ExitNormal:
 			mergeTier2CallCacheFeedback(proto, cf)
+			if midRunRefreshDeferred {
+				tm.retireStaleTier2AfterFeedback(proto, cf)
+			}
 			// Tier 2 return: result in regs[base] (slot 0 relative to base).
 			result := regs[base]
 			return runtime.ReuseValueSlice1(retBuf, result), nil
@@ -258,6 +240,10 @@ func (tm *TieringManager) executeTier2WithResultBuffer(cf *CompiledFunction, reg
 			}
 			if guardAction, ok := tm.guardDeoptRefreshAction(proto, cf, ctx); ok {
 				deoptAction = guardAction
+			}
+			if deoptAction.Kind == Tier2DeoptDisableAndFallback && tier2DeoptIsFeedbackRefreshableFieldMiss(cf, ctx) {
+				deoptAction.Kind = Tier2DeoptRefreshAndFallback
+				deoptAction.Reason = "tier2: runtime field deopt after feedback matured"
 			}
 			if tm.envR154Trace && tm.r154DeoptPrints < 20 {
 				var r0, r1 uint64
@@ -549,6 +535,22 @@ func tier2ExitResumeCodePtr(cf *CompiledFunction, ctx *ExecContext, resumeOff in
 	ctx.ExitCode = 0
 	ctx.ResumeNumericPass = 0
 	return codePtr
+}
+
+func tier2DeoptIsFeedbackRefreshableFieldMiss(cf *CompiledFunction, ctx *ExecContext) bool {
+	if cf == nil || ctx == nil || cf.ExitSites == nil {
+		return false
+	}
+	meta, ok := cf.ExitSites[int(ctx.DeoptInstrID)]
+	if !ok {
+		return false
+	}
+	switch meta.Op {
+	case "GetField", "GetFieldNumToFloat":
+		return true
+	default:
+		return false
+	}
 }
 
 func (tm *TieringManager) disableTier2AfterRuntimeDeopt(proto *vm.FuncProto, reason string) {

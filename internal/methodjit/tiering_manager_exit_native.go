@@ -224,10 +224,18 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 	observeTier2NativeCalleeArgShapes(proto, regs, base)
 	codePtr := uintptr(0)
 	resumeClosurePtr := ctx.NativeCalleeClosurePtr
+	midRunRefreshDeferred := false
 	refreshCallee := func(resumeOff int) int {
+		if midRunRefreshDeferred {
+			return resumeOff
+		}
+		current := tm.currentTier2SpeculationProfile(proto)
+		if !tm.recompile.ShouldRefreshProfileForProto(proto, cf, current) {
+			return resumeOff
+		}
 		nextCF, nextResumeOff, switched := tm.tryMidRunTier2Refresh(proto, cf, ctx)
 		if !switched {
-			tm.retireStaleTier2AfterFeedback(proto, cf)
+			midRunRefreshDeferred = true
 			return resumeOff
 		}
 		cf = nextCF
@@ -321,6 +329,9 @@ func (tm *TieringManager) resumeNativeTier2CalleeExit(ctx *ExecContext, cf *Comp
 		tm.tier2PerfStop(perfTier2NativeExecution, nativeMark)
 		switch ctx.ExitCode {
 		case ExitNormal:
+			if midRunRefreshDeferred {
+				tm.retireStaleTier2AfterFeedback(proto, cf)
+			}
 			return runtime.Value(ctx.BaselineReturnValue), nil
 		case ExitTableExit:
 			handlerMark := tm.tier2PerfStart()

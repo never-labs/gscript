@@ -52,6 +52,10 @@ func (ec *emitContext) emitGetField(instr *Instr) {
 	typeDeoptLabel := ec.uniqueLabel("getfield_type_deopt")
 	doneLabel := ec.uniqueLabel("getfield_done")
 	deoptLabel := ec.uniqueLabel("getfield_deopt")
+	shapeMissCanDeopt := false
+	if fact, idx, ok := getFieldReceiverFixedShapeFact(ec.fn, instr); ok && fact.ShapeID == shapeID && idx == fieldIdx {
+		shapeMissCanDeopt = true
+	}
 	if ec.hasFieldSvalsCache(tblValueID, shapeID) {
 		asm.LDR(jit.X0, jit.X1, fieldIdx*jit.ValueSize)
 		if instr.Type == TypeFloat || instr.Type == TypeInt {
@@ -101,10 +105,14 @@ func (ec *emitContext) emitGetField(instr *Instr) {
 
 	// Deopt fallback: use table-exit to perform the field access in Go.
 	asm.Label(deoptLabel)
-	savedReprs := ec.snapshotValueReprs()
-	ec.emitGetFieldExit(instr)
-	ec.emitUnboxRawIntRegs(savedReprs)
-	ec.restoreValueReprSnapshot(savedReprs)
+	if shapeMissCanDeopt {
+		ec.emitDeopt(instr)
+	} else {
+		savedReprs := ec.snapshotValueReprs()
+		ec.emitGetFieldExit(instr)
+		ec.emitUnboxRawIntRegs(savedReprs)
+		ec.restoreValueReprSnapshot(savedReprs)
+	}
 	asm.B(doneLabel)
 
 	if instr.Type == TypeFloat || instr.Type == TypeInt {
@@ -164,12 +172,23 @@ func (ec *emitContext) emitGetFieldDirectPolyShapeFacts(instr *Instr) bool {
 	typeDeoptLabel := ec.uniqueLabel("getfield_direct_poly_type_deopt")
 	missLabel := ec.uniqueLabel("getfield_direct_poly_miss")
 	doneLabel := ec.uniqueLabel("getfield_direct_poly_done")
+	_, _, fixedReceiver := getFieldReceiverFixedShapeFact(ec.fn, instr)
 
-	ec.resolveValueToReg(tblValueID, jit.X0)
-	if ec.irTypes[tblValueID] != TypeTable {
+	if ec.hasReg(tblValueID) && ec.valueReprOf(tblValueID) == valueReprRawTablePtr {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else if ec.tableValueAlreadyChecked(tblValueID) {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else {
+		ec.resolveValueToReg(tblValueID, jit.X0)
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
+		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	}
-	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.CBZ(jit.X0, missLabel)
 	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
 	asm.LDR(jit.X5, jit.X0, jit.TableOffSvalsLen)
@@ -200,10 +219,14 @@ func (ec *emitContext) emitGetFieldDirectPolyShapeFacts(instr *Instr) bool {
 	asm.B(missLabel)
 
 	asm.Label(missLabel)
-	savedReprs := ec.snapshotValueReprs()
-	ec.emitGetFieldExit(instr)
-	ec.emitUnboxRawIntRegs(savedReprs)
-	ec.restoreValueReprSnapshot(savedReprs)
+	if fixedReceiver {
+		ec.emitDeopt(instr)
+	} else {
+		savedReprs := ec.snapshotValueReprs()
+		ec.emitGetFieldExit(instr)
+		ec.emitUnboxRawIntRegs(savedReprs)
+		ec.restoreValueReprSnapshot(savedReprs)
+	}
 	asm.B(doneLabel)
 
 	if instr.Type == TypeFloat || instr.Type == TypeInt {
@@ -238,11 +261,21 @@ func (ec *emitContext) emitFieldPolyLen(instr *Instr) {
 	doneLabel := ec.uniqueLabel("field_poly_len_done")
 	tblValueID := instr.Args[0].ID
 
-	ec.resolveValueToReg(tblValueID, jit.X0)
-	if ec.irTypes[tblValueID] != TypeTable {
+	if ec.hasReg(tblValueID) && ec.valueReprOf(tblValueID) == valueReprRawTablePtr {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else if ec.tableValueAlreadyChecked(tblValueID) {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else {
+		ec.resolveValueToReg(tblValueID, jit.X0)
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, missLabel)
+		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	}
-	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.CBZ(jit.X0, missLabel)
 	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
 
@@ -492,11 +525,21 @@ func (ec *emitContext) emitGetFieldDynamicCache(instr *Instr) bool {
 	asm.CMPimm(jit.X4, 0)
 	asm.BCond(jit.CondLT, deoptLabel)
 
-	ec.resolveValueToReg(tblValueID, jit.X0)
-	if ec.irTypes[tblValueID] != TypeTable {
+	if ec.hasReg(tblValueID) && ec.valueReprOf(tblValueID) == valueReprRawTablePtr {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else if ec.tableValueAlreadyChecked(tblValueID) {
+		tblReg := ec.resolveRawTablePtr(tblValueID, jit.X0)
+		if tblReg != jit.X0 {
+			asm.MOVreg(jit.X0, tblReg)
+		}
+	} else {
+		ec.resolveValueToReg(tblValueID, jit.X0)
 		jit.EmitCheckIsTableFull(asm, jit.X0, jit.X1, jit.X2, deoptLabel)
+		jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	}
-	jit.EmitExtractPtr(asm, jit.X0, jit.X0)
 	asm.CBZ(jit.X0, deoptLabel)
 	asm.LDRW(jit.X1, jit.X0, jit.TableOffShapeID)
 	asm.CMPreg(jit.X1, jit.X5)
@@ -793,8 +836,17 @@ func (ec *emitContext) emitGetFieldExit(instr *Instr) {
 	// We need the table value in a register slot so Go can read it.
 	// Store the table arg to its home slot (it may only be in a register).
 	if len(instr.Args) > 0 {
-		ec.resolveValueToReg(instr.Args[0].ID, jit.X0)
-		tblSlot, hasTblSlot := ec.slotMap[instr.Args[0].ID]
+		argID := instr.Args[0].ID
+		if ec.valueReprOf(argID) == valueReprRawTablePtr {
+			tblReg := ec.resolveRawTablePtr(argID, jit.X0)
+			if tblReg != jit.X0 {
+				asm.MOVreg(jit.X0, tblReg)
+			}
+			emitBoxTablePtr(asm, jit.X0, jit.X0, jit.X17)
+		} else {
+			ec.resolveValueToReg(argID, jit.X0)
+		}
+		tblSlot, hasTblSlot := ec.slotMap[argID]
 		if hasTblSlot {
 			asm.STR(jit.X0, mRegRegs, slotOffset(tblSlot))
 		}
