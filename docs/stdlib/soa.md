@@ -29,8 +29,10 @@ print(soa.row(points, 2).id)  // 102
   mutates the SoA.
 - `soa.row` returns a copied ordinary table. Mutating that table does not write
   back; use `soa.setRow` for row-style mutation.
-- `soa.slice`, `soa.filter`, and `soa.unzip` return independent dense-column
-  copies.
+- `soa.slice`, `soa.filter`, `soa.gather`, and `soa.unzip` return independent
+  dense-column copies.
+- `soa.sumWhere` reduces a numeric column over a bool mask without
+  materializing a filtered SoA first.
 
 ## Introspection
 
@@ -98,6 +100,35 @@ Returns an independent SoA containing rows `first..last`, inclusive.
 Returns an independent SoA containing rows whose corresponding mask element is
 `true`. `mask` must be a bool dense array with the same length as `s`.
 
+Use `soa.filter` as the current compact/filter operation: build a bool dense
+mask from a predicate, compact all columns together, then continue with column
+kernels on the returned SoA.
+
+```gscript
+active := soa.filter(points, []bool{true, false, true})
+activeX := soa.sum(active, "x")
+```
+
+### `soa.gather(s, indices) -> soa`
+
+Returns an independent SoA containing rows addressed by an i64 dense index
+vector. Indexes are one-based, matching `soa.row` and `soa.slice`. Duplicate
+indexes preserve duplicate rows, and output order matches the index vector.
+
+Use gather when the selection is already represented as positions rather than
+a predicate mask: sparse lookup, permutation, join output, stable top-K, or
+replaying an externally computed order.
+
+```gscript
+picked := soa.gather(points, [3]i64{3, 1, 3})
+```
+
+### Reserved: `soa.compact(s, mask) -> soa`
+
+Reserved as an alias or semantic twin of `soa.filter` for callers that want the
+array-programming term "compact" after computing a bool mask. Use `soa.filter`
+today; its contract already matches compact semantics.
+
 ## Fused Column Kernels
 
 The current native SoA kernels operate over numeric dense columns and mutate the
@@ -139,12 +170,31 @@ dependent updates into separate calls to preserve order.
 
 Reduces one numeric dense column and returns its sum.
 
+### `soa.sumWhere(s, column, mask) -> number`
+
+Reduces numeric `column` over mask-true rows without row materialization.
+`mask` must be a bool dense array with the same length as `s`.
+
+```gscript
+mask := []bool{true, false, true}
+total := soa.sumWhere(points, "x", mask)
+```
+
+Future aggregate-family helpers may include `soa.minWhere`, `soa.maxWhere`,
+and `soa.countWhere`.
+
 ## Hot Path Guidance
 
 - Prefer `soa.column` plus fused kernels for loops that touch a small subset of
   fields.
 - Prefer `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` over
   manual row loops when the operation fits their contracts.
+- For masked aggregates, prefer `soa.sumWhere` over `soa.filter` plus `soa.sum`
+  when you do not need the compacted rows.
+- For compact/filter pipelines, keep the mask as a bool dense array and compact
+  once before downstream kernels.
+- For gather-style pipelines, keep selection positions in a dense i64 array so
+  `soa.gather` can preserve order and duplicates without row tables.
 - Keep numeric columns dense and stable. Replacing columns or changing lengths
   prevents specialization from reusing prior layout facts.
 - Use `soa.row` and `soa.setRow` at API boundaries, not inside high-iteration
@@ -158,8 +208,9 @@ Reduces one numeric dense column and returns its sum.
 - Columns cannot be appended, removed, or resized through the `soa` API yet.
 - `soa.zip` does not deep-copy columns. It keeps the provided dense arrays.
 - Row views are copies, not live proxies.
+- `soa.compact` and additional masked aggregate helpers are reserved directions
+  and are not available yet.
 - `soa.slice`, `soa.filter`, and `soa.unzip` copy dense columns rather than
   returning zero-copy views.
 - The current fast path is a portable runtime kernel layer. Direct SIMD/native
   loop-body emission is future work.
-

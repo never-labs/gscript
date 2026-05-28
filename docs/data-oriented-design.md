@@ -181,10 +181,17 @@ Current implementation status:
   `soa.setRow` are available;
 - `soa.unzip`, `soa.slice`, and `soa.filter` preserve column alignment while
   returning independent dense-column copies;
+- `soa.gather` preserves column alignment while materializing rows from a
+  one-based i64 dense index vector;
+- `soa.sumWhere` reduces a numeric column over mask-true rows without
+  materializing a filtered SoA first;
 - `soa.shape` exposes layout diagnostics: length, shape version, column names,
   element kinds, column lengths, and column versions;
 - `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` provide fused
   column kernels over dense columns;
+- the array-programming surface still reserves a `compact` alias and additional
+  masked aggregate helpers for subset pipelines that should stay columnar
+  instead of materializing row tables;
 - row access materializes an ordinary table and is intended for boundary code,
   debugging, and tests, not hot loops.
 
@@ -202,10 +209,19 @@ Current API contract:
 | `soa.setRow(s, index, row)` | Writes every column from a table field of the same name and returns `true`. Missing or incompatible fields are errors. |
 | `soa.slice(s, first, last)` | Returns an independent SoA for one-based inclusive rows `first..last`. |
 | `soa.filter(s, mask)` | Returns an independent SoA containing rows whose bool dense mask entry is true. The mask length must match. |
+| `soa.gather(s, indices)` | Returns an independent SoA containing rows addressed by a one-based i64 dense index vector. Duplicates and index order are preserved. |
 | `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
 | `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
 | `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
+| `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |
+
+Reserved array-programming API shape:
+
+| API | Intended contract |
+|---|---|
+| `soa.compact(s, mask)` | Alias or semantic twin of `soa.filter`: return an independent SoA containing mask-true rows in original order. The name is reserved for code that wants to emphasize mask compaction after vectorized predicates. |
+| Additional aggregate-family helpers | `soa.minWhere`, `soa.maxWhere`, and `soa.countWhere` should follow `soa.sumWhere` semantics without building row tables. |
 
 Hot path guidance:
 
@@ -213,6 +229,15 @@ Hot path guidance:
 - use `soa.row` and `soa.setRow` for boundary conversion, debugging, and tests;
 - batch independent column updates with `soa.affineMany` rather than repeated
   row materialization;
+- for masked aggregates today, prefer `filtered := soa.filter(s, mask)` followed
+  by `soa.sum(filtered, column)`; do not loop through `soa.row` just to test a
+  predicate and accumulate a numeric column;
+- for compact/filter pipelines, build or reuse a bool dense mask, call
+  `soa.filter`, then continue with column kernels on the returned independent
+  SoA;
+- for future gather-style selection, keep row indexes in a dense integer array
+  and treat the result as an independent SoA that may contain duplicates in the
+  requested order;
 - keep column dtypes and lengths stable so layout and column-version facts stay
   reusable by runtime specialization;
 - prefer `soa.shape` for diagnostics, not for application-level branching on
@@ -222,6 +247,8 @@ Current limitations:
 
 - there is no parser-level SoA syntax and no live row proxy;
 - SoA columns cannot be appended, removed, or resized through the `soa` API yet;
+- `soa.gather`, `soa.compact`, and fused masked aggregate helpers are reserved
+  API directions and are not implemented in the current stdlib surface;
 - `soa.slice`, `soa.filter`, and `soa.unzip` copy columns instead of creating
   zero-copy views;
 - direct SIMD/native loop-body emission is still future work; current kernels

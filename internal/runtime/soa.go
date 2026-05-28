@@ -178,6 +178,24 @@ func (s *SoA) Filter(mask *DenseArray) (*SoA, error) {
 	return NewSoA(cols)
 }
 
+func (s *SoA) Gather(indices *DenseArray) (*SoA, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if indices == nil || indices.DType() != DenseArrayI64 {
+		return nil, fmt.Errorf("soa gather indices must be an i64 dense array")
+	}
+	cols := make(map[string]*DenseArray, len(s.columns))
+	for _, name := range s.names {
+		col, err := s.columns[name].Gather(indices)
+		if err != nil {
+			return nil, fmt.Errorf("soa column %q: %w", name, err)
+		}
+		cols[name] = col
+	}
+	return NewSoA(cols)
+}
+
 func (s *SoA) ColumnDescriptor(name string) (SoAColumnDescriptor, bool) {
 	col, ok := s.Column(name)
 	if !ok {
@@ -364,6 +382,20 @@ func (s *SoA) Sum(columnName string) (Value, error) {
 		return NilValue(), fmt.Errorf("soa column %q not found", columnName)
 	}
 	return DenseArrayReduce(DenseArrayReduceSum, col)
+}
+
+func (s *SoA) SumWhere(columnName string, mask *DenseArray) (Value, error) {
+	if s == nil {
+		return NilValue(), fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return NilValue(), fmt.Errorf("soa sumWhere mask must be a bool dense array")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return NilValue(), fmt.Errorf("soa column %q not found", columnName)
+	}
+	return col.SumWhere(mask)
 }
 
 func (s *SoA) numericColumns(dstName, srcName string) (*DenseArray, *DenseArray, error) {

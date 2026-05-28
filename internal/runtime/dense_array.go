@@ -254,6 +254,88 @@ func (a *DenseArray) filterKnownCount(mask *DenseArray, count int) (*DenseArray,
 	}
 }
 
+func (a *DenseArray) Gather(indices *DenseArray) (*DenseArray, error) {
+	if a == nil || indices == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if indices.dtype != DenseArrayI64 {
+		return nil, fmt.Errorf("dense array gather indices must be i64")
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		out := make([]float64, len(indices.i64))
+		for i, index := range indices.i64 {
+			pos, err := denseArrayOneBasedIndex(index, len(a.f64))
+			if err != nil {
+				return nil, err
+			}
+			out[i] = a.f64[pos]
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, nil
+	case DenseArrayI64:
+		out := make([]int64, len(indices.i64))
+		for i, index := range indices.i64 {
+			pos, err := denseArrayOneBasedIndex(index, len(a.i64))
+			if err != nil {
+				return nil, err
+			}
+			out[i] = a.i64[pos]
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
+	case DenseArrayBool:
+		out := make([]bool, len(indices.i64))
+		for i, index := range indices.i64 {
+			pos, err := denseArrayOneBasedIndex(index, len(a.bools))
+			if err != nil {
+				return nil, err
+			}
+			out[i] = a.bools[pos]
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
+func (a *DenseArray) SumWhere(mask *DenseArray) (Value, error) {
+	if a == nil || mask == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return NilValue(), fmt.Errorf("dense array sumWhere mask must be bool")
+	}
+	if a.Len() != mask.Len() {
+		return NilValue(), ErrDenseArrayLength
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		sum := 0.0
+		for i, keep := range mask.bools {
+			if keep {
+				sum += a.f64[i]
+			}
+		}
+		return FloatValue(sum), nil
+	case DenseArrayI64:
+		var sum int64
+		for i, keep := range mask.bools {
+			if keep {
+				sum += a.i64[i]
+			}
+		}
+		return IntValue(sum), nil
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func denseArrayOneBasedIndex(index int64, length int) (int, error) {
+	if index < 1 || index > int64(length) {
+		return 0, fmt.Errorf("dense array index out of range")
+	}
+	return int(index - 1), nil
+}
+
 func denseArrayBoolCount(xs []bool) int {
 	n := 0
 	for _, v := range xs {

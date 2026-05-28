@@ -138,6 +138,21 @@ func buildSoALib() *Table {
 		return []Value{SoAValue(out)}, nil
 	}, soaFilterValue)
 
+	setFastArg2("gather", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.gather", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsDenseArray() {
+			return nil, fmt.Errorf("soa.gather: argument 2 must be an i64 dense array")
+		}
+		out, err := s.Gather(args[1].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{SoAValue(out)}, nil
+	}, soaGatherValue)
+
 	set("row", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.row", args, 0)
 		if err != nil {
@@ -239,6 +254,24 @@ func buildSoALib() *Table {
 		}
 		return []Value{v}, nil
 	}, soaSumValue)
+
+	setFastArg3("sumWhere", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.sumWhere", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.sumWhere: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsDenseArray() {
+			return nil, fmt.Errorf("soa.sumWhere: argument 3 must be a bool dense array")
+		}
+		v, err := s.SumWhere(args[1].Str(), args[2].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaSumWhereValue)
 
 	return t
 }
@@ -375,6 +408,33 @@ func soaFilterValue(soaValue, maskValue Value) (Value, error) {
 		return NilValue(), err
 	}
 	return SoAValue(out), nil
+}
+
+func soaGatherValue(soaValue, indicesValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.gather: argument 1 must be soa")
+	}
+	if !indicesValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.gather: argument 2 must be an i64 dense array")
+	}
+	out, err := soaValue.SoA().Gather(indicesValue.DenseArray())
+	if err != nil {
+		return NilValue(), err
+	}
+	return SoAValue(out), nil
+}
+
+func soaSumWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.sumWhere: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.sumWhere: argument 2 must be a string")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.sumWhere: argument 3 must be a bool dense array")
+	}
+	return soaValue.SoA().SumWhere(columnValue.Str(), maskValue.DenseArray())
 }
 
 func soaShapeTable(s *SoA) *Table {
