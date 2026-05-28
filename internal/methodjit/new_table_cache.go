@@ -24,7 +24,7 @@ const (
 	// exit-resume allocation without paying that cost at cold compile time.
 	fixedTableCacheBatch          = 1024
 	fixedTableCacheRefillBatch    = 8192
-	fixedTableNRefillBatch        = 131072
+	fixedTableNRefillBatch        = 32768
 	newTableCacheMaxBatch         = 512
 	newTableCacheTargetBytes      = 4 << 20
 	newTableCacheLargeTargetBytes = 16 << 20
