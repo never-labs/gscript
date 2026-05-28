@@ -64,9 +64,12 @@ contract check without the long benchmark passes. The default `--full` mode
 runs the correctness gates, the release smoke, and the repeatable performance
 gate through `scripts/performance_gate.sh --full`. Use
 `scripts/production_check.sh --list` to print the available command subset for
-the current checkout. If LuaJIT is unavailable, benchmark commands that support
-it are run with `--no-luajit`; if optional tools such as `pytest` are absent,
-the script reports that clearly instead of failing before the Go gates run.
+the current checkout. Add `--out-dir DIR` to write the resolved plan and command
+logs to a local artifact directory; this works with `--quick`, default `--full`,
+and `--list` runs, and leaving it unset preserves the normal console-only
+behavior. If LuaJIT is unavailable, benchmark commands that support it are run
+with `--no-luajit`; if optional tools such as `pytest` are absent, the script
+reports that clearly instead of failing before the Go gates run.
 
 ### CI Quick Gates
 
