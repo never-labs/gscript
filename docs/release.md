@@ -121,6 +121,13 @@ bash scripts/release_artifacts.sh --version vX.Y.Z \
   --dry-run
 ```
 
+The repository-owned artifact smoke check wraps that dry-run path and verifies
+the planned names and metadata without touching `dist/`:
+
+```bash
+bash scripts/release_artifacts_check.sh --version vX.Y.Z
+```
+
 Use a temporary output directory for local smoke tests without touching `dist/`:
 
 ```bash
@@ -128,6 +135,15 @@ bash scripts/release_artifacts.sh --version vX.Y.Z \
   --output-dir /tmp/gscript-release-smoke
 /tmp/gscript-release-smoke/gscript_vX.Y.Z_<goos>_<goarch> -e 'print("ok")'
 cat /tmp/gscript-release-smoke/SHA256SUMS
+```
+
+For release-candidate evidence, run the same check with a real local build.
+When `--output-dir` is omitted, it builds into an auto-created temporary
+directory, verifies both `SHA256SUMS` entries against SHA256, and runs the built
+CLI on `tests/01_basic.gs`:
+
+```bash
+bash scripts/release_artifacts_check.sh --version vX.Y.Z --build
 ```
 
 When version metadata is wired into the binary, include tag, commit SHA, build
