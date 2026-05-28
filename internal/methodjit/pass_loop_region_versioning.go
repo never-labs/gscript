@@ -25,15 +25,16 @@ import "github.com/gscript/gscript/internal/vm"
 // len. Any miss exits before native execution continues, so the preheader facts
 // remain valid inside the region.
 func LoopRegionVersioningPass(fn *Function) (*Function, error) {
-	if fn == nil {
-		return fn, nil
+	if fn != nil {
+		fn.ensureAnalysis()
 	}
-	fn.ensureAnalysis()
-	var globals map[string]*vm.FuncProto
-	if globalFacts := functionGlobalFacts(fn); globalFacts != nil {
-		globals = globalFacts.GlobalsMap()
-	}
-	return loopRegionVersioningPass(fn, globals, functionLoopSpecializationFacts(fn), functionNumericFacts(fn))
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactIntRanges),
+		analysisFacts(AnalysisFactTableArrayBoundsSafe, AnalysisFactLoopTableArrayFacts),
+		analysisFacts(AnalysisFactTableArrayBoundsSafe),
+		analysisFacts(AnalysisFactGlobals),
+	)
+	return LoopRegionVersioningPassCtx(newPassContext(fn, nil, allowed, false))
 }
 
 func LoopRegionVersioningPassCtx(ctx *PassContext) (*Function, error) {

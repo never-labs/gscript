@@ -24,7 +24,16 @@ func CallSiteRuntimeSpecializationExitPassCtx(globals map[string]*vm.FuncProto) 
 }
 
 func AnnotateCallSiteRuntimeSpecializationExits(fn *Function, globals map[string]*vm.FuncProto) *Function {
-	return annotateCallSiteRuntimeSpecializationExits(fn, globals, functionCallFacts(fn))
+	if fn != nil {
+		fn.ensureAnalysis()
+	}
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactCallABIs),
+		analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+		nil,
+	)
+	out, _ := CallSiteRuntimeSpecializationExitPassCtx(globals)(newPassContext(fn, nil, allowed, false))
+	return out
 }
 
 func annotateCallSiteRuntimeSpecializationExits(fn *Function, globals map[string]*vm.FuncProto, callFacts *CallFacts) *Function {

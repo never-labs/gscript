@@ -25,7 +25,16 @@ func GuardedConstCallFoldPassCtx(globals map[string]*vm.FuncProto) CtxPassFunc {
 }
 
 func AnnotateGuardedConstCallFolds(fn *Function, globals map[string]*vm.FuncProto) *Function {
-	return annotateGuardedConstCallFolds(fn, globals, functionCallFacts(fn))
+	if fn != nil {
+		fn.ensureAnalysis()
+	}
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactCallABIs),
+		analysisFacts(AnalysisFactGuardedConstCallFolds),
+		nil,
+	)
+	out, _ := GuardedConstCallFoldPassCtx(globals)(newPassContext(fn, nil, allowed, false))
+	return out
 }
 
 func annotateGuardedConstCallFolds(fn *Function, globals map[string]*vm.FuncProto, callFacts *CallFacts) *Function {
