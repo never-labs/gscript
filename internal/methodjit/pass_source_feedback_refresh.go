@@ -13,10 +13,21 @@ import (
 // instructions. SourceProto lets this pass recover those generic facts without
 // coupling to a specific workload.
 func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
+	return SourceFeedbackRefreshPassCtx(newPassContext(fn, nil, sourceFeedbackRefreshAllowedDomains, false))
+}
+
+var sourceFeedbackRefreshAllowedDomains = allowedDomainsForModule(nil, nil, analysisFacts(AnalysisFactFieldPolyShapeFacts))
+
+func SourceFeedbackRefreshPassCtx(ctx *PassContext) (*Function, error) {
+	if ctx == nil {
+		return nil, nil
+	}
+	fn := ctx.Func()
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
+	tableShapes := ctx.TableShape()
 	for _, block := range fn.Blocks {
 		if block == nil {
 			continue
@@ -27,7 +38,7 @@ func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 			}
 			switch sourceFeedbackPolicy(instr.Op) {
 			case OpSourceFeedbackGetField:
-				sourceFeedbackRefreshGetField(fn, block, instr)
+				sourceFeedbackRefreshGetField(fn, tableShapes, block, instr)
 			case OpSourceFeedbackSetField:
 				sourceFeedbackRefreshSetField(fn, block, instr)
 			case OpSourceFeedbackGetTable:
@@ -42,8 +53,8 @@ func SourceFeedbackRefreshPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
-func sourceFeedbackRefreshGetField(fn *Function, block *Block, instr *Instr) {
-	if functionTableShapeFacts(fn).HasFieldPolyShapeCases(instr.ID) {
+func sourceFeedbackRefreshGetField(fn *Function, tableShapes *TableShapeFacts, block *Block, instr *Instr) {
+	if tableShapes != nil && tableShapes.HasFieldPolyShapeCases(instr.ID) {
 		if typ, ok := sourceFeedbackFieldValueType(instr.SourceProto, instr.SourcePC); ok &&
 			(instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = typ
@@ -53,7 +64,9 @@ func sourceFeedbackRefreshGetField(fn *Function, block *Block, instr *Instr) {
 		return
 	}
 	if cases, typ := runtimeFieldPolyShapeCasesFromFeedback(fn, instr); len(cases) >= 2 {
-		functionTableShapeFacts(fn).RecordFieldPolyShapeCases(instr.ID, cases)
+		if tableShapes != nil {
+			tableShapes.RecordFieldPolyShapeCases(instr.ID, cases)
+		}
 		instr.Aux2 = 0
 		if typ != TypeUnknown && typ != TypeAny && (instr.Type == TypeAny || instr.Type == TypeUnknown) {
 			instr.Type = typ

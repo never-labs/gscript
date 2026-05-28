@@ -110,7 +110,17 @@ func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tie
 			},
 		},
 		tier2PostInlinePassModuleWith("SimplifyPhis (post-inline)", nil, SimplifyPhisPass),
-		tier2PostInlinePassModuleWith("SourceFeedbackRefresh (post-inline)", nil, SourceFeedbackRefreshPass),
+		{
+			Name:    "SourceFeedbackRefresh (post-inline)",
+			Phase:   Tier2PhaseInlineCall,
+			Updates: analysisFacts(AnalysisFactFieldPolyShapeFacts),
+			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
+				if ctx == nil || !ctx.InlineApplied {
+					return fn, nil
+				}
+				return SourceFeedbackRefreshPassCtx(newPassContext(fn, opts, sourceFeedbackRefreshAllowedDomains, passContextEnforce))
+			},
+		},
 		{
 			Name:     "Intrinsic (post-inline)",
 			Phase:    Tier2PhaseInlineCall,
