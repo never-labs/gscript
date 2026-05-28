@@ -185,6 +185,21 @@ func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
 	}
 }
 
+func TestWithMaxStepsLimitsEmptyBytecodeLoop(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
+	err := vm.Exec(`for {}`)
+	if err == nil {
+		t.Fatal("expected step limit error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "steps" || budgetErr.Limit != 8 {
+		t.Fatalf("budget = %s %d, want steps 8", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
 func TestWithMaxStepsAllowsBytecodeExecutionWithinBudget(t *testing.T) {
 	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(256))
 	if err := vm.Exec(`
