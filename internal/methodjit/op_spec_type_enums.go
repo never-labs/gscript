@@ -208,3 +208,20 @@ const (
 	OpTableArrayFactLen
 	OpTableArrayFactData
 )
+
+type OpFixedShapeArrayElementWriteRole uint8
+
+const (
+	OpFixedShapeArrayElementWriteNone OpFixedShapeArrayElementWriteRole = iota
+	OpFixedShapeArrayElementWriteSingle
+	OpFixedShapeArrayElementWriteVariadic
+	OpFixedShapeArrayElementWriteConflict
+)
+
+type OpFixedShapeArrayElementReadRole uint8
+
+const (
+	OpFixedShapeArrayElementReadNone OpFixedShapeArrayElementReadRole = iota
+	OpFixedShapeArrayElementReadDirect
+	OpFixedShapeArrayElementReadLoweredArray
+)

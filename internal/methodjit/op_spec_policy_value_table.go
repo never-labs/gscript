@@ -67,3 +67,14 @@ var opTableIntArrayReverseBodyBenignPolicies = [...]bool{
 	OpJump:           true,
 	OpNop:            true,
 }
+
+var opFixedShapeArrayElementWriteRolePolicies = [...]OpFixedShapeArrayElementWriteRole{
+	OpSetTable: OpFixedShapeArrayElementWriteSingle,
+	OpSetList:  OpFixedShapeArrayElementWriteVariadic,
+	OpAppend:   OpFixedShapeArrayElementWriteConflict,
+}
+
+var opFixedShapeArrayElementReadRolePolicies = [...]OpFixedShapeArrayElementReadRole{
+	OpGetTable:       OpFixedShapeArrayElementReadDirect,
+	OpTableArrayLoad: OpFixedShapeArrayElementReadLoweredArray,
+}

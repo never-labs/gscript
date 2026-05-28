@@ -169,6 +169,22 @@ func tableIntArrayReverseBodyBenign(op Op) bool {
 	return ok && spec.TableIntArrayReverseBodyBenign
 }
 
+func fixedShapeArrayElementWriteRole(op Op) OpFixedShapeArrayElementWriteRole {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpFixedShapeArrayElementWriteNone
+	}
+	return spec.FixedShapeArrayElementWriteRole
+}
+
+func fixedShapeArrayElementReadRole(op Op) OpFixedShapeArrayElementReadRole {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpFixedShapeArrayElementReadNone
+	}
+	return spec.FixedShapeArrayElementReadRole
+}
+
 func opIsTableArrayStoreLoopCandidate(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.TableArrayStoreLoopCandidate

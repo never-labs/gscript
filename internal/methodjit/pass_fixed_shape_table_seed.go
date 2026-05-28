@@ -665,8 +665,8 @@ func inferLocalArrayElementTableFacts(fn *Function, valueFacts map[int]FixedShap
 			if instr == nil || len(instr.Args) == 0 || instr.Args[0] == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpSetTable:
+			switch fixedShapeArrayElementWriteRole(instr.Op) {
+			case OpFixedShapeArrayElementWriteSingle:
 				if len(instr.Args) < 3 || instr.Args[1] == nil || instr.Args[2] == nil || !tableKeyProvenInt(instr.Args[1]) {
 					continue
 				}
@@ -675,7 +675,7 @@ func inferLocalArrayElementTableFacts(fn *Function, valueFacts map[int]FixedShap
 					continue
 				}
 				states[instr.Args[0].ID] = mergeArrayElementTableFactState(states[instr.Args[0].ID], valueFact)
-			case OpSetList:
+			case OpFixedShapeArrayElementWriteVariadic:
 				st := states[instr.Args[0].ID]
 				for _, arg := range instr.Args[1:] {
 					if arg == nil {
@@ -689,7 +689,7 @@ func inferLocalArrayElementTableFacts(fn *Function, valueFacts map[int]FixedShap
 					st = mergeArrayElementTableFactState(st, valueFact)
 				}
 				states[instr.Args[0].ID] = st
-			case OpAppend:
+			case OpFixedShapeArrayElementWriteConflict:
 				st := states[instr.Args[0].ID]
 				if st.seen {
 					st.conflict = true
@@ -796,13 +796,13 @@ func seedLocalArrayElementTableFacts(fn *Function, facts map[int]FixedShapeTable
 				continue
 			}
 			var tableValue *Value
-			switch instr.Op {
-			case OpGetTable:
+			switch fixedShapeArrayElementReadRole(instr.Op) {
+			case OpFixedShapeArrayElementReadDirect:
 				if len(instr.Args) < 2 || instr.Args[0] == nil {
 					continue
 				}
 				tableValue = instr.Args[0]
-			case OpTableArrayLoad:
+			case OpFixedShapeArrayElementReadLoweredArray:
 				if table, ok := loweredTableArrayLoadTableValue(instr); ok {
 					tableValue = table
 				}

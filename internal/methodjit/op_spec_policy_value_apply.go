@@ -61,4 +61,10 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTableIntArrayReverseBodyBenignPolicies) {
 		spec.TableIntArrayReverseBodyBenign = opTableIntArrayReverseBodyBenignPolicies[op]
 	}
+	if int(op) < len(opFixedShapeArrayElementWriteRolePolicies) {
+		spec.FixedShapeArrayElementWriteRole = opFixedShapeArrayElementWriteRolePolicies[op]
+	}
+	if int(op) < len(opFixedShapeArrayElementReadRolePolicies) {
+		spec.FixedShapeArrayElementReadRole = opFixedShapeArrayElementReadRolePolicies[op]
+	}
 }
