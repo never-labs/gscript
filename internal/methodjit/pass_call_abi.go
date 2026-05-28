@@ -26,15 +26,12 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 	if fn == nil {
 		return fn
 	}
+	config = callABIAnnotationConfigWithDefaults(fn, config)
 	tableShapes := config.TableShapes
-	if tableShapes == nil {
-		tableShapes = functionTableShapeFacts(fn)
-	}
-	config.TableShapes = tableShapes
 	globals := callABIMergeGlobals(config.Globals, callABIStableGlobals(fn.Proto))
 	callFacts := config.CallFacts
 	if callFacts == nil {
-		callFacts = functionCallFacts(fn)
+		return fn
 	}
 	callFacts.SetCallABIs(nil)
 
@@ -93,6 +90,20 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 		callFacts.SetCallABIs(descs)
 	}
 	return fn
+}
+
+func callABIAnnotationConfigWithDefaults(fn *Function, config CallABIAnnotationConfig) CallABIAnnotationConfig {
+	if fn == nil {
+		return config
+	}
+	fn.ensureAnalysis()
+	if config.TableShapes == nil {
+		config.TableShapes = functionTableShapeFacts(fn)
+	}
+	if config.CallFacts == nil {
+		config.CallFacts = functionCallFacts(fn)
+	}
+	return config
 }
 
 func callABIDescriptorKind(desc CallABIDescriptor) string {
