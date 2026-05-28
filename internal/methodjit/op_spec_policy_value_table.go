@@ -47,6 +47,11 @@ var opTableArrayLenArgIndexPolicies = [...]uint8{
 	OpTableArrayStore: 3,
 }
 
+var opTableArrayLoweredOpPolicies = [...]opTargetPolicy{
+	OpGetTable: {Op: OpTableArrayLoad, Set: true},
+	OpSetTable: {Op: OpTableArrayStore, Set: true},
+}
+
 var opTableIntArraySwapPairsBodyBenignPolicies = [...]bool{
 	OpAddInt:         true,
 	OpGuardTableKind: true,

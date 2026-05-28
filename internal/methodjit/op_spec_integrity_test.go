@@ -37,6 +37,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "MatrixLoweredOp", spec.MatrixLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixRowLoweredOp", spec.MatrixRowLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixRowConstLoweredOp", spec.MatrixRowConstLoweredOp)
+		assertOpSpecTarget(t, op, "TableArrayLoweredOp", spec.TableArrayLoweredOp)
 	}
 	if len(seenNames) != int(OpMax) {
 		t.Fatalf("OpSpec name lookup saw %d names, want %d", len(seenNames), OpMax)
@@ -84,6 +85,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 			t.Fatalf("%s table-array access layout default = table %d data %d len %d, want all -1",
 				op, spec.TableArrayTableArgIndex, spec.TableArrayDataArgIndex, spec.TableArrayLenArgIndex)
 		}
+		if spec.TableArrayLoweredOp != OpMax {
+			t.Fatalf("%s TableArrayLoweredOp default=%s, want OpMax", op, spec.TableArrayLoweredOp)
+		}
 		if spec.ClosureScalarLocalUseArgIndex != -1 || spec.ClosureScalarLoadClosureArgIndex != -1 ||
 			spec.ClosureScalarStoreClosureArgIndex != -1 || spec.ClosureScalarStoreValueArgIndex != -1 {
 			t.Fatalf("%s closure scalar arg defaults=%d/%d/%d/%d, want all -1",
@@ -130,6 +134,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := tableArrayAccessLayoutForOp(op); ok {
 			t.Fatalf("%s should not report a table-array access layout", op)
+		}
+		if _, ok := tableArrayLoweredOp(op); ok {
+			t.Fatalf("%s should not report a table-array lowering target", op)
 		}
 	}
 }

@@ -51,7 +51,8 @@ func TableArrayLowerPass(fn *Function) (*Function, error) {
 			data.copySourceFrom(instr)
 
 			newInstrs = append(newInstrs, header, length, data)
-			instr.Op = OpTableArrayLoad
+			lowered, _ := tableArrayLoweredOp(instr.Op)
+			instr.Op = lowered
 			instr.Args = []*Value{data.Value(), length.Value(), key, header.Value()}
 			instr.Aux = kind
 			instr.Aux2 = 0
@@ -102,7 +103,10 @@ func tableArrayLowerableKind(kind int64) bool {
 }
 
 func tableArrayLowerableGetTable(fn *Function, instr *Instr) bool {
-	if instr == nil || instr.Op != OpGetTable || len(instr.Args) < 2 {
+	if instr == nil || len(instr.Args) < 2 {
+		return false
+	}
+	if lowered, ok := tableArrayLoweredOp(instr.Op); !ok || lowered != OpTableArrayLoad {
 		return false
 	}
 	if !tableAccessKeyReadyForArrayLowering(fn, instr) ||

@@ -81,6 +81,11 @@ func matrixRowConstLoweredOp(op Op) (Op, bool) {
 	return spec.MatrixRowConstLoweredOp, ok && spec.MatrixRowConstLoweredOp != OpMax
 }
 
+func tableArrayLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.TableArrayLoweredOp, ok && spec.TableArrayLoweredOp != OpMax
+}
+
 func opIsRawCarryClobber(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.RawCarryClobber

@@ -35,8 +35,8 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 			continue
 		}
 
-		switch instr.Op {
-		case OpSetTable:
+		switch lowered, ok := tableArrayLoweredOp(instr.Op); {
+		case ok && lowered == OpTableArrayStore:
 			if len(instr.Args) < 3 || instr.Args[0] == nil || !tableArrayLowerableKind(instr.Aux2) {
 				if len(instr.Args) >= 1 && instr.Args[0] != nil {
 					facts.InvalidateTable(instr.Args[0].ID)
@@ -58,7 +58,7 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 			if tableArrayStoreNeedsTablePtr(fact.kind, 0) {
 				storeArgs = append(storeArgs, fact.header)
 			}
-			instr.Op = OpTableArrayStore
+			instr.Op = lowered
 			instr.Args = storeArgs
 			instr.Aux = fact.kind
 			instr.Aux2 = 0
@@ -66,7 +66,7 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 			functionRemarks(fn).Add("TableArrayStoreLower", "changed", block.ID, instr.ID, instr.Op,
 				"reused typed array data/len for checked in-bounds store")
 
-		case OpTableArrayStore:
+		case instr.Op == OpTableArrayStore:
 			// This store is structural-preserving on its continuing path.
 			continue
 
