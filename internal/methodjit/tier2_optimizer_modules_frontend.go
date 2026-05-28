@@ -104,6 +104,7 @@ func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tie
 				config := InlineConfig{
 					Globals:                  globals,
 					GlobalFacts:              passCtx.Global(),
+					SpeculationFacts:         passCtx.Speculation(),
 					MaxSize:                  maxSize,
 					MaxRecursion:             8,
 					MaxCumulativeSize:        120,
@@ -195,10 +196,11 @@ func tier2PostInlinePassModuleWith(name string, provides []AnalysisFact, pass Pa
 func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	callABIRequires := analysisFacts(AnalysisFactFixedShapeTables)
 	callABIProvides := analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts)
+	callABIUpdates := analysisFacts(AnalysisFactSpecDependencyProtos)
 	callABIAllowed := allowedDomainsForModule(
 		callABIRequires,
 		callABIProvides,
-		nil,
+		callABIUpdates,
 		analysisFacts(AnalysisFactIntRanges),
 	)
 	guardedConstCallFoldRequires := analysisFacts(AnalysisFactCallABIs)
@@ -221,6 +223,7 @@ func tier2CallLoweringModules(specializationGlobals map[string]*vm.FuncProto) []
 			Phase:         Tier2PhaseCallLower,
 			Requires:      callABIRequires,
 			Provides:      callABIProvides,
+			Updates:       callABIUpdates,
 			OptionalReads: analysisFacts(AnalysisFactIntRanges),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
 				return runCallABIModule(fn, ctx, newPassContext(fn, opts, callABIAllowed, passContextEnforce))
@@ -284,6 +287,7 @@ func runCallABIModule(fn *Function, optCtx *Tier2OptimizerContext, passCtx *Pass
 		GlobalArrayElementFacts: globalArrayFacts,
 		TableShapes:             tableShapes,
 		CallFacts:               passCtx.Call(),
+		SpeculationFacts:        passCtx.Speculation(),
 		DependencyRegistry:      ctxDependencyRegistry(optCtx),
 	})(fn)
 }
@@ -329,7 +333,7 @@ func tier2PostRewriteModules() []Tier2OptimizerModule {
 
 func tier2FinalCallModules(specializationGlobals map[string]*vm.FuncProto) []Tier2OptimizerModule {
 	callABIFinalRequires := analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges)
-	callABIFinalUpdates := analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts)
+	callABIFinalUpdates := analysisFacts(AnalysisFactCallABIs, AnalysisFactGlobalArrayElementFacts, AnalysisFactSpecDependencyProtos)
 	callABIFinalAllowed := allowedDomainsForModule(
 		callABIFinalRequires,
 		nil,

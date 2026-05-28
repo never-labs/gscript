@@ -49,6 +49,7 @@ func countOpHelper(fn *Function, op Op) int {
 type InlineConfig struct {
 	Globals                  map[string]*vm.FuncProto // global function name -> proto
 	GlobalFacts              *GlobalFacts             // optional diagnostics/oracle fact sink for residual calls
+	SpeculationFacts         *SpeculationFacts        // optional spec-dependency fact sink for inlined callees
 	MaxSize                  int                      // max callee bytecode count (default 30)
 	MaxRecursion             int                      // max inlining depth for self/mutually-recursive callees (0 = no recursive inlining)
 	MaxCumulativeSize        int                      // R166: V8-style cumulative-bytecode cap across all inlines in this compilation (0 = unbounded, preserves R73 behavior)
@@ -341,7 +342,7 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 			if newInstrs != nil {
 				block.Instrs = newInstrs
 				inlined = true
-				recordTier2SpecDependency(fn, calleeProto)
+				recordTier2SpecDependency(fn.Proto, config.SpeculationFacts, calleeProto)
 				recursionCounts[calleeProto]++
 				cumulative.totalBytes += len(calleeProto.Code)
 				functionRemarks(fn).Add("Inline", "changed", block.ID, instr.ID, instr.Op,
@@ -359,7 +360,7 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 		// This modifies block.Instrs directly (truncates + adds jump),
 		// moves post-call instrs to a merge block. Stop processing this block.
 		inlineMultiBlock(fn, block, instr, i, calleeFn, calleeName)
-		recordTier2SpecDependency(fn, calleeProto)
+		recordTier2SpecDependency(fn.Proto, config.SpeculationFacts, calleeProto)
 		recursionCounts[calleeProto]++
 		cumulative.totalBytes += len(calleeProto.Code)
 		functionRemarks(fn).Add("Inline", "changed", block.ID, instr.ID, instr.Op,

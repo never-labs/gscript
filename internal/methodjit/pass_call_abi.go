@@ -289,7 +289,7 @@ func callABITypedPeerDescriptorFor(fn *Function, instr *Instr, callee *vm.FuncPr
 		}
 		return CallABIDescriptor{}, false, "callee typed-peer ABI rejected: " + abi.RejectWhy
 	}
-	recordTier2SpecDependency(fn, callee)
+	recordTier2SpecDependency(fn.Proto, config.SpeculationFacts, callee)
 	if typedPeerABIUsesOnlyGlobalTableFacts(abi) {
 		wantSig := typedABISignature(abi)
 		if callee.Tier2TypedEntryPtr == 0 {

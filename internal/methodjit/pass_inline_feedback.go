@@ -12,11 +12,11 @@ import (
 	"unsafe"
 )
 
-func recordTier2SpecDependency(fn *Function, callee *vm.FuncProto) {
-	if fn == nil || fn.Analysis == nil || callee == nil || callee == fn.Proto {
+func recordTier2SpecDependency(owner *vm.FuncProto, facts *SpeculationFacts, callee *vm.FuncProto) {
+	if owner == nil || facts == nil || callee == nil || callee == owner {
 		return
 	}
-	functionSpeculationFacts(fn).RecordSpecDependencyProto(fn.Proto, callee)
+	facts.RecordSpecDependencyProto(owner, callee)
 }
 
 func inlineFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool) {
