@@ -3,6 +3,7 @@ package methodjit
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -42,6 +43,11 @@ func ClassifyOracleSupport(fn *Function) (OracleSupportSummary, error) {
 				summary.Reasons[instr.Op] = opOracleUnsupportedReason(instr.Op)
 			}
 		}
+	}
+	for support := range summary.BySupport {
+		sort.Slice(summary.BySupport[support], func(i, j int) bool {
+			return summary.BySupport[support][i] < summary.BySupport[support][j]
+		})
 	}
 	return summary, nil
 }

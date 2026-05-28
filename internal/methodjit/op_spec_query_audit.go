@@ -8,14 +8,19 @@ import (
 )
 
 type OpAuditRow struct {
-	Op        Op     `json:"op"`
-	Name      string `json:"name"`
-	Validator string `json:"validator"`
-	Builder   string `json:"builder"`
-	Oracle    string `json:"oracle"`
-	Emitter   string `json:"emitter"`
-	Regalloc  string `json:"regalloc"`
-	Deopt     string `json:"deopt"`
+	Op            Op     `json:"op"`
+	Name          string `json:"name"`
+	Validator     string `json:"validator"`
+	Builder       string `json:"builder"`
+	Oracle        string `json:"oracle"`
+	Emitter       string `json:"emitter"`
+	Regalloc      string `json:"regalloc"`
+	Deopt         string `json:"deopt"`
+	ArgPolicy     string `json:"arg_policy"`
+	OracleSupport string `json:"oracle_support"`
+	OracleReason  string `json:"oracle_reason,omitempty"`
+	EmitterFamily string `json:"emitter_family"`
+	MayDeopt      bool   `json:"may_deopt"`
 }
 
 func OpAuditMatrix() []OpAuditRow {
@@ -26,14 +31,19 @@ func OpAuditMatrix() []OpAuditRow {
 			continue
 		}
 		rows = append(rows, OpAuditRow{
-			Op:        op,
-			Name:      spec.Name,
-			Validator: opAuditValidator(spec),
-			Builder:   opAuditBuilder(spec),
-			Oracle:    opAuditOracle(spec),
-			Emitter:   opAuditEmitter(spec),
-			Regalloc:  opAuditRegalloc(spec),
-			Deopt:     opAuditDeopt(spec),
+			Op:            op,
+			Name:          spec.Name,
+			Validator:     opAuditValidator(spec),
+			Builder:       opAuditBuilder(spec),
+			Oracle:        opAuditOracle(spec),
+			Emitter:       opAuditEmitter(spec),
+			Regalloc:      opAuditRegalloc(spec),
+			Deopt:         opAuditDeopt(spec),
+			ArgPolicy:     spec.ArgPolicy.String(),
+			OracleSupport: spec.OracleSupport.String(),
+			OracleReason:  spec.OracleUnsupportedReason,
+			EmitterFamily: spec.EmitterFamily.String(),
+			MayDeopt:      spec.MayDeopt,
 		})
 	}
 	return rows

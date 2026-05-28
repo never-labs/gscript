@@ -104,6 +104,11 @@ func TestClassifyOracleSupportGroupsOpsFromOpSpec(t *testing.T) {
 	assertOracleSummaryHasOp(t, summary, OpOraclePseudo, OpPhi)
 	assertOracleSummaryHasOp(t, summary, OpOracleUnsupported, OpYield)
 	assertOracleSummaryHasOp(t, summary, OpOracleTerminator, OpReturn)
+	for support, ops := range summary.BySupport {
+		if !sort.SliceIsSorted(ops, func(i, j int) bool { return ops[i] < ops[j] }) {
+			t.Fatalf("%s ops are not sorted: %v", support, ops)
+		}
+	}
 	if got := countOracleSummaryOp(summary, OpYield); got != 1 {
 		t.Fatalf("OpYield classified %d times, want once", got)
 	}
