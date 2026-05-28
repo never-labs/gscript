@@ -10,10 +10,12 @@ test runner、benchmark runner、文档生成、诊断输出、REPL、source map
 GScript 当前最强的工具链资产是运行时/性能诊断：`cmd/gscript` 已提供 JIT
 开关、profile、Tier 2 统计、runtime path 统计、warm dump、source/PC map
 等生产路径诊断；`benchmarks/` 里也有 `timing_compare.py`、`strict_guard.py`、
-`diagnose.py`、`triage.py` 等成熟 harness。
+`diagnose.py`、`triage.py` 等成熟 harness。CLI 现在也有最小可用的
+`gscript fmt`、`gscript lint` 和 `gscript test` 子命令入口。
 
-主要缺口在用户级开发工具：没有稳定的 `gscript fmt`、`gscript lint`、
-`gscript test`、`gscript bench`、`gscript doc` 子命令；REPL 仍是最小可用；
+主要缺口在用户级开发工具：`fmt`/`lint`/`test` 已有脚手架，但 formatter
+仍不是 AST pretty printer，linter 目前只做词法/语法诊断；还没有稳定的
+`gscript bench`、`gscript doc` 子命令；REPL 仍是最小可用；
 module 管理只有 `require()` 解析和 `package.loaded` 缓存，没有 manifest、
 lockfile、版本、发布或 dependency graph；CI 没有仓库内统一入口。
 
@@ -33,7 +35,8 @@ schema。
 
 ### Current State
 
-`cmd/gscript/main.go` 是主入口，使用 Go `flag` 包提供平铺 flags：
+`cmd/gscript/main.go` 是主入口，使用 Go `flag` 包提供平铺 flags 和少量
+子命令：
 
 - `-e` 执行字符串。
 - 无参数进入 REPL。
@@ -46,6 +49,11 @@ schema。
   `-tier2-perf-stats-json`、`-tier2-spec-state-json`、
   `-tier2-spec-worklist-json`、`-jit-op-audit`、`-jit-op-audit-json`、
   `-coroutine-stats`、`-runtime-path-stats`、`-runtime-path-stats-json`。
+- `gscript test <path-or-dir>` 递归运行 `.gs` 文件，可用同名 `.out` 做
+  stdout golden 对比。
+- `gscript fmt [--check] [--write] <path-or-dir> [...]` 解析并规范基础空白。
+- `gscript lint <path-or-dir> [...]` 解析文件/目录并报告 `GS1001` 词法或
+  语法错误。
 
 There are also developer binaries:
 
@@ -109,14 +117,30 @@ func RunString(ctx context.Context, source, name string, opts RunOptions) (*RunR
 
 ### Current State
 
-No formatter command or formatter package is visible in `cmd/`, `benchmarks/`,
-or `tests/`. The parser/AST exist, but there is no production contract for
-round-tripping comments, preserving layout, or writing canonical GScript style.
+`gscript fmt` is a minimal parser-backed formatter scaffold. It accepts one or
+more `.gs` files or directories, recursively discovers `.gs` files in
+directories, and parses each file before changing bytes. The current formatter
+contract is intentionally narrow:
+
+- normalize CRLF/CR line endings to LF;
+- trim trailing spaces and tabs from each line;
+- collapse trailing blank lines;
+- ensure exactly one final newline for non-empty and empty files;
+- refuse to write files that fail lexing or parsing.
+
+Default mode writes changed files in place and prints each changed filename to
+stdout. `--check` reports files that would change without writing. `--write`
+is accepted as an explicit spelling of the default write mode. `--check` and
+`--write` are mutually exclusive.
+
+The AST/parser currently do not expose a complete comment-preserving pretty
+printer. Until that exists, `gscript fmt` remains a whitespace normalizer with
+a clear no-op boundary for AST layout.
 
 ### Gaps
 
-- No `gscript fmt`, no check mode, no editor integration target.
-- Unknown comment attachment and AST round-trip fidelity.
+- No AST pretty printer, indentation engine, or editor stdin mode.
+- Unknown comment attachment and AST round-trip fidelity beyond parse success.
 - No formatter golden tests.
 
 ### Recommendations
@@ -158,8 +182,17 @@ func Format(filename string, src []byte, opts FormatOptions) ([]byte, error)
 
 ### Current State
 
-No user-facing linter exists. Current validation comes from lexer/parser errors,
-Go unit tests, translated Lua semantics, and benchmark guard scripts.
+`gscript lint` is a minimal parser-backed linter scaffold. It accepts one or
+more `.gs` files or directories, recursively discovers `.gs` files in
+directories, and reports lexer/parser failures as `GS1001` errors:
+
+```text
+path/to/file.gs: GS1001 error: parse error: parse error at 1:6: expected ...
+```
+
+This provides a stable command entry point and file traversal path for future
+lint rules without introducing static-analysis behavior before the diagnostic
+model is designed.
 
 ### Gaps
 

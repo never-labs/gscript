@@ -123,3 +123,110 @@ func TestRunTestsReportsGoldenStdoutMismatch(t *testing.T) {
 		}
 	}
 }
+
+func TestFmtCheckReportsUnformattedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "needs_fmt.gs")
+	original := []byte("x := 1 \t\r\n")
+	if err := os.WriteFile(path, original, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--check", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runFmtCommand code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), path+": not formatted") {
+		t.Fatalf("stderr = %q, want not formatted diagnostic", stderr.String())
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, original) {
+		t.Fatalf("file changed during --check: %q", string(got))
+	}
+}
+
+func TestFmtWritesWhitespaceNormalization(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "needs_fmt.gs")
+	if err := os.WriteFile(path, []byte("x := 1  \n\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runFmtCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), path) {
+		t.Fatalf("stdout = %q, want formatted filename", stdout.String())
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "x := 1\n" {
+		t.Fatalf("formatted file = %q, want %q", string(got), "x := 1\n")
+	}
+}
+
+func TestFmtRefusesSyntaxErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.gs")
+	original := []byte("func {\n")
+	if err := os.WriteFile(path, original, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runFmtCommand code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "parse error") {
+		t.Fatalf("stderr = %q, want parse error", stderr.String())
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, original) {
+		t.Fatalf("file changed after parse failure: %q", string(got))
+	}
+}
+
+func TestLintReportsSyntaxErrors(t *testing.T) {
+	dir := t.TempDir()
+	okPath := filepath.Join(dir, "ok.gs")
+	badPath := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(okPath, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(badPath, []byte("func {\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runLintCommand code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	out := stderr.String()
+	for _, want := range []string{badPath, "GS1001", "parse error"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stderr = %q, want %q", out, want)
+		}
+	}
+	if strings.Contains(out, okPath) {
+		t.Fatalf("stderr = %q, did not want clean file", out)
+	}
+}

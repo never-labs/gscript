@@ -63,6 +63,15 @@ func init() {
 }
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "fmt":
+			os.Exit(runFmtCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "lint":
+			os.Exit(runLintCommand(os.Args[2:], os.Stdout, os.Stderr))
+		}
+	}
+
 	// Flags
 	eval := flag.String("e", "", "execute string")
 	useVM := flag.Bool("vm", false, "use bytecode VM without JIT")
@@ -211,6 +220,145 @@ func main() {
 	}
 }
 
+func runFmtCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("fmt", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	check := fs.Bool("check", false, "check whether files are formatted without writing")
+	write := fs.Bool("write", false, "write formatted files in place")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	paths := fs.Args()
+	if len(paths) == 0 {
+		fmt.Fprintln(errw, "usage: gscript fmt [--check] [--write] <path-or-dir> [...]")
+		return 2
+	}
+	if *check && *write {
+		fmt.Fprintln(errw, "gscript fmt: --check and --write are mutually exclusive")
+		return 2
+	}
+
+	writeFiles := *write || !*check
+	ok := true
+	for _, path := range paths {
+		files, err := gscriptFiles(path)
+		if err != nil {
+			fmt.Fprintf(errw, "%s: %v\n", path, err)
+			ok = false
+			continue
+		}
+		for _, filename := range files {
+			changed, err := formatFile(filename, writeFiles)
+			if err != nil {
+				fmt.Fprintf(errw, "%s: %v\n", filename, err)
+				ok = false
+				continue
+			}
+			if *check && changed {
+				fmt.Fprintf(errw, "%s: not formatted\n", filename)
+				ok = false
+			}
+			if writeFiles && changed {
+				fmt.Fprintln(outw, filename)
+			}
+		}
+	}
+	if !ok {
+		return 1
+	}
+	return 0
+}
+
+func runLintCommand(args []string, _ io.Writer, errw io.Writer) int {
+	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	paths := fs.Args()
+	if len(paths) == 0 {
+		fmt.Fprintln(errw, "usage: gscript lint <path-or-dir> [...]")
+		return 2
+	}
+
+	ok := true
+	for _, path := range paths {
+		files, err := gscriptFiles(path)
+		if err != nil {
+			fmt.Fprintf(errw, "%s: %v\n", path, err)
+			ok = false
+			continue
+		}
+		for _, filename := range files {
+			if err := parseGScriptFile(filename); err != nil {
+				fmt.Fprintf(errw, "%s: GS1001 error: %v\n", filename, err)
+				ok = false
+			}
+		}
+	}
+	if !ok {
+		return 1
+	}
+	return 0
+}
+
+func formatFile(filename string, write bool) (bool, error) {
+	src, err := os.ReadFile(filename)
+	if err != nil {
+		return false, err
+	}
+	formatted, err := formatSource(filename, src)
+	if err != nil {
+		return false, err
+	}
+	changed := !bytes.Equal(src, formatted)
+	if write && changed {
+		if err := os.WriteFile(filename, formatted, 0644); err != nil {
+			return false, err
+		}
+	}
+	return changed, nil
+}
+
+func formatSource(filename string, src []byte) ([]byte, error) {
+	if err := parseGScriptSource(filename, src); err != nil {
+		return nil, err
+	}
+
+	normalized := bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n"))
+	normalized = bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
+	lines := bytes.Split(normalized, []byte("\n"))
+	for i := range lines {
+		lines[i] = bytes.TrimRight(lines[i], " \t")
+	}
+	for len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
+		lines = lines[:len(lines)-1]
+	}
+	if len(lines) == 0 {
+		return []byte("\n"), nil
+	}
+	return append(bytes.Join(lines, []byte("\n")), '\n'), nil
+}
+
+func parseGScriptFile(filename string) error {
+	src, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	return parseGScriptSource(filename, src)
+}
+
+func parseGScriptSource(filename string, src []byte) error {
+	tokens, err := lexer.New(string(src)).Tokenize()
+	if err != nil {
+		return fmt.Errorf("lexer error: %w", err)
+	}
+	if _, err := parser.New(tokens).Parse(); err != nil {
+		return fmt.Errorf("parse error: %w", err)
+	}
+	return nil
+}
+
 type cliRunOptions struct {
 	UseVM        bool
 	UseJIT       bool
@@ -354,13 +502,17 @@ func stdoutDiff(expected, got []byte) string {
 }
 
 func testFiles(path string) ([]string, error) {
+	return gscriptFiles(path)
+}
+
+func gscriptFiles(path string) ([]string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
 	if !info.IsDir() {
 		if filepath.Ext(path) != ".gs" {
-			return nil, fmt.Errorf("test file must have .gs extension")
+			return nil, fmt.Errorf("file must have .gs extension")
 		}
 		return []string{path}, nil
 	}
