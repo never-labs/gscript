@@ -1159,6 +1159,20 @@ func TestWithFilesystemFalseRemovesFilesystemGlobals(t *testing.T) {
 	}
 }
 
+func TestWithFilesystemFalseClearsRootEnabledFilesystem(t *testing.T) {
+	root := t.TempDir()
+	vm := gs.New(gs.WithFilesystemRoot(root), gs.WithFilesystem(false))
+	for _, name := range []string{"fs", "dofile", "loadfile"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+}
+
 func TestWithFilesystemReadOnlyAllowsReadAndBlocksWrite(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside"), 0644); err != nil {
@@ -1179,6 +1193,64 @@ func TestWithFilesystemReadOnlyAllowsReadAndBlocksWrite(t *testing.T) {
 	err = vm.Exec(`fs.writefile("new.txt", "new")`)
 	if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
 		t.Fatalf("writefile error = %v, want write access disabled", err)
+	}
+}
+
+func TestWithFilesystemRootReadOnlyAllowsFileLoadsAndConfinesReads(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+	if err := os.Mkdir(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "inside.gs"), []byte(`loaded := "inside"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "outside.txt"), []byte("outside"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemWrite(false))
+	if err := vm.Exec(`
+		dofile("inside.gs")
+		inside, insideErr := fs.readfile("inside.txt")
+		outside, outsideErr := fs.readfile("../outside.txt")
+	`); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]interface{}{
+		"loaded":    "inside",
+		"inside":    "inside",
+		"insideErr": nil,
+		"outside":   nil,
+	} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("%s = %v (%T), want %v", name, got, got, want)
+		}
+	}
+	outsideErr, err := vm.Get("outsideErr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg, ok := outsideErr.(string); !ok || !strings.Contains(msg, "escapes root") {
+		t.Fatalf("outsideErr = %v, want escapes root string", outsideErr)
+	}
+	err = vm.Exec(`fs.writefile("blocked.txt", "blocked")`)
+	if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
+		t.Fatalf("writefile error = %v, want write access disabled", err)
+	}
+	loadfile, err := vm.Get("loadfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := publicAPIType(loadfile); got != "function" {
+		t.Fatalf("loadfile type = %v, want function", got)
 	}
 }
 
@@ -1205,6 +1277,131 @@ func TestWithFilesystemWriteOnlyAllowsWriteAndBlocksRead(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "filesystem read access disabled") {
 		t.Fatalf("readfile error = %v, want read access disabled", err)
 	}
+}
+
+func TestWithFilesystemRootWriteOnlyConfinesWritesAndRemovesFileLoads(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+	if err := os.Mkdir(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemRead(false))
+	if err := vm.Exec(`
+		insideOK, insideErr := fs.writefile("inside.txt", "inside")
+		outsideOK, outsideErr := fs.writefile("../outside.txt", "outside")
+	`); err != nil {
+		t.Fatal(err)
+	}
+	insideOK, err := vm.Get("insideOK")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if insideOK != true {
+		t.Fatalf("insideOK = %v, want true", insideOK)
+	}
+	insideErr, err := vm.Get("insideErr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if insideErr != nil {
+		t.Fatalf("insideErr = %v, want nil", insideErr)
+	}
+	if got, err := os.ReadFile(filepath.Join(root, "inside.txt")); err != nil || string(got) != "inside" {
+		t.Fatalf("host file = %q, %v; want inside, nil", string(got), err)
+	}
+	if _, err := os.Stat(filepath.Join(base, "outside.txt")); !os.IsNotExist(err) {
+		t.Fatalf("outside file stat err = %v, want not exist", err)
+	}
+	outsideOK, err := vm.Get("outsideOK")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outsideOK != nil {
+		t.Fatalf("outsideOK = %v, want nil", outsideOK)
+	}
+	outsideErr, err := vm.Get("outsideErr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg, ok := outsideErr.(string); !ok || !strings.Contains(msg, "escapes root") {
+		t.Fatalf("outsideErr = %v, want escapes root string", outsideErr)
+	}
+	for _, name := range []string{"dofile", "loadfile"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+}
+
+func TestFilesystemReadCapabilityControlsBytecodeFileLoadGlobals(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      []gs.Option
+		wantFS    string
+		wantFiles string
+	}{
+		{
+			name:      "filesystem disabled",
+			opts:      []gs.Option{gs.WithFilesystem(false)},
+			wantFS:    "nil",
+			wantFiles: "nil",
+		},
+		{
+			name:      "read only",
+			opts:      []gs.Option{gs.WithFilesystemWrite(false)},
+			wantFS:    "table",
+			wantFiles: "function",
+		},
+		{
+			name:      "write only",
+			opts:      []gs.Option{gs.WithFilesystemRead(false)},
+			wantFS:    "table",
+			wantFiles: "nil",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithVM()}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`probe := true`); err != nil {
+				t.Fatal(err)
+			}
+			gotFS, err := vm.Get("fs")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := publicAPIType(gotFS); got != tc.wantFS {
+				t.Fatalf("fs type = %v, want %s", got, tc.wantFS)
+			}
+			for _, name := range []string{"dofile", "loadfile"} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if gotType := publicAPIType(got); gotType != tc.wantFiles {
+					t.Fatalf("%s type = %v, want %s", name, gotType, tc.wantFiles)
+				}
+			}
+		})
+	}
+}
+
+func publicAPIType(v interface{}) string {
+	if v == nil {
+		return "nil"
+	}
+	if val, ok := v.(runtime.Value); ok && val.IsFunction() {
+		return "function"
+	}
+	if _, ok := v.(map[string]interface{}); ok {
+		return "table"
+	}
+	return fmt.Sprintf("%T", v)
 }
 
 func TestWithFilesystemRootConfinesFSModule(t *testing.T) {
