@@ -67,6 +67,15 @@ level-2 headings in `docs/language-spec.md`. It also checks the reverse
 direction: every level-2 language-spec section must be referenced by at least
 one feature row unless it is an explicitly ignored process/planning section.
 
+Release metadata is checked by `TestReleaseMatrix*` in
+`tests/release_matrix_test.go`. That gate requires every stable language-spec
+section to have a `semantic_gate` or `official_case` reference, every paired
+official translated case to be classified in
+`tests/official_lua_cases/MANIFEST.md` or recorded in
+`tests/official_lua_cases/KNOWN_FAILURES.md`, every known-gap ledger to be
+named from `docs/test-matrix.md`, and every `docs/stdlib-contract.md` module to
+have an official-case or capability-ledger coverage entry.
+
 When adding a new language feature, add one row even if several columns are
 `partial` or `missing`. The point of this matrix is to make gaps explicit
 before they turn into assumptions about semantic or tier coverage. If no
