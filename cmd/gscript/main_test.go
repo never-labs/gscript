@@ -81,3 +81,45 @@ func TestRunTestsReportsFailingFile(t *testing.T) {
 		t.Fatalf("stderr = %q, want parse error", out)
 	}
 }
+
+func TestRunTestsComparesGoldenStdout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(path, []byte("print(\"hello\", \"world\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ok.out"), []byte("hello\tworld\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stderr bytes.Buffer
+	if !runTests(path, cliRunOptions{UseVM: false}, &stderr) {
+		t.Fatalf("runTests failed, stderr = %q", stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunTestsReportsGoldenStdoutMismatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.gs")
+	golden := filepath.Join(dir, "bad.out")
+	if err := os.WriteFile(path, []byte("print(\"actual\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(golden, []byte("expected\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stderr bytes.Buffer
+	if runTests(path, cliRunOptions{UseVM: false}, &stderr) {
+		t.Fatal("runTests succeeded, want failure")
+	}
+	out := stderr.String()
+	for _, want := range []string{path, golden, "stdout mismatch", "expected:\nexpected\n", "got:\nactual\n"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stderr = %q, want %q", out, want)
+		}
+	}
+}

@@ -286,9 +286,17 @@ Testing is Go-driven:
 - Official translated cases compare Lua output to GScript output and are not
   performance timings.
 
+### Current `gscript test` behavior
+
+`gscript test <path-or-dir>` runs `.gs` files directly. A single file path must
+end in `.gs`; a directory path is walked recursively and all `.gs` files are run
+in sorted order. By default the runner only checks whether each script succeeds.
+If a sibling `<name>.out` file exists next to `<name>.gs`, the runner captures
+stdout and compares it exactly to the golden file. Mismatches report the `.gs`
+file, the `.out` file, and an expected/got stdout summary.
+
 ### Gaps
 
-- No `gscript test` command for GScript users.
 - Test discovery is encoded in Go tests, not a language-level test manifest.
 - No standard assertion/test API, fixture layout, per-test timeout, JSON report,
   JUnit report, coverage, or watch mode.

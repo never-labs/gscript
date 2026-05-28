@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	goruntime "runtime"
 	"runtime/pprof"
 	"sort"
+	"strings"
 
 	"github.com/gscript/gscript/internal/lexer"
 	"github.com/gscript/gscript/internal/parser"
@@ -246,16 +248,109 @@ func runTests(path string, opts cliRunOptions, errw io.Writer) bool {
 
 	ok := true
 	for _, filename := range files {
-		interp := runtime.New()
-		if err := runScriptFile(interp, filename, nil, opts); err != nil {
-			if exit, isExit := processExit(err); isExit && exit.Code == 0 {
+		golden, hasGolden, err := testGoldenOutputFile(filename)
+		if err != nil {
+			fmt.Fprintf(errw, "%s: %v\n", filename, err)
+			ok = false
+			continue
+		}
+
+		var runErr error
+		var stdout []byte
+		if hasGolden {
+			stdout, runErr = runScriptFileCapturingStdout(filename, opts)
+		} else {
+			interp := runtime.New()
+			runErr = runScriptFile(interp, filename, nil, opts)
+		}
+		if runErr != nil {
+			if exit, isExit := processExit(runErr); isExit && exit.Code == 0 {
+				runErr = nil
+			} else {
+				fmt.Fprintf(errw, "%s: %v\n", filename, runErr)
+				ok = false
 				continue
 			}
-			fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		}
+		if !hasGolden {
+			continue
+		}
+
+		expected, err := os.ReadFile(golden)
+		if err != nil {
+			fmt.Fprintf(errw, "%s: read golden %s: %v\n", filename, golden, err)
+			ok = false
+			continue
+		}
+		if !bytes.Equal(stdout, expected) {
+			fmt.Fprintf(errw, "%s: stdout mismatch with %s\n%s", filename, golden, stdoutDiff(expected, stdout))
 			ok = false
 		}
 	}
 	return ok
+}
+
+func testGoldenOutputFile(filename string) (string, bool, error) {
+	golden := strings.TrimSuffix(filename, filepath.Ext(filename)) + ".out"
+	_, err := os.Stat(golden)
+	if err == nil {
+		return golden, true, nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return golden, false, nil
+	}
+	return golden, false, fmt.Errorf("stat golden %s: %w", golden, err)
+}
+
+func runScriptFileCapturingStdout(filename string, opts cliRunOptions) ([]byte, error) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	var stdout bytes.Buffer
+	copyDone := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(&stdout, r)
+		copyDone <- err
+	}()
+
+	oldStdout := os.Stdout
+	var runErr error
+	func() {
+		os.Stdout = w
+		defer func() {
+			os.Stdout = oldStdout
+		}()
+		interp := runtime.New()
+		runErr = runScriptFile(interp, filename, nil, opts)
+	}()
+
+	closeErr := w.Close()
+	copyErr := <-copyDone
+	if runErr != nil {
+		return stdout.Bytes(), runErr
+	}
+	if closeErr != nil {
+		return stdout.Bytes(), closeErr
+	}
+	if copyErr != nil {
+		return stdout.Bytes(), copyErr
+	}
+	return stdout.Bytes(), nil
+}
+
+func stdoutDiff(expected, got []byte) string {
+	want := string(expected)
+	have := string(got)
+	if len(want) > 400 {
+		want = want[:400] + "...(truncated)"
+	}
+	if len(have) > 400 {
+		have = have[:400] + "...(truncated)"
+	}
+	return fmt.Sprintf("expected:\n%s\ngot:\n%s\n", want, have)
 }
 
 func testFiles(path string) ([]string, error) {
