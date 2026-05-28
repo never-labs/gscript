@@ -32,3 +32,17 @@ var opTableArrayKeyArgIndexPolicies = [...]uint8{
 	OpTableArraySwapPairs:  2,
 	OpTableArrayNestedLoad: 4,
 }
+
+var opTableArrayTableArgIndexPolicies = [...]uint8{
+	OpTableArrayStore: 1,
+}
+
+var opTableArrayDataArgIndexPolicies = [...]uint8{
+	OpTableArrayLoad:  1,
+	OpTableArrayStore: 2,
+}
+
+var opTableArrayLenArgIndexPolicies = [...]uint8{
+	OpTableArrayLoad:  2,
+	OpTableArrayStore: 3,
+}

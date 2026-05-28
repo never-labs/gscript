@@ -338,34 +338,16 @@ func loopRegionAccessFact(headerID, preheaderID int, instr *Instr, facts []loopR
 	if instr == nil || key == nil || length == nil {
 		return LoopTableArrayFact{}, false
 	}
-	switch instr.Op {
-	case OpTableArrayLoad:
-		if len(instr.Args) < 3 || instr.Args[0] == nil || instr.Args[1] == nil || instr.Args[2] == nil {
-			return LoopTableArrayFact{}, false
-		}
-		if instr.Args[1].ID != length.ID || instr.Args[2].ID != key.ID {
-			return LoopTableArrayFact{}, false
-		}
-		for _, fact := range facts {
-			if fact.kind == instr.Aux && fact.length.ID == instr.Args[1].ID && fact.data.ID == instr.Args[0].ID {
-				return makeLoopTableArrayFact(headerID, preheaderID, instr, fact, key), true
-			}
-		}
-	case OpTableArrayStore:
-		if len(instr.Args) < 5 || instr.Args[0] == nil || instr.Args[1] == nil ||
-			instr.Args[2] == nil || instr.Args[3] == nil {
-			return LoopTableArrayFact{}, false
-		}
-		if instr.Args[2].ID != length.ID || instr.Args[3].ID != key.ID {
-			return LoopTableArrayFact{}, false
-		}
-		for _, fact := range facts {
-			if fact.kind == instr.Aux &&
-				fact.table.ID == instr.Args[0].ID &&
-				fact.length.ID == instr.Args[2].ID &&
-				fact.data.ID == instr.Args[1].ID {
-				return makeLoopTableArrayFact(headerID, preheaderID, instr, fact, key), true
-			}
+	layout, ok := tableArrayAccessLayoutForOp(instr.Op)
+	if !ok || !loopRegionInstrHasAccessArgs(instr, layout) {
+		return LoopTableArrayFact{}, false
+	}
+	if instr.Args[layout.LenArg].ID != length.ID || instr.Args[layout.KeyArg].ID != key.ID {
+		return LoopTableArrayFact{}, false
+	}
+	for _, fact := range facts {
+		if loopRegionAccessMatchesFact(instr, layout, fact) {
+			return makeLoopTableArrayFact(headerID, preheaderID, instr, fact, key), true
 		}
 	}
 	return LoopTableArrayFact{}, false
@@ -375,31 +357,51 @@ func loopRegionAccessFactWithGuardedArrayLen(headerID, preheaderID int, instr *I
 	if instr == nil || key == nil {
 		return LoopTableArrayFact{}, false
 	}
-	switch instr.Op {
-	case OpTableArrayLoad:
-		if len(instr.Args) < 3 || instr.Args[0] == nil || instr.Args[1] == nil || instr.Args[2] == nil || instr.Args[2].ID != key.ID {
-			return LoopTableArrayFact{}, false
-		}
-		for _, fact := range facts {
-			if fact.kind == instr.Aux && fact.length.ID == instr.Args[1].ID && fact.data.ID == instr.Args[0].ID {
-				return makeLoopTableArrayFact(headerID, preheaderID, instr, fact, key), true
-			}
-		}
-	case OpTableArrayStore:
-		if len(instr.Args) < 5 || instr.Args[0] == nil || instr.Args[1] == nil ||
-			instr.Args[2] == nil || instr.Args[3] == nil || instr.Args[3].ID != key.ID {
-			return LoopTableArrayFact{}, false
-		}
-		for _, fact := range facts {
-			if fact.kind == instr.Aux &&
-				fact.table.ID == instr.Args[0].ID &&
-				fact.length.ID == instr.Args[2].ID &&
-				fact.data.ID == instr.Args[1].ID {
-				return makeLoopTableArrayFact(headerID, preheaderID, instr, fact, key), true
-			}
+	layout, ok := tableArrayAccessLayoutForOp(instr.Op)
+	if !ok || !loopRegionInstrHasAccessArgs(instr, layout) || instr.Args[layout.KeyArg].ID != key.ID {
+		return LoopTableArrayFact{}, false
+	}
+	for _, fact := range facts {
+		if loopRegionAccessMatchesFact(instr, layout, fact) {
+			return makeLoopTableArrayFact(headerID, preheaderID, instr, fact, key), true
 		}
 	}
 	return LoopTableArrayFact{}, false
+}
+
+func loopRegionInstrHasAccessArgs(instr *Instr, layout tableArrayAccessLayout) bool {
+	if instr == nil || layout.DataArg < 0 || layout.LenArg < 0 || layout.KeyArg < 0 {
+		return false
+	}
+	maxArg := layout.KeyArg
+	if layout.DataArg > maxArg {
+		maxArg = layout.DataArg
+	}
+	if layout.LenArg > maxArg {
+		maxArg = layout.LenArg
+	}
+	if layout.TableArg > maxArg {
+		maxArg = layout.TableArg
+	}
+	if len(instr.Args) <= maxArg {
+		return false
+	}
+	for _, arg := range []int{layout.DataArg, layout.LenArg, layout.KeyArg} {
+		if instr.Args[arg] == nil {
+			return false
+		}
+	}
+	return layout.TableArg < 0 || instr.Args[layout.TableArg] != nil
+}
+
+func loopRegionAccessMatchesFact(instr *Instr, layout tableArrayAccessLayout, fact loopRegionTableArrayFact) bool {
+	if instr == nil || fact.length == nil || fact.data == nil || fact.kind != instr.Aux {
+		return false
+	}
+	if instr.Args[layout.DataArg].ID != fact.data.ID || instr.Args[layout.LenArg].ID != fact.length.ID {
+		return false
+	}
+	return layout.TableArg < 0 || (fact.table != nil && instr.Args[layout.TableArg].ID == fact.table.ID)
 }
 
 func insertedLoopLimitArrayLenGuard(fn *Function, preheader *Block, body map[int]bool, loopKey, limit *Value, instr *Instr, facts []loopRegionTableArrayFact, seen map[[2]int]bool) bool {
@@ -443,14 +445,11 @@ func loopRegionInstrUsesKey(instr *Instr, key *Value) bool {
 	if instr == nil || key == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpTableArrayLoad:
-		return len(instr.Args) >= 3 && instr.Args[2] != nil && instr.Args[2].ID == key.ID
-	case OpTableArrayStore:
-		return len(instr.Args) >= 4 && instr.Args[3] != nil && instr.Args[3].ID == key.ID
-	default:
+	layout, ok := tableArrayAccessLayoutForOp(instr.Op)
+	if !ok || !loopRegionInstrHasAccessArgs(instr, layout) {
 		return false
 	}
+	return instr.Args[layout.KeyArg].ID == key.ID
 }
 
 func loopRegionValueInvariant(body map[int]bool, v *Value) bool {
@@ -464,16 +463,11 @@ func loopRegionInstrUsesFact(instr *Instr, fact loopRegionTableArrayFact) bool {
 	if instr == nil || fact.length == nil || fact.data == nil {
 		return false
 	}
-	switch instr.Op {
-	case OpTableArrayLoad:
-		return len(instr.Args) >= 2 && instr.Args[0] != nil && instr.Args[1] != nil &&
-			instr.Args[0].ID == fact.data.ID && instr.Args[1].ID == fact.length.ID
-	case OpTableArrayStore:
-		return len(instr.Args) >= 3 && instr.Args[1] != nil && instr.Args[2] != nil &&
-			instr.Args[1].ID == fact.data.ID && instr.Args[2].ID == fact.length.ID
-	default:
+	layout, ok := tableArrayAccessLayoutForOp(instr.Op)
+	if !ok || !loopRegionInstrHasAccessArgs(instr, layout) {
 		return false
 	}
+	return instr.Args[layout.DataArg].ID == fact.data.ID && instr.Args[layout.LenArg].ID == fact.length.ID
 }
 
 func makeLoopTableArrayFact(headerID, preheaderID int, instr *Instr, fact loopRegionTableArrayFact, key *Value) LoopTableArrayFact {

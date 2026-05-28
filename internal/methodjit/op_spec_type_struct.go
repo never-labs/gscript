@@ -35,6 +35,11 @@ type OpSpec struct {
 	LiteralConst                     bool
 	LoadElimPureCSE                  bool
 	LoadElimShapeFactKiller          bool
+	LoadElimDynamicTableCacheMutation bool
+	LoadElimTypedArrayFactMutation    bool
+	LoadElimTableCacheKeyArgIndex     int
+	LoadElimTableCacheValueArgIndex   int
+	LoadElimFactBarrier               bool
 
 	// Result representation and value-lowering contracts.
 	NoSSAResult                   bool
@@ -47,6 +52,9 @@ type OpSpec struct {
 	TableArrayGPRInvariantRank    int
 	TableArrayGPRInvariantUseMask uint8
 	TableArrayKeyArgIndex         int
+	TableArrayTableArgIndex       int
+	TableArrayDataArgIndex        int
+	TableArrayLenArgIndex         int
 	TableArrayFactRole            OpTableArrayFactRole
 
 	// Optimizer admission and numeric specialization contracts.

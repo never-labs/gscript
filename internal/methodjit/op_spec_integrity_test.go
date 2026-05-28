@@ -68,6 +68,14 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.TableArrayKeyArgIndex != -1 {
 			t.Fatalf("%s TableArrayKeyArgIndex default=%d, want -1", op, spec.TableArrayKeyArgIndex)
 		}
+		if spec.TableArrayTableArgIndex != -1 || spec.TableArrayDataArgIndex != -1 || spec.TableArrayLenArgIndex != -1 {
+			t.Fatalf("%s table-array access layout default = table %d data %d len %d, want all -1",
+				op, spec.TableArrayTableArgIndex, spec.TableArrayDataArgIndex, spec.TableArrayLenArgIndex)
+		}
+		if spec.LoadElimTableCacheKeyArgIndex != -1 || spec.LoadElimTableCacheValueArgIndex != -1 {
+			t.Fatalf("%s load-elim table-cache arg defaults=%d/%d, want both -1",
+				op, spec.LoadElimTableCacheKeyArgIndex, spec.LoadElimTableCacheValueArgIndex)
+		}
 		if _, ok := exactIntNarrowOp(op); ok {
 			t.Fatalf("%s should not report an exact int-narrow target", op)
 		}
@@ -82,6 +90,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := tableArrayKeyArgIndex(op); ok {
 			t.Fatalf("%s should not report a table-array key arg index", op)
+		}
+		if _, ok := tableArrayAccessLayoutForOp(op); ok {
+			t.Fatalf("%s should not report a table-array access layout", op)
 		}
 	}
 }

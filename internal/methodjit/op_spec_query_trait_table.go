@@ -86,6 +86,26 @@ func tableArrayKeyArgIndex(op Op) (int, bool) {
 	return spec.TableArrayKeyArgIndex, ok && spec.TableArrayKeyArgIndex >= 0
 }
 
+type tableArrayAccessLayout struct {
+	TableArg int
+	DataArg  int
+	LenArg   int
+	KeyArg   int
+}
+
+func tableArrayAccessLayoutForOp(op Op) (tableArrayAccessLayout, bool) {
+	spec, ok := op.Spec()
+	if !ok || spec.TableArrayDataArgIndex < 0 || spec.TableArrayLenArgIndex < 0 || spec.TableArrayKeyArgIndex < 0 {
+		return tableArrayAccessLayout{}, false
+	}
+	return tableArrayAccessLayout{
+		TableArg: spec.TableArrayTableArgIndex,
+		DataArg:  spec.TableArrayDataArgIndex,
+		LenArg:   spec.TableArrayLenArgIndex,
+		KeyArg:   spec.TableArrayKeyArgIndex,
+	}, true
+}
+
 func tableArrayFactRole(op Op) OpTableArrayFactRole {
 	spec, ok := op.Spec()
 	if !ok {

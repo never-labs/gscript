@@ -220,4 +220,23 @@ func TestBackendAndLoopContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s table-array key arg = %d, want %d", tc.op, spec.TableArrayKeyArgIndex, tc.arg)
 		}
 	}
+	for _, tc := range []struct {
+		op    Op
+		table int
+		data  int
+		len   int
+		key   int
+	}{
+		{OpTableArrayLoad, -1, 0, 1, 2},
+		{OpTableArrayStore, 0, 1, 2, 3},
+	} {
+		layout, ok := tableArrayAccessLayoutForOp(tc.op)
+		if !ok {
+			t.Fatalf("%s missing table-array access layout", tc.op)
+		}
+		if layout.TableArg != tc.table || layout.DataArg != tc.data || layout.LenArg != tc.len || layout.KeyArg != tc.key {
+			t.Fatalf("%s table-array access layout = table %d data %d len %d key %d, want table %d data %d len %d key %d",
+				tc.op, layout.TableArg, layout.DataArg, layout.LenArg, layout.KeyArg, tc.table, tc.data, tc.len, tc.key)
+		}
+	}
 }

@@ -43,4 +43,13 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTableArrayKeyArgIndexPolicies) && opTableArrayKeyArgIndexPolicies[op] != 0 {
 		spec.TableArrayKeyArgIndex = int(opTableArrayKeyArgIndexPolicies[op]) - 1
 	}
+	if int(op) < len(opTableArrayTableArgIndexPolicies) && opTableArrayTableArgIndexPolicies[op] != 0 {
+		spec.TableArrayTableArgIndex = int(opTableArrayTableArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opTableArrayDataArgIndexPolicies) && opTableArrayDataArgIndexPolicies[op] != 0 {
+		spec.TableArrayDataArgIndex = int(opTableArrayDataArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opTableArrayLenArgIndexPolicies) && opTableArrayLenArgIndexPolicies[op] != 0 {
+		spec.TableArrayLenArgIndex = int(opTableArrayLenArgIndexPolicies[op]) - 1
+	}
 }
