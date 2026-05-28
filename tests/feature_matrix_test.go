@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -62,6 +63,7 @@ func TestFeatureMatrixSchema(t *testing.T) {
 	}
 
 	seenIDs := map[string]bool{}
+	referencedSpecSections := map[string]bool{}
 	for i, feature := range matrix.Features {
 		id := decodeRequiredString(t, feature, i, "id")
 		if seenIDs[id] {
@@ -75,6 +77,7 @@ func TestFeatureMatrixSchema(t *testing.T) {
 			if !specSections[section] {
 				t.Fatalf("features[%d] %s.spec_sections references missing language spec section %q", i, id, section)
 			}
+			referencedSpecSections[section] = true
 		}
 
 		for _, field := range matrix.RequiredFields {
@@ -97,6 +100,7 @@ func TestFeatureMatrixSchema(t *testing.T) {
 			}
 		}
 	}
+	assertLanguageSpecSectionsCovered(t, specSections, referencedSpecSections)
 }
 
 func decodeRequiredString(t *testing.T, feature map[string]json.RawMessage, index int, field string) string {
@@ -161,6 +165,35 @@ func loadLanguageSpecSections(t *testing.T, root string) map[string]bool {
 		t.Fatal("language spec must contain at least one level-2 section")
 	}
 	return sections
+}
+
+func assertLanguageSpecSectionsCovered(t *testing.T, specSections, referencedSpecSections map[string]bool) {
+	t.Helper()
+	ignoredSpecSections := map[string]string{
+		"Phase 0 Hard Deliverables": "phase acceptance criteria, not a language feature",
+		"Production Roadmap":        "planning metadata, not a language feature",
+		"Change-Control Checklist":  "change process metadata, not a language feature",
+	}
+	for section := range ignoredSpecSections {
+		if !specSections[section] {
+			t.Fatalf("ignored language spec section %q does not exist", section)
+		}
+		if referencedSpecSections[section] {
+			t.Fatalf("ignored language spec section %q must not also be referenced by a feature", section)
+		}
+	}
+
+	var uncovered []string
+	for section := range specSections {
+		if referencedSpecSections[section] || ignoredSpecSections[section] != "" {
+			continue
+		}
+		uncovered = append(uncovered, section)
+	}
+	if len(uncovered) > 0 {
+		sort.Strings(uncovered)
+		t.Fatalf("language spec sections must be referenced by at least one feature or explicitly ignored: %s", strings.Join(uncovered, ", "))
+	}
 }
 
 func assertRepoRelativeFileRef(t *testing.T, root, featureID, field, ref string) {

@@ -63,7 +63,9 @@ Update `tests/feature_matrix.json` first. The lightweight Go test
 `TestFeatureMatrixSchema` checks that every feature row has all required fields,
 uses an allowed status, keeps references as relative paths, points file
 references at existing repository files, and maps `spec_sections` to existing
-level-2 headings in `docs/language-spec.md`.
+level-2 headings in `docs/language-spec.md`. It also checks the reverse
+direction: every level-2 language-spec section must be referenced by at least
+one feature row unless it is an explicitly ignored process/planning section.
 
 When adding a new language feature, add one row even if several columns are
 `partial` or `missing`. The point of this matrix is to make gaps explicit
