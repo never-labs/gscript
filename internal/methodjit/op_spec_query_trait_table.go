@@ -86,6 +86,14 @@ func tableArrayKeyArgIndex(op Op) (int, bool) {
 	return spec.TableArrayKeyArgIndex, ok && spec.TableArrayKeyArgIndex >= 0
 }
 
+func tableArrayFactRole(op Op) OpTableArrayFactRole {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpTableArrayFactNone
+	}
+	return spec.TableArrayFactRole
+}
+
 func opIsTableMetatableMutationBarrier(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.TableMetatableMutationBarrier

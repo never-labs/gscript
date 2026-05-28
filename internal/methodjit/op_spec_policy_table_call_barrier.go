@@ -54,3 +54,9 @@ var opTableMetatableMutationBarrierPolicies = [...]bool{
 	OpSend:      true,
 	OpRecv:      true,
 }
+
+var opTableArrayFactRolePolicies = [...]OpTableArrayFactRole{
+	OpTableArrayHeader: OpTableArrayFactHeader,
+	OpTableArrayLen:    OpTableArrayFactLen,
+	OpTableArrayData:   OpTableArrayFactData,
+}

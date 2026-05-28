@@ -47,6 +47,7 @@ type OpSpec struct {
 	TableArrayGPRInvariantRank    int
 	TableArrayGPRInvariantUseMask uint8
 	TableArrayKeyArgIndex         int
+	TableArrayFactRole            OpTableArrayFactRole
 
 	// Optimizer admission and numeric specialization contracts.
 	LICMHoistable               bool

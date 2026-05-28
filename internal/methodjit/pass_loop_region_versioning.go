@@ -207,20 +207,7 @@ func collectLoopRegionTableArrayFacts(preheader *Block) []loopRegionTableArrayFa
 		if instr == nil {
 			continue
 		}
-		switch instr.Op {
-		case OpTableArrayHeader:
-			if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-				headers[instr.ID] = tableArrayHeaderFact{table: instr.Args[0], kind: instr.Aux}
-			}
-		case OpTableArrayLen:
-			if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-				lens[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
-			}
-		case OpTableArrayData:
-			if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-				datas[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
-			}
-		}
+		collectLoopRegionTableArrayFactInstr(instr, headers, lens, datas)
 	}
 
 	facts := make([]loopRegionTableArrayFact, 0, len(headers))
@@ -257,23 +244,24 @@ func collectLoopRegionTableArrayFactsDominating(fn *Function, dom *domInfo, head
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpTableArrayHeader:
-				if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-					headers[instr.ID] = tableArrayHeaderFact{table: instr.Args[0], kind: instr.Aux}
-				}
-			case OpTableArrayLen:
-				if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-					lens[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
-				}
-			case OpTableArrayData:
-				if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-					datas[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
-				}
-			}
+			collectLoopRegionTableArrayFactInstr(instr, headers, lens, datas)
 		}
 	}
 	return makeLoopRegionTableArrayFacts(headers, lens, datas)
+}
+
+func collectLoopRegionTableArrayFactInstr(instr *Instr, headers map[int]tableArrayHeaderFact, lens map[tableArrayDerivedKey]*Value, datas map[tableArrayDerivedKey]*Value) {
+	if instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil || !tableArrayLowerableKind(instr.Aux) {
+		return
+	}
+	switch tableArrayFactRole(instr.Op) {
+	case OpTableArrayFactHeader:
+		headers[instr.ID] = tableArrayHeaderFact{table: instr.Args[0], kind: instr.Aux}
+	case OpTableArrayFactLen:
+		lens[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
+	case OpTableArrayFactData:
+		datas[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
+	}
 }
 
 func makeLoopRegionTableArrayFacts(headers map[int]tableArrayHeaderFact, lens map[tableArrayDerivedKey]*Value, datas map[tableArrayDerivedKey]*Value) []loopRegionTableArrayFact {

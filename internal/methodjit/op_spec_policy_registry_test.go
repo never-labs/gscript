@@ -99,6 +99,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opTableArrayRegionAliasingAlwaysPolicies", opTableArrayRegionAliasingAlwaysPolicies},
 		{"opTableArrayRegionTableMutationPolicies", opTableArrayRegionTableMutationPolicies},
 		{"opTableMetatableMutationBarrierPolicies", opTableMetatableMutationBarrierPolicies},
+		{"opTableArrayFactRolePolicies", opTableArrayFactRolePolicies},
 		{"opRuntimeOverflowBoxablePolicies", opRuntimeOverflowBoxablePolicies},
 		{"opRuntimeGuardRefreshablePolicies", opRuntimeGuardRefreshablePolicies},
 		{"opNativeNumericValueProducerPolicies", opNativeNumericValueProducerPolicies},

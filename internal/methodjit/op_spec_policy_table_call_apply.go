@@ -108,4 +108,7 @@ func applyOpSpecTableCallBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTableMetatableMutationBarrierPolicies) {
 		spec.TableMetatableMutationBarrier = opTableMetatableMutationBarrierPolicies[op]
 	}
+	if int(op) < len(opTableArrayFactRolePolicies) {
+		spec.TableArrayFactRole = opTableArrayFactRolePolicies[op]
+	}
 }

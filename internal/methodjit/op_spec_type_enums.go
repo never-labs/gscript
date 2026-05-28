@@ -199,3 +199,12 @@ func (s OpOracleSupport) String() string {
 		return "invalid"
 	}
 }
+
+type OpTableArrayFactRole uint8
+
+const (
+	OpTableArrayFactNone OpTableArrayFactRole = iota
+	OpTableArrayFactHeader
+	OpTableArrayFactLen
+	OpTableArrayFactData
+)
