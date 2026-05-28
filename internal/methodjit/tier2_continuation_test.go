@@ -112,4 +112,14 @@ func TestTier2ContinuationExactStateCompatible(t *testing.T) {
 	if ok, reason := tier2ContinuationExactStateCompatible(old, next); ok || reason != "live_slot_repr_changed" {
 		t.Fatalf("changed repr compatibility = (%v,%q), want (false,live_slot_repr_changed)", ok, reason)
 	}
+	next.LiveSlots[1].Repr = valueReprRawInt
+	next.VMRegLimit = 4
+	if ok, reason := tier2ContinuationExactStateCompatible(old, next); ok || reason != "vm_reg_limit_changed" {
+		t.Fatalf("changed VM reg limit compatibility = (%v,%q), want (false,vm_reg_limit_changed)", ok, reason)
+	}
+	next.VMRegLimit = 0
+	next.LiveSlots[1].ValueID = 99
+	if ok, reason := tier2ContinuationExactStateCompatible(old, next); ok || reason != "live_slot_value_changed" {
+		t.Fatalf("changed value compatibility = (%v,%q), want (false,live_slot_value_changed)", ok, reason)
+	}
 }

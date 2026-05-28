@@ -276,6 +276,9 @@ func tier2ContinuationExactStateCompatible(oldCont, newCont Tier2Continuation) (
 	if oldCont.Ambiguous || newCont.Ambiguous {
 		return false, "ambiguous_key"
 	}
+	if oldCont.VMRegLimit != newCont.VMRegLimit {
+		return false, "vm_reg_limit_changed"
+	}
 	if len(oldCont.LiveSlots) != len(newCont.LiveSlots) {
 		return false, "live_slot_count_changed"
 	}
@@ -290,6 +293,15 @@ func tier2ContinuationExactStateCompatible(oldCont, newCont Tier2Continuation) (
 		}
 		if old.Repr != live.Repr {
 			return false, "live_slot_repr_changed"
+		}
+		if old.ValueID != live.ValueID {
+			return false, "live_slot_value_changed"
+		}
+		if old.DefOp != live.DefOp {
+			return false, "live_slot_def_op_changed"
+		}
+		if old.DefSourcePC != live.DefSourcePC {
+			return false, "live_slot_source_pc_changed"
 		}
 	}
 	return true, ""
