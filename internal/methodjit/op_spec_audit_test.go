@@ -83,6 +83,9 @@ func TestWriteOpAuditMatrixJSON(t *testing.T) {
 	for _, key := range []string{
 		"op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt",
 		"arg_policy", "oracle_support", "emitter_family", "may_deopt",
+		"direct_deopt_without_full_flush", "native_replay_may_exit",
+		"native_replay_visible_side_effect", "native_replay_visible_table_mutation",
+		"native_callee_resume_unsafe", "restart_visible_side_effect",
 		"fixed_shape_array_element_write_role", "fixed_shape_array_element_read_role",
 		"fixed_shape_return_array_element_role", "local_string_array_table_use_role",
 		"readonly_table_param_use_role", "inline_allocation_role",
@@ -114,6 +117,24 @@ func TestOpAuditMatrixStructuredFieldsMatchOpSpec(t *testing.T) {
 		}
 		if row.MayDeopt != spec.MayDeopt {
 			t.Fatalf("%s may_deopt = %t, want %t", row.Name, row.MayDeopt, spec.MayDeopt)
+		}
+		if row.DirectDeoptWithoutFullFlush != spec.DirectDeoptWithoutFullFlush {
+			t.Fatalf("%s direct_deopt_without_full_flush = %t, want %t", row.Name, row.DirectDeoptWithoutFullFlush, spec.DirectDeoptWithoutFullFlush)
+		}
+		if row.NativeReplayMayExit != spec.NativeReplayMayExit {
+			t.Fatalf("%s native_replay_may_exit = %t, want %t", row.Name, row.NativeReplayMayExit, spec.NativeReplayMayExit)
+		}
+		if row.NativeReplayVisibleSideEffect != spec.NativeReplayVisibleSideEffect {
+			t.Fatalf("%s native_replay_visible_side_effect = %t, want %t", row.Name, row.NativeReplayVisibleSideEffect, spec.NativeReplayVisibleSideEffect)
+		}
+		if row.NativeReplayVisibleTableMutation != spec.NativeReplayVisibleTableMutation {
+			t.Fatalf("%s native_replay_visible_table_mutation = %t, want %t", row.Name, row.NativeReplayVisibleTableMutation, spec.NativeReplayVisibleTableMutation)
+		}
+		if row.NativeCalleeResumeUnsafe != spec.NativeCalleeResumeUnsafe {
+			t.Fatalf("%s native_callee_resume_unsafe = %t, want %t", row.Name, row.NativeCalleeResumeUnsafe, spec.NativeCalleeResumeUnsafe)
+		}
+		if row.RestartVisibleSideEffect != spec.RestartVisibleSideEffect {
+			t.Fatalf("%s restart_visible_side_effect = %t, want %t", row.Name, row.RestartVisibleSideEffect, spec.RestartVisibleSideEffect)
 		}
 		if row.FixedShapeArrayElementWriteRole != spec.FixedShapeArrayElementWriteRole.String() {
 			t.Fatalf("%s fixed_shape_array_element_write_role = %q, want %q", row.Name, row.FixedShapeArrayElementWriteRole, spec.FixedShapeArrayElementWriteRole.String())

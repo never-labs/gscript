@@ -44,6 +44,35 @@ func TestOpSpecOracleSupportMatchesIRInterpreterCases(t *testing.T) {
 	}
 }
 
+func TestOpSpecOracleTerminatorsMatchResolverCases(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	handled, err := interpResolveTerminatorHandledOps(filepath.Join(filepath.Dir(file), "interp.go"))
+	if err != nil {
+		t.Fatalf("scan interp.go: %v", err)
+	}
+
+	var missing []string
+	for op := Op(0); op < OpMax; op++ {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if !spec.Terminator && spec.OracleSupport != OpOracleTerminator {
+			continue
+		}
+		if !handled[op] {
+			missing = append(missing, spec.Name)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("OpSpec marks terminator op(s) but interp.resolveTerminator lacks case: %s", strings.Join(missing, ", "))
+	}
+}
+
 func TestOpSpecOracleUnsupportedOpsHaveReasons(t *testing.T) {
 	for op := Op(0); op < OpMax; op++ {
 		spec, ok := op.Spec()
@@ -180,6 +209,53 @@ func interpExecInstrHandledOps(path string) (map[Op]bool, error) {
 	return nil, errExecInstrNotFound{}
 }
 
+func interpResolveTerminatorHandledOps(path string) (map[Op]bool, error) {
+	return interpSwitchHandledOps(path, "resolveTerminator")
+}
+
+func interpSwitchHandledOps(path, funcName string) (map[Op]bool, error) {
+	fileSet := token.NewFileSet()
+	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
+	if err != nil {
+		return nil, err
+	}
+	ops := make(map[Op]bool)
+	for _, decl := range parsed.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != funcName {
+			continue
+		}
+		ast.Inspect(fn.Body, func(node ast.Node) bool {
+			sw, ok := node.(*ast.SwitchStmt)
+			if !ok {
+				return true
+			}
+			for _, stmt := range sw.Body.List {
+				cc, ok := stmt.(*ast.CaseClause)
+				if !ok {
+					continue
+				}
+				for _, expr := range cc.List {
+					if ident, ok := expr.(*ast.Ident); ok {
+						if op, ok := OpByName(strings.TrimPrefix(ident.Name, "Op")); ok {
+							ops[op] = true
+						}
+					}
+				}
+			}
+			return false
+		})
+		return ops, nil
+	}
+	return nil, errInterpSwitchNotFound{funcName: funcName}
+}
+
 type errExecInstrNotFound struct{}
 
 func (errExecInstrNotFound) Error() string { return "execInstr not found" }
+
+type errInterpSwitchNotFound struct {
+	funcName string
+}
+
+func (e errInterpSwitchNotFound) Error() string { return e.funcName + " not found" }

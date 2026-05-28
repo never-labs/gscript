@@ -21,6 +21,12 @@ type OpAuditRow struct {
 	OracleReason                     string `json:"oracle_reason,omitempty"`
 	EmitterFamily                    string `json:"emitter_family"`
 	MayDeopt                         bool   `json:"may_deopt"`
+	DirectDeoptWithoutFullFlush      bool   `json:"direct_deopt_without_full_flush"`
+	NativeReplayMayExit              bool   `json:"native_replay_may_exit"`
+	NativeReplayVisibleSideEffect    bool   `json:"native_replay_visible_side_effect"`
+	NativeReplayVisibleTableMutation bool   `json:"native_replay_visible_table_mutation"`
+	NativeCalleeResumeUnsafe         bool   `json:"native_callee_resume_unsafe"`
+	RestartVisibleSideEffect         bool   `json:"restart_visible_side_effect"`
 	FixedShapeArrayElementWriteRole  string `json:"fixed_shape_array_element_write_role"`
 	FixedShapeArrayElementReadRole   string `json:"fixed_shape_array_element_read_role"`
 	FixedShapeReturnArrayElementRole string `json:"fixed_shape_return_array_element_role"`
@@ -52,6 +58,12 @@ func OpAuditMatrix() []OpAuditRow {
 			OracleReason:                     spec.OracleUnsupportedReason,
 			EmitterFamily:                    spec.EmitterFamily.String(),
 			MayDeopt:                         spec.MayDeopt,
+			DirectDeoptWithoutFullFlush:      spec.DirectDeoptWithoutFullFlush,
+			NativeReplayMayExit:              spec.NativeReplayMayExit,
+			NativeReplayVisibleSideEffect:    spec.NativeReplayVisibleSideEffect,
+			NativeReplayVisibleTableMutation: spec.NativeReplayVisibleTableMutation,
+			NativeCalleeResumeUnsafe:         spec.NativeCalleeResumeUnsafe,
+			RestartVisibleSideEffect:         spec.RestartVisibleSideEffect,
 			FixedShapeArrayElementWriteRole:  spec.FixedShapeArrayElementWriteRole.String(),
 			FixedShapeArrayElementReadRole:   spec.FixedShapeArrayElementReadRole.String(),
 			FixedShapeReturnArrayElementRole: spec.FixedShapeReturnArrayElementRole.String(),
