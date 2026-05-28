@@ -796,6 +796,25 @@ func (s *SoA) SumWhere(columnName string, mask *DenseArray) (Value, error) {
 	return col.SumWhere(mask)
 }
 
+func (s *SoA) Dot(leftName, rightName string) (Value, error) {
+	left, right, err := s.numericColumns(leftName, rightName)
+	if err != nil {
+		return NilValue(), err
+	}
+	return denseArrayDot(left, right)
+}
+
+func (s *SoA) DotWhere(leftName, rightName string, mask *DenseArray) (Value, error) {
+	left, right, err := s.numericColumns(leftName, rightName)
+	if err != nil {
+		return NilValue(), err
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return NilValue(), fmt.Errorf("soa dotWhere mask must be a bool dense array")
+	}
+	return denseArrayDotWhere(left, right, mask)
+}
+
 func (s *SoA) MinWhere(columnName string, mask *DenseArray) (Value, error) {
 	col, err := s.maskedAggregateColumn("soa minWhere", columnName, mask)
 	if err != nil {

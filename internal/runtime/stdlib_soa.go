@@ -499,6 +499,45 @@ func buildSoALib() *Table {
 		return []Value{v}, nil
 	}, soaSumWhereValue)
 
+	setFastArg3("dot", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.dot", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.dot: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsString() {
+			return nil, fmt.Errorf("soa.dot: argument 3 must be a string")
+		}
+		v, err := s.Dot(args[1].Str(), args[2].Str())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaDotValue)
+
+	setFastArg4("dotWhere", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.dotWhere", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.dotWhere: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsString() {
+			return nil, fmt.Errorf("soa.dotWhere: argument 3 must be a string")
+		}
+		if len(args) < 4 || !args[3].IsDenseArray() {
+			return nil, fmt.Errorf("soa.dotWhere: argument 4 must be a bool dense array")
+		}
+		v, err := s.DotWhere(args[1].Str(), args[2].Str(), args[3].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaDotWhereValue)
+
 	setFastArg3("minWhere", func(args []Value) ([]Value, error) {
 		v, err := soaMaskedAggregateArgs("soa.minWhere", args, (*SoA).MinWhere)
 		if err != nil {
@@ -1035,6 +1074,35 @@ func soaScatterIntoValue(soaValue, dstValue, indicesValue, valuesValue Value) (V
 
 func soaSumWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
 	return soaMaskedAggregateValue("soa.sumWhere", soaValue, columnValue, maskValue, (*SoA).SumWhere)
+}
+
+func soaDotValue(soaValue, leftValue, rightValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.dot: argument 1 must be soa")
+	}
+	if !leftValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.dot: argument 2 must be a string")
+	}
+	if !rightValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.dot: argument 3 must be a string")
+	}
+	return soaValue.SoA().Dot(leftValue.Str(), rightValue.Str())
+}
+
+func soaDotWhereValue(soaValue, leftValue, rightValue, maskValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.dotWhere: argument 1 must be soa")
+	}
+	if !leftValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.dotWhere: argument 2 must be a string")
+	}
+	if !rightValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.dotWhere: argument 3 must be a string")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.dotWhere: argument 4 must be a bool dense array")
+	}
+	return soaValue.SoA().DotWhere(leftValue.Str(), rightValue.Str(), maskValue.DenseArray())
 }
 
 func soaMinWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {

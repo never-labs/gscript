@@ -286,6 +286,16 @@ dependent updates into separate calls to preserve order.
 
 Reduces one numeric dense column and returns its sum.
 
+### `soa.dot(s, left, right) -> number`
+
+Returns the dot product of two numeric dense columns with the same length.
+When both columns are `i64`, the result is an integer; mixed or `f64` columns
+return a float.
+
+```gscript
+energy := soa.dot(points, "velocity", "mass")
+```
+
 ### `soa.sumWhere(s, column, mask) -> number`
 
 Reduces numeric `column` over mask-true rows without row materialization.
@@ -295,6 +305,11 @@ Reduces numeric `column` over mask-true rows without row materialization.
 mask := []bool{true, false, true}
 total := soa.sumWhere(points, "x", mask)
 ```
+
+### `soa.dotWhere(s, left, right, mask) -> number`
+
+Masked dot product over rows where `mask` is true. Use this instead of
+`soa.filter` plus `soa.dot` when the compacted rows are not needed.
 
 ### `soa.minWhere(s, column, mask) -> number`
 
@@ -327,6 +342,8 @@ is zero, and `min`, `max`, and `mean` are `nil`.
   fields.
 - Prefer `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` over
   manual row loops when the operation fits their contracts.
+- Use `soa.dot` and `soa.dotWhere` for vector-style products instead of
+  multiplying columns through row materialization.
 - Use `soa.mask` to produce reusable dense masks from column comparisons.
 - Use `soa.select` for branch-free mask selection into a dense temporary.
 - Use `soa.selectInto` when a dense scratch/output column can be reused.

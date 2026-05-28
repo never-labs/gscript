@@ -1316,6 +1316,151 @@ func (a *DenseArray) SumWhere(mask *DenseArray) (Value, error) {
 	}
 }
 
+func denseArrayDot(left, right *DenseArray) (Value, error) {
+	if left == nil || right == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if left.Len() != right.Len() {
+		return NilValue(), ErrDenseArrayLength
+	}
+	switch {
+	case left.dtype == DenseArrayF64 && right.dtype == DenseArrayF64:
+		return FloatValue(denseArrayDotF64F64(left.f64, right.f64)), nil
+	case left.dtype == DenseArrayI64 && right.dtype == DenseArrayI64:
+		return IntValue(denseArrayDotI64I64(left.i64, right.i64)), nil
+	case left.dtype == DenseArrayF64 && right.dtype == DenseArrayI64:
+		return FloatValue(denseArrayDotF64I64(left.f64, right.i64)), nil
+	case left.dtype == DenseArrayI64 && right.dtype == DenseArrayF64:
+		return FloatValue(denseArrayDotI64F64(left.i64, right.f64)), nil
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func denseArrayDotWhere(left, right, mask *DenseArray) (Value, error) {
+	if left == nil || right == nil || mask == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return NilValue(), fmt.Errorf("dense array dotWhere mask must be bool")
+	}
+	if left.Len() != right.Len() || left.Len() != mask.Len() {
+		return NilValue(), ErrDenseArrayLength
+	}
+	switch {
+	case left.dtype == DenseArrayF64 && right.dtype == DenseArrayF64:
+		return FloatValue(denseArrayDotWhereF64F64(left.f64, right.f64, mask.bools)), nil
+	case left.dtype == DenseArrayI64 && right.dtype == DenseArrayI64:
+		return IntValue(denseArrayDotWhereI64I64(left.i64, right.i64, mask.bools)), nil
+	case left.dtype == DenseArrayF64 && right.dtype == DenseArrayI64:
+		return FloatValue(denseArrayDotWhereF64I64(left.f64, right.i64, mask.bools)), nil
+	case left.dtype == DenseArrayI64 && right.dtype == DenseArrayF64:
+		return FloatValue(denseArrayDotWhereI64F64(left.i64, right.f64, mask.bools)), nil
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func denseArrayDotF64F64(left, right []float64) float64 {
+	n := len(left)
+	if n == 0 {
+		return 0
+	}
+	_, _ = left[n-1], right[n-1]
+	sum0, sum1, sum2, sum3 := 0.0, 0.0, 0.0, 0.0
+	i := 0
+	limit := n - n%4
+	for ; i < limit; i += 4 {
+		sum0 += left[i] * right[i]
+		sum1 += left[i+1] * right[i+1]
+		sum2 += left[i+2] * right[i+2]
+		sum3 += left[i+3] * right[i+3]
+	}
+	sum := sum0 + sum1 + sum2 + sum3
+	for ; i < n; i++ {
+		sum += left[i] * right[i]
+	}
+	return sum
+}
+
+func denseArrayDotI64I64(left, right []int64) int64 {
+	n := len(left)
+	if n == 0 {
+		return 0
+	}
+	_, _ = left[n-1], right[n-1]
+	var sum0, sum1, sum2, sum3 int64
+	i := 0
+	limit := n - n%4
+	for ; i < limit; i += 4 {
+		sum0 += left[i] * right[i]
+		sum1 += left[i+1] * right[i+1]
+		sum2 += left[i+2] * right[i+2]
+		sum3 += left[i+3] * right[i+3]
+	}
+	sum := sum0 + sum1 + sum2 + sum3
+	for ; i < n; i++ {
+		sum += left[i] * right[i]
+	}
+	return sum
+}
+
+func denseArrayDotF64I64(left []float64, right []int64) float64 {
+	sum := 0.0
+	for i, v := range left {
+		sum += v * float64(right[i])
+	}
+	return sum
+}
+
+func denseArrayDotI64F64(left []int64, right []float64) float64 {
+	sum := 0.0
+	for i, v := range left {
+		sum += float64(v) * right[i]
+	}
+	return sum
+}
+
+func denseArrayDotWhereF64F64(left, right []float64, mask []bool) float64 {
+	sum := 0.0
+	for i, keep := range mask {
+		if keep {
+			sum += left[i] * right[i]
+		}
+	}
+	return sum
+}
+
+func denseArrayDotWhereI64I64(left, right []int64, mask []bool) int64 {
+	var sum int64
+	for i, keep := range mask {
+		if keep {
+			sum += left[i] * right[i]
+		}
+	}
+	return sum
+}
+
+func denseArrayDotWhereF64I64(left []float64, right []int64, mask []bool) float64 {
+	sum := 0.0
+	for i, keep := range mask {
+		if keep {
+			sum += left[i] * float64(right[i])
+		}
+	}
+	return sum
+}
+
+func denseArrayDotWhereI64F64(left []int64, right []float64, mask []bool) float64 {
+	sum := 0.0
+	for i, keep := range mask {
+		if keep {
+			sum += float64(left[i]) * right[i]
+		}
+	}
+	return sum
+}
+
 func (a *DenseArray) MeanWhere(mask *DenseArray) (Value, error) {
 	if a == nil || mask == nil {
 		return NilValue(), ErrDenseArrayOperand
