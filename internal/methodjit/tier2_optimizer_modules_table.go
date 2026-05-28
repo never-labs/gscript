@@ -136,11 +136,11 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 
 func tier2TableLoopSpecializationModules() []Tier2OptimizerModule {
 	return []Tier2OptimizerModule{
-		tier2PassModuleWith("BoolTableFillLoop", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableFillLoopPass),
+		tier2PassModuleWithCtx("BoolTableFillLoop", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableFillLoopPassCtx),
 		tier2PassModuleWith("TableArrayStoreLoopVersion", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactIntRanges), nil, TableArrayStoreLoopVersionPass),
 		tier2PassModuleWithCtx("RecordArrayLoopSpecialization", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), analysisFacts(AnalysisFactRecordArrayLoopSpecialization, AnalysisFactRecordArrayLoopCaches), RecordArrayLoopSpecializationPassCtx),
 		tier2PassModuleWith("TableIntArraySpecialization", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs), nil, TableIntArraySpecializationPass),
-		tier2PassModuleWith("BoolTableCountLoop", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableCountLoopPass),
+		tier2PassModuleWithCtx("BoolTableCountLoop", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges), nil, BoolTableCountLoopPassCtx),
 	}
 }
 

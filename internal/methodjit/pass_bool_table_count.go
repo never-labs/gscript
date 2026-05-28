@@ -15,8 +15,20 @@ func BoolTableCountLoopPass(fn *Function) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
+	fn.ensureAnalysis()
+	return boolTableCountLoopPass(fn, functionNumericFacts(fn))
+}
+
+func BoolTableCountLoopPassCtx(ctx *PassContext) (*Function, error) {
+	return boolTableCountLoopPass(ctx.Func(), ctx.Numeric())
+}
+
+func boolTableCountLoopPass(fn *Function, numeric *NumericFacts) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
 	for _, header := range append([]*Block(nil), fn.Blocks...) {
-		cand, ok := detectBoolTableCountLoop(fn, header)
+		cand, ok := detectBoolTableCountLoop(fn, header, numeric)
 		if !ok || !boolCountLoopDefsAreLocal(fn, cand) {
 			continue
 		}
@@ -39,7 +51,7 @@ type boolCountLoopCandidate struct {
 	countPhi  *Instr
 }
 
-func detectBoolTableCountLoop(fn *Function, header *Block) (boolCountLoopCandidate, bool) {
+func detectBoolTableCountLoop(fn *Function, header *Block, numeric *NumericFacts) (boolCountLoopCandidate, bool) {
 	var zero boolCountLoopCandidate
 	if fn == nil || header == nil || len(header.Preds) != 3 || len(header.Succs) != 2 || len(header.Instrs) == 0 {
 		return zero, false
@@ -127,7 +139,7 @@ func detectBoolTableCountLoop(fn *Function, header *Block) (boolCountLoopCandida
 	if countPhi == nil {
 		return zero, false
 	}
-	if !boolCountRangeFitsInt48(fn, start, end) {
+	if !boolCountRangeFitsInt48(start, end, numeric) {
 		return zero, false
 	}
 
@@ -236,9 +248,9 @@ func boolCountIncrementUsesPhi(add *Instr, phiID int) bool {
 		(add.Args[1] != nil && add.Args[1].ID == phiID)
 }
 
-func boolCountRangeFitsInt48(fn *Function, start, end *Value) bool {
-	startRange := boolFillValueRange(fn, start)
-	endRange := boolFillValueRange(fn, end)
+func boolCountRangeFitsInt48(start, end *Value, numeric *NumericFacts) bool {
+	startRange := boolFillValueRange(start, numeric)
+	endRange := boolFillValueRange(end, numeric)
 	if !startRange.known || !endRange.known {
 		return false
 	}

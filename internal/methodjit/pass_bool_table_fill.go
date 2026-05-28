@@ -16,12 +16,24 @@ func BoolTableFillLoopPass(fn *Function) (*Function, error) {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
+	return boolTableFillLoopPass(fn, functionNumericFacts(fn))
+}
+
+func BoolTableFillLoopPassCtx(ctx *PassContext) (*Function, error) {
+	return boolTableFillLoopPass(ctx.Func(), ctx.Numeric())
+}
+
+func boolTableFillLoopPass(fn *Function, numeric *NumericFacts) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
 	for _, header := range append([]*Block(nil), fn.Blocks...) {
-		cand, ok := detectBoolTableFillLoop(fn, header)
+		cand, ok := detectBoolTableFillLoop(fn, header, numeric)
 		if !ok || !boolFillLoopDefsAreLocal(fn, cand) {
 			continue
 		}
-		fillID := applyBoolTableFillLoop(fn, cand)
+		fillID := applyBoolTableFillLoop(fn, cand, numeric)
 		functionRemarks(fn).Add("BoolTableFillLoop", "changed", cand.preheader.ID, fillID, OpTableBoolArrayFill,
 			"replaced const-bool table store loop with bulk bool-array fill")
 	}
@@ -40,7 +52,7 @@ type boolFillLoopCandidate struct {
 	byteVal   int64
 }
 
-func detectBoolTableFillLoop(fn *Function, header *Block) (boolFillLoopCandidate, bool) {
+func detectBoolTableFillLoop(fn *Function, header *Block, numeric *NumericFacts) (boolFillLoopCandidate, bool) {
 	var zero boolFillLoopCandidate
 	if header == nil || len(header.Preds) != 2 || len(header.Succs) != 2 || len(header.Instrs) == 0 {
 		return zero, false
@@ -91,7 +103,7 @@ func detectBoolTableFillLoop(fn *Function, header *Block) (boolFillLoopCandidate
 	if cond.Def.Args[0] == nil || cond.Def.Args[1] == nil {
 		return zero, false
 	}
-	start, step, ok := boolFillLoopStartAndStep(fn, header, bodyPredIdx, preheaderIdx, key, cond.Def.Args[0])
+	start, step, ok := boolFillLoopStartAndStep(fn, header, bodyPredIdx, preheaderIdx, key, cond.Def.Args[0], numeric)
 	if !ok || start == nil || step == nil {
 		return zero, false
 	}
@@ -152,7 +164,7 @@ func boolFillStoreParts(store *Instr) (table, key, val *Value, kind int64, ok bo
 	return store.Args[layout.TableArg], store.Args[layout.KeyArg], store.Args[layout.ValueArg], kind, true
 }
 
-func boolFillLoopStartAndStep(fn *Function, header *Block, bodyPredIdx, preheaderIdx int, key, condKey *Value) (*Value, *Value, bool) {
+func boolFillLoopStartAndStep(fn *Function, header *Block, bodyPredIdx, preheaderIdx int, key, condKey *Value, numeric *NumericFacts) (*Value, *Value, bool) {
 	if key == nil || condKey == nil || key.Def == nil {
 		return nil, nil, false
 	}
@@ -170,7 +182,7 @@ func boolFillLoopStartAndStep(fn *Function, header *Block, bodyPredIdx, preheade
 		if !ok || phi.Block != header || len(phi.Args) != len(header.Preds) {
 			return nil, nil, false
 		}
-		if step.Def == nil || step.Def.Op != OpConstInt || !boolFillPositiveStep(fn, step) {
+		if step.Def == nil || step.Def.Op != OpConstInt || !boolFillPositiveStep(step, numeric) {
 			return nil, nil, false
 		}
 		if phi.Args[bodyPredIdx] == nil || phi.Args[bodyPredIdx].ID != key.ID {
@@ -195,7 +207,7 @@ func boolFillLoopStartAndStep(fn *Function, header *Block, bodyPredIdx, preheade
 		return nil, nil, false
 	}
 	step, ok := boolFillLoopUpdateStep(update.Def, key.ID)
-	if !ok || !boolFillPositiveStep(fn, step) {
+	if !ok || !boolFillPositiveStep(step, numeric) {
 		return nil, nil, false
 	}
 	init := key.Def.Args[preheaderIdx]
@@ -230,7 +242,7 @@ func boolFillLoopUpdateStep(instr *Instr, phiID int) (*Value, bool) {
 	return nil, false
 }
 
-func boolFillPositiveStep(fn *Function, step *Value) bool {
+func boolFillPositiveStep(step *Value, numeric *NumericFacts) bool {
 	if step == nil || step.Def == nil {
 		return false
 	}
@@ -240,7 +252,10 @@ func boolFillPositiveStep(fn *Function, step *Value) bool {
 	if step.Def.Type != TypeInt {
 		return false
 	}
-	r, ok := functionNumericFacts(fn).IntRange(step.ID)
+	if numeric == nil {
+		return false
+	}
+	r, ok := numeric.IntRange(step.ID)
 	return ok && r.known && r.min > 0
 }
 
@@ -270,7 +285,7 @@ func boolFillLoopDefsAreLocal(fn *Function, cand boolFillLoopCandidate) bool {
 	return true
 }
 
-func applyBoolTableFillLoop(fn *Function, cand boolFillLoopCandidate) int {
+func applyBoolTableFillLoop(fn *Function, cand boolFillLoopCandidate, numeric *NumericFacts) int {
 	start := cand.start
 	var inserted []*Instr
 	if start != nil && start.Def != nil && start.Def.ID == 0 && start.Def.Block == nil && start.Def.Op == OpConstInt {
@@ -296,7 +311,7 @@ func applyBoolTableFillLoop(fn *Function, cand boolFillLoopCandidate) int {
 	fn.nextID++
 	if !boolFillStepIsOne(cand.step) {
 		fill.Args = append(fill.Args, cand.step)
-		if boolFillStrideNoOverflow(fn, cand) {
+		if boolFillStrideNoOverflow(cand, numeric) {
 			fill.Aux2 |= boolFillFlagNoStrideOverflow
 		}
 	}
@@ -330,25 +345,27 @@ func boolFillStepIsOne(step *Value) bool {
 	return step != nil && step.Def != nil && step.Def.Op == OpConstInt && step.Def.Aux == 1
 }
 
-func boolFillStrideNoOverflow(fn *Function, cand boolFillLoopCandidate) bool {
+func boolFillStrideNoOverflow(cand boolFillLoopCandidate, numeric *NumericFacts) bool {
 	if cand.step == nil || cand.end == nil {
 		return false
 	}
-	stepRange := boolFillValueRange(fn, cand.step)
-	endRange := boolFillValueRange(fn, cand.end)
+	stepRange := boolFillValueRange(cand.step, numeric)
+	endRange := boolFillValueRange(cand.end, numeric)
 	return stepRange.known && stepRange.min > 0 && stepRange.max <= MaxInt48 &&
 		endRange.known && endRange.max <= MaxInt48
 }
 
-func boolFillValueRange(fn *Function, v *Value) intRange {
+func boolFillValueRange(v *Value, numeric *NumericFacts) intRange {
 	if v == nil || v.Def == nil {
 		return topRange()
 	}
 	if v.Def.Op == OpConstInt {
 		return pointRange(v.Def.Aux)
 	}
-	if r, ok := functionNumericFacts(fn).IntRange(v.ID); ok {
-		return r
+	if numeric != nil {
+		if r, ok := numeric.IntRange(v.ID); ok {
+			return r
+		}
 	}
 	return topRange()
 }
