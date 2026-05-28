@@ -40,7 +40,7 @@ func collectTableArrayDataPtrFacts(fn *Function) map[int]TableArrayDataPtrFact {
 	lens := make(map[tableArrayDerivedKey]int)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpTableArrayLen || len(instr.Args) < 1 || instr.Args[0] == nil {
+			if instr == nil || tableArrayFactRole(instr.Op) != OpTableArrayFactLen || len(instr.Args) < 1 || instr.Args[0] == nil {
 				continue
 			}
 			lens[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.ID
@@ -50,11 +50,11 @@ func collectTableArrayDataPtrFacts(fn *Function) map[int]TableArrayDataPtrFact {
 	facts := make(map[int]TableArrayDataPtrFact)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpTableArrayData || len(instr.Args) < 1 || instr.Args[0] == nil {
+			if instr == nil || tableArrayFactRole(instr.Op) != OpTableArrayFactData || len(instr.Args) < 1 || instr.Args[0] == nil {
 				continue
 			}
 			header := instr.Args[0].Def
-			if header == nil || header.Op != OpTableArrayHeader || len(header.Args) < 1 || header.Args[0] == nil {
+			if header == nil || tableArrayFactRole(header.Op) != OpTableArrayFactHeader || len(header.Args) < 1 || header.Args[0] == nil {
 				continue
 			}
 			if header.Aux != instr.Aux || !tableArrayLowerableKind(instr.Aux) {
