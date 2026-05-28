@@ -54,16 +54,18 @@ const (
 
 // feedbackFromValueType maps runtime.ValueType to FeedbackType.
 // This avoids a switch in the hot path.
-var feedbackFromValueType = [9]FeedbackType{
-	runtime.TypeNil:       FBAny, // nil is rare; treat as polymorphic
-	runtime.TypeBool:      FBBool,
-	runtime.TypeInt:       FBInt,
-	runtime.TypeFloat:     FBFloat,
-	runtime.TypeString:    FBString,
-	runtime.TypeTable:     FBTable,
-	runtime.TypeFunction:  FBFunction,
-	runtime.TypeCoroutine: FBAny, // rare; treat as polymorphic
-	runtime.TypeChannel:   FBAny, // rare; treat as polymorphic
+var feedbackFromValueType = [...]FeedbackType{
+	runtime.TypeNil:        FBAny, // nil is rare; treat as polymorphic
+	runtime.TypeBool:       FBBool,
+	runtime.TypeInt:        FBInt,
+	runtime.TypeFloat:      FBFloat,
+	runtime.TypeString:     FBString,
+	runtime.TypeTable:      FBTable,
+	runtime.TypeFunction:   FBFunction,
+	runtime.TypeCoroutine:  FBAny, // rare; treat as polymorphic
+	runtime.TypeChannel:    FBAny, // rare; treat as polymorphic
+	runtime.TypeDenseArray: FBAny, // data-oriented values are guarded by their own shape/version facts
+	runtime.TypeSoA:        FBAny, // data-oriented values are guarded by their own shape/version facts
 }
 
 // Observe records a new type observation. Monotonic: never narrows.

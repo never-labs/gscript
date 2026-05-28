@@ -184,15 +184,18 @@ That section calls out suite benchmarks that beat LuaJIT by a large margin but
 are not confirmed by their structural variants. It is intentionally a review
 signal, not a performance patch gate.
 
-Use `--group=suite`, `--group=extended`, `--group=variants`, or
-`--group=official` to narrow the run; repeat `--bench=group/name` for a
-representative subset.
+Use `--group=suite`, `--group=extended`, `--group=variants`,
+`--group=official`, or `--group=data_oriented` to narrow the run; repeat
+`--bench=group/name` for a representative subset.
 Use `--group=official` to run the extracted official-case hot benchmarks under
 `benchmarks/official_hot` against their LuaJIT references in
 `benchmarks/lua_official_hot`. `timing_compare.py --all-groups` includes this
 group. `strict_guard.py` still excludes it from the default strict run because
 official hot is a broader coverage/profiling surface and may contain known gaps
 while they are being optimized.
+Use `--group=data_oriented` for script-level SoA and dense-column hot kernels
+under `benchmarks/data_oriented_hot`, compared with equivalent LuaJIT column
+loops in `benchmarks/lua_data_oriented_hot`.
 
 `timing_compare.py` is the preferred harness for local before/after timing when
 the current worktree may differ from clean `HEAD`. It exports a clean `HEAD`

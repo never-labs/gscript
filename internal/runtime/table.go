@@ -444,6 +444,20 @@ func (t *Table) bumpArrayVersionLocked() {
 	}
 }
 
+// MutationVersion returns a best-effort mutation counter for caches derived
+// from raw table contents. It tracks array writes and string-field writes once
+// the string-field counter has been enabled by a cache user.
+func (t *Table) MutationVersion() uint64 {
+	if t == nil {
+		return 0
+	}
+	if t.mu != nil {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+	}
+	return t.arrayVersion ^ (t.enableStringLookupVersionLocked() << 32)
+}
+
 // SampleStringTableValues visits up to limit table-valued entries stored under
 // string keys. It samples both fixed-shape string fields and the hash part so
 // profiling can learn generic string-map value shapes without exposing table

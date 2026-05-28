@@ -52,7 +52,7 @@ DEFAULT_SUITE = [
     "object_creation",
 ]
 
-GROUPS = ["suite", "extended", "variants", "official"]
+GROUPS = ["suite", "extended", "variants", "official", "data_oriented"]
 MODES = ["default", "vm", "no_filter"]
 TIME_SOURCES = ["auto", "script", "wall"]
 
@@ -86,6 +86,10 @@ HOT_SCALE_PROFILE = [
     "official/stdlib_host_hot:N=28000",
     "official/table_sort_proxy_hot:N=840",
     "official/table_sort_proxy_hot:PASSES=3000",
+    "data_oriented/soa_affine_many_hot:STEPS=600",
+    "data_oriented/soa_masked_aggregate_hot:REPS=2400",
+    "data_oriented/soa_filter_gather_hot:FILTER_REPS=360",
+    "data_oriented/soa_filter_gather_hot:GATHER_REPS=360",
 ]
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
@@ -624,6 +628,16 @@ def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
                 f"benchmarks/lua_official_hot/{path.stem}.lua",
             )
             for path in sorted((root / "benchmarks" / "official_hot").glob("*.gs"))
+        )
+    if "data_oriented" in groups:
+        specs.extend(
+            BenchmarkSpec(
+                "data_oriented",
+                path.stem,
+                f"benchmarks/data_oriented_hot/{path.name}",
+                f"benchmarks/lua_data_oriented_hot/{path.stem}.lua",
+            )
+            for path in sorted((root / "benchmarks" / "data_oriented_hot").glob("*.gs"))
         )
     return specs
 

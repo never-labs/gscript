@@ -5,6 +5,7 @@ import "fmt"
 // buildSoALib creates the "soa" data-oriented structure-of-arrays library.
 func buildSoALib() *Table {
 	t := NewTable()
+	affineManyTerms := &soaAffineManyTermCache{}
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn}))
 	}
@@ -265,15 +266,22 @@ func buildSoALib() *Table {
 		if len(args) < 2 || !args[1].IsTable() {
 			return nil, fmt.Errorf("soa.affineMany: argument 2 must be a table of affine terms")
 		}
-		terms, err := soaAffineTermsFromTable(args[1].Table())
-		if err != nil {
-			return nil, err
-		}
-		if err := s.AffineMany(terms); err != nil {
+		if err := affineManyTerms.apply(s, args[1].Table()); err != nil {
 			return nil, err
 		}
 		return []Value{BoolValue(true)}, nil
-	}, soaAffineManyValue)
+	}, func(soaValue, termsValue Value) (Value, error) {
+		if !soaValue.IsSoA() {
+			return NilValue(), fmt.Errorf("soa.affineMany: argument 1 must be soa")
+		}
+		if !termsValue.IsTable() {
+			return NilValue(), fmt.Errorf("soa.affineMany: argument 2 must be a table of affine terms")
+		}
+		if err := affineManyTerms.apply(soaValue.SoA(), termsValue.Table()); err != nil {
+			return NilValue(), err
+		}
+		return BoolValue(true), nil
+	})
 	if gf := t.RawGetString("affineMany").GoFunction(); gf != nil {
 		gf.NativeKind = NativeKindStdSoAAffineMany
 		gf.NativeData = StdSoAAffineManyIdentityPtr()
@@ -483,6 +491,77 @@ func soaAffineManyValue(soaValue, termsValue Value) (Value, error) {
 	return BoolValue(true), nil
 }
 
+type soaAffineManyTermCache struct {
+	table        *Table
+	version      uint64
+	termTables   []*Table
+	termVersions []uint64
+	parsed       []SoAAffineTerm
+	planSoA      *SoA
+	planGuard    SoAShapeSnapshot
+	planWrites   []string
+	plans        []soaAffinePlan
+}
+
+func (c *soaAffineManyTermCache) terms(tbl *Table) ([]SoAAffineTerm, error) {
+	if tbl == nil {
+		return nil, fmt.Errorf("soa.affineMany: argument 2 must be a table of affine terms")
+	}
+	version := tbl.MutationVersion()
+	if c.table == tbl && c.version == version && len(c.parsed) > 0 && c.termVersionsMatch() {
+		return c.parsed, nil
+	}
+	terms, termTables, termVersions, err := soaAffineTermsFromTableWithVersions(tbl)
+	if err != nil {
+		return nil, err
+	}
+	c.table = tbl
+	c.version = version
+	c.termTables = termTables
+	c.termVersions = termVersions
+	c.parsed = terms
+	c.clearPlan()
+	return terms, nil
+}
+
+func (c *soaAffineManyTermCache) termVersionsMatch() bool {
+	if len(c.termTables) != len(c.termVersions) {
+		return false
+	}
+	for i, tbl := range c.termTables {
+		if tbl == nil || tbl.MutationVersion() != c.termVersions[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *soaAffineManyTermCache) apply(s *SoA, tbl *Table) error {
+	terms, err := c.terms(tbl)
+	if err != nil {
+		return err
+	}
+	if c.planSoA == s && len(c.plans) > 0 && s.ValidateSnapshotForWrites(c.planGuard, c.planWrites...) {
+		return applySoAAffinePlans(c.plans)
+	}
+	plans, writes, guard, err := s.affineManyPlan(terms)
+	if err != nil {
+		return err
+	}
+	c.planSoA = s
+	c.planGuard = guard
+	c.planWrites = writes
+	c.plans = plans
+	return applySoAAffinePlans(plans)
+}
+
+func (c *soaAffineManyTermCache) clearPlan() {
+	c.planSoA = nil
+	c.planGuard = SoAShapeSnapshot{}
+	c.planWrites = nil
+	c.plans = nil
+}
+
 func soaSumValue(soaValue, columnValue Value) (Value, error) {
 	if !soaValue.IsSoA() {
 		return NilValue(), fmt.Errorf("soa.sum: argument 1 must be soa")
@@ -663,29 +742,37 @@ func soaShapeTable(s *SoA) *Table {
 }
 
 func soaAffineTermsFromTable(tbl *Table) ([]SoAAffineTerm, error) {
+	terms, _, _, err := soaAffineTermsFromTableWithVersions(tbl)
+	return terms, err
+}
+
+func soaAffineTermsFromTableWithVersions(tbl *Table) ([]SoAAffineTerm, []*Table, []uint64, error) {
 	n := tbl.Length()
 	terms := make([]SoAAffineTerm, 0, n)
+	termTables := make([]*Table, 0, n)
+	termVersions := make([]uint64, 0, n)
 	for i := 1; i <= n; i++ {
 		v := tbl.RawGetInt(int64(i))
 		if !v.IsTable() {
-			return nil, fmt.Errorf("soa.affineMany: term %d must be a table", i)
+			return nil, nil, nil, fmt.Errorf("soa.affineMany: term %d must be a table", i)
 		}
 		termTable := v.Table()
+		termVersion := termTable.MutationVersion()
 		dst := termTable.RawGetString("dst")
 		src := termTable.RawGetString("src")
 		scale := termTable.RawGetString("scale")
 		bias := termTable.RawGetString("bias")
 		if !dst.IsString() || !src.IsString() {
-			return nil, fmt.Errorf("soa.affineMany: term %d requires string dst and src", i)
+			return nil, nil, nil, fmt.Errorf("soa.affineMany: term %d requires string dst and src", i)
 		}
 		if !scale.IsNumber() {
-			return nil, fmt.Errorf("soa.affineMany: term %d requires numeric scale", i)
+			return nil, nil, nil, fmt.Errorf("soa.affineMany: term %d requires numeric scale", i)
 		}
 		if bias.IsNil() {
 			bias = IntValue(0)
 		}
 		if !bias.IsNumber() {
-			return nil, fmt.Errorf("soa.affineMany: term %d requires numeric bias", i)
+			return nil, nil, nil, fmt.Errorf("soa.affineMany: term %d requires numeric bias", i)
 		}
 		terms = append(terms, SoAAffineTerm{
 			Dst:   dst.Str(),
@@ -693,6 +780,8 @@ func soaAffineTermsFromTable(tbl *Table) ([]SoAAffineTerm, error) {
 			Scale: scale.Number(),
 			Bias:  bias.Number(),
 		})
+		termTables = append(termTables, termTable)
+		termVersions = append(termVersions, termVersion)
 	}
-	return terms, nil
+	return terms, termTables, termVersions, nil
 }

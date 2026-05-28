@@ -54,7 +54,7 @@ DEFAULT_BENCHMARKS = [
 
 DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_GROUPS = ["suite", "extended", "variants"]
-ALL_GROUPS = ["suite", "extended", "variants", "official"]
+ALL_GROUPS = ["suite", "extended", "variants", "official", "data_oriented"]
 
 LOGICAL_TIME_BENCHMARKS = {
     "official/defer_protected_hot",
@@ -678,12 +678,25 @@ def official_specs(root: Path) -> list[BenchmarkSpec]:
     ]
 
 
+def data_oriented_specs(root: Path) -> list[BenchmarkSpec]:
+    return [
+        BenchmarkSpec(
+            "data_oriented",
+            path.stem,
+            path,
+            root / "benchmarks" / "lua_data_oriented_hot" / f"{path.stem}.lua",
+        )
+        for path in sorted((root / "benchmarks" / "data_oriented_hot").glob("*.gs"))
+    ]
+
+
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
     by_group = {
         "suite": suite_specs,
         "extended": extended_specs,
         "variants": variant_specs,
         "official": official_specs,
+        "data_oriented": data_oriented_specs,
     }
     specs: list[BenchmarkSpec] = []
     for group in groups:

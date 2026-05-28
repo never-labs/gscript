@@ -361,11 +361,19 @@ func (s *SoA) AffineWhere(dstName, srcName string, mask *DenseArray, scale, bias
 }
 
 func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
+	plans, _, _, err := s.affineManyPlan(terms)
+	if err != nil {
+		return err
+	}
+	return applySoAAffinePlans(plans)
+}
+
+func (s *SoA) affineManyPlan(terms []SoAAffineTerm) ([]soaAffinePlan, []string, SoAShapeSnapshot, error) {
 	if s == nil {
-		return fmt.Errorf("soa is nil")
+		return nil, nil, SoAShapeSnapshot{}, fmt.Errorf("soa is nil")
 	}
 	if len(terms) == 0 {
-		return nil
+		return nil, nil, SoAShapeSnapshot{}, nil
 	}
 	var stackPlans [8]soaAffinePlan
 	plans := stackPlans[:]
@@ -374,27 +382,43 @@ func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
 	} else {
 		plans = plans[:len(terms)]
 	}
+	writeNames := make([]string, len(terms))
+	snapshotNames := make([]string, 0, len(terms)*2)
 	for i, term := range terms {
 		if term.Dst == "" || term.Src == "" {
-			return fmt.Errorf("soa.affineMany: term %d has empty column name", i+1)
+			return nil, nil, SoAShapeSnapshot{}, fmt.Errorf("soa.affineMany: term %d has empty column name", i+1)
 		}
 		for j := 0; j < i; j++ {
 			if terms[j].Dst == term.Dst {
-				return fmt.Errorf("soa.affineMany: duplicate destination column %q", term.Dst)
+				return nil, nil, SoAShapeSnapshot{}, fmt.Errorf("soa.affineMany: duplicate destination column %q", term.Dst)
 			}
 		}
 		dst, src, err := s.numericColumns(term.Dst, term.Src)
 		if err != nil {
-			return fmt.Errorf("soa.affineMany term %d: %w", i+1, err)
+			return nil, nil, SoAShapeSnapshot{}, fmt.Errorf("soa.affineMany term %d: %w", i+1, err)
 		}
 		plans[i] = soaAffinePlan{dst: dst, src: src, scale: term.Scale, bias: term.Bias}
+		writeNames[i] = term.Dst
+		snapshotNames = append(snapshotNames, term.Dst, term.Src)
 	}
 	for i, term := range terms {
 		for _, candidate := range terms {
 			if candidate.Dst == term.Src {
-				return fmt.Errorf("soa.affineMany: source column %q in term %d is also written; split dependent updates to preserve order", term.Src, i+1)
+				return nil, nil, SoAShapeSnapshot{}, fmt.Errorf("soa.affineMany: source column %q in term %d is also written; split dependent updates to preserve order", term.Src, i+1)
 			}
 		}
+	}
+	guard, err := s.Snapshot(snapshotNames...)
+	if err != nil {
+		return nil, nil, SoAShapeSnapshot{}, err
+	}
+	ownedPlans := append([]soaAffinePlan(nil), plans...)
+	return ownedPlans, writeNames, guard, nil
+}
+
+func applySoAAffinePlans(plans []soaAffinePlan) error {
+	if denseArrayAffineManyF64(plans) {
+		return nil
 	}
 	for _, plan := range plans {
 		if err := denseArrayAffine(plan.dst, plan.src, plan.scale, plan.bias); err != nil {
@@ -402,6 +426,84 @@ func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
 		}
 	}
 	return nil
+}
+
+func denseArrayAffineManyF64(plans []soaAffinePlan) bool {
+	if len(plans) == 0 {
+		return false
+	}
+	for _, plan := range plans {
+		if plan.dst == nil || plan.src == nil || plan.dst.dtype != DenseArrayF64 || plan.src.dtype != DenseArrayF64 {
+			return false
+		}
+	}
+	n := plans[0].dst.Len()
+	switch len(plans) {
+	case 1:
+		p0 := plans[0]
+		d0, s0 := p0.dst.f64, p0.src.f64
+		scale0, bias0 := p0.scale, p0.bias
+		if n > 0 {
+			_, _ = d0[n-1], s0[n-1]
+		}
+		for i := 0; i < n; i++ {
+			d0[i] = s0[i]*scale0 + bias0
+		}
+	case 2:
+		p0, p1 := plans[0], plans[1]
+		d0, s0 := p0.dst.f64, p0.src.f64
+		d1, s1 := p1.dst.f64, p1.src.f64
+		scale0, bias0 := p0.scale, p0.bias
+		scale1, bias1 := p1.scale, p1.bias
+		if n > 0 {
+			_, _, _, _ = d0[n-1], s0[n-1], d1[n-1], s1[n-1]
+		}
+		for i := 0; i < n; i++ {
+			d0[i] = s0[i]*scale0 + bias0
+			d1[i] = s1[i]*scale1 + bias1
+		}
+	case 3:
+		p0, p1, p2 := plans[0], plans[1], plans[2]
+		denseArrayAffineMany3F64(p0.dst.f64, p0.src.f64, p0.scale, p0.bias, p1.dst.f64, p1.src.f64, p1.scale, p1.bias, p2.dst.f64, p2.src.f64, p2.scale, p2.bias)
+	case 4:
+		p0, p1, p2, p3 := plans[0], plans[1], plans[2], plans[3]
+		d0, s0 := p0.dst.f64, p0.src.f64
+		d1, s1 := p1.dst.f64, p1.src.f64
+		d2, s2 := p2.dst.f64, p2.src.f64
+		d3, s3 := p3.dst.f64, p3.src.f64
+		scale0, bias0 := p0.scale, p0.bias
+		scale1, bias1 := p1.scale, p1.bias
+		scale2, bias2 := p2.scale, p2.bias
+		scale3, bias3 := p3.scale, p3.bias
+		if n > 0 {
+			_, _, _, _, _, _, _, _ = d0[n-1], s0[n-1], d1[n-1], s1[n-1], d2[n-1], s2[n-1], d3[n-1], s3[n-1]
+		}
+		for i := 0; i < n; i++ {
+			d0[i] = s0[i]*scale0 + bias0
+			d1[i] = s1[i]*scale1 + bias1
+			d2[i] = s2[i]*scale2 + bias2
+			d3[i] = s3[i]*scale3 + bias3
+		}
+	default:
+		return false
+	}
+	for _, plan := range plans {
+		plan.dst.bumpVersion()
+	}
+	return true
+}
+
+func denseArrayAffineMany3F64(d0, s0 []float64, scale0, bias0 float64, d1, s1 []float64, scale1, bias1 float64, d2, s2 []float64, scale2, bias2 float64) {
+	n := len(d0)
+	if n == 0 {
+		return
+	}
+	_, _, _, _, _, _ = d0[n-1], s0[n-1], d1[n-1], s1[n-1], d2[n-1], s2[n-1]
+	for i := 0; i < n; i++ {
+		d0[i] = s0[i]*scale0 + bias0
+		d1[i] = s1[i]*scale1 + bias1
+		d2[i] = s2[i]*scale2 + bias2
+	}
 }
 
 func (s *SoA) Sum(columnName string) (Value, error) {

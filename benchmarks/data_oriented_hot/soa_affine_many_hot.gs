@@ -1,0 +1,43 @@
+// Data-oriented hot benchmark: fused SoA affine column updates.
+
+N := 262144
+STEPS := 300
+
+func make_f64(n, scale, bias) {
+    t := {}
+    for i := 1; i <= n; i++ {
+        t[i] = i * scale + bias
+    }
+    return array.f64(t)
+}
+
+cols := soa.zip({
+    x: make_f64(N, 0.001, 0.0),
+    y: make_f64(N, 0.002, 1.0),
+    z: make_f64(N, 0.003, 2.0),
+    vx: make_f64(N, 0.00001, 0.01),
+    vy: make_f64(N, 0.00002, -0.02),
+    vz: make_f64(N, -0.00001, 0.015),
+})
+terms := {
+    {dst: "x", src: "vx", scale: 0.016, bias: 0.0},
+    {dst: "y", src: "vy", scale: 0.016, bias: 1.0},
+    {dst: "z", src: "vz", scale: 0.016, bias: 2.0},
+}
+
+func run_hot(cols, terms, steps) {
+    for step := 1; step <= steps; step++ {
+        soa.affineMany(cols, terms)
+    }
+    return soa.sum(cols, "x") + soa.sum(cols, "y") + soa.sum(cols, "z")
+}
+
+warm := run_hot(cols, terms, 30)
+collectgarbage("collect")
+t0 := time.now()
+checksum := run_hot(cols, terms, STEPS)
+elapsed := time.since(t0)
+
+print(string.format("soa_affine_many_hot n=%d steps=%d", N, STEPS))
+print(string.format("checksum: %.6f", checksum + warm * 0.000001))
+print(string.format("Time: %.3fs", elapsed))

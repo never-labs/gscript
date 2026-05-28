@@ -198,6 +198,45 @@ func affine_many_kernel(cols, scale, bias) {
 	}
 }
 
+func TestSoAAffineManyLiteralRuntimeSpecializationInsideLoop(t *testing.T) {
+	src := `
+func affine_many_kernel(cols, steps, scale) {
+    for step := 1; step <= steps; step++ {
+        soa.affineMany(cols, {
+            {dst: "x", src: "vx", scale: scale, bias: 0.0},
+            {dst: "y", src: "vy", scale: scale, bias: 1.0},
+            {dst: "z", src: "vz", scale: scale, bias: 2.0},
+        })
+    }
+}
+`
+	proto, v := compileSpectralSpecializationTestProgram(t, src)
+	defer v.Close()
+	fn := findTestProtoByName(proto, "affine_many_kernel")
+	if fn == nil {
+		t.Fatal("missing affine_many_kernel proto")
+	}
+	if _, ok := soaAffineManyLiteralSpecForProto(fn, 7); !ok {
+		t.Fatalf("loop soa affineMany literal specialization did not recognize bytecode:\n%s", Disassemble(fn))
+	}
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatal(err)
+	}
+	soa := mustBenchParticleSoA(t, 4)
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+	if _, err := v.CallValue(v.GetGlobal("affine_many_kernel"), []runtime.Value{
+		runtime.SoAValue(soa),
+		runtime.IntValue(3),
+		runtime.FloatValue(2),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteNoResult, "soa_affine_many_literal"); got != 3 {
+		t.Fatalf("soa_affine_many_literal hit count = %d, want 3", got)
+	}
+}
+
 func TestSoAColumnAffineUpdateSupportsI64SourceColumn(t *testing.T) {
 	proto, v := compileSpectralSpecializationTestProgram(t, soaAffineUpdateSource)
 	defer v.Close()
@@ -755,20 +794,26 @@ func mustBenchParticleSoA(b testing.TB, n int) *runtime.SoA {
 	b.Helper()
 	x := make([]float64, n)
 	y := make([]float64, n)
+	z := make([]float64, n)
 	vx := make([]float64, n)
 	vy := make([]float64, n)
+	vz := make([]float64, n)
 	for i := range x {
 		f := 1 + float64(i)*0.001
 		x[i] = f
 		y[i] = f * 2
+		z[i] = f * 3
 		vx[i] = 0.1 + f*0.01
 		vy[i] = 0.2 + f*0.02
+		vz[i] = 0.3 + f*0.03
 	}
 	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
 		"x":  runtime.NewDenseArrayF64(x),
 		"y":  runtime.NewDenseArrayF64(y),
+		"z":  runtime.NewDenseArrayF64(z),
 		"vx": runtime.NewDenseArrayF64(vx),
 		"vy": runtime.NewDenseArrayF64(vy),
+		"vz": runtime.NewDenseArrayF64(vz),
 	})
 	if err != nil {
 		b.Fatal(err)
