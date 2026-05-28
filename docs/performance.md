@@ -81,10 +81,26 @@ SoA must be measured on two classes of workload:
 
 The first native SoA kernel layer is `soa.addScaled`, `soa.affine`,
 `soa.affineMany`, and `soa.sum`: these execute fused column loops over stable
-dense columns. `soa.shape` exposes the layout facts used by guarded
-specialization: length, shape version, column dtype, column length, and column
-version. They are the semantic target for later ARM64/NEON emission; until then
+dense columns. The public shape-management helpers around those kernels are
+part of the same performance contract:
+
+| API | Performance role |
+|---|---|
+| `soa.zip` / `soa.unzip` | Boundary conversion between named dense columns and a SoA value. `zip` keeps the supplied dense columns; `unzip` clones columns for isolation. |
+| `soa.len` / `soa.columns` / `soa.column` | Cheap access to row count, sorted column names, and live dense columns. Hot loops should use live columns or fused kernels rather than `soa.row`. |
+| `soa.shape` | Exposes specialization facts: length, shape version, column dtype, column length, and column version. |
+| `soa.row` / `soa.setRow` | Ergonomic row boundary operations. They are intentionally not the hot path because `row` materializes a table and `setRow` writes field-by-field. |
+| `soa.slice` / `soa.filter` | Preserve column alignment while returning independent copied SoA values for subset pipelines. |
+| `soa.addScaled` | In-place numeric update: `dst += src * scale`. |
+| `soa.affine` | In-place numeric update: `dst = src * scale + bias`. |
+| `soa.affineMany` | Batched independent affine updates. Duplicate destinations and source/destination dependency cycles are rejected; split dependent updates into ordered calls. |
+| `soa.sum` | Numeric dense-column reduction. |
+
+These APIs are the semantic target for later ARM64/NEON emission; until then
 they provide the portable native baseline that JIT lowering must match or beat.
+Performance-sensitive examples should keep numeric data in dense columns, batch
+independent column updates, and reserve row materialization for debug/output
+boundaries.
 
 Runnable entry points:
 
@@ -96,6 +112,10 @@ go run ./benchmarks/data_oriented/cmd/data_oriented_bench \
 go run ./cmd/gscript examples/data_oriented/particle_integration.gs
 go run ./cmd/gscript examples/data_oriented/soa_kernels.gs
 ```
+
+`examples/data_oriented/soa_kernels.gs` is the smoke coverage for the current
+SoA stdlib surface: `zip`, `unzip`, `len`, `columns`, `column`, `shape`, `row`,
+`setRow`, `slice`, `filter`, `addScaled`, `affine`, `affineMany`, and `sum`.
 
 The JSON schema is `gscript.data_oriented_benchmark.v1`; rows include
 `benchmark`, `layout`, `implementation`, `backend_status`, problem size,

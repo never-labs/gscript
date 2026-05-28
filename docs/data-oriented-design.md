@@ -179,12 +179,55 @@ Current implementation status:
 
 - `soa.zip`, `soa.len`, `soa.columns`, `soa.column`, `soa.row`, and
   `soa.setRow` are available;
+- `soa.unzip`, `soa.slice`, and `soa.filter` preserve column alignment while
+  returning independent dense-column copies;
 - `soa.shape` exposes layout diagnostics: length, shape version, column names,
   element kinds, column lengths, and column versions;
 - `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` provide fused
   column kernels over dense columns;
 - row access materializes an ordinary table and is intended for boundary code,
   debugging, and tests, not hot loops.
+
+Current API contract:
+
+| API | Contract |
+|---|---|
+| `soa.zip({name: dense, ...})` | Builds a SoA from a plain string-keyed table of dense arrays. All columns must exist, have non-empty names, and have equal length. Columns are kept as dense columns rather than row tables. |
+| `soa.unzip(s)` | Returns a plain table of cloned dense columns. Mutating the returned columns does not mutate `s`. |
+| `soa.len(s)` | Returns the row count. |
+| `soa.columns(s)` | Returns one-based sorted column names. |
+| `soa.column(s, name)` | Returns the live dense column for hot-path access, or `nil` for a missing column. |
+| `soa.shape(s)` | Returns `{length, version, columns}` where each column reports `{name, dtype, length, version}` for diagnostics and guarded specialization. |
+| `soa.row(s, index)` | Returns a copied one-based row table. Mutating it does not write back. |
+| `soa.setRow(s, index, row)` | Writes every column from a table field of the same name and returns `true`. Missing or incompatible fields are errors. |
+| `soa.slice(s, first, last)` | Returns an independent SoA for one-based inclusive rows `first..last`. |
+| `soa.filter(s, mask)` | Returns an independent SoA containing rows whose bool dense mask entry is true. The mask length must match. |
+| `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
+| `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
+| `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
+| `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
+
+Hot path guidance:
+
+- use `soa.column` or fused kernels when a loop touches only a subset of fields;
+- use `soa.row` and `soa.setRow` for boundary conversion, debugging, and tests;
+- batch independent column updates with `soa.affineMany` rather than repeated
+  row materialization;
+- keep column dtypes and lengths stable so layout and column-version facts stay
+  reusable by runtime specialization;
+- prefer `soa.shape` for diagnostics, not for application-level branching on
+  version numbers.
+
+Current limitations:
+
+- there is no parser-level SoA syntax and no live row proxy;
+- SoA columns cannot be appended, removed, or resized through the `soa` API yet;
+- `soa.slice`, `soa.filter`, and `soa.unzip` copy columns instead of creating
+  zero-copy views;
+- direct SIMD/native loop-body emission is still future work; current kernels
+  are portable runtime fast paths.
+
+See [soa stdlib reference](stdlib/soa.md) for examples and edge cases.
 
 Deliverables:
 
