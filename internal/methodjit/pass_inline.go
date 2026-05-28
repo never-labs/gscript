@@ -188,7 +188,7 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 		var fieldShapeCase FieldPolyShapeCase
 		hasFieldShapeCase := false
 		if calleeProto == nil {
-			if feedbackCallee, closure, ok := inlineFeedbackCalleeWithFacts(fn, instr, config.TableShapes); ok {
+			if feedbackCallee, closure, ok := inlineFeedbackCalleeWithFacts(fn, instr, config.TableShapes, config.SpeculationFacts); ok {
 				calleeName = feedbackCallee.Name
 				calleeProto = feedbackCallee
 				guardedFeedbackCallee = true

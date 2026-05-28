@@ -99,7 +99,7 @@ func tier2FloatNumericModules() []Tier2OptimizerModule {
 
 func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 	modules := []Tier2OptimizerModule{
-		tier2PassModuleWithCtxOptionalReads("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables), nil, analysisFacts(AnalysisFactGlobals), LICMPassCtx),
+		tier2PassModuleWithCtxOptionalReads("LICM", Tier2PhaseLoopSpecialization, analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables, AnalysisFactSpecDependencyProtos), nil, analysisFacts(AnalysisFactGlobals), LICMPassCtx),
 		tier2PassModuleWith("LoopGlobalStoreSink", Tier2PhaseLoopSpecialization, nil, nil, LoopGlobalStoreSinkPass),
 	}
 	modules = append(modules, tier2TableLoopSpecializationModules()...)
@@ -114,7 +114,7 @@ func tier2LoopSpecializationModules() []Tier2OptimizerModule {
 }
 
 func tier2LoopPostModules() []Tier2OptimizerModule {
-	licmPostRequires := analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables)
+	licmPostRequires := analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables, AnalysisFactSpecDependencyProtos)
 	licmPostOptionalReads := analysisFacts(AnalysisFactGlobals)
 	licmPostAllowed := allowedDomainsForModule(licmPostRequires, nil, nil, licmPostOptionalReads)
 	return []Tier2OptimizerModule{
@@ -142,7 +142,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 		}),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
 		tier2PassModuleWithCtxProvidesUpdatesOptionalReads("LoopRegionVersioning", Tier2PhaseLoopPost,
-			analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization),
+			analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization, AnalysisFactSpecDependencyProtos),
 			analysisFacts(AnalysisFactLoopTableArrayFacts),
 			analysisFacts(AnalysisFactTableArrayBoundsSafe),
 			analysisFacts(AnalysisFactGlobals),

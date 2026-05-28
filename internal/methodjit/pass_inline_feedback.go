@@ -25,11 +25,11 @@ func inlineFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool)
 }
 
 func inlineFeedbackCallee(fn *Function, instr *Instr) (*vm.FuncProto, uintptr, bool) {
-	return inlineFeedbackCalleeWithFacts(fn, instr, functionTableShapeFacts(fn))
+	return inlineFeedbackCalleeWithFacts(fn, instr, functionTableShapeFacts(fn), functionSpeculationFacts(fn))
 }
 
-func inlineFeedbackCalleeWithFacts(fn *Function, instr *Instr, tableShapes *TableShapeFacts) (*vm.FuncProto, uintptr, bool) {
-	if proto, ok := callABIFeedbackCalleeProto(fn, instr); ok && proto != nil {
+func inlineFeedbackCalleeWithFacts(fn *Function, instr *Instr, tableShapes *TableShapeFacts, spec *SpeculationFacts) (*vm.FuncProto, uintptr, bool) {
+	if proto, ok := callABIFeedbackCalleeProtoWithFacts(fn, instr, spec); ok && proto != nil {
 		if closure, closureProto, closureOK := inlineFeedbackVMClosure(fn, instr); closureOK && closureProto == proto {
 			return proto, closure, true
 		}

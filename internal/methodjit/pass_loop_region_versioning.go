@@ -29,7 +29,7 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 		fn.ensureAnalysis()
 	}
 	allowed := allowedDomainsForModule(
-		analysisFacts(AnalysisFactIntRanges),
+		analysisFacts(AnalysisFactIntRanges, AnalysisFactSpecDependencyProtos),
 		analysisFacts(AnalysisFactTableArrayBoundsSafe, AnalysisFactLoopTableArrayFacts),
 		analysisFacts(AnalysisFactTableArrayBoundsSafe),
 		analysisFacts(AnalysisFactGlobals),
@@ -45,10 +45,10 @@ func LoopRegionVersioningPassCtx(ctx *PassContext) (*Function, error) {
 	if globalFacts := ctx.Global(); globalFacts != nil {
 		globals = globalFacts.GlobalsMap()
 	}
-	return loopRegionVersioningPass(ctx.Func(), globals, ctx.LoopSpecialization(), ctx.Numeric())
+	return loopRegionVersioningPass(ctx.Func(), globals, ctx.LoopSpecialization(), ctx.Numeric(), ctx.Speculation())
 }
 
-func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncProto, loopSpecializationFacts *LoopSpecializationFacts, numeric *NumericFacts) (*Function, error) {
+func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncProto, loopSpecializationFacts *LoopSpecializationFacts, numeric *NumericFacts, spec *SpeculationFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -122,7 +122,7 @@ func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncPro
 				if !ok {
 					continue
 				}
-				if hazard := loopRegionAliasingHazard(fn, li.headerBlocks[header.ID], fact, seededGlobals); hazard != nil {
+				if hazard := loopRegionAliasingHazard(fn, li.headerBlocks[header.ID], fact, seededGlobals, spec); hazard != nil {
 					hazardBlockID := header.ID
 					if hazard.Block != nil {
 						hazardBlockID = hazard.Block.ID
@@ -294,7 +294,7 @@ func loopRegionStructuralHazard(fn *Function, body map[int]bool) (*Instr, bool) 
 	return nil, false
 }
 
-func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArrayFact, seededGlobals map[string]*vm.FuncProto) *Instr {
+func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArrayFact, seededGlobals map[string]*vm.FuncProto, spec *SpeculationFacts) *Instr {
 	if fn == nil || body == nil || fact.TableID < 0 {
 		return nil
 	}
@@ -309,7 +309,7 @@ func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArr
 			}
 			switch {
 			case opIsTableArrayRegionAliasingCall(instr.Op):
-				if licmLoopCallMayMutateValueWithGlobals(fn, []*Instr{instr}, table, seededGlobals) {
+				if licmLoopCallMayMutateValueWithGlobals(fn, []*Instr{instr}, table, seededGlobals, spec) {
 					return instr
 				}
 			case opIsTableArrayRegionAliasingAlways(instr.Op):

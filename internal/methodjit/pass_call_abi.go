@@ -204,12 +204,12 @@ func callABIDescriptorFor(fn *Function, instr *Instr, globals map[string]*vm.Fun
 	}
 	_, callee := resolveCallee(instr, fn, InlineConfig{Globals: globals})
 	if callee == nil {
-		if feedbackCallee, ok := callABIFeedbackCalleeProto(fn, instr); ok {
+		if feedbackCallee, ok := callABIFeedbackCalleeProtoWithFacts(fn, instr, config.SpeculationFacts); ok {
 			callee = feedbackCallee
 		}
 	}
 	if callee == nil {
-		if protos := fieldShapeCalleeProtos(fn, instr); len(protos) == 1 {
+		if protos := fieldShapeCalleeProtosWithFacts(fn, config.TableShapes, instr); len(protos) == 1 {
 			callee = protos[0]
 		}
 	}
@@ -619,11 +619,15 @@ func specializedRawIntParamReps(n int) []SpecializedABIParamRep {
 }
 
 func callABIFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool) {
+	return callABIFeedbackCalleeProtoWithFacts(fn, instr, functionSpeculationFacts(fn))
+}
+
+func callABIFeedbackCalleeProtoWithFacts(fn *Function, instr *Instr, spec *SpeculationFacts) (*vm.FuncProto, bool) {
 	if fn == nil || fn.Proto == nil || instr == nil || instr.Op != OpCall ||
 		!instr.HasSource || instr.SourcePC < 0 || instr.SourcePC >= len(fn.Proto.CallSiteFeedback) {
 		return nil, false
 	}
-	if specGuardKindSuppressed(fn, instr.SourcePC, "GuardCalleeProto") {
+	if specGuardKindSuppressedFacts(spec, instr.SourcePC, "GuardCalleeProto") {
 		return nil, false
 	}
 	fb := fn.Proto.CallSiteFeedback[instr.SourcePC]
@@ -637,7 +641,11 @@ func callABIFeedbackCalleeProto(fn *Function, instr *Instr) (*vm.FuncProto, bool
 }
 
 func fieldShapeCalleeProtos(fn *Function, instr *Instr) []*vm.FuncProto {
-	cases := fieldShapeCalleeCases(fn, instr)
+	return fieldShapeCalleeProtosWithFacts(fn, functionTableShapeFacts(fn), instr)
+}
+
+func fieldShapeCalleeProtosWithFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr) []*vm.FuncProto {
+	cases := fieldShapeCalleeCasesWithFacts(fn, tableShapes, instr)
 	if len(cases) == 0 {
 		return nil
 	}
