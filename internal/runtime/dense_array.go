@@ -383,6 +383,81 @@ func (a *DenseArray) MaxWhere(mask *DenseArray) (Value, error) {
 	return a.extremeWhere(mask, true)
 }
 
+func (a *DenseArray) StatsWhere(mask *DenseArray) (*Table, error) {
+	if a == nil || mask == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return nil, fmt.Errorf("dense array statsWhere mask must be bool")
+	}
+	if a.Len() != mask.Len() {
+		return nil, ErrDenseArrayLength
+	}
+	out := NewTable()
+	switch a.dtype {
+	case DenseArrayF64:
+		var sum, min, max float64
+		count := 0
+		for i, keep := range mask.bools {
+			if !keep {
+				continue
+			}
+			v := a.f64[i]
+			sum += v
+			if count == 0 || v < min {
+				min = v
+			}
+			if count == 0 || v > max {
+				max = v
+			}
+			count++
+		}
+		out.RawSetString("count", IntValue(int64(count)))
+		out.RawSetString("sum", FloatValue(sum))
+		if count == 0 {
+			out.RawSetString("min", NilValue())
+			out.RawSetString("max", NilValue())
+			out.RawSetString("mean", NilValue())
+			return out, nil
+		}
+		out.RawSetString("min", FloatValue(min))
+		out.RawSetString("max", FloatValue(max))
+		out.RawSetString("mean", FloatValue(sum/float64(count)))
+		return out, nil
+	case DenseArrayI64:
+		var sum, min, max int64
+		count := 0
+		for i, keep := range mask.bools {
+			if !keep {
+				continue
+			}
+			v := a.i64[i]
+			sum += v
+			if count == 0 || v < min {
+				min = v
+			}
+			if count == 0 || v > max {
+				max = v
+			}
+			count++
+		}
+		out.RawSetString("count", IntValue(int64(count)))
+		out.RawSetString("sum", IntValue(sum))
+		if count == 0 {
+			out.RawSetString("min", NilValue())
+			out.RawSetString("max", NilValue())
+			out.RawSetString("mean", NilValue())
+			return out, nil
+		}
+		out.RawSetString("min", IntValue(min))
+		out.RawSetString("max", IntValue(max))
+		out.RawSetString("mean", FloatValue(float64(sum)/float64(count)))
+		return out, nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
 func (a *DenseArray) extremeWhere(mask *DenseArray, max bool) (Value, error) {
 	if a == nil || mask == nil {
 		return NilValue(), ErrDenseArrayOperand

@@ -442,6 +442,14 @@ func (s *SoA) MaxWhere(columnName string, mask *DenseArray) (Value, error) {
 	return col.MaxWhere(mask)
 }
 
+func (s *SoA) StatsWhere(columnName string, mask *DenseArray) (*Table, error) {
+	col, err := s.maskedAggregateColumn("soa statsWhere", columnName, mask)
+	if err != nil {
+		return nil, err
+	}
+	return col.StatsWhere(mask)
+}
+
 func (s *SoA) maskedAggregateColumn(op, columnName string, mask *DenseArray) (*DenseArray, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")

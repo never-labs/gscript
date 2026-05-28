@@ -76,6 +76,8 @@ check("masked aggregate minWhere", soa.minWhere(points, "velocity", movingMask) 
 check("masked aggregate meanWhere", soa.meanWhere(points, "velocity", movingMask) == 70 / 3)
 check("masked aggregate maxWhere", soa.maxWhere(points, "velocity", movingMask) == 40)
 check("masked aggregate countWhere", soa.countWhere(points, movingMask) == 3)
+stats := soa.statsWhere(points, "velocity", movingMask)
+check("masked aggregate statsWhere", stats.count == 3 && stats.mean == 70 / 3)
 
 columns := soa.unzip(points)
 columns.velocity[1] = 999

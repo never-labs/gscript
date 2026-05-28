@@ -302,6 +302,14 @@ func buildSoALib() *Table {
 		return []Value{v}, nil
 	}, soaMaxWhereValue)
 
+	setFastArg3("statsWhere", func(args []Value) ([]Value, error) {
+		t, err := soaMaskedStatsArgs("soa.statsWhere", args)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(t)}, nil
+	}, soaStatsWhereValue)
+
 	setFastArg2("countWhere", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.countWhere", args, 0)
 		if err != nil {
@@ -352,6 +360,20 @@ func soaMaskedAggregateArgs(name string, args []Value, fn func(*SoA, string, *De
 		return NilValue(), fmt.Errorf("%s: argument 3 must be a bool dense array", name)
 	}
 	return fn(s, args[1].Str(), args[2].DenseArray())
+}
+
+func soaMaskedStatsArgs(name string, args []Value) (*Table, error) {
+	s, err := requireSoAArg(name, args, 0)
+	if err != nil {
+		return nil, err
+	}
+	if len(args) < 2 || !args[1].IsString() {
+		return nil, fmt.Errorf("%s: argument 2 must be a string", name)
+	}
+	if len(args) < 3 || !args[2].IsDenseArray() {
+		return nil, fmt.Errorf("%s: argument 3 must be a bool dense array", name)
+	}
+	return s.StatsWhere(args[1].Str(), args[2].DenseArray())
 }
 
 func soaAddScaledValue(soaValue, dstValue, srcValue, scaleValue Value) (Value, error) {
@@ -510,6 +532,23 @@ func soaMeanWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
 
 func soaMaxWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
 	return soaMaskedAggregateValue("soa.maxWhere", soaValue, columnValue, maskValue, (*SoA).MaxWhere)
+}
+
+func soaStatsWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.statsWhere: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.statsWhere: argument 2 must be a string")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.statsWhere: argument 3 must be a bool dense array")
+	}
+	t, err := soaValue.SoA().StatsWhere(columnValue.Str(), maskValue.DenseArray())
+	if err != nil {
+		return NilValue(), err
+	}
+	return TableValue(t), nil
 }
 
 func soaMaskedAggregateValue(name string, soaValue, columnValue, maskValue Value, fn func(*SoA, string, *DenseArray) (Value, error)) (Value, error) {

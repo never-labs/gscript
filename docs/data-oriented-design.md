@@ -220,6 +220,7 @@ Current API contract:
 | `soa.meanWhere(s, column, mask)` | Returns the mean numeric dense-column value over mask-true rows. |
 | `soa.maxWhere(s, column, mask)` | Returns the maximum numeric dense-column value over mask-true rows. |
 | `soa.countWhere(s, mask)` | Counts mask-true rows without compacting all columns first. |
+| `soa.statsWhere(s, column, mask)` | Computes count, sum, min, max, and mean in one masked pass. |
 
 Reserved array-programming API shape:
 

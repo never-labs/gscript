@@ -198,6 +198,12 @@ rows are selected.
 
 Returns the number of mask-true rows without materializing a filtered SoA.
 
+### `soa.statsWhere(s, column, mask) -> table`
+
+Computes `count`, `sum`, `min`, `max`, and `mean` for a numeric column over
+mask-true rows in one pass. When no rows are selected, `count` is zero, `sum`
+is zero, and `min`, `max`, and `mean` are `nil`.
+
 ## Hot Path Guidance
 
 - Prefer `soa.column` plus fused kernels for loops that touch a small subset of

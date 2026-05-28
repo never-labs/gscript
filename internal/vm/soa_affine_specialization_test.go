@@ -486,6 +486,28 @@ func BenchmarkSoAStdlibMeanWhere(b *testing.B) {
 	benchmarkSoAMaskedColumnAggregate(b, "meanWhere")
 }
 
+func BenchmarkSoAStdlibStatsWhere(b *testing.B) {
+	src := `
+func stats_where_kernel(cols, mask) {
+    return soa.statsWhere(cols, "x", mask)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "stats_where_kernel")
+	defer v.Close()
+	soa := mustBenchParticleSoA(b, 32768)
+	mask := runtime.NewDenseArrayBool(makeAlternatingMask(32768))
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.DenseArrayValue(mask)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = results[0].Table().RawGetString("mean").Number()
+	}
+}
+
 func BenchmarkSoAStdlibMaxWhere(b *testing.B) {
 	benchmarkSoAMaskedColumnAggregate(b, "maxWhere")
 }
