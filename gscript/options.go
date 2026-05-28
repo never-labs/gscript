@@ -85,14 +85,19 @@ const (
 	CapModuleLoading   CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
 	CapFilesystemRead                              // script file APIs may read the host filesystem
 	CapFilesystemWrite                             // script file APIs may mutate the host filesystem
+	CapEnvironmentRead                             // script OS APIs may read host environment variables
+	CapEnvironmentWrite                            // script OS APIs may mutate host environment variables
 
 	// CapFilesystem enables both filesystem read and write access.
 	CapFilesystem = CapFilesystemRead | CapFilesystemWrite
 
-	// CapAll enables every host capability (default, for compatibility).
-	CapAll = CapModuleLoading | CapFilesystem
+	// CapEnvironment enables both environment read and write access.
+	CapEnvironment = CapEnvironmentRead | CapEnvironmentWrite
 
-	// CapSafe disables host filesystem-backed capabilities.
+	// CapAll enables every host capability (default, for compatibility).
+	CapAll = CapModuleLoading | CapFilesystem | CapEnvironment
+
+	// CapSafe disables host-backed capabilities.
 	CapSafe CapabilityFlags = 0
 )
 
@@ -170,6 +175,42 @@ func WithFilesystemWrite(enabled bool) Option {
 			o.capabilities |= CapFilesystemWrite
 		} else {
 			o.capabilities &^= CapFilesystemWrite
+		}
+	}
+}
+
+// WithEnvironment controls script-side host environment variable APIs. It
+// enables or disables both read and write access.
+func WithEnvironment(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapEnvironment
+		} else {
+			o.capabilities &^= CapEnvironment
+		}
+	}
+}
+
+// WithEnvironmentRead controls script-side environment variable reads. This
+// gates APIs such as os.getenv, os.environ, and os.expand.
+func WithEnvironmentRead(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapEnvironmentRead
+		} else {
+			o.capabilities &^= CapEnvironmentRead
+		}
+	}
+}
+
+// WithEnvironmentWrite controls script-side environment variable writes. This
+// gates APIs such as os.setenv and os.unsetenv.
+func WithEnvironmentWrite(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapEnvironmentWrite
+		} else {
+			o.capabilities &^= CapEnvironmentWrite
 		}
 	}
 }

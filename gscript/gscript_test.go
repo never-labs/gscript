@@ -1102,6 +1102,64 @@ func TestWithSandboxDisablesFilesystemCapabilities(t *testing.T) {
 	}
 }
 
+func TestEnvironmentCapabilities(t *testing.T) {
+	t.Setenv("GSCRIPT_PUBLIC_ENV_CAP_TEST", "visible")
+
+	tests := []struct {
+		name    string
+		opts    []gs.Option
+		src     string
+		wantErr string
+	}{
+		{
+			name:    "environment disabled blocks getenv",
+			opts:    []gs.Option{gs.WithEnvironment(false)},
+			src:     `value := os.getenv("GSCRIPT_PUBLIC_ENV_CAP_TEST")`,
+			wantErr: "environment read access disabled",
+		},
+		{
+			name:    "read disabled blocks expand",
+			opts:    []gs.Option{gs.WithEnvironmentRead(false)},
+			src:     `value := os.expand("$GSCRIPT_PUBLIC_ENV_CAP_TEST")`,
+			wantErr: "environment read access disabled",
+		},
+		{
+			name:    "write disabled blocks setenv",
+			opts:    []gs.Option{gs.WithEnvironmentWrite(false)},
+			src:     `ok := os.setenv("GSCRIPT_PUBLIC_ENV_WRITE_TEST", "blocked")`,
+			wantErr: "environment write access disabled",
+		},
+		{
+			name: "read only still reads",
+			opts: []gs.Option{gs.WithEnvironmentWrite(false)},
+			src:  `value := os.getenv("GSCRIPT_PUBLIC_ENV_CAP_TEST")`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(tc.opts...)
+			err := vm.Exec(tc.src)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("Exec error = %v, want %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := vm.Get("value")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "visible" {
+				t.Fatalf("value = %v, want visible", got)
+			}
+		})
+	}
+}
+
 func TestWithModuleLoadingFalseAllowsStdlibRequireButBlocksFileModules(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "helper.gs"), []byte(`return { value: 42 }`), 0644); err != nil {

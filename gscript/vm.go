@@ -39,6 +39,10 @@ func newVM(o vmOptions) *VM {
 		o.capabilities&CapFilesystemRead != 0,
 		o.capabilities&CapFilesystemWrite != 0,
 	)
+	interp.SetEnvironmentCapabilities(
+		o.capabilities&CapEnvironmentRead != 0,
+		o.capabilities&CapEnvironmentWrite != 0,
+	)
 	if o.maxSteps > 0 {
 		interp.SetMaxSteps(o.maxSteps)
 		o.useJIT = false

@@ -67,20 +67,24 @@
 - `LibFlags` 只控制标准库表是否出现在全局环境、是否能通过内建
   `require(name)` 取得；它不代表脚本拥有对应宿主资源权限。
 - `CapabilityFlags` 控制已经可见的脚本 API 是否能触达宿主效果。当前
-  公共能力位是 `CapModuleLoading`、`CapFilesystemRead` 和
-  `CapFilesystemWrite`：前者控制 `require` 是否能从宿主文件系统加载
+  公共能力位是 `CapModuleLoading`、`CapFilesystemRead`、
+  `CapFilesystemWrite`、`CapEnvironmentRead` 和
+  `CapEnvironmentWrite`：前者控制 `require` 是否能从宿主文件系统加载
   `.gs` 文件；`CapFilesystemRead` 控制 `fs.readfile`、`fs.stat`、
   `fs.readdir`、`dofile`、`loadfile` 等读取入口；`CapFilesystemWrite`
   控制 `fs.writefile`、`fs.remove`、`fs.rename`、`fs.mkdir`、`fs.chdir`、
   `fs.tempfile` 等变更入口。`CapFilesystem` 保留为兼容别名，等价于
-  `CapFilesystemRead | CapFilesystemWrite`。
+  `CapFilesystemRead | CapFilesystemWrite`；`CapEnvironment` 等价于
+  `CapEnvironmentRead | CapEnvironmentWrite`。
 - 环境变量是独立宿主能力，不等同于 `LibSafe` 选择，也不等同于
   `CapFilesystem`。runtime 的 `os` 表把读取类入口
   `os.getenv`、`os.environ`、`os.expand` 与写入类入口
   `os.setenv`、`os.unsetenv` 分开限权；读取被关闭时报
   `environment read access disabled`，写入被关闭时报
-  `environment write access disabled`。默认兼容模式仍启用读写。
-- `WithSandbox()` 等价于选择 `LibSafe` 并关闭宿主文件系统能力
+  `environment write access disabled`。`WithEnvironment(false)` 同时关闭
+  读写；`WithEnvironmentRead(false)` 和 `WithEnvironmentWrite(false)`
+  可以单独收窄。默认兼容模式仍启用读写。
+- `WithSandbox()` 等价于选择 `LibSafe` 并关闭宿主能力
   (`CapSafe`)。因此安全内建模块仍可 `require("json")`，但文件模块
   `require("helper")`、`fs`、`dofile`、`loadfile` 默认不可用。
 - `WithFilesystemRoot(root)` 会启用文件系统能力并把脚本侧路径限制在
