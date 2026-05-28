@@ -109,6 +109,39 @@ func buildSoALib() *Table {
 		return []Value{DenseArrayValue(col)}, nil
 	}, soaColumnValue)
 
+	setFastArg3("withColumn", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.withColumn", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.withColumn: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsDenseArray() {
+			return nil, fmt.Errorf("soa.withColumn: argument 3 must be a dense array")
+		}
+		out, err := s.WithColumn(args[1].Str(), args[2].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{SoAValue(out)}, nil
+	}, soaWithColumnValue)
+
+	setFastArg2("dropColumn", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.dropColumn", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.dropColumn: argument 2 must be a string")
+		}
+		out, err := s.DropColumn(args[1].Str())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{SoAValue(out)}, nil
+	}, soaDropColumnValue)
+
 	setFastArg3("slice", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.slice", args, 0)
 		if err != nil {
@@ -591,6 +624,37 @@ func soaColumnValue(soaValue, nameValue Value) (Value, error) {
 		return NilValue(), nil
 	}
 	return DenseArrayValue(col), nil
+}
+
+func soaWithColumnValue(soaValue, nameValue, columnValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.withColumn: argument 1 must be soa")
+	}
+	if !nameValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.withColumn: argument 2 must be a string")
+	}
+	if !columnValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.withColumn: argument 3 must be a dense array")
+	}
+	out, err := soaValue.SoA().WithColumn(nameValue.Str(), columnValue.DenseArray())
+	if err != nil {
+		return NilValue(), err
+	}
+	return SoAValue(out), nil
+}
+
+func soaDropColumnValue(soaValue, nameValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.dropColumn: argument 1 must be soa")
+	}
+	if !nameValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.dropColumn: argument 2 must be a string")
+	}
+	out, err := soaValue.SoA().DropColumn(nameValue.Str())
+	if err != nil {
+		return NilValue(), err
+	}
+	return SoAValue(out), nil
 }
 
 func soaUnzipValue(soaValue Value) (Value, error) {

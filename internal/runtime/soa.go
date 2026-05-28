@@ -123,6 +123,49 @@ func (s *SoA) Column(name string) (*DenseArray, bool) {
 	return col, ok
 }
 
+func (s *SoA) WithColumn(name string, col *DenseArray) (*SoA, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("soa column name must not be empty")
+	}
+	if col == nil {
+		return nil, fmt.Errorf("soa column %q is nil", name)
+	}
+	if col.Len() != s.length {
+		return nil, fmt.Errorf("soa column length mismatch")
+	}
+	cols := make(map[string]*DenseArray, len(s.columns)+1)
+	for _, existing := range s.names {
+		cols[existing] = s.columns[existing]
+	}
+	cols[name] = col
+	return NewSoA(cols)
+}
+
+func (s *SoA) DropColumn(name string) (*SoA, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("soa column name must not be empty")
+	}
+	if _, ok := s.columns[name]; !ok {
+		return nil, fmt.Errorf("soa column %q not found", name)
+	}
+	if len(s.columns) == 1 {
+		return nil, fmt.Errorf("soa requires at least one column")
+	}
+	cols := make(map[string]*DenseArray, len(s.columns)-1)
+	for _, existing := range s.names {
+		if existing != name {
+			cols[existing] = s.columns[existing]
+		}
+	}
+	return NewSoA(cols)
+}
+
 func (s *SoA) Unzip() (map[string]*DenseArray, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")

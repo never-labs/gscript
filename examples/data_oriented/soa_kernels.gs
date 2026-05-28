@@ -24,6 +24,10 @@ points := soa.zip({
 check("len", soa.len(points) == 4)
 check("columns sorted", soa.columns(points)[1] == "id")
 check("shape", soa.shape(points).columns[1].dtype == "i64")
+extended := soa.withColumn(points, "speed", []f64{1.5, 2.5, 3.5, 4.5})
+withoutY := soa.dropColumn(extended, "y")
+check("withColumn", soa.column(extended, "speed")[4] == 4.5)
+check("dropColumn", soa.column(withoutY, "y") == nil && soa.column(withoutY, "x")[1] == 1)
 
 row := soa.row(points, 2)
 check("row copy", row.id == 102 && row.x == 2)

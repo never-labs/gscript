@@ -80,6 +80,8 @@ ys := xs * 10
 points := soa.zip({x: xs, y: ys})
 n := soa.len(points)
 cols := soa.columns(points)
+withZ := soa.withColumn(points, "z", []i64{7, 8, 9})
+droppedY := soa.dropColumn(withZ, "y")
 unzipped := soa.unzip(points)
 xcol := soa.column(points, "x")
 row := soa.row(points, 2)
@@ -105,6 +107,14 @@ maskedCount := soa.countWhere(points, []bool{true, false, true})
 	if got := interp.GetGlobal("cols").Table().RawGetInt(1); !got.IsString() || got.Str() != "x" {
 		t.Fatalf("cols[1] = %v, want x", got)
 	}
+	if got := interp.GetGlobal("withZ"); !got.IsSoA() || got.SoA().Len() != 3 {
+		t.Fatalf("withZ = %v, want SoA length 3", got)
+	}
+	assertDenseI64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("withZ").SoA(), "z")), []int64{7, 8, 9})
+	if _, ok := interp.GetGlobal("droppedY").SoA().Column("y"); ok {
+		t.Fatal("droppedY still has y column")
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("droppedY").SoA(), "x")), []float64{1, 42, 3})
 	assertDenseF64(t, interp.GetGlobal("unzipped").Table().RawGetString("y"), []float64{10, 20, 30})
 	assertDenseF64(t, interp.GetGlobal("xcol"), []float64{1, 42, 3})
 	if got := interp.GetGlobal("row").Table().RawGetString("y"); !got.IsFloat() || got.Float() != 20 {
@@ -331,6 +341,8 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	lib := buildSoALib()
 	lenFn := lib.RawGetString("len").GoFunction()
 	column := lib.RawGetString("column").GoFunction()
+	withColumn := lib.RawGetString("withColumn").GoFunction()
+	dropColumn := lib.RawGetString("dropColumn").GoFunction()
 	unzip := lib.RawGetString("unzip").GoFunction()
 	slice := lib.RawGetString("slice").GoFunction()
 	filter := lib.RawGetString("filter").GoFunction()
@@ -352,6 +364,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if column == nil || column.FastArg2 == nil {
 		t.Fatal("soa.column FastArg2 is nil")
+	}
+	if withColumn == nil || withColumn.FastArg3 == nil {
+		t.Fatal("soa.withColumn FastArg3 is nil")
+	}
+	if dropColumn == nil || dropColumn.FastArg2 == nil {
+		t.Fatal("soa.dropColumn FastArg2 is nil")
 	}
 	if unzip == nil || unzip.FastArg1 == nil {
 		t.Fatal("soa.unzip FastArg1 is nil")
@@ -418,6 +436,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if got, err := column.FastArg2(soaValue, StringValue("x")); err != nil || !got.IsDenseArray() {
 		t.Fatalf("soa.column FastArg2 got=%s err=%v", got.String(), err)
+	}
+	if got, err := withColumn.FastArg3(soaValue, StringValue("id"), DenseArrayValue(NewDenseArrayI64([]int64{1, 2, 3}))); err != nil || !got.IsSoA() {
+		t.Fatalf("soa.withColumn FastArg3 got=%s err=%v", got.String(), err)
+	}
+	if got, err := dropColumn.FastArg2(soaValue, StringValue("v")); err != nil || !got.IsSoA() {
+		t.Fatalf("soa.dropColumn FastArg2 got=%s err=%v", got.String(), err)
 	}
 	if got, err := unzip.FastArg1(soaValue); err != nil || !got.IsTable() {
 		t.Fatalf("soa.unzip FastArg1 got=%s err=%v", got.String(), err)

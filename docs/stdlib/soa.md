@@ -60,6 +60,20 @@ Returns a one-based table of column names in sorted order.
 Returns the live dense column named `name`, or `nil` if the column does not
 exist.
 
+### `soa.withColumn(s, name, column) -> soa`
+
+Returns a new SoA layout containing all current columns plus `column` under
+`name`. The new column must be a dense array with the same length as `s`.
+
+Existing columns and the supplied column are kept by reference, matching
+`soa.zip`; use `soa.unzip` first when independent column copies are required.
+
+### `soa.dropColumn(s, name) -> soa`
+
+Returns a new SoA layout without `name`. At least one column must remain.
+
+Remaining columns are kept by reference, matching `soa.zip`.
+
 ### `soa.shape(s) -> table`
 
 Returns layout diagnostics:
