@@ -42,6 +42,8 @@ const (
 	LibCrypto                         // crypto.*
 	LibContainer                      // container.*
 	LibLog                            // log.*
+	LibArray                          // array.* dense arrays
+	LibSoA                            // soa.* structure-of-arrays
 
 	LibRL = LibGL // compatibility alias for the registered rl.* module
 
@@ -53,7 +55,7 @@ const (
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
 		LibProcess | LibScript | LibDebug | LibTestkit | LibMatrix |
 		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibLog
+		LibContainer | LibLog | LibArray | LibSoA
 
 	// LibSafe is a sandboxed subset with no I/O, network, or system access.
 	LibSafe = LibString | LibTable | LibMath | LibCoroutine |
@@ -61,7 +63,7 @@ const (
 		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
 		LibBytes | LibCSV | LibURL | LibUUID | LibMatrix |
 		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer
+		LibContainer | LibArray | LibSoA
 
 	// LibApp is a convenient preset for application development (no GL).
 	LibApp = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
@@ -69,12 +71,12 @@ const (
 		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
 		LibBytes | LibCSV | LibURL | LibUUID | LibProcess | LibScript |
 		LibDebug | LibMatrix | LibRand | LibSort | LibEncoding |
-		LibCompress | LibCrypto | LibContainer | LibLog
+		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA
 
 	// LibGame is a preset for game development (no I/O, includes GL/vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |
 		LibGL | LibVec | LibColor | LibJSON | LibBit32 | LibBits |
-		LibTime | LibRand
+		LibTime | LibRand | LibArray | LibSoA
 )
 
 // CapabilityFlags controls host capabilities that are separate from selecting
@@ -82,11 +84,11 @@ const (
 type CapabilityFlags uint64
 
 const (
-	CapModuleLoading   CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
-	CapFilesystemRead                              // script file APIs may read the host filesystem
-	CapFilesystemWrite                             // script file APIs may mutate the host filesystem
-	CapEnvironmentRead                             // script OS APIs may read host environment variables
-	CapEnvironmentWrite                            // script OS APIs may mutate host environment variables
+	CapModuleLoading    CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
+	CapFilesystemRead                               // script file APIs may read the host filesystem
+	CapFilesystemWrite                              // script file APIs may mutate the host filesystem
+	CapEnvironmentRead                              // script OS APIs may read host environment variables
+	CapEnvironmentWrite                             // script OS APIs may mutate host environment variables
 
 	// CapFilesystem enables both filesystem read and write access.
 	CapFilesystem = CapFilesystemRead | CapFilesystemWrite

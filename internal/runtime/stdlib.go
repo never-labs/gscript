@@ -2,6 +2,7 @@ package runtime
 
 var stdlibModuleNames = []string{
 	"base64",
+	"array",
 	"binary",
 	"bit32",
 	"bits",
@@ -80,6 +81,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("rl", TableValue(rlLib(interp)))
 
 	// --- Encoding / Crypto ---
+	interp.globals.Define("array", TableValue(buildArrayLib()))
 	interp.globals.Define("json", TableValue(buildJSONLib()))
 	interp.globals.Define("base64", TableValue(buildBase64Lib()))
 	interp.globals.Define("hash", TableValue(buildHashLib()))
@@ -113,6 +115,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Numeric matrix (R42 DenseMatrix Phase 1) ---
 	interp.globals.Define("matrix", TableValue(buildMatrixLib()))
+	interp.globals.Define("soa", TableValue(buildSoALib()))
 
 	// --- Text processing ---
 	interp.globals.Define("regexp", TableValue(buildRegexpLib()))

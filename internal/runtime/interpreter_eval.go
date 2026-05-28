@@ -137,6 +137,13 @@ func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value
 		}
 		return []Value{v}, nil
 
+	case *ast.DenseLitExpr:
+		v, err := interp.evalDenseLit(e, env)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+
 	case *ast.MakeChanExpr:
 		cap := 0
 		if e.Size != nil {
@@ -280,6 +287,12 @@ func (interp *Interpreter) evalBinary(e *ast.BinaryExpr, env *Environment) (Valu
 		return NilValue(), err
 	}
 
+	if left.IsDenseArray() || right.IsDenseArray() {
+		if op, ok := denseArrayBinaryOp(e.Op); ok {
+			return DenseArrayElementwise(op, left, right)
+		}
+	}
+
 	switch e.Op {
 	case "+", "-", "*", "/", "%", "**":
 		return interp.arith(e.Op, left, right)
@@ -327,6 +340,33 @@ func (interp *Interpreter) evalBinary(e *ast.BinaryExpr, env *Environment) (Valu
 		return BoolValue(res), nil
 	default:
 		return NilValue(), fmt.Errorf("unknown binary operator: %s", e.Op)
+	}
+}
+
+func denseArrayBinaryOp(op string) (DenseArrayBinaryOp, bool) {
+	switch op {
+	case "+":
+		return DenseArrayAdd, true
+	case "-":
+		return DenseArraySub, true
+	case "*":
+		return DenseArrayMul, true
+	case "/":
+		return DenseArrayDiv, true
+	case "==":
+		return DenseArrayEQ, true
+	case "!=":
+		return DenseArrayNE, true
+	case "<":
+		return DenseArrayLT, true
+	case "<=":
+		return DenseArrayLE, true
+	case ">":
+		return DenseArrayGT, true
+	case ">=":
+		return DenseArrayGE, true
+	default:
+		return 0, false
 	}
 }
 
@@ -970,4 +1010,41 @@ func (interp *Interpreter) evalTableLit(e *ast.TableLitExpr, env *Environment) (
 	}
 
 	return TableValue(tbl), nil
+}
+
+func (interp *Interpreter) evalDenseLit(e *ast.DenseLitExpr, env *Environment) (Value, error) {
+	dtype, err := denseDTypeFromLiteral(e.DType)
+	if err != nil {
+		return NilValue(), err
+	}
+	if e.Len > 0 && len(e.Values) != e.Len {
+		return NilValue(), fmt.Errorf("dense literal length mismatch: declared %d, got %d", e.Len, len(e.Values))
+	}
+	arr, err := NewDenseArrayOfLen(dtype, len(e.Values))
+	if err != nil {
+		return NilValue(), err
+	}
+	for i, expr := range e.Values {
+		v, err := interp.evalExprSingle(expr, env)
+		if err != nil {
+			return NilValue(), err
+		}
+		if err := arr.Set(i, v); err != nil {
+			return NilValue(), err
+		}
+	}
+	return DenseArrayValue(arr), nil
+}
+
+func denseDTypeFromLiteral(dtype string) (DenseArrayDType, error) {
+	switch dtype {
+	case "f64", "f32":
+		return DenseArrayF64, nil
+	case "i64", "i32":
+		return DenseArrayI64, nil
+	case "bool":
+		return DenseArrayBool, nil
+	default:
+		return 0, fmt.Errorf("unsupported dense literal dtype %q", dtype)
+	}
 }

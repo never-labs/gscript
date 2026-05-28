@@ -254,6 +254,12 @@ func ScanValueRoots(v Value, visitor func(unsafe.Pointer), seen map[uintptr]stru
 		visitStringRoot(p, visitor)
 		return
 	}
+	if sub == ptrSubSoA {
+		visitor(p)
+		soa := (*SoA)(p)
+		scanSoARoots(soa, visitor, seen)
+		return
+	}
 	visitor(p)
 }
 

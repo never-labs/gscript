@@ -23,6 +23,7 @@ const (
 	TypeCoroutine            // coroutines
 	TypeChannel              // channels
 	TypeDenseArray           // data-oriented dense arrays
+	TypeSoA                  // structure-of-arrays records
 )
 
 // ---------------------------------------------------------------------------
@@ -86,6 +87,7 @@ const (
 	ptrSubVMCoroutine uint64 = 10 << ptrSubShift // *vm.VMCoroutine (direct pointer, fast coroutine path)
 	ptrSubFixedRecord uint64 = 11 << ptrSubShift // *FixedRecord, materializes to *Table on generic table use
 	ptrSubDenseArray  uint64 = 12 << ptrSubShift // *DenseArray
+	ptrSubSoA         uint64 = 13 << ptrSubShift // *SoA
 )
 
 // Value is a NaN-boxed 8-byte representation of all GScript values.
@@ -542,6 +544,8 @@ func (v Value) Type() ValueType {
 			return TypeChannel
 		case ptrSubDenseArray:
 			return TypeDenseArray
+		case ptrSubSoA:
+			return TypeSoA
 		default:
 			return TypeTable // fallback
 		}
@@ -737,6 +741,8 @@ func (v Value) Ptr() any {
 		return (*Channel)(p)
 	case ptrSubDenseArray:
 		return (*DenseArray)(p)
+	case ptrSubSoA:
+		return (*SoA)(p)
 	case ptrSubAnyFunction, ptrSubAnyCoro, ptrSubVMClosure:
 		// Recover the original interface from gcRoots.
 		return lookupIface(p)
@@ -808,6 +814,8 @@ func (v Value) TypeName() string {
 		return "channel"
 	case TypeDenseArray:
 		return "array"
+	case TypeSoA:
+		return "soa"
 	default:
 		return "unknown"
 	}
@@ -851,7 +859,7 @@ func (v Value) Equal(other Value) bool {
 		return v.Float() == other.Float()
 	case TypeString:
 		return v.Str() == other.Str()
-	case TypeTable, TypeFunction, TypeCoroutine, TypeChannel, TypeDenseArray:
+	case TypeTable, TypeFunction, TypeCoroutine, TypeChannel, TypeDenseArray, TypeSoA:
 		// Pointer identity: compare the raw address (strip sub-type bits).
 		return v.ptrPayload() == other.ptrPayload()
 	default:
@@ -916,6 +924,11 @@ func (v Value) String() string {
 			return a.String()
 		}
 		return "array<nil>[]"
+	case TypeSoA:
+		if s := v.SoA(); s != nil {
+			return s.String()
+		}
+		return "soa<nil>"
 	default:
 		return "unknown"
 	}

@@ -64,6 +64,22 @@ func NewDenseArrayBool(values []bool) *DenseArray {
 	return a
 }
 
+func NewDenseArrayOfLen(dtype DenseArrayDType, n int) (*DenseArray, error) {
+	if n < 0 {
+		return nil, fmt.Errorf("dense array length must be non-negative")
+	}
+	switch dtype {
+	case DenseArrayF64:
+		return &DenseArray{dtype: dtype, f64: make([]float64, n)}, nil
+	case DenseArrayI64:
+		return &DenseArray{dtype: dtype, i64: make([]int64, n)}, nil
+	case DenseArrayBool:
+		return &DenseArray{dtype: dtype, bools: make([]bool, n)}, nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
 func DenseArrayValue(a *DenseArray) Value {
 	if a == nil {
 		return NilValue()
@@ -130,6 +146,54 @@ func (a *DenseArray) Bool() ([]bool, bool) {
 		return nil, false
 	}
 	return a.bools, true
+}
+
+func (a *DenseArray) At(i int) (Value, error) {
+	if a == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if i < 0 || i >= a.Len() {
+		return NilValue(), fmt.Errorf("dense array index out of range")
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		return FloatValue(a.f64[i]), nil
+	case DenseArrayI64:
+		return IntValue(a.i64[i]), nil
+	case DenseArrayBool:
+		return BoolValue(a.bools[i]), nil
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func (a *DenseArray) Set(i int, v Value) error {
+	if a == nil {
+		return ErrDenseArrayOperand
+	}
+	if i < 0 || i >= a.Len() {
+		return fmt.Errorf("dense array index out of range")
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		if !v.IsNumber() {
+			return fmt.Errorf("dense array f64 value must be numeric")
+		}
+		a.f64[i] = v.Number()
+	case DenseArrayI64:
+		if !v.IsInt() {
+			return fmt.Errorf("dense array i64 value must be integer")
+		}
+		a.i64[i] = v.Int()
+	case DenseArrayBool:
+		if !v.IsBool() {
+			return fmt.Errorf("dense array bool value must be boolean")
+		}
+		a.bools[i] = v.Bool()
+	default:
+		return ErrDenseArrayDType
+	}
+	return nil
 }
 
 func (a *DenseArray) String() string {

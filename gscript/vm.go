@@ -201,6 +201,7 @@ func (vm *VM) copyInterpreterGlobalToBytecode(bvm *bytecodevm.VM, name string) {
 
 func stdlibAllowedNames(libs LibFlags) map[string]bool {
 	allowed := map[string]bool{
+		"array":     libs&LibArray != 0,
 		"base64":    libs&LibBase64 != 0,
 		"binary":    libs&LibBinary != 0,
 		"bit32":     libs&LibBit32 != 0,
@@ -229,6 +230,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"regexp":    libs&LibRegexp != 0,
 		"rl":        libs&LibGL != 0,
 		"script":    libs&LibScript != 0,
+		"soa":       libs&LibSoA != 0,
 		"sort":      libs&LibSort != 0,
 		"string":    libs&LibString != 0,
 		"table":     libs&LibTable != 0,
