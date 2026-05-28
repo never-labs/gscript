@@ -86,6 +86,7 @@ func TestWriteOpAuditMatrixJSON(t *testing.T) {
 		"fixed_shape_array_element_write_role", "fixed_shape_array_element_read_role",
 		"fixed_shape_return_array_element_role", "local_string_array_table_use_role",
 		"readonly_table_param_use_role", "inline_allocation_role",
+		"tier2_call_boundary_loop_blocker", "tier2_loop_allocation_blocker",
 	} {
 		if _, ok := raw[0][key]; !ok {
 			t.Fatalf("audit JSON first row missing key %q: %v", key, raw[0])
@@ -131,6 +132,12 @@ func TestOpAuditMatrixStructuredFieldsMatchOpSpec(t *testing.T) {
 		}
 		if row.InlineAllocationRole != spec.InlineAllocationRole.String() {
 			t.Fatalf("%s inline_allocation_role = %q, want %q", row.Name, row.InlineAllocationRole, spec.InlineAllocationRole.String())
+		}
+		if row.Tier2CallBoundaryLoopBlocker != spec.Tier2CallBoundaryLoopBlocker {
+			t.Fatalf("%s tier2_call_boundary_loop_blocker = %t, want %t", row.Name, row.Tier2CallBoundaryLoopBlocker, spec.Tier2CallBoundaryLoopBlocker)
+		}
+		if row.Tier2LoopAllocationBlocker != spec.Tier2LoopAllocationBlocker {
+			t.Fatalf("%s tier2_loop_allocation_blocker = %t, want %t", row.Name, row.Tier2LoopAllocationBlocker, spec.Tier2LoopAllocationBlocker)
 		}
 	}
 }

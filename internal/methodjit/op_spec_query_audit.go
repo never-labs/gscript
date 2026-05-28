@@ -27,6 +27,8 @@ type OpAuditRow struct {
 	LocalStringArrayTableUseRole     string `json:"local_string_array_table_use_role"`
 	ReadonlyTableParamUseRole        string `json:"readonly_table_param_use_role"`
 	InlineAllocationRole             string `json:"inline_allocation_role"`
+	Tier2CallBoundaryLoopBlocker     bool   `json:"tier2_call_boundary_loop_blocker"`
+	Tier2LoopAllocationBlocker       bool   `json:"tier2_loop_allocation_blocker"`
 }
 
 func OpAuditMatrix() []OpAuditRow {
@@ -56,6 +58,8 @@ func OpAuditMatrix() []OpAuditRow {
 			LocalStringArrayTableUseRole:     spec.LocalStringArrayTableUseRole.String(),
 			ReadonlyTableParamUseRole:        spec.ReadonlyTableParamUseRole.String(),
 			InlineAllocationRole:             spec.InlineAllocationRole.String(),
+			Tier2CallBoundaryLoopBlocker:     spec.Tier2CallBoundaryLoopBlocker,
+			Tier2LoopAllocationBlocker:       spec.Tier2LoopAllocationBlocker,
 		})
 	}
 	return rows
