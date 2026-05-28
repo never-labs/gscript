@@ -113,7 +113,7 @@ func RangeAnalysisPassCtx(ctx *PassContext) (*Function, error) {
 		nonNegative[id] = true
 	}
 	numeric.SetComputedRanges(safe, ranges, nonNegative)
-	populateIntModFacts(fn, ranges)
+	populateIntModFacts(fn, ranges, numeric)
 	return fn, nil
 }
 

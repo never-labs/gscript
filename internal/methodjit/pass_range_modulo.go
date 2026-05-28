@@ -169,10 +169,13 @@ func valueRangeWithin(v *Value, bounds intRange, ranges, phiCandidates map[int]i
 	return false
 }
 
-func populateIntModFacts(fn *Function, baseRanges map[int]intRange) {
+func populateIntModFacts(fn *Function, baseRanges map[int]intRange, numeric *NumericFacts) {
+	if numeric == nil {
+		return
+	}
 	nonZeroDivisor := make(map[int]bool)
 	noSignAdjust := make(map[int]bool)
-	nonNegative := functionNumericFacts(fn).IntNonNegativeMap()
+	nonNegative := numeric.IntNonNegativeMap()
 	blockEntries := computeBlockEntryRanges(fn, baseRanges)
 
 	for _, block := range fn.Blocks {
@@ -203,5 +206,5 @@ func populateIntModFacts(fn *Function, baseRanges map[int]intRange) {
 		}
 	}
 
-	functionNumericFacts(fn).SetModuloFacts(nonZeroDivisor, noSignAdjust)
+	numeric.SetModuloFacts(nonZeroDivisor, noSignAdjust)
 }
