@@ -88,7 +88,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 			Phase:    Tier2PhaseTableFieldLower,
 			Requires: analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactFixedShapeEntryGuards),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				return FieldSvalsLowerPassWith(ctxDependencyRegistry(ctx))(fn)
+				return FieldSvalsLowerPassCtx(ctxDependencyRegistry(ctx))(newPassContext(fn, opts, fieldSvalsLowerPassAllowedDomains, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("FieldSvalsCSE", Tier2PhaseTableFieldLower, nil, nil, FieldSvalsCSEPass),
