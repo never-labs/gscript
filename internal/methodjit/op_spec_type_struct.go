@@ -123,6 +123,10 @@ type OpSpec struct {
 	FieldWrite                    bool
 	BoolTableFillBodyBenign       bool
 	BoolTableFillStore            bool
+	BoolTableFillStoreTableArg    int
+	BoolTableFillStoreKeyArg      int
+	BoolTableFillStoreValueArg    int
+	BoolTableFillStoreKindSource  OpBoolTableFillKindSource
 	BoolTableCountLoadBodyBenign  bool
 	BoolTableCountLoad            bool
 	BoolTableCountIncrementBenign bool

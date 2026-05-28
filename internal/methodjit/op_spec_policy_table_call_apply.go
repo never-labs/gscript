@@ -30,6 +30,18 @@ func applyOpSpecTableCallBoolPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opBoolTableFillStorePolicies) {
 		spec.BoolTableFillStore = opBoolTableFillStorePolicies[op]
 	}
+	if int(op) < len(opBoolTableFillStoreTableArgPolicies) && opBoolTableFillStoreTableArgPolicies[op] != 0 {
+		spec.BoolTableFillStoreTableArg = int(opBoolTableFillStoreTableArgPolicies[op]) - 1
+	}
+	if int(op) < len(opBoolTableFillStoreKeyArgPolicies) && opBoolTableFillStoreKeyArgPolicies[op] != 0 {
+		spec.BoolTableFillStoreKeyArg = int(opBoolTableFillStoreKeyArgPolicies[op]) - 1
+	}
+	if int(op) < len(opBoolTableFillStoreValueArgPolicies) && opBoolTableFillStoreValueArgPolicies[op] != 0 {
+		spec.BoolTableFillStoreValueArg = int(opBoolTableFillStoreValueArgPolicies[op]) - 1
+	}
+	if int(op) < len(opBoolTableFillStoreKindSourcePolicies) {
+		spec.BoolTableFillStoreKindSource = opBoolTableFillStoreKindSourcePolicies[op]
+	}
 	if int(op) < len(opBoolTableCountLoadBodyBenignPolicies) {
 		spec.BoolTableCountLoadBodyBenign = opBoolTableCountLoadBodyBenignPolicies[op]
 	}

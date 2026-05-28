@@ -35,8 +35,12 @@ func TestTableCallContractsLiveInOpSpec(t *testing.T) {
 	}
 	for _, op := range []Op{OpSetTable, OpTableArrayStore} {
 		spec, ok := op.Spec()
-		if !ok || !spec.BoolTableFillStore {
+		layout, layoutOK := boolTableFillStoreLayoutForOp(op)
+		if !ok || !spec.BoolTableFillStore || !layoutOK {
 			t.Fatalf("%s bool-fill store contract should be driven by OpSpec", op)
+		}
+		if layout.TableArg != 0 || layout.KindSource == OpBoolTableFillKindNone {
+			t.Fatalf("%s bool-fill store layout should include table arg and kind source", op)
 		}
 	}
 	for _, op := range []Op{OpNop, OpJump, OpBranch, OpGuardTruthy} {

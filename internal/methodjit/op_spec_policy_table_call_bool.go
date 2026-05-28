@@ -14,6 +14,26 @@ var opBoolTableFillStorePolicies = [...]bool{
 	OpTableArrayStore: true,
 }
 
+var opBoolTableFillStoreTableArgPolicies = [...]uint8{
+	OpSetTable:        1,
+	OpTableArrayStore: 1,
+}
+
+var opBoolTableFillStoreKeyArgPolicies = [...]uint8{
+	OpSetTable:        2,
+	OpTableArrayStore: 4,
+}
+
+var opBoolTableFillStoreValueArgPolicies = [...]uint8{
+	OpSetTable:        3,
+	OpTableArrayStore: 5,
+}
+
+var opBoolTableFillStoreKindSourcePolicies = [...]OpBoolTableFillKindSource{
+	OpSetTable:        OpBoolTableFillKindAux2,
+	OpTableArrayStore: OpBoolTableFillKindAux,
+}
+
 var opBoolTableCountLoadBodyBenignPolicies = [...]bool{
 	OpNop:         true,
 	OpJump:        true,

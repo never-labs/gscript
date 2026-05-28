@@ -137,20 +137,19 @@ func boolFillStoreParts(store *Instr) (table, key, val *Value, kind int64, ok bo
 	if store == nil {
 		return nil, nil, nil, 0, false
 	}
-	switch store.Op {
-	case OpSetTable:
-		if len(store.Args) < 3 {
-			return nil, nil, nil, 0, false
-		}
-		return store.Args[0], store.Args[1], store.Args[2], store.Aux2, true
-	case OpTableArrayStore:
-		if len(store.Args) < 5 {
-			return nil, nil, nil, 0, false
-		}
-		return store.Args[0], store.Args[3], store.Args[4], store.Aux, true
+	layout, ok := boolTableFillStoreLayoutForOp(store.Op)
+	if !ok || len(store.Args) <= layout.TableArg || len(store.Args) <= layout.KeyArg || len(store.Args) <= layout.ValueArg {
+		return nil, nil, nil, 0, false
+	}
+	switch layout.KindSource {
+	case OpBoolTableFillKindAux:
+		kind = store.Aux
+	case OpBoolTableFillKindAux2:
+		kind = store.Aux2
 	default:
 		return nil, nil, nil, 0, false
 	}
+	return store.Args[layout.TableArg], store.Args[layout.KeyArg], store.Args[layout.ValueArg], kind, true
 }
 
 func boolFillLoopStartAndStep(fn *Function, header *Block, bodyPredIdx, preheaderIdx int, key, condKey *Value) (*Value, *Value, bool) {

@@ -81,6 +81,10 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.LocalStringArrayTableArgIndex != -1 {
 			t.Fatalf("%s LocalStringArrayTableArgIndex default=%d, want -1", op, spec.LocalStringArrayTableArgIndex)
 		}
+		if spec.BoolTableFillStoreTableArg != -1 || spec.BoolTableFillStoreKeyArg != -1 || spec.BoolTableFillStoreValueArg != -1 {
+			t.Fatalf("%s bool-fill store arg defaults=%d/%d/%d, want all -1",
+				op, spec.BoolTableFillStoreTableArg, spec.BoolTableFillStoreKeyArg, spec.BoolTableFillStoreValueArg)
+		}
 		if spec.LoadElimTableCacheKeyArgIndex != -1 || spec.LoadElimTableCacheValueArgIndex != -1 {
 			t.Fatalf("%s load-elim table-cache arg defaults=%d/%d, want both -1",
 				op, spec.LoadElimTableCacheKeyArgIndex, spec.LoadElimTableCacheValueArgIndex)
