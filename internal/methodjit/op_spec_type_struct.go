@@ -119,6 +119,7 @@ type OpSpec struct {
 	ConstPoolUser                    bool
 	RawStringResult                  bool
 	DynamicStringQueryCacheKey       bool
+	StringEnumCompareLoweredOp       Op
 	UnrollCloneable                  bool
 	NestedFloatPhiOverrideSafe       bool
 	FloatReductionWideUnrollBarrier  bool

@@ -44,6 +44,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		FieldCallFloorProjectionOp:        OpMax,
 		FieldCalleeGuardLoweredOp:         OpMax,
 		ModZeroCompareLoweredOp:           OpMax,
+		StringEnumCompareLoweredOp:        OpMax,
 	}
 }
 

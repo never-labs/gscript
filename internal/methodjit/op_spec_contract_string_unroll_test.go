@@ -3,6 +3,12 @@ package methodjit
 import "testing"
 
 func TestStringUnrollContractsLiveInOpSpec(t *testing.T) {
+	if lowered, ok := stringEnumCompareLoweredOp(OpEqString); !ok || lowered != OpEqInt {
+		t.Fatalf("EqString enum lowered op = %s, %v; want EqInt, true", lowered, ok)
+	}
+	if lowered, ok := stringEnumCompareLoweredOp(OpEqInt); ok || lowered != OpMax {
+		t.Fatalf("EqInt enum lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
 	for _, op := range []Op{OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen, OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber, OpGuardConstString} {
 		spec, ok := op.Spec()
 		if !ok || !spec.ConstPoolUser || !instrUsesConstPool(&Instr{Op: op}) {

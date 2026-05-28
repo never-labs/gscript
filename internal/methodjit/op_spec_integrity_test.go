@@ -46,6 +46,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "FieldCallFloorProjectionOp", spec.FieldCallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCalleeGuardLoweredOp", spec.FieldCalleeGuardLoweredOp)
 		assertOpSpecTarget(t, op, "ModZeroCompareLoweredOp", spec.ModZeroCompareLoweredOp)
+		assertOpSpecTarget(t, op, "StringEnumCompareLoweredOp", spec.StringEnumCompareLoweredOp)
 	}
 	if len(seenNames) != int(OpMax) {
 		t.Fatalf("OpSpec name lookup saw %d names, want %d", len(seenNames), OpMax)
@@ -106,8 +107,8 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.CallFloorProjectionOp != OpMax || spec.FieldCallFloorProjectionOp != OpMax {
 			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax", op, spec.CallFloorProjectionOp, spec.FieldCallFloorProjectionOp)
 		}
-		if spec.FieldCalleeGuardLoweredOp != OpMax || spec.ModZeroCompareLoweredOp != OpMax {
-			t.Fatalf("%s guard/mod lowering defaults=%s/%s, want OpMax/OpMax", op, spec.FieldCalleeGuardLoweredOp, spec.ModZeroCompareLoweredOp)
+		if spec.FieldCalleeGuardLoweredOp != OpMax || spec.ModZeroCompareLoweredOp != OpMax || spec.StringEnumCompareLoweredOp != OpMax {
+			t.Fatalf("%s guard/mod/string lowering defaults=%s/%s/%s, want OpMax", op, spec.FieldCalleeGuardLoweredOp, spec.ModZeroCompareLoweredOp, spec.StringEnumCompareLoweredOp)
 		}
 		if spec.ClosureScalarLocalUseArgIndex != -1 || spec.ClosureScalarLoadClosureArgIndex != -1 ||
 			spec.ClosureScalarStoreClosureArgIndex != -1 || spec.ClosureScalarStoreValueArgIndex != -1 {
@@ -183,18 +184,8 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if _, ok := modZeroCompareLoweredOp(op); ok {
 			t.Fatalf("%s should not report a mod-zero compare lowering target", op)
 		}
-	}
-}
-
-func assertOpSpecTarget(t *testing.T, owner Op, field string, target Op) {
-	t.Helper()
-	if target == 0 || target == OpMax {
-		return
-	}
-	if target < 0 || target >= OpMax {
-		t.Fatalf("%s.%s targets invalid op %d", owner, field, target)
-	}
-	if _, ok := target.Spec(); !ok {
-		t.Fatalf("%s.%s targets op %d without OpSpec", owner, field, target)
+		if _, ok := stringEnumCompareLoweredOp(op); ok {
+			t.Fatalf("%s should not report a string enum compare lowering target", op)
+		}
 	}
 }

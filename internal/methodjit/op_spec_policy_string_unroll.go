@@ -30,6 +30,10 @@ var opDynamicStringQueryCacheKeyPolicies = [...]bool{
 	OpStringFormatInt:   true,
 }
 
+var opStringEnumCompareLoweredOpPolicies = [...]opTargetPolicy{
+	OpEqString: {Op: OpEqInt, Set: true},
+}
+
 var opUnrollCloneablePolicies = [...]bool{
 	OpConstInt:             true,
 	OpConstFloat:           true,

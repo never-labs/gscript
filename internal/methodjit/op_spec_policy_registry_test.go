@@ -93,6 +93,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opConstPoolUserPolicies", opConstPoolUserPolicies},
 		{"opRawStringResultPolicies", opRawStringResultPolicies},
 		{"opDynamicStringQueryCacheKeyPolicies", opDynamicStringQueryCacheKeyPolicies},
+		{"opStringEnumCompareLoweredOpPolicies", opStringEnumCompareLoweredOpPolicies},
 		{"opUnrollCloneablePolicies", opUnrollCloneablePolicies},
 		{"opNestedFloatPhiOverrideSafePolicies", opNestedFloatPhiOverrideSafePolicies},
 		{"opFloatReductionWideUnrollBarrierPolicies", opFloatReductionWideUnrollBarrierPolicies},

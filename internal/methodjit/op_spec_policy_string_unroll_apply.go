@@ -17,6 +17,9 @@ func applyOpSpecStringPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opDynamicStringQueryCacheKeyPolicies) {
 		spec.DynamicStringQueryCacheKey = opDynamicStringQueryCacheKeyPolicies[op]
 	}
+	if int(op) < len(opStringEnumCompareLoweredOpPolicies) && opStringEnumCompareLoweredOpPolicies[op].Set {
+		spec.StringEnumCompareLoweredOp = opStringEnumCompareLoweredOpPolicies[op].Op
+	}
 }
 
 func applyOpSpecUnrollPolicies(op Op, spec *OpSpec) {

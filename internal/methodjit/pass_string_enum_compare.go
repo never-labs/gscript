@@ -29,7 +29,11 @@ func StringEnumComparePass(fn *Function) (*Function, error) {
 		}
 		for i := 0; i < len(block.Instrs); i++ {
 			instr := block.Instrs[i]
-			if instr == nil || instr.Op != OpEqString || len(instr.Args) < 2 {
+			if instr == nil {
+				continue
+			}
+			lowered, ok := stringEnumCompareLoweredOp(instr.Op)
+			if !ok || lowered != OpEqInt || len(instr.Args) < 2 {
 				continue
 			}
 			load, constArg := stringEnumCompareParts(instr)
@@ -65,7 +69,7 @@ func StringEnumComparePass(fn *Function) (*Function, error) {
 			}
 			block.Instrs = append(block.Instrs[:i], append([]*Instr{idxConst}, block.Instrs[i:]...)...)
 			i++
-			instr.Op = OpEqInt
+			instr.Op = lowered
 			instr.Type = TypeBool
 			instr.Args = []*Value{load.Args[2], idxConst.Value()}
 			functionRemarks(fn).Add("StringEnumCompare", "changed", block.ID, instr.ID, instr.Op,
