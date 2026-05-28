@@ -44,7 +44,8 @@ firecracker-style microVMs is still recommended for hostile multi-tenant code.
 
 The embedding API already exposes `WithLibs`, library presets,
 `WithCapabilities`, `WithModuleLoading`, `WithFilesystem`,
-`WithFilesystemRoot`, and `WithSandbox`.
+`WithFilesystemRead`, `WithFilesystemWrite`, `WithFilesystemRoot`, and
+`WithSandbox`.
 
 Current controls are split deliberately:
 
@@ -55,12 +56,16 @@ Current controls are split deliberately:
 - `CapabilityFlags` gate host-backed effects that can remain dangerous even
   when a library table exists. The current public flags are
   `CapModuleLoading` for filesystem-backed `.gs` module loading and
-  `CapFilesystem` for script-side filesystem APIs such as `fs`, `dofile`, and
-  `loadfile`.
+  `CapFilesystemRead` / `CapFilesystemWrite` for script-side filesystem APIs.
+  `CapFilesystem` is a compatibility alias for
+  `CapFilesystemRead | CapFilesystemWrite`.
 - `WithLibs` does not grant host capabilities. `WithCapabilities` does not
   make hidden stdlib tables visible. A filesystem-backed stdlib table such as
-  `fs` needs both its `Lib*` bit and `CapFilesystem`; filesystem-backed
-  builtins such as `dofile` and `loadfile` are governed by `CapFilesystem`.
+  `fs` needs both its `Lib*` bit and at least the relevant filesystem
+  capability. Read APIs such as `fs.readfile`, `fs.stat`, `fs.readdir`,
+  `dofile`, and `loadfile` require `CapFilesystemRead`; write APIs such as
+  `fs.writefile`, `fs.remove`, `fs.rename`, `fs.mkdir`, `fs.chdir`, and
+  `fs.tempfile` require `CapFilesystemWrite`.
 
 The public VM applies stdlib restriction to both tree-walk and bytecode VMs.
 Capability restrictions are also bridged into bytecode execution: disabled
@@ -95,7 +100,7 @@ vm := gscript.New(
 
 - `LibSafe` is selected as the stdlib preset.
 - `CapSafe` is selected, which disables `CapModuleLoading` and
-  `CapFilesystem`.
+  both `CapFilesystemRead` and `CapFilesystemWrite`.
 - Filesystem-backed globals `fs`, `dofile`, and `loadfile` are absent.
 - `require("json")` and other enabled built-in stdlib modules still work,
   because stdlib module identity is controlled by `LibFlags`, not
@@ -270,7 +275,20 @@ Filesystem policy:
 Current public root confinement:
 
 - `WithFilesystemRoot(root)` confines script-side filesystem paths to `root`
-  and enables `CapFilesystem`.
+  and enables `CapFilesystem`, the compatibility alias for both filesystem
+  read and write access.
+- `WithFilesystemRead(false)` disables read APIs such as `fs.readfile`,
+  `fs.stat`, `fs.readdir`, `dofile`, and `loadfile`. If write access remains
+  enabled, `fs` can still expose write operations.
+- `WithFilesystemWrite(false)` disables mutating APIs such as `fs.writefile`,
+  `fs.remove`, `fs.rename`, `fs.mkdir`, `fs.chdir`, and `fs.tempfile`. If read
+  access remains enabled, `fs` can still expose read operations and
+  `dofile`/`loadfile`.
+- `WithFilesystem(false)` disables both filesystem read and write access by
+  clearing `CapFilesystem`.
+- Options are applied in order. To create a confined read-only filesystem, pass
+  `WithFilesystemRoot(root)` before `WithFilesystemWrite(false)`; to create a
+  confined write-only filesystem, pass it before `WithFilesystemRead(false)`.
 - Relative paths are resolved under `root`; absolute paths are allowed only
   when their cleaned absolute form is equal to `root` or below it.
 - Escapes through `..` are rejected with a filesystem access error. This
@@ -279,7 +297,8 @@ Current public root confinement:
 - The current implementation performs lexical/absolute path cleaning. Full
   symlink-resolution policy, special-file denial, separate read/write roots,
   and per-operation byte limits remain production roadmap items.
-- `WithFilesystem(false)` removes `fs`, `dofile`, and `loadfile` from script
+- When read and write access are both disabled, `fs`, `dofile`, and
+  `loadfile` are removed from script
   globals. It does not by itself define the logical stdlib allowlist; use
   `WithLibs` for library visibility and `WithModuleLoading(false)` for
   filesystem-backed `require`.

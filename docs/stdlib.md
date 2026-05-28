@@ -48,16 +48,28 @@
 - `LibFlags` 只控制标准库表是否出现在全局环境、是否能通过内建
   `require(name)` 取得；它不代表脚本拥有对应宿主资源权限。
 - `CapabilityFlags` 控制已经可见的脚本 API 是否能触达宿主效果。当前
-  公共能力位是 `CapModuleLoading` 和 `CapFilesystem`：前者控制
-  `require` 是否能从宿主文件系统加载 `.gs` 文件，后者控制 `fs`、
-  `dofile`、`loadfile` 等脚本侧文件 API。
+  公共能力位是 `CapModuleLoading`、`CapFilesystemRead` 和
+  `CapFilesystemWrite`：前者控制 `require` 是否能从宿主文件系统加载
+  `.gs` 文件；`CapFilesystemRead` 控制 `fs.readfile`、`fs.stat`、
+  `fs.readdir`、`dofile`、`loadfile` 等读取入口；`CapFilesystemWrite`
+  控制 `fs.writefile`、`fs.remove`、`fs.rename`、`fs.mkdir`、`fs.chdir`、
+  `fs.tempfile` 等变更入口。`CapFilesystem` 保留为兼容别名，等价于
+  `CapFilesystemRead | CapFilesystemWrite`。
 - `WithSandbox()` 等价于选择 `LibSafe` 并关闭宿主文件系统能力
   (`CapSafe`)。因此安全内建模块仍可 `require("json")`，但文件模块
   `require("helper")`、`fs`、`dofile`、`loadfile` 默认不可用。
 - `WithFilesystemRoot(root)` 会启用文件系统能力并把脚本侧路径限制在
-  `root` 内；相对路径在 root 内解析，清理后的绝对路径不得等于 root
-  外部位置。当前 root confinement 主要防 `..`/绝对路径逃逸，符号链接
-  解析、读写根拆分、特殊文件拒绝和大小限制仍是生产路线项目。
+  `root` 内；它当前授予 `CapFilesystem`，也就是同时授予读写能力。
+  相对路径在 root 内解析，清理后的绝对路径不得等于 root 外部位置。
+  当前 root confinement 主要防 `..`/绝对路径逃逸，符号链接解析、
+  独立读写根、特殊文件拒绝和大小限制仍是生产路线项目。
+- `WithFilesystemRead(false)` 可在保留写能力时禁用读取入口；
+  `WithFilesystemWrite(false)` 可在保留读能力时禁用变更入口；
+  `WithFilesystem(false)` 同时清除读写能力并移除 `fs`、`dofile`、
+  `loadfile`。
+- Options 按传入顺序应用；要组合 root confinement 和只读/只写能力，应先传
+  `WithFilesystemRoot(root)`，再传 `WithFilesystemWrite(false)` 或
+  `WithFilesystemRead(false)`。
 - `WithModuleLoading(false)` 只关闭文件系统 `.gs` 模块加载；启用的内建
   标准库模块仍可通过 `require` 获得。
 - `fs`、`os.remove`、`os.rename`、`process.run`、`process.shell`、`http.listen`、`net/http client`、`debug.goStack`、`debug.globals` 应可按 interpreter 禁用或限制。

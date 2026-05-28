@@ -25,9 +25,9 @@ extensions:
 - Go binding: `RegisterFunc`, `RegisterTable`, `BindStruct`, `BindStructWithConstructor`, and `BindMethod`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`,
-  `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRoot`,
-  `WithRequirePath`, `WithMaxSteps`, `WithPrint`, `WithVM`, `WithJIT`, and
-  `WithTracing`.
+  `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
+  `WithFilesystemWrite`, `WithFilesystemRoot`, `WithRequirePath`,
+  `WithMaxSteps`, `WithPrint`, `WithVM`, `WithJIT`, and `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -150,15 +150,28 @@ The current public API separates library visibility from host effects:
 - `LibFlags` answer "is this stdlib table visible and require-able as a
   built-in module?"
 - `CapabilityFlags` answer "may visible script APIs perform host-backed
-  effects?" The current flags are `CapModuleLoading` and `CapFilesystem`.
+  effects?" The current flags are `CapModuleLoading`,
+  `CapFilesystemRead`, and `CapFilesystemWrite`. `CapFilesystem` is a
+  compatibility alias for `CapFilesystemRead | CapFilesystemWrite`.
 - `WithSandbox()` selects `LibSafe` and `CapSafe`, so filesystem-backed module
   loading and script-side filesystem APIs are disabled by default.
 - `WithModuleLoading(false)` blocks `.gs` files loaded through `require`, but
   still allows enabled built-in stdlib modules such as `json`.
-- `WithFilesystem(false)` removes `fs`, `dofile`, and `loadfile`; it does not
-  change which safe built-in tables are present.
-- `WithFilesystemRoot(root)` enables filesystem APIs and confines script-side
-  paths to `root`.
+- `WithFilesystem(false)` clears both filesystem read and write capabilities.
+  When both are disabled, `fs`, `dofile`, and `loadfile` are removed; this does
+  not change which safe built-in tables are present.
+- `WithFilesystemRead(false)` disables read APIs such as `fs.readfile`,
+  `fs.stat`, `fs.readdir`, `dofile`, and `loadfile` while leaving write access
+  unchanged.
+- `WithFilesystemWrite(false)` disables mutating APIs such as `fs.writefile`,
+  `fs.remove`, `fs.rename`, `fs.mkdir`, `fs.chdir`, and `fs.tempfile` while
+  leaving read access unchanged.
+- `WithFilesystemRoot(root)` confines script-side paths to `root` and enables
+  `CapFilesystem`, so it grants both read and write access unless followed by
+  `WithFilesystemRead(false)` or `WithFilesystemWrite(false)`.
+- Options are applied in order, so combine root confinement with read-only or
+  write-only access by passing `WithFilesystemRoot(root)` before the narrower
+  `WithFilesystemWrite(false)` or `WithFilesystemRead(false)` option.
 
 Current sandbox gaps:
 
@@ -168,9 +181,10 @@ Current sandbox gaps:
   duration, or wall-clock time.
 - Context-aware public entry points exist, but cancellation is not yet
   preemptive inside long-running interpreter, bytecode VM, or JIT loops.
-- Filesystem policy is currently limited to an on/off capability plus one root
-  confinement directory. There is no read/write split, byte limit, symlink
-  policy, special-file policy, or per-operation audit event.
+- Filesystem policy currently has read/write capability bits plus one root
+  confinement directory. It does not yet have separate read roots and write
+  roots, byte limits, symlink policy, special-file policy, or per-operation
+  audit events.
 - No public host policy for network, process, environment, debug
   introspection, or host callbacks beyond coarse stdlib removal.
 - No public loader interface for resolving, validating, caching, or auditing
