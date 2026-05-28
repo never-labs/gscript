@@ -128,6 +128,51 @@ func (s *SoA) SetRow(i int, row *Table) error {
 	return nil
 }
 
+func (s *SoA) AddScaled(dstName, srcName string, scale float64) error {
+	dst, src, err := s.numericColumns(dstName, srcName)
+	if err != nil {
+		return err
+	}
+	return denseArrayAddScaled(dst, src, scale)
+}
+
+func (s *SoA) Affine(dstName, srcName string, scale, bias float64) error {
+	dst, src, err := s.numericColumns(dstName, srcName)
+	if err != nil {
+		return err
+	}
+	return denseArrayAffine(dst, src, scale, bias)
+}
+
+func (s *SoA) Sum(columnName string) (Value, error) {
+	if s == nil {
+		return NilValue(), fmt.Errorf("soa is nil")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return NilValue(), fmt.Errorf("soa column %q not found", columnName)
+	}
+	return DenseArrayReduce(DenseArrayReduceSum, col)
+}
+
+func (s *SoA) numericColumns(dstName, srcName string) (*DenseArray, *DenseArray, error) {
+	if s == nil {
+		return nil, nil, fmt.Errorf("soa is nil")
+	}
+	dst, ok := s.Column(dstName)
+	if !ok {
+		return nil, nil, fmt.Errorf("soa column %q not found", dstName)
+	}
+	src, ok := s.Column(srcName)
+	if !ok {
+		return nil, nil, fmt.Errorf("soa column %q not found", srcName)
+	}
+	if dst.Len() != src.Len() {
+		return nil, nil, fmt.Errorf("soa column length mismatch")
+	}
+	return dst, src, nil
+}
+
 func (s *SoA) String() string {
 	if s == nil {
 		return "soa<nil>"

@@ -30,6 +30,7 @@ var stdlibModuleNames = []string{
 	"regexp",
 	"rl",
 	"script",
+	"soa",
 	"sort",
 	"string",
 	"table",

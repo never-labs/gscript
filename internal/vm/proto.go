@@ -39,6 +39,7 @@ type FuncProto struct {
 	MatrixMultiplySpecialization          *matrixMultiplySpecializationCache          // guarded runtime-generated matrix multiply specialization cache
 	DenseMatrixMultiplyTBSpecialization   *denseMatrixMultiplyTBSpecializationCache   // guarded runtime-generated dense transposed matrix multiply specialization cache
 	SpectralRuntimeSpecialization         *spectralRuntimeSpecializationCache         // guarded runtime-generated spectral call-site runtime specialization cache
+	SoAColumnAffineUpdateSpecialization   *soaColumnAffineUpdateCache                 // guarded runtime-generated SoA column affine update specialization cache
 	RecordWalkFoldSpecialization          *recordWalkFoldSpecializationCache          // guarded runtime-generated record walk/fold specialization cache
 	BoolTableMarkCountSpecialization      *boolTableMarkCountSpecializationCache      // guarded runtime-generated bool table mark-count specialization cache
 	TableAffineUpdateModuloSpecialization *tableAffineUpdateModuloLeafCache           // guarded runtime-generated table affine update modulo cache

@@ -39,6 +39,7 @@ JIT fast path policy:
 
 | Module | Safety | Host capability | Error model | JIT fast path |
 |---|---|---|---|---|
+| `array` | Pure | none; in-process dense typed array allocation and conversion | runtime error for bad argument shape or unsupported dtype/value | VM fallback; runtime specialization target for dense column loops |
 | `base64` | Pure | none; string/byte encoding only | runtime error for bad argument shape; `nil, err` for malformed decode | VM fallback |
 | `binary` | Pure | none; binary pack/unpack over strings | runtime error for bad argument shape; `nil, err` for malformed fields or bounds | VM fallback |
 | `bit32` | Pure | none; 32-bit integer bit operations | runtime error | native identity for selected bit ops; VM fallback otherwise |
@@ -67,6 +68,7 @@ JIT fast path policy:
 | `regexp` | Pure | none; Go RE2 compile/match/replace/split | runtime error for bad arguments; `nil, err` for invalid patterns in non-must APIs | runtime specialization for regexp hot driver cases; VM fallback |
 | `rl` | Privileged host | optional raylib window, drawing, input, audio; default build is a stub | runtime error for invalid calls; stub-safe sentinel behavior when bindings are unavailable | VM fallback |
 | `script` | Privileged host | script path, loader, and entry metadata | runtime error; sentinel nil/empty for unavailable metadata | VM fallback |
+| `soa` | Pure | none; in-process structure-of-arrays records over dense columns | runtime error for bad columns, mismatched lengths, or invalid row values | runtime specialization for recognized column kernels; VM fallback |
 | `sort` | Pure | in-process sort helpers with optional script callbacks | runtime error, including invalid comparator/order cases | runtime specialization for numeric sort cases; VM callback and VM fallback |
 | `string` | Pure | none; Lua-style byte string and pattern helpers plus Go-style helpers | runtime error | native identity for `format`, `sub`, `split`, `find`, `match`, `gsub`; VM fallback otherwise |
 | `table` | Pure | in-process table mutation, iteration, raw/proxy helpers, callback helpers | runtime error; sentinel nil/empty for absent values | native identity for raw helpers/iterators; VM callback and VM fallback |

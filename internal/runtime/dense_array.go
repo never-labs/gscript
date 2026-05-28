@@ -454,6 +454,66 @@ func denseArrayReduceF64(op DenseArrayReduceOp, xs []float64) (Value, error) {
 	}
 }
 
+func denseArrayAddScaled(dst, src *DenseArray, scale float64) error {
+	if dst == nil || src == nil {
+		return ErrDenseArrayOperand
+	}
+	if dst.Len() != src.Len() {
+		return ErrDenseArrayLength
+	}
+	if dst.dtype == DenseArrayBool || src.dtype == DenseArrayBool {
+		return ErrDenseArrayDType
+	}
+	if dst.dtype == DenseArrayF64 {
+		switch src.dtype {
+		case DenseArrayF64:
+			for i := range dst.f64 {
+				dst.f64[i] += src.f64[i] * scale
+			}
+		case DenseArrayI64:
+			for i := range dst.f64 {
+				dst.f64[i] += float64(src.i64[i]) * scale
+			}
+		default:
+			return ErrDenseArrayDType
+		}
+		return nil
+	}
+	if dst.dtype == DenseArrayI64 && src.dtype == DenseArrayI64 && scale == float64(int64(scale)) {
+		s := int64(scale)
+		for i := range dst.i64 {
+			dst.i64[i] += src.i64[i] * s
+		}
+		return nil
+	}
+	return fmt.Errorf("dense array addScaled requires f64 destination or integral i64 scale")
+}
+
+func denseArrayAffine(dst, src *DenseArray, scale, bias float64) error {
+	if dst == nil || src == nil {
+		return ErrDenseArrayOperand
+	}
+	if dst.Len() != src.Len() {
+		return ErrDenseArrayLength
+	}
+	if dst.dtype != DenseArrayF64 || src.dtype == DenseArrayBool {
+		return fmt.Errorf("dense array affine requires f64 destination and numeric source")
+	}
+	switch src.dtype {
+	case DenseArrayF64:
+		for i := range dst.f64 {
+			dst.f64[i] = src.f64[i]*scale + bias
+		}
+	case DenseArrayI64:
+		for i := range dst.f64 {
+			dst.f64[i] = float64(src.i64[i])*scale + bias
+		}
+	default:
+		return ErrDenseArrayDType
+	}
+	return nil
+}
+
 func denseArrayFloatAt(a *DenseArray, i int) float64 {
 	switch a.dtype {
 	case DenseArrayF64:

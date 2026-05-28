@@ -1347,6 +1347,20 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					break
 				}
 			}
+			if tableVal.IsDenseArray() && key.IsInt() {
+				val, err := tableVal.DenseArray().At(int(key.Int() - 1))
+				if err != nil {
+					return nil, err
+				}
+				vm.regs[base+a] = val
+				if frame.closure.Proto.Feedback != nil {
+					fb := &frame.closure.Proto.Feedback[frame.pc-1]
+					fb.Left.Observe(tableVal.Type())
+					fb.Right.Observe(key.Type())
+					fb.Result.Observe(val.Type())
+				}
+				break
+			}
 			val, err := vm.tableGet(tableVal, key)
 			if err != nil {
 				return nil, err
@@ -1415,6 +1429,18 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 					break
 				}
+			}
+			if tableVal.IsDenseArray() && key.IsInt() {
+				if err := tableVal.DenseArray().Set(int(key.Int()-1), val); err != nil {
+					return nil, err
+				}
+				if frame.closure.Proto.Feedback != nil {
+					fb := &frame.closure.Proto.Feedback[frame.pc-1]
+					fb.Left.Observe(tableVal.Type())
+					fb.Right.Observe(key.Type())
+					fb.Result.Observe(val.Type())
+				}
+				break
 			}
 			if err := vm.tableSet(tableVal, key, val); err != nil {
 				return nil, err

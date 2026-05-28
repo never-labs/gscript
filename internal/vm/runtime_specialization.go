@@ -42,6 +42,7 @@ const (
 	callSiteNoResultRuntimeSpecializationSpectralCoefficientMatrixTransposeVector
 	callSiteNoResultRuntimeSpecializationSpectralCoefficientMatrixAtAVector
 	callSiteNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector
+	callSiteNoResultRuntimeSpecializationSoAColumnAffineUpdate
 	callSiteNoResultRuntimeSpecializationCount
 )
 
@@ -485,6 +486,19 @@ var callSiteNoResultRuntimeSpecializationRegistry = [callSiteNoResultRuntimeSpec
 			Recognize: isDenseSpectralAtAvProto,
 		},
 		Run: (*VM).runSpectralRuntimeSpecialization,
+	},
+	callSiteNoResultRuntimeSpecializationSoAColumnAffineUpdate: {
+		RuntimeSpecialization: RuntimeSpecialization{
+			Info: RuntimeSpecializationInfo{
+				Name:          "soa_column_affine_update",
+				Route:         RuntimeSpecializationRouteCallSiteNoResult,
+				Arity:         3,
+				Results:       runtimeSpecializationCallSiteInPlaceResultCount,
+				TieringPolicy: runtimeSpecializationTieringStructuralWithFloatConstant,
+			},
+			Recognize: isSoAColumnAffineUpdateProto,
+		},
+		Run: (*VM).runSoAColumnAffineUpdateRuntimeSpecialization,
 	},
 }
 
