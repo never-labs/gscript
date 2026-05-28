@@ -98,8 +98,8 @@ func applyOpSpecTypeNarrowPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opRawIntSpecializationBlockerPolicies) {
 		spec.RawIntSpecializationBlocker = opRawIntSpecializationBlockerPolicies[op]
 	}
-	if int(op) < len(opRawIntSpecializedOpPolicies) {
-		spec.RawIntSpecializedOp = opRawIntSpecializedOpPolicies[op]
+	if int(op) < len(opRawIntSpecializedOpPolicies) && opRawIntSpecializedOpPolicies[op].Set {
+		spec.RawIntSpecializedOp = opRawIntSpecializedOpPolicies[op].Op
 	}
 	if int(op) < len(opExactIntNarrowOpPolicies) && opExactIntNarrowOpPolicies[op].Set {
 		spec.ExactIntNarrowOp = opExactIntNarrowOpPolicies[op].Op

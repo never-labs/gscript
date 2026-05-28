@@ -58,6 +58,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 			t.Fatalf("%s has unexpected type-specialization defaults: int=%s float=%s string=%s",
 				op, spec.TypeSpecializeIntOp, spec.TypeSpecializeFloatOp, spec.TypeSpecializeStringOp)
 		}
+		if spec.RawIntSpecializedOp != OpMax {
+			t.Fatalf("%s RawIntSpecializedOp default=%s, want OpMax", op, spec.RawIntSpecializedOp)
+		}
 		if spec.ExactIntNarrowOp != OpMax {
 			t.Fatalf("%s ExactIntNarrowOp default=%s, want OpMax", op, spec.ExactIntNarrowOp)
 		}

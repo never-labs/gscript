@@ -37,10 +37,10 @@ var opFieldSvalsFirstArgMutationBarrierPolicies = [...]bool{
 	OpTableIntArrayCopyPrefix:    true,
 }
 
-var opFieldSvalsLoweredOpPolicies = [...]Op{
-	OpGetField:           OpFieldLoad,
-	OpGetFieldNumToFloat: OpFieldLoadNumToFloat,
-	OpSetField:           OpFieldStore,
+var opFieldSvalsLoweredOpPolicies = [...]opTargetPolicy{
+	OpGetField:           {Op: OpFieldLoad, Set: true},
+	OpGetFieldNumToFloat: {Op: OpFieldLoadNumToFloat, Set: true},
+	OpSetField:           {Op: OpFieldStore, Set: true},
 }
 
 var opFieldLenFoldBarrierPolicies = [...]bool{

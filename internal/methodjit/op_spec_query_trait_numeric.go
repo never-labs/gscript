@@ -45,7 +45,7 @@ func opIsNativeNumericValueProducer(op Op) bool {
 
 func rawIntSpecializedOp(op Op) (Op, bool) {
 	spec, ok := op.Spec()
-	return spec.RawIntSpecializedOp, ok && spec.RawIntSpecializedOp != Op(0)
+	return spec.RawIntSpecializedOp, ok && spec.RawIntSpecializedOp != OpMax
 }
 
 func opIsRawIntSpecializationBlocker(op Op) bool {

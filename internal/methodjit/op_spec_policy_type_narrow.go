@@ -81,22 +81,22 @@ var opRawIntSpecializationBlockerPolicies = [...]bool{
 	OpUnm: true,
 }
 
-var opRawIntSpecializedOpPolicies = [...]Op{
-	OpAdd: OpAddInt,
-	OpSub: OpSubInt,
-	OpMul: OpMulInt,
-	OpMod: OpModInt,
-	OpEq:  OpEqInt,
-	OpLt:  OpLtInt,
-	OpLe:  OpLeInt,
-}
-
-type opExactIntNarrowOpPolicy struct {
+type opTargetPolicy struct {
 	Op  Op
 	Set bool
 }
 
-var opExactIntNarrowOpPolicies = [...]opExactIntNarrowOpPolicy{
+var opRawIntSpecializedOpPolicies = [...]opTargetPolicy{
+	OpAdd: {Op: OpAddInt, Set: true},
+	OpSub: {Op: OpSubInt, Set: true},
+	OpMul: {Op: OpMulInt, Set: true},
+	OpMod: {Op: OpModInt, Set: true},
+	OpEq:  {Op: OpEqInt, Set: true},
+	OpLt:  {Op: OpLtInt, Set: true},
+	OpLe:  {Op: OpLeInt, Set: true},
+}
+
+var opExactIntNarrowOpPolicies = [...]opTargetPolicy{
 	OpAdd:      {Op: OpAddInt, Set: true},
 	OpAddFloat: {Op: OpAddInt, Set: true},
 	OpSub:      {Op: OpSubInt, Set: true},
@@ -111,12 +111,7 @@ var opExactIntNarrowOpPolicies = [...]opExactIntNarrowOpPolicy{
 	OpLe:       {Op: OpLeInt, Set: true},
 }
 
-type opBoxedFallbackOpPolicy struct {
-	Op  Op
-	Set bool
-}
-
-var opBoxedFallbackOpPolicies = [...]opBoxedFallbackOpPolicy{
+var opBoxedFallbackOpPolicies = [...]opTargetPolicy{
 	OpAddInt:      {Op: OpAdd, Set: true},
 	OpSubInt:      {Op: OpSub, Set: true},
 	OpMulInt:      {Op: OpMul, Set: true},
