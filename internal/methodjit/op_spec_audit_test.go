@@ -56,7 +56,8 @@ func TestOpAuditMatrixExplainsOracleUnsupportedOps(t *testing.T) {
 
 func TestPrintOpAuditMatrix(t *testing.T) {
 	matrix := FormatOpAuditMatrix()
-	if !strings.Contains(matrix, "validator") || !strings.Contains(matrix, "oracle") || !strings.Contains(matrix, "regalloc") {
+	if !strings.Contains(matrix, "validator") || !strings.Contains(matrix, "oracle") || !strings.Contains(matrix, "regalloc") ||
+		!strings.Contains(matrix, "effect") || !strings.Contains(matrix, "term") || !strings.Contains(matrix, "keep") {
 		t.Fatalf("matrix header missing expected columns:\n%s", matrix)
 	}
 	t.Logf("\n%s", matrix)

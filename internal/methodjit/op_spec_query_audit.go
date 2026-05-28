@@ -85,7 +85,7 @@ func OpAuditMatrix() []OpAuditRow {
 
 func FormatOpAuditMatrix() string {
 	rows := OpAuditMatrix()
-	widths := []int{2, 4, 9, 7, 6, 7, 8, 5}
+	widths := []int{2, 4, 9, 7, 6, 7, 8, 5, 6, 4, 4}
 	for _, row := range rows {
 		widths[0] = max(widths[0], len(fmt.Sprint(int(row.Op))))
 		widths[1] = max(widths[1], len(row.Name))
@@ -95,10 +95,13 @@ func FormatOpAuditMatrix() string {
 		widths[5] = max(widths[5], len(row.Emitter))
 		widths[6] = max(widths[6], len(row.Regalloc))
 		widths[7] = max(widths[7], len(row.Deopt))
+		widths[8] = max(widths[8], len(row.SideEffect))
+		widths[9] = max(widths[9], len(opAuditBool(row.Terminator)))
+		widths[10] = max(widths[10], len(opAuditBool(row.KeepUnused)))
 	}
 
 	var b strings.Builder
-	writeOpAuditRow(&b, widths, "op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt")
+	writeOpAuditRow(&b, widths, "op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt", "effect", "term", "keep")
 	writeOpAuditSep(&b, widths)
 	for _, row := range rows {
 		writeOpAuditRow(&b, widths,
@@ -110,6 +113,9 @@ func FormatOpAuditMatrix() string {
 			row.Emitter,
 			row.Regalloc,
 			row.Deopt,
+			row.SideEffect,
+			opAuditBool(row.Terminator),
+			opAuditBool(row.KeepUnused),
 		)
 	}
 	return b.String()
@@ -142,6 +148,13 @@ func writeOpAuditSep(b *strings.Builder, widths []int) {
 		b.WriteString(strings.Repeat("-", width))
 	}
 	b.WriteByte('\n')
+}
+
+func opAuditBool(v bool) string {
+	if v {
+		return "yes"
+	}
+	return "-"
 }
 
 func opAuditValidator(spec OpSpec) string {
