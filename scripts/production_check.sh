@@ -169,6 +169,18 @@ add_performance_gate() {
     add_run "Performance Gate" "$cmd"
 }
 
+add_documentation_references() {
+    if [ ! -f scripts/docs_check.sh ]; then
+        add_skip "Documentation References" "missing scripts/docs_check.sh"
+        return
+    fi
+    if ! have_cmd python3; then
+        add_skip "Documentation References" "missing python3"
+        return
+    fi
+    add_run "Documentation References" "bash scripts/docs_check.sh"
+}
+
 add_release_smoke() {
     if ! have_cmd go; then
         add_skip "Release Smoke" "missing go"
@@ -197,6 +209,7 @@ build_quick_plan() {
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Stdlib Contract" \
         "go test ./tests -run TestStdlibContract -count=1"
+    add_documentation_references
 }
 
 build_full_plan() {
@@ -206,6 +219,7 @@ build_full_plan() {
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Official Lua Compatibility Surface" \
         "go test ./tests -run Official -count=1"
+    add_documentation_references
     add_performance_gate
     add_release_smoke
 }

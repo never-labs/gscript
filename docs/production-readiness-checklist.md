@@ -59,10 +59,12 @@ captures git revision/status, Go environment summary, quick Go test logs, and
 quick benchmark/strict-guard summaries when those local tools are available.
 
 Use `scripts/production_check.sh --quick` for a short preflight that runs the
-core Go package tests, feature/integration checks, and the standard-library
-contract check without the long benchmark passes. The default `--full` mode
-runs the correctness gates, the release smoke, and the repeatable performance
-gate through `scripts/performance_gate.sh --full`. Use
+core Go package tests, feature/integration checks, the standard-library
+contract check, and the documentation reference gate when `scripts/docs_check.sh`
+is present, without the long benchmark passes. The default `--full` mode runs
+the correctness gates, the documentation reference gate when available, the
+release smoke, and the repeatable performance gate through
+`scripts/performance_gate.sh --full`. Use
 `scripts/production_check.sh --list` to print the available command subset for
 the current checkout. Add `--out-dir DIR` to write the resolved plan and command
 logs to a local artifact directory; this works with `--quick`, default `--full`,
@@ -71,7 +73,7 @@ behavior. If LuaJIT is unavailable, benchmark commands that support it are run
 with `--no-luajit`; if optional tools such as `pytest` are absent, the script
 reports that clearly instead of failing before the Go gates run.
 
-Before publishing a tag, run the documentation reference gate:
+The integrated documentation reference gate is:
 
 ```bash
 scripts/docs_check.sh
@@ -89,14 +91,14 @@ artifacts:
 ```bash
 go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1
 bash scripts/production_check.sh --quick
-scripts/docs_check.sh
 go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
 ```
 
 These commands cover fast Go correctness, the repository-owned production
-preflight, documentation link/script-reference drift, and the release matrix
-metadata gate. A version tag is not releasable until the full local checklist
-below has also been run and archived with the release evidence.
+preflight including documentation link/script-reference drift when the checker
+is available, and the release matrix metadata gate. A version tag is not
+releasable until the full local checklist below has also been run and archived
+with the release evidence.
 
 ### Correctness
 
