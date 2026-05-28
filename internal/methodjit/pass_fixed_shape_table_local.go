@@ -249,6 +249,10 @@ func classifyReturnedField(fn *Function, instrByID map[int]*Instr, fact FixedSha
 }
 
 func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
+	return inferLocalFixedShapeTablesWithFacts(fn, nil)
+}
+
+func inferLocalFixedShapeTablesWithFacts(fn *Function, numeric *NumericFacts) map[int]FixedShapeTableFact {
 	if fn == nil || fn.Proto == nil {
 		return nil
 	}
@@ -272,7 +276,7 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 				allocFieldTableFacts[instr.ID] = make(map[string]FixedShapeTableFact)
 				out[instr.ID] = FixedShapeTableFact{}
 			case OpNewFixedTable:
-				fact, ok := fixedShapeFactForFixedConstructor(fn, instr, globalTypes)
+				fact, ok := fixedShapeFactForFixedConstructor(fn, instr, globalTypes, numeric)
 				if ok {
 					out[instr.ID] = fact
 				}
@@ -297,7 +301,7 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 						allocTypes[allocID][name] = typ
 					}
 				}
-				if r, ok := inferFixedCtorArgRange(fn, instr.Args[1]); ok {
+				if r, ok := inferFixedCtorArgRange(instr.Args[1], numeric); ok {
 					allocRanges[allocID][name] = r
 				}
 				if valueFact, ok := out[instr.Args[1].ID]; ok && fixedShapeTableFactHasUsableTableFact(valueFact) {
@@ -357,7 +361,7 @@ func inferLocalFixedShapeTables(fn *Function) map[int]FixedShapeTableFact {
 	return out
 }
 
-func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes map[int64]Type) (FixedShapeTableFact, bool) {
+func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes map[int64]Type, numeric *NumericFacts) (FixedShapeTableFact, bool) {
 	if fn == nil || fn.Proto == nil || instr == nil || instr.Op != OpNewFixedTable {
 		return FixedShapeTableFact{}, false
 	}
@@ -397,7 +401,7 @@ func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes m
 				types[field] = typ
 			}
 		}
-		if r, ok := inferFixedCtorArgRange(fn, instr.Args[i]); ok {
+		if r, ok := inferFixedCtorArgRange(instr.Args[i], numeric); ok {
 			ranges[field] = r
 		}
 	}
@@ -410,14 +414,14 @@ func fixedShapeFactForFixedConstructor(fn *Function, instr *Instr, globalTypes m
 	}, true
 }
 
-func inferFixedCtorArgRange(fn *Function, v *Value) (intRange, bool) {
+func inferFixedCtorArgRange(v *Value, numeric *NumericFacts) (intRange, bool) {
 	if c, ok := constIntFromValue(v); ok {
 		return pointRange(c), true
 	}
 	if v == nil {
 		return intRange{}, false
 	}
-	if numeric := functionNumericFacts(fn); numeric != nil {
+	if numeric != nil {
 		if r, ok := numeric.IntRange(v.ID); ok && r.known {
 			return r, true
 		}

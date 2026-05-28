@@ -132,7 +132,7 @@ func fixedShapeTableFactsPass(fn *Function, config FixedShapeTableFactsConfig, t
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	facts := inferLocalFixedShapeTables(fn)
+	facts := inferLocalFixedShapeTablesWithFacts(fn, numeric)
 	if len(facts) == 0 {
 		facts = make(map[int]FixedShapeTableFact)
 	}

@@ -15,7 +15,7 @@ import (
 
 func annotateFixedShapeGetFields(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts, facts map[int]FixedShapeTableFact) {
 	mutableFields := collectFixedShapeMutableFields(fn)
-	mutableRanges := collectFixedShapeMutableFieldRanges(fn, tableShapes, facts, mutableFields)
+	mutableRanges := collectFixedShapeMutableFieldRanges(fn, tableShapes, numeric, facts, mutableFields)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if annotateFixedShapeFieldLoad(fn, tableShapes, numeric, block, instr, facts, mutableFields, mutableRanges) {
@@ -227,12 +227,11 @@ func collectFixedShapeMutableFields(fn *Function) map[uint32]map[int]bool {
 	return mutable
 }
 
-func collectFixedShapeMutableFieldRanges(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, mutable map[uint32]map[int]bool) map[uint32]map[int]intRange {
+func collectFixedShapeMutableFieldRanges(fn *Function, tableShapes *TableShapeFacts, numeric *NumericFacts, facts map[int]FixedShapeTableFact, mutable map[uint32]map[int]bool) map[uint32]map[int]intRange {
 	out := make(map[uint32]map[int]intRange)
 	if fn == nil || len(mutable) == 0 || !fixedShapeMutableRangeFactsSafeFunction(fn) {
 		return out
 	}
-	numeric := functionNumericFacts(fn)
 
 	merge := func(shapeID uint32, fieldIdx int, r intRange) {
 		if shapeID == 0 || fieldIdx < 0 || !r.known || !fixedShapeFieldMayMutate(mutable, shapeID, fieldIdx) {
