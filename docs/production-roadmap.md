@@ -30,6 +30,17 @@ GScript should become a small, predictable, embeddable language with:
 | Performance and JIT | `docs/performance.md` | Are performance wins validated by correctness oracles and stable benchmark guardrails? |
 | Release engineering | `docs/release.md` | Can the project ship versioned artifacts with documented compatibility and support policy? |
 
+Supporting audits:
+
+- `docs/api-audit.md` records the current public Go API surface and the
+  internal concepts that should or should not become stable.
+- `docs/test-matrix.md` maps correctness, official translated tests, stdlib
+  tests, and benchmark oracles to release gates.
+- `docs/benchmark-timing-audit.md` records the current timing harness risks and
+  the path to removing unexplained `low_resolution` cells.
+- `docs/cli-audit.md` records the current command-line surface and the command
+  set expected from a standalone language.
+
 ## Phase Plan
 
 ### Phase 1: Specify and Stabilize
@@ -114,10 +125,12 @@ Exit criteria:
 
 ## Immediate Next Tasks
 
-1. Land the seven detailed roadmap docs named above.
-2. Add a production-readiness checklist that maps docs to tests and CI commands.
-3. Audit the exported Go API and decide which internal concepts become public.
-4. Normalize official hot benchmark timing so no release table contains
-   unexplained `low_resolution` cells.
+1. Land the seven detailed roadmap docs named above. Done in this roadmap
+   bundle.
+2. Use `docs/production-readiness-checklist.md` as the release-gate index that
+   maps docs to tests, benchmark commands, and CI candidates.
+3. Use `docs/api-audit.md` to decide which internal concepts become public.
+4. Use `docs/benchmark-timing-audit.md` to normalize official hot benchmark
+   timing so no release table contains unexplained `low_resolution` cells.
 5. Choose the first production feature implementation after the audit: public
    embedding API, sandbox capabilities, or test runner.
