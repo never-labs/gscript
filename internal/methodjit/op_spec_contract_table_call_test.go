@@ -3,6 +3,15 @@ package methodjit
 import "testing"
 
 func TestTableCallContractsLiveInOpSpec(t *testing.T) {
+	if lowered, ok := callFloorProjectionOp(OpCall); !ok || lowered != OpCallFloor {
+		t.Fatalf("Call floor projection target = %s, %v; want CallFloor, true", lowered, ok)
+	}
+	if lowered, ok := fieldCallFloorProjectionOp(OpCall); !ok || lowered != OpFieldCallFloor {
+		t.Fatalf("field call floor projection target = %s, %v; want FieldCallFloor, true", lowered, ok)
+	}
+	if lowered, ok := callFloorProjectionOp(OpCallFloor); ok || lowered != OpMax {
+		t.Fatalf("CallFloor projection target = %s, %v; want OpMax, false", lowered, ok)
+	}
 	for _, op := range []Op{OpGetField, OpGetFieldNumToFloat, OpSetField} {
 		spec, ok := op.Spec()
 		if !ok || !spec.NeedsTier2FieldCache {

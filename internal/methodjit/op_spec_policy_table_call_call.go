@@ -11,6 +11,14 @@ var opModuloReducibleCallFloorPolicies = [...]bool{
 	OpFieldCallFloor: true,
 }
 
+var opCallFloorProjectionOpPolicies = [...]opTargetPolicy{
+	OpCall: {Op: OpCallFloor, Set: true},
+}
+
+var opFieldCallFloorProjectionOpPolicies = [...]opTargetPolicy{
+	OpCall: {Op: OpFieldCallFloor, Set: true},
+}
+
 var opCallFloorSpecStableCalleePolicies = [...]bool{
 	OpCallFloor: true,
 }

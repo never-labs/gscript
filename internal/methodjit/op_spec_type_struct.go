@@ -140,6 +140,8 @@ type OpSpec struct {
 	BoolTableCountIncrement       bool
 	CallResultRangeGuardCandidate bool
 	ModuloReducibleCallFloor      bool
+	CallFloorProjectionOp         Op
+	FieldCallFloorProjectionOp    Op
 	CallFloorSpecStableCallee     bool
 	CallFloorSpecFieldShape       bool
 	Tier2LoopCall                 bool

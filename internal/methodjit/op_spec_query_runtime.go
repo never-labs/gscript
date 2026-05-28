@@ -158,6 +158,16 @@ func isModuloReducibleCallFloor(instr *Instr) bool {
 	return ok && spec.ModuloReducibleCallFloor
 }
 
+func callFloorProjectionOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.CallFloorProjectionOp, ok && spec.CallFloorProjectionOp != OpMax
+}
+
+func fieldCallFloorProjectionOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.FieldCallFloorProjectionOp, ok && spec.FieldCallFloorProjectionOp != OpMax
+}
+
 func isCallResultRangeGuardCandidate(instr *Instr) bool {
 	if instr == nil {
 		return false

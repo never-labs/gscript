@@ -39,6 +39,8 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "MatrixRowLoweredOp", spec.MatrixRowLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixRowConstLoweredOp", spec.MatrixRowConstLoweredOp)
 		assertOpSpecTarget(t, op, "TableArrayLoweredOp", spec.TableArrayLoweredOp)
+		assertOpSpecTarget(t, op, "CallFloorProjectionOp", spec.CallFloorProjectionOp)
+		assertOpSpecTarget(t, op, "FieldCallFloorProjectionOp", spec.FieldCallFloorProjectionOp)
 	}
 	if len(seenNames) != int(OpMax) {
 		t.Fatalf("OpSpec name lookup saw %d names, want %d", len(seenNames), OpMax)
@@ -92,6 +94,10 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.TableArrayLoweredOp != OpMax {
 			t.Fatalf("%s TableArrayLoweredOp default=%s, want OpMax", op, spec.TableArrayLoweredOp)
 		}
+		if spec.CallFloorProjectionOp != OpMax || spec.FieldCallFloorProjectionOp != OpMax {
+			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax",
+				op, spec.CallFloorProjectionOp, spec.FieldCallFloorProjectionOp)
+		}
 		if spec.ClosureScalarLocalUseArgIndex != -1 || spec.ClosureScalarLoadClosureArgIndex != -1 ||
 			spec.ClosureScalarStoreClosureArgIndex != -1 || spec.ClosureScalarStoreValueArgIndex != -1 {
 			t.Fatalf("%s closure scalar arg defaults=%d/%d/%d/%d, want all -1",
@@ -144,6 +150,12 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := tableArrayLoweredOp(op); ok {
 			t.Fatalf("%s should not report a table-array lowering target", op)
+		}
+		if _, ok := callFloorProjectionOp(op); ok {
+			t.Fatalf("%s should not report a call-floor projection target", op)
+		}
+		if _, ok := fieldCallFloorProjectionOp(op); ok {
+			t.Fatalf("%s should not report a field-call-floor projection target", op)
 		}
 	}
 }

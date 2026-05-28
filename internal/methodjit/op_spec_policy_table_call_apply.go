@@ -63,6 +63,12 @@ func applyOpSpecTableCallCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opModuloReducibleCallFloorPolicies) {
 		spec.ModuloReducibleCallFloor = opModuloReducibleCallFloorPolicies[op]
 	}
+	if int(op) < len(opCallFloorProjectionOpPolicies) && opCallFloorProjectionOpPolicies[op].Set {
+		spec.CallFloorProjectionOp = opCallFloorProjectionOpPolicies[op].Op
+	}
+	if int(op) < len(opFieldCallFloorProjectionOpPolicies) && opFieldCallFloorProjectionOpPolicies[op].Set {
+		spec.FieldCallFloorProjectionOp = opFieldCallFloorProjectionOpPolicies[op].Op
+	}
 	if int(op) < len(opCallFloorSpecStableCalleePolicies) {
 		spec.CallFloorSpecStableCallee = opCallFloorSpecStableCalleePolicies[op]
 	}

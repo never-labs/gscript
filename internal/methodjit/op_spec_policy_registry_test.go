@@ -112,6 +112,8 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opBoolTableCountIncrementPolicies", opBoolTableCountIncrementPolicies},
 		{"opCallResultRangeGuardCandidatePolicies", opCallResultRangeGuardCandidatePolicies},
 		{"opModuloReducibleCallFloorPolicies", opModuloReducibleCallFloorPolicies},
+		{"opCallFloorProjectionOpPolicies", opCallFloorProjectionOpPolicies},
+		{"opFieldCallFloorProjectionOpPolicies", opFieldCallFloorProjectionOpPolicies},
 		{"opCallFloorSpecStableCalleePolicies", opCallFloorSpecStableCalleePolicies},
 		{"opCallFloorSpecFieldShapePolicies", opCallFloorSpecFieldShapePolicies},
 		{"opTier2LoopCallPolicies", opTier2LoopCallPolicies},
