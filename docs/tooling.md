@@ -494,6 +494,11 @@ Diagnostics are a strong existing capability:
   to IR/opcode/source metadata.
 - `benchmarks/diagnose.py`, `triage.py`, `debug_artifact.py`, and
   `jit_addr_map.py` turn raw diagnostics into artifact bundles and summaries.
+- `scripts/diagnostics_bundle.sh` is the current scriptable local collection
+  entrypoint. It writes an ignored `diagnostics/<timestamp>/` bundle by default,
+  or another explicitly supplied ignored/external directory, with git revision,
+  Go environment summary, quick Go test logs, and quick benchmark/strict-guard
+  summaries when the local harnesses are available.
 
 ### Gaps
 

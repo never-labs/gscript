@@ -46,6 +46,16 @@ The local release-gate entrypoint is:
 scripts/production_check.sh
 ```
 
+For handoff or failure triage, collect a local diagnostics bundle:
+
+```bash
+scripts/diagnostics_bundle.sh
+```
+
+The bundle defaults to the git-ignored `diagnostics/<timestamp>/` directory and
+captures git revision/status, Go environment summary, quick Go test logs, and
+quick benchmark/strict-guard summaries when those local tools are available.
+
 Use `scripts/production_check.sh --quick` for a short preflight that runs the
 core Go package tests, feature/integration checks, and the standard-library
 contract check without the long benchmark passes. Use
