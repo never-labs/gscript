@@ -32,7 +32,10 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 	}
 	config.TableShapes = tableShapes
 	globals := callABIMergeGlobals(config.Globals, callABIStableGlobals(fn.Proto))
-	callFacts := functionCallFacts(fn)
+	callFacts := config.CallFacts
+	if callFacts == nil {
+		callFacts = functionCallFacts(fn)
+	}
 	callFacts.SetCallABIs(nil)
 
 	tails := callABITailCalls(fn)
