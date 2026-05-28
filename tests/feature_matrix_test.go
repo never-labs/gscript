@@ -26,12 +26,13 @@ func TestFeatureMatrixSchema(t *testing.T) {
 	if err := json.Unmarshal(data, &matrix); err != nil {
 		t.Fatalf("decode feature matrix: %v", err)
 	}
-	if matrix.SchemaVersion != 1 {
-		t.Fatalf("schema_version = %d, want 1", matrix.SchemaVersion)
+	if matrix.SchemaVersion != 2 {
+		t.Fatalf("schema_version = %d, want 2", matrix.SchemaVersion)
 	}
 	if len(matrix.Features) == 0 {
 		t.Fatal("feature matrix must contain at least one feature")
 	}
+	specSections := loadLanguageSpecSections(t, root)
 
 	statuses := make(map[string]bool, len(matrix.StatusValues))
 	for _, status := range matrix.StatusValues {
@@ -69,6 +70,12 @@ func TestFeatureMatrixSchema(t *testing.T) {
 		seenIDs[id] = true
 		_ = decodeRequiredString(t, feature, i, "name")
 		_ = decodeRequiredString(t, feature, i, "category")
+		sections := decodeRequiredStringList(t, feature, i, "spec_sections")
+		for _, section := range sections {
+			if !specSections[section] {
+				t.Fatalf("features[%d] %s.spec_sections references missing language spec section %q", i, id, section)
+			}
+		}
 
 		for _, field := range matrix.RequiredFields {
 			raw, ok := feature[field]
@@ -106,6 +113,54 @@ func decodeRequiredString(t *testing.T, feature map[string]json.RawMessage, inde
 		t.Fatalf("features[%d].%s must not be empty", index, field)
 	}
 	return value
+}
+
+func decodeRequiredStringList(t *testing.T, feature map[string]json.RawMessage, index int, field string) []string {
+	t.Helper()
+	raw, ok := feature[field]
+	if !ok {
+		t.Fatalf("features[%d] missing %q", index, field)
+	}
+	var values []string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		t.Fatalf("features[%d].%s: %v", index, field, err)
+	}
+	if len(values) == 0 {
+		t.Fatalf("features[%d].%s must not be empty", index, field)
+	}
+	seen := map[string]bool{}
+	for _, value := range values {
+		if value == "" {
+			t.Fatalf("features[%d].%s must not contain empty strings", index, field)
+		}
+		if seen[value] {
+			t.Fatalf("features[%d].%s contains duplicate section %q", index, field, value)
+		}
+		seen[value] = true
+	}
+	return values
+}
+
+func loadLanguageSpecSections(t *testing.T, root string) map[string]bool {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, "docs", "language-spec.md"))
+	if err != nil {
+		t.Fatalf("read language spec: %v", err)
+	}
+	sections := map[string]bool{}
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "## ") {
+			continue
+		}
+		title := strings.TrimSpace(strings.TrimPrefix(line, "## "))
+		if title != "" {
+			sections[title] = true
+		}
+	}
+	if len(sections) == 0 {
+		t.Fatal("language spec must contain at least one level-2 section")
+	}
+	return sections
 }
 
 func assertRepoRelativeFileRef(t *testing.T, root, featureID, field, ref string) {

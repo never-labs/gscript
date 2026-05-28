@@ -21,6 +21,7 @@ and hot performance cases.
 | `semantic_gate` | CI or official-case gate that should block semantic regressions. |
 | `official_case` | Translated official Lua or comparable semantic cases. |
 | `perf_hot_case` | Hot-loop benchmark coverage, when the feature matters for steady-state performance. |
+| `spec_sections` | Level-2 sections in `docs/language-spec.md` that define this feature's language contract. |
 
 Allowed status values are:
 
@@ -60,9 +61,12 @@ Allowed status values are:
 
 Update `tests/feature_matrix.json` first. The lightweight Go test
 `TestFeatureMatrixSchema` checks that every feature row has all required fields,
-uses an allowed status, keeps references as relative paths, and points file
-references at existing repository files.
+uses an allowed status, keeps references as relative paths, points file
+references at existing repository files, and maps `spec_sections` to existing
+level-2 headings in `docs/language-spec.md`.
 
 When adding a new language feature, add one row even if several columns are
 `partial` or `missing`. The point of this matrix is to make gaps explicit
-before they turn into assumptions about semantic or tier coverage.
+before they turn into assumptions about semantic or tier coverage. If no
+language-spec section can be cited yet, update the specification first; parser
+behavior alone is not a user-facing contract.
