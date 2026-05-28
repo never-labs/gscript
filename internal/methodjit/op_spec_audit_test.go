@@ -23,6 +23,7 @@ func TestOpAuditMatrixCoversEveryOp(t *testing.T) {
 			"emitter":                               row.Emitter,
 			"regalloc":                              row.Regalloc,
 			"deopt":                                 row.Deopt,
+			"side_effect":                           row.SideEffect,
 			"arg_policy":                            row.ArgPolicy,
 			"oracle_support":                        row.OracleSupport,
 			"emitter_family":                        row.EmitterFamily,
@@ -82,7 +83,7 @@ func TestWriteOpAuditMatrixJSON(t *testing.T) {
 	}
 	for _, key := range []string{
 		"op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt",
-		"arg_policy", "oracle_support", "emitter_family", "may_deopt",
+		"side_effect", "terminator", "keep_unused", "arg_policy", "oracle_support", "emitter_family", "may_deopt",
 		"direct_deopt_without_full_flush", "native_replay_may_exit",
 		"native_replay_visible_side_effect", "native_replay_visible_table_mutation",
 		"native_callee_resume_unsafe", "restart_visible_side_effect",
@@ -114,6 +115,15 @@ func TestOpAuditMatrixStructuredFieldsMatchOpSpec(t *testing.T) {
 		}
 		if row.EmitterFamily != spec.EmitterFamily.String() {
 			t.Fatalf("%s emitter_family = %q, want %q", row.Name, row.EmitterFamily, spec.EmitterFamily.String())
+		}
+		if row.SideEffect != spec.SideEffect.String() {
+			t.Fatalf("%s side_effect = %q, want %q", row.Name, row.SideEffect, spec.SideEffect.String())
+		}
+		if row.Terminator != spec.Terminator {
+			t.Fatalf("%s terminator = %t, want %t", row.Name, row.Terminator, spec.Terminator)
+		}
+		if row.KeepUnused != spec.KeepUnused {
+			t.Fatalf("%s keep_unused = %t, want %t", row.Name, row.KeepUnused, spec.KeepUnused)
 		}
 		if row.MayDeopt != spec.MayDeopt {
 			t.Fatalf("%s may_deopt = %t, want %t", row.Name, row.MayDeopt, spec.MayDeopt)

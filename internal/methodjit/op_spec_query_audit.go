@@ -16,6 +16,9 @@ type OpAuditRow struct {
 	Emitter                          string `json:"emitter"`
 	Regalloc                         string `json:"regalloc"`
 	Deopt                            string `json:"deopt"`
+	SideEffect                       string `json:"side_effect"`
+	Terminator                       bool   `json:"terminator"`
+	KeepUnused                       bool   `json:"keep_unused"`
 	ArgPolicy                        string `json:"arg_policy"`
 	OracleSupport                    string `json:"oracle_support"`
 	OracleReason                     string `json:"oracle_reason,omitempty"`
@@ -53,6 +56,9 @@ func OpAuditMatrix() []OpAuditRow {
 			Emitter:                          opAuditEmitter(spec),
 			Regalloc:                         opAuditRegalloc(spec),
 			Deopt:                            opAuditDeopt(spec),
+			SideEffect:                       spec.SideEffect.String(),
+			Terminator:                       spec.Terminator,
+			KeepUnused:                       spec.KeepUnused,
 			ArgPolicy:                        spec.ArgPolicy.String(),
 			OracleSupport:                    spec.OracleSupport.String(),
 			OracleReason:                     spec.OracleUnsupportedReason,
