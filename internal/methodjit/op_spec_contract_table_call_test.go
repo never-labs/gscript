@@ -118,6 +118,20 @@ func TestTableCallContractsLiveInOpSpec(t *testing.T) {
 	if spec, ok := OpFieldCallFloor.Spec(); !ok || !spec.Tier2LoopNativeCandidate {
 		t.Fatalf("FieldCallFloor Tier2 native-candidate contract should be driven by OpSpec")
 	}
+	for _, op := range []Op{
+		OpSelf, OpConcat, OpAppend, OpSetList,
+		OpGo, OpMakeChan, OpSend, OpRecv,
+		OpClosure, OpClose, OpVararg, OpPow,
+		OpTForCall, OpTForLoop,
+	} {
+		spec, ok := op.Spec()
+		if !ok || !spec.Tier2CallBoundaryLoopBlocker || !opIsTier2CallBoundaryLoopBlocker(op) {
+			t.Fatalf("%s Tier2 call-boundary loop blocker contract should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpSetList.Spec(); !ok || !spec.Tier2LoopAllocationBlocker || !opIsTier2LoopAllocationBlocker(OpSetList) {
+		t.Fatalf("SetList Tier2 loop-allocation blocker contract should be driven by OpSpec")
+	}
 	for _, tc := range []struct {
 		op    Op
 		start int

@@ -156,6 +156,8 @@ type OpSpec struct {
 	Tier2LoopFeedbackVMProtoCall  bool
 	Tier2ResidualCallBlocker      bool
 	Tier2LoopNativeCandidate      bool
+	Tier2CallBoundaryLoopBlocker  bool
+	Tier2LoopAllocationBlocker    bool
 	TableArrayStoreLoopCandidate  bool
 	TableArrayStoreLoopBlocker    bool
 	TableArrayStoreLoopEscapeCall bool

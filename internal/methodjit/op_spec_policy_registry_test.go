@@ -97,6 +97,8 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opTier2LoopFeedbackVMProtoCallPolicies", opTier2LoopFeedbackVMProtoCallPolicies},
 		{"opTier2ResidualCallBlockerPolicies", opTier2ResidualCallBlockerPolicies},
 		{"opTier2LoopNativeCandidatePolicies", opTier2LoopNativeCandidatePolicies},
+		{"opTier2CallBoundaryLoopBlockerPolicies", opTier2CallBoundaryLoopBlockerPolicies},
+		{"opTier2LoopAllocationBlockerPolicies", opTier2LoopAllocationBlockerPolicies},
 		{"opCallUserArgStartPolicies", opCallUserArgStartPolicies},
 		{"opSpeculativeIntUseCandidatePolicies", opSpeculativeIntUseCandidatePolicies},
 		{"opFloatRegResultPolicies", opFloatRegResultPolicies},

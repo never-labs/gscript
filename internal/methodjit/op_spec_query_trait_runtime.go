@@ -30,6 +30,16 @@ func opIsTier2LoopNativeCandidate(op Op) bool {
 	return ok && spec.Tier2LoopNativeCandidate
 }
 
+func opIsTier2CallBoundaryLoopBlocker(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2CallBoundaryLoopBlocker
+}
+
+func opIsTier2LoopAllocationBlocker(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.Tier2LoopAllocationBlocker
+}
+
 func opIsTier2LoopFeedbackVMProtoCall(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.Tier2LoopFeedbackVMProtoCall

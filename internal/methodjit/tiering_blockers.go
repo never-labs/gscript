@@ -276,14 +276,6 @@ func firstCallBoundaryTier2BlockerInLoopGate(fn *Function, globals map[string]*v
 					continue
 				}
 				return blockGateOp("CallBoundaryLoop", "performance-blocked op remains inside loop", instr.Op)
-			case OpSelf,
-				OpConcat, OpAppend, OpSetList,
-				OpGo, OpMakeChan, OpSend, OpRecv,
-				OpClosure, OpClose,
-				OpVararg,
-				OpPow,
-				OpTForCall, OpTForLoop:
-				return blockGateOp("CallBoundaryLoop", "performance-blocked op remains inside loop", instr.Op)
 			case OpNewTable:
 				if tier2NewTableLoopCandidateIsSafe(instr) {
 					continue
@@ -299,6 +291,9 @@ func firstCallBoundaryTier2BlockerInLoopGate(fn *Function, globals map[string]*v
 					continue
 				}
 				return blockGateOp("CallBoundaryLoop", "dynamic table mutation remains inside loop", instr.Op)
+			}
+			if opIsTier2CallBoundaryLoopBlocker(instr.Op) {
+				return blockGateOp("CallBoundaryLoop", "performance-blocked op remains inside loop", instr.Op)
 			}
 		}
 	}
@@ -326,7 +321,8 @@ func firstLoopAllocationBlockerGate(fn *Function) GateResult {
 					continue
 				}
 				return blockGateOp("LoopAllocation", "fixed-table allocation remains inside loop", instr.Op)
-			case OpSetList:
+			}
+			if opIsTier2LoopAllocationBlocker(instr.Op) {
 				return blockGateOp("LoopAllocation", "setlist allocation-style initialization remains inside loop", instr.Op)
 			}
 		}

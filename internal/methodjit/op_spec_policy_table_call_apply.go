@@ -90,6 +90,12 @@ func applyOpSpecTableCallCallPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTier2LoopNativeCandidatePolicies) {
 		spec.Tier2LoopNativeCandidate = opTier2LoopNativeCandidatePolicies[op]
 	}
+	if int(op) < len(opTier2CallBoundaryLoopBlockerPolicies) {
+		spec.Tier2CallBoundaryLoopBlocker = opTier2CallBoundaryLoopBlockerPolicies[op]
+	}
+	if int(op) < len(opTier2LoopAllocationBlockerPolicies) {
+		spec.Tier2LoopAllocationBlocker = opTier2LoopAllocationBlockerPolicies[op]
+	}
 	if int(op) < len(opCallUserArgStartPolicies) && opCallUserArgStartPolicies[op].Set {
 		spec.CallUserArgStart = opCallUserArgStartPolicies[op].Start
 	}

@@ -51,6 +51,27 @@ var opTier2LoopNativeCandidatePolicies = [...]bool{
 	OpFieldCallFloor: true,
 }
 
+var opTier2CallBoundaryLoopBlockerPolicies = [...]bool{
+	OpSelf:     true,
+	OpConcat:   true,
+	OpAppend:   true,
+	OpSetList:  true,
+	OpGo:       true,
+	OpMakeChan: true,
+	OpSend:     true,
+	OpRecv:     true,
+	OpClosure:  true,
+	OpClose:    true,
+	OpVararg:   true,
+	OpPow:      true,
+	OpTForCall: true,
+	OpTForLoop: true,
+}
+
+var opTier2LoopAllocationBlockerPolicies = [...]bool{
+	OpSetList: true,
+}
+
 type opCallUserArgStartPolicy struct {
 	Start int
 	Set   bool
