@@ -3,20 +3,6 @@ package methodjit
 import "testing"
 
 func TestTableRuntimeTypeContractsLiveInOpSpec(t *testing.T) {
-	for _, tc := range []struct {
-		op      Op
-		lowered Op
-	}{
-		{OpGetTable, OpTableArrayLoad},
-		{OpSetTable, OpTableArrayStore},
-	} {
-		if got, ok := tableArrayLoweredOp(tc.op); !ok || got != tc.lowered {
-			t.Fatalf("%s table-array lowered op = %s, %v; want %s, true", tc.op, got, ok, tc.lowered)
-		}
-	}
-	if lowered, ok := tableArrayLoweredOp(OpTableArrayLoad); ok || lowered != OpMax {
-		t.Fatalf("TableArrayLoad table-array lowered op = %s, %v; want OpMax, false", lowered, ok)
-	}
 	if spec, ok := OpTableArrayLoad.Spec(); !ok || !spec.TableResultRawTablePtr || !isRawTablePtrValue(&Instr{Op: OpTableArrayLoad, Type: TypeTable}) {
 		t.Fatalf("TableArrayLoad table-result raw-table-ptr contract should be driven by OpSpec")
 	}

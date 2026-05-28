@@ -52,6 +52,10 @@ var opTableArrayLoweredOpPolicies = [...]opTargetPolicy{
 	OpSetTable: {Op: OpTableArrayStore, Set: true},
 }
 
+var opTableArrayNestedLoweredOpPolicies = [...]opTargetPolicy{
+	OpTableArrayLoad: {Op: OpTableArrayNestedLoad, Set: true},
+}
+
 var opTableIntArraySwapPairsBodyBenignPolicies = [...]bool{
 	OpAddInt:         true,
 	OpGuardTableKind: true,

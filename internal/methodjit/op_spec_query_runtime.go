@@ -86,6 +86,11 @@ func tableArrayLoweredOp(op Op) (Op, bool) {
 	return spec.TableArrayLoweredOp, ok && spec.TableArrayLoweredOp != OpMax
 }
 
+func tableArrayNestedLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.TableArrayNestedLoweredOp, ok && spec.TableArrayNestedLoweredOp != OpMax
+}
+
 func opIsRawCarryClobber(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.RawCarryClobber

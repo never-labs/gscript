@@ -20,7 +20,8 @@ func TableArrayNestedLoadPass(fn *Function) (*Function, error) {
 	uses := computeUseCounts(fn)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr.Op != OpTableArrayLoad || len(instr.Args) < 3 {
+			lowered, ok := tableArrayNestedLoweredOp(instr.Op)
+			if !ok || lowered != OpTableArrayNestedLoad || len(instr.Args) < 3 {
 				continue
 			}
 			if !tableArrayNestedLoadSupported(instr.Aux, instr.Type) {
@@ -60,7 +61,7 @@ func TableArrayNestedLoadPass(fn *Function) (*Function, error) {
 				continue
 			}
 
-			instr.Op = OpTableArrayNestedLoad
+			instr.Op = lowered
 			instr.Args = []*Value{outerTable, rowLoad.Args[0], rowLoad.Args[1], rowLoad.Args[2], instr.Args[2]}
 			instr.Aux2 = 0
 			instr.copySourceFrom(rowLoad)
