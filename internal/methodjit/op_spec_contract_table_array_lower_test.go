@@ -27,3 +27,12 @@ func TestTableArrayNestedLoweringTargetsLiveInOpSpec(t *testing.T) {
 		t.Fatalf("GetTable nested lowered op = %s, %v; want OpMax, false", lowered, ok)
 	}
 }
+
+func TestTableArraySwapLoweringTargetsLiveInOpSpec(t *testing.T) {
+	if lowered, ok := tableArraySwapLoweredOp(OpTableArrayLoad); !ok || lowered != OpTableArraySwap {
+		t.Fatalf("TableArrayLoad swap lowered op = %s, %v; want TableArraySwap, true", lowered, ok)
+	}
+	if lowered, ok := tableArraySwapLoweredOp(OpTableArrayStore); ok || lowered != OpMax {
+		t.Fatalf("TableArrayStore swap lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
+}

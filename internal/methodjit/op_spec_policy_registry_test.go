@@ -47,6 +47,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opTableArrayLenArgIndexPolicies", opTableArrayLenArgIndexPolicies},
 		{"opTableArrayLoweredOpPolicies", opTableArrayLoweredOpPolicies},
 		{"opTableArrayNestedLoweredOpPolicies", opTableArrayNestedLoweredOpPolicies},
+		{"opTableArraySwapLoweredOpPolicies", opTableArraySwapLoweredOpPolicies},
 		{"opTableIntArraySwapPairsBodyBenignPolicies", opTableIntArraySwapPairsBodyBenignPolicies},
 		{"opTableIntArrayCopyPrefixBodyBenignPolicies", opTableIntArrayCopyPrefixBodyBenignPolicies},
 		{"opTableIntArrayReverseBodyBenignPolicies", opTableIntArrayReverseBodyBenignPolicies},

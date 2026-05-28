@@ -16,6 +16,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		TableArrayLenArgIndex:             -1,
 		TableArrayLoweredOp:               OpMax,
 		TableArrayNestedLoweredOp:         OpMax,
+		TableArraySwapLoweredOp:           OpMax,
 		ClosureScalarLocalUseArgIndex:     -1,
 		ClosureScalarLoadClosureArgIndex:  -1,
 		ClosureScalarStoreClosureArgIndex: -1,

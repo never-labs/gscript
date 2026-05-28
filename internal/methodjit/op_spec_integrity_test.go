@@ -40,6 +40,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "MatrixRowConstLoweredOp", spec.MatrixRowConstLoweredOp)
 		assertOpSpecTarget(t, op, "TableArrayLoweredOp", spec.TableArrayLoweredOp)
 		assertOpSpecTarget(t, op, "TableArrayNestedLoweredOp", spec.TableArrayNestedLoweredOp)
+		assertOpSpecTarget(t, op, "TableArraySwapLoweredOp", spec.TableArraySwapLoweredOp)
 		assertOpSpecTarget(t, op, "CallFloorProjectionOp", spec.CallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCallFloorProjectionOp", spec.FieldCallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCalleeGuardLoweredOp", spec.FieldCalleeGuardLoweredOp)
@@ -98,6 +99,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if spec.TableArrayNestedLoweredOp != OpMax {
 			t.Fatalf("%s TableArrayNestedLoweredOp default=%s, want OpMax", op, spec.TableArrayNestedLoweredOp)
+		}
+		if spec.TableArraySwapLoweredOp != OpMax {
+			t.Fatalf("%s TableArraySwapLoweredOp default=%s, want OpMax", op, spec.TableArraySwapLoweredOp)
 		}
 		if spec.CallFloorProjectionOp != OpMax || spec.FieldCallFloorProjectionOp != OpMax {
 			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax",
@@ -161,6 +165,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := tableArrayNestedLoweredOp(op); ok {
 			t.Fatalf("%s should not report a table-array nested lowering target", op)
+		}
+		if _, ok := tableArraySwapLoweredOp(op); ok {
+			t.Fatalf("%s should not report a table-array swap lowering target", op)
 		}
 		if _, ok := callFloorProjectionOp(op); ok {
 			t.Fatalf("%s should not report a call-floor projection target", op)

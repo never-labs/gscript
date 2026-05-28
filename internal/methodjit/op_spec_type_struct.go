@@ -60,6 +60,7 @@ type OpSpec struct {
 	TableArrayLenArgIndex             int
 	TableArrayLoweredOp               Op
 	TableArrayNestedLoweredOp         Op
+	TableArraySwapLoweredOp           Op
 	ClosureScalarLocalUseArgIndex     int
 	ClosureScalarLoadClosureArgIndex  int
 	ClosureScalarStoreClosureArgIndex int
