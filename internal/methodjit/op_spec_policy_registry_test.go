@@ -35,6 +35,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opTableArrayGPRInvariantUseMaskPolicies", opTableArrayGPRInvariantUseMaskPolicies},
 		{"opTableArrayKeyArgIndexPolicies", opTableArrayKeyArgIndexPolicies},
 		{"opOracleSupportPolicies", opOracleSupportPolicies},
+		{"opOracleUnsupportedReasonPolicies", opOracleUnsupportedReasonPolicies},
 		{"opLICMHoistablePolicies", opLICMHoistablePolicies},
 		{"opLICMInterestingMissPolicies", opLICMInterestingMissPolicies},
 		{"opLICMIntArithPolicies", opLICMIntArithPolicies},

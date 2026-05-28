@@ -7,3 +7,11 @@ func opOracleSupport(op Op) OpOracleSupport {
 	}
 	return spec.OracleSupport
 }
+
+func opOracleUnsupportedReason(op Op) string {
+	spec, ok := op.Spec()
+	if !ok {
+		return "missing-op-spec"
+	}
+	return spec.OracleUnsupportedReason
+}

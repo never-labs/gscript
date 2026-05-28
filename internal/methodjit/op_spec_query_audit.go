@@ -28,7 +28,7 @@ func OpAuditMatrix() []OpAuditRow {
 			Name:      spec.Name,
 			Validator: opAuditValidator(spec),
 			Builder:   opAuditBuilder(spec),
-			Oracle:    spec.OracleSupport.String(),
+			Oracle:    opAuditOracle(spec),
 			Emitter:   opAuditEmitter(spec),
 			Regalloc:  opAuditRegalloc(spec),
 			Deopt:     opAuditDeopt(spec),
@@ -108,6 +108,13 @@ func opAuditBuilder(spec OpSpec) string {
 		return "base+count"
 	}
 	return "base"
+}
+
+func opAuditOracle(spec OpSpec) string {
+	if spec.OracleSupport == OpOracleUnsupported && spec.OracleUnsupportedReason != "" {
+		return spec.OracleSupport.String() + "(" + spec.OracleUnsupportedReason + ")"
+	}
+	return spec.OracleSupport.String()
 }
 
 func opAuditEmitter(spec OpSpec) string {

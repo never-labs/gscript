@@ -1,6 +1,7 @@
 package methodjit
 
 import (
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -40,6 +41,40 @@ func TestOpSpecOracleSupportMatchesIRInterpreterCases(t *testing.T) {
 	if len(missing) > 0 {
 		sort.Strings(missing)
 		t.Fatalf("OpSpec marks op(s) oracle-supported but interp.execInstr lacks case: %s", strings.Join(missing, ", "))
+	}
+}
+
+func TestOpSpecOracleUnsupportedOpsHaveReasons(t *testing.T) {
+	for op := Op(0); op < OpMax; op++ {
+		spec, ok := op.Spec()
+		if !ok {
+			t.Fatalf("%d has no OpSpec", op)
+		}
+		if spec.OracleSupport == OpOracleUnsupported && spec.OracleUnsupportedReason == "" {
+			t.Fatalf("%s is oracle-unsupported without a reason", spec.Name)
+		}
+		if spec.OracleSupport != OpOracleUnsupported && spec.OracleUnsupportedReason != "" {
+			t.Fatalf("%s has oracle unsupported reason %q but support is %s", spec.Name, spec.OracleUnsupportedReason, spec.OracleSupport)
+		}
+	}
+}
+
+func TestValidateOracleSupportRejectsUnsupportedOpsWithReasons(t *testing.T) {
+	fn := &Function{
+		Blocks: []*Block{{
+			Instrs: []*Instr{{Op: OpYield}},
+		}},
+	}
+	err := ValidateOracleSupport(fn)
+	if !errors.Is(err, ErrOracleUnsupported) {
+		t.Fatalf("ValidateOracleSupport error = %v, want ErrOracleUnsupported", err)
+	}
+	var unsupported *OracleUnsupportedError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("ValidateOracleSupport error type = %T, want *OracleUnsupportedError", err)
+	}
+	if got := unsupported.Reasons[OpYield]; got != "coroutine" {
+		t.Fatalf("OpYield unsupported reason = %q, want coroutine", got)
 	}
 }
 

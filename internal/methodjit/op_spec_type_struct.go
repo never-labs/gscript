@@ -13,6 +13,9 @@ type OpSpec struct {
 	EmitterFamily OpEmitterFamily
 	MayDeopt      bool
 	OracleSupport OpOracleSupport
+	// OracleUnsupportedReason explains why the IR interpreter oracle cannot
+	// execute this op. It is required when OracleSupport is OpOracleUnsupported.
+	OracleUnsupportedReason string
 
 	// Runtime replay, deopt, and side-effect contracts.
 	NativeReplayMayExit              bool

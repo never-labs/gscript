@@ -21,3 +21,24 @@ var opOracleSupportPolicies = [...]OpOracleSupport{
 	OpRecv:                  OpOracleUnsupported,
 	OpPhi:                   OpOraclePseudo,
 }
+
+var opOracleUnsupportedReasonPolicies = [...]string{
+	OpComplexEscapeInSet:    "runtime-specialization",
+	OpComplexEscapeRowCount: "runtime-specialization",
+	OpGuardFieldCalleeProto: "callee-shape-guard",
+	OpCallFloor:             "call-fold-specialization",
+	OpFieldCallFloor:        "call-fold-specialization",
+	OpResume:                "coroutine",
+	OpYield:                 "coroutine",
+	OpSelf:                  "method-call-bytecode",
+	OpForPrep:               "loop-bytecode",
+	OpForLoop:               "loop-bytecode",
+	OpTForCall:              "iterator-bytecode",
+	OpTForLoop:              "iterator-bytecode",
+	OpVararg:                "vararg-bytecode",
+	OpTestSet:               "control-bytecode",
+	OpGo:                    "concurrency",
+	OpMakeChan:              "concurrency",
+	OpSend:                  "concurrency",
+	OpRecv:                  "concurrency",
+}

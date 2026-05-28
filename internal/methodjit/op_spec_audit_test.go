@@ -29,6 +29,19 @@ func TestOpAuditMatrixCoversEveryOp(t *testing.T) {
 	}
 }
 
+func TestOpAuditMatrixExplainsOracleUnsupportedOps(t *testing.T) {
+	rows := OpAuditMatrix()
+	for _, row := range rows {
+		if row.Op == OpYield {
+			if row.Oracle != "unsupported(coroutine)" {
+				t.Fatalf("OpYield oracle audit = %q, want unsupported(coroutine)", row.Oracle)
+			}
+			return
+		}
+	}
+	t.Fatal("OpYield missing from OpAuditMatrix")
+}
+
 func TestPrintOpAuditMatrix(t *testing.T) {
 	matrix := FormatOpAuditMatrix()
 	if !strings.Contains(matrix, "validator") || !strings.Contains(matrix, "oracle") || !strings.Contains(matrix, "regalloc") {
