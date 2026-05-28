@@ -456,18 +456,14 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 				continue
 			}
 			replaceAllUses(fn, ins.ID, newDef)
-			ins.Op = OpNop
-			ins.Args = nil
-			ins.Aux = 0
+			rewriteInstrToNop(ins)
 		}
 	}
 
 	// Step 5: Nop the original Phi and each feeder NewTable +
 	// associated SetFields.
 	remarks := functionRemarks(fn)
-	phiInstr.Op = OpNop
-	phiInstr.Args = nil
-	phiInstr.Aux = 0
+	rewriteInstrToNop(phiInstr)
 	for _, allocID := range vphi.feeders {
 		cand, ok := candidates[allocID]
 		if !ok {
@@ -479,18 +475,13 @@ func applyVirtualPhiRewrite(fn *Function, vphi *virtualPhiInfo,
 				remarks.Add("EscapeAnalysis", "changed", cand.blockID, allocID, OpNewTable,
 					"scalar-replaced phi-carried table allocation")
 			}
-			allocInstr.Op = OpNop
-			allocInstr.Args = nil
-			allocInstr.Aux = 0
-			allocInstr.Aux2 = 0
+			rewriteInstrToNop(allocInstr)
 		}
 		block := blockForID(fn, cand.blockID)
 		for _, ins := range block.Instrs {
 			if ins.Op == OpSetField && len(ins.Args) >= 2 &&
 				ins.Args[0].ID == allocID {
-				ins.Op = OpNop
-				ins.Args = nil
-				ins.Aux = 0
+				rewriteInstrToNop(ins)
 			}
 		}
 	}
@@ -760,9 +751,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 					continue
 				}
 				fieldSSA[name] = instr.Args[1].ID
-				instr.Op = OpNop
-				instr.Args = nil
-				instr.Aux = 0
+				rewriteInstrToNop(instr)
 
 			case opIsFieldRead(instr.Op) && len(instr.Args) >= 1 &&
 				instr.Args[0].ID == allocID:
@@ -779,9 +768,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 					continue
 				}
 				replaceAllUses(fn, instr.ID, defInstr)
-				instr.Op = OpNop
-				instr.Args = nil
-				instr.Aux = 0
+				rewriteInstrToNop(instr)
 			}
 		}
 
@@ -811,9 +798,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 					continue
 				}
 				replaceAllUses(fn, instr.ID, defInstr)
-				instr.Op = OpNop
-				instr.Args = nil
-				instr.Aux = 0
+				rewriteInstrToNop(instr)
 			}
 		}
 
@@ -826,10 +811,7 @@ func escapeAnalysisPass(fn *Function, tableShapes *TableShapeFacts, globals map[
 				remarks.Add("EscapeAnalysis", "changed", info.blockID, allocID, op,
 					"scalar-replaced block-local table allocation")
 			}
-			allocInstr.Op = OpNop
-			allocInstr.Args = nil
-			allocInstr.Aux = 0
-			allocInstr.Aux2 = 0
+			rewriteInstrToNop(allocInstr)
 		}
 	}
 
@@ -954,10 +936,7 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 				break
 			}
 			replaceAllUses(fn, read.ID, def)
-			read.Op = OpNop
-			read.Args = nil
-			read.Aux = 0
-			read.Aux2 = 0
+			rewriteInstrToNop(read)
 		}
 		if !ok {
 			continue
@@ -984,16 +963,10 @@ func partialMaterializeTablesForReadonlyCalls(fn *Function, remarks *Optimizatio
 			instrByID[clone.ID] = clone
 		}
 		for _, store := range ctor.stores {
-			store.Op = OpNop
-			store.Args = nil
-			store.Aux = 0
-			store.Aux2 = 0
+			rewriteInstrToNop(store)
 		}
 		allocOp := alloc.Op
-		alloc.Op = OpNop
-		alloc.Args = nil
-		alloc.Aux = 0
-		alloc.Aux2 = 0
+		rewriteInstrToNop(alloc)
 		if remarks != nil {
 			remarks.Add("EscapeAnalysis", "changed", alloc.Block.ID, alloc.ID, allocOp,
 				"partially scalar-replaced table and materialized it only for readonly call arguments")
