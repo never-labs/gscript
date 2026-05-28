@@ -1,13 +1,10 @@
 package gscript
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
 	"github.com/gscript/gscript/internal/runtime"
 	bytecodevm "github.com/gscript/gscript/internal/vm"
 )
@@ -57,37 +54,66 @@ func New(opts ...Option) *VM {
 
 // Exec compiles and executes a GScript source string.
 func (vm *VM) Exec(src string) error {
-	return vm.exec(src, "<string>")
+	return vm.ExecContext(context.Background(), src)
+}
+
+// ExecContext compiles and executes a GScript source string.
+//
+// Context cancellation is checked before starting and after completion. Runtime
+// preemption for long-running scripts is a separate sandbox/resource-control
+// feature and is not implied by this method.
+func (vm *VM) ExecContext(ctx context.Context, src string) error {
+	prog, err := CompileContext(ctx, src)
+	if err != nil {
+		return err
+	}
+	return vm.RunContext(ctx, prog)
 }
 
 // ExecFile reads and executes a GScript source file.
 func (vm *VM) ExecFile(path string) error {
-	src, err := os.ReadFile(path)
-	if err != nil {
-		return &Error{Kind: ErrRuntime, Message: err.Error(), File: path}
-	}
-	abs, _ := filepath.Abs(path)
-	vm.interp.SetScriptDir(filepath.Dir(abs))
-	return vm.exec(string(src), path)
+	return vm.ExecFileContext(context.Background(), path)
 }
 
-func (vm *VM) exec(src, filename string) error {
-	tokens, err := lexer.New(src).Tokenize()
+// ExecFileContext reads and executes a GScript source file.
+//
+// Context cancellation is checked before starting and after completion. Runtime
+// preemption for long-running scripts is a separate sandbox/resource-control
+// feature and is not implied by this method.
+func (vm *VM) ExecFileContext(ctx context.Context, path string) error {
+	prog, err := CompileFileContext(ctx, path)
 	if err != nil {
-		return &Error{Kind: ErrLex, Message: err.Error(), File: filename}
+		return err
 	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
-		return &Error{Kind: ErrParse, Message: err.Error(), File: filename}
-	}
+	return vm.RunContext(ctx, prog)
+}
 
+// Run executes a previously compiled Program.
+func (vm *VM) Run(prog *Program) error {
+	return vm.RunContext(context.Background(), prog)
+}
+
+// RunContext executes a previously compiled Program.
+//
+// Context cancellation is checked before starting and after completion. Runtime
+// preemption for long-running scripts is a separate sandbox/resource-control
+// feature and is not implied by this method.
+func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	if prog == nil {
+		return &Error{Kind: ErrRuntime, Message: "nil program"}
+	}
+	if prog.scriptDir != "" {
+		vm.interp.SetScriptDir(prog.scriptDir)
+	}
 	if vm.opts.useVM {
 		// Bytecode VM path
-		proto, err := bytecodevm.Compile(prog)
+		proto, err := prog.bytecodeProto()
 		if err != nil {
-			return &Error{Kind: ErrRuntime, Message: err.Error(), File: filename}
+			return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}
 		}
-		setBytecodeSource(proto, filename)
 		globals := vm.interp.ExportGlobals()
 		// Reuse existing bytecode VM if available (preserves JIT state)
 		bvm := vm.bvm
@@ -101,16 +127,22 @@ func (vm *VM) exec(src, filename string) error {
 			}
 		}
 		if _, err := bvm.Execute(proto); err != nil {
-			return &Error{Kind: ErrRuntime, Message: err.Error(), File: filename}
+			return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}
 		}
 		// Persist the bytecode VM for future Call routing
 		vm.bvm = bvm
 		vm.syncBytecodeGlobals()
+		if err := checkContext(ctx); err != nil {
+			return err
+		}
 		return nil
 	}
 
-	if err := vm.interp.Exec(prog); err != nil {
-		return &Error{Kind: ErrRuntime, Message: err.Error(), File: filename}
+	if err := vm.interp.Exec(prog.ast); err != nil {
+		return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}
+	}
+	if err := checkContext(ctx); err != nil {
+		return err
 	}
 	return nil
 }
@@ -182,15 +214,46 @@ func (vm *VM) syncBytecodeGlobals() {
 // Call calls a named GScript function with Go arguments and returns Go values.
 // Args and return values are automatically converted via reflection.
 func (vm *VM) Call(name string, args ...interface{}) ([]interface{}, error) {
+	return vm.CallContext(context.Background(), name, args...)
+}
+
+// CallContext calls a named GScript function with Go arguments and returns Go values.
+//
+// Context cancellation is checked before starting and after completion. Runtime
+// preemption for long-running scripts is a separate sandbox/resource-control
+// feature and is not implied by this method.
+func (vm *VM) CallContext(ctx context.Context, name string, args ...interface{}) ([]interface{}, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	fn := vm.interp.GetGlobal(name)
 	if fn.IsNil() {
 		return nil, &Error{Kind: ErrRuntime, Message: fmt.Sprintf("function %q not found", name)}
 	}
-	return vm.callValue(fn, args...)
+	results, err := vm.callValue(fn, args...)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 // CallValue calls a GScript function value (obtained via Get) with Go arguments.
 func (vm *VM) CallValue(fn interface{}, args ...interface{}) ([]interface{}, error) {
+	return vm.CallValueContext(context.Background(), fn, args...)
+}
+
+// CallValueContext calls a GScript function value with Go arguments.
+//
+// Context cancellation is checked before starting and after completion. Runtime
+// preemption for long-running scripts is a separate sandbox/resource-control
+// feature and is not implied by this method.
+func (vm *VM) CallValueContext(ctx context.Context, fn interface{}, args ...interface{}) ([]interface{}, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
 	var gsVal runtime.Value
 	if v, ok := fn.(runtime.Value); ok {
 		gsVal = v
@@ -201,7 +264,14 @@ func (vm *VM) CallValue(fn interface{}, args ...interface{}) ([]interface{}, err
 		}
 		gsVal = v2
 	}
-	return vm.callValue(gsVal, args...)
+	results, err := vm.callValue(gsVal, args...)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 func (vm *VM) callValue(fn runtime.Value, args ...interface{}) ([]interface{}, error) {

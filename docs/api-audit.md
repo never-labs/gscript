@@ -16,9 +16,14 @@ import "github.com/gscript/gscript/gscript"
 Current public package surface:
 
 - VM lifecycle: `New(opts ...Option) *VM`.
-- Execution: `(*VM).Exec(src string) error`, `(*VM).ExecFile(path string) error`.
+- Compilation: `Compile`, `CompileContext`, `CompileFile`,
+  `CompileFileContext`, `WithSourceName`, and `Program.SourceName`.
+- Execution: `(*VM).Exec(src string) error`, `(*VM).ExecContext`,
+  `(*VM).ExecFile`, `(*VM).ExecFileContext`, `(*VM).Run`, and
+  `(*VM).RunContext`.
 - Calls: `(*VM).Call(name string, args ...interface{}) ([]interface{}, error)`,
-  `(*VM).CallValue(fn interface{}, args ...interface{}) ([]interface{}, error)`.
+  `(*VM).CallContext`, `(*VM).CallValue(fn interface{}, args ...interface{})
+  ([]interface{}, error)`, and `(*VM).CallValueContext`.
 - Globals: `(*VM).Set`, `(*VM).Get`.
 - Raw-value globals and calls: `(*VM).GetValue`, `(*VM).SetValue`,
   `(*VM).CallFunction`.
@@ -49,12 +54,13 @@ embedders except by shelling out.
 
 ## Productionization Gaps
 
-- No context-aware execution. Public `Exec`, `ExecFile`, and `Call` cannot
-  receive `context.Context`, cannot propagate cancellation, and cannot
-  distinguish deadline/cancel errors from ordinary runtime failures.
-- No public compiled artifact. Every public `Exec` reparses source. Internal
-  `*vm.FuncProto` exists, but there is no stable `Program` type that can be
-  compiled once, cached, shared across VMs, or inspected for metadata.
+- Context-aware entry points exist, but cancellation is currently checked only
+  before starting and after completion. Interpreter, bytecode VM, and JIT loops
+  still need preemptive cancellation and instruction-budget polling.
+- A public `Program` artifact exists for parsed source and lazily compiled
+  bytecode, but it is not yet a full production compiled-artifact contract:
+  sharing/concurrency, metadata, cache invalidation, and JIT-state ownership
+  still need to be specified.
 - Public API leaks unusable internal types. `ToValue`, `MustToValue`,
   `FromValue`, `GetValue`, `SetValue`, `CallFunction`, and `Interpreter`
   mention `internal/runtime` types. External modules cannot import those
@@ -320,8 +326,8 @@ and debug capabilities should route through explicit policy objects.
   `runtime.LuaError` in interpreter and bytecode paths.
 - Add examples/tests for `WithLibs(LibSafe)`, `WithRequirePath`, `WithVM`,
   `WithJIT`, `RegisterFunc`, `RegisterTable`, struct binding, and `Pool`.
-- Add a public `ExecContext`/`CallContext` design doc or minimal API skeleton
-  before wiring deep cancellation.
+- Extend the existing `ExecContext`/`CallContext`/`RunContext` entry points
+  with deep cancellation polling in interpreter, bytecode VM, and JIT paths.
 - Decide engine default policy for embedding versus CLI and document the
   mismatch if it remains intentional.
 
@@ -329,8 +335,9 @@ and debug capabilities should route through explicit policy objects.
 
 - Add `gscript.Value`, `Kind`, constructors, inspection methods,
   `Encode`, and `Decode`.
-- Add immutable `Program`, `Compile`, `CompileFile`, and `Run` APIs that hide
-  `internal/vm.FuncProto`.
+- Harden the existing `Program`, `Compile`, `CompileFile`, and `Run` APIs into
+  a documented compiled-artifact contract with explicit concurrency and
+  JIT-state ownership rules.
 - Add `Function` handles and public call APIs that avoid
   `internal/runtime.Value`.
 - Implement context cancellation checks in interpreter and bytecode VM loops.

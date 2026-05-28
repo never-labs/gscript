@@ -1,8 +1,12 @@
 package gscript_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -28,6 +32,90 @@ func TestExec(t *testing.T) {
 	}
 	if len(output) != 1 || output[0] != "hello\tworld" {
 		t.Fatalf("expected 'hello\\tworld', got %v", output)
+	}
+}
+
+func TestCompileRunProgram(t *testing.T) {
+	prog, err := gs.Compile(`result := 40 + 2`, gs.WithSourceName("calc.gs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prog.SourceName() != "calc.gs" {
+		t.Fatalf("SourceName = %q, want calc.gs", prog.SourceName())
+	}
+	vm := gs.New()
+	if err := vm.Run(prog); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(42) {
+		t.Fatalf("result = %v (%T), want int64(42)", got, got)
+	}
+}
+
+func TestCompileRunProgramWithVM(t *testing.T) {
+	prog, err := gs.Compile(`func add(a, b) { return a + b }`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithVM())
+	if err := vm.Run(prog); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Call("add", 20, 22)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != int64(42) {
+		t.Fatalf("add result = %v, want [42]", got)
+	}
+}
+
+func TestCompileFileSetsSourceAndRequireDir(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := filepath.Join(dir, "main.gs")
+	helperPath := filepath.Join(dir, "helper.gs")
+	if err := os.WriteFile(helperPath, []byte(`return { value: 42 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mainPath, []byte(`helper := require("helper"); result := helper.value`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gs.CompileFile(mainPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prog.SourceName() != mainPath {
+		t.Fatalf("SourceName = %q, want %q", prog.SourceName(), mainPath)
+	}
+	vm := gs.New()
+	if err := vm.Run(prog); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(42) {
+		t.Fatalf("result = %v (%T), want int64(42)", got, got)
+	}
+}
+
+func TestContextEntrypointsRespectCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	vm := gs.New()
+	if err := vm.ExecContext(ctx, `x := 1`); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ExecContext err = %v, want context.Canceled", err)
+	}
+	if _, err := gs.CompileContext(ctx, `x := 1`); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CompileContext err = %v, want context.Canceled", err)
+	}
+	if _, err := vm.CallContext(ctx, "missing"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("CallContext err = %v, want context.Canceled", err)
 	}
 }
 

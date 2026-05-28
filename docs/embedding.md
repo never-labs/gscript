@@ -107,7 +107,8 @@ Current sandbox gaps:
 
 - No public resource budget API for CPU steps, memory, table growth, string
   allocation, recursion depth, goroutine/thread usage, or wall-clock time.
-- No context-aware cancellation.
+- Context-aware public entry points exist, but cancellation is not yet
+  preemptive inside long-running interpreter, bytecode VM, or JIT loops.
 - No public host policy for filesystem, network, process, environment, or
   module loading beyond coarse stdlib removal.
 - No public loader interface for resolving, validating, caching, or auditing
@@ -335,15 +336,19 @@ Keep `VM` single-owner and make that explicit. Add:
 
 ### Phase 1: Public values and compiled programs
 
-- Introduce `gscript.Value`, `Program`, `Compile`, `CompileFile`, and `Run`.
+- Harden the initial `Program`, `Compile`, `CompileFile`, and `Run` APIs into a
+  stable production contract.
+- Introduce `gscript.Value`.
 - Hide internal `runtime.Value` from new public APIs.
-- Make compiled programs immutable and safe for concurrent sharing.
+- Decide whether compiled programs are immutable and safe for concurrent
+  sharing, or explicitly single-owner because they may hold JIT state.
 - Add conversion tests for overflow, sparse tables, maps, structs, function
   values, and script error values.
 
 ### Phase 2: Context, limits, and diagnostics
 
-- Add context-aware entry points for run and call.
+- Extend existing context-aware entry points for run and call with preemptive
+  cancellation.
 - Implement VM/interpreter cancellation checks and instruction budgets.
 - Surface structured stack traces consistently across interpreter and bytecode
   VM paths.
@@ -379,8 +384,9 @@ Keep `VM` single-owner and make that explicit. Add:
 
 The current Go API is a practical convenience wrapper around the interpreter
 and bytecode VM, but it is not yet a production embedding contract. The main
-gaps are stable public value types, reusable compiled programs, context-aware
-execution, structured diagnostics, policy-based sandboxing, a host-controlled
-module loader, and precise concurrency/reset semantics. The recommended path
-is to preserve the current convenience API while adding a stricter production
-layer that does not leak internal packages.
+gaps are stable public value types, a fully specified compiled-program
+contract, preemptive context cancellation, structured diagnostics,
+policy-based sandboxing, a host-controlled module loader, and precise
+concurrency/reset semantics. The recommended path is to preserve the current
+convenience API while adding a stricter production layer that does not leak
+internal packages.
