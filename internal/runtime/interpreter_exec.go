@@ -23,6 +23,7 @@ func (interp *Interpreter) Exec(prog *ast.Program) error {
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return err
 	}
+	interp.resetStepBudget()
 	interp.pushDeferFrame()
 	_, _, _, _, err := interp.execBlockInEnv(&ast.BlockStmt{P: prog.GetPos(), Stmts: prog.Stmts}, interp.globals)
 	if err != nil {
@@ -49,6 +50,7 @@ func (interp *Interpreter) ExecString(src string) ([]Value, error) {
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return nil, err
 	}
+	interp.resetStepBudget()
 	// Execute and collect return values from the last return statement.
 	var lastRet []Value
 	interp.pushDeferFrame()
@@ -119,6 +121,9 @@ func (interp *Interpreter) execBlockInEnv(block *ast.BlockStmt, env *Environment
 
 // execStmt dispatches a single statement.
 func (interp *Interpreter) execStmt(stmt ast.Stmt, env *Environment) ([]Value, bool, bool, bool, error) {
+	if err := interp.checkStepBudget(); err != nil {
+		return nil, false, false, false, interp.wrapRuntimeError(err, stmt.GetPos())
+	}
 	retVals, isRet, isBrk, isCont, err := interp.execStmtRaw(stmt, env)
 	if err != nil {
 		var jump *gotoSignal

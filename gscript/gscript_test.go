@@ -119,6 +119,76 @@ func TestContextEntrypointsRespectCanceledContext(t *testing.T) {
 	}
 }
 
+func TestWithMaxStepsLimitsInterpreterExecution(t *testing.T) {
+	vm := gs.New(gs.WithMaxSteps(8))
+	err := vm.Exec(`
+		i := 0
+		for {
+			i += 1
+		}
+	`)
+	if err == nil {
+		t.Fatal("expected max step error")
+	}
+	if !strings.Contains(err.Error(), "execution step limit exceeded") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWithMaxStepsAllowsInterpreterExecutionWithinBudget(t *testing.T) {
+	vm := gs.New(gs.WithMaxSteps(64))
+	if err := vm.Exec(`
+		sum := 0
+		for i := 0; i < 5; i++ {
+			sum += i
+		}
+	`); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(10) {
+		t.Fatalf("sum = %v (%T), want int64(10)", got, got)
+	}
+}
+
+func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
+	err := vm.Exec(`
+		i := 0
+		for {
+			i += 1
+		}
+	`)
+	if err == nil {
+		t.Fatal("expected max step error")
+	}
+	if !strings.Contains(err.Error(), "execution step limit exceeded") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWithMaxStepsAllowsBytecodeExecutionWithinBudget(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(256))
+	if err := vm.Exec(`
+		sum := 0
+		for i := 0; i < 5; i++ {
+			sum += i
+		}
+	`); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(10) {
+		t.Fatalf("sum = %v (%T), want int64(10)", got, got)
+	}
+}
+
 func TestExecGoStyleNumberLiteralsWithVM(t *testing.T) {
 	vm := gs.New(gs.WithVM())
 	if err := vm.Exec(`result := 0xFF + 0b1010 + 0o20 + 1_000`); err != nil {

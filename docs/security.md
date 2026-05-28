@@ -92,8 +92,9 @@ deterministic and testable.
 
 Required controls:
 
-- `MaxInstructions`: decremented at bytecode dispatch and tree-walker statement
-  boundaries.
+- `WithMaxSteps` / future `MaxInstructions`: checked at bytecode dispatch and
+  tree-walker statement boundaries. This exists today for interpreter and
+  bytecode VM execution.
 - `MaxNativeCalls`: limits calls from script into Go stdlib or host callbacks.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
@@ -107,7 +108,9 @@ location when available, and budget counters. Do not panic. Do not call
 
 Implementation notes:
 
-- Add a shared `ExecutionBudget` pointer to runtime interpreter and bytecode VM.
+- The first implementation stores a per-VM step counter in the runtime
+  interpreter and bytecode VM. A later shared `ExecutionBudget` should add
+  structured counters, deadline integration, and host-call accounting.
 - Compile/JIT loop backedges should include budget polls. If a compiled path
   cannot poll correctly, it must side-exit to the interpreter before continuing.
 - Blocking stdlib operations must use the VM context so a timed-out script

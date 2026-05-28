@@ -69,11 +69,14 @@ embedders except by shelling out.
   `Value`, but the wrappers mostly populate kind/message/file only. Internal
   `runtime.SourceError`, `runtime.LuaError`, stack/debug frames, and bytecode
   diagnostics are not normalized into a public error shape.
-- `LibSafe` is a stdlib preset, not a complete sandbox. There is no public
-  resource budget, filesystem/network/process policy, environment policy,
-  module loader policy, host-call policy, or allocation/table/string limit.
-- `maxSteps` exists in private options but is not surfaced or enforced through
-  the public API.
+- `LibSafe` is a stdlib preset, not a complete sandbox. `WithMaxSteps` now
+  provides a first CPU/work-unit budget for interpreter statements and bytecode
+  instructions, but there is still no public filesystem/network/process policy,
+  environment policy, module loader policy, host-call policy, wall-clock
+  timeout, or allocation/table/string limit.
+- `WithMaxSteps` disables JIT execution while the limit is active so native
+  code cannot bypass budget checkpoints. JIT budget polling remains future
+  work.
 - Module loading is path-based and VM-owned. `WithRequirePath` and
   `ExecFile` set a script directory, but there is no public loader interface
   for canonical names, cache scoping, deny/allow decisions, virtual filesystems,
@@ -341,7 +344,8 @@ and debug capabilities should route through explicit policy objects.
 - Add `Function` handles and public call APIs that avoid
   `internal/runtime.Value`.
 - Implement context cancellation checks in interpreter and bytecode VM loops.
-- Add `Limits` for instruction count, call depth, and wall-clock timeout.
+- Expand the initial `WithMaxSteps` control into `Limits` for instruction
+  count, call depth, wall-clock timeout, memory, and host-call duration.
 - Add structured `Frame` stack traces with parity across interpreter and
   bytecode VM.
 - Add `HostFunc` and panic-safe host-call boundary.

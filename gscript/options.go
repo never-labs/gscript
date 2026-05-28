@@ -105,6 +105,15 @@ func WithPrint(fn func(args ...interface{})) Option {
 	return func(o *vmOptions) { o.printFunc = fn }
 }
 
+// WithMaxSteps limits interpreter statements or bytecode instructions executed
+// by one Exec/Run. A non-positive value disables the limit.
+//
+// When a step limit is set, JIT execution is disabled so native code cannot
+// bypass the budget checkpoints.
+func WithMaxSteps(max int64) Option {
+	return func(o *vmOptions) { o.maxSteps = max }
+}
+
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.
 func WithVM() Option {
 	return func(o *vmOptions) { o.useVM = true }

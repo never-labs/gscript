@@ -29,6 +29,10 @@ func New(opts ...Option) *VM {
 	interp := runtime.New()
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)
+	if o.maxSteps > 0 {
+		interp.SetMaxSteps(o.maxSteps)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -122,9 +126,14 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetStringMeta(vm.interp.StringMeta())
 			bvm.SetScriptDir(vm.interp.ScriptDir())
 			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
+			if vm.opts.maxSteps > 0 {
+				bvm.SetMaxSteps(vm.opts.maxSteps)
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
+		} else if vm.opts.maxSteps > 0 {
+			bvm.SetMaxSteps(vm.opts.maxSteps)
 		}
 		if _, err := bvm.Execute(proto); err != nil {
 			return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}

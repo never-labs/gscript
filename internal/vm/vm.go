@@ -94,6 +94,8 @@ type VM struct {
 	debugSink            runtime.Value
 	debugBusy            bool
 	scriptDir            string
+	maxSteps             int64 // <=0 means unlimited
+	steps                int64
 }
 
 // SetMethodJIT sets the Method JIT engine for this VM.
@@ -104,6 +106,28 @@ func (vm *VM) SetMethodJIT(engine MethodJITEngine) {
 	if engine != nil {
 		engine.SetCallVM(vm)
 	}
+}
+
+// SetMaxSteps sets the maximum number of bytecode instruction checkpoints.
+// A non-positive value disables the limit. The counter resets for each Execute.
+func (vm *VM) SetMaxSteps(max int64) {
+	vm.maxSteps = max
+	vm.steps = 0
+}
+
+func (vm *VM) resetStepBudget() {
+	vm.steps = 0
+}
+
+func (vm *VM) checkStepBudget() error {
+	if vm.maxSteps <= 0 {
+		return nil
+	}
+	vm.steps++
+	if vm.steps > vm.maxSteps {
+		return fmt.Errorf("execution step limit exceeded (%d)", vm.maxSteps)
+	}
+	return nil
 }
 
 // Regs returns the register file. Used by the JIT executor.
@@ -765,6 +789,7 @@ func (vm *VM) Execute(proto *FuncProto) ([]runtime.Value, error) {
 	cl := &Closure{Proto: proto}
 	vm.frameCount = 0
 	vm.top = 0
+	vm.resetStepBudget()
 	return vm.call(cl, nil, 0, 0)
 }
 
@@ -951,6 +976,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 	base := frame.base
 
 	for {
+		if err := vm.checkStepBudget(); err != nil {
+			return nil, wrapLineErr(frame, err)
+		}
 		if frame.pc >= len(code) {
 			// End of function - implicit return nil
 			if err := vm.drainFrameDefers(frame); err != nil {

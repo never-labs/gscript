@@ -1,5 +1,7 @@
 package runtime
 
+import "fmt"
+
 // Core tree-walking interpreter: the Interpreter type, its constructor New /
 // NewInterpreterGlobals, and the global-environment / args / package-cache
 // accessors. Builtin registration, metamethod helpers, statement and
@@ -23,6 +25,8 @@ type Interpreter struct {
 	debugBusy         bool             // prevents debug hooks from recursively firing
 	gcMode            string           // host-facing collectgarbage mode label
 	gcRunning         bool             // host-facing collectgarbage running flag
+	maxSteps          int64            // <=0 means unlimited
+	steps             int64
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -163,4 +167,26 @@ func (interp *Interpreter) Args() []string {
 // Output returns captured print output (for testing).
 func (interp *Interpreter) Output() []string {
 	return interp.output
+}
+
+// SetMaxSteps sets the maximum number of interpreter statement checkpoints.
+// A non-positive value disables the limit. The counter resets for each Exec.
+func (interp *Interpreter) SetMaxSteps(max int64) {
+	interp.maxSteps = max
+	interp.steps = 0
+}
+
+func (interp *Interpreter) resetStepBudget() {
+	interp.steps = 0
+}
+
+func (interp *Interpreter) checkStepBudget() error {
+	if interp.maxSteps <= 0 {
+		return nil
+	}
+	interp.steps++
+	if interp.steps > interp.maxSteps {
+		return fmt.Errorf("execution step limit exceeded (%d)", interp.maxSteps)
+	}
+	return nil
 }

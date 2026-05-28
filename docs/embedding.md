@@ -105,8 +105,10 @@ but it is not a complete security sandbox by itself.
 
 Current sandbox gaps:
 
-- No public resource budget API for CPU steps, memory, table growth, string
-  allocation, recursion depth, goroutine/thread usage, or wall-clock time.
+- `WithMaxSteps` exposes a first CPU/work-unit budget for interpreter
+  statements and bytecode instructions. It does not yet cover memory, table
+  growth, string allocation, recursion depth, goroutine/thread usage, host-call
+  duration, or wall-clock time.
 - Context-aware public entry points exist, but cancellation is not yet
   preemptive inside long-running interpreter, bytecode VM, or JIT loops.
 - No public host policy for filesystem, network, process, environment, or
@@ -235,10 +237,9 @@ be checked by both interpreter and bytecode VM loops, not only at call
 boundaries. Timeouts should return a distinguishable error, for example
 `errors.Is(err, context.Canceled)` or `context.DeadlineExceeded`.
 
-The existing `maxSteps` option field is not exposed or enforced through the
-public API. A production limits object should cover instruction/step budgets,
-wall time, call depth, recursion, allocation/table sizes, module count, and
-host-call duration policy.
+`WithMaxSteps` is the first production-limits API. A full production limits
+object should still cover wall time, call depth, recursion, allocation/table
+sizes, module count, and host-call duration policy.
 
 ### Errors and stack traces
 
