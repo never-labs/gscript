@@ -20,4 +20,10 @@ func TestInlineAllocationContractsLiveInOpSpec(t *testing.T) {
 	if inlineAllocationRole(OpSetTable) != OpInlineAllocationNone {
 		t.Fatalf("%s should not report inline allocation role", OpSetTable)
 	}
+	if lowered, ok := inlineAllocationLoweredOp(OpNewTable); !ok || lowered != OpNewFixedTable {
+		t.Fatalf("%s inline allocation lowering = %s, %v; want %s, true", OpNewTable, lowered, ok, OpNewFixedTable)
+	}
+	if lowered, ok := inlineAllocationLoweredOp(OpNewFixedTable); ok || lowered != OpMax {
+		t.Fatalf("%s inline allocation lowering = %s, %v; want OpMax, false", OpNewFixedTable, lowered, ok)
+	}
 }

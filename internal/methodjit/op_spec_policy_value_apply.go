@@ -103,4 +103,7 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opInlineAllocationRolePolicies) {
 		spec.InlineAllocationRole = opInlineAllocationRolePolicies[op]
 	}
+	if int(op) < len(opInlineAllocationLoweredOpPolicies) && opInlineAllocationLoweredOpPolicies[op].Set {
+		spec.InlineAllocationLoweredOp = opInlineAllocationLoweredOpPolicies[op].Op
+	}
 }

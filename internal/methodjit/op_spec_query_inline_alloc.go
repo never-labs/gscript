@@ -7,3 +7,8 @@ func inlineAllocationRole(op Op) OpInlineAllocationRole {
 	}
 	return spec.InlineAllocationRole
 }
+
+func inlineAllocationLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.InlineAllocationLoweredOp, ok && spec.InlineAllocationLoweredOp != OpMax
+}

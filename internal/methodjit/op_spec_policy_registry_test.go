@@ -6,7 +6,7 @@ type opSpecPolicyTable struct {
 }
 
 func opSpecPolicyTables() []opSpecPolicyTable {
-	return []opSpecPolicyTable{
+	tables := []opSpecPolicyTable{
 		{"opBackendPolicies", opBackendPolicies},
 		{"opKeepUnusedPolicies", opKeepUnusedPolicies},
 		{"opNativeReplayMayExitPolicies", opNativeReplayMayExitPolicies},
@@ -29,36 +29,6 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opLoadElimTableCacheKeyArgIndexPolicies", opLoadElimTableCacheKeyArgIndexPolicies},
 		{"opLoadElimTableCacheValueArgIndexPolicies", opLoadElimTableCacheValueArgIndexPolicies},
 		{"opLoadElimFactBarrierPolicies", opLoadElimFactBarrierPolicies},
-		{"opNoSSAResultPolicies", opNoSSAResultPolicies},
-		{"opRawIntResultPolicies", opRawIntResultPolicies},
-		{"opRawTablePtrResultPolicies", opRawTablePtrResultPolicies},
-		{"opRawDataPtrResultPolicies", opRawDataPtrResultPolicies},
-		{"opRawFloatResultPolicies", opRawFloatResultPolicies},
-		{"opMatrixNativePolicies", opMatrixNativePolicies},
-		{"opMatrixLoweredOpPolicies", opMatrixLoweredOpPolicies},
-		{"opMatrixRowLoweredOpPolicies", opMatrixRowLoweredOpPolicies},
-		{"opMatrixRowConstLoweredOpPolicies", opMatrixRowConstLoweredOpPolicies},
-		{"opMatrixNestedLoweredOpPolicies", opMatrixNestedLoweredOpPolicies},
-		{"opTableArrayGPRInvariantPolicies", opTableArrayGPRInvariantPolicies},
-		{"opTableArrayGPRInvariantRankPolicies", opTableArrayGPRInvariantRankPolicies},
-		{"opTableArrayGPRInvariantUseMaskPolicies", opTableArrayGPRInvariantUseMaskPolicies},
-		{"opTableArrayKeyArgIndexPolicies", opTableArrayKeyArgIndexPolicies},
-		{"opTableArrayTableArgIndexPolicies", opTableArrayTableArgIndexPolicies},
-		{"opTableArrayDataArgIndexPolicies", opTableArrayDataArgIndexPolicies},
-		{"opTableArrayLenArgIndexPolicies", opTableArrayLenArgIndexPolicies},
-		{"opTableArrayLoweredOpPolicies", opTableArrayLoweredOpPolicies},
-		{"opTableArrayNestedLoweredOpPolicies", opTableArrayNestedLoweredOpPolicies},
-		{"opTableArraySwapLoweredOpPolicies", opTableArraySwapLoweredOpPolicies},
-		{"opTableIntArraySwapPairsBodyBenignPolicies", opTableIntArraySwapPairsBodyBenignPolicies},
-		{"opTableIntArrayCopyPrefixBodyBenignPolicies", opTableIntArrayCopyPrefixBodyBenignPolicies},
-		{"opTableIntArrayReverseBodyBenignPolicies", opTableIntArrayReverseBodyBenignPolicies},
-		{"opFixedShapeArrayElementWriteRolePolicies", opFixedShapeArrayElementWriteRolePolicies},
-		{"opFixedShapeArrayElementReadRolePolicies", opFixedShapeArrayElementReadRolePolicies},
-		{"opFixedShapeReturnArrayElementRolePolicies", opFixedShapeReturnArrayElementRolePolicies},
-		{"opLocalStringArrayTableUseRolePolicies", opLocalStringArrayTableUseRolePolicies},
-		{"opLocalStringArrayTableArgIndexPolicies", opLocalStringArrayTableArgIndexPolicies},
-		{"opReadonlyTableParamUseRolePolicies", opReadonlyTableParamUseRolePolicies},
-		{"opInlineAllocationRolePolicies", opInlineAllocationRolePolicies},
 		{"opOracleSupportPolicies", opOracleSupportPolicies},
 		{"opOracleUnsupportedReasonPolicies", opOracleUnsupportedReasonPolicies},
 		{"opLICMHoistablePolicies", opLICMHoistablePolicies},
@@ -177,4 +147,6 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opSourceFeedbackPolicies", opSourceFeedbackPolicies},
 		{"opRangeRefineKindPolicies", opRangeRefineKindPolicies},
 	}
+	tables = append(tables, opSpecValuePolicyTables()...)
+	return tables
 }

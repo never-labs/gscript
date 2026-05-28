@@ -68,8 +68,12 @@ func lowerFixedTableConstructor2(fn *Function, block *Block, idx int, alloc *Ins
 	if len(set1.Args) < 2 || set1.Args[1] == nil || len(set2.Args) < 2 || set2.Args[1] == nil {
 		return false
 	}
+	loweredOp, ok := inlineAllocationLoweredOp(alloc.Op)
+	if !ok {
+		return false
+	}
 
-	alloc.Op = OpNewFixedTable
+	alloc.Op = loweredOp
 	alloc.Type = TypeTable
 	alloc.Args = []*Value{set1.Args[1], set2.Args[1]}
 	alloc.Aux = int64(fact.Ctor2Index)
@@ -100,8 +104,12 @@ func lowerFixedTableConstructorN(fn *Function, block *Block, idx int, alloc *Ins
 		values = append(values, set.Args[1])
 		pos = next
 	}
+	loweredOp, ok := inlineAllocationLoweredOp(alloc.Op)
+	if !ok {
+		return false
+	}
 
-	alloc.Op = OpNewFixedTable
+	alloc.Op = loweredOp
 	alloc.Type = TypeTable
 	alloc.Args = values
 	alloc.Aux = int64(fact.CtorNIndex)
@@ -319,10 +327,14 @@ func rewriteMaterializedCtor(fn *Function, cand *materializedCtorCandidate) bool
 		keys[i] = store.key
 		args[i] = store.value
 	}
+	loweredOp, ok := inlineAllocationLoweredOp(cand.alloc.Op)
+	if !ok {
+		return false
+	}
 	ctorIdx := ensureFuncProtoTableCtorN(fn.Proto, keys)
 	fixed := &Instr{
 		ID:    fn.newValueID(),
-		Op:    OpNewFixedTable,
+		Op:    loweredOp,
 		Type:  TypeTable,
 		Args:  args,
 		Aux:   int64(ctorIdx),

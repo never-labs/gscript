@@ -43,6 +43,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "TableArrayLoweredOp", spec.TableArrayLoweredOp)
 		assertOpSpecTarget(t, op, "TableArrayNestedLoweredOp", spec.TableArrayNestedLoweredOp)
 		assertOpSpecTarget(t, op, "TableArraySwapLoweredOp", spec.TableArraySwapLoweredOp)
+		assertOpSpecTarget(t, op, "InlineAllocationLoweredOp", spec.InlineAllocationLoweredOp)
 		assertOpSpecTarget(t, op, "CallFloorProjectionOp", spec.CallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCallFloorProjectionOp", spec.FieldCallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCalleeGuardLoweredOp", spec.FieldCalleeGuardLoweredOp)
@@ -104,6 +105,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if spec.TableArraySwapLoweredOp != OpMax {
 			t.Fatalf("%s TableArraySwapLoweredOp default=%s, want OpMax", op, spec.TableArraySwapLoweredOp)
+		}
+		if spec.InlineAllocationLoweredOp != OpMax {
+			t.Fatalf("%s InlineAllocationLoweredOp default=%s, want OpMax", op, spec.InlineAllocationLoweredOp)
 		}
 		if spec.CallFloorProjectionOp != OpMax || spec.FieldCallFloorProjectionOp != OpMax {
 			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax", op, spec.CallFloorProjectionOp, spec.FieldCallFloorProjectionOp)

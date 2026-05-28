@@ -138,3 +138,7 @@ var opInlineAllocationRolePolicies = [...]OpInlineAllocationRole{
 	OpSetField:      OpInlineAllocationFieldInit,
 	OpSetList:       OpInlineAllocationArrayInit,
 }
+
+var opInlineAllocationLoweredOpPolicies = [...]opTargetPolicy{
+	OpNewTable: {Op: OpNewFixedTable, Set: true},
+}
