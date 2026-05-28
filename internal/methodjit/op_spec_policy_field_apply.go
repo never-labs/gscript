@@ -46,12 +46,20 @@ func applyOpSpecFieldLoadPolicies(op Op, spec *OpSpec) {
 }
 
 func applyOpSpecFieldBarrierPolicies(op Op, spec *OpSpec) {
+	applyOpSpecFieldSvalsBarrierPolicies(op, spec)
+	applyOpSpecFieldLenBarrierPolicies(op, spec)
+}
+
+func applyOpSpecFieldSvalsBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldSvalsCrossBlockBarrierPolicies) {
 		spec.FieldSvalsCrossBlockBarrier = opFieldSvalsCrossBlockBarrierPolicies[op]
 	}
 	if int(op) < len(opFieldSvalsGlobalBarrierPolicies) {
 		spec.FieldSvalsGlobalBarrier = opFieldSvalsGlobalBarrierPolicies[op]
 	}
+}
+
+func applyOpSpecFieldLenBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldLenFoldBarrierPolicies) {
 		spec.FieldLenFoldBarrier = opFieldLenFoldBarrierPolicies[op]
 	}

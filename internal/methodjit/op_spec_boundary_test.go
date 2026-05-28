@@ -208,6 +208,7 @@ func TestOpSpecPolicyApplyEntrypointsOnlyOrchestrateSubdomains(t *testing.T) {
 		fn   string
 	}{
 		{"op_spec_policy_backend_apply.go", "applyOpSpecBackendPolicies"},
+		{"op_spec_policy_field_apply.go", "applyOpSpecFieldBarrierPolicies"},
 		{"op_spec_policy_field_apply.go", "applyOpSpecFieldPolicies"},
 		{"op_spec_policy_licm_apply.go", "applyOpSpecLICMPolicies"},
 		{"op_spec_policy_numeric_apply.go", "applyOpSpecNumericPolicies"},
