@@ -52,6 +52,10 @@ func StdGetMetatableIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdGetMetatableIdentity)
 }
 
+func StdSoAAffineManyIdentityPtr() unsafe.Pointer {
+	return unsafe.Pointer(&stdSoAAffineManyIdentity)
+}
+
 func IsStdToNumberFunction(v Value) bool {
 	gf := v.GoFunction()
 	return gf != nil &&
@@ -79,6 +83,14 @@ func IsStdIPairsFunction(v Value) bool {
 	return gf != nil &&
 		gf.NativeKind == NativeKindStdIPairs &&
 		gf.NativeData == StdIPairsIdentityPtr()
+}
+
+func IsStdSoAAffineManyFunction(v Value) bool {
+	gf := v.GoFunction()
+	return gf != nil &&
+		gf.NativeKind == NativeKindStdSoAAffineMany &&
+		gf.NativeData == StdSoAAffineManyIdentityPtr() &&
+		gf.FastArg2 != nil
 }
 
 func SelectReturnRange(selector Value, argCount int) (start int, countOnly bool, err error) {

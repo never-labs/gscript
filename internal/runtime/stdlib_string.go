@@ -11,22 +11,23 @@ import (
 )
 
 const (
-	NativeKindStdStringFormat uint8 = 2
-	NativeKindStdStringSplit  uint8 = 100
-	NativeKindStdStringSub    uint8 = 101
-	NativeKindStdToNumber     uint8 = 102
-	NativeKindStdSelect       uint8 = 103
-	NativeKindStdPairs        uint8 = 104
-	NativeKindStdIPairs       uint8 = 105
-	NativeKindStdStringFind   uint8 = 106
-	NativeKindStdStringMatch  uint8 = 107
-	NativeKindStdRawGet       uint8 = 108
-	NativeKindStdRawSet       uint8 = 109
-	NativeKindStdRawLen       uint8 = 110
-	NativeKindStdType         uint8 = 111
-	NativeKindStdNext         uint8 = 112
-	NativeKindStdGetMetatable uint8 = 113
-	NativeKindStdStringGSub   uint8 = 114
+	NativeKindStdStringFormat  uint8 = 2
+	NativeKindStdStringSplit   uint8 = 100
+	NativeKindStdStringSub     uint8 = 101
+	NativeKindStdToNumber      uint8 = 102
+	NativeKindStdSelect        uint8 = 103
+	NativeKindStdPairs         uint8 = 104
+	NativeKindStdIPairs        uint8 = 105
+	NativeKindStdStringFind    uint8 = 106
+	NativeKindStdStringMatch   uint8 = 107
+	NativeKindStdRawGet        uint8 = 108
+	NativeKindStdRawSet        uint8 = 109
+	NativeKindStdRawLen        uint8 = 110
+	NativeKindStdType          uint8 = 111
+	NativeKindStdNext          uint8 = 112
+	NativeKindStdGetMetatable  uint8 = 113
+	NativeKindStdStringGSub    uint8 = 114
+	NativeKindStdSoAAffineMany uint8 = 115
 )
 
 var stdStringFormatIdentity byte
@@ -45,6 +46,7 @@ var stdRawLenIdentity byte
 var stdTypeIdentity byte
 var stdNextIdentity byte
 var stdGetMetatableIdentity byte
+var stdSoAAffineManyIdentity byte
 
 type compiledLuaPatternCacheEntry struct {
 	prog luaPatternProgram

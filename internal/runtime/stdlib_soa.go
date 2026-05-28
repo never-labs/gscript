@@ -220,6 +220,10 @@ func buildSoALib() *Table {
 		}
 		return []Value{BoolValue(true)}, nil
 	}, soaAffineManyValue)
+	if gf := t.RawGetString("affineMany").GoFunction(); gf != nil {
+		gf.NativeKind = NativeKindStdSoAAffineMany
+		gf.NativeData = StdSoAAffineManyIdentityPtr()
+	}
 
 	setFastArg2("sum", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.sum", args, 0)

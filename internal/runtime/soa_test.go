@@ -255,6 +255,9 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	if affineMany == nil || affineMany.FastArg2 == nil {
 		t.Fatal("soa.affineMany FastArg2 is nil")
 	}
+	if !IsStdSoAAffineManyFunction(FunctionValue(affineMany)) {
+		t.Fatal("soa.affineMany native identity is missing")
+	}
 	if sum == nil || sum.FastArg2 == nil {
 		t.Fatal("soa.sum FastArg2 is nil")
 	}
