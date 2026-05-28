@@ -434,6 +434,19 @@ type TableField struct {
 	Value Expr
 }
 
+// DenseLitExpr represents an experimental typed dense array literal:
+// []f64{...} or [3]f64{...}. Len == 0 means dynamic length.
+type DenseLitExpr struct {
+	P      Pos
+	DType  string
+	Len    int
+	Values []Expr
+}
+
+func (e *DenseLitExpr) nodeType() string { return "DenseLitExpr" }
+func (e *DenseLitExpr) GetPos() Pos      { return e.P }
+func (e *DenseLitExpr) exprNode()        {}
+
 // RecvExpr represents a channel receive expression: <-ch
 type RecvExpr struct {
 	P       Pos

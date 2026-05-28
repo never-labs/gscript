@@ -55,6 +55,7 @@ Allowed status values are:
 | UTF-8 library | not_applicable | not_applicable | covered | semantic_only | semantic_only | covered | covered | covered |
 | Host stdlibs | not_applicable | not_applicable | covered | semantic_only | semantic_only | covered | covered | partial |
 | Dense arrays and matrix helpers | not_applicable | partial | covered | covered | covered | covered | covered | covered |
+| Experimental typed dense array literals | covered | missing | missing | not_applicable | not_applicable | missing | not_applicable | missing |
 | Class-style and method syntax examples | covered | partial | covered | partial | partial | partial | not_applicable | covered |
 
 ## Maintenance

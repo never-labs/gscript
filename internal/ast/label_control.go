@@ -186,6 +186,12 @@ func (s *labelScope) walkExpr(expr Expr) error {
 				return err
 			}
 		}
+	case *DenseLitExpr:
+		for _, value := range e.Values {
+			if err := s.walkExpr(value); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

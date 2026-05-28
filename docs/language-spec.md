@@ -62,6 +62,8 @@ letter         = "A".."Z" | "a".."z" | "_" ;
 digit          = "0".."9" ;
 
 number_lit     = decimal_lit | base_int_lit ;
+decimal_int_lit
+              = digit { digit | "_" } ;
 decimal_lit    = digit { digit | "_" } [ "." { digit | "_" } ] [ exponent ] ;
 exponent       = ( "e" | "E" ) [ "+" | "-" ] digit { digit | "_" } ;
 base_int_lit   = "0" ( "x" | "X" | "b" | "B" | "o" | "O" ) base_digit { base_digit | "_" } ;
@@ -171,9 +173,14 @@ primary        = number_lit
                | identifier
                | "(" expr ")"
                | func_lit
+               | typed_dense_lit
                | table_lit ;
 
 func_lit       = "func" param_list block ;
+typed_dense_lit
+              = ( "[]" | "[" decimal_int_lit "]" ) dense_dtype
+                "{" [ expr { ( "," | ";" ) expr } [ "," | ";" ] ] "}" ;
+dense_dtype    = "f64" | "f32" | "i64" | "i32" | "bool" ;
 table_lit      = "{" [ table_field { ( "," | ";" ) table_field } [ "," | ";" ] ] "}" ;
 table_field    = "[" expr "]" ":" expr
                | identifier ":" expr
@@ -262,6 +269,14 @@ Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentiona
 - `{ [expr]: value }` evaluates `expr` as a computed key.
 - Table keys use raw identity/equality for lookup; `__eq` does not affect key identity.
 - `nil` keys are invalid. NaN key behavior must be rejected or normalized consistently and is not stable until covered by tests.
+
+### Experimental data-oriented literals
+
+- `[]f64{1, 2}` creates a typed dense array literal AST node with dynamic length.
+- `[3]f64{1, 2, 3}` creates a typed dense array literal AST node with fixed length `3`.
+- The experimental dense dtypes are exactly `f64`, `f32`, `i64`, `i32`, and `bool`.
+- This is currently a parser/AST surface. Runtime representation, bytecode lowering, coercion rules, fixed-length validation, mutation semantics, and interop with table APIs are intentionally not stable here.
+- A typed dense literal may appear wherever an expression may appear, including as an array-style table field: `{[]f32{1, 2}}`.
 
 ### Channels
 

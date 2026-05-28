@@ -1055,6 +1055,75 @@ func TestTableTrailingComma(t *testing.T) {
 	}
 }
 
+func TestTypedDenseLiteralDynamicLen(t *testing.T) {
+	prog := mustParse(t, `v := []f64{1, 2}`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	dense, ok := decl.Values[0].(*ast.DenseLitExpr)
+	if !ok {
+		t.Fatalf("expected DenseLitExpr, got %T", decl.Values[0])
+	}
+	if dense.DType != "f64" {
+		t.Fatalf("expected dtype f64, got %q", dense.DType)
+	}
+	if dense.Len != 0 {
+		t.Fatalf("expected dynamic len 0, got %d", dense.Len)
+	}
+	if len(dense.Values) != 2 {
+		t.Fatalf("expected 2 values, got %d", len(dense.Values))
+	}
+}
+
+func TestTypedDenseLiteralFixedLen(t *testing.T) {
+	prog := mustParse(t, `v := [3]i32{1, 2, 3}`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	dense, ok := decl.Values[0].(*ast.DenseLitExpr)
+	if !ok {
+		t.Fatalf("expected DenseLitExpr, got %T", decl.Values[0])
+	}
+	if dense.DType != "i32" {
+		t.Fatalf("expected dtype i32, got %q", dense.DType)
+	}
+	if dense.Len != 3 {
+		t.Fatalf("expected fixed len 3, got %d", dense.Len)
+	}
+	if len(dense.Values) != 3 {
+		t.Fatalf("expected 3 values, got %d", len(dense.Values))
+	}
+}
+
+func TestTypedDenseLiteralInTable(t *testing.T) {
+	prog := mustParse(t, `t := {[]bool{true, false}, [2]f32{1, 2}}`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tbl := decl.Values[0].(*ast.TableLitExpr)
+	if len(tbl.Fields) != 2 {
+		t.Fatalf("expected 2 fields, got %d", len(tbl.Fields))
+	}
+	for i, field := range tbl.Fields {
+		if field.Key != nil {
+			t.Fatalf("field %d should be array-style, got key %T", i, field.Key)
+		}
+		if _, ok := field.Value.(*ast.DenseLitExpr); !ok {
+			t.Fatalf("field %d expected DenseLitExpr value, got %T", i, field.Value)
+		}
+	}
+}
+
+func TestTypedDenseLiteralRejectsUnknownDType(t *testing.T) {
+	mustFail(t, `v := []u8{1}`)
+}
+
+func TestComputedKeyStillParsesBeforeTypedDenseLiteral(t *testing.T) {
+	prog := mustParse(t, `t := {[3]: "three"}`)
+	decl := prog.Stmts[0].(*ast.DeclareStmt)
+	tbl := decl.Values[0].(*ast.TableLitExpr)
+	if len(tbl.Fields) != 1 {
+		t.Fatalf("expected 1 field, got %d", len(tbl.Fields))
+	}
+	if _, ok := tbl.Fields[0].Key.(*ast.NumberLit); !ok {
+		t.Fatalf("expected numeric computed key, got %T", tbl.Fields[0].Key)
+	}
+}
+
 // ============================================================
 // VarArgExpr
 // ============================================================

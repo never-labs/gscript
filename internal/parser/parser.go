@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/gscript/gscript/internal/ast"
 	"github.com/gscript/gscript/internal/lexer"
@@ -813,7 +815,7 @@ func (p *Parser) canStartExpr() bool {
 	switch p.peek().Type {
 	case lexer.TOKEN_IDENT, lexer.TOKEN_NUMBER, lexer.TOKEN_STRING,
 		lexer.TOKEN_TRUE, lexer.TOKEN_FALSE, lexer.TOKEN_NIL,
-		lexer.TOKEN_LPAREN, lexer.TOKEN_LBRACE, lexer.TOKEN_FUNC,
+		lexer.TOKEN_LPAREN, lexer.TOKEN_LBRACE, lexer.TOKEN_LBRACKET, lexer.TOKEN_FUNC,
 		lexer.TOKEN_MINUS, lexer.TOKEN_NOT, lexer.TOKEN_LEN,
 		lexer.TOKEN_ELLIPSIS:
 		return true
@@ -1224,6 +1226,12 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 	case lexer.TOKEN_LBRACE:
 		return p.parseTableLitExpr()
 
+	case lexer.TOKEN_LBRACKET:
+		if p.isTypedDenseLitStart() {
+			return p.parseDenseLitExpr()
+		}
+		return nil, p.errorf("unexpected token %s (%q)", tok.Type, tok.Value)
+
 	default:
 		return nil, p.errorf("unexpected token %s (%q)", tok.Type, tok.Value)
 	}
@@ -1282,8 +1290,9 @@ func (p *Parser) parseTableField() (ast.TableField, error) {
 	// 2. ident: value   -- string key shorthand
 	// 3. value           -- array-style (positional)
 
-	// Form 1: [expr]: value
-	if p.check(lexer.TOKEN_LBRACKET) {
+	// Form 1: [expr]: value. A typed dense literal such as []f64{...} or
+	// [3]f64{...} is a bare value, not a computed-key field.
+	if p.check(lexer.TOKEN_LBRACKET) && !p.isTypedDenseLitStart() {
 		p.advance() // consume '['
 		key, err := p.parseExpr()
 		if err != nil {
@@ -1321,4 +1330,103 @@ func (p *Parser) parseTableField() (ast.TableField, error) {
 		return ast.TableField{}, err
 	}
 	return ast.TableField{Key: nil, Value: val}, nil
+}
+
+func (p *Parser) isTypedDenseLitStart() bool {
+	if p.peek().Type != lexer.TOKEN_LBRACKET {
+		return false
+	}
+	off := 1
+	if p.peekAt(off).Type == lexer.TOKEN_NUMBER {
+		off++
+	}
+	if p.peekAt(off).Type != lexer.TOKEN_RBRACKET {
+		return false
+	}
+	off++
+	if p.peekAt(off).Type != lexer.TOKEN_IDENT || !isDenseDType(p.peekAt(off).Value) {
+		return false
+	}
+	off++
+	return p.peekAt(off).Type == lexer.TOKEN_LBRACE
+}
+
+func (p *Parser) parseDenseLitExpr() (ast.Expr, error) {
+	lbracket := p.advance() // consume '['
+	pos := p.tokenPos(lbracket)
+
+	length := 0
+	if p.check(lexer.TOKEN_NUMBER) {
+		lenTok := p.advance()
+		parsed, err := parseDenseLiteralLen(lenTok.Value)
+		if err != nil {
+			return nil, fmt.Errorf("parse error at %d:%d: invalid dense literal length %q", lenTok.Line, lenTok.Column, lenTok.Value)
+		}
+		length = parsed
+	}
+
+	if _, err := p.expect(lexer.TOKEN_RBRACKET); err != nil {
+		return nil, err
+	}
+
+	dtypeTok, err := p.expect(lexer.TOKEN_IDENT)
+	if err != nil {
+		return nil, err
+	}
+	if !isDenseDType(dtypeTok.Value) {
+		return nil, fmt.Errorf("parse error at %d:%d: unsupported dense literal dtype %q", dtypeTok.Line, dtypeTok.Column, dtypeTok.Value)
+	}
+
+	if _, err := p.expect(lexer.TOKEN_LBRACE); err != nil {
+		return nil, err
+	}
+
+	var values []ast.Expr
+	if !p.check(lexer.TOKEN_RBRACE) {
+		for {
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, value)
+			if !p.check(lexer.TOKEN_COMMA) && !p.check(lexer.TOKEN_SEMICOLON) {
+				break
+			}
+			p.advance()
+			if p.check(lexer.TOKEN_RBRACE) {
+				break
+			}
+		}
+	}
+
+	if _, err := p.expect(lexer.TOKEN_RBRACE); err != nil {
+		return nil, err
+	}
+
+	return &ast.DenseLitExpr{
+		P:      pos,
+		DType:  dtypeTok.Value,
+		Len:    length,
+		Values: values,
+	}, nil
+}
+
+func isDenseDType(dtype string) bool {
+	switch dtype {
+	case "f64", "f32", "i64", "i32", "bool":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseDenseLiteralLen(raw string) (int, error) {
+	if strings.ContainsAny(raw, ".eE") {
+		return 0, fmt.Errorf("dense literal length must be an integer")
+	}
+	n, err := strconv.Atoi(strings.ReplaceAll(raw, "_", ""))
+	if err != nil || n < 0 {
+		return 0, fmt.Errorf("dense literal length must be a non-negative integer")
+	}
+	return n, nil
 }
