@@ -184,11 +184,12 @@ func TestProductionCodeKeepsAnalysisFactFallbacksAtCompatibilityBoundaries(t *te
 	}
 }
 
-func TestEmittersUseFactAccessBoundaries(t *testing.T) {
+func TestCompilerRuntimeUsesFactAccessBoundaries(t *testing.T) {
 	files, err := filepath.Glob("emit_*.go")
 	if err != nil {
-		t.Fatalf("glob emitter files: %v", err)
+		t.Fatalf("glob compiler runtime files: %v", err)
 	}
+	files = append(files, "graph_builder.go", "interp_ops.go")
 	for _, file := range files {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
@@ -209,7 +210,7 @@ func TestEmittersUseFactAccessBoundaries(t *testing.T) {
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
 				pos := fset.Position(sel.Pos())
-				t.Fatalf("%s directly calls Analysis.%s in emitter; use function*Facts helpers", pos, sel.Sel.Name)
+				t.Fatalf("%s directly calls Analysis.%s in compiler/runtime code; use function*Facts helpers", pos, sel.Sel.Name)
 			}
 			return true
 		})

@@ -351,7 +351,7 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 
 		// Check if the callee is single-block (trivial inline).
 		if len(calleeFn.Blocks) == 1 {
-			newInstrs := inlineTrivial(fn, block, instr, i, calleeFn, calleeName)
+			newInstrs := inlineTrivial(fn, block, instr, i, calleeFn, calleeName, config)
 			if newInstrs != nil {
 				block.Instrs = newInstrs
 				inlined = true
@@ -372,7 +372,7 @@ func inlineCallsInBlock(fn *Function, block *Block, config InlineConfig, recursi
 		// Multi-block callee: inline with block splicing.
 		// This modifies block.Instrs directly (truncates + adds jump),
 		// moves post-call instrs to a merge block. Stop processing this block.
-		inlineMultiBlock(fn, block, instr, i, calleeFn, calleeName)
+		inlineMultiBlock(fn, block, instr, i, calleeFn, calleeName, config)
 		recordTier2SpecDependency(fn.Proto, config.SpeculationFacts, calleeProto)
 		recursionCounts[calleeProto]++
 		cumulative.totalBytes += len(calleeProto.Code)
@@ -510,7 +510,7 @@ func isRecursiveOrMutualCached(proto *vm.FuncProto, globals map[string]*vm.FuncP
 //  3. Replace callee's OpReturn: the return value becomes the inline result.
 //  4. Splice the callee's instructions (minus LoadSlots and Return) into the
 //     caller block, replacing the OpCall.
-func inlineTrivial(fn *Function, block *Block, callInstr *Instr, idx int, calleeFn *Function, calleeName string) []*Instr {
+func inlineTrivial(fn *Function, block *Block, callInstr *Instr, idx int, calleeFn *Function, calleeName string, config InlineConfig) []*Instr {
 	calleeBlock := calleeFn.Entry
 	callArgs, ok := inlineCallArgumentValues(callInstr)
 	if !ok {
@@ -610,7 +610,7 @@ func inlineTrivial(fn *Function, block *Block, callInstr *Instr, idx int, callee
 		}
 	}
 
-	copyInlinedFixedTableConstructors(fn, calleeFn, idMap)
+	copyInlinedFixedTableConstructors(fn, calleeFn, config.TableShapes, calleeFn.ensureAnalysis().TableShapeFacts(), idMap)
 
 	// Also remove the OpGetGlobal that loaded the function (it's now dead).
 	// We leave it for DCE to clean up — don't complicate inlining with dead code removal.
@@ -633,7 +633,7 @@ func inlineCallCalleeValue(callInstr *Instr) *Value {
 //   - Post-call instructions move to the merge block
 //
 // Modifies the block and function in place.
-func inlineMultiBlock(fn *Function, block *Block, callInstr *Instr, idx int, calleeFn *Function, calleeName string) {
+func inlineMultiBlock(fn *Function, block *Block, callInstr *Instr, idx int, calleeFn *Function, calleeName string, config InlineConfig) {
 	callArgs, ok := inlineCallArgumentValues(callInstr)
 	if !ok {
 		return
@@ -842,7 +842,7 @@ func inlineMultiBlock(fn *Function, block *Block, callInstr *Instr, idx int, cal
 		fn.Blocks = append(fn.Blocks, blockMap[cb.ID])
 	}
 	fn.Blocks = append(fn.Blocks, mergeBlock)
-	copyInlinedFixedTableConstructors(fn, calleeFn, idMap)
+	copyInlinedFixedTableConstructors(fn, calleeFn, config.TableShapes, calleeFn.ensureAnalysis().TableShapeFacts(), idMap)
 
 }
 
@@ -891,11 +891,11 @@ func remapValue(v *Value, idMap map[int]int, paramValues map[int]*Value) *Value 
 	return v
 }
 
-func copyInlinedFixedTableConstructors(callerFn, calleeFn *Function, idMap map[int]int) {
-	if callerFn == nil || callerFn.Proto == nil || calleeFn == nil || calleeFn.Proto == nil || calleeFn.Analysis.TableShapeFacts().FixedTableConstructorCount() == 0 {
+func copyInlinedFixedTableConstructors(callerFn, calleeFn *Function, callerTableShapes, calleeTableShapes *TableShapeFacts, idMap map[int]int) {
+	if callerFn == nil || callerFn.Proto == nil || calleeFn == nil || calleeFn.Proto == nil || callerTableShapes == nil || calleeTableShapes == nil || calleeTableShapes.FixedTableConstructorCount() == 0 {
 		return
 	}
-	calleeFn.Analysis.TableShapeFacts().ForEachFixedTableConstructor(func(oldID int, fact FixedTableConstructorFact) bool {
+	calleeTableShapes.ForEachFixedTableConstructor(func(oldID int, fact FixedTableConstructorFact) bool {
 		newID, ok := idMap[oldID]
 		if !ok {
 			return true
@@ -904,7 +904,7 @@ func copyInlinedFixedTableConstructors(callerFn, calleeFn *Function, idMap map[i
 		if !ok {
 			return true
 		}
-		callerFn.Analysis.TableShapeFacts().RecordFixedTableConstructor(newID, mapped)
+		callerTableShapes.RecordFixedTableConstructor(newID, mapped)
 		return true
 	})
 }

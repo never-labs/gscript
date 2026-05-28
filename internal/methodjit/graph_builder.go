@@ -30,7 +30,7 @@ func BuildGraphWithSpeculation(proto *vm.FuncProto, speculation Tier2Speculation
 		lastMultiRetReg: -1,
 	}
 	// Initialize suppressed spec guard PCs and kinds from speculation
-	specFacts := b.fn.Analysis.SpeculationFacts()
+	specFacts := functionSpeculationFacts(b.fn)
 	if speculation.SuppressedGuardPCs() != nil {
 		specFacts.SetSuppressedSpecGuardPCs(speculation.SuppressedGuardPCs())
 	}
@@ -792,7 +792,7 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, tbl)
 				if ctorIdx >= 0 && ctorIdx < len(b.proto.TableCtors2) {
 					ctor := b.proto.TableCtors2[ctorIdx]
-					b.fn.Analysis.TableShapeFacts().RecordFixedTableConstructor(newTable.ID, FixedTableConstructorFact{
+					functionTableShapeFacts(b.fn).RecordFixedTableConstructor(newTable.ID, FixedTableConstructorFact{
 						Ctor2Index: ctorIdx,
 						CtorNIndex: -1,
 						FieldNames: []string{ctor.Runtime.Key1, ctor.Runtime.Key2},
@@ -816,7 +816,7 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, tbl)
 				if ctorIdx >= 0 && ctorIdx < len(b.proto.TableCtorsN) {
 					ctor := b.proto.TableCtorsN[ctorIdx]
-					b.fn.Analysis.TableShapeFacts().RecordFixedTableConstructor(newTable.ID, FixedTableConstructorFact{
+					functionTableShapeFacts(b.fn).RecordFixedTableConstructor(newTable.ID, FixedTableConstructorFact{
 						Ctor2Index: -1,
 						CtorNIndex: ctorIdx,
 						FieldNames: append([]string(nil), ctor.Runtime.Keys...),

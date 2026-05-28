@@ -55,8 +55,9 @@ func (s *interpState) callViaVM(fnVal runtime.Value, args []runtime.Value) ([]ru
 	// Populate VM globals with any function protos known to the caller.
 	// This lets residual cross-function calls (e.g., after bounded recursive
 	// inlining) resolve their callees when the VM executes their bytecode.
-	if s.fn.Analysis.GlobalFacts().GlobalsPopulated() {
-		s.fn.Analysis.GlobalFacts().ForEachGlobal(func(name string, p *vm.FuncProto) {
+	globalFacts := functionGlobalFacts(s.fn)
+	if globalFacts.GlobalsPopulated() {
+		globalFacts.ForEachGlobal(func(name string, p *vm.FuncProto) {
 			if p == nil {
 				return
 			}
@@ -141,7 +142,7 @@ func (s *interpState) getGlobal(name string) runtime.Value {
 		return runtime.VMClosureFastValue(unsafe.Pointer(cl))
 	}
 	// Consult the inline pass's globals table if available.
-	if p, ok := s.fn.Analysis.GlobalFacts().GlobalProto(name); ok && p != nil {
+	if p, ok := functionGlobalFacts(s.fn).GlobalProto(name); ok && p != nil {
 		cl := vm.NewClosure(p)
 		return runtime.VMClosureFastValue(unsafe.Pointer(cl))
 	}
