@@ -36,7 +36,7 @@ func globalConstSpecializationPassWith(fn *Function, config GlobalConstSpecializ
 	for _, block := range fn.Blocks {
 		changed := false
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpGetGlobal {
+			if instr == nil || !opIsGlobalRead(instr.Op) {
 				continue
 			}
 			v, ok := values[int(instr.Aux)]
@@ -51,7 +51,7 @@ func globalConstSpecializationPassWith(fn *Function, config GlobalConstSpecializ
 		}
 		newInstrs := make([]*Instr, 0, len(block.Instrs)*2)
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpGetGlobal {
+			if instr == nil || !opIsGlobalRead(instr.Op) {
 				newInstrs = append(newInstrs, instr)
 				continue
 			}

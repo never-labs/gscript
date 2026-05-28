@@ -750,7 +750,7 @@ func propagateArrayElementFactsThroughGlobals(fn *Function, arrayElementFacts ma
 	globals := make(map[int64]state)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpSetGlobal || len(instr.Args) == 0 || instr.Args[0] == nil {
+			if instr == nil || !opIsGlobalWrite(instr.Op) || len(instr.Args) == 0 || instr.Args[0] == nil {
 				continue
 			}
 			fact, ok := arrayElementFacts[instr.Args[0].ID]
@@ -774,7 +774,7 @@ func propagateArrayElementFactsThroughGlobals(fn *Function, arrayElementFacts ma
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpGetGlobal {
+			if instr == nil || !opIsGlobalRead(instr.Op) {
 				continue
 			}
 			st := globals[instr.Aux]

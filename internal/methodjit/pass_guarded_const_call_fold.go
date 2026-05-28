@@ -168,7 +168,7 @@ func collectProtocolStableIntGlobals(fn *Function) map[int]int64 {
 	invalid := make(map[int]bool)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpSetGlobal || len(instr.Args) == 0 {
+			if instr == nil || !opIsGlobalWrite(instr.Op) || len(instr.Args) == 0 {
 				continue
 			}
 			constIdx := int(instr.Aux)
