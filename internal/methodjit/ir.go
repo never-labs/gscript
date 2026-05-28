@@ -217,6 +217,7 @@ type CallABIAnnotationConfig struct {
 	GlobalArrayElementFacts map[string]FixedShapeTableFact
 	TableShapes             *TableShapeFacts
 	CallFacts               *CallFacts
+	NumericFacts            *NumericFacts
 	SpeculationFacts        *SpeculationFacts
 	DependencyRegistry      *CompilationDependencyRegistry
 }

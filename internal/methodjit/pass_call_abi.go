@@ -234,7 +234,7 @@ func callABIDescriptorFor(fn *Function, instr *Instr, globals map[string]*vm.Fun
 			return miss("callee is not raw-int ABI eligible")
 		}
 	}
-	if spec := callABIShiftAddOverflowVersion(callee, shiftAddOverflowVersions); spec != nil && !callABICallsiteBoundsShiftAddSafe(fn, instr, spec) {
+	if spec := callABIShiftAddOverflowVersion(callee, shiftAddOverflowVersions); spec != nil && !callABICallsiteBoundsShiftAddSafe(fn, instr, spec, config.NumericFacts) {
 		return miss("callee may promote raw-int recurrence on overflow")
 	}
 	numArgs := len(instr.Args) - 1
@@ -840,7 +840,7 @@ func callABIShiftAddOverflowVersion(callee *vm.FuncProto, memo map[*vm.FuncProto
 	return setResult(spec)
 }
 
-func callABICallsiteBoundsShiftAddSafe(fn *Function, instr *Instr, spec *shiftAddOverflowVersion) bool {
+func callABICallsiteBoundsShiftAddSafe(fn *Function, instr *Instr, spec *shiftAddOverflowVersion, numeric *NumericFacts) bool {
 	if fn == nil || fn.Proto == nil || instr == nil || spec == nil ||
 		!spec.hasCheckFreePrefix || spec.boundParamSlot < 0 ||
 		spec.boundParamSlot >= vm.MaxCallSiteFeedbackArgs ||
@@ -853,7 +853,7 @@ func callABICallsiteBoundsShiftAddSafe(fn *Function, instr *Instr, spec *shiftAd
 	}
 	min, max, ok := fb.ArgRanges[spec.boundParamSlot].StableRange()
 	if !ok && len(instr.Args) > 1+spec.boundParamSlot {
-		if r, rok := callABIValueIntRange(fn, instr.Args[1+spec.boundParamSlot]); rok {
+		if r, rok := callABIValueIntRange(instr.Args[1+spec.boundParamSlot], numeric); rok {
 			min, max, ok = r.min, r.max, true
 		}
 	}
@@ -865,8 +865,8 @@ func callABICallsiteBoundsShiftAddSafe(fn *Function, instr *Instr, spec *shiftAd
 	return adjustedMax <= spec.safeLastCounter
 }
 
-func callABIValueIntRange(fn *Function, v *Value) (intRange, bool) {
-	if fn == nil || v == nil {
+func callABIValueIntRange(v *Value, numeric *NumericFacts) (intRange, bool) {
+	if v == nil {
 		return intRange{}, false
 	}
 	if v.Def != nil {
@@ -877,8 +877,10 @@ func callABIValueIntRange(fn *Function, v *Value) (intRange, bool) {
 			return intRange{min: v.Def.Aux, max: v.Def.Aux2, known: true}, true
 		}
 	}
-	if r, ok := functionNumericFacts(fn).IntRange(v.ID); ok && r.known {
-		return r, true
+	if numeric != nil {
+		if r, ok := numeric.IntRange(v.ID); ok && r.known {
+			return r, true
+		}
 	}
 	return intRange{}, false
 }
