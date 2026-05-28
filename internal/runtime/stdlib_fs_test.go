@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,16 @@ import (
 // runWithFSPath creates a temp dir and runs GScript source with fs and path libs registered.
 // Returns the interpreter and the temp dir path (caller should defer os.RemoveAll(tmpDir)).
 func runWithFSPath(t *testing.T, src string) (*Interpreter, string) {
+	t.Helper()
+	interp, tmpDir, err := runWithFSPathCaps(t, src, true, true)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("exec error: %v", err)
+	}
+	return interp, tmpDir
+}
+
+func runWithFSPathCaps(t *testing.T, src string, read, write bool) (*Interpreter, string, error) {
 	t.Helper()
 	tmpDir, err := os.MkdirTemp("", "gscript_fs_test_")
 	if err != nil {
@@ -31,20 +42,89 @@ func runWithFSPath(t *testing.T, src string) (*Interpreter, string) {
 		t.Fatalf("parse error: %v", err)
 	}
 	interp := New()
-	interp.globals.Define("fs", TableValue(buildFSLib()))
+	interp.globals.Define("fs", TableValue(buildFSLibWithCapabilities("", read, write)))
 	interp.globals.Define("path", TableValue(buildPathLib()))
 	// Provide the temp dir as a global for tests to use
 	interp.globals.Define("tmpDir", StringValue(tmpDir))
 	if err := interp.Exec(prog); err != nil {
-		os.RemoveAll(tmpDir)
-		t.Fatalf("exec error: %v", err)
+		return interp, tmpDir, err
 	}
-	return interp, tmpDir
+	return interp, tmpDir, nil
 }
 
 // ==================================================================
 // fs.exists, fs.isfile, fs.isdir
 // ==================================================================
+
+func TestFS_ReadCapabilityRequired(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{name: "readfile", src: `fs.readfile(tmpDir .. "/file.txt")`},
+		{name: "stat", src: `fs.stat(tmpDir .. "/file.txt")`},
+		{name: "readdir", src: `fs.readdir(tmpDir)`},
+		{name: "exists", src: `fs.exists(tmpDir .. "/file.txt")`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, tmpDir, err := runWithFSPathCaps(t, tt.src, false, true)
+			defer os.RemoveAll(tmpDir)
+			if err == nil || !strings.Contains(err.Error(), "filesystem read access disabled") {
+				t.Fatalf("error = %v, want read access disabled", err)
+			}
+		})
+	}
+}
+
+func TestFS_WriteCapabilityRequired(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(string)
+		src   string
+	}{
+		{name: "writefile", src: `fs.writefile(tmpDir .. "/file.txt", "data")`},
+		{
+			name: "remove",
+			setup: func(tmpDir string) {
+				if err := os.WriteFile(filepath.Join(tmpDir, "file.txt"), []byte("data"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			src: `fs.remove(tmpDir .. "/file.txt")`,
+		},
+		{
+			name: "rename",
+			setup: func(tmpDir string) {
+				if err := os.WriteFile(filepath.Join(tmpDir, "old.txt"), []byte("data"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			src: `fs.rename(tmpDir .. "/old.txt", tmpDir .. "/new.txt")`,
+		},
+		{name: "mkdir", src: `fs.mkdir(tmpDir .. "/dir")`},
+		{name: "chdir", src: `fs.chdir(tmpDir)`},
+		{name: "tempfile", src: `fs.tempfile(tmpDir, "test_")`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir, err := os.MkdirTemp("", "gscript_fs_test_")
+			if err != nil {
+				t.Fatalf("failed to create temp dir: %v", err)
+			}
+			defer os.RemoveAll(tmpDir)
+			if tt.setup != nil {
+				tt.setup(tmpDir)
+			}
+			src := strings.ReplaceAll(tt.src, "tmpDir", fmt.Sprintf("%q", tmpDir))
+			_, scriptTmpDir, err := runWithFSPathCaps(t, src, true, false)
+			defer os.RemoveAll(scriptTmpDir)
+			if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
+				t.Fatalf("error = %v, want write access disabled", err)
+			}
+		})
+	}
+}
 
 func TestFS_Exists_File(t *testing.T) {
 	interp, tmpDir := runWithFSPath(t, `

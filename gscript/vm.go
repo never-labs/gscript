@@ -35,7 +35,10 @@ func newVM(o vmOptions) *VM {
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
 	interp.SetFilesystemRoot(o.filesystemRoot)
-	interp.SetFilesystemEnabled(o.capabilities&CapFilesystem != 0)
+	interp.SetFilesystemCapabilities(
+		o.capabilities&CapFilesystemRead != 0,
+		o.capabilities&CapFilesystemWrite != 0,
+	)
 	if o.maxSteps > 0 {
 		interp.SetMaxSteps(o.maxSteps)
 		o.useJIT = false
@@ -170,6 +173,10 @@ func (vm *VM) applyBytecodeCapabilities(bvm *bytecodevm.VM) {
 	}
 	if vm.opts.capabilities&CapFilesystem == 0 {
 		for _, name := range []string{"fs", "dofile", "loadfile"} {
+			bvm.DeleteGlobal(name)
+		}
+	} else if vm.opts.capabilities&CapFilesystemRead == 0 {
+		for _, name := range []string{"dofile", "loadfile"} {
 			bvm.DeleteGlobal(name)
 		}
 	} else if vm.opts.filesystemRoot != "" {

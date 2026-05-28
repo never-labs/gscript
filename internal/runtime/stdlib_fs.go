@@ -42,12 +42,36 @@ func resolveSandboxPath(root, path string) (string, error) {
 	return "", fmt.Errorf("filesystem access denied: path escapes root")
 }
 
+// SetFilesystemCapabilities controls script-side filesystem read and write
+// access independently.
+func (interp *Interpreter) SetFilesystemCapabilities(read, write bool) {
+	if !read && !write {
+		interp.SetFilesystemEnabled(false)
+		return
+	}
+	interp.filesystemEnabled = true
+	if v, ok := interp.globals.Get("fs"); ok && v.IsTable() {
+		fs := TableValue(buildFSLibWithCapabilities(interp.filesystemRoot, read, write))
+		interp.globals.Define("fs", fs)
+		interp.modules["fs"] = fs
+		interp.markPackageLoaded("fs", fs)
+	}
+	if !read {
+		interp.globals.Delete("dofile")
+		interp.globals.Delete("loadfile")
+	}
+}
+
 // buildFSLib creates the "fs" standard library table.
 func buildFSLib(roots ...string) *Table {
 	root := ""
 	if len(roots) > 0 {
 		root = roots[0]
 	}
+	return buildFSLibWithCapabilities(root, true, true)
+}
+
+func buildFSLibWithCapabilities(root string, read, write bool) *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -56,9 +80,36 @@ func buildFSLib(roots ...string) *Table {
 			Fn:   fn,
 		}))
 	}
+	setRead := func(name string, fn func([]Value) ([]Value, error)) {
+		set(name, func(args []Value) ([]Value, error) {
+			if !read {
+				return nil, fmt.Errorf("filesystem read access disabled")
+			}
+			return fn(args)
+		})
+	}
+	setWrite := func(name string, fn func([]Value) ([]Value, error)) {
+		set(name, func(args []Value) ([]Value, error) {
+			if !write {
+				return nil, fmt.Errorf("filesystem write access disabled")
+			}
+			return fn(args)
+		})
+	}
+	setReadWrite := func(name string, fn func([]Value) ([]Value, error)) {
+		set(name, func(args []Value) ([]Value, error) {
+			if !read {
+				return nil, fmt.Errorf("filesystem read access disabled")
+			}
+			if !write {
+				return nil, fmt.Errorf("filesystem write access disabled")
+			}
+			return fn(args)
+		})
+	}
 
 	// fs.exists(path) -> bool
-	set("exists", func(args []Value) ([]Value, error) {
+	setRead("exists", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.exists' (string expected)")
 		}
@@ -71,7 +122,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.isfile(path) -> bool
-	set("isfile", func(args []Value) ([]Value, error) {
+	setRead("isfile", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.isfile' (string expected)")
 		}
@@ -87,7 +138,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.isdir(path) -> bool
-	set("isdir", func(args []Value) ([]Value, error) {
+	setRead("isdir", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.isdir' (string expected)")
 		}
@@ -103,7 +154,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.stat(path) -> table or nil, errMsg
-	set("stat", func(args []Value) ([]Value, error) {
+	setRead("stat", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.stat' (string expected)")
 		}
@@ -126,7 +177,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.readfile(path) -> string or nil, errMsg
-	set("readfile", func(args []Value) ([]Value, error) {
+	setRead("readfile", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.readfile' (string expected)")
 		}
@@ -142,7 +193,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.writefile(path, content) -> true or nil, errMsg
-	set("writefile", func(args []Value) ([]Value, error) {
+	setWrite("writefile", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.writefile' (path and content expected)")
 		}
@@ -158,7 +209,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.appendfile(path, content) -> true or nil, errMsg
-	set("appendfile", func(args []Value) ([]Value, error) {
+	setWrite("appendfile", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.appendfile' (path and content expected)")
 		}
@@ -179,7 +230,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.remove(path) -> true or nil, errMsg
-	set("remove", func(args []Value) ([]Value, error) {
+	setWrite("remove", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.remove' (string expected)")
 		}
@@ -195,7 +246,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.removeAll(path) -> true or nil, errMsg
-	set("removeAll", func(args []Value) ([]Value, error) {
+	setWrite("removeAll", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.removeAll' (string expected)")
 		}
@@ -211,7 +262,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.rename(oldpath, newpath) -> true or nil, errMsg
-	set("rename", func(args []Value) ([]Value, error) {
+	setWrite("rename", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.rename' (oldpath and newpath expected)")
 		}
@@ -231,7 +282,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.mkdir(path) -> true or nil, errMsg
-	set("mkdir", func(args []Value) ([]Value, error) {
+	setWrite("mkdir", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.mkdir' (string expected)")
 		}
@@ -247,7 +298,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.mkdirAll(path) -> true or nil, errMsg
-	set("mkdirAll", func(args []Value) ([]Value, error) {
+	setWrite("mkdirAll", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.mkdirAll' (string expected)")
 		}
@@ -263,7 +314,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.readdir(path) -> table (array of {name, isdir, size}) or nil, errMsg
-	set("readdir", func(args []Value) ([]Value, error) {
+	setRead("readdir", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.readdir' (string expected)")
 		}
@@ -292,7 +343,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.glob(pattern) -> table (array of matching paths) or nil, errMsg
-	set("glob", func(args []Value) ([]Value, error) {
+	setRead("glob", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.glob' (string expected)")
 		}
@@ -312,7 +363,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.copy(src, dst) -> true or nil, errMsg
-	set("copy", func(args []Value) ([]Value, error) {
+	setReadWrite("copy", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.copy' (src and dst expected)")
 		}
@@ -346,7 +397,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.tempdir() -> string
-	set("tempdir", func(args []Value) ([]Value, error) {
+	setRead("tempdir", func(args []Value) ([]Value, error) {
 		if root != "" {
 			p, err := resolveSandboxPath(root, ".")
 			if err != nil {
@@ -358,7 +409,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.tempfile([dir [, prefix]]) -> string (path) or nil, errMsg
-	set("tempfile", func(args []Value) ([]Value, error) {
+	setWrite("tempfile", func(args []Value) ([]Value, error) {
 		dir := ""
 		prefix := ""
 		if len(args) >= 1 && !args[0].IsNil() {
@@ -387,7 +438,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.cwd() -> string or nil, errMsg
-	set("cwd", func(args []Value) ([]Value, error) {
+	setRead("cwd", func(args []Value) ([]Value, error) {
 		if root != "" {
 			p, err := resolveSandboxPath(root, ".")
 			if err != nil {
@@ -403,7 +454,7 @@ func buildFSLib(roots ...string) *Table {
 	})
 
 	// fs.chdir(path) -> true or nil, errMsg
-	set("chdir", func(args []Value) ([]Value, error) {
+	setWrite("chdir", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.chdir' (string expected)")
 		}

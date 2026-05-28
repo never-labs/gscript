@@ -1159,6 +1159,54 @@ func TestWithFilesystemFalseRemovesFilesystemGlobals(t *testing.T) {
 	}
 }
 
+func TestWithFilesystemReadOnlyAllowsReadAndBlocksWrite(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemWrite(false))
+	if err := vm.Exec(`content := fs.readfile("inside.txt")`); err != nil {
+		t.Fatalf("readfile with read-only filesystem failed: %v", err)
+	}
+	content, err := vm.Get("content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content != "inside" {
+		t.Fatalf("content = %v, want inside", content)
+	}
+	err = vm.Exec(`fs.writefile("new.txt", "new")`)
+	if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
+		t.Fatalf("writefile error = %v, want write access disabled", err)
+	}
+}
+
+func TestWithFilesystemWriteOnlyAllowsWriteAndBlocksRead(t *testing.T) {
+	root := t.TempDir()
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root), gs.WithFilesystemRead(false))
+
+	if err := vm.Exec(`ok := fs.writefile("out.txt", "out")`); err != nil {
+		t.Fatalf("writefile with write-only filesystem failed: %v", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(root, "out.txt")); err != nil || string(got) != "out" {
+		t.Fatalf("host file = %q, %v; want out, nil", string(got), err)
+	}
+	for _, name := range []string{"dofile", "loadfile"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+	err := vm.Exec(`fs.readfile("out.txt")`)
+	if err == nil || !strings.Contains(err.Error(), "filesystem read access disabled") {
+		t.Fatalf("readfile error = %v, want read access disabled", err)
+	}
+}
+
 func TestWithFilesystemRootConfinesFSModule(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "root")

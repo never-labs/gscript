@@ -82,8 +82,12 @@ const (
 type CapabilityFlags uint64
 
 const (
-	CapModuleLoading CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
-	CapFilesystem                                // script file APIs may access the host filesystem
+	CapModuleLoading   CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
+	CapFilesystemRead                              // script file APIs may read the host filesystem
+	CapFilesystemWrite                             // script file APIs may mutate the host filesystem
+
+	// CapFilesystem enables both filesystem read and write access.
+	CapFilesystem = CapFilesystemRead | CapFilesystemWrite
 
 	// CapAll enables every host capability (default, for compatibility).
 	CapAll = CapModuleLoading | CapFilesystem
@@ -133,13 +137,39 @@ func WithModuleLoading(enabled bool) Option {
 }
 
 // WithFilesystem controls filesystem-backed script APIs such as fs, dofile,
-// and loadfile. It does not affect host-side ExecFile/CompileFile calls.
+// and loadfile. It enables or disables both filesystem read and write access.
+// It does not affect host-side ExecFile/CompileFile calls.
 func WithFilesystem(enabled bool) Option {
 	return func(o *vmOptions) {
 		if enabled {
 			o.capabilities |= CapFilesystem
 		} else {
 			o.capabilities &^= CapFilesystem
+		}
+	}
+}
+
+// WithFilesystemRead controls script-side filesystem read access. This gates
+// APIs such as fs.readfile, fs.stat, fs.readdir, dofile, and loadfile.
+func WithFilesystemRead(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapFilesystemRead
+		} else {
+			o.capabilities &^= CapFilesystemRead
+		}
+	}
+}
+
+// WithFilesystemWrite controls script-side filesystem write access. This gates
+// APIs such as fs.writefile, fs.remove, fs.rename, fs.mkdir, fs.chdir, and
+// fs.tempfile.
+func WithFilesystemWrite(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapFilesystemWrite
+		} else {
+			o.capabilities &^= CapFilesystemWrite
 		}
 	}
 }
