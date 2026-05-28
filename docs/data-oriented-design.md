@@ -188,6 +188,8 @@ Current implementation status:
 - `soa.sumWhere`, `soa.minWhere`, `soa.meanWhere`, `soa.maxWhere`,
   `soa.countWhere`, and `soa.statsWhere` reduce over mask-true rows without
   materializing a filtered SoA first;
+- `soa.mask` builds reusable bool dense masks from scalar or column
+  comparisons;
 - `soa.shape` exposes layout diagnostics: length, shape version, column names,
   element kinds, column lengths, and column versions;
 - `soa.addScaled`, `soa.affine`, `soa.affineWhere`, `soa.affineMany`, and
@@ -214,6 +216,7 @@ Current API contract:
 | `soa.slice(s, first, last)` | Returns an independent SoA for one-based inclusive rows `first..last`. |
 | `soa.filter(s, mask)` | Returns an independent SoA containing rows whose bool dense mask entry is true. The mask length must match. |
 | `soa.compact(s, mask)` | Alias of `soa.filter`, using array-programming naming for mask compaction. |
+| `soa.mask(s, column, op, rhs)` | Returns a bool dense mask by comparing `column` with a scalar or another column named by `rhs`. |
 | `soa.gather(s, indices)` | Returns an independent SoA containing rows addressed by a one-based i64 dense index vector. Duplicates and index order are preserved. |
 | `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
 | `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
@@ -241,6 +244,8 @@ Hot path guidance:
   row materialization;
 - for masked aggregates, prefer `soa.sumWhere` or `soa.statsWhere` over
   `soa.filter` plus a later aggregate when the compacted rows are not needed;
+- use `soa.mask` to produce and reuse comparison masks instead of writing
+  predicate loops by hand;
 - for compact/filter pipelines, build or reuse a bool dense mask, call
   `soa.filter`, then continue with column kernels on the returned independent
   SoA;

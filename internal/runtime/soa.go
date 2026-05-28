@@ -238,6 +238,48 @@ func (s *SoA) CountWhere(mask *DenseArray) (Value, error) {
 	return IntValue(int64(denseArrayBoolCount(mask.bools))), nil
 }
 
+func (s *SoA) Mask(columnName, op string, rhs Value) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	left, ok := s.Column(columnName)
+	if !ok {
+		return nil, fmt.Errorf("soa column %q not found", columnName)
+	}
+	denseOp, err := denseArrayCompareOp(op)
+	if err != nil {
+		return nil, err
+	}
+	right := rhs
+	if rhs.IsString() {
+		col, ok := s.Column(rhs.Str())
+		if !ok {
+			return nil, fmt.Errorf("soa column %q not found", rhs.Str())
+		}
+		right = DenseArrayValue(col)
+	}
+	return denseArrayCompareMask(left, denseOp, right)
+}
+
+func denseArrayCompareOp(op string) (DenseArrayBinaryOp, error) {
+	switch op {
+	case "==", "eq":
+		return DenseArrayEQ, nil
+	case "!=", "ne":
+		return DenseArrayNE, nil
+	case "<", "lt":
+		return DenseArrayLT, nil
+	case "<=", "le":
+		return DenseArrayLE, nil
+	case ">", "gt":
+		return DenseArrayGT, nil
+	case ">=", "ge":
+		return DenseArrayGE, nil
+	default:
+		return DenseArrayEQ, fmt.Errorf("soa mask comparison %q is not supported", op)
+	}
+}
+
 func (s *SoA) Gather(indices *DenseArray) (*SoA, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")

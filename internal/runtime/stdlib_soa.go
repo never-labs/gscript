@@ -390,6 +390,27 @@ func buildSoALib() *Table {
 		return []Value{v}, nil
 	}, soaCountWhereValue)
 
+	setFastArg4("mask", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.mask", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.mask: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsString() {
+			return nil, fmt.Errorf("soa.mask: argument 3 must be a comparison string")
+		}
+		if len(args) < 4 {
+			return nil, fmt.Errorf("soa.mask: argument 4 is required")
+		}
+		out, err := s.Mask(args[1].Str(), args[2].Str(), args[3])
+		if err != nil {
+			return nil, err
+		}
+		return []Value{DenseArrayValue(out)}, nil
+	}, soaMaskValue)
+
 	return t
 }
 
@@ -785,6 +806,23 @@ func soaCountWhereValue(soaValue, maskValue Value) (Value, error) {
 		return NilValue(), fmt.Errorf("soa.countWhere: argument 2 must be a bool dense array")
 	}
 	return soaValue.SoA().CountWhere(maskValue.DenseArray())
+}
+
+func soaMaskValue(soaValue, columnValue, opValue, rhsValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.mask: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.mask: argument 2 must be a string")
+	}
+	if !opValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.mask: argument 3 must be a comparison string")
+	}
+	out, err := soaValue.SoA().Mask(columnValue.Str(), opValue.Str(), rhsValue)
+	if err != nil {
+		return NilValue(), err
+	}
+	return DenseArrayValue(out), nil
 }
 
 func soaShapeTable(s *SoA) *Table {

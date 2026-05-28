@@ -60,6 +60,11 @@ check("affineMany", soa.affineMany(points, {
 check("affineMany x", soa.column(points, "x")[4] == 10.5)
 check("affineMany y", soa.column(points, "y")[4] == 41)
 
+fastMask := soa.mask(points, "velocity", ">=", 20)
+aheadMask := soa.mask(points, "x", "<", "velocity")
+check("mask scalar", soa.countWhere(points, fastMask) == 3)
+check("mask column", soa.countWhere(points, aheadMask) == 4)
+
 window := soa.slice(points, 2, 4)
 check("slice inclusive", soa.len(window) == 3 && soa.column(window, "id")[1] == 202)
 

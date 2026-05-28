@@ -31,6 +31,8 @@ print(soa.row(points, 2).id)  // 102
   back; use `soa.setRow` for row-style mutation.
 - `soa.slice`, `soa.filter`, `soa.gather`, and `soa.unzip` return independent
   dense-column copies.
+- `soa.mask` builds a bool dense array from a column comparison. The mask can
+  feed `soa.filter`, `soa.compact`, `soa.affineWhere`, and `*Where` reducers.
 - `soa.sumWhere` reduces a numeric column over a bool mask without
   materializing a filtered SoA first.
 
@@ -142,6 +144,20 @@ picked := soa.gather(points, [3]i64{3, 1, 3})
 Alias of `soa.filter` for callers that want the array-programming term
 "compact" after computing a bool mask.
 
+### `soa.mask(s, column, op, rhs) -> []bool`
+
+Returns a bool dense array produced by comparing `column` with `rhs`.
+
+`op` accepts symbolic operators (`==`, `!=`, `<`, `<=`, `>`, `>=`) and word
+aliases (`eq`, `ne`, `lt`, `le`, `gt`, `ge`). `rhs` may be a numeric or bool
+scalar, or a string naming another column in the same SoA.
+
+```gscript
+moving := soa.mask(points, "velocity", ">", 0)
+ahead := soa.mask(points, "x", ">=", "target_x")
+active := soa.compact(points, moving)
+```
+
 ## Fused Column Kernels
 
 The current native SoA kernels operate over numeric dense columns and mutate the
@@ -235,6 +251,7 @@ is zero, and `min`, `max`, and `mean` are `nil`.
   fields.
 - Prefer `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` over
   manual row loops when the operation fits their contracts.
+- Use `soa.mask` to produce reusable dense masks from column comparisons.
 - For masked aggregates, prefer `soa.sumWhere` over `soa.filter` plus `soa.sum`
   when you do not need the compacted rows.
 - For compact/filter pipelines, keep the mask as a bool dense array and use
@@ -251,7 +268,7 @@ is zero, and `min`, `max`, and `mean` are `nil`.
 ## Limitations
 
 - There is no parser-level SoA syntax; SoA is a stdlib/runtime value.
-- Columns cannot be appended, removed, or resized through the `soa` API yet.
+- Columns cannot be appended or resized through the `soa` API yet.
 - `soa.zip` does not deep-copy columns. It keeps the provided dense arrays.
 - Row views are copies, not live proxies.
 - Additional masked aggregate helpers can follow the same `*Where` contract.

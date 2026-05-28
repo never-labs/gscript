@@ -679,6 +679,286 @@ func denseArrayArrayOp(op DenseArrayBinaryOp, left, right *DenseArray) (Value, e
 	return DenseArrayValue(&DenseArray{dtype: DenseArrayF64, f64: out}), nil
 }
 
+func denseArrayCompareMask(left *DenseArray, op DenseArrayBinaryOp, right Value) (*DenseArray, error) {
+	if left == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if !isComparisonOp(op) {
+		return nil, ErrDenseArrayDType
+	}
+	if rightArray := right.DenseArray(); rightArray != nil {
+		return denseArrayCompareMaskArray(left, op, rightArray)
+	}
+	return denseArrayCompareMaskScalar(left, op, right)
+}
+
+func denseArrayCompareMaskArray(left *DenseArray, op DenseArrayBinaryOp, right *DenseArray) (*DenseArray, error) {
+	if right == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if left.Len() != right.Len() {
+		return nil, ErrDenseArrayLength
+	}
+	out := make([]bool, left.Len())
+	if (op == DenseArrayEQ || op == DenseArrayNE) && left.dtype == DenseArrayBool && right.dtype == DenseArrayBool {
+		for i := range out {
+			out[i] = compareBools(op, left.bools[i], right.bools[i])
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	}
+	if left.dtype == DenseArrayBool || right.dtype == DenseArrayBool {
+		return nil, ErrDenseArrayDType
+	}
+	switch {
+	case left.dtype == DenseArrayF64 && right.dtype == DenseArrayF64:
+		denseArrayCompareF64F64Into(out, op, left.f64, right.f64)
+	case left.dtype == DenseArrayF64 && right.dtype == DenseArrayI64:
+		denseArrayCompareF64I64Into(out, op, left.f64, right.i64)
+	case left.dtype == DenseArrayI64 && right.dtype == DenseArrayF64:
+		denseArrayCompareI64F64Into(out, op, left.i64, right.f64)
+	case left.dtype == DenseArrayI64 && right.dtype == DenseArrayI64:
+		denseArrayCompareI64I64Into(out, op, left.i64, right.i64)
+	default:
+		return nil, ErrDenseArrayDType
+	}
+	return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+}
+
+func denseArrayCompareMaskScalar(left *DenseArray, op DenseArrayBinaryOp, right Value) (*DenseArray, error) {
+	out := make([]bool, left.Len())
+	if (op == DenseArrayEQ || op == DenseArrayNE) && left.dtype == DenseArrayBool && right.IsBool() {
+		r := right.Bool()
+		for i := range out {
+			out[i] = compareBools(op, left.bools[i], r)
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	}
+	if left.dtype == DenseArrayBool {
+		return nil, ErrDenseArrayDType
+	}
+	if !right.IsNumber() {
+		return nil, ErrDenseArrayScalar
+	}
+	if left.dtype == DenseArrayI64 && right.IsInt() {
+		r := right.Int()
+		denseArrayCompareI64ScalarInto(out, op, left.i64, r)
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	}
+	r := right.Number()
+	switch left.dtype {
+	case DenseArrayF64:
+		denseArrayCompareF64ScalarInto(out, op, left.f64, r)
+	case DenseArrayI64:
+		denseArrayCompareI64F64ScalarInto(out, op, left.i64, r)
+	default:
+		return nil, ErrDenseArrayDType
+	}
+	return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+}
+
+func denseArrayCompareF64F64Into(out []bool, op DenseArrayBinaryOp, left, right []float64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = v == right[i]
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = v != right[i]
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = v < right[i]
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = v <= right[i]
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = v > right[i]
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = v >= right[i]
+		}
+	}
+}
+
+func denseArrayCompareF64I64Into(out []bool, op DenseArrayBinaryOp, left []float64, right []int64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = v == float64(right[i])
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = v != float64(right[i])
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = v < float64(right[i])
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = v <= float64(right[i])
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = v > float64(right[i])
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = v >= float64(right[i])
+		}
+	}
+}
+
+func denseArrayCompareI64F64Into(out []bool, op DenseArrayBinaryOp, left []int64, right []float64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = float64(v) == right[i]
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = float64(v) != right[i]
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = float64(v) < right[i]
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = float64(v) <= right[i]
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = float64(v) > right[i]
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = float64(v) >= right[i]
+		}
+	}
+}
+
+func denseArrayCompareI64I64Into(out []bool, op DenseArrayBinaryOp, left, right []int64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = v == right[i]
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = v != right[i]
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = v < right[i]
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = v <= right[i]
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = v > right[i]
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = v >= right[i]
+		}
+	}
+}
+
+func denseArrayCompareF64ScalarInto(out []bool, op DenseArrayBinaryOp, left []float64, right float64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = v == right
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = v != right
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = v < right
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = v <= right
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = v > right
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = v >= right
+		}
+	}
+}
+
+func denseArrayCompareI64F64ScalarInto(out []bool, op DenseArrayBinaryOp, left []int64, right float64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = float64(v) == right
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = float64(v) != right
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = float64(v) < right
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = float64(v) <= right
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = float64(v) > right
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = float64(v) >= right
+		}
+	}
+}
+
+func denseArrayCompareI64ScalarInto(out []bool, op DenseArrayBinaryOp, left []int64, right int64) {
+	switch op {
+	case DenseArrayEQ:
+		for i, v := range left {
+			out[i] = v == right
+		}
+	case DenseArrayNE:
+		for i, v := range left {
+			out[i] = v != right
+		}
+	case DenseArrayLT:
+		for i, v := range left {
+			out[i] = v < right
+		}
+	case DenseArrayLE:
+		for i, v := range left {
+			out[i] = v <= right
+		}
+	case DenseArrayGT:
+		for i, v := range left {
+			out[i] = v > right
+		}
+	case DenseArrayGE:
+		for i, v := range left {
+			out[i] = v >= right
+		}
+	}
+}
+
 func denseArrayScalarOp(op DenseArrayBinaryOp, arr *DenseArray, scalar Value, scalarLeft bool) (Value, error) {
 	if scalar.IsDenseArray() {
 		panic("denseArrayScalarOp called with array scalar")
@@ -972,6 +1252,25 @@ func arithmeticFloat64(op DenseArrayBinaryOp, left, right float64) float64 {
 }
 
 func compareFloat64(op DenseArrayBinaryOp, left, right float64) bool {
+	switch op {
+	case DenseArrayEQ:
+		return left == right
+	case DenseArrayNE:
+		return left != right
+	case DenseArrayLT:
+		return left < right
+	case DenseArrayLE:
+		return left <= right
+	case DenseArrayGT:
+		return left > right
+	case DenseArrayGE:
+		return left >= right
+	default:
+		panic(fmt.Sprintf("unsupported comparison op %d", op))
+	}
+}
+
+func compareInt64(op DenseArrayBinaryOp, left, right int64) bool {
 	switch op {
 	case DenseArrayEQ:
 		return left == right

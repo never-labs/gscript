@@ -88,6 +88,9 @@ row := soa.row(points, 2)
 row.x = 42
 ok := soa.setRow(points, 2, row)
 updated := soa.column(points, "x")
+geMask := soa.mask(points, "x", ">=", 3)
+colMask := soa.mask(points, "x", "<", "y")
+boolMask := soa.mask(soa.withColumn(points, "alive", []bool{true, false, true}), "alive", "==", true)
 window := soa.slice(points, 2, 3)
 filtered := soa.filter(points, []bool{true, false, true})
 compacted := soa.compact(points, []bool{false, true, true})
@@ -124,6 +127,9 @@ maskedCount := soa.countWhere(points, []bool{true, false, true})
 		t.Fatalf("ok = %v, want true", got)
 	}
 	assertDenseF64(t, interp.GetGlobal("updated"), []float64{1, 42, 3})
+	assertDenseBool(t, interp.GetGlobal("geMask"), []bool{false, true, true})
+	assertDenseBool(t, interp.GetGlobal("colMask"), []bool{true, false, true})
+	assertDenseBool(t, interp.GetGlobal("boolMask"), []bool{true, false, true})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("window").SoA(), "x")), []float64{42, 3})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("filtered").SoA(), "x")), []float64{1, 3})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("compacted").SoA(), "x")), []float64{42, 3})
@@ -359,6 +365,7 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	maxWhere := lib.RawGetString("maxWhere").GoFunction()
 	statsWhere := lib.RawGetString("statsWhere").GoFunction()
 	countWhere := lib.RawGetString("countWhere").GoFunction()
+	maskFn := lib.RawGetString("mask").GoFunction()
 	if lenFn == nil || lenFn.FastArg1 == nil {
 		t.Fatal("soa.len FastArg1 is nil")
 	}
@@ -421,6 +428,9 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if countWhere == nil || countWhere.FastArg2 == nil {
 		t.Fatal("soa.countWhere FastArg2 is nil")
+	}
+	if maskFn == nil || maskFn.FastArg4 == nil {
+		t.Fatal("soa.mask FastArg4 is nil")
 	}
 
 	s, err := NewSoA(map[string]*DenseArray{
@@ -526,6 +536,11 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	if got.Int() != 2 {
 		t.Fatalf("soa.countWhere FastArg2 = %s, want 2", got.String())
 	}
+	got, err = maskFn.FastArg4(soaValue, StringValue("v"), StringValue(">"), FloatValue(5))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDenseBool(t, got, []bool{false, true, true})
 }
 
 func BenchmarkDenseArrayFilterF64(b *testing.B) {
