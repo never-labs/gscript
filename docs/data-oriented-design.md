@@ -181,6 +181,8 @@ Current implementation status:
   `soa.setRow` are available;
 - `soa.withColumn` and `soa.dropColumn` return new SoA layouts while preserving
   dense-column references;
+- `soa.resize` and `soa.appendRow` mutate all columns together while preserving
+  alignment;
 - `soa.unzip`, `soa.slice`, and `soa.filter` preserve column alignment while
   returning independent dense-column copies;
 - `soa.gather` preserves column alignment while materializing rows from a
@@ -210,6 +212,8 @@ Current API contract:
 | `soa.column(s, name)` | Returns the live dense column for hot-path access, or `nil` for a missing column. |
 | `soa.withColumn(s, name, column)` | Returns a new SoA layout with `column` stored under `name`. Existing columns and the supplied dense column are kept by reference. |
 | `soa.dropColumn(s, name)` | Returns a new SoA layout without `name`. At least one column must remain. |
+| `soa.resize(s, length)` | Resizes all columns in place, zero-filling when growing and truncating when shrinking. |
+| `soa.appendRow(s, row)` | Appends one row in place after validating every column field. |
 | `soa.shape(s)` | Returns `{length, version, columns}` where each column reports `{name, dtype, length, version}` for diagnostics and guarded specialization. |
 | `soa.row(s, index)` | Returns a copied one-based row table. Mutating it does not write back. |
 | `soa.setRow(s, index, row)` | Writes every column from a table field of the same name and returns `true`. Missing or incompatible fields are errors. |
@@ -260,7 +264,6 @@ Hot path guidance:
 Current limitations:
 
 - there is no parser-level SoA syntax and no live row proxy;
-- SoA columns cannot be resized through the `soa` API yet;
 - `soa.zip` keeps the provided dense arrays rather than deep-copying them;
 - `soa.slice`, `soa.filter`, and `soa.unzip` copy columns instead of creating
   zero-copy views;

@@ -142,6 +142,34 @@ func buildSoALib() *Table {
 		return []Value{SoAValue(out)}, nil
 	}, soaDropColumnValue)
 
+	setFastArg2("resize", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.resize", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsInt() {
+			return nil, fmt.Errorf("soa.resize: argument 2 must be an integer")
+		}
+		if err := s.Resize(int(args[1].Int())); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaResizeValue)
+
+	setFastArg2("appendRow", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.appendRow", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsTable() {
+			return nil, fmt.Errorf("soa.appendRow: argument 2 must be a table")
+		}
+		if err := s.AppendRow(args[1].Table()); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaAppendRowValue)
+
 	setFastArg3("slice", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.slice", args, 0)
 		if err != nil {
@@ -676,6 +704,32 @@ func soaDropColumnValue(soaValue, nameValue Value) (Value, error) {
 		return NilValue(), err
 	}
 	return SoAValue(out), nil
+}
+
+func soaResizeValue(soaValue, lengthValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.resize: argument 1 must be soa")
+	}
+	if !lengthValue.IsInt() {
+		return NilValue(), fmt.Errorf("soa.resize: argument 2 must be an integer")
+	}
+	if err := soaValue.SoA().Resize(int(lengthValue.Int())); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
+func soaAppendRowValue(soaValue, rowValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.appendRow: argument 1 must be soa")
+	}
+	if !rowValue.IsTable() {
+		return NilValue(), fmt.Errorf("soa.appendRow: argument 2 must be a table")
+	}
+	if err := soaValue.SoA().AppendRow(rowValue.Table()); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
 }
 
 func soaUnzipValue(soaValue Value) (Value, error) {

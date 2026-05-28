@@ -182,6 +182,89 @@ func (a *DenseArray) Clone() (*DenseArray, error) {
 	}
 }
 
+func (a *DenseArray) Resize(n int) error {
+	if a == nil {
+		return ErrDenseArrayOperand
+	}
+	if n < 0 {
+		return fmt.Errorf("dense array length must be non-negative")
+	}
+	if n == a.Len() {
+		return nil
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		a.f64 = denseArrayResize(a.f64, n)
+	case DenseArrayI64:
+		a.i64 = denseArrayResize(a.i64, n)
+	case DenseArrayBool:
+		a.bools = denseArrayResize(a.bools, n)
+	default:
+		return ErrDenseArrayDType
+	}
+	a.bumpVersion()
+	return nil
+}
+
+func denseArrayResize[T any](xs []T, n int) []T {
+	if n <= len(xs) {
+		return xs[:n]
+	}
+	out := make([]T, n)
+	copy(out, xs)
+	return out
+}
+
+func (a *DenseArray) Append(v Value) error {
+	if a == nil {
+		return ErrDenseArrayOperand
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		if !v.IsNumber() {
+			return fmt.Errorf("dense array f64 value must be numeric")
+		}
+		a.f64 = append(a.f64, v.Number())
+	case DenseArrayI64:
+		if !v.IsInt() {
+			return fmt.Errorf("dense array i64 value must be integer")
+		}
+		a.i64 = append(a.i64, v.Int())
+	case DenseArrayBool:
+		if !v.IsBool() {
+			return fmt.Errorf("dense array bool value must be boolean")
+		}
+		a.bools = append(a.bools, v.Bool())
+	default:
+		return ErrDenseArrayDType
+	}
+	a.bumpVersion()
+	return nil
+}
+
+func (a *DenseArray) CanAppend(v Value) error {
+	if a == nil {
+		return ErrDenseArrayOperand
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		if !v.IsNumber() {
+			return fmt.Errorf("dense array f64 value must be numeric")
+		}
+	case DenseArrayI64:
+		if !v.IsInt() {
+			return fmt.Errorf("dense array i64 value must be integer")
+		}
+	case DenseArrayBool:
+		if !v.IsBool() {
+			return fmt.Errorf("dense array bool value must be boolean")
+		}
+	default:
+		return ErrDenseArrayDType
+	}
+	return nil
+}
+
 func (a *DenseArray) Slice(start, end int) (*DenseArray, error) {
 	if a == nil {
 		return nil, ErrDenseArrayOperand

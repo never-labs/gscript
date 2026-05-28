@@ -101,6 +101,10 @@ maskedMean := soa.meanWhere(points, "x", []bool{true, false, true})
 maskedMax := soa.maxWhere(points, "x", []bool{true, false, true})
 maskedStats := soa.statsWhere(points, "x", []bool{true, false, true})
 maskedCount := soa.countWhere(points, []bool{true, false, true})
+resized := soa.zip({x: []f64{1, 2}, id: []i64{10, 20}, ok: []bool{true, false}})
+resizeGrowOK := soa.resize(resized, 3)
+resizeAppendOK := soa.appendRow(resized, {x: 4, id: 40, ok: true})
+resizeShrinkOK := soa.resize(resized, 2)
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -156,6 +160,21 @@ maskedCount := soa.countWhere(points, []bool{true, false, true})
 	if got := interp.GetGlobal("maskedCount"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("maskedCount = %v, want 2", got)
 	}
+	if got := interp.GetGlobal("resizeGrowOK"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("resizeGrowOK = %v, want true", got)
+	}
+	if got := interp.GetGlobal("resizeAppendOK"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("resizeAppendOK = %v, want true", got)
+	}
+	if got := interp.GetGlobal("resizeShrinkOK"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("resizeShrinkOK = %v, want true", got)
+	}
+	resized := interp.GetGlobal("resized").SoA()
+	if resized.Len() != 2 {
+		t.Fatalf("resized len = %d, want 2", resized.Len())
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, resized, "x")), []float64{1, 2})
+	assertDenseI64(t, DenseArrayValue(mustSoATestColumn(t, resized, "id")), []int64{10, 20})
 }
 
 func TestSoANativeColumnKernels(t *testing.T) {
@@ -349,6 +368,8 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	column := lib.RawGetString("column").GoFunction()
 	withColumn := lib.RawGetString("withColumn").GoFunction()
 	dropColumn := lib.RawGetString("dropColumn").GoFunction()
+	resizeFn := lib.RawGetString("resize").GoFunction()
+	appendRow := lib.RawGetString("appendRow").GoFunction()
 	unzip := lib.RawGetString("unzip").GoFunction()
 	slice := lib.RawGetString("slice").GoFunction()
 	filter := lib.RawGetString("filter").GoFunction()
@@ -377,6 +398,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if dropColumn == nil || dropColumn.FastArg2 == nil {
 		t.Fatal("soa.dropColumn FastArg2 is nil")
+	}
+	if resizeFn == nil || resizeFn.FastArg2 == nil {
+		t.Fatal("soa.resize FastArg2 is nil")
+	}
+	if appendRow == nil || appendRow.FastArg2 == nil {
+		t.Fatal("soa.appendRow FastArg2 is nil")
 	}
 	if unzip == nil || unzip.FastArg1 == nil {
 		t.Fatal("soa.unzip FastArg1 is nil")
@@ -452,6 +479,23 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if got, err := dropColumn.FastArg2(soaValue, StringValue("v")); err != nil || !got.IsSoA() {
 		t.Fatalf("soa.dropColumn FastArg2 got=%s err=%v", got.String(), err)
+	}
+	resizeS, err := NewSoA(map[string]*DenseArray{
+		"x": NewDenseArrayF64([]float64{1, 2}),
+		"v": NewDenseArrayF64([]float64{10, 20}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resizeValue := SoAValue(resizeS)
+	if got, err := resizeFn.FastArg2(resizeValue, IntValue(4)); err != nil || !got.Bool() || resizeS.Len() != 4 {
+		t.Fatalf("soa.resize FastArg2 got=%s len=%d err=%v", got.String(), resizeS.Len(), err)
+	}
+	row := NewTable()
+	row.RawSetString("x", FloatValue(4))
+	row.RawSetString("v", FloatValue(40))
+	if got, err := appendRow.FastArg2(resizeValue, TableValue(row)); err != nil || !got.Bool() || resizeS.Len() != 5 {
+		t.Fatalf("soa.appendRow FastArg2 got=%s len=%d err=%v", got.String(), resizeS.Len(), err)
 	}
 	if got, err := unzip.FastArg1(soaValue); err != nil || !got.IsTable() {
 		t.Fatalf("soa.unzip FastArg1 got=%s err=%v", got.String(), err)

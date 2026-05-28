@@ -166,6 +166,65 @@ func (s *SoA) DropColumn(name string) (*SoA, error) {
 	return NewSoA(cols)
 }
 
+func (s *SoA) Resize(n int) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if n < 0 {
+		return fmt.Errorf("soa length must be non-negative")
+	}
+	if n == s.length {
+		return nil
+	}
+	for _, name := range s.names {
+		if err := s.columns[name].Resize(n); err != nil {
+			return fmt.Errorf("soa column %q: %w", name, err)
+		}
+	}
+	s.length = n
+	s.bumpShapeVersion()
+	return nil
+}
+
+func (s *SoA) AppendRow(row *Table) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if row == nil {
+		return fmt.Errorf("soa row must be a table")
+	}
+	values := make([]Value, len(s.names))
+	for i, name := range s.names {
+		v := row.RawGetString(name)
+		if v.IsNil() {
+			return fmt.Errorf("soa row missing column %q", name)
+		}
+		col := s.columns[name]
+		if err := col.CanAppend(v); err != nil {
+			return fmt.Errorf("soa column %q: %w", name, err)
+		}
+		values[i] = v
+	}
+	for i, name := range s.names {
+		if err := s.columns[name].Append(values[i]); err != nil {
+			return fmt.Errorf("soa column %q: %w", name, err)
+		}
+	}
+	s.length++
+	s.bumpShapeVersion()
+	return nil
+}
+
+func (s *SoA) bumpShapeVersion() {
+	if s == nil {
+		return
+	}
+	s.shapeVersion++
+	if s.shapeVersion == 0 {
+		s.shapeVersion = 1
+	}
+}
+
 func (s *SoA) Unzip() (map[string]*DenseArray, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")

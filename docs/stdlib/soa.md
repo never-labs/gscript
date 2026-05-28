@@ -76,6 +76,17 @@ Returns a new SoA layout without `name`. At least one column must remain.
 
 Remaining columns are kept by reference, matching `soa.zip`.
 
+### `soa.resize(s, length) -> true`
+
+Resizes every column in place and updates the SoA row count. Growing fills new
+slots with the element type's zero value (`0`, `0.0`, or `false`); shrinking
+truncates all columns together.
+
+### `soa.appendRow(s, row) -> true`
+
+Appends one row in place. `row` must be a table containing a non-nil field for
+every column, and each value must match the column element type.
+
 ### `soa.shape(s) -> table`
 
 Returns layout diagnostics:
@@ -268,7 +279,6 @@ is zero, and `min`, `max`, and `mean` are `nil`.
 ## Limitations
 
 - There is no parser-level SoA syntax; SoA is a stdlib/runtime value.
-- Columns cannot be appended or resized through the `soa` API yet.
 - `soa.zip` does not deep-copy columns. It keeps the provided dense arrays.
 - Row views are copies, not live proxies.
 - Additional masked aggregate helpers can follow the same `*Where` contract.
