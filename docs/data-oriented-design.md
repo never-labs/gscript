@@ -189,9 +189,9 @@ Current implementation status:
   element kinds, column lengths, and column versions;
 - `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` provide fused
   column kernels over dense columns;
-- the array-programming surface still reserves a `compact` alias and additional
-  masked aggregate helpers for subset pipelines that should stay columnar
-  instead of materializing row tables;
+- the array-programming surface still reserves additional masked aggregate
+  helpers for subset pipelines that should stay columnar instead of
+  materializing row tables;
 - row access materializes an ordinary table and is intended for boundary code,
   debugging, and tests, not hot loops.
 
@@ -209,19 +209,20 @@ Current API contract:
 | `soa.setRow(s, index, row)` | Writes every column from a table field of the same name and returns `true`. Missing or incompatible fields are errors. |
 | `soa.slice(s, first, last)` | Returns an independent SoA for one-based inclusive rows `first..last`. |
 | `soa.filter(s, mask)` | Returns an independent SoA containing rows whose bool dense mask entry is true. The mask length must match. |
+| `soa.compact(s, mask)` | Alias of `soa.filter`, using array-programming naming for mask compaction. |
 | `soa.gather(s, indices)` | Returns an independent SoA containing rows addressed by a one-based i64 dense index vector. Duplicates and index order are preserved. |
 | `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
 | `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
 | `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
 | `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |
+| `soa.countWhere(s, mask)` | Counts mask-true rows without compacting all columns first. |
 
 Reserved array-programming API shape:
 
 | API | Intended contract |
 |---|---|
-| `soa.compact(s, mask)` | Alias or semantic twin of `soa.filter`: return an independent SoA containing mask-true rows in original order. The name is reserved for code that wants to emphasize mask compaction after vectorized predicates. |
-| Additional aggregate-family helpers | `soa.minWhere`, `soa.maxWhere`, and `soa.countWhere` should follow `soa.sumWhere` semantics without building row tables. |
+| Additional aggregate-family helpers | `soa.minWhere` and `soa.maxWhere` should follow `soa.sumWhere` semantics without building row tables. |
 
 Hot path guidance:
 

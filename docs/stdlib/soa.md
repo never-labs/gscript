@@ -123,11 +123,10 @@ replaying an externally computed order.
 picked := soa.gather(points, [3]i64{3, 1, 3})
 ```
 
-### Reserved: `soa.compact(s, mask) -> soa`
+### `soa.compact(s, mask) -> soa`
 
-Reserved as an alias or semantic twin of `soa.filter` for callers that want the
-array-programming term "compact" after computing a bool mask. Use `soa.filter`
-today; its contract already matches compact semantics.
+Alias of `soa.filter` for callers that want the array-programming term
+"compact" after computing a bool mask.
 
 ## Fused Column Kernels
 
@@ -181,7 +180,11 @@ total := soa.sumWhere(points, "x", mask)
 ```
 
 Future aggregate-family helpers may include `soa.minWhere`, `soa.maxWhere`,
-and `soa.countWhere`.
+and similar reducers.
+
+### `soa.countWhere(s, mask) -> integer`
+
+Returns the number of mask-true rows without materializing a filtered SoA.
 
 ## Hot Path Guidance
 
@@ -191,8 +194,8 @@ and `soa.countWhere`.
   manual row loops when the operation fits their contracts.
 - For masked aggregates, prefer `soa.sumWhere` over `soa.filter` plus `soa.sum`
   when you do not need the compacted rows.
-- For compact/filter pipelines, keep the mask as a bool dense array and compact
-  once before downstream kernels.
+- For compact/filter pipelines, keep the mask as a bool dense array and use
+  `soa.compact` or `soa.filter` once before downstream kernels.
 - For gather-style pipelines, keep selection positions in a dense i64 array so
   `soa.gather` can preserve order and duplicates without row tables.
 - Keep numeric columns dense and stable. Replacing columns or changing lengths
@@ -208,8 +211,8 @@ and `soa.countWhere`.
 - Columns cannot be appended, removed, or resized through the `soa` API yet.
 - `soa.zip` does not deep-copy columns. It keeps the provided dense arrays.
 - Row views are copies, not live proxies.
-- `soa.compact` and additional masked aggregate helpers are reserved directions
-  and are not available yet.
+- Additional masked aggregate helpers beyond `sumWhere` and `countWhere` are
+  reserved directions and are not available yet.
 - `soa.slice`, `soa.filter`, and `soa.unzip` copy dense columns rather than
   returning zero-copy views.
 - The current fast path is a portable runtime kernel layer. Direct SIMD/native

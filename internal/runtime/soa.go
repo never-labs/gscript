@@ -178,6 +178,23 @@ func (s *SoA) Filter(mask *DenseArray) (*SoA, error) {
 	return NewSoA(cols)
 }
 
+func (s *SoA) Compact(mask *DenseArray) (*SoA, error) {
+	return s.Filter(mask)
+}
+
+func (s *SoA) CountWhere(mask *DenseArray) (Value, error) {
+	if s == nil {
+		return NilValue(), fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return NilValue(), fmt.Errorf("soa countWhere mask must be a bool dense array")
+	}
+	if mask.Len() != s.length {
+		return NilValue(), ErrDenseArrayLength
+	}
+	return IntValue(int64(denseArrayBoolCount(mask.bools))), nil
+}
+
 func (s *SoA) Gather(indices *DenseArray) (*SoA, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")

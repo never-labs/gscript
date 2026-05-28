@@ -66,12 +66,13 @@ check("gather preserves duplicates", soa.column(picked, "id")[3] == 104)
 // Current compact/filter spelling: compute or reuse a bool dense mask, compact
 // all columns together, then keep using column kernels on the resulting SoA.
 movingMask := []bool{true, true, false, true}
-moving := soa.filter(points, movingMask)
+moving := soa.compact(points, movingMask)
 check("compact/filter keeps alignment", soa.len(moving) == 3 && soa.column(moving, "id")[2] == 202)
 
 // Masked aggregate spelling: reduce the hot column directly over the mask
 // when the compacted rows are not needed downstream.
 check("masked aggregate sumWhere", soa.sumWhere(points, "velocity", movingMask) == 70)
+check("masked aggregate countWhere", soa.countWhere(points, movingMask) == 3)
 
 columns := soa.unzip(points)
 columns.velocity[1] = 999
