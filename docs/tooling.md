@@ -465,14 +465,16 @@ Suggested schema envelope:
 
 Docs are Markdown/HTML under `docs/`, including stdlib pages and performance
 writeups. `docs/_config.yml` and `docs/_layouts/default.html` indicate static
-site generation support. There is no visible doc generator command.
+site generation support. `scripts/docs_check.sh` is the current repository
+check for relative Markdown links and documented release-script entrypoints.
+There is no visible doc generator command.
 
 ### Gaps
 
 - Stdlib docs appear hand-maintained.
 - No API/doc extraction from runtime builtin registration.
 - No docs freshness check for CLI flags, stdlib modules, or language features.
-- No link checker or generated command reference.
+- No generated command reference.
 
 ### Recommendations
 
@@ -480,7 +482,8 @@ P0:
 
 - Add `gscript doc generate` that emits CLI reference and stdlib inventory from
   code metadata.
-- Add `gscript doc check` for stale generated docs and broken internal links.
+- Keep `scripts/docs_check.sh` in the release gate until `gscript doc check`
+  owns stale generated docs and broken internal links.
 
 P1:
 
@@ -491,6 +494,7 @@ P1:
 Suggested CLI:
 
 ```bash
+scripts/docs_check.sh
 gscript doc generate --output docs/reference
 gscript doc check
 gscript doc check --snippets docs
@@ -659,6 +663,7 @@ found in the reviewed scope. README and docs recommend direct commands:
 
 ```bash
 go test ./... -count=1 -p 1 -timeout=600s
+scripts/docs_check.sh
 python3 benchmarks/timing_compare.py --all --runs 7 --warmup 2 --timeout 900 --time-source script
 ```
 
@@ -669,7 +674,9 @@ commands.
 
 - No canonical `ci` command for local and hosted CI parity.
 - No fast/slow/release split.
-- No formatter/linter/doc checks yet.
+- Formatter and linter checks are not yet part of a canonical CI profile;
+  documentation links and release-script command references have
+  `scripts/docs_check.sh`.
 - No benchmark guard profile with explicit thresholds for PR vs release.
 
 ### Recommendations

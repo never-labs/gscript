@@ -71,6 +71,16 @@ behavior. If LuaJIT is unavailable, benchmark commands that support it are run
 with `--no-luajit`; if optional tools such as `pytest` are absent, the script
 reports that clearly instead of failing before the Go gates run.
 
+Before publishing a tag, run the documentation reference gate:
+
+```bash
+scripts/docs_check.sh
+```
+
+It checks README and `docs/**/*.md` relative `.md` links, and verifies fenced
+code blocks that mention `production_check`, `performance_gate`,
+`diagnostics_bundle`, or `release_artifacts` point at executable scripts.
+
 ### CI Quick Gates
 
 The minimum CI gate is intentionally small and does not publish release
@@ -79,13 +89,14 @@ artifacts:
 ```bash
 go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1
 bash scripts/production_check.sh --quick
+scripts/docs_check.sh
 go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
 ```
 
 These commands cover fast Go correctness, the repository-owned production
-preflight, and the release matrix metadata gate. A version tag is not
-releasable until the full local checklist below has also been run and archived
-with the release evidence.
+preflight, documentation link/script-reference drift, and the release matrix
+metadata gate. A version tag is not releasable until the full local checklist
+below has also been run and archived with the release evidence.
 
 ### Correctness
 
@@ -173,6 +184,7 @@ Before a release candidate, confirm:
 - `docs/tooling.md` lists stable CLI commands and diagnostic workflows;
 - `docs/performance.md` explains benchmark methodology and guardrails;
 - `docs/release.md` defines versioning, artifacts, and compatibility policy.
+- `scripts/docs_check.sh` passes for README and `docs/**/*.md`.
 
 ## API Checklist
 
