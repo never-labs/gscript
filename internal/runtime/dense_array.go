@@ -213,29 +213,35 @@ func (a *DenseArray) Filter(mask *DenseArray) (*DenseArray, error) {
 	}
 	switch a.dtype {
 	case DenseArrayF64:
-		out := make([]float64, 0, denseArrayBoolCount(mask.bools))
+		out := make([]float64, denseArrayBoolCount(mask.bools))
+		j := 0
 		for i, keep := range mask.bools {
 			if keep {
-				out = append(out, a.f64[i])
+				out[j] = a.f64[i]
+				j++
 			}
 		}
-		return NewDenseArrayF64(out), nil
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, nil
 	case DenseArrayI64:
-		out := make([]int64, 0, denseArrayBoolCount(mask.bools))
+		out := make([]int64, denseArrayBoolCount(mask.bools))
+		j := 0
 		for i, keep := range mask.bools {
 			if keep {
-				out = append(out, a.i64[i])
+				out[j] = a.i64[i]
+				j++
 			}
 		}
-		return NewDenseArrayI64(out), nil
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
 	case DenseArrayBool:
-		out := make([]bool, 0, denseArrayBoolCount(mask.bools))
+		out := make([]bool, denseArrayBoolCount(mask.bools))
+		j := 0
 		for i, keep := range mask.bools {
 			if keep {
-				out = append(out, a.bools[i])
+				out[j] = a.bools[i]
+				j++
 			}
 		}
-		return NewDenseArrayBool(out), nil
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
 	default:
 		return nil, ErrDenseArrayDType
 	}

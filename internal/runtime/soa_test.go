@@ -301,6 +301,27 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 }
 
+func BenchmarkDenseArrayFilterF64(b *testing.B) {
+	xs := make([]float64, 32768)
+	mask := make([]bool, len(xs))
+	for i := range xs {
+		xs[i] = float64(i)
+		mask[i] = i%2 == 0
+	}
+	col := NewDenseArrayF64(xs)
+	maskCol := NewDenseArrayBool(mask)
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		out, err := col.Filter(maskCol)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if out.Len() != len(xs)/2 {
+			b.Fatalf("filter len = %d, want %d", out.Len(), len(xs)/2)
+		}
+	}
+}
+
 func runSource(interp *Interpreter, src string) error {
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
