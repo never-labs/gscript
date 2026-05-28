@@ -21,10 +21,12 @@ type tableArrayHeaderFact struct {
 }
 
 type tableArrayCompleteFact struct {
-	header *Value
-	data   *Value
-	len    *Value
-	kind   int64
+	table    *Value
+	header   *Value
+	headerID int
+	data     *Value
+	len      *Value
+	kind     int64
 }
 
 func newTableArrayFactSet() tableArrayFactSet {
@@ -152,11 +154,40 @@ func (s *tableArrayFactSet) Complete(tableID int, kind int64) (tableArrayComplet
 		return tableArrayCompleteFact{}, false
 	}
 	return tableArrayCompleteFact{
-		header: headerFact.header,
-		data:   dataVal,
-		len:    lenVal,
-		kind:   kind,
+		table:    headerFact.table,
+		header:   headerFact.header,
+		headerID: headerFact.header.ID,
+		data:     dataVal,
+		len:      lenVal,
+		kind:     kind,
 	}, true
+}
+
+func (s *tableArrayFactSet) CompleteFacts() []tableArrayCompleteFact {
+	if len(s.headersByID) == 0 {
+		return nil
+	}
+	out := make([]tableArrayCompleteFact, 0, len(s.headersByID))
+	for headerID, headerFact := range s.headersByID {
+		if headerFact == nil || headerFact.table == nil || headerFact.header == nil {
+			continue
+		}
+		key := tableArrayDerivedKey{headerID: headerID, kind: headerFact.kind}
+		lenVal := s.lens[key]
+		dataVal := s.datas[key]
+		if lenVal == nil || dataVal == nil {
+			continue
+		}
+		out = append(out, tableArrayCompleteFact{
+			table:    headerFact.table,
+			header:   headerFact.header,
+			headerID: headerID,
+			data:     dataVal,
+			len:      lenVal,
+			kind:     headerFact.kind,
+		})
+	}
+	return out
 }
 
 func (s *tableArrayFactSet) InvalidateTable(tableID int) bool {

@@ -199,43 +199,21 @@ func collectLoopRegionTableArrayFacts(preheader *Block) []loopRegionTableArrayFa
 	if preheader == nil {
 		return nil
 	}
-	headers := make(map[int]tableArrayHeaderFact)
-	lens := make(map[tableArrayDerivedKey]*Value)
-	datas := make(map[tableArrayDerivedKey]*Value)
-
+	facts := newTableArrayFactSet()
 	for _, instr := range preheader.Instrs {
 		if instr == nil {
 			continue
 		}
-		collectLoopRegionTableArrayFactInstr(instr, headers, lens, datas)
+		facts.RecordByRole(tableArrayFactRole(instr.Op), instr)
 	}
-
-	facts := make([]loopRegionTableArrayFact, 0, len(headers))
-	for headerID, header := range headers {
-		key := tableArrayDerivedKey{headerID: headerID, kind: header.kind}
-		length := lens[key]
-		data := datas[key]
-		if header.table == nil || length == nil || data == nil {
-			continue
-		}
-		facts = append(facts, loopRegionTableArrayFact{
-			table:    header.table,
-			headerID: headerID,
-			length:   length,
-			data:     data,
-			kind:     header.kind,
-		})
-	}
-	return facts
+	return loopRegionFactsFromTableArrayFacts(facts.CompleteFacts())
 }
 
 func collectLoopRegionTableArrayFactsDominating(fn *Function, dom *domInfo, headerID int) []loopRegionTableArrayFact {
 	if fn == nil || dom == nil {
 		return nil
 	}
-	headers := make(map[int]tableArrayHeaderFact)
-	lens := make(map[tableArrayDerivedKey]*Value)
-	datas := make(map[tableArrayDerivedKey]*Value)
+	facts := newTableArrayFactSet()
 	for _, block := range fn.Blocks {
 		if block == nil || !dom.dominates(block.ID, headerID) {
 			continue
@@ -244,44 +222,27 @@ func collectLoopRegionTableArrayFactsDominating(fn *Function, dom *domInfo, head
 			if instr == nil {
 				continue
 			}
-			collectLoopRegionTableArrayFactInstr(instr, headers, lens, datas)
+			facts.RecordByRole(tableArrayFactRole(instr.Op), instr)
 		}
 	}
-	return makeLoopRegionTableArrayFacts(headers, lens, datas)
+	return loopRegionFactsFromTableArrayFacts(facts.CompleteFacts())
 }
 
-func collectLoopRegionTableArrayFactInstr(instr *Instr, headers map[int]tableArrayHeaderFact, lens map[tableArrayDerivedKey]*Value, datas map[tableArrayDerivedKey]*Value) {
-	if instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil || !tableArrayLowerableKind(instr.Aux) {
-		return
+func loopRegionFactsFromTableArrayFacts(src []tableArrayCompleteFact) []loopRegionTableArrayFact {
+	if len(src) == 0 {
+		return nil
 	}
-	switch tableArrayFactRole(instr.Op) {
-	case OpTableArrayFactHeader:
-		headers[instr.ID] = tableArrayHeaderFact{table: instr.Args[0], kind: instr.Aux}
-	case OpTableArrayFactLen:
-		lens[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
-	case OpTableArrayFactData:
-		datas[tableArrayDerivedKey{headerID: instr.Args[0].ID, kind: instr.Aux}] = instr.Value()
-	}
-}
-
-func makeLoopRegionTableArrayFacts(headers map[int]tableArrayHeaderFact, lens map[tableArrayDerivedKey]*Value, datas map[tableArrayDerivedKey]*Value) []loopRegionTableArrayFact {
-	facts := make([]loopRegionTableArrayFact, 0, len(headers))
-	for headerID, header := range headers {
-		key := tableArrayDerivedKey{headerID: headerID, kind: header.kind}
-		length := lens[key]
-		data := datas[key]
-		if header.table == nil || length == nil || data == nil {
-			continue
-		}
-		facts = append(facts, loopRegionTableArrayFact{
-			table:    header.table,
-			headerID: headerID,
-			length:   length,
-			data:     data,
-			kind:     header.kind,
+	out := make([]loopRegionTableArrayFact, 0, len(src))
+	for _, fact := range src {
+		out = append(out, loopRegionTableArrayFact{
+			table:    fact.table,
+			headerID: fact.headerID,
+			length:   fact.len,
+			data:     fact.data,
+			kind:     fact.kind,
 		})
 	}
-	return facts
+	return out
 }
 
 func loopRegionStructuralHazard(fn *Function, body map[int]bool) (*Instr, bool) {
