@@ -69,12 +69,12 @@ func sinkableLoopSetGlobal(fn *Function, li *loopInfo, header *Block) (*Block, *
 			if opMayCallOrRunConcurrently(instr.Op) {
 				return nil, nil, false
 			}
-			switch instr.Op {
-			case OpGetGlobal:
+			switch {
+			case opIsGlobalRead(instr.Op):
 				if store != nil && instr.Aux == constIdx {
 					return nil, nil, false
 				}
-			case OpSetGlobal:
+			case opIsGlobalWrite(instr.Op):
 				if len(instr.Args) != 1 || instr.Args[0] == nil || valueDefinedInLoop(li, instr.Args[0]) {
 					return nil, nil, false
 				}
@@ -95,7 +95,7 @@ func sinkableLoopSetGlobal(fn *Function, li *loopInfo, header *Block) (*Block, *
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if instr != nil && instr.Op == OpGetGlobal && instr.Aux == constIdx {
+			if instr != nil && opIsGlobalRead(instr.Op) && instr.Aux == constIdx {
 				return nil, nil, false
 			}
 		}
