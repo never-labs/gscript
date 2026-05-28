@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -300,5 +301,91 @@ func TestLintReportsSyntaxErrors(t *testing.T) {
 	}
 	if strings.Contains(out, okPath) {
 		t.Fatalf("stderr = %q, did not want clean file", out)
+	}
+}
+
+func TestLintJSONReportsSyntaxErrors(t *testing.T) {
+	dir := t.TempDir()
+	okPath := filepath.Join(dir, "ok.gs")
+	badPath := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(okPath, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(badPath, []byte("func {\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format=json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runLintCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+
+	var diagnostics []lintDiagnostic
+	if err := json.Unmarshal(stdout.Bytes(), &diagnostics); err != nil {
+		t.Fatalf("stdout is not JSON diagnostics: %v; stdout = %q", err, stdout.String())
+	}
+	if len(diagnostics) != 1 {
+		t.Fatalf("diagnostics len = %d, want 1: %#v", len(diagnostics), diagnostics)
+	}
+	got := diagnostics[0]
+	if got.File != badPath {
+		t.Fatalf("diagnostic file = %q, want %q", got.File, badPath)
+	}
+	if got.Code != "GS1001" {
+		t.Fatalf("diagnostic code = %q, want GS1001", got.Code)
+	}
+	if got.Severity != "error" {
+		t.Fatalf("diagnostic severity = %q, want error", got.Severity)
+	}
+	if !strings.Contains(got.Message, "parse error") {
+		t.Fatalf("diagnostic message = %q, want parse error", got.Message)
+	}
+}
+
+func TestLintJSONReportsEmptyDiagnosticsOnSuccess(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(path, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format", "json", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runLintCommand code = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var diagnostics []lintDiagnostic
+	if err := json.Unmarshal(stdout.Bytes(), &diagnostics); err != nil {
+		t.Fatalf("stdout is not JSON diagnostics: %v; stdout = %q", err, stdout.String())
+	}
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v, want empty", diagnostics)
+	}
+}
+
+func TestLintRejectsUnsupportedFormat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(path, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format=sarif", path}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runLintCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "unsupported --format") {
+		t.Fatalf("stderr = %q, want unsupported format diagnostic", stderr.String())
 	}
 }

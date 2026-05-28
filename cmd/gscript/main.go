@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -308,34 +309,73 @@ func runFmtStdin(filename string, check bool, outw, errw io.Writer) int {
 	return 0
 }
 
-func runLintCommand(args []string, _ io.Writer, errw io.Writer) int {
+type lintDiagnostic struct {
+	File     string `json:"file"`
+	Code     string `json:"code"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+
+	text string
+}
+
+func runLintCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
 	fs.SetOutput(errw)
+	format := fs.String("format", "text", "output format: text or json")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *format != "text" && *format != "json" {
+		fmt.Fprintf(errw, "gscript lint: unsupported --format %q (want text or json)\n", *format)
 		return 2
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {
-		fmt.Fprintln(errw, "usage: gscript lint <path-or-dir> [...]")
+		fmt.Fprintln(errw, "usage: gscript lint [--format=text|json] <path-or-dir> [...]")
 		return 2
 	}
 
-	ok := true
+	diagnostics := []lintDiagnostic{}
 	for _, path := range paths {
 		files, err := gscriptFiles(path)
 		if err != nil {
-			fmt.Fprintf(errw, "%s: %v\n", path, err)
-			ok = false
+			diagnostics = append(diagnostics, lintDiagnostic{
+				File:     path,
+				Code:     "GS0001",
+				Severity: "error",
+				Message:  err.Error(),
+				text:     fmt.Sprintf("%s: %v", path, err),
+			})
 			continue
 		}
 		for _, filename := range files {
 			if err := parseGScriptFile(filename); err != nil {
-				fmt.Fprintf(errw, "%s: GS1001 error: %v\n", filename, err)
-				ok = false
+				diagnostics = append(diagnostics, lintDiagnostic{
+					File:     filename,
+					Code:     "GS1001",
+					Severity: "error",
+					Message:  err.Error(),
+				})
 			}
 		}
 	}
-	if !ok {
+
+	if *format == "json" {
+		if err := json.NewEncoder(outw).Encode(diagnostics); err != nil {
+			fmt.Fprintf(errw, "gscript lint: write json: %v\n", err)
+			return 1
+		}
+	} else {
+		for _, diagnostic := range diagnostics {
+			if diagnostic.text != "" {
+				fmt.Fprintln(errw, diagnostic.text)
+				continue
+			}
+			fmt.Fprintf(errw, "%s: %s %s: %s\n", diagnostic.File, diagnostic.Code, diagnostic.Severity, diagnostic.Message)
+		}
+	}
+
+	if len(diagnostics) > 0 {
 		return 1
 	}
 	return 0

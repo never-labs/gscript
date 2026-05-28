@@ -53,8 +53,8 @@ schema。
   stdout golden 对比。
 - `gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
   解析并规范基础空白。
-- `gscript lint <path-or-dir> [...]` 解析文件/目录并报告 `GS1001` 词法或
-  语法错误。
+- `gscript lint [--format=text|json] <path-or-dir> [...]` 解析文件/目录并报告
+  `GS1001` 词法或语法错误。
 
 There are also developer binaries:
 
@@ -190,10 +190,25 @@ func Format(filename string, src []byte, opts FormatOptions) ([]byte, error)
 
 `gscript lint` is a minimal parser-backed linter scaffold. It accepts one or
 more `.gs` files or directories, recursively discovers `.gs` files in
-directories, and reports lexer/parser failures as `GS1001` errors:
+directories, and reports lexer/parser failures as `GS1001` errors. The default
+`--format=text` mode preserves the original stderr output:
 
 ```text
 path/to/file.gs: GS1001 error: parse error: parse error at 1:6: expected ...
+```
+
+`--format=json` writes a JSON diagnostics array to stdout. Each diagnostic has
+the stable machine-readable fields `file`, `code`, `severity`, and `message`:
+
+```json
+[
+  {
+    "file": "path/to/file.gs",
+    "code": "GS1001",
+    "severity": "error",
+    "message": "parse error: parse error at 1:6: expected ..."
+  }
+]
 ```
 
 This provides a stable command entry point and file traversal path for future
@@ -206,7 +221,7 @@ model is designed.
   malformed `require()` paths, unsupported JIT patterns, or deprecated stdlib
   APIs.
 - No diagnostic code registry or severity model.
-- No SARIF/JSON output for CI annotation.
+- No SARIF output for CI annotation.
 
 ### Recommendations
 
@@ -219,7 +234,7 @@ P0:
 
 P1:
 
-- Add `--format=text|json|sarif`.
+- Add `--format=sarif`.
 - Add config suppressions and inline ignore comments.
 
 Suggested CLI:
