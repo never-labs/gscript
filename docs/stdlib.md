@@ -22,7 +22,7 @@
 | `time` | 已有 `now`、`sleep`、`since`、`unix`、`format`、`parse`、`add`、`diff`、`isBefore`、`isAfter`、`weekday`、`month` 和 duration 常量；支持 Go layout 与部分 strftime 转换。 | sleep 不可取消；timezone/location 能力有限；单调时钟与 wall clock 未区分；parse/format layout 文档不足。 | 引入 context-aware sleep/timer；明确 time table 字段不变式；补 location/UTC/local；测试固定 UTC 边界、DST、nsec round-trip 和 layout 错误。 |
 | `regexp` | 已有 Go RE2 风格 compile/mustCompile/match/find/findAll/submatch/replace/split/numSubexp，支持 compiled object 与 cache。 | 不兼容 Lua pattern；缺少 named capture、byte/rune index 说明、replace callback、cache 上限。 | 坚持 RE2 作为 `regexp`；Lua pattern 留在 `string`；新增 named group table 和 callback replace；文档化所有 index 按字节还是字符。 |
 | `bytes` | 已有 buffer、fromString/fromHex/toHex/xor/compare/repeat/concat，buffer 支持多种 little-endian numeric write/read、hex、len、reset。 | 缺少 endian 参数、read numeric 系列完整性、切片零拷贝语义、base64/hash/crypto 之间的二进制约定。 | 定义“GScript string 可承载 bytes”；补 endian option 和 bounds error；避免默认 UTF-8 假设；与 `binary` 共享字段 token。 |
-| `os` | 已有 `time`、`clock`、`date`、`exit`、`getenv`、`setenv`、`unsetenv`、`expand`、`remove`、`rename`、`tmpname`、`args`、`hostname`、`getpid`。 | `os.exit` 直接退出进程，不适合 embedded production；文件操作与 `fs` 边界重叠；环境变量修改缺少 sandbox policy。 | 推荐生产入口使用 `process.exit` 的可捕获错误；把危险 OS API 纳入 capability policy；文档化 `os` 是 Lua 兼容表，`process`/`fs` 是 Go-host 表。 |
+| `os` | 已有 `time`、`clock`、`date`、`exit`、`getenv`、`setenv`、`unsetenv`、`environ`、`expand`、`remove`、`rename`、`tmpname`、`args`、`hostname`、`getpid`；环境变量读取与写入在 runtime 层可独立限权。 | `os.exit` 直接退出进程，不适合 embedded production；文件操作与 `fs` 边界重叠；公开 embedding option 仍需把 env capability 接到统一 policy。 | 推荐生产入口使用 `process.exit` 的可捕获错误；把危险 OS API 纳入 capability policy；文档化 `os` 是 Lua 兼容表，`process`/`fs` 是 Go-host 表。 |
 | `process` | 已有 `run`、`exec`、`shell`、`which`、`pid`、`env`、`args`、`entry`、`setArgs`、`exit`；`run` 支持 stdin/env/dir/timeout 和结构化结果。 | shell 注入风险、Windows shell 差异、streaming stdout/stderr、取消传播、环境白名单和 resource limit。 | `run(tableArgs)` 作为生产推荐；`shell` 标为显式危险能力；增加 context cancellation、max output、stream callback；测试 timeout kill、cwd、env merge 和 non-zero exit。 |
 | `crypto` | 已有 secure random bytes/hex、AES-GCM encrypt/decrypt、generateKey、constant-time equal。 | 缺少 AEAD associated data、nonce 策略可控性、KDF、签名、hash/HMAC 与 `hash` 模块边界说明。 | 保持高层安全默认；新增 `{aad, nonce}` 但默认随机 nonce；补 HKDF/PBKDF2/Ed25519 时要求 test vectors；禁止弱算法进入默认命名空间。 |
 | `path` | 已有 separator/listSeparator、join/dir/base/ext/abs/isAbs/clean/split/match/rel，基于 `filepath`。 | OS-specific 行为会影响跨平台测试；缺少 URL path 与 filepath 区分；glob 在 `fs` 而不在 `path`。 | 明确 `path` 是 host filepath；URL 使用 `url`；跨平台测试只断言不变量，平台具体 separator 用 golden per OS。 |
@@ -74,6 +74,12 @@
   控制 `fs.writefile`、`fs.remove`、`fs.rename`、`fs.mkdir`、`fs.chdir`、
   `fs.tempfile` 等变更入口。`CapFilesystem` 保留为兼容别名，等价于
   `CapFilesystemRead | CapFilesystemWrite`。
+- 环境变量是独立宿主能力，不等同于 `LibSafe` 选择，也不等同于
+  `CapFilesystem`。runtime 的 `os` 表把读取类入口
+  `os.getenv`、`os.environ`、`os.expand` 与写入类入口
+  `os.setenv`、`os.unsetenv` 分开限权；读取被关闭时报
+  `environment read access disabled`，写入被关闭时报
+  `environment write access disabled`。默认兼容模式仍启用读写。
 - `WithSandbox()` 等价于选择 `LibSafe` 并关闭宿主文件系统能力
   (`CapSafe`)。因此安全内建模块仍可 `require("json")`，但文件模块
   `require("helper")`、`fs`、`dofile`、`loadfile` 默认不可用。
