@@ -119,7 +119,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 		// Bytecode VM path
 		proto, err := prog.bytecodeProto()
 		if err != nil {
-			return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}
+			return runtimeError(err, prog.sourceName)
 		}
 		globals := vm.interp.ExportGlobals()
 		// Reuse existing bytecode VM if available (preserves JIT state)
@@ -139,7 +139,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetMaxSteps(vm.opts.maxSteps)
 		}
 		if _, err := bvm.Execute(proto); err != nil {
-			return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}
+			return runtimeError(err, prog.sourceName)
 		}
 		// Persist the bytecode VM for future Call routing
 		vm.bvm = bvm
@@ -151,7 +151,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 	}
 
 	if err := vm.interp.Exec(prog.ast); err != nil {
-		return &Error{Kind: ErrRuntime, Message: err.Error(), File: prog.sourceName}
+		return runtimeError(err, prog.sourceName)
 	}
 	if err := checkContext(ctx); err != nil {
 		return err
@@ -305,7 +305,7 @@ func (vm *VM) callValue(fn runtime.Value, args ...interface{}) ([]interface{}, e
 		results, err = vm.interp.CallFunction(fn, gsArgs)
 	}
 	if err != nil {
-		return nil, &Error{Kind: ErrRuntime, Message: err.Error()}
+		return nil, runtimeError(err, "")
 	}
 	out := make([]interface{}, len(results))
 	for i, r := range results {

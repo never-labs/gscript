@@ -334,7 +334,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 		defer func() {
 			if r := recover(); r != nil {
 				results = nil
-				err = fmt.Errorf("host function %s panicked: %v", gf.Name, r)
+				err = &HostCallbackPanicError{Name: gf.Name, Value: r}
 			}
 		}()
 
@@ -400,7 +400,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 		if hasError && numOut > 0 {
 			lastOut := out[numOut-1]
 			if !lastOut.IsNil() {
-				return nil, lastOut.Interface().(error)
+				return nil, &HostCallbackError{Name: gf.Name, Err: lastOut.Interface().(error)}
 			}
 			out = out[:numOut-1]
 		}

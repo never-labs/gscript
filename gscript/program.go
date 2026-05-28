@@ -68,7 +68,7 @@ func CompileContext(ctx context.Context, src string, opts ...CompileOption) (*Pr
 func CompileFile(path string, opts ...CompileOption) (*Program, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
-		return nil, &Error{Kind: ErrRuntime, Message: err.Error(), File: path}
+		return nil, newError(ErrRuntime, err, path)
 	}
 	cfg := compileOptions{sourceName: path}
 	for _, opt := range opts {
@@ -105,11 +105,11 @@ func (p *Program) SourceName() string {
 func compileSource(src, filename, scriptDir string) (*Program, error) {
 	tokens, err := lexer.New(src).Tokenize()
 	if err != nil {
-		return nil, &Error{Kind: ErrLex, Message: err.Error(), File: filename}
+		return nil, newError(ErrLex, err, filename)
 	}
 	parsed, err := parser.New(tokens).Parse()
 	if err != nil {
-		return nil, &Error{Kind: ErrParse, Message: err.Error(), File: filename}
+		return nil, newError(ErrParse, err, filename)
 	}
 	return &Program{
 		sourceName: filename,
