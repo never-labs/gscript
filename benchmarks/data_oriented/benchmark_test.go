@@ -51,3 +51,67 @@ func BenchmarkVectorNormalizeSoA(b *testing.B) {
 		sinkFloat = NormalizeSoA(vs)
 	}
 }
+
+func BenchmarkRecordSliceAoS(b *testing.B) {
+	rs := NewRecordsAoS(DefaultRecords)
+	offset := DefaultRecords / 4
+	length := DefaultRecords / 2
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = SliceRecordsAoS(rs, offset, length)
+	}
+}
+
+func BenchmarkRecordSliceSoA(b *testing.B) {
+	rs := NewRecordsSoA(DefaultRecords)
+	offset := DefaultRecords / 4
+	length := DefaultRecords / 2
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = SliceRecordsSoA(rs, offset, length)
+	}
+}
+
+func BenchmarkRecordFilterAoS(b *testing.B) {
+	src := NewRecordsAoS(DefaultRecords)
+	dst := make([]RecordAoS, 0, DefaultRecords)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var checksum float64
+		dst, checksum = FilterRecordsAoS(src, dst)
+		sinkFloat = checksum
+	}
+}
+
+func BenchmarkRecordFilterSoA(b *testing.B) {
+	src := NewRecordsSoA(DefaultRecords)
+	dst := MakeRecordsSoABuffer(DefaultRecords)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var checksum float64
+		dst, checksum = FilterRecordsSoA(src, dst)
+		sinkFloat = checksum
+	}
+}
+
+func BenchmarkRecordUnzipAoS(b *testing.B) {
+	src := NewRecordsAoS(DefaultRecords)
+	dst := MakeRecordsSoABuffer(DefaultRecords)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var checksum float64
+		dst, checksum = UnzipRecordsAoS(src, dst)
+		sinkFloat = checksum
+	}
+}
+
+func BenchmarkRecordCopyAoS(b *testing.B) {
+	src := NewRecordsAoS(DefaultRecords)
+	dst := make([]RecordAoS, 0, DefaultRecords)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var checksum float64
+		dst, checksum = CopyRecordsAoS(src, dst)
+		sinkFloat = checksum
+	}
+}

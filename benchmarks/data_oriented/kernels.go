@@ -6,6 +6,7 @@ const (
 	DefaultParticles = 32768
 	DefaultSteps     = 64
 	DefaultVectors   = 65536
+	DefaultRecords   = 65536
 )
 
 type ParticleAoS struct {
@@ -26,6 +27,22 @@ type Vec3AoS struct {
 
 type Vec3SoA struct {
 	X, Y, Z []float64
+}
+
+type RecordAoS struct {
+	ID     int64
+	Group  int32
+	Active bool
+	Value  float64
+	Weight float64
+}
+
+type RecordsSoA struct {
+	ID     []int64
+	Group  []int32
+	Active []bool
+	Value  []float64
+	Weight []float64
 }
 
 func NewParticlesAoS(n int) []ParticleAoS {
@@ -189,4 +206,140 @@ func ChecksumVec3SoA(vs Vec3SoA) float64 {
 		sum += vs.X[i] + 0.5*vs.Y[i] + 0.25*vs.Z[i]
 	}
 	return sum
+}
+
+func NewRecordsAoS(n int) []RecordAoS {
+	rs := make([]RecordAoS, n)
+	for i := range rs {
+		rs[i] = RecordAoS{
+			ID:     int64(i + 1),
+			Group:  int32(i % 19),
+			Active: i%3 != 0,
+			Value:  1.0 + 0.125*float64(i%257),
+			Weight: 0.5 + 0.01*float64(i%31),
+		}
+	}
+	return rs
+}
+
+func NewRecordsSoA(n int) RecordsSoA {
+	rs := RecordsSoA{
+		ID:     make([]int64, n),
+		Group:  make([]int32, n),
+		Active: make([]bool, n),
+		Value:  make([]float64, n),
+		Weight: make([]float64, n),
+	}
+	for i := 0; i < n; i++ {
+		rs.ID[i] = int64(i + 1)
+		rs.Group[i] = int32(i % 19)
+		rs.Active[i] = i%3 != 0
+		rs.Value[i] = 1.0 + 0.125*float64(i%257)
+		rs.Weight[i] = 0.5 + 0.01*float64(i%31)
+	}
+	return rs
+}
+
+func MakeRecordsSoABuffer(n int) RecordsSoA {
+	return RecordsSoA{
+		ID:     make([]int64, 0, n),
+		Group:  make([]int32, 0, n),
+		Active: make([]bool, 0, n),
+		Value:  make([]float64, 0, n),
+		Weight: make([]float64, 0, n),
+	}
+}
+
+func SliceRecordsAoS(rs []RecordAoS, offset, length int) float64 {
+	return ChecksumRecordsAoS(rs[offset : offset+length])
+}
+
+func SliceRecordsSoA(rs RecordsSoA, offset, length int) float64 {
+	end := offset + length
+	return ChecksumRecordsSoA(RecordsSoA{
+		ID:     rs.ID[offset:end],
+		Group:  rs.Group[offset:end],
+		Active: rs.Active[offset:end],
+		Value:  rs.Value[offset:end],
+		Weight: rs.Weight[offset:end],
+	})
+}
+
+func FilterRecordsAoS(src, dst []RecordAoS) ([]RecordAoS, float64) {
+	dst = dst[:0]
+	for i := range src {
+		if keepRecord(src[i].Active, src[i].Group, src[i].Value, src[i].Weight) {
+			dst = append(dst, src[i])
+		}
+	}
+	return dst, ChecksumRecordsAoS(dst)
+}
+
+func FilterRecordsSoA(src, dst RecordsSoA) (RecordsSoA, float64) {
+	dst = resetRecordsSoA(dst)
+	for i := range src.ID {
+		if keepRecord(src.Active[i], src.Group[i], src.Value[i], src.Weight[i]) {
+			dst.ID = append(dst.ID, src.ID[i])
+			dst.Group = append(dst.Group, src.Group[i])
+			dst.Active = append(dst.Active, src.Active[i])
+			dst.Value = append(dst.Value, src.Value[i])
+			dst.Weight = append(dst.Weight, src.Weight[i])
+		}
+	}
+	return dst, ChecksumRecordsSoA(dst)
+}
+
+func UnzipRecordsAoS(src []RecordAoS, dst RecordsSoA) (RecordsSoA, float64) {
+	dst = resetRecordsSoA(dst)
+	for i := range src {
+		dst.ID = append(dst.ID, src[i].ID)
+		dst.Group = append(dst.Group, src[i].Group)
+		dst.Active = append(dst.Active, src[i].Active)
+		dst.Value = append(dst.Value, src[i].Value)
+		dst.Weight = append(dst.Weight, src[i].Weight)
+	}
+	return dst, ChecksumRecordsSoA(dst)
+}
+
+func CopyRecordsAoS(src, dst []RecordAoS) ([]RecordAoS, float64) {
+	dst = dst[:0]
+	dst = append(dst, src...)
+	return dst, ChecksumRecordsAoS(dst)
+}
+
+func ChecksumRecordsAoS(rs []RecordAoS) float64 {
+	sum := 0.0
+	for i := range rs {
+		active := 0.0
+		if rs[i].Active {
+			active = 1.0
+		}
+		sum += float64(rs[i].ID%97)*0.03125 + float64(rs[i].Group)*0.125 + active + rs[i].Value*rs[i].Weight
+	}
+	return sum
+}
+
+func ChecksumRecordsSoA(rs RecordsSoA) float64 {
+	sum := 0.0
+	for i := range rs.ID {
+		active := 0.0
+		if rs.Active[i] {
+			active = 1.0
+		}
+		sum += float64(rs.ID[i]%97)*0.03125 + float64(rs.Group[i])*0.125 + active + rs.Value[i]*rs.Weight[i]
+	}
+	return sum
+}
+
+func keepRecord(active bool, group int32, value, weight float64) bool {
+	return active && (group%5 == 0 || value*weight > 18.0)
+}
+
+func resetRecordsSoA(rs RecordsSoA) RecordsSoA {
+	rs.ID = rs.ID[:0]
+	rs.Group = rs.Group[:0]
+	rs.Active = rs.Active[:0]
+	rs.Value = rs.Value[:0]
+	rs.Weight = rs.Weight[:0]
+	return rs
 }
