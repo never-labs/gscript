@@ -194,6 +194,8 @@ Current implementation status:
   materializing a filtered SoA first;
 - `soa.scan` and `soa.scanInto` compute inclusive prefix sums for numeric
   columns;
+- `soa.clamp` and `soa.clampInto` provide numeric range limiting over dense
+  columns;
 - `soa.dot` and `soa.dotWhere` provide vector-style numeric products over
   dense columns without row materialization;
 - `soa.mask` builds reusable bool dense masks from scalar or column
@@ -248,6 +250,8 @@ Current API contract:
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
 | `soa.scan(s, column)` | Returns an inclusive prefix sum dense array for a numeric column. |
 | `soa.scanInto(s, dst, src)` | Writes an inclusive prefix sum from `src` into `dst`. |
+| `soa.clamp(s, column, min, max)` | Returns a dense array with a numeric column clamped to `min..max`. |
+| `soa.clampInto(s, dst, src, min, max)` | Writes clamped values from `src` into `dst`. |
 | `soa.dot(s, left, right)` | Computes the dot product of two numeric dense columns. |
 | `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |
 | `soa.dotWhere(s, left, right, mask)` | Computes a masked dot product over mask-true rows. |
@@ -270,6 +274,7 @@ Hot path guidance:
 - batch independent column updates with `soa.affineMany` rather than repeated
   row materialization;
 - use `soa.scan` and `soa.scanInto` for prefix sums and offset generation;
+- use `soa.clamp` and `soa.clampInto` for numeric range limiting;
 - use `soa.dot` and `soa.dotWhere` for vector-style products;
 - for masked aggregates, prefer `soa.sumWhere` or `soa.statsWhere` over
   `soa.filter` plus a later aggregate when the compacted rows are not needed;

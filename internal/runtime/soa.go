@@ -815,6 +815,25 @@ func (s *SoA) ScanInto(dstName, srcName string) error {
 	return denseArrayScanInto(dst, src)
 }
 
+func (s *SoA) Clamp(columnName string, minValue, maxValue Value) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return nil, fmt.Errorf("soa column %q not found", columnName)
+	}
+	return denseArrayClamp(col, minValue, maxValue)
+}
+
+func (s *SoA) ClampInto(dstName, srcName string, minValue, maxValue Value) error {
+	dst, src, err := s.numericColumns(dstName, srcName)
+	if err != nil {
+		return err
+	}
+	return denseArrayClampInto(dst, src, minValue, maxValue)
+}
+
 func (s *SoA) Dot(leftName, rightName string) (Value, error) {
 	left, right, err := s.numericColumns(leftName, rightName)
 	if err != nil {

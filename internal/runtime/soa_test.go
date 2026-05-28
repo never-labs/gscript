@@ -106,6 +106,9 @@ maskedSum := soa.sumWhere(points, "x", []bool{true, false, true})
 scanX := soa.scan(points, "x")
 scanS := soa.zip({x: []f64{1, 2, 3}, total: []f64{0, 0, 0}})
 scanIntoOK := soa.scanInto(scanS, "total", "x")
+clampS := soa.zip({x: []f64{-2, 1, 5}, out: []f64{0, 0, 0}})
+clamped := soa.clamp(clampS, "x", 0, 3)
+clampIntoOK := soa.clampInto(clampS, "out", "x", 0, 3)
 dotXY := soa.dot(points, "x", "y")
 dotWhereXY := soa.dotWhere(points, "x", "y", []bool{true, false, true})
 maskedMin := soa.minWhere(points, "x", []bool{true, false, true})
@@ -175,6 +178,11 @@ fillWhereOK := soa.fillWhere(filled, "ok", []bool{true, false, true}, true)
 		t.Fatalf("scanIntoOK = %v, want true", got)
 	}
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("scanS").SoA(), "total")), []float64{1, 3, 6})
+	assertDenseF64(t, interp.GetGlobal("clamped"), []float64{0, 1, 3})
+	if got := interp.GetGlobal("clampIntoOK"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("clampIntoOK = %v, want true", got)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("clampS").SoA(), "out")), []float64{0, 1, 3})
 	if got := interp.GetGlobal("dotXY"); !got.IsFloat() || got.Float() != 5100 {
 		t.Fatalf("dotXY = %v, want 5100", got)
 	}
@@ -436,6 +444,8 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	sumWhere := lib.RawGetString("sumWhere").GoFunction()
 	scan := lib.RawGetString("scan").GoFunction()
 	scanInto := lib.RawGetString("scanInto").GoFunction()
+	clampFn := lib.RawGetString("clamp").GoFunction()
+	clampInto := lib.RawGetString("clampInto").GoFunction()
 	dot := lib.RawGetString("dot").GoFunction()
 	dotWhere := lib.RawGetString("dotWhere").GoFunction()
 	minWhere := lib.RawGetString("minWhere").GoFunction()
@@ -518,6 +528,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if scanInto == nil || scanInto.FastArg3 == nil {
 		t.Fatal("soa.scanInto FastArg3 is nil")
+	}
+	if clampFn == nil || clampFn.FastArg4 == nil {
+		t.Fatal("soa.clamp FastArg4 is nil")
+	}
+	if clampInto == nil || clampInto.FastArg5 == nil {
+		t.Fatal("soa.clampInto FastArg5 is nil")
 	}
 	if dot == nil || dot.FastArg3 == nil {
 		t.Fatal("soa.dot FastArg3 is nil")
@@ -675,6 +691,22 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 		t.Fatalf("soa.scanInto FastArg3 got=%s err=%v", got.String(), err)
 	}
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, scanS, "total")), []float64{1, 3, 6})
+	clampS, err := NewSoA(map[string]*DenseArray{
+		"x":   NewDenseArrayF64([]float64{-2, 1, 5}),
+		"out": NewDenseArrayF64([]float64{0, 0, 0}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = clampFn.FastArg4(SoAValue(clampS), StringValue("x"), FloatValue(0), FloatValue(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDenseF64(t, got, []float64{0, 1, 3})
+	if got, err := clampInto.FastArg5(SoAValue(clampS), StringValue("out"), StringValue("x"), FloatValue(0), FloatValue(3)); err != nil || !got.Bool() {
+		t.Fatalf("soa.clampInto FastArg5 got=%s err=%v", got.String(), err)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, clampS, "out")), []float64{0, 1, 3})
 	dotS, err := NewSoA(map[string]*DenseArray{
 		"x": NewDenseArrayF64([]float64{1, 2, 3}),
 		"v": NewDenseArrayF64([]float64{10, 20, 30}),

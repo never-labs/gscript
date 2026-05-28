@@ -531,6 +531,44 @@ func buildSoALib() *Table {
 		return []Value{BoolValue(true)}, nil
 	}, soaScanIntoValue)
 
+	setFastArg4("clamp", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.clamp", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.clamp: argument 2 must be a string")
+		}
+		if len(args) < 4 {
+			return nil, fmt.Errorf("soa.clamp: arguments 3 and 4 are required")
+		}
+		out, err := s.Clamp(args[1].Str(), args[2], args[3])
+		if err != nil {
+			return nil, err
+		}
+		return []Value{DenseArrayValue(out)}, nil
+	}, soaClampValue)
+
+	setFastArg5("clampInto", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.clampInto", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.clampInto: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsString() {
+			return nil, fmt.Errorf("soa.clampInto: argument 3 must be a string")
+		}
+		if len(args) < 5 {
+			return nil, fmt.Errorf("soa.clampInto: arguments 4 and 5 are required")
+		}
+		if err := s.ClampInto(args[1].Str(), args[2].Str(), args[3], args[4]); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaClampIntoValue)
+
 	setFastArg3("dot", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.dot", args, 0)
 		if err != nil {
@@ -1133,6 +1171,36 @@ func soaScanIntoValue(soaValue, dstValue, srcValue Value) (Value, error) {
 		return NilValue(), fmt.Errorf("soa.scanInto: argument 3 must be a string")
 	}
 	if err := soaValue.SoA().ScanInto(dstValue.Str(), srcValue.Str()); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
+func soaClampValue(soaValue, columnValue, minValue, maxValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.clamp: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.clamp: argument 2 must be a string")
+	}
+	out, err := soaValue.SoA().Clamp(columnValue.Str(), minValue, maxValue)
+	if err != nil {
+		return NilValue(), err
+	}
+	return DenseArrayValue(out), nil
+}
+
+func soaClampIntoValue(soaValue, dstValue, srcValue, minValue, maxValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.clampInto: argument 1 must be soa")
+	}
+	if !dstValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.clampInto: argument 2 must be a string")
+	}
+	if !srcValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.clampInto: argument 3 must be a string")
+	}
+	if err := soaValue.SoA().ClampInto(dstValue.Str(), srcValue.Str(), minValue, maxValue); err != nil {
 		return NilValue(), err
 	}
 	return BoolValue(true), nil

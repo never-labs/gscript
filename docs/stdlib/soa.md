@@ -300,6 +300,21 @@ offsets := soa.scan(points, "count")
 Writes the inclusive prefix sum of `src` into `dst`. `dst` and `src` must have
 the same length; an `i64` source may write into an `f64` destination.
 
+### `soa.clamp(s, column, min, max) -> dense array`
+
+Returns a dense array where each numeric value in `column` is clamped into
+`min..max`. Bounds must be numeric for `f64` columns and integer-compatible
+for `i64` columns.
+
+```gscript
+safe_speed := soa.clamp(points, "velocity", 0, 100)
+```
+
+### `soa.clampInto(s, dst, src, min, max) -> true`
+
+Writes clamped values from `src` into `dst`. The destination and source must
+have the same length; an `i64` source may write into an `f64` destination.
+
 ### `soa.dot(s, left, right) -> number`
 
 Returns the dot product of two numeric dense columns with the same length.
@@ -357,6 +372,8 @@ is zero, and `min`, `max`, and `mean` are `nil`.
 - Prefer `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` over
   manual row loops when the operation fits their contracts.
 - Use `soa.scan` and `soa.scanInto` for prefix sums and offset generation.
+- Use `soa.clamp` and `soa.clampInto` for range limiting without row
+  materialization.
 - Use `soa.dot` and `soa.dotWhere` for vector-style products instead of
   multiplying columns through row materialization.
 - Use `soa.mask` to produce reusable dense masks from column comparisons.
