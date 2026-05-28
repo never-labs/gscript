@@ -51,13 +51,8 @@ func lowerStringFormatConstLengths(fn *Function) []string {
 			if !ok || len(pat.specs) != len(fmtInstr.Args)-2 || !stringFormatConstLenPatternIsIntOnly(pat) {
 				continue
 			}
-			instr.Op = OpStringFormatConstLen
-			instr.Args = append([]*Value(nil), fmtInstr.Args...)
-			instr.Aux = fmtInstr.Aux
-			instr.Aux2 = fmtInstr.Aux2
-			instr.Type = TypeInt
-			fmtInstr.Op = OpNop
-			fmtInstr.Args = nil
+			rewriteStringNativeInstr(instr, OpStringFormatConstLen, TypeInt, fmtInstr.Args, fmtInstr.Aux, fmtInstr.Aux2)
+			eraseStringNativeInstr(fmtInstr)
 			notes = append(notes, "intrinsic: len(string.format(const-int-pattern,...)) -> StringFormatConstLen")
 		}
 	}
@@ -174,11 +169,7 @@ func lowerStringSplitSubstrings(fn *Function) []string {
 			}
 			specIdx := len(fn.StringSplitSubSpecs)
 			fn.StringSplitSubSpecs = append(fn.StringSplitSubSpecs, spec)
-			instr.Op = OpStringSplitSubstr
-			instr.Type = TypeString
-			instr.Args = args
-			instr.Aux = int64(specIdx)
-			instr.Aux2 = 0
+			rewriteStringNativeInstr(instr, OpStringSplitSubstr, TypeString, args, int64(specIdx), 0)
 			notes = append(notes, "intrinsic: string.sub(string.split(...)[const], const) -> StringSplitSubstr")
 		}
 	}
@@ -200,17 +191,15 @@ func lowerStringSplitSubstringNumbers(fn *Function) []string {
 				continue
 			}
 			substr := arg.Def
-			instr.Op = OpStringSplitSubstrNumber
+			typ := instr.Type
 			if instr.Type == TypeUnknown {
-				instr.Type = TypeAny
+				typ = TypeAny
 			}
 			source := substr.Args[len(substr.Args)-2]
 			sep := substr.Args[len(substr.Args)-1]
 			args := append([]*Value{}, substr.Args[:len(substr.Args)-2]...)
 			args = append(args, instr.Args[0], source, sep)
-			instr.Args = args
-			instr.Aux = substr.Aux
-			instr.Aux2 = 0
+			rewriteStringNativeInstr(instr, OpStringSplitSubstrNumber, typ, args, substr.Aux, 0)
 			notes = append(notes, "intrinsic: tonumber(string.sub(string.split(...)[const], const)) -> StringSplitSubstrNumber")
 		}
 	}
@@ -307,17 +296,10 @@ func lowerStringSplitProjections(fn *Function) []string {
 				continue
 			}
 			for _, proj := range projections {
-				proj.get.Op = OpStringSplitPart
-				proj.get.Type = TypeAny
-				proj.get.Args = []*Value{instr.Args[0], instr.Args[1], instr.Args[2]}
-				proj.get.Aux = proj.index
-				proj.get.Aux2 = 0
+				rewriteStringNativeInstr(proj.get, OpStringSplitPart, TypeAny,
+					[]*Value{instr.Args[0], instr.Args[1], instr.Args[2]}, proj.index, 0)
 			}
-			instr.Op = OpNop
-			instr.Type = TypeUnknown
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
+			eraseStringNativeInstr(instr)
 			notes = append(notes, "intrinsic: string.split const-index projections -> StringSplitPart")
 		}
 	}
@@ -392,9 +374,8 @@ func fuseStringFormatIntGetTable(fn *Function) []string {
 				continue
 			}
 			fmtInstr := key.Def
-			instr.Op = OpGetTableStringFormatInt
-			instr.Args = []*Value{instr.Args[0], fmtInstr.Args[0], fmtInstr.Args[1], fmtInstr.Args[2]}
-			instr.Aux = fmtInstr.Aux
+			rewriteStringNativeInstr(instr, OpGetTableStringFormatInt, instr.Type,
+				[]*Value{instr.Args[0], fmtInstr.Args[0], fmtInstr.Args[1], fmtInstr.Args[2]}, fmtInstr.Aux, instr.Aux2)
 			notes = append(notes, "intrinsic: gettable(string.format(pattern,int)) -> GetTableStringFormatInt")
 		}
 	}
@@ -415,10 +396,7 @@ func lowerStringFormatConst(fn *Function, instr *Instr) bool {
 	}
 	patternIdx := len(fn.StringFormatPatterns)
 	fn.StringFormatPatterns = append(fn.StringFormatPatterns, formatStr)
-	instr.Op = OpStringFormatConst
-	instr.Type = TypeString
-	instr.Aux = int64(patternIdx)
-	instr.Aux2 = int64(len(instr.Args))
+	rewriteStringNativeInstr(instr, OpStringFormatConst, TypeString, instr.Args, int64(patternIdx), int64(len(instr.Args)))
 	return true
 }
 
@@ -441,10 +419,7 @@ func lowerStringFormatProfiledConst(fn *Function, instr *Instr) bool {
 	}
 	patternIdx := len(fn.StringFormatPatterns)
 	fn.StringFormatPatterns = append(fn.StringFormatPatterns, formatStr)
-	instr.Op = OpStringFormatConst
-	instr.Type = TypeString
-	instr.Aux = int64(patternIdx)
-	instr.Aux2 = int64(len(instr.Args))
+	rewriteStringNativeInstr(instr, OpStringFormatConst, TypeString, instr.Args, int64(patternIdx), int64(len(instr.Args)))
 	return true
 }
 
@@ -455,10 +430,7 @@ func lowerStringFormatInt(fn *Function, instr *Instr) bool {
 	}
 	patternIdx := len(fn.StringFormatPatterns)
 	fn.StringFormatPatterns = append(fn.StringFormatPatterns, cand.Pattern)
-	instr.Op = OpStringFormatInt
-	instr.Type = TypeString
-	instr.Aux = int64(patternIdx)
-	instr.Aux2 = 0
+	rewriteStringNativeInstr(instr, OpStringFormatInt, TypeString, instr.Args, int64(patternIdx), 0)
 	return true
 }
 
@@ -524,11 +496,7 @@ func lowerStringFormatConstIntLookup(fn *Function, instr *Instr) bool {
 	tableIdx := len(fn.StringConstTables)
 	fn.StringConstTables = append(fn.StringConstTables, table)
 
-	instr.Op = OpStringConstLookup
-	instr.Type = TypeString
-	instr.Args = []*Value{indexArg}
-	instr.Aux = int64(tableIdx)
-	instr.Aux2 = int64(modulus)
+	rewriteStringNativeInstr(instr, OpStringConstLookup, TypeString, []*Value{indexArg}, int64(tableIdx), int64(modulus))
 	return true
 }
 
