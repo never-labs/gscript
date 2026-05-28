@@ -55,10 +55,10 @@ func LICMPassCtx(ctx *PassContext) (*Function, error) {
 	if globalFacts := ctx.Global(); globalFacts != nil {
 		globals = globalFacts.GlobalsMap()
 	}
-	return licmPass(ctx.Func(), globals, ctx.Call())
+	return licmPass(ctx.Func(), globals, ctx.Call(), ctx.Numeric())
 }
 
-func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts) (*Function, error) {
+func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts, numeric *NumericFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -107,7 +107,7 @@ func licmPass(fn *Function, seededGlobals map[string]*vm.FuncProto, callFacts *C
 			// blocks). Skip defensively.
 			continue
 		}
-		hoistOneLoop(fn, li, hdr, seededGlobals, callFacts)
+		hoistOneLoop(fn, li, hdr, seededGlobals, callFacts, numeric)
 	}
 
 	if errs := Validate(fn); len(errs) > 0 {
@@ -143,7 +143,7 @@ func loopDepths(li *loopInfo) map[int]int {
 
 // hoistOneLoop performs LICM for a single loop identified by its header.
 // Assumes li reflects the current state of fn.
-func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts) {
+func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[string]*vm.FuncProto, callFacts *CallFacts, numeric *NumericFacts) {
 	bodyBlocks := li.headerBlocks[hdr.ID]
 	if bodyBlocks == nil {
 		return
@@ -449,7 +449,7 @@ func hoistOneLoop(fn *Function, li *loopInfo, hdr *Block, seededGlobals map[stri
 			}
 			// Int arithmetic: require Int48Safe marking.
 			if isIntArithOp(instr.Op) {
-				if !functionNumericFacts(fn).IsInt48Safe(instr.ID) {
+				if numeric == nil || !numeric.IsInt48Safe(instr.ID) {
 					functionRemarks(fn).Add("LICM", "missed", loc.block.ID, instr.ID, instr.Op,
 						"integer arithmetic is not proven int48-safe")
 					continue
