@@ -194,6 +194,67 @@ func TestTableArrayStoreLoopVersion_RejectsCallReceivingLocalTable(t *testing.T)
 	}
 }
 
+func TestTableArrayStoreLoopVersion_AllowsWhitelistedTableUsesWithLoopCall(t *testing.T) {
+	fn := tableArrayNumericStoreLoopFixture(t)
+	tbl, _, body, exit := tableArrayLoopBlocks(fn)
+	callee := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeFunction, Aux: 1, Block: body}
+	arg := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 7, Block: body}
+	call := &Instr{ID: fn.newValueID(), Op: OpCall, Type: TypeInt, Args: []*Value{callee.Value(), arg.Value()}, Block: body}
+	guardKind := &Instr{ID: fn.newValueID(), Op: OpGuardTableKind, Type: TypeTable, Aux: int64(vm.FBKindInt), Args: []*Value{tbl}, Block: body}
+	guardType := &Instr{ID: fn.newValueID(), Op: OpGuardType, Type: TypeTable, Aux: int64(TypeTable), Args: []*Value{tbl}, Block: body}
+	body.Instrs = append([]*Instr{callee, arg, call, guardKind, guardType}, body.Instrs...)
+	exit.Instrs[0].Args = []*Value{tbl}
+	assertValidates(t, fn, "store loop with whitelisted local-table uses")
+
+	out, err := TableArrayStoreLoopVersionPass(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertValidates(t, out, "store loop with whitelisted local-table uses versioned")
+	counts := countOps(out)
+	if counts[OpTableArrayStore] != 1 || counts[OpSetTable] != 0 {
+		t.Fatalf("whitelisted table uses should not block store lowering, counts=%v\n%s", counts, Print(out))
+	}
+}
+
+func TestTableArrayStoreLoopVersion_RejectsNonWhitelistedGuardTypeUseWithLoopCall(t *testing.T) {
+	fn := tableArrayNumericStoreLoopFixture(t)
+	tbl, _, body, _ := tableArrayLoopBlocks(fn)
+	callee := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeFunction, Aux: 1, Block: body}
+	call := &Instr{ID: fn.newValueID(), Op: OpCall, Type: TypeInt, Args: []*Value{callee.Value()}, Block: body}
+	guardType := &Instr{ID: fn.newValueID(), Op: OpGuardType, Type: TypeInt, Aux: int64(TypeInt), Args: []*Value{tbl}, Block: body}
+	body.Instrs = append([]*Instr{callee, call, guardType}, body.Instrs...)
+
+	out, err := TableArrayStoreLoopVersionPass(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := countOps(out)
+	if counts[OpTableArrayStore] != 0 || counts[OpSetTable] != 1 {
+		t.Fatalf("non-table GuardType use should block store lowering when a loop call exists, counts=%v\n%s", counts, Print(out))
+	}
+}
+
+func TestTableArrayStoreLoopVersion_RejectsBlockerOps(t *testing.T) {
+	for _, op := range []Op{OpTableArrayStore, OpResume, OpSelf, OpSetField, OpAppend, OpSetList, OpTableBoolArrayFill} {
+		t.Run(op.String(), func(t *testing.T) {
+			fn := tableArrayNumericStoreLoopFixture(t)
+			tbl, _, body, _ := tableArrayLoopBlocks(fn)
+			blocker := &Instr{ID: fn.newValueID(), Op: op, Type: TypeUnknown, Args: []*Value{tbl}, Block: body}
+			body.Instrs = append([]*Instr{blocker}, body.Instrs...)
+
+			out, err := TableArrayStoreLoopVersionPass(fn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			counts := countOps(out)
+			if counts[OpSetTable] != 1 || counts[OpTableArrayHeader] != 0 {
+				t.Fatalf("%s should block store loop versioning, counts=%v\n%s", op, counts, Print(out))
+			}
+		})
+	}
+}
+
 func TestTableArrayStoreLoopVersion_DiagnosticsCoversSieveStoreLoop(t *testing.T) {
 	proto := compileProto(t, `
 func sieve_like(n) {

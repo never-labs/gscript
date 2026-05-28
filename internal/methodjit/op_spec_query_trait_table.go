@@ -114,6 +114,38 @@ func tableArrayFactRole(op Op) OpTableArrayFactRole {
 	return spec.TableArrayFactRole
 }
 
+func opIsTableArrayStoreLoopCandidate(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayStoreLoopCandidate
+}
+
+func opIsTableArrayStoreLoopBlocker(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayStoreLoopBlocker
+}
+
+func opIsTableArrayStoreLoopEscapeCall(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableArrayStoreLoopEscapeCall
+}
+
+func tableArrayStoreLoopUseOK(instr *Instr, inLoop bool) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	if !ok || !spec.TableArrayStoreLoopUseOK {
+		return false
+	}
+	if instr.Op == OpGuardType {
+		return instr.Type == TypeTable && Type(instr.Aux) == TypeTable
+	}
+	if instr.Op == OpReturn {
+		return !inLoop
+	}
+	return true
+}
+
 func opIsTableMetatableMutationBarrier(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.TableMetatableMutationBarrier

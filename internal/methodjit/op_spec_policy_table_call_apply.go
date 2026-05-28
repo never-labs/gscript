@@ -111,4 +111,16 @@ func applyOpSpecTableCallBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTableArrayFactRolePolicies) {
 		spec.TableArrayFactRole = opTableArrayFactRolePolicies[op]
 	}
+	if int(op) < len(opTableArrayStoreLoopCandidatePolicies) {
+		spec.TableArrayStoreLoopCandidate = opTableArrayStoreLoopCandidatePolicies[op]
+	}
+	if int(op) < len(opTableArrayStoreLoopBlockerPolicies) {
+		spec.TableArrayStoreLoopBlocker = opTableArrayStoreLoopBlockerPolicies[op]
+	}
+	if int(op) < len(opTableArrayStoreLoopEscapeCallPolicies) {
+		spec.TableArrayStoreLoopEscapeCall = opTableArrayStoreLoopEscapeCallPolicies[op]
+	}
+	if int(op) < len(opTableArrayStoreLoopUseOKPolicies) {
+		spec.TableArrayStoreLoopUseOK = opTableArrayStoreLoopUseOKPolicies[op]
+	}
 }

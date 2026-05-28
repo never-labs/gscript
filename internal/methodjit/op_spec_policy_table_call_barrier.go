@@ -60,3 +60,27 @@ var opTableArrayFactRolePolicies = [...]OpTableArrayFactRole{
 	OpTableArrayLen:    OpTableArrayFactLen,
 	OpTableArrayData:   OpTableArrayFactData,
 }
+
+var opTableArrayStoreLoopCandidatePolicies = [...]bool{
+	OpSetTable: true,
+}
+
+var opTableArrayStoreLoopBlockerPolicies = [...]bool{
+	OpTableArrayStore:    true,
+	OpResume:             true,
+	OpSelf:               true,
+	OpSetField:           true,
+	OpAppend:             true,
+	OpSetList:            true,
+	OpTableBoolArrayFill: true,
+}
+
+var opTableArrayStoreLoopEscapeCallPolicies = [...]bool{
+	OpCall: true,
+}
+
+var opTableArrayStoreLoopUseOKPolicies = [...]bool{
+	OpGuardTableKind: true,
+	OpGuardType:      true,
+	OpReturn:         true,
+}

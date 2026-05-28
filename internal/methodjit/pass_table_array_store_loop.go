@@ -100,8 +100,7 @@ func tableArrayStoreLoopCandidatesFor(fn *Function, body map[int]bool) []tableAr
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpSetTable:
+			if opIsTableArrayStoreLoopCandidate(instr.Op) {
 				if len(instr.Args) < 3 || instr.Args[0] == nil || !tableArrayStoreLoopKind(instr.Aux2) {
 					return nil
 				}
@@ -118,13 +117,12 @@ func tableArrayStoreLoopCandidatesFor(fn *Function, body map[int]bool) []tableAr
 					return nil
 				}
 				cand.stores = append(cand.stores, instr)
-			case OpTableArrayStore:
-				// Existing checked stores are structural-preserving, but this
-				// pass is only responsible for pure SetTable mutation loops.
-				return nil
-			case OpCall:
 				continue
-			case OpResume, OpSelf, OpSetField, OpAppend, OpSetList, OpTableBoolArrayFill:
+			}
+			if opIsTableArrayStoreLoopEscapeCall(instr.Op) {
+				continue
+			}
+			if opIsTableArrayStoreLoopBlocker(instr.Op) {
 				return nil
 			}
 		}
@@ -152,7 +150,7 @@ func tableArrayStoreLoopLocalTableEscapesToLoopCall(fn *Function, body map[int]b
 			continue
 		}
 		for _, instr := range block.Instrs {
-			if instr != nil && instr.Op == OpCall {
+			if instr != nil && opIsTableArrayStoreLoopEscapeCall(instr.Op) {
 				hasLoopCall = true
 				break
 			}
@@ -184,13 +182,10 @@ func tableArrayStoreLoopLocalTableEscapesToLoopCall(fn *Function, body map[int]b
 				if arg == nil || arg.ID != tableID {
 					continue
 				}
-				if inLoop && instr.Op == OpSetTable && storeIDs[instr.ID] && argIdx == 0 {
+				if inLoop && opIsTableArrayStoreLoopCandidate(instr.Op) && storeIDs[instr.ID] && argIdx == 0 {
 					continue
 				}
-				if instr.Op == OpGuardTableKind || (instr.Op == OpGuardType && instr.Type == TypeTable) {
-					continue
-				}
-				if !inLoop && instr.Op == OpReturn {
+				if tableArrayStoreLoopUseOK(instr, inLoop) {
 					continue
 				}
 				return true

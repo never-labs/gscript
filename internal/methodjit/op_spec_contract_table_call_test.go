@@ -113,3 +113,36 @@ func TestTableCallContractsLiveInOpSpec(t *testing.T) {
 		}
 	}
 }
+
+func TestTableArrayStoreLoopContractsLiveInOpSpec(t *testing.T) {
+	if spec, ok := OpSetTable.Spec(); !ok || !spec.TableArrayStoreLoopCandidate || !opIsTableArrayStoreLoopCandidate(OpSetTable) {
+		t.Fatalf("SetTable typed-store-loop candidate contract should be driven by OpSpec")
+	}
+	for _, op := range []Op{OpTableArrayStore, OpResume, OpSelf, OpSetField, OpAppend, OpSetList, OpTableBoolArrayFill} {
+		spec, ok := op.Spec()
+		if !ok || !spec.TableArrayStoreLoopBlocker || !opIsTableArrayStoreLoopBlocker(op) {
+			t.Fatalf("%s typed-store-loop blocker contract should be driven by OpSpec", op)
+		}
+	}
+	if spec, ok := OpCall.Spec(); !ok || !spec.TableArrayStoreLoopEscapeCall || !opIsTableArrayStoreLoopEscapeCall(OpCall) {
+		t.Fatalf("Call typed-store-loop escape-analysis contract should be driven by OpSpec")
+	}
+	for _, op := range []Op{OpGuardTableKind, OpGuardType, OpReturn} {
+		spec, ok := op.Spec()
+		if !ok || !spec.TableArrayStoreLoopUseOK {
+			t.Fatalf("%s typed-store-loop use whitelist contract should be driven by OpSpec", op)
+		}
+	}
+	if !tableArrayStoreLoopUseOK(&Instr{Op: OpGuardTableKind}, true) {
+		t.Fatalf("GuardTableKind use whitelist should be driven by OpSpec")
+	}
+	if !tableArrayStoreLoopUseOK(&Instr{Op: OpGuardType, Type: TypeTable, Aux: int64(TypeTable)}, true) {
+		t.Fatalf("GuardType(TypeTable) use whitelist should be driven by OpSpec")
+	}
+	if tableArrayStoreLoopUseOK(&Instr{Op: OpGuardType, Type: TypeInt, Aux: int64(TypeInt)}, true) {
+		t.Fatalf("GuardType non-table uses must not be whitelisted")
+	}
+	if !tableArrayStoreLoopUseOK(&Instr{Op: OpReturn}, false) || tableArrayStoreLoopUseOK(&Instr{Op: OpReturn}, true) {
+		t.Fatalf("Return use whitelist should only allow non-loop returns")
+	}
+}
