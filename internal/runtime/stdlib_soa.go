@@ -286,6 +286,14 @@ func buildSoALib() *Table {
 		return []Value{v}, nil
 	}, soaMinWhereValue)
 
+	setFastArg3("meanWhere", func(args []Value) ([]Value, error) {
+		v, err := soaMaskedAggregateArgs("soa.meanWhere", args, (*SoA).MeanWhere)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaMeanWhereValue)
+
 	setFastArg3("maxWhere", func(args []Value) ([]Value, error) {
 		v, err := soaMaskedAggregateArgs("soa.maxWhere", args, (*SoA).MaxWhere)
 		if err != nil {
@@ -494,6 +502,10 @@ func soaSumWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
 
 func soaMinWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
 	return soaMaskedAggregateValue("soa.minWhere", soaValue, columnValue, maskValue, (*SoA).MinWhere)
+}
+
+func soaMeanWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
+	return soaMaskedAggregateValue("soa.meanWhere", soaValue, columnValue, maskValue, (*SoA).MeanWhere)
 }
 
 func soaMaxWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {

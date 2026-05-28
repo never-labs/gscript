@@ -184,6 +184,11 @@ total := soa.sumWhere(points, "x", mask)
 Returns the minimum numeric column value over mask-true rows. It errors if no
 rows are selected.
 
+### `soa.meanWhere(s, column, mask) -> number`
+
+Returns the mean numeric column value over mask-true rows as a float. It errors
+if no rows are selected.
+
 ### `soa.maxWhere(s, column, mask) -> number`
 
 Returns the maximum numeric column value over mask-true rows. It errors if no

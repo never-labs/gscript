@@ -482,6 +482,10 @@ func BenchmarkSoAStdlibMinWhere(b *testing.B) {
 	benchmarkSoAMaskedColumnAggregate(b, "minWhere")
 }
 
+func BenchmarkSoAStdlibMeanWhere(b *testing.B) {
+	benchmarkSoAMaskedColumnAggregate(b, "meanWhere")
+}
+
 func BenchmarkSoAStdlibMaxWhere(b *testing.B) {
 	benchmarkSoAMaskedColumnAggregate(b, "maxWhere")
 }

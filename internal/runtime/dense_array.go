@@ -339,6 +339,42 @@ func (a *DenseArray) SumWhere(mask *DenseArray) (Value, error) {
 	}
 }
 
+func (a *DenseArray) MeanWhere(mask *DenseArray) (Value, error) {
+	if a == nil || mask == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return NilValue(), fmt.Errorf("dense array meanWhere mask must be bool")
+	}
+	if a.Len() != mask.Len() {
+		return NilValue(), ErrDenseArrayLength
+	}
+	sum := 0.0
+	count := 0
+	switch a.dtype {
+	case DenseArrayF64:
+		for i, keep := range mask.bools {
+			if keep {
+				sum += a.f64[i]
+				count++
+			}
+		}
+	case DenseArrayI64:
+		for i, keep := range mask.bools {
+			if keep {
+				sum += float64(a.i64[i])
+				count++
+			}
+		}
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+	if count == 0 {
+		return NilValue(), ErrDenseArrayEmpty
+	}
+	return FloatValue(sum / float64(count)), nil
+}
+
 func (a *DenseArray) MinWhere(mask *DenseArray) (Value, error) {
 	return a.extremeWhere(mask, false)
 }

@@ -217,6 +217,7 @@ Current API contract:
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
 | `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |
 | `soa.minWhere(s, column, mask)` | Returns the minimum numeric dense-column value over mask-true rows. |
+| `soa.meanWhere(s, column, mask)` | Returns the mean numeric dense-column value over mask-true rows. |
 | `soa.maxWhere(s, column, mask)` | Returns the maximum numeric dense-column value over mask-true rows. |
 | `soa.countWhere(s, mask)` | Counts mask-true rows without compacting all columns first. |
 

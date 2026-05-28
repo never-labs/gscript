@@ -426,6 +426,14 @@ func (s *SoA) MinWhere(columnName string, mask *DenseArray) (Value, error) {
 	return col.MinWhere(mask)
 }
 
+func (s *SoA) MeanWhere(columnName string, mask *DenseArray) (Value, error) {
+	col, err := s.maskedAggregateColumn("soa meanWhere", columnName, mask)
+	if err != nil {
+		return NilValue(), err
+	}
+	return col.MeanWhere(mask)
+}
+
 func (s *SoA) MaxWhere(columnName string, mask *DenseArray) (Value, error) {
 	col, err := s.maskedAggregateColumn("soa maxWhere", columnName, mask)
 	if err != nil {

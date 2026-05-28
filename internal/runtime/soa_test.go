@@ -92,6 +92,7 @@ compacted := soa.compact(points, []bool{false, true, true})
 gathered := soa.gather(points, []i64{3, 1})
 maskedSum := soa.sumWhere(points, "x", []bool{true, false, true})
 maskedMin := soa.minWhere(points, "x", []bool{true, false, true})
+maskedMean := soa.meanWhere(points, "x", []bool{true, false, true})
 maskedMax := soa.maxWhere(points, "x", []bool{true, false, true})
 maskedCount := soa.countWhere(points, []bool{true, false, true})
 `); err != nil {
@@ -121,6 +122,9 @@ maskedCount := soa.countWhere(points, []bool{true, false, true})
 	}
 	if got := interp.GetGlobal("maskedMin"); !got.IsFloat() || got.Float() != 1 {
 		t.Fatalf("maskedMin = %v, want 1", got)
+	}
+	if got := interp.GetGlobal("maskedMean"); !got.IsFloat() || got.Float() != 2 {
+		t.Fatalf("maskedMean = %v, want 2", got)
 	}
 	if got := interp.GetGlobal("maskedMax"); !got.IsFloat() || got.Float() != 3 {
 		t.Fatalf("maskedMax = %v, want 3", got)
@@ -265,6 +269,13 @@ func TestSoASliceFilterAndUnzipCopyColumns(t *testing.T) {
 	if !min.IsFloat() || min.Float() != 1 {
 		t.Fatalf("MinWhere = %s, want 1", min.String())
 	}
+	mean, err := s.MeanWhere("x", mask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !mean.IsFloat() || mean.Float() != 2 {
+		t.Fatalf("MeanWhere = %s, want 2", mean.String())
+	}
 	max, err := s.MaxWhere("x", mask)
 	if err != nil {
 		t.Fatal(err)
@@ -303,6 +314,7 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	sum := lib.RawGetString("sum").GoFunction()
 	sumWhere := lib.RawGetString("sumWhere").GoFunction()
 	minWhere := lib.RawGetString("minWhere").GoFunction()
+	meanWhere := lib.RawGetString("meanWhere").GoFunction()
 	maxWhere := lib.RawGetString("maxWhere").GoFunction()
 	countWhere := lib.RawGetString("countWhere").GoFunction()
 	if unzip == nil || unzip.FastArg1 == nil {
@@ -340,6 +352,9 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if minWhere == nil || minWhere.FastArg3 == nil {
 		t.Fatal("soa.minWhere FastArg3 is nil")
+	}
+	if meanWhere == nil || meanWhere.FastArg3 == nil {
+		t.Fatal("soa.meanWhere FastArg3 is nil")
 	}
 	if maxWhere == nil || maxWhere.FastArg3 == nil {
 		t.Fatal("soa.maxWhere FastArg3 is nil")
@@ -407,6 +422,13 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if got.Number() != 13 {
 		t.Fatalf("soa.minWhere FastArg3 = %s, want 13", got.String())
+	}
+	got, err = meanWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number() != 25 {
+		t.Fatalf("soa.meanWhere FastArg3 = %s, want 25", got.String())
 	}
 	got, err = maxWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {

@@ -73,6 +73,7 @@ check("compact/filter keeps alignment", soa.len(moving) == 3 && soa.column(movin
 // when the compacted rows are not needed downstream.
 check("masked aggregate sumWhere", soa.sumWhere(points, "velocity", movingMask) == 70)
 check("masked aggregate minWhere", soa.minWhere(points, "velocity", movingMask) == 10)
+check("masked aggregate meanWhere", soa.meanWhere(points, "velocity", movingMask) == 70 / 3)
 check("masked aggregate maxWhere", soa.maxWhere(points, "velocity", movingMask) == 40)
 check("masked aggregate countWhere", soa.countWhere(points, movingMask) == 3)
 
