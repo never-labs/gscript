@@ -45,7 +45,7 @@ func MatrixLowerPass(fn *Function) (*Function, error) {
 		// Check if block has any OpMatrixGetF/OpMatrixSetF to lower.
 		needsRewrite := false
 		for _, instr := range block.Instrs {
-			if instr.Op == OpMatrixGetF || instr.Op == OpMatrixSetF {
+			if _, ok := matrixLoweredOp(instr.Op); ok {
 				needsRewrite = true
 				break
 			}
@@ -60,8 +60,13 @@ func MatrixLowerPass(fn *Function) (*Function, error) {
 		// INSERT the Flat/Stride ops before it.
 		newInstrs := make([]*Instr, 0, len(block.Instrs)+2*len(block.Instrs))
 		for _, instr := range block.Instrs {
-			switch instr.Op {
-			case OpMatrixGetF:
+			lowered, ok := matrixLoweredOp(instr.Op)
+			if !ok {
+				newInstrs = append(newInstrs, instr)
+				continue
+			}
+			switch lowered {
+			case OpMatrixLoadFAt:
 				if len(instr.Args) < 3 {
 					newInstrs = append(newInstrs, instr)
 					continue
@@ -78,10 +83,10 @@ func MatrixLowerPass(fn *Function) (*Function, error) {
 				// pipeline did NOT absorb, measuring 0.037 vs R45's
 				// 0.035 median. Keep R45 form; RowPtr ops remain
 				// available for future 3D-tensor work or hand-specializations.
-				instr.Op = OpMatrixLoadFAt
+				instr.Op = lowered
 				instr.Args = []*Value{flat.Value(), stride.Value(), i, j}
 				newInstrs = append(newInstrs, instr)
-			case OpMatrixSetF:
+			case OpMatrixStoreFAt:
 				if len(instr.Args) < 4 {
 					newInstrs = append(newInstrs, instr)
 					continue
@@ -92,10 +97,8 @@ func MatrixLowerPass(fn *Function) (*Function, error) {
 				flat.copySourceFrom(instr)
 				stride.copySourceFrom(instr)
 				newInstrs = append(newInstrs, flat, stride)
-				instr.Op = OpMatrixStoreFAt
+				instr.Op = lowered
 				instr.Args = []*Value{flat.Value(), stride.Value(), i, j, v}
-				newInstrs = append(newInstrs, instr)
-			default:
 				newInstrs = append(newInstrs, instr)
 			}
 		}

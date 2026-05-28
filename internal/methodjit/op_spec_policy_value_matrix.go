@@ -14,3 +14,8 @@ var opMatrixNativePolicies = [...]bool{
 	OpMatrixLoadFRowConst:  true,
 	OpMatrixStoreFRowConst: true,
 }
+
+var opMatrixLoweredOpPolicies = [...]Op{
+	OpMatrixGetF: OpMatrixLoadFAt,
+	OpMatrixSetF: OpMatrixStoreFAt,
+}

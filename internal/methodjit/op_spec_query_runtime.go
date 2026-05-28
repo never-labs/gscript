@@ -66,6 +66,11 @@ func isMatrixNativeOp(op Op) bool {
 	return ok && spec.MatrixNative
 }
 
+func matrixLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.MatrixLoweredOp, ok && spec.MatrixLoweredOp != OpMax
+}
+
 func opIsRawCarryClobber(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.RawCarryClobber
