@@ -36,11 +36,7 @@ func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *Numer
 				lens, ok := constStringFieldLensFromPreds(fn, tableShapes, block, get.Args[0].ID, get.Aux)
 				if ok && len(lens) == len(block.Preds) {
 					if allInt64Equal(lens) {
-						instr.Op = OpConstInt
-						instr.Type = TypeInt
-						instr.Args = nil
-						instr.Aux = lens[0]
-						instr.Aux2 = 0
+						rewriteInstrToConstInt(instr, lens[0])
 						functionRemarks(fn).Add("FieldLenFold", "changed", block.ID, instr.ID, instr.Op,
 							"folded len(field) from predecessor constant string stores")
 						continue
@@ -48,11 +44,7 @@ func fieldLenFoldPass(fn *Function, tableShapes *TableShapeFacts, numeric *Numer
 					phi := insertFieldLenPhi(fn, block, lens)
 					if phi != nil {
 						replaceValueUses(fn, instr.ID, phi.Value(), phi.ID)
-						instr.Op = OpNop
-						instr.Type = TypeUnknown
-						instr.Args = nil
-						instr.Aux = 0
-						instr.Aux2 = 0
+						rewriteInstrToNop(instr)
 						functionRemarks(fn).Add("FieldLenFold", "changed", block.ID, phi.ID, phi.Op,
 							"replaced len(field) with predecessor constant string length phi")
 						continue
@@ -174,11 +166,7 @@ func foldExactLenFromMap(fn *Function, block *Block, lenInstr *Instr, lens map[i
 	if !ok || !r.known || r.min != r.max || r.min < 0 {
 		return false
 	}
-	lenInstr.Op = OpConstInt
-	lenInstr.Type = TypeInt
-	lenInstr.Args = nil
-	lenInstr.Aux = r.min
-	lenInstr.Aux2 = 0
+	rewriteInstrToConstInt(lenInstr, r.min)
 	functionRemarks(fn).Add("FieldLenFold", "changed", block.ID, lenInstr.ID, lenInstr.Op,
 		"folded lowered field string length from fixed-shape facts")
 	return true
@@ -198,11 +186,7 @@ func foldProfiledExactLen(fn *Function, tableShapes *TableShapeFacts, block *Blo
 	if !ok || !r.known || r.min != r.max || r.min < 0 {
 		return false
 	}
-	lenInstr.Op = OpConstInt
-	lenInstr.Type = TypeInt
-	lenInstr.Args = nil
-	lenInstr.Aux = r.min
-	lenInstr.Aux2 = 0
+	rewriteInstrToConstInt(lenInstr, r.min)
 	functionRemarks(fn).Add("FieldLenFold", "changed", block.ID, lenInstr.ID, lenInstr.Op,
 		"folded guarded exact string length")
 	return true
@@ -231,11 +215,7 @@ func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr, numeric *Nume
 		lens[i] = r.min
 	}
 	if allInt64Equal(lens) {
-		lenInstr.Op = OpConstInt
-		lenInstr.Type = TypeInt
-		lenInstr.Args = nil
-		lenInstr.Aux = lens[0]
-		lenInstr.Aux2 = 0
+		rewriteInstrToConstInt(lenInstr, lens[0])
 		functionRemarks(fn).Add("FieldLenFold", "changed", block.ID, lenInstr.ID, lenInstr.Op,
 			"folded len(phi(strings)) from guarded exact lengths")
 		return true
@@ -245,11 +225,7 @@ func foldPhiStringLen(fn *Function, block *Block, lenInstr *Instr, numeric *Nume
 		return false
 	}
 	replaceValueUses(fn, lenInstr.ID, lenPhi.Value(), lenPhi.ID)
-	lenInstr.Op = OpNop
-	lenInstr.Type = TypeUnknown
-	lenInstr.Args = nil
-	lenInstr.Aux = 0
-	lenInstr.Aux2 = 0
+	rewriteInstrToNop(lenInstr)
 	functionRemarks(fn).Add("FieldLenFold", "changed", phi.Block.ID, lenPhi.ID, lenPhi.Op,
 		"replaced len(phi(strings)) with guarded string length phi")
 	return true

@@ -27,11 +27,7 @@ func StaticTableLenFoldPass(fn *Function) (*Function, error) {
 			if !ok {
 				continue
 			}
-			instr.Op = OpConstInt
-			instr.Type = TypeInt
-			instr.Args = nil
-			instr.Aux = fact.length
-			instr.Aux2 = 0
+			rewriteInstrToConstInt(instr, fact.length)
 			functionRemarks(fn).Add("StaticTableLenFold", "changed", block.ID, instr.ID, instr.Op,
 				"folded length of SetList-constructed local table")
 		}

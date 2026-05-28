@@ -65,16 +65,10 @@ func globalConstSpecializationPassWith(fn *Function, config GlobalConstSpecializ
 			newInstrs = append(newInstrs, guard)
 			recordGlobalConstDependency(fn, int(instr.Aux), config)
 			if v.IsInt() {
-				instr.Op = OpConstInt
-				instr.Type = TypeInt
-				instr.Aux = v.Int()
+				rewriteInstrToConstInt(instr, v.Int())
 			} else {
-				instr.Op = OpConstFloat
-				instr.Type = TypeFloat
-				instr.Aux = int64(uint64(v))
+				rewriteInstrToConstFloatBits(instr, uint64(v))
 			}
-			instr.Args = nil
-			instr.Aux2 = 0
 			functionRemarks(fn).Add("GlobalConstSpecialization", "changed", block.ID, instr.ID, OpGetGlobal,
 				"guarded numeric global as constant")
 			newInstrs = append(newInstrs, instr)

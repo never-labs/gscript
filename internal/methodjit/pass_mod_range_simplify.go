@@ -39,11 +39,7 @@ func ModRangeSimplifyPassCtx(ctx *PassContext) (*Function, error) {
 				continue
 			}
 			if divisor == 1 {
-				instr.Op = OpConstInt
-				instr.Type = TypeInt
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
+				rewriteInstrToConstInt(instr, 0)
 				functionRemarks(fn).Add("ModRangeSimplify", "changed", block.ID, instr.ID, instr.Op,
 					"folded x % 1 to zero")
 				continue
@@ -54,11 +50,7 @@ func ModRangeSimplifyPassCtx(ctx *PassContext) (*Function, error) {
 				continue
 			}
 			replaceValueUses(fn, instr.ID, lhs, lhs.ID)
-			instr.Op = OpNop
-			instr.Type = TypeUnknown
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
+			rewriteInstrToNop(instr)
 			functionRemarks(fn).Add("ModRangeSimplify", "changed", block.ID, instr.ID, instr.Op,
 				"replaced range-proven x % const with x")
 		}

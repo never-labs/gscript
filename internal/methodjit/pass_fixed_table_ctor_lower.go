@@ -138,11 +138,7 @@ func nextFixedCtorSetField(instrs []*Instr, start, allocID int, constIdx int64) 
 }
 
 func nopInstruction(instr *Instr) {
-	instr.Op = OpNop
-	instr.Type = TypeUnknown
-	instr.Args = nil
-	instr.Aux = 0
-	instr.Aux2 = 0
+	rewriteInstrToNop(instr)
 }
 
 type materializedCtorUse struct {

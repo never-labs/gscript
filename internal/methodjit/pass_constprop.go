@@ -266,18 +266,12 @@ func (cp *constProp) getFloat(v *Value) (float64, bool) {
 
 // rewriteAsConstInt rewrites an instruction to be a ConstInt.
 func (cp *constProp) rewriteAsConstInt(instr *Instr, val int64) {
-	instr.Op = OpConstInt
-	instr.Type = TypeInt
-	instr.Aux = val
-	instr.Args = nil
+	rewriteInstrToConstInt(instr, val)
 	cp.constants[instr.ID] = constVal{isInt: true, intVal: val}
 }
 
 // rewriteAsConstFloat rewrites an instruction to be a ConstFloat.
 func (cp *constProp) rewriteAsConstFloat(instr *Instr, val float64) {
-	instr.Op = OpConstFloat
-	instr.Type = TypeFloat
-	instr.Aux = int64(math.Float64bits(val))
-	instr.Args = nil
+	rewriteInstrToConstFloat(instr, val)
 	cp.constants[instr.ID] = constVal{isInt: false, floatVal: val}
 }

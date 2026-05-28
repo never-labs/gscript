@@ -173,11 +173,7 @@ func forwardFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact)
 				if !fixedShapeReadForwardSafe(block, instr) {
 					continue
 				}
-				instr.Op = OpConstNil
-				instr.Type = TypeNil
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
+				rewriteInstrToConstNil(instr)
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, OpGetField,
 					fmt.Sprintf("forwarded empty fixed-shape field %q to nil", name))
 				continue
@@ -194,11 +190,7 @@ func forwardFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact)
 				if !fixedShapeReadForwardSafe(block, instr) {
 					continue
 				}
-				instr.Op = OpConstNil
-				instr.Type = TypeNil
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
+				rewriteInstrToConstNil(instr)
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, OpGetField,
 					fmt.Sprintf("forwarded fixed-shape field %q to nil", name))
 			case FixedShapeFieldParam:
@@ -217,10 +209,7 @@ func forwardFixedShapeGetFields(fn *Function, facts map[int]FixedShapeTableFact)
 					continue
 				}
 				replaceAllUses(fn, instr.ID, actual.Def)
-				instr.Op = OpNop
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
+				rewriteInstrToNop(instr)
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, OpGetField,
 					fmt.Sprintf("forwarded fixed-shape field %q to call arg %d", name, fieldFact.ParamIndex))
 			}
