@@ -23,7 +23,12 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, numeric *NumericFacts,
 			}
 			factValue := instr.Args[0]
 			keyArgIdx := 1
-			if instr.Op == OpTableArrayLoad {
+			readRole := fixedShapeArrayElementReadRole(instr.Op)
+			writeRole := fixedShapeArrayElementWriteRole(instr.Op)
+			if readRole == OpFixedShapeArrayElementReadNone && writeRole == OpFixedShapeArrayElementWriteSingle {
+				readRole = OpFixedShapeArrayElementReadDirect
+			}
+			if readRole == OpFixedShapeArrayElementReadLoweredArray {
 				if len(instr.Args) < 3 || instr.Args[2] == nil {
 					continue
 				}
@@ -42,8 +47,16 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, numeric *NumericFacts,
 			if !ok || !tableKeyProvenInt(instr.Args[keyArgIdx]) {
 				continue
 			}
-			switch instr.Op {
-			case OpGetTable:
+			switch readRole {
+			case OpFixedShapeArrayElementReadDirect:
+				if writeRole == OpFixedShapeArrayElementWriteSingle {
+					if instr.Aux2 == 0 && fixedShapeSetTableValueMatchesArrayKind(instr, kind) {
+						instr.Aux2 = kind
+						functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+							fmt.Sprintf("table store carries guarded array element kind %d", kind))
+					}
+					continue
+				}
 				if instr.Aux2 == 0 {
 					instr.Aux2 = kind
 				}
@@ -55,7 +68,7 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, numeric *NumericFacts,
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("table value carries guarded array element kind %d", kind))
-			case OpTableArrayLoad:
+			case OpFixedShapeArrayElementReadLoweredArray:
 				if instr.Aux == 0 || instr.Aux == int64(vm.FBKindMixed) {
 					instr.Aux = kind
 					setLoweredTableArrayPipelineKind(instr, kind)
@@ -68,12 +81,6 @@ func annotateFixedShapeArrayElementAccesses(fn *Function, numeric *NumericFacts,
 				}
 				functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 					fmt.Sprintf("lowered table value carries guarded array element kind %d", kind))
-			case OpSetTable:
-				if instr.Aux2 == 0 && fixedShapeSetTableValueMatchesArrayKind(instr, kind) {
-					instr.Aux2 = kind
-					functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
-						fmt.Sprintf("table store carries guarded array element kind %d", kind))
-				}
 			}
 		}
 	}
