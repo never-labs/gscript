@@ -54,6 +54,8 @@ type jitWarmDumpController interface {
 	WriteWarmDump(top *bytecodevm.FuncProto) error
 }
 
+var cliStdin io.Reader = os.Stdin
+
 // sortStrings is a tiny helper shared with platform files to keep them from
 // each importing "sort".
 func sortStrings(s []string) { sort.Strings(s) }
@@ -225,17 +227,29 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	check := fs.Bool("check", false, "check whether files are formatted without writing")
 	write := fs.Bool("write", false, "write formatted files in place")
+	stdinFileName := fs.String("stdin-file-name", "", "read source from stdin and use this filename for diagnostics")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	paths := fs.Args()
-	if len(paths) == 0 {
-		fmt.Fprintln(errw, "usage: gscript fmt [--check] [--write] <path-or-dir> [...]")
+	if len(paths) == 0 && *stdinFileName == "" {
+		fmt.Fprintln(errw, "usage: gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]")
 		return 2
 	}
 	if *check && *write {
 		fmt.Fprintln(errw, "gscript fmt: --check and --write are mutually exclusive")
 		return 2
+	}
+	if *stdinFileName != "" {
+		if len(paths) != 0 {
+			fmt.Fprintln(errw, "gscript fmt: --stdin-file-name cannot be used with path arguments")
+			return 2
+		}
+		if *write {
+			fmt.Fprintln(errw, "gscript fmt: --stdin-file-name cannot be used with --write")
+			return 2
+		}
+		return runFmtStdin(*stdinFileName, *check, outw, errw)
 	}
 
 	writeFiles := *write || !*check
@@ -264,6 +278,31 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 		}
 	}
 	if !ok {
+		return 1
+	}
+	return 0
+}
+
+func runFmtStdin(filename string, check bool, outw, errw io.Writer) int {
+	src, err := io.ReadAll(cliStdin)
+	if err != nil {
+		fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		return 1
+	}
+	formatted, err := formatSource(filename, src)
+	if err != nil {
+		fmt.Fprintf(errw, "%s: %v\n", filename, err)
+		return 1
+	}
+	if check {
+		if !bytes.Equal(src, formatted) {
+			fmt.Fprintf(errw, "%s: not formatted\n", filename)
+			return 1
+		}
+		return 0
+	}
+	if _, err := outw.Write(formatted); err != nil {
+		fmt.Fprintf(errw, "%s: %v\n", filename, err)
 		return 1
 	}
 	return 0

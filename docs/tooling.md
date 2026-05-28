@@ -51,7 +51,8 @@ schema。
   `-coroutine-stats`、`-runtime-path-stats`、`-runtime-path-stats-json`。
 - `gscript test <path-or-dir>` 递归运行 `.gs` 文件，可用同名 `.out` 做
   stdout golden 对比。
-- `gscript fmt [--check] [--write] <path-or-dir> [...]` 解析并规范基础空白。
+- `gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
+  解析并规范基础空白。
 - `gscript lint <path-or-dir> [...]` 解析文件/目录并报告 `GS1001` 词法或
   语法错误。
 
@@ -128,10 +129,16 @@ contract is intentionally narrow:
 - ensure exactly one final newline for non-empty and empty files;
 - refuse to write files that fail lexing or parsing.
 
-Default mode writes changed files in place and prints each changed filename to
-stdout. `--check` reports files that would change without writing. `--write`
+Default file mode writes changed files in place and prints each changed filename
+to stdout. `--check` reports files that would change without writing. `--write`
 is accepted as an explicit spelling of the default write mode. `--check` and
 `--write` are mutually exclusive.
+
+Editor stdin mode is available with `--stdin-file-name FILE`. In this mode
+`gscript fmt --stdin-file-name foo.gs < in.gs` reads source from stdin, uses the
+provided filename for diagnostics, writes the formatted result to stdout, and
+never writes files. `--check --stdin-file-name foo.gs < in.gs` exits non-zero
+and reports `foo.gs: not formatted` when stdin would change.
 
 The AST/parser currently do not expose a complete comment-preserving pretty
 printer. Until that exists, `gscript fmt` remains a whitespace normalizer with
@@ -139,7 +146,7 @@ a clear no-op boundary for AST layout.
 
 ### Gaps
 
-- No AST pretty printer, indentation engine, or editor stdin mode.
+- No AST pretty printer or indentation engine.
 - Unknown comment attachment and AST round-trip fidelity beyond parse success.
 - No formatter golden tests.
 
@@ -156,7 +163,6 @@ P0:
 P1:
 
 - Add comment preservation and idempotence tests.
-- Add `--check` for CI and `--stdin-file-name` for editor/LSP integration.
 
 Suggested CLI:
 

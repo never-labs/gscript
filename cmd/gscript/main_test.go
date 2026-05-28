@@ -176,6 +176,78 @@ func TestFmtWritesWhitespaceNormalization(t *testing.T) {
 	}
 }
 
+func TestFmtStdinWritesFormattedSourceToStdout(t *testing.T) {
+	oldStdin := cliStdin
+	cliStdin = strings.NewReader("x := 1  \r\n\r\n")
+	defer func() { cliStdin = oldStdin }()
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--stdin-file-name", "scratch.gs"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runFmtCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if got, want := stdout.String(), "x := 1\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestFmtStdinCheckReportsUnformattedSource(t *testing.T) {
+	oldStdin := cliStdin
+	cliStdin = strings.NewReader("x := 1 \t\n")
+	defer func() { cliStdin = oldStdin }()
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--check", "--stdin-file-name", "scratch.gs"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runFmtCommand code = %d, want 1", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "scratch.gs: not formatted") {
+		t.Fatalf("stderr = %q, want not formatted diagnostic", stderr.String())
+	}
+}
+
+func TestFmtStdinCheckAcceptsFormattedSource(t *testing.T) {
+	oldStdin := cliStdin
+	cliStdin = strings.NewReader("x := 1\n")
+	defer func() { cliStdin = oldStdin }()
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--check", "--stdin-file-name", "scratch.gs"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runFmtCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestFmtStdinRejectsPathArguments(t *testing.T) {
+	oldStdin := cliStdin
+	cliStdin = strings.NewReader("x := 1\n")
+	defer func() { cliStdin = oldStdin }()
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--stdin-file-name", "scratch.gs", "file.gs"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runFmtCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "--stdin-file-name cannot be used with path arguments") {
+		t.Fatalf("stderr = %q, want stdin/path diagnostic", stderr.String())
+	}
+}
+
 func TestFmtRefusesSyntaxErrors(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.gs")
