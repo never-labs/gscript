@@ -1,5 +1,7 @@
 package methodjit
 
+import "github.com/gscript/gscript/internal/vm"
+
 // LoopRegionVersioningPass recognizes single-entry natural loops whose
 // preheader carries typed table-array facts and whose header branch proves a
 // key is below the table-array len on every continuing iteration.
@@ -23,6 +25,25 @@ package methodjit
 // len. Any miss exits before native execution continues, so the preheader facts
 // remain valid inside the region.
 func LoopRegionVersioningPass(fn *Function) (*Function, error) {
+	var globals map[string]*vm.FuncProto
+	if globalFacts := functionGlobalFacts(fn); globalFacts != nil {
+		globals = globalFacts.GlobalsMap()
+	}
+	return loopRegionVersioningPass(fn, globals)
+}
+
+func LoopRegionVersioningPassCtx(ctx *PassContext) (*Function, error) {
+	if ctx == nil {
+		return nil, nil
+	}
+	var globals map[string]*vm.FuncProto
+	if globalFacts := ctx.Global(); globalFacts != nil {
+		globals = globalFacts.GlobalsMap()
+	}
+	return loopRegionVersioningPass(ctx.Func(), globals)
+}
+
+func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncProto) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -94,7 +115,7 @@ func LoopRegionVersioningPass(fn *Function) (*Function, error) {
 				if !ok {
 					continue
 				}
-				if hazard := loopRegionAliasingHazard(fn, li.headerBlocks[header.ID], fact); hazard != nil {
+				if hazard := loopRegionAliasingHazard(fn, li.headerBlocks[header.ID], fact, seededGlobals); hazard != nil {
 					hazardBlockID := header.ID
 					if hazard.Block != nil {
 						hazardBlockID = hazard.Block.ID
@@ -265,7 +286,7 @@ func loopRegionStructuralHazard(fn *Function, body map[int]bool) (*Instr, bool) 
 	return nil, false
 }
 
-func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArrayFact) *Instr {
+func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArrayFact, seededGlobals map[string]*vm.FuncProto) *Instr {
 	if fn == nil || body == nil || fact.TableID < 0 {
 		return nil
 	}
@@ -280,7 +301,7 @@ func loopRegionAliasingHazard(fn *Function, body map[int]bool, fact LoopTableArr
 			}
 			switch {
 			case opIsTableArrayRegionAliasingCall(instr.Op):
-				if licmLoopCallMayMutateValue(fn, []*Instr{instr}, table) {
+				if licmLoopCallMayMutateValueWithGlobals(fn, []*Instr{instr}, table, seededGlobals) {
 					return instr
 				}
 			case opIsTableArrayRegionAliasingAlways(instr.Op):

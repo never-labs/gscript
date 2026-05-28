@@ -141,13 +141,12 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 			return TableArrayStaticBoundsPass(ctx.Func())
 		}),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
-		tier2PassModuleWithCtxProvidesUpdates("LoopRegionVersioning", Tier2PhaseLoopPost,
+		tier2PassModuleWithCtxProvidesUpdatesOptionalReads("LoopRegionVersioning", Tier2PhaseLoopPost,
 			analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization),
 			analysisFacts(AnalysisFactLoopTableArrayFacts),
 			analysisFacts(AnalysisFactTableArrayBoundsSafe),
-			func(ctx *PassContext) (*Function, error) {
-				return LoopRegionVersioningPass(ctx.Func())
-			}),
+			analysisFacts(AnalysisFactGlobals),
+			LoopRegionVersioningPassCtx),
 		tier2PassModuleWithCtxUpdates("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), analysisFacts(AnalysisFactTableArrayBoundsSafe), func(ctx *PassContext) (*Function, error) {
 			return TableArrayStaticBoundsPass(ctx.Func())
 		}),

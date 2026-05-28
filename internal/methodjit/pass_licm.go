@@ -823,14 +823,18 @@ func insertBlockBefore(fn *Function, blk, target *Block) {
 }
 
 func licmLoopCallMayMutateValue(fn *Function, loopCalls []*Instr, value *Value, seededGlobalsOpt ...map[string]*vm.FuncProto) bool {
-	if value == nil {
-		return true
-	}
 	var seededGlobals map[string]*vm.FuncProto
 	if len(seededGlobalsOpt) > 0 {
 		seededGlobals = seededGlobalsOpt[0]
 	} else if globalFacts := functionGlobalFacts(fn); globalFacts != nil {
 		seededGlobals = globalFacts.GlobalsMap()
+	}
+	return licmLoopCallMayMutateValueWithGlobals(fn, loopCalls, value, seededGlobals)
+}
+
+func licmLoopCallMayMutateValueWithGlobals(fn *Function, loopCalls []*Instr, value *Value, seededGlobals map[string]*vm.FuncProto) bool {
+	if value == nil {
+		return true
 	}
 	for _, call := range loopCalls {
 		if call == nil {
