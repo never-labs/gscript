@@ -369,6 +369,29 @@ func affine_many_kernel(cols, scale, bias) {
 	benchmarkFloatSink = x[len(x)-1]
 }
 
+func BenchmarkSoAStdlibAffineWhere(b *testing.B) {
+	src := `
+func affine_where_kernel(cols, scale, mask, bias) {
+    soa.affineWhere(cols, "x", "vx", scale, mask, bias)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "affine_where_kernel")
+	defer v.Close()
+	soa := mustBenchParticleSoA(b, 32768)
+	mask := runtime.NewDenseArrayBool(makeAlternatingMask(32768))
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.FloatValue(1.00001), runtime.DenseArrayValue(mask), runtime.FloatValue(0.25)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	x, _ := testSoAColumns(b, soa)
+	benchmarkFloatSink = x[len(x)-1]
+}
+
 func BenchmarkSoAStdlibSlice(b *testing.B) {
 	src := `
 func slice_kernel(cols, first, last) {

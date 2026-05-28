@@ -895,6 +895,39 @@ func denseArrayAffine(dst, src *DenseArray, scale, bias float64) error {
 	return nil
 }
 
+func denseArrayAffineWhere(dst, src, mask *DenseArray, scale, bias float64) error {
+	if dst == nil || src == nil || mask == nil {
+		return ErrDenseArrayOperand
+	}
+	if dst.Len() != src.Len() || dst.Len() != mask.Len() {
+		return ErrDenseArrayLength
+	}
+	if mask.dtype != DenseArrayBool {
+		return fmt.Errorf("dense array affineWhere mask must be bool")
+	}
+	if dst.dtype != DenseArrayF64 || src.dtype == DenseArrayBool {
+		return fmt.Errorf("dense array affineWhere requires f64 destination and numeric source")
+	}
+	switch src.dtype {
+	case DenseArrayF64:
+		for i, keep := range mask.bools {
+			if keep {
+				dst.f64[i] = src.f64[i]*scale + bias
+			}
+		}
+	case DenseArrayI64:
+		for i, keep := range mask.bools {
+			if keep {
+				dst.f64[i] = float64(src.i64[i])*scale + bias
+			}
+		}
+	default:
+		return ErrDenseArrayDType
+	}
+	dst.bumpVersion()
+	return nil
+}
+
 func denseArrayFloatAt(a *DenseArray, i int) float64 {
 	switch a.dtype {
 	case DenseArrayF64:

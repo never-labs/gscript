@@ -213,6 +213,7 @@ Current API contract:
 | `soa.gather(s, indices)` | Returns an independent SoA containing rows addressed by a one-based i64 dense index vector. Duplicates and index order are preserved. |
 | `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
 | `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
+| `soa.affineWhere(s, dst, src, scale, mask, bias)` | In-place masked affine kernel that updates only mask-true rows. |
 | `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
 | `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |

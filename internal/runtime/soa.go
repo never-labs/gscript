@@ -349,6 +349,17 @@ func (s *SoA) Affine(dstName, srcName string, scale, bias float64) error {
 	return denseArrayAffine(dst, src, scale, bias)
 }
 
+func (s *SoA) AffineWhere(dstName, srcName string, mask *DenseArray, scale, bias float64) error {
+	dst, src, err := s.numericColumns(dstName, srcName)
+	if err != nil {
+		return err
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return fmt.Errorf("soa affineWhere mask must be a bool dense array")
+	}
+	return denseArrayAffineWhere(dst, src, mask, scale, bias)
+}
+
 func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
 	if s == nil {
 		return fmt.Errorf("soa is nil")

@@ -153,6 +153,8 @@ ok1 := soa.addScaled(points, "x", "vx", 0.5)
 sum1 := soa.sum(points, "x")
 ok2 := soa.affine(points, "x", "vx", 2, 1)
 sum2 := soa.sum(points, "x")
+okWhere := soa.affineWhere(points, "x", "vx", 0.1, []bool{true, false, true}, 1)
+sumWhereUpdate := soa.sum(points, "x")
 ok3 := soa.affineMany(points, {
     {dst: "x", src: "vx", scale: 0.25, bias: 0.5},
     {dst: "y", src: "vy", scale: 10, bias: 1},
@@ -173,6 +175,12 @@ shape := soa.shape(points)
 	}
 	if got := interp.GetGlobal("sum2"); !got.IsFloat() || got.Float() != 123 {
 		t.Fatalf("sum2 = %v, want 123", got)
+	}
+	if got := interp.GetGlobal("okWhere"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("okWhere = %v, want true", got)
+	}
+	if got := interp.GetGlobal("sumWhereUpdate"); !got.IsFloat() || got.Float() != 47 {
+		t.Fatalf("sumWhereUpdate = %v, want 47", got)
 	}
 	if got := interp.GetGlobal("ok3"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("ok3 = %v, want true", got)
@@ -328,6 +336,7 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	gather := lib.RawGetString("gather").GoFunction()
 	addScaled := lib.RawGetString("addScaled").GoFunction()
 	affine := lib.RawGetString("affine").GoFunction()
+	affineWhere := lib.RawGetString("affineWhere").GoFunction()
 	affineMany := lib.RawGetString("affineMany").GoFunction()
 	sum := lib.RawGetString("sum").GoFunction()
 	sumWhere := lib.RawGetString("sumWhere").GoFunction()
@@ -356,6 +365,9 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if affine == nil || affine.FastArg5 == nil {
 		t.Fatal("soa.affine FastArg5 is nil")
+	}
+	if affineWhere == nil || affineWhere.FastArg6 == nil {
+		t.Fatal("soa.affineWhere FastArg6 is nil")
 	}
 	if affineMany == nil || affineMany.FastArg2 == nil {
 		t.Fatal("soa.affineMany FastArg2 is nil")
@@ -414,6 +426,9 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	if got, err := affine.FastArg5(soaValue, StringValue("v"), StringValue("x"), FloatValue(2), FloatValue(1)); err != nil || !got.Bool() {
 		t.Fatalf("soa.affine FastArg5 got=%s err=%v", got.String(), err)
 	}
+	if got, err := affineWhere.FastArg6(soaValue, StringValue("v"), StringValue("x"), FloatValue(0.5), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})), FloatValue(1)); err != nil || !got.Bool() {
+		t.Fatalf("soa.affineWhere FastArg6 got=%s err=%v", got.String(), err)
+	}
 	terms := NewTable()
 	term := NewTable()
 	term.RawSetString("dst", StringValue("x"))
@@ -428,43 +443,43 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Number() != 75 {
-		t.Fatalf("soa.sum FastArg2 = %s, want 75", got.String())
+	if got.Number() != 39 {
+		t.Fatalf("soa.sum FastArg2 = %s, want 39", got.String())
 	}
 	got, err = sumWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Number() != 50 {
-		t.Fatalf("soa.sumWhere FastArg3 = %s, want 50", got.String())
+	if got.Number() != 14 {
+		t.Fatalf("soa.sumWhere FastArg3 = %s, want 14", got.String())
 	}
 	got, err = minWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Number() != 13 {
-		t.Fatalf("soa.minWhere FastArg3 = %s, want 13", got.String())
+	if got.Number() != 4 {
+		t.Fatalf("soa.minWhere FastArg3 = %s, want 4", got.String())
 	}
 	got, err = meanWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Number() != 25 {
-		t.Fatalf("soa.meanWhere FastArg3 = %s, want 25", got.String())
+	if got.Number() != 7 {
+		t.Fatalf("soa.meanWhere FastArg3 = %s, want 7", got.String())
 	}
 	got, err = maxWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Number() != 37 {
-		t.Fatalf("soa.maxWhere FastArg3 = %s, want 37", got.String())
+	if got.Number() != 10 {
+		t.Fatalf("soa.maxWhere FastArg3 = %s, want 10", got.String())
 	}
 	got, err = statsWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Table().RawGetString("mean").Number() != 25 {
-		t.Fatalf("soa.statsWhere FastArg3 mean = %s, want 25", got.Table().RawGetString("mean").String())
+	if got.Table().RawGetString("mean").Number() != 7 {
+		t.Fatalf("soa.statsWhere FastArg3 mean = %s, want 7", got.Table().RawGetString("mean").String())
 	}
 	got, err = countWhere.FastArg2(soaValue, DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {

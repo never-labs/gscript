@@ -23,6 +23,9 @@ func buildSoALib() *Table {
 	setFastArg5 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value, Value, Value, Value) (Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn, FastArg5: fast}))
 	}
+	setFastArg6 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value, Value, Value, Value, Value) (Value, error)) {
+		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn, FastArg6: fast}))
+	}
 
 	set("zip", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
@@ -233,6 +236,27 @@ func buildSoALib() *Table {
 		return []Value{BoolValue(true)}, nil
 	}, soaAffineValue)
 
+	setFastArg6("affineWhere", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.affineWhere", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		dst, src, scale, err := requireSoAKernelArgs("soa.affineWhere", args)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 5 || !args[4].IsDenseArray() {
+			return nil, fmt.Errorf("soa.affineWhere: argument 5 must be a bool dense array")
+		}
+		if len(args) < 6 || !args[5].IsNumber() {
+			return nil, fmt.Errorf("soa.affineWhere: argument 6 must be numeric")
+		}
+		if err := s.AffineWhere(dst, src, args[4].DenseArray(), scale, args[5].Number()); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaAffineWhereValue)
+
 	setFastArg2("affineMany", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.affineMany", args, 0)
 		if err != nil {
@@ -412,6 +436,31 @@ func soaAffineValue(soaValue, dstValue, srcValue, scaleValue, biasValue Value) (
 		return NilValue(), fmt.Errorf("soa.affine: argument 5 must be numeric")
 	}
 	if err := soaValue.SoA().Affine(dstValue.Str(), srcValue.Str(), scaleValue.Number(), biasValue.Number()); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
+func soaAffineWhereValue(soaValue, dstValue, srcValue, scaleValue, maskValue, biasValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.affineWhere: argument 1 must be soa")
+	}
+	if !dstValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.affineWhere: argument 2 must be a string")
+	}
+	if !srcValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.affineWhere: argument 3 must be a string")
+	}
+	if !scaleValue.IsNumber() {
+		return NilValue(), fmt.Errorf("soa.affineWhere: argument 4 must be numeric")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.affineWhere: argument 5 must be a bool dense array")
+	}
+	if !biasValue.IsNumber() {
+		return NilValue(), fmt.Errorf("soa.affineWhere: argument 6 must be numeric")
+	}
+	if err := soaValue.SoA().AffineWhere(dstValue.Str(), srcValue.Str(), maskValue.DenseArray(), scaleValue.Number(), biasValue.Number()); err != nil {
 		return NilValue(), err
 	}
 	return BoolValue(true), nil

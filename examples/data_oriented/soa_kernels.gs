@@ -46,6 +46,9 @@ check("affine", soa.affine(points, "x", "velocity", 2, 1))
 check("affine result", soa.column(points, "x")[3] == 61)
 check("sum", soa.sum(points, "x") == 204)
 
+check("affineWhere", soa.affineWhere(points, "x", "velocity", 0.1, []bool{true, false, true, false}, 1))
+check("affineWhere masked result", soa.column(points, "x")[1] == 2 && soa.column(points, "x")[2] == 41)
+
 check("affineMany", soa.affineMany(points, {
     {dst: "x", src: "velocity", scale: 0.25, bias: 0.5},
     {dst: "y", src: "vy", scale: 10, bias: 1},

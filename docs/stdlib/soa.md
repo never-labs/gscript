@@ -149,6 +149,17 @@ Computes:
 dst[i] = src[i] * scale + bias
 ```
 
+### `soa.affineWhere(s, dst, src, scale, mask, bias) -> true`
+
+Computes the same affine update only for mask-true rows:
+
+```text
+if mask[i] { dst[i] = src[i] * scale + bias }
+```
+
+`dst` must be an f64 column, `src` must be numeric, and `mask` must be a bool
+dense array with the same length as `s`.
+
 ### `soa.affineMany(s, terms) -> true`
 
 Runs multiple independent affine updates in one call:
