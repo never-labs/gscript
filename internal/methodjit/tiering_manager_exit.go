@@ -279,7 +279,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 			var result runtime.Value
 			if tblVal.IsTable() && !tblVal.Table().HasMetatable() {
 				pc := int(ctx.TableKeySlot)
-				if pc >= 0 && pc < len(proto.Code) && vm.DecodeOp(proto.Code[pc]) == vm.OP_GETFIELD {
+				if tier2TableExitFieldCachePC(proto, pc, vm.OP_GETFIELD, constIdx) {
 					ensureFieldCache(proto)
 					ensureFieldPolyCache(proto)
 					result = tblVal.Table().RawGetStringCachedPoly(
@@ -287,7 +287,7 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 						&proto.FieldCache[pc],
 						runtime.FieldPolyCacheSlot(proto.FieldPolyCache, pc),
 					)
-					if proto.FieldAccessFeedback != nil {
+					if proto.FieldAccessFeedback != nil && pc < len(proto.FieldAccessFeedback) {
 						proto.FieldAccessFeedback[pc].ObserveFieldCache(proto.FieldCache[pc], result, 1)
 					}
 					ensureTableStringKeyCache(proto)
@@ -327,10 +327,10 @@ func (tm *TieringManager) executeTableExit(ctx *ExecContext, regs []runtime.Valu
 					}
 					return tm.callVM.TableSetForJIT(tblVal, runtime.StringValue(fieldName), valVal)
 				}
-				if pc >= 0 && pc < len(proto.Code) && vm.DecodeOp(proto.Code[pc]) == vm.OP_SETFIELD {
+				if tier2TableExitFieldCachePC(proto, pc, vm.OP_SETFIELD, constIdx) {
 					ensureFieldCache(proto)
 					tblVal.Table().RawSetStringCached(fieldName, valVal, &proto.FieldCache[pc])
-					if proto.FieldAccessFeedback != nil {
+					if proto.FieldAccessFeedback != nil && pc < len(proto.FieldAccessFeedback) {
 						proto.FieldAccessFeedback[pc].ObserveFieldCache(proto.FieldCache[pc], valVal, 2)
 					}
 				} else {
