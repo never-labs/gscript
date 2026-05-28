@@ -56,6 +56,8 @@ type FuncProto struct {
 	UTF8CodepointSumLoopShape             int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
 	IndexRawSlotFallbackShape             int8                                        // cached __index raw-slot fallback recognition: 0 unknown, 1 yes, -1 no
 	IndexRawSlotFallbackPC                int                                         // start PC for cached raw-slot fallback shape
+	TableIteratorModuloFoldShape          int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
+	TableIteratorModuloFoldSpec           tableIteratorModuloFoldSpec                 // cached table iterator modulo-fold shape when recognized
 	Feedback                              FeedbackVector                              // lazily-initialized per-PC type feedback for Method JIT
 	TableKeyFeedback                      TableKeyFeedbackVector                      // lazily-initialized per-PC table int-key range feedback
 	FieldAccessFeedback                   FieldAccessFeedbackVector                   // lazily-initialized per-PC table field shape feedback

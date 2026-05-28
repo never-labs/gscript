@@ -17,8 +17,28 @@ type tableIteratorModuloFoldSpec struct {
 }
 
 func isTableIteratorModuloFoldProto(p *FuncProto) bool {
-	_, ok := tableIteratorModuloFoldSpecForProto(p)
+	_, ok := cachedTableIteratorModuloFoldSpecForProto(p)
 	return ok
+}
+
+func cachedTableIteratorModuloFoldSpecForProto(p *FuncProto) (tableIteratorModuloFoldSpec, bool) {
+	if p == nil {
+		return tableIteratorModuloFoldSpec{}, false
+	}
+	switch p.TableIteratorModuloFoldShape {
+	case 1:
+		return p.TableIteratorModuloFoldSpec, true
+	case -1:
+		return tableIteratorModuloFoldSpec{}, false
+	}
+	spec, ok := tableIteratorModuloFoldSpecForProto(p)
+	if ok {
+		p.TableIteratorModuloFoldSpec = spec
+		p.TableIteratorModuloFoldShape = 1
+		return spec, true
+	}
+	p.TableIteratorModuloFoldShape = -1
+	return tableIteratorModuloFoldSpec{}, false
 }
 
 func tableIteratorModuloFoldSpecForProto(p *FuncProto) (tableIteratorModuloFoldSpec, bool) {
@@ -155,7 +175,7 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 	if len(args) != 1 || !args[0].IsTable() {
 		return false, nil, nil
 	}
-	spec, ok := tableIteratorModuloFoldSpecForProto(cl.Proto)
+	spec, ok := cachedTableIteratorModuloFoldSpecForProto(cl.Proto)
 	if !ok {
 		return false, nil, nil
 	}
@@ -179,7 +199,7 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 			} else {
 				return false
 			}
-			sum = positiveModInt64(sum+term, mod)
+			sum = (sum + term) % mod
 			count++
 			return true
 		}); !ok {
@@ -197,7 +217,7 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 				} else {
 					return false, nil, nil
 				}
-				sum = positiveModInt64(sum+term, mod)
+				sum = (sum + term) % mod
 				count++
 				key = k
 			}
@@ -212,7 +232,7 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 			} else {
 				return false
 			}
-			sum = positiveModInt64(sum+term, mod)
+			sum = (sum + term) % mod
 			count++
 			return true
 		}); !ok {
@@ -230,7 +250,7 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 				} else {
 					return false, nil, nil
 				}
-				sum = positiveModInt64(sum+term, mod)
+				sum = (sum + term) % mod
 				count++
 				key = k
 			}
@@ -244,7 +264,7 @@ func (vm *VM) runTableIteratorModuloFoldRuntimeSpecialization(cl *Closure, args 
 			if v.RawType() != runtime.TypeInt {
 				return false, nil, nil
 			}
-			sum = positiveModInt64(sum+i*spec.numScale+v.RawInt(), mod)
+			sum = (sum + i*spec.numScale + v.RawInt()) % mod
 			count++
 		}
 	default:

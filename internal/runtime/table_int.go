@@ -302,11 +302,19 @@ func (t *Table) TryPlainArraySort(length int64) bool {
 // path: callers must fall back to ordinary table.insert semantics when it
 // returns false.
 func (t *Table) TryPlainArrayInsert(pos int64, val Value) bool {
+	if t == nil {
+		return false
+	}
+	return t.TryPlainArrayInsertKnownLength(pos, val, int64(t.Length()))
+}
+
+// TryPlainArrayInsertKnownLength is TryPlainArrayInsert for callers that have
+// already computed the table length through the correct semantic path.
+func (t *Table) TryPlainArrayInsertKnownLength(pos int64, val Value, length int64) bool {
 	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil ||
 		t.dmMeta != nil || t.dmStride != 0 || pos < 1 {
 		return false
 	}
-	length := int64(t.Length())
 	if pos > length+1 {
 		return false
 	}
@@ -356,11 +364,19 @@ func (t *Table) TryPlainArrayInsert(pos int64, val Value) bool {
 // metamethod-aware table access. The boolean reports whether the guarded fast
 // path handled the operation.
 func (t *Table) TryPlainArrayRemove(pos int64) (Value, bool) {
+	if t == nil {
+		return NilValue(), false
+	}
+	return t.TryPlainArrayRemoveKnownLength(pos, int64(t.Length()))
+}
+
+// TryPlainArrayRemoveKnownLength is TryPlainArrayRemove for callers that have
+// already computed the table length through the correct semantic path.
+func (t *Table) TryPlainArrayRemoveKnownLength(pos int64, length int64) (Value, bool) {
 	if t == nil || t.mu != nil || t.lazyTree != nil || t.metatable != nil ||
 		t.dmMeta != nil || t.dmStride != 0 {
 		return NilValue(), false
 	}
-	length := int64(t.Length())
 	if length == 0 && pos == 0 {
 		return NilValue(), false
 	}

@@ -106,8 +106,11 @@ func prewarmNewTableCachesForFunction(fn *Function, caches []newTableCacheEntry)
 				if ctor, ok := fixedTableCtorNForInstr(fn.Proto, instr); ok && cacheableSmallCtorN(ctor) {
 					if fixedRecordCtorNCacheableForFunction(fn, instr, ctor) {
 						prewarmFixedRecordNCacheEntry(&caches[instr.ID], ctor, fixedTableCacheBatch, fixedTableSeedValuesForInstr(instr))
+						prewarmFixedTableNSparseSingleNilEntries(&caches[instr.ID], ctor, fixedTableCacheBatch, fixedTableSeedValuesForInstr(instr))
+						prewarmFixedTableNConstNilRuntimeMaskEntries(&caches[instr.ID], ctor, fixedTableCacheBatch, fixedTableSeedValuesForInstr(instr), instr)
 					} else {
 						prewarmFixedTableNCacheEntry(&caches[instr.ID], ctor, fixedTableCacheBatch, fixedTableSeedValuesForInstr(instr))
+						prewarmFixedTableNConstNilRuntimeMaskEntries(&caches[instr.ID], ctor, fixedTableCacheBatch, fixedTableSeedValuesForInstr(instr), instr)
 					}
 				}
 			}
@@ -163,7 +166,7 @@ func prewarmFixedRecordNCacheEntry(entry *newTableCacheEntry, ctor *runtime.Smal
 	seed = normalizeFixedTableSeed(seed, len(ctor.Keys))
 	entry.Values = make([]runtime.Value, batch)
 	for i := range entry.Values {
-		if v, ok := runtime.NewFixedRecordValue(ctor, seed); ok {
+		if v, ok := runtime.NewFixedRecordCacheValue(ctor, seed); ok {
 			entry.Values[i] = v
 		} else {
 			t := runtime.NewTableFromCtorNNonNil(ctor, seed)
@@ -227,6 +230,42 @@ func prewarmFixedTableNSparseSingleNilEntries(entry *newTableCacheEntry, ctor *r
 	for omitted := 0; omitted < n; omitted++ {
 		mask := fixedTableMaskExcept(n, omitted)
 		prewarmFixedTableNMaskCacheEntry(&entry.Sparse[omitted], ctor, mask, batch, seed)
+	}
+}
+
+func prewarmFixedTableNConstNilRuntimeMaskEntries(entry *newTableCacheEntry, ctor *runtime.SmallTableCtorN, batch int, seed []runtime.Value, instr *Instr) {
+	if entry == nil || ctor == nil || ctor.Shape == nil || instr == nil || len(instr.Args) != len(ctor.Keys) || len(ctor.Keys) <= 2 || len(ctor.Keys) > runtime.SmallFieldCap || batch <= 1 {
+		return
+	}
+	n := len(ctor.Keys)
+	seed = normalizeFixedTableSeed(seed, n)
+	mask := fixedTableFullMask(n)
+	hasConstNil := false
+	runtimeNullable := -1
+	for i, arg := range instr.Args {
+		switch {
+		case isConstNilValue(arg):
+			mask &^= uint64(1) << uint(i)
+			hasConstNil = true
+		case fixedTableArgProvenNonNil(arg):
+		default:
+			if runtimeNullable >= 0 {
+				return
+			}
+			runtimeNullable = i
+		}
+	}
+	if !hasConstNil {
+		return
+	}
+	if mask != 0 && mask != fixedTableFullMask(n) {
+		prewarmFixedTableNMaskCacheEntry(fixedTableSparseCacheEntryForMask(entry, mask, n), ctor, mask, batch, seed)
+	}
+	if runtimeNullable >= 0 {
+		runtimeMask := mask &^ (uint64(1) << uint(runtimeNullable))
+		if runtimeMask != 0 && runtimeMask != fixedTableFullMask(n) {
+			prewarmFixedTableNMaskCacheEntry(fixedTableSparseCacheEntryForMask(entry, runtimeMask, n), ctor, runtimeMask, batch, seed)
+		}
 	}
 }
 

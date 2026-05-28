@@ -669,6 +669,9 @@ func build(n) {
 	if fn.IsNil() {
 		t.Fatal("missing global: build")
 	}
+	if _, err := v.CallValue(fn, []runtime.Value{runtime.IntValue(4)}); err != nil {
+		t.Fatalf("warm CallValue: %v", err)
+	}
 
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -706,6 +709,125 @@ func build(n) {
 			continue
 		}
 		if strings.HasPrefix(site.Reason, "NewFixedTable") {
+			t.Fatalf("unexpected NewFixedTable exit at %s pc=%d count=%d reason=%s",
+				site.Proto, site.PC, site.Count, site.Reason)
+		}
+	}
+}
+
+func TestTier2_FixedRecordRuntimeNilSparsePathNoNewFixedExit(t *testing.T) {
+	src := `
+func build(n) {
+    prev := nil
+    last := nil
+    for i := 1; i <= n; i++ {
+        obj := {id: i, tag: "node", value: i, left: prev}
+        prev = obj
+        last = obj
+    }
+    return last
+}
+`
+	top := compileProto(t, src)
+	build := findProtoByName(top, "build")
+	if build == nil {
+		t.Fatal("build proto not found")
+	}
+
+	globals := runtime.NewInterpreterGlobals()
+	v := vm.New(globals)
+	defer v.Close()
+	if _, err := v.Execute(top); err != nil {
+		t.Fatalf("execute top: %v", err)
+	}
+	fn := v.GetGlobal("build")
+	if fn.IsNil() {
+		t.Fatal("missing global: build")
+	}
+	if _, err := v.CallValue(fn, []runtime.Value{runtime.IntValue(40)}); err != nil {
+		t.Fatalf("warm CallValue: %v", err)
+	}
+
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	if err := tm.CompileTier2(build); err != nil {
+		t.Fatalf("CompileTier2(build): %v", err)
+	}
+
+	got, err := v.CallValue(fn, []runtime.Value{runtime.IntValue(200)})
+	if err != nil {
+		t.Fatalf("CallValue: %v", err)
+	}
+	if len(got) != 1 || !got[0].IsTable() {
+		t.Fatalf("CallValue returned %v, want one table", got)
+	}
+
+	stats := tm.ExitStats()
+	for _, site := range stats.Sites {
+		if site.ExitName == "ExitTableExit" && strings.HasPrefix(site.Reason, "NewFixedTable") {
+			t.Fatalf("unexpected NewFixedTable exit at %s pc=%d count=%d reason=%s",
+				site.Proto, site.PC, site.Count, site.Reason)
+		}
+	}
+}
+
+func TestTier2_FixedRecordRuntimeNilObjectGraphNoNewFixedExit(t *testing.T) {
+	src := `
+func build(n) {
+    prev := nil
+    last := nil
+    for i := 1; i <= n; i++ {
+        obj := {id: i, tag: "node", value: i, left: prev}
+        if prev != nil {
+            prev.right = obj
+        }
+        prev = obj
+        last = obj
+    }
+    return last
+}
+`
+	top := compileProto(t, src)
+	build := findProtoByName(top, "build")
+	if build == nil {
+		t.Fatal("build proto not found")
+	}
+
+	globals := runtime.NewInterpreterGlobals()
+	v := vm.New(globals)
+	defer v.Close()
+	if _, err := v.Execute(top); err != nil {
+		t.Fatalf("execute top: %v", err)
+	}
+	fn := v.GetGlobal("build")
+	if fn.IsNil() {
+		t.Fatal("missing global: build")
+	}
+	if _, err := v.CallValue(fn, []runtime.Value{runtime.IntValue(40)}); err != nil {
+		t.Fatalf("warm CallValue: %v", err)
+	}
+
+	tm := NewTieringManager()
+	v.SetMethodJIT(tm)
+	if err := tm.CompileTier2(build); err != nil {
+		t.Fatalf("CompileTier2(build): %v", err)
+	}
+
+	const trips = 200
+	got, err := v.CallValue(fn, []runtime.Value{runtime.IntValue(trips)})
+	if err != nil {
+		t.Fatalf("CallValue: %v", err)
+	}
+	if len(got) != 1 || !got[0].IsTable() {
+		t.Fatalf("CallValue returned %v, want one table", got)
+	}
+	if v, want := got[0].Table().RawGetString("id"), runtime.IntValue(trips); !v.Equal(want) {
+		t.Fatalf("last.id = %v, want %v", v, want)
+	}
+
+	stats := tm.ExitStats()
+	for _, site := range stats.Sites {
+		if site.ExitName == "ExitTableExit" && strings.HasPrefix(site.Reason, "NewFixedTable") {
 			t.Fatalf("unexpected NewFixedTable exit at %s pc=%d count=%d reason=%s",
 				site.Proto, site.PC, site.Count, site.Reason)
 		}

@@ -737,7 +737,7 @@ func (vm *VM) RegisterTableProxyLib() {
 			return err
 		}
 		if !hasPos {
-			if t.Table().TryPlainArrayInsert(int64(length+1), value) {
+			if t.Table().TryPlainArrayInsertKnownLength(int64(length+1), value, int64(length)) {
 				return nil
 			}
 			return vm.tableSet(t, runtime.IntValue(length+1), value)
@@ -746,7 +746,7 @@ func (vm *VM) RegisterTableProxyLib() {
 		if pos < 1 || pos > length+1 {
 			return fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
 		}
-		if t.Table().TryPlainArrayInsert(pos, value) {
+		if t.Table().TryPlainArrayInsertKnownLength(pos, value, int64(length)) {
 			return nil
 		}
 		for i := length; i >= pos; i-- {
@@ -778,7 +778,7 @@ func (vm *VM) RegisterTableProxyLib() {
 		if pos == length+1 {
 			return runtime.NilValue(), nil
 		}
-		if removed, ok := t.Table().TryPlainArrayRemove(pos); ok {
+		if removed, ok := t.Table().TryPlainArrayRemoveKnownLength(pos, int64(length)); ok {
 			return removed, nil
 		}
 		removed, err := vm.tableGet(t, runtime.IntValue(pos))
