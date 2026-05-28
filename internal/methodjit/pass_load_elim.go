@@ -130,11 +130,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				if origID, ok := constAvail[key]; ok {
 					if origInstr := instrByID[origID]; origInstr != nil {
 						replaceAllUses(fn, instr.ID, origInstr)
-						instr.Op = OpNop
-						instr.Args = nil
-						instr.Aux = 0
-						instr.Aux2 = 0
-						instr.Type = TypeUnknown
+						rewriteInstrToNop(instr)
 						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, key.op,
 							"reused earlier same-block constant")
 					}
@@ -146,11 +142,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 			if !handled && loadElimPureCSE(instr) {
 				if instr.Op == OpNumToFloat && redundantNumToFloatArg(instr) {
 					replaceAllUses(fn, instr.ID, instr.Args[0].Def)
-					instr.Op = OpNop
-					instr.Args = nil
-					instr.Aux = 0
-					instr.Aux2 = 0
-					instr.Type = TypeUnknown
+					rewriteInstrToNop(instr)
 					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, OpNumToFloat,
 						"removed numeric-to-float conversion of statically-float value")
 				} else if key, ok := pureTypedCSEKey(instr); ok {
@@ -267,9 +259,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 							functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
 								"guard proven by producer type")
 						}
-						instr.Op = OpNop
-						instr.Args = nil
-						instr.Aux = 0
+						rewriteInstrToNop(instr)
 						continue
 					}
 					key := guardKey{argID: instr.Args[0].ID, guardType: instr.Aux}
@@ -281,9 +271,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 							"reused earlier GuardType result")
 						// Guards are side-effecting so DCE won't remove them.
 						// Convert to Nop to make the redundant guard dead.
-						instr.Op = OpNop
-						instr.Args = nil
-						instr.Aux = 0
+						rewriteInstrToNop(instr)
 					} else {
 						guardAvail[key] = instr.ID
 					}
@@ -291,11 +279,7 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 				case OpGuardGlobalConst:
 					key := globalConstGuardKey{constIdx: instr.Aux, value: instr.Aux2}
 					if globalConstGuardAvail[key] {
-						instr.Op = OpNop
-						instr.Args = nil
-						instr.Aux = 0
-						instr.Aux2 = 0
-						instr.Type = TypeUnknown
+						rewriteInstrToNop(instr)
 						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, OpGuardGlobalConst,
 							"removed redundant global const guard")
 					} else {
@@ -732,11 +716,7 @@ func cleanupProducerProvenGuards(fn *Function) {
 				functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, OpGuardType,
 					"guard proven after cross-block field forwarding")
 			}
-			instr.Op = OpNop
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
-			instr.Type = TypeUnknown
+			rewriteInstrToNop(instr)
 		}
 	}
 }

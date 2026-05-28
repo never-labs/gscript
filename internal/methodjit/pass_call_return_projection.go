@@ -52,18 +52,10 @@ func callReturnProjectionPass(fn *Function, callFacts *CallFacts, tableShapes *T
 				}
 				instr.Op = fieldCallFloorOp
 				instr.Args = append([]*Value(nil), instr.Args[1:]...)
-				calleeLoad.Op = OpNop
-				calleeLoad.Type = TypeUnknown
-				calleeLoad.Args = nil
-				calleeLoad.Aux = 0
-				calleeLoad.Aux2 = 0
+				rewriteInstrToNop(calleeLoad)
 			}
 			replaceValueUses(fn, next.ID, instr.Value(), instr.ID)
-			next.Op = OpNop
-			next.Type = TypeUnknown
-			next.Args = nil
-			next.Aux = 0
-			next.Aux2 = 0
+			rewriteInstrToNop(next)
 			functionRemarks(fn).Add("CallReturnProjection", "changed", block.ID, instr.ID, instr.Op,
 				"folded single-use call result into floor projection")
 		}

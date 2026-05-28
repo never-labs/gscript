@@ -39,11 +39,7 @@ func FieldSvalsCSEPass(fn *Function) (*Function, error) {
 			key := fieldSvalsLowerKey{tableID: instr.Args[0].ID, shapeID: uint32(instr.Aux)}
 			if prev := available[key]; prev != nil {
 				replaceValueUses(fn, instr.ID, prev.Value(), prev.ID)
-				instr.Op = OpNop
-				instr.Type = TypeUnknown
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
+				rewriteInstrToNop(instr)
 				changed = true
 				functionRemarks(fn).Add("FieldSvalsCSE", "changed", block.ID, prev.ID, prev.Op,
 					fmt.Sprintf("reused svals v%d for table v%d shape %d", prev.ID, key.tableID, key.shapeID))
@@ -51,11 +47,7 @@ func FieldSvalsCSEPass(fn *Function) (*Function, error) {
 			}
 			if prev := findReusableCrossBlockFieldSvals(fn, dom, seen, block, instr, key); prev != nil {
 				replaceValueUses(fn, instr.ID, prev.Value(), prev.ID)
-				instr.Op = OpNop
-				instr.Type = TypeUnknown
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
+				rewriteInstrToNop(instr)
 				changed = true
 				functionRemarks(fn).Add("FieldSvalsCSE", "changed", block.ID, prev.ID, prev.Op,
 					fmt.Sprintf("reused dominating svals v%d for table v%d shape %d", prev.ID, key.tableID, key.shapeID))

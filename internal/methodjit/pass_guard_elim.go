@@ -14,11 +14,7 @@ func RedundantGuardEliminationPass(fn *Function) (*Function, error) {
 				arg := instr.Args[0]
 				if arg != nil && arg.Def != nil && arg.Def.Type == TypeBool {
 					replaceAllUses(fn, instr.ID, arg.Def)
-					instr.Op = OpNop
-					instr.Args = nil
-					instr.Aux = 0
-					instr.Aux2 = 0
-					instr.Type = TypeUnknown
+					rewriteInstrToNop(instr)
 				}
 				continue
 			}
@@ -36,22 +32,14 @@ func RedundantGuardEliminationPass(fn *Function) (*Function, error) {
 			if guardType == TypeFloat && arg.Def.Op == OpGetField && countValueUses(fn, arg.ID) == 1 {
 				arg.Def.Type = TypeFloat
 				replaceAllUses(fn, instr.ID, arg.Def)
-				instr.Op = OpNop
-				instr.Args = nil
-				instr.Aux = 0
-				instr.Aux2 = 0
-				instr.Type = TypeUnknown
+				rewriteInstrToNop(instr)
 				continue
 			}
 			if arg.Def.Type != guardType {
 				continue
 			}
 			replaceAllUses(fn, instr.ID, arg.Def)
-			instr.Op = OpNop
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
-			instr.Type = TypeUnknown
+			rewriteInstrToNop(instr)
 		}
 	}
 	return fn, nil

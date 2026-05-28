@@ -50,11 +50,7 @@ func fieldPolyLenPhiPass(fn *Function, tableShapes *TableShapeFacts) (*Function,
 				continue
 			}
 			replaceValueUses(fn, instr.ID, repl, repl.ID)
-			instr.Op = OpNop
-			instr.Type = TypeUnknown
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
+			rewriteInstrToNop(instr)
 			changed = true
 			functionRemarks(fn).Add("FieldPolyLenPhi", "changed", block.ID, instr.ID, instr.Op,
 				fmt.Sprintf("replaced polymorphic field length with shape-controlled value v%d", repl.ID))

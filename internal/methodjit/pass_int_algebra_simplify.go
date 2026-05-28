@@ -40,11 +40,7 @@ func IntAlgebraSimplifyPassCtx(ctx *PassContext) (*Function, error) {
 				continue
 			}
 			replaceValueUses(fn, instr.ID, base, instr.ID)
-			instr.Op = OpNop
-			instr.Type = TypeUnknown
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
+			rewriteInstrToNop(instr)
 			functionRemarks(fn).Add("IntAlgebraSimplify", "changed", block.ID, instr.ID, instr.Op,
 				"removed cancelling checked integer add/sub pair")
 		}

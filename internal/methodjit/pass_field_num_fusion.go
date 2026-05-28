@@ -42,11 +42,7 @@ func FieldNumToFloatFusionPass(fn *Function) (*Function, error) {
 			get.Op = lowered
 			get.Type = TypeFloat
 			replaceValueUses(fn, instr.ID, get.Value(), get.ID)
-			instr.Op = OpNop
-			instr.Type = TypeUnknown
-			instr.Args = nil
-			instr.Aux = 0
-			instr.Aux2 = 0
+			rewriteInstrToNop(instr)
 			functionRemarks(fn).Add("FieldNumFusion", "changed", block.ID, get.ID, get.Op,
 				"fused GetField with NumToFloat at original field-load position")
 		}

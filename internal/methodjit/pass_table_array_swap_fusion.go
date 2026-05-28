@@ -40,11 +40,7 @@ func fuseTableArraySwapsInBlock(fn *Function, block *Block, uses map[int]int) {
 
 		loadB := block.Instrs[loadBIdx]
 		lowered, _ := tableArraySwapLoweredOp(loadB.Op)
-		loadB.Op = lowered
-		loadB.Type = TypeUnknown
-		loadB.Args = []*Value{table, loadA.Args[0], loadA.Args[1], loadA.Args[2], loadB.Args[2]}
-		loadB.Aux = loadA.Aux
-		loadB.Aux2 = 0
+		rewriteInstr(loadB, lowered, TypeUnknown, []*Value{table, loadA.Args[0], loadA.Args[1], loadA.Args[2], loadB.Args[2]}, loadA.Aux, 0)
 		loadB.copySourceFrom(loadA)
 
 		nopTableArraySwapMember(loadA)
@@ -59,11 +55,7 @@ func nopTableArraySwapMember(instr *Instr) {
 	if instr == nil {
 		return
 	}
-	instr.Op = OpNop
-	instr.Args = nil
-	instr.Type = TypeUnknown
-	instr.Aux = 0
-	instr.Aux2 = 0
+	rewriteInstrToNop(instr)
 }
 
 func tableArraySwapLoadCandidate(instr *Instr) bool {

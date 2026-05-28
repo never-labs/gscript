@@ -92,13 +92,9 @@ func promoteClosureUpvalueInLoop(fn *Function, header, body *Block) {
 		}
 		insertHeaderPhi(header, phi)
 		replaceAllUses(fn, get.ID, phi)
-		get.Op = OpNop
-		get.Args = nil
-		get.Type = TypeUnknown
+		rewriteInstrToNop(get)
 		if inlinedClosureValueDoesNotEscape(fn, set.Args[closureArg]) {
-			set.Op = OpNop
-			set.Args = nil
-			set.Type = TypeUnknown
+			rewriteInstrToNop(set)
 			functionRemarks(fn).Add("ClosureUpvalueScalar", "changed", body.ID, set.ID, OpSetUpval,
 				"removed dead inlined closure upvalue store for non-escaping closure")
 		}

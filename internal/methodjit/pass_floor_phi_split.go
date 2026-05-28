@@ -27,9 +27,7 @@ func FloorPhiSplitPass(fn *Function) (*Function, error) {
 					continue
 				}
 				replaceValueUses(fn, instr.ID, repl.Value(), repl.ID)
-				instr.Op = OpNop
-				instr.Type = TypeUnknown
-				instr.Args = nil
+				rewriteInstrToNop(instr)
 				functionRemarks(fn).Add("FloorPhiSplit", "changed", block.ID, instr.ID, OpFloor,
 					"pushed floor through numeric phi")
 				changed = true
