@@ -1036,14 +1036,12 @@ func relinkValueDefs(fn *Function) {
 // constant pool. Since the callee has its own constant pool, we need to
 // copy constants to the caller's pool when necessary.
 //
-// For OpConstString and OpGetGlobal, the Aux is a constant pool index.
-// We copy the referenced constant from the callee's pool to the caller's.
+// Const-pool user ops carry an Aux index into the callee's pool. Copy the
+// referenced constant into the caller's pool and return the caller index.
 func remapAux(ci *Instr, callerFn *Function, calleeFn *Function) int64 {
-	switch ci.Op {
-	case OpConstString, OpGetGlobal, OpSetGlobal, OpGetField, OpSetField:
-		// These ops use Aux as a constant pool index into the callee's pool.
+	if instrUsesConstPool(ci) {
 		calleeIdx := int(ci.Aux)
-		if calleeFn.Proto == nil || calleeIdx < 0 || calleeIdx >= len(calleeFn.Proto.Constants) {
+		if calleeFn.Proto == nil || callerFn.Proto == nil || calleeIdx < 0 || calleeIdx >= len(calleeFn.Proto.Constants) {
 			return ci.Aux
 		}
 		calleeConst := calleeFn.Proto.Constants[calleeIdx]
@@ -1054,10 +1052,12 @@ func remapAux(ci *Instr, callerFn *Function, calleeFn *Function) int64 {
 				return int64(j)
 			}
 		}
-		// Append to caller's constant pool.
 		newIdx := len(callerFn.Proto.Constants)
 		callerFn.Proto.Constants = append(callerFn.Proto.Constants, calleeConst)
 		return int64(newIdx)
+	}
+
+	switch ci.Op {
 	case OpClosure:
 		calleeIdx := int(ci.Aux)
 		if calleeFn.Proto == nil || callerFn.Proto == nil || calleeIdx < 0 || calleeIdx >= len(calleeFn.Proto.Protos) {

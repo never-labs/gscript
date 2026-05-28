@@ -10,6 +10,11 @@ var opConstPoolUserPolicies = [...]bool{
 	OpStringSplitSubstr:       true,
 	OpStringSplitSubstrNumber: true,
 	OpGuardConstString:        true,
+	OpGetGlobal:               true,
+	OpSetGlobal:               true,
+	OpGetField:                true,
+	OpGetFieldNumToFloat:      true,
+	OpSetField:                true,
 }
 
 var opRawStringResultPolicies = [...]bool{

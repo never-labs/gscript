@@ -9,7 +9,11 @@ func TestStringUnrollContractsLiveInOpSpec(t *testing.T) {
 	if lowered, ok := stringEnumCompareLoweredOp(OpEqInt); ok || lowered != OpMax {
 		t.Fatalf("EqInt enum lowered op = %s, %v; want OpMax, false", lowered, ok)
 	}
-	for _, op := range []Op{OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen, OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber, OpGuardConstString} {
+	for _, op := range []Op{
+		OpConstString, OpStringConstLookup, OpStringFormatInt, OpStringFormatConst, OpStringFormatConstLen,
+		OpStringSplitPart, OpStringSplitSubstr, OpStringSplitSubstrNumber, OpGuardConstString,
+		OpGetGlobal, OpSetGlobal, OpGetField, OpGetFieldNumToFloat, OpSetField,
+	} {
 		spec, ok := op.Spec()
 		if !ok || !spec.ConstPoolUser || !instrUsesConstPool(&Instr{Op: op}) {
 			t.Fatalf("%s const-pool contract should be driven by OpSpec", op)
