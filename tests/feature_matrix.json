@@ -267,6 +267,20 @@
       "perf_hot_case": {"status": "partial", "refs": ["benchmarks/official_hot/stdlib_host_hot.gs", "benchmarks/extended/json_table_walk.gs"]}
     },
     {
+      "id": "sandbox_capabilities_module_loading",
+      "name": "Sandbox capabilities, filesystem root, and module loading policy",
+      "category": "embedding-security",
+      "spec_sections": ["Modules, Loading, And Scope", "Numbers, Strings, And Stdlib", "Intentional Differences From Lua"],
+      "parser": {"status": "not_applicable", "refs": []},
+      "bytecode": {"status": "not_applicable", "refs": []},
+      "interpreter": {"status": "covered", "refs": ["gscript/gscript_test.go", "docs/security.md", "docs/embedding.md", "docs/stdlib.md"]},
+      "tier1": {"status": "semantic_only", "refs": []},
+      "tier2": {"status": "semantic_only", "refs": []},
+      "semantic_gate": {"status": "covered", "refs": ["gscript/gscript_test.go", "docs/test-matrix.md"]},
+      "official_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "not_applicable", "refs": []}
+    },
+    {
       "id": "matrix_dense_arrays",
       "name": "Dense arrays and matrix helpers",
       "category": "runtime-extension",

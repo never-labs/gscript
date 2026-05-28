@@ -45,6 +45,21 @@
 
 生产级标准库需要一层统一的 capability policy：
 
+- `LibFlags` 只控制标准库表是否出现在全局环境、是否能通过内建
+  `require(name)` 取得；它不代表脚本拥有对应宿主资源权限。
+- `CapabilityFlags` 控制已经可见的脚本 API 是否能触达宿主效果。当前
+  公共能力位是 `CapModuleLoading` 和 `CapFilesystem`：前者控制
+  `require` 是否能从宿主文件系统加载 `.gs` 文件，后者控制 `fs`、
+  `dofile`、`loadfile` 等脚本侧文件 API。
+- `WithSandbox()` 等价于选择 `LibSafe` 并关闭宿主文件系统能力
+  (`CapSafe`)。因此安全内建模块仍可 `require("json")`，但文件模块
+  `require("helper")`、`fs`、`dofile`、`loadfile` 默认不可用。
+- `WithFilesystemRoot(root)` 会启用文件系统能力并把脚本侧路径限制在
+  `root` 内；相对路径在 root 内解析，清理后的绝对路径不得等于 root
+  外部位置。当前 root confinement 主要防 `..`/绝对路径逃逸，符号链接
+  解析、读写根拆分、特殊文件拒绝和大小限制仍是生产路线项目。
+- `WithModuleLoading(false)` 只关闭文件系统 `.gs` 模块加载；启用的内建
+  标准库模块仍可通过 `require` 获得。
 - `fs`、`os.remove`、`os.rename`、`process.run`、`process.shell`、`http.listen`、`net/http client`、`debug.goStack`、`debug.globals` 应可按 interpreter 禁用或限制。
 - 默认 CLI 可以保持当前完整能力；embedded runtime 应允许最小权限启动，再按模块或函数授予。
 - 所有后台 server、subprocess、timer、goroutine/channel 都必须有可关闭句柄或可取消 context，测试结束不得留下宿主资源。

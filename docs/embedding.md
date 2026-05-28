@@ -24,7 +24,10 @@ extensions:
 - Globals: `Set`, `Get`, `SetValue`, and `GetValue`.
 - Go binding: `RegisterFunc`, `RegisterTable`, `BindStruct`, `BindStructWithConstructor`, and `BindMethod`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
-- Options: `WithLibs`, `WithRequirePath`, `WithPrint`, `WithVM`, `WithJIT`, and `WithTracing`.
+- Options: `WithLibs`, `WithCapabilities`, `WithSandbox`,
+  `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRoot`,
+  `WithRequirePath`, `WithMaxSteps`, `WithPrint`, `WithVM`, `WithJIT`, and
+  `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -99,9 +102,25 @@ interpreter and bytecode VM execution.
 ## Sandbox and module-loading audit
 
 `WithLibs` restricts which registered standard-library globals remain
-available. `LibSafe` removes obvious I/O, network, process, debug, script, and
-testkit modules from the public preset. This is a useful compatibility control,
-but it is not a complete security sandbox by itself.
+available. `LibSafe` removes obvious I/O, network, process, debug, script,
+HTTP server, GL, testkit, and other unsafe or host-heavy modules from the
+public preset. This is a useful compatibility control, but it is not a complete
+security sandbox by itself.
+
+The current public API separates library visibility from host effects:
+
+- `LibFlags` answer "is this stdlib table visible and require-able as a
+  built-in module?"
+- `CapabilityFlags` answer "may visible script APIs perform host-backed
+  effects?" The current flags are `CapModuleLoading` and `CapFilesystem`.
+- `WithSandbox()` selects `LibSafe` and `CapSafe`, so filesystem-backed module
+  loading and script-side filesystem APIs are disabled by default.
+- `WithModuleLoading(false)` blocks `.gs` files loaded through `require`, but
+  still allows enabled built-in stdlib modules such as `json`.
+- `WithFilesystem(false)` removes `fs`, `dofile`, and `loadfile`; it does not
+  change which safe built-in tables are present.
+- `WithFilesystemRoot(root)` enables filesystem APIs and confines script-side
+  paths to `root`.
 
 Current sandbox gaps:
 
@@ -111,8 +130,11 @@ Current sandbox gaps:
   duration, or wall-clock time.
 - Context-aware public entry points exist, but cancellation is not yet
   preemptive inside long-running interpreter, bytecode VM, or JIT loops.
-- No public host policy for filesystem, network, process, environment, or
-  module loading beyond coarse stdlib removal.
+- Filesystem policy is currently limited to an on/off capability plus one root
+  confinement directory. There is no read/write split, byte limit, symlink
+  policy, special-file policy, or per-operation audit event.
+- No public host policy for network, process, environment, debug
+  introspection, or host callbacks beyond coarse stdlib removal.
 - No public loader interface for resolving, validating, caching, or auditing
   modules.
 - No explicit isolation contract for host functions registered into a sandbox.
@@ -295,6 +317,14 @@ The default production sandbox should deny filesystem, network, process,
 environment, debug introspection, dynamic script loading, and native host
 object access unless explicitly enabled.
 
+The current `WithSandbox()` boundary is narrower and should be documented as
+such in embedding examples: it is `WithLibs(LibSafe)` plus `CapSafe`. That
+removes filesystem-backed script APIs and disables file-module loading, while
+keeping safe built-in modules require-able. It does not wrap registered Go
+functions, does not make context cancellation preemptive inside long-running
+loops, and does not govern network/process effects if an embedder explicitly
+re-enables the corresponding libraries without a future policy layer.
+
 ### Module loader
 
 Define a public loader:
@@ -309,6 +339,14 @@ Loader behavior should include canonical module names, base directories,
 search paths, package cache scoping, cycle handling, source names for
 diagnostics, optional bytecode/program cache integration, and sandbox policy
 checks before filesystem access.
+
+Current module loading is path-based and VM-owned. Built-in stdlib modules are
+resolved by name from the active `LibFlags` set and can still be required when
+file-module loading is disabled. File modules are resolved relative to the
+script directory or `WithRequirePath`, then checked against
+`WithFilesystemRoot` when a root is configured. A production `ModuleLoader`
+should preserve that separation: stdlib allowlists are not filesystem
+permissions, and filesystem permissions are not stdlib visibility.
 
 ### Concurrent use
 

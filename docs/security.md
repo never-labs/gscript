@@ -2,8 +2,9 @@
 
 This document defines the production security model GScript should expose to
 embedders. It is a roadmap, not a statement that every control is implemented
-today. Current code already has an important base: `LibFlags`, `LibSafe`,
-stdlib module restriction, bytecode VM call-frame limits, and host-controlled
+today. Current code already has an important base: `LibFlags`,
+`CapabilityFlags`, `LibSafe`, `WithSandbox`, stdlib module restriction,
+filesystem root confinement, bytecode VM call-frame limits, and host-controlled
 process exit errors. Production isolation needs those controls to be unified
 under one policy object and enforced consistently in the tree interpreter,
 bytecode VM, JIT, stdlib, host callbacks, coroutines, goroutines, and channels.
@@ -41,10 +42,31 @@ firecracker-style microVMs is still recommended for hostile multi-tenant code.
 
 ## Current Baseline
 
-The embedding API already exposes `WithLibs` and library presets. `LibSafe`
-removes I/O, network, process, script, debug, HTTP server, and test diagnostics
-from the standard library. The public VM applies stdlib restriction to both
-tree-walk and bytecode VMs.
+The embedding API already exposes `WithLibs`, library presets,
+`WithCapabilities`, `WithModuleLoading`, `WithFilesystem`,
+`WithFilesystemRoot`, and `WithSandbox`.
+
+Current controls are split deliberately:
+
+- `LibFlags` select which standard-library tables are present as globals and
+  available through built-in `require(name)`. `LibSafe` removes I/O, network,
+  process, script, debug, HTTP server, GL, test diagnostics, and other unsafe
+  or host-heavy modules from that table set.
+- `CapabilityFlags` gate host-backed effects that can remain dangerous even
+  when a library table exists. The current public flags are
+  `CapModuleLoading` for filesystem-backed `.gs` module loading and
+  `CapFilesystem` for script-side filesystem APIs such as `fs`, `dofile`, and
+  `loadfile`.
+- `WithLibs` does not grant host capabilities. `WithCapabilities` does not
+  make hidden stdlib tables visible. A filesystem-backed stdlib table such as
+  `fs` needs both its `Lib*` bit and `CapFilesystem`; filesystem-backed
+  builtins such as `dofile` and `loadfile` are governed by `CapFilesystem`.
+
+The public VM applies stdlib restriction to both tree-walk and bytecode VMs.
+Capability restrictions are also bridged into bytecode execution: disabled
+filesystem globals are removed, and the bytecode `require` path uses the
+interpreter-backed policy when module loading is disabled or a filesystem root
+is configured.
 
 The bytecode VM has internal constants such as `maxStack`, `maxCallDepth`, and
 `maxMetaDepth`. These are useful safety rails, but they are not yet an
@@ -53,19 +75,41 @@ errors and audit events.
 
 The stdlib surface includes host-effect modules such as `io`, `fs`, `net`,
 `http`, `os`, `process`, `script`, `debug`, and `testkit`. In production these
-modules must be considered capabilities, not ordinary libraries.
+modules must be considered capabilities, not ordinary libraries. The current
+`CapabilityFlags` layer is intentionally smaller than the future
+`SecurityPolicy`: it covers module loading and filesystem-backed script APIs,
+but not network, process, environment, debug introspection, memory, or host
+callback effects yet.
 
 ## Default Security Configuration
 
-The recommended production default should be deny-by-default:
+The current public safe entry point is:
 
 ```go
 vm := gscript.New(
-    gscript.WithSecurity(gscript.SecuritySandbox()),
+    gscript.WithSandbox(),
 )
 ```
 
-`SecuritySandbox()` should mean:
+`WithSandbox()` currently means:
+
+- `LibSafe` is selected as the stdlib preset.
+- `CapSafe` is selected, which disables `CapModuleLoading` and
+  `CapFilesystem`.
+- Filesystem-backed globals `fs`, `dofile`, and `loadfile` are absent.
+- `require("json")` and other enabled built-in stdlib modules still work,
+  because stdlib module identity is controlled by `LibFlags`, not
+  `CapModuleLoading`.
+- `require("tenant.module")` cannot load a `.gs` file from the host
+  filesystem.
+
+This is an in-process sandbox boundary, not a complete isolation boundary. It
+does not currently add memory budgets, wall-clock preemption, network/process
+policy, environment policy, debug redaction, or host-callback capability
+wrapping. For untrusted scripts, embedders should combine `WithSandbox()` with
+`WithMaxSteps`, explicit host bindings, and OS-level isolation where needed.
+
+The future `SecuritySandbox()` policy should mean:
 
 - CPU budget enabled.
 - Wall-clock timeout enabled.
@@ -223,6 +267,23 @@ Filesystem policy:
 - Deny device files, FIFOs, sockets, and special files unless explicitly
   allowed.
 
+Current public root confinement:
+
+- `WithFilesystemRoot(root)` confines script-side filesystem paths to `root`
+  and enables `CapFilesystem`.
+- Relative paths are resolved under `root`; absolute paths are allowed only
+  when their cleaned absolute form is equal to `root` or below it.
+- Escapes through `..` are rejected with a filesystem access error. This
+  applies to `fs` operations and script/module file loading paths that route
+  through the interpreter-backed policy.
+- The current implementation performs lexical/absolute path cleaning. Full
+  symlink-resolution policy, special-file denial, separate read/write roots,
+  and per-operation byte limits remain production roadmap items.
+- `WithFilesystem(false)` removes `fs`, `dofile`, and `loadfile` from script
+  globals. It does not by itself define the logical stdlib allowlist; use
+  `WithLibs` for library visibility and `WithModuleLoading(false)` for
+  filesystem-backed `require`.
+
 Network policy:
 
 - Default deny.
@@ -258,6 +319,21 @@ Module loading should have two independent gates:
 
 - Standard library modules allowed by name.
 - Script modules allowed by module name and resolved file path.
+
+Current public module-loading policy:
+
+- Built-in stdlib `require(name)` is allowed only for modules present under the
+  active `LibFlags` preset.
+- `WithModuleLoading(false)` disables filesystem-backed `.gs` module loading
+  while still allowing enabled built-in stdlib modules to be required.
+- `WithSandbox()` sets `CapModuleLoading` off, so file modules cannot be loaded
+  by `require`.
+- `WithRequirePath(path)` chooses the base directory for relative file-module
+  lookup. If `WithFilesystemRoot(root)` is also set, resolved file-module paths
+  must remain inside `root`.
+- `ExecFile` and `CompileFile` are host-side entry points. They read the file
+  the embedder explicitly passed and are not treated as script-side filesystem
+  permission grants.
 
 Required controls:
 
