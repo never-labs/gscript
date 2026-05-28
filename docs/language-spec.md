@@ -1,6 +1,6 @@
-# GScript Language Semantics Stability Roadmap
+# GScript Language Specification
 
-本文定义 GScript 作为 Go-style scripting language 的生产级语义边界。目标不是复刻 Lua 5.4 的每个表面行为，而是把已经依赖的 Lua 兼容项、故意不同项、仍需规范项和验证 gate 固定下来，避免 JIT、VM、解释器、stdlib 或 host API 在后续优化中漂移。
+本文定义 GScript 作为 Go-style scripting language 的生产级语义边界。它不是普通设计文档，而是 Phase 0 的硬产出：embedding API、formatter、linter、安全沙盒、VM、JIT、stdlib 和官方兼容测试都必须以这里写下来的语法和行为为基准。目标不是复刻 Lua 5.4 的每个表面行为，而是把已经依赖的 Lua 兼容项、故意不同项、仍需规范项和验证 gate 固定下来，避免 JIT、VM、解释器、stdlib 或 host API 在后续优化中漂移。
 
 当前语义基线：
 
@@ -8,6 +8,266 @@
 - 能力 ledger：`tests/official_lua_cases/MISSING_CAPABILITIES.md`。它记录已覆盖能力、明确非目标和后续翻译官方 case 时新增的候选能力。
 - 覆盖矩阵：`docs/language-feature-checklist.md` 与 `tests/feature_matrix.json`。语言语义稳定项必须同时有 parser/bytecode/runtime/official gate 或明确标为 `semantic_only` / `not_applicable`。
 - 实现锚点：`internal/runtime` 是值模型、标准库、解释器、错误、表、协程和 channel 语义源；`internal/vm` 是文件模式 bytecode、JIT gate 与 VM parity 源。
+
+## Phase 0 Hard Deliverables
+
+Phase 0 不以“代码能跑”为完成条件，而以“语义可被引用、测试、实现”为完成条件。
+
+必须交付：
+
+1. 本文件包含 GScript 自己的 BNF/EBNF、词法边界、表达式优先级、语句语义、值模型、错误模型、模块模型和 host capability 边界。
+2. 每个稳定语言特性都能回答三件事：语法是什么、运行时行为是什么、哪些测试锁定它。
+3. `docs/language-feature-checklist.md` 和 `tests/feature_matrix.json` 每一行都能映射到本文件某个章节或明确 non-goal。
+4. formatter/linter 只格式化/诊断本文件承诺的语法；不能从 parser 实现反推出未写入规范的用户承诺。
+5. embedding API 只能暴露本文件承诺的行为；如果底层行为还在 Tier 1/Tier 2，API 必须标为实验或不暴露。
+6. sandbox 只能按本文件定义的 capability surface 隔离：文件、网络、进程、环境变量、模块加载、时间、随机、debug、host callback、CPU/内存/递归/协程/channel。
+7. VM/JIT 优化不能改变本文件的行为；遇到未规范语义必须 VM fallback 或保持解释器路径。
+
+Phase 0 验收 gate：
+
+```bash
+go test ./tests -run 'TestFeatureMatrix|TestOfficialLuaTranslatedCases' -count=1
+go test ./internal/runtime ./internal/vm ./gscript -count=1
+```
+
+新增或修改语言行为时，必须先改本文件和矩阵，再改实现。
+
+## Lexical Grammar
+
+GScript 源码是 UTF-8 文本。词法层当前按 byte 扫描标识符与操作符；标识符稳定承诺为 ASCII 字母、数字和 `_`，且首字符不能是数字。非 ASCII 标识符不是 Phase 0 承诺。
+
+空白包括空格、tab、换行和回车。换行本身不是语句分隔符；`;` 是可选分隔符，主要用于一行多个语句或 C-style `for`。文件以 EOF 结束。
+
+注释：
+
+```ebnf
+line_comment  = "//" { any_char_except_newline } ;
+block_comment = "/*" { any_char } "*/" ;
+```
+
+关键字：
+
+```text
+func return if else elseif for range break continue in var go chan defer const goto
+true false nil
+```
+
+`in` 和 `var` 当前是保留词；除非本文件后续定义它们的语义，否则用户代码不得依赖它们可作为标识符。
+
+字面量：
+
+```ebnf
+identifier     = letter { letter | digit | "_" } ;
+letter         = "A".."Z" | "a".."z" | "_" ;
+digit          = "0".."9" ;
+
+number_lit     = decimal_lit | base_int_lit ;
+decimal_lit    = digit { digit | "_" } [ "." { digit | "_" } ] [ exponent ] ;
+exponent       = ( "e" | "E" ) [ "+" | "-" ] digit { digit | "_" } ;
+base_int_lit   = "0" ( "x" | "X" | "b" | "B" | "o" | "O" ) base_digit { base_digit | "_" } ;
+
+string_lit     = quoted_string | raw_string ;
+quoted_string  = '"' { string_char | escape } '"' ;
+raw_string     = "`" { any_char_except_backtick } "`" ;
+escape         = "\\" ( "n" | "r" | "t" | "\\" | "\"" | "0"
+                 | "x" hex hex
+                 | "u" hex hex hex hex
+                 | decimal_byte_escape ) ;
+```
+
+数字 `_` 分隔符只用于可读性，不改变值。base integer 支持 `0x`、`0b`、`0o`。raw string 不处理 escape。
+
+## Syntactic Grammar
+
+本节是 Phase 0 语法合同。它描述用户可写语法；parser 内部辅助规则不等于用户承诺。
+
+约定：`{ x }` 表示重复 0 次或多次，`[ x ]` 表示可选，`|` 表示选择。
+
+```ebnf
+program       = { separator | statement } EOF ;
+separator     = ";" ;
+block         = "{" { separator | statement } "}" ;
+
+statement     = func_decl
+              | if_stmt
+              | for_stmt
+              | return_stmt
+              | break_stmt
+              | continue_stmt
+              | goto_stmt
+              | label_stmt
+              | go_stmt
+              | defer_stmt
+              | const_decl
+              | simple_stmt ;
+
+func_decl     = "func" identifier param_list block ;
+param_list    = "(" [ param { "," param } [ "," vararg_param ]
+                    | vararg_param ] ")" ;
+param         = identifier ;
+vararg_param  = "..." | identifier "..." ;
+
+if_stmt       = "if" expr block { "elseif" expr block } [ "else" block ] ;
+
+for_stmt      = "for" block
+              | "for" expr block
+              | "for" simple_stmt ";" expr ";" simple_stmt block
+              | "for" identifier [ "," identifier ] ":=" "range" expr block ;
+
+return_stmt   = "return" [ expr_list ] ;
+break_stmt    = "break" ;
+continue_stmt = "continue" ;
+goto_stmt     = "goto" identifier ;
+label_stmt    = identifier ":" ;
+go_stmt       = "go" call_expr ;
+defer_stmt    = "defer" call_expr ;
+
+const_decl    = "const" identifier { "," identifier } ( ":=" | "=" ) expr_list ;
+
+simple_stmt   = expr ":=" expr_list
+              | expr "=" expr_list
+              | expr compound_op expr
+              | expr ( "++" | "--" )
+              | expr { "," expr } ( ":=" | "=" ) expr_list
+              | expr "<-" expr
+              | call_expr
+              | method_call_expr
+              | recv_expr ;
+
+compound_op   = "+=" | "-=" | "*=" | "/=" ;
+expr_list     = expr { "," expr } ;
+```
+
+`:=` 声明左侧必须是标识符列表。`=` 赋值左侧可以是变量、字段或索引表达式。`go` 和 `defer` 后面必须是普通调用或 method call。`label_stmt` 与 `obj:method(...)` 的歧义按 method call 优先：只有 `identifier ":"` 且后面不是 `identifier "("` 时才是 label。
+
+表达式语法：
+
+```ebnf
+expr           = or_expr ;
+or_expr        = and_expr { "||" and_expr } ;
+and_expr       = compare_expr { "&&" compare_expr } ;
+compare_expr   = concat_expr { compare_op concat_expr } ;
+concat_expr    = additive_expr [ ".." concat_expr ] ;
+additive_expr  = multiplicative_expr { additive_op multiplicative_expr } ;
+multiplicative_expr
+               = unary_expr { multiplicative_op unary_expr } ;
+unary_expr     = ( "-" | "!" | "#" | "^" | "<-" ) unary_expr
+               | power_expr ;
+power_expr     = postfix_expr [ "**" unary_expr ] ;
+postfix_expr   = primary { selector | index | call | method_call } ;
+
+selector       = "." identifier ;
+index          = "[" expr "]" ;
+call           = "(" [ argument_list ] ")" ;
+method_call    = ":" identifier "(" [ argument_list ] ")" ;
+argument_list  = expr { "," expr } ;
+
+primary        = number_lit
+               | string_lit
+               | "true"
+               | "false"
+               | "nil"
+               | "..."
+               | identifier
+               | "(" expr ")"
+               | func_lit
+               | table_lit ;
+
+func_lit       = "func" param_list block ;
+table_lit      = "{" [ table_field { ( "," | ";" ) table_field } [ "," | ";" ] ] "}" ;
+table_field    = "[" expr "]" ":" expr
+               | identifier ":" expr
+               | expr ;
+
+compare_op     = "==" | "!=" | "<" | "<=" | ">" | ">=" ;
+additive_op    = "+" | "-" | "|" | "^" ;
+multiplicative_op
+               = "*" | "/" | "%" | "<<" | ">>" | "&" | "&^" ;
+```
+
+Special forms:
+
+```ebnf
+make_channel   = "make" "(" "chan" [ "," expr ] ")" ;
+recv_expr      = "<-" expr ;
+```
+
+`make(chan)` and `make(chan, n)` are parsed as channel construction only when the callee is the identifier `make` and the first argument token is `chan`.
+
+## Operator Precedence
+
+从低到高：
+
+| Level | Operators | Associativity | Notes |
+|---|---|---|---|
+| 1 | `||` | left | short-circuit, returns operand value |
+| 2 | `&&` | left | short-circuit, returns operand value |
+| 3 | `==` `!=` `<` `<=` `>` `>=` | left | comparison/metamethod aware where specified |
+| 4 | `..` | right | string concat, may use `__concat` |
+| 5 | `+` `-` `|` `^` | left | arithmetic and bitwise xor |
+| 6 | `*` `/` `%` `<<` `>>` `&` `&^` | left | multiplication, division, modulo, shifts, bitwise and/and-not |
+| 7 | `**` | right | exponentiation |
+| 8 | unary `-` `!` `#` `^` `<-` | right | negate, logical not, length, bitwise not, receive |
+| 9 | `.` `[]` `()` `:` | left | field/index/call/method call |
+
+Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentional GScript difference from Lua.
+
+## Core Behavioral Rules
+
+这些行为是语言规范，而不是实现建议。
+
+### Program and blocks
+
+- A source file is a chunk. Top-level statements execute in order in the selected global environment.
+- `{ ... }` creates a lexical block for local declarations and labels.
+- A statement may be followed by `;`; semicolons are otherwise only required by C-style `for init; cond; post`.
+- A runtime error aborts the current protected boundary unless caught by `pcall`/`xpcall`.
+
+### Variables and assignment
+
+- `:=` declares lexical locals in the current scope. `const` declares readonly lexical locals.
+- `=` assigns to existing variables or to table field/index targets.
+- Multiple assignment evaluates right-hand expressions before assignment and then adjusts arity: missing values become `nil`; extra values are discarded; final multi-return expression can expand.
+- `const` prevents rebinding the binding, not mutation of a table value stored in it.
+- `++` and `--` are statement forms equivalent to numeric `target = target +/- 1` with the same target assignment rules.
+- Compound assignments evaluate the target location once at language level and then apply the corresponding arithmetic operation before storing.
+
+### Calls and returns
+
+- Function calls pass arguments after multi-return adjustment rules. Extra arguments are accepted; missing parameters are `nil`.
+- `...` is only valid inside vararg functions or vararg-compatible chunks.
+- `return` may return zero or more values. Function calls used in tail position of return/argument/list contexts follow the language multi-return adjustment rules.
+- Method call `obj:method(args...)` passes `obj` as receiver/self according to existing method-call semantics; it is distinct from label syntax.
+
+### Control flow
+
+- `if`, `elseif`, `for expr`, `&&`, `||`, and `!` use truthiness: only `nil` and `false` are falsey.
+- `for {}` is an infinite loop until `break`, `return`, `goto`, error, coroutine yield, or host cancellation once cancellation is specified.
+- `for cond {}` tests `cond` before each iteration.
+- `for init; cond; post {}` executes `init` once, then `cond` before each iteration, then `post` after each normal iteration.
+- `for k := range expr {}` and `for k, v := range expr {}` use the GScript range protocol for tables/channels/iterables as implemented and tested; exact extension points must be written before new range sources become stable.
+- `break` and `continue` apply to the innermost loop.
+- `goto` is function-local. It may jump out of a block but must not jump into a deeper scope or over declarations whose lifetime would be skipped.
+
+### Defer and goroutines
+
+- `defer call(...)` evaluates the deferred call target and arguments according to current tested behavior and drains in LIFO order when the enclosing function exits normally or by error.
+- `go call(...)` starts asynchronous execution through host-backed goroutine semantics. Scheduling order is intentionally unspecified; synchronization must use channels or explicit waits.
+- `defer` and `go` accept only calls because non-call expressions would not define useful side effects.
+
+### Tables and objects
+
+- `{ expr, expr }` creates array-style fields with 1-based sequence convention.
+- `{ name: expr }` creates a string key field equivalent to `["name"]: expr`.
+- `{ [expr]: value }` evaluates `expr` as a computed key.
+- Table keys use raw identity/equality for lookup; `__eq` does not affect key identity.
+- `nil` keys are invalid. NaN key behavior must be rejected or normalized consistently and is not stable until covered by tests.
+
+### Channels
+
+- `make(chan)` creates an unbuffered channel. `make(chan, n)` creates a buffered channel with non-negative capacity `n`.
+- `ch <- value` sends to a channel. `<-ch` receives from a channel.
+- Blocking behavior follows Go-channel intuition, but scheduling and fairness are not deterministic user contracts.
 
 ## Stability Contract
 

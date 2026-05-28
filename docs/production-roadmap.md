@@ -43,10 +43,32 @@ Supporting audits:
 
 ## Phase Plan
 
-### Phase 1: Specify and Stabilize
+### Phase 0: Freeze Language Semantics
 
-- Write a language specification skeleton that records current behavior,
-  intentional Go-style choices, and compatibility-layer mappings.
+Language specification is a hard dependency for every production-facing layer.
+The embedding API cannot be stable if the behavior underneath it is implicit;
+formatter/linter cannot be correct without grammar; sandboxing cannot be
+defined without a capability and behavior surface.
+
+- Maintain `docs/language-spec.md` as the source of truth for GScript grammar,
+  operator precedence, statements, value behavior, errors, modules, tables,
+  coroutines, channels, stdlib, and VM/JIT semantic gates.
+- Treat parser behavior that is not written in the spec as implementation
+  detail, not user contract.
+- Map feature-matrix rows and official translated cases back to spec sections.
+- Require spec-first changes for language-visible behavior.
+
+Exit criteria:
+
+- the language spec includes BNF/EBNF and behavior rules, not only roadmap text;
+- each stable language feature has at least one test or explicit non-goal;
+- formatter, linter, embedding, sandbox, and JIT work can cite spec sections.
+
+### Phase 1: Specify APIs and Stabilize Tests
+
+- Keep the language specification current as behavior moves from experimental
+  to stable, and split detailed appendices only when the main spec becomes too
+  large to review.
 - Define the public embedding surface before adding more host-facing features.
 - Convert the missing-capabilities ledger into GScript-native backlog items.
 - Make official translated tests and GScript-specific tests part of the same
