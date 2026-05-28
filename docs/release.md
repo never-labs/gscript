@@ -100,7 +100,20 @@ Artifact builds should be reproducible from a clean checkout:
 ```bash
 git status --short
 go test ./... -count=1 -p 1 -timeout=600s
-go build -trimpath -ldflags="-s -w" -o dist/gscript ./cmd/gscript
+bash scripts/release_artifacts.sh
+```
+
+The local artifact script builds only the current platform CLI binary and writes
+all outputs under `dist/` by default. It also records git, Go, and platform
+metadata and writes `SHA256SUMS` for the generated binary and metadata file. It
+does not tag, publish, upload, or create a release.
+
+Use a temporary output directory for local smoke tests without touching `dist/`:
+
+```bash
+bash scripts/release_artifacts.sh --output-dir /tmp/gscript-release-smoke
+/tmp/gscript-release-smoke/gscript_dev-<commit>_<goos>_<goarch> -e 'print("ok")'
+cat /tmp/gscript-release-smoke/SHA256SUMS
 ```
 
 When version metadata is wired into the binary, include tag, commit SHA, build

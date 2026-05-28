@@ -3,6 +3,7 @@
 gscript/gscript
 game_engine
 /tmp/
+/dist/
 
 # Profiling
 *.prof
