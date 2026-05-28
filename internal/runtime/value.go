@@ -13,15 +13,16 @@ import (
 type ValueType uint8
 
 const (
-	TypeNil       ValueType = iota
-	TypeBool                // boolean
-	TypeInt                 // integer numbers
-	TypeFloat               // floating-point numbers
-	TypeString              // strings
-	TypeTable               // tables (associative arrays)
-	TypeFunction            // functions (closures and Go functions)
-	TypeCoroutine           // coroutines
-	TypeChannel             // channels
+	TypeNil        ValueType = iota
+	TypeBool                 // boolean
+	TypeInt                  // integer numbers
+	TypeFloat                // floating-point numbers
+	TypeString               // strings
+	TypeTable                // tables (associative arrays)
+	TypeFunction             // functions (closures and Go functions)
+	TypeCoroutine            // coroutines
+	TypeChannel              // channels
+	TypeDenseArray           // data-oriented dense arrays
 )
 
 // ---------------------------------------------------------------------------
@@ -84,6 +85,7 @@ const (
 	ptrSubLazyString  uint64 = 9 << ptrSubShift  // *lazyString
 	ptrSubVMCoroutine uint64 = 10 << ptrSubShift // *vm.VMCoroutine (direct pointer, fast coroutine path)
 	ptrSubFixedRecord uint64 = 11 << ptrSubShift // *FixedRecord, materializes to *Table on generic table use
+	ptrSubDenseArray  uint64 = 12 << ptrSubShift // *DenseArray
 )
 
 // Value is a NaN-boxed 8-byte representation of all GScript values.
@@ -538,6 +540,8 @@ func (v Value) Type() ValueType {
 			return TypeCoroutine
 		case ptrSubChannel:
 			return TypeChannel
+		case ptrSubDenseArray:
+			return TypeDenseArray
 		default:
 			return TypeTable // fallback
 		}
@@ -731,6 +735,8 @@ func (v Value) Ptr() any {
 		return (*Coroutine)(p)
 	case ptrSubChannel:
 		return (*Channel)(p)
+	case ptrSubDenseArray:
+		return (*DenseArray)(p)
 	case ptrSubAnyFunction, ptrSubAnyCoro, ptrSubVMClosure:
 		// Recover the original interface from gcRoots.
 		return lookupIface(p)
@@ -800,6 +806,8 @@ func (v Value) TypeName() string {
 		return "coroutine"
 	case TypeChannel:
 		return "channel"
+	case TypeDenseArray:
+		return "array"
 	default:
 		return "unknown"
 	}
@@ -843,7 +851,7 @@ func (v Value) Equal(other Value) bool {
 		return v.Float() == other.Float()
 	case TypeString:
 		return v.Str() == other.Str()
-	case TypeTable, TypeFunction, TypeCoroutine, TypeChannel:
+	case TypeTable, TypeFunction, TypeCoroutine, TypeChannel, TypeDenseArray:
 		// Pointer identity: compare the raw address (strip sub-type bits).
 		return v.ptrPayload() == other.ptrPayload()
 	default:
@@ -903,6 +911,11 @@ func (v Value) String() string {
 		return fmt.Sprintf("coroutine: %p", v.ptrPayload())
 	case TypeChannel:
 		return fmt.Sprintf("channel: %p", v.ptrPayload())
+	case TypeDenseArray:
+		if a := v.DenseArray(); a != nil {
+			return a.String()
+		}
+		return "array<nil>[]"
 	default:
 		return "unknown"
 	}
