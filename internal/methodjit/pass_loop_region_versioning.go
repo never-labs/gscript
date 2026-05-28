@@ -25,11 +25,15 @@ import "github.com/gscript/gscript/internal/vm"
 // len. Any miss exits before native execution continues, so the preheader facts
 // remain valid inside the region.
 func LoopRegionVersioningPass(fn *Function) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
 	var globals map[string]*vm.FuncProto
 	if globalFacts := functionGlobalFacts(fn); globalFacts != nil {
 		globals = globalFacts.GlobalsMap()
 	}
-	return loopRegionVersioningPass(fn, globals)
+	return loopRegionVersioningPass(fn, globals, functionLoopSpecializationFacts(fn), functionNumericFacts(fn))
 }
 
 func LoopRegionVersioningPassCtx(ctx *PassContext) (*Function, error) {
@@ -40,15 +44,17 @@ func LoopRegionVersioningPassCtx(ctx *PassContext) (*Function, error) {
 	if globalFacts := ctx.Global(); globalFacts != nil {
 		globals = globalFacts.GlobalsMap()
 	}
-	return loopRegionVersioningPass(ctx.Func(), globals)
+	return loopRegionVersioningPass(ctx.Func(), globals, ctx.LoopSpecialization(), ctx.Numeric())
 }
 
-func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncProto) (*Function, error) {
+func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncProto, loopSpecializationFacts *LoopSpecializationFacts, numeric *NumericFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
-	loopSpecializationFacts := functionLoopSpecializationFacts(fn)
+	if loopSpecializationFacts == nil {
+		return fn, nil
+	}
 	loopSpecializationFacts.SetLoopTableArrayFacts(nil)
 
 	li := computeLoopInfo(fn)
@@ -125,7 +131,7 @@ func loopRegionVersioningPass(fn *Function, seededGlobals map[string]*vm.FuncPro
 					continue
 				}
 				safe[instr.ID] = true
-				if loopRegionKeyNonNegative(fn, li, header, key) {
+				if loopRegionKeyNonNegative(numeric, li, header, key) {
 					lowerSafe[instr.ID] = true
 					functionRemarks(fn).Add("LoopRegionVersioning", "changed", block.ID, instr.ID, instr.Op,
 						"loop induction proves table-array access lower bound")
@@ -156,12 +162,11 @@ func loopRegionSkipAccess(instr *Instr) bool {
 		instr.Aux2&tableArrayStoreFlagAllowGrow != 0
 }
 
-func loopRegionKeyNonNegative(fn *Function, li *loopInfo, header *Block, key *Value) bool {
-	if fn == nil || li == nil || header == nil || key == nil {
+func loopRegionKeyNonNegative(numeric *NumericFacts, li *loopInfo, header *Block, key *Value) bool {
+	if li == nil || header == nil || key == nil {
 		return false
 	}
-	numeric := functionNumericFacts(fn)
-	if numeric.IsIntNonNegative(key.ID) {
+	if numeric != nil && numeric.IsIntNonNegative(key.ID) {
 		return true
 	}
 	if c, ok := constIntFromValue(key); ok {
@@ -170,8 +175,10 @@ func loopRegionKeyNonNegative(fn *Function, li *loopInfo, header *Block, key *Va
 	if key.Def == nil {
 		return false
 	}
-	if r, ok := numeric.IntRange(key.ID); ok && r.nonNegative() {
-		return true
+	if numeric != nil {
+		if r, ok := numeric.IntRange(key.ID); ok && r.nonNegative() {
+			return true
+		}
 	}
 	for _, instr := range header.Instrs {
 		if instr == nil || instr.Op != OpPhi || !instr.Type.isIntegerLike() {
