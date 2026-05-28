@@ -50,7 +50,11 @@ func TableArrayStoreLoopVersionPass(fn *Function) (*Function, error) {
 				if len(store.Args) < 3 {
 					continue
 				}
-				store.Op = OpTableArrayStore
+				lowered, ok := tableArrayLoweredOp(store.Op)
+				if !ok || lowered != OpTableArrayStore {
+					continue
+				}
+				store.Op = lowered
 				store.Args = []*Value{cand.table, data, length, store.Args[1], store.Args[2], header}
 				store.Aux = cand.kind
 				store.Aux2 = tableArrayStoreLoopFlags(cand, nestedBuilder)
