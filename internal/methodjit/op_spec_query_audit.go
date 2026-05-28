@@ -8,19 +8,25 @@ import (
 )
 
 type OpAuditRow struct {
-	Op            Op     `json:"op"`
-	Name          string `json:"name"`
-	Validator     string `json:"validator"`
-	Builder       string `json:"builder"`
-	Oracle        string `json:"oracle"`
-	Emitter       string `json:"emitter"`
-	Regalloc      string `json:"regalloc"`
-	Deopt         string `json:"deopt"`
-	ArgPolicy     string `json:"arg_policy"`
-	OracleSupport string `json:"oracle_support"`
-	OracleReason  string `json:"oracle_reason,omitempty"`
-	EmitterFamily string `json:"emitter_family"`
-	MayDeopt      bool   `json:"may_deopt"`
+	Op                               Op     `json:"op"`
+	Name                             string `json:"name"`
+	Validator                        string `json:"validator"`
+	Builder                          string `json:"builder"`
+	Oracle                           string `json:"oracle"`
+	Emitter                          string `json:"emitter"`
+	Regalloc                         string `json:"regalloc"`
+	Deopt                            string `json:"deopt"`
+	ArgPolicy                        string `json:"arg_policy"`
+	OracleSupport                    string `json:"oracle_support"`
+	OracleReason                     string `json:"oracle_reason,omitempty"`
+	EmitterFamily                    string `json:"emitter_family"`
+	MayDeopt                         bool   `json:"may_deopt"`
+	FixedShapeArrayElementWriteRole  string `json:"fixed_shape_array_element_write_role"`
+	FixedShapeArrayElementReadRole   string `json:"fixed_shape_array_element_read_role"`
+	FixedShapeReturnArrayElementRole string `json:"fixed_shape_return_array_element_role"`
+	LocalStringArrayTableUseRole     string `json:"local_string_array_table_use_role"`
+	ReadonlyTableParamUseRole        string `json:"readonly_table_param_use_role"`
+	InlineAllocationRole             string `json:"inline_allocation_role"`
 }
 
 func OpAuditMatrix() []OpAuditRow {
@@ -31,19 +37,25 @@ func OpAuditMatrix() []OpAuditRow {
 			continue
 		}
 		rows = append(rows, OpAuditRow{
-			Op:            op,
-			Name:          spec.Name,
-			Validator:     opAuditValidator(spec),
-			Builder:       opAuditBuilder(spec),
-			Oracle:        opAuditOracle(spec),
-			Emitter:       opAuditEmitter(spec),
-			Regalloc:      opAuditRegalloc(spec),
-			Deopt:         opAuditDeopt(spec),
-			ArgPolicy:     spec.ArgPolicy.String(),
-			OracleSupport: spec.OracleSupport.String(),
-			OracleReason:  spec.OracleUnsupportedReason,
-			EmitterFamily: spec.EmitterFamily.String(),
-			MayDeopt:      spec.MayDeopt,
+			Op:                               op,
+			Name:                             spec.Name,
+			Validator:                        opAuditValidator(spec),
+			Builder:                          opAuditBuilder(spec),
+			Oracle:                           opAuditOracle(spec),
+			Emitter:                          opAuditEmitter(spec),
+			Regalloc:                         opAuditRegalloc(spec),
+			Deopt:                            opAuditDeopt(spec),
+			ArgPolicy:                        spec.ArgPolicy.String(),
+			OracleSupport:                    spec.OracleSupport.String(),
+			OracleReason:                     spec.OracleUnsupportedReason,
+			EmitterFamily:                    spec.EmitterFamily.String(),
+			MayDeopt:                         spec.MayDeopt,
+			FixedShapeArrayElementWriteRole:  spec.FixedShapeArrayElementWriteRole.String(),
+			FixedShapeArrayElementReadRole:   spec.FixedShapeArrayElementReadRole.String(),
+			FixedShapeReturnArrayElementRole: spec.FixedShapeReturnArrayElementRole.String(),
+			LocalStringArrayTableUseRole:     spec.LocalStringArrayTableUseRole.String(),
+			ReadonlyTableParamUseRole:        spec.ReadonlyTableParamUseRole.String(),
+			InlineAllocationRole:             spec.InlineAllocationRole.String(),
 		})
 	}
 	return rows

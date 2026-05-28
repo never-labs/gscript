@@ -17,15 +17,21 @@ func TestOpAuditMatrixCoversEveryOp(t *testing.T) {
 			t.Fatalf("row %d has op %s", i, row.Op)
 		}
 		for name, value := range map[string]string{
-			"validator":      row.Validator,
-			"builder":        row.Builder,
-			"oracle":         row.Oracle,
-			"emitter":        row.Emitter,
-			"regalloc":       row.Regalloc,
-			"deopt":          row.Deopt,
-			"arg_policy":     row.ArgPolicy,
-			"oracle_support": row.OracleSupport,
-			"emitter_family": row.EmitterFamily,
+			"validator":                             row.Validator,
+			"builder":                               row.Builder,
+			"oracle":                                row.Oracle,
+			"emitter":                               row.Emitter,
+			"regalloc":                              row.Regalloc,
+			"deopt":                                 row.Deopt,
+			"arg_policy":                            row.ArgPolicy,
+			"oracle_support":                        row.OracleSupport,
+			"emitter_family":                        row.EmitterFamily,
+			"fixed_shape_array_element_write_role":  row.FixedShapeArrayElementWriteRole,
+			"fixed_shape_array_element_read_role":   row.FixedShapeArrayElementReadRole,
+			"fixed_shape_return_array_element_role": row.FixedShapeReturnArrayElementRole,
+			"local_string_array_table_use_role":     row.LocalStringArrayTableUseRole,
+			"readonly_table_param_use_role":         row.ReadonlyTableParamUseRole,
+			"inline_allocation_role":                row.InlineAllocationRole,
 		} {
 			if value == "" {
 				t.Fatalf("%s has empty %s audit column", row.Name, name)
@@ -74,7 +80,13 @@ func TestWriteOpAuditMatrixJSON(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &raw); err != nil {
 		t.Fatalf("unmarshal raw audit JSON: %v", err)
 	}
-	for _, key := range []string{"op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt", "arg_policy", "oracle_support", "emitter_family", "may_deopt"} {
+	for _, key := range []string{
+		"op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt",
+		"arg_policy", "oracle_support", "emitter_family", "may_deopt",
+		"fixed_shape_array_element_write_role", "fixed_shape_array_element_read_role",
+		"fixed_shape_return_array_element_role", "local_string_array_table_use_role",
+		"readonly_table_param_use_role", "inline_allocation_role",
+	} {
 		if _, ok := raw[0][key]; !ok {
 			t.Fatalf("audit JSON first row missing key %q: %v", key, raw[0])
 		}
@@ -101,6 +113,24 @@ func TestOpAuditMatrixStructuredFieldsMatchOpSpec(t *testing.T) {
 		}
 		if row.MayDeopt != spec.MayDeopt {
 			t.Fatalf("%s may_deopt = %t, want %t", row.Name, row.MayDeopt, spec.MayDeopt)
+		}
+		if row.FixedShapeArrayElementWriteRole != spec.FixedShapeArrayElementWriteRole.String() {
+			t.Fatalf("%s fixed_shape_array_element_write_role = %q, want %q", row.Name, row.FixedShapeArrayElementWriteRole, spec.FixedShapeArrayElementWriteRole.String())
+		}
+		if row.FixedShapeArrayElementReadRole != spec.FixedShapeArrayElementReadRole.String() {
+			t.Fatalf("%s fixed_shape_array_element_read_role = %q, want %q", row.Name, row.FixedShapeArrayElementReadRole, spec.FixedShapeArrayElementReadRole.String())
+		}
+		if row.FixedShapeReturnArrayElementRole != spec.FixedShapeReturnArrayElementRole.String() {
+			t.Fatalf("%s fixed_shape_return_array_element_role = %q, want %q", row.Name, row.FixedShapeReturnArrayElementRole, spec.FixedShapeReturnArrayElementRole.String())
+		}
+		if row.LocalStringArrayTableUseRole != spec.LocalStringArrayTableUseRole.String() {
+			t.Fatalf("%s local_string_array_table_use_role = %q, want %q", row.Name, row.LocalStringArrayTableUseRole, spec.LocalStringArrayTableUseRole.String())
+		}
+		if row.ReadonlyTableParamUseRole != spec.ReadonlyTableParamUseRole.String() {
+			t.Fatalf("%s readonly_table_param_use_role = %q, want %q", row.Name, row.ReadonlyTableParamUseRole, spec.ReadonlyTableParamUseRole.String())
+		}
+		if row.InlineAllocationRole != spec.InlineAllocationRole.String() {
+			t.Fatalf("%s inline_allocation_role = %q, want %q", row.Name, row.InlineAllocationRole, spec.InlineAllocationRole.String())
 		}
 	}
 }
