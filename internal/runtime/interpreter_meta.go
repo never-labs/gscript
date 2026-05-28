@@ -63,6 +63,15 @@ func (interp *Interpreter) tableGetDepth(t Value, key Value, depth int) (Value, 
 	if depth > maxMetaDepth {
 		return NilValue(), fmt.Errorf("'__index' chain too long; possible loop")
 	}
+	if t.IsDenseArray() {
+		if i, ok, err := DenseArrayIndexFromValue(key, t.DenseArray().Len()); ok || err != nil {
+			if err != nil {
+				return NilValue(), err
+			}
+			return t.DenseArray().At(i)
+		}
+		return NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
+	}
 	if !t.IsTable() {
 		return NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}

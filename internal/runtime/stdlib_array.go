@@ -8,6 +8,9 @@ func buildArrayLib() *Table {
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "array." + name, Fn: fn}))
 	}
+	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
+		t.RawSetString(name, FunctionValue(&GoFunction{Name: "array." + name, Fn: fn, FastArg1: fast}))
+	}
 	set("f64", func(args []Value) ([]Value, error) {
 		a, err := denseArrayFromArgs(DenseArrayF64, args)
 		if err != nil {
@@ -29,7 +32,24 @@ func buildArrayLib() *Table {
 		}
 		return []Value{DenseArrayValue(a)}, nil
 	})
+	setFastArg1("sum", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsDenseArray() {
+			return nil, fmt.Errorf("array.sum: argument 1 must be a dense array")
+		}
+		v, err := DenseArrayReduce(DenseArrayReduceSum, args[0].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, arraySumValue)
 	return t
+}
+
+func arraySumValue(arrayValue Value) (Value, error) {
+	if !arrayValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("array.sum: argument 1 must be a dense array")
+	}
+	return DenseArrayReduce(DenseArrayReduceSum, arrayValue.DenseArray())
 }
 
 func denseArrayFromArgs(dtype DenseArrayDType, args []Value) (*DenseArray, error) {

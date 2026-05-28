@@ -421,6 +421,21 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 				if cf.Proto != nil && cf.Proto.TableKeyFeedback != nil && pc >= 0 && pc < len(cf.Proto.TableKeyFeedback) {
 					cf.Proto.TableKeyFeedback[pc].ObserveTableAccess(tbl, keyVal, result, vm.TableAccessKindGet, -1, -1)
 				}
+			} else if tblVal.IsDenseArray() {
+				if resultSlot < len(regs) {
+					if idx, ok, err := runtime.DenseArrayIndexFromValue(keyVal, tblVal.DenseArray().Len()); ok || err != nil {
+						if err != nil {
+							return err
+						}
+						result, err := tblVal.DenseArray().At(idx)
+						if err != nil {
+							return err
+						}
+						regs[resultSlot] = result
+					} else {
+						regs[resultSlot] = runtime.NilValue()
+					}
+				}
 			} else if resultSlot < len(regs) {
 				regs[resultSlot] = runtime.NilValue()
 			}
@@ -465,6 +480,15 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 				}
 				if cf.Proto != nil && cf.Proto.TableKeyFeedback != nil && pc >= 0 && pc < len(cf.Proto.TableKeyFeedback) {
 					cf.Proto.TableKeyFeedback[pc].ObserveTableAccess(tbl, keyVal, valVal, vm.TableAccessKindSet, beforeLen, beforeFieldIdx)
+				}
+			} else if tblVal.IsDenseArray() {
+				if idx, ok, err := runtime.DenseArrayIndexFromValue(keyVal, tblVal.DenseArray().Len()); ok || err != nil {
+					if err != nil {
+						return err
+					}
+					if err := tblVal.DenseArray().Set(idx, valVal); err != nil {
+						return err
+					}
 				}
 			}
 		}

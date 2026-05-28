@@ -194,6 +194,12 @@ Current implementation status:
   materializing a filtered SoA first;
 - `soa.mask` builds reusable bool dense masks from scalar or column
   comparisons;
+- `soa.select` builds dense temporaries by selecting between scalar or column
+  operands per mask lane;
+- `soa.selectInto` writes selection results into reusable columns for hot
+  loops;
+- `soa.sumSelect` fuses mask selection with numeric reduction when the
+  temporary is only consumed by a sum;
 - `soa.shape` exposes layout diagnostics: length, shape version, column names,
   element kinds, column lengths, and column versions;
 - `soa.addScaled`, `soa.affine`, `soa.affineWhere`, `soa.affineMany`, and
@@ -225,6 +231,9 @@ Current API contract:
 | `soa.filter(s, mask)` | Returns an independent SoA containing rows whose bool dense mask entry is true. The mask length must match. |
 | `soa.compact(s, mask)` | Alias of `soa.filter`, using array-programming naming for mask compaction. |
 | `soa.mask(s, column, op, rhs)` | Returns a bool dense mask by comparing `column` with a scalar or another column named by `rhs`. |
+| `soa.select(s, mask, if_true, if_false)` | Returns a dense array that selects from scalar or column operands per mask lane. |
+| `soa.selectInto(s, dst, mask, if_true, if_false)` | Writes a mask selection into an existing destination column. |
+| `soa.sumSelect(s, mask, if_true, if_false)` | Sums a mask selection without materializing a temporary dense array. |
 | `soa.gather(s, indices)` | Returns an independent SoA containing rows addressed by a one-based i64 dense index vector. Duplicates and index order are preserved. |
 | `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
 | `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
@@ -254,6 +263,10 @@ Hot path guidance:
   `soa.filter` plus a later aggregate when the compacted rows are not needed;
 - use `soa.mask` to produce and reuse comparison masks instead of writing
   predicate loops by hand;
+- use `soa.select` when a conditional expression can be represented as dense
+  mask selection;
+- use `soa.selectInto` for repeated selections into a reusable output column;
+- use `soa.sumSelect` when a selected temporary is immediately reduced;
 - for compact/filter pipelines, build or reuse a bool dense mask, call
   `soa.filter`, then continue with column kernels on the returned independent
   SoA;

@@ -334,6 +334,742 @@ func (a *DenseArray) FillWhere(mask *DenseArray, v Value) error {
 	return nil
 }
 
+func denseArraySelect(mask *DenseArray, trueValue, falseValue Value, length int) (*DenseArray, error) {
+	if mask == nil || mask.dtype != DenseArrayBool {
+		return nil, fmt.Errorf("dense array select mask must be bool")
+	}
+	if mask.Len() != length {
+		return nil, ErrDenseArrayLength
+	}
+	if out, ok, err := denseArraySelectFast(mask.bools, trueValue, falseValue, length); ok || err != nil {
+		return out, err
+	}
+	dtype, err := denseArraySelectDType(trueValue, falseValue, length)
+	if err != nil {
+		return nil, err
+	}
+	switch dtype {
+	case DenseArrayF64:
+		out := make([]float64, length)
+		tv := denseArrayF64Selector(trueValue)
+		fv := denseArrayF64Selector(falseValue)
+		for i, keep := range mask.bools {
+			if keep {
+				out[i] = tv(i)
+			} else {
+				out[i] = fv(i)
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, nil
+	case DenseArrayI64:
+		out := make([]int64, length)
+		tv := denseArrayI64Selector(trueValue)
+		fv := denseArrayI64Selector(falseValue)
+		for i, keep := range mask.bools {
+			if keep {
+				out[i] = tv(i)
+			} else {
+				out[i] = fv(i)
+			}
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
+	case DenseArrayBool:
+		out := make([]bool, length)
+		tv := denseArrayBoolSelector(trueValue)
+		fv := denseArrayBoolSelector(falseValue)
+		for i, keep := range mask.bools {
+			if keep {
+				out[i] = tv(i)
+			} else {
+				out[i] = fv(i)
+			}
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
+func denseArraySelectInto(dst *DenseArray, mask *DenseArray, trueValue, falseValue Value, length int) error {
+	if dst == nil || mask == nil {
+		return ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return fmt.Errorf("dense array selectInto mask must be bool")
+	}
+	if dst.Len() != length || mask.Len() != length {
+		return ErrDenseArrayLength
+	}
+	if ok, err := denseArraySelectIntoFast(dst, mask.bools, trueValue, falseValue); ok || err != nil {
+		return err
+	}
+	selected, err := denseArraySelect(mask, trueValue, falseValue, length)
+	if err != nil {
+		return err
+	}
+	if dst.dtype != selected.dtype {
+		return ErrDenseArrayDType
+	}
+	switch dst.dtype {
+	case DenseArrayF64:
+		copy(dst.f64, selected.f64)
+	case DenseArrayI64:
+		copy(dst.i64, selected.i64)
+	case DenseArrayBool:
+		copy(dst.bools, selected.bools)
+	default:
+		return ErrDenseArrayDType
+	}
+	dst.bumpVersion()
+	return nil
+}
+
+func denseArraySelectIntoFast(dst *DenseArray, mask []bool, trueValue, falseValue Value) (bool, error) {
+	trueArray, falseArray := trueValue.DenseArray(), falseValue.DenseArray()
+	if trueArray != nil && trueArray.Len() != len(mask) {
+		return true, ErrDenseArrayLength
+	}
+	if falseArray != nil && falseArray.Len() != len(mask) {
+		return true, ErrDenseArrayLength
+	}
+	if trueArray != nil && falseArray != nil {
+		if ok, err := denseArraySelectIntoArrayArrayFast(dst, mask, trueArray, falseArray); ok || err != nil {
+			return ok, err
+		}
+	}
+	switch dst.dtype {
+	case DenseArrayF64:
+		tv, ok := denseArrayF64SelectorFast(trueValue)
+		if !ok {
+			return false, nil
+		}
+		fv, ok := denseArrayF64SelectorFast(falseValue)
+		if !ok {
+			return false, nil
+		}
+		for i, keep := range mask {
+			if keep {
+				dst.f64[i] = tv(i)
+			} else {
+				dst.f64[i] = fv(i)
+			}
+		}
+	case DenseArrayI64:
+		tv, ok := denseArrayI64SelectorFast(trueValue)
+		if !ok {
+			return false, nil
+		}
+		fv, ok := denseArrayI64SelectorFast(falseValue)
+		if !ok {
+			return false, nil
+		}
+		for i, keep := range mask {
+			if keep {
+				dst.i64[i] = tv(i)
+			} else {
+				dst.i64[i] = fv(i)
+			}
+		}
+	case DenseArrayBool:
+		tv, ok := denseArrayBoolSelectorFast(trueValue)
+		if !ok {
+			return false, nil
+		}
+		fv, ok := denseArrayBoolSelectorFast(falseValue)
+		if !ok {
+			return false, nil
+		}
+		for i, keep := range mask {
+			if keep {
+				dst.bools[i] = tv(i)
+			} else {
+				dst.bools[i] = fv(i)
+			}
+		}
+	default:
+		return true, ErrDenseArrayDType
+	}
+	dst.bumpVersion()
+	return true, nil
+}
+
+func denseArraySelectIntoArrayArrayFast(dst *DenseArray, mask []bool, trueArray, falseArray *DenseArray) (bool, error) {
+	switch {
+	case dst.dtype == DenseArrayF64 && trueArray.dtype == DenseArrayF64 && falseArray.dtype == DenseArrayF64:
+		for i, keep := range mask {
+			if keep {
+				dst.f64[i] = trueArray.f64[i]
+			} else {
+				dst.f64[i] = falseArray.f64[i]
+			}
+		}
+	case dst.dtype == DenseArrayF64 && trueArray.dtype == DenseArrayF64 && falseArray.dtype == DenseArrayI64:
+		for i, keep := range mask {
+			if keep {
+				dst.f64[i] = trueArray.f64[i]
+			} else {
+				dst.f64[i] = float64(falseArray.i64[i])
+			}
+		}
+	case dst.dtype == DenseArrayF64 && trueArray.dtype == DenseArrayI64 && falseArray.dtype == DenseArrayF64:
+		for i, keep := range mask {
+			if keep {
+				dst.f64[i] = float64(trueArray.i64[i])
+			} else {
+				dst.f64[i] = falseArray.f64[i]
+			}
+		}
+	case dst.dtype == DenseArrayF64 && trueArray.dtype == DenseArrayI64 && falseArray.dtype == DenseArrayI64:
+		for i, keep := range mask {
+			if keep {
+				dst.f64[i] = float64(trueArray.i64[i])
+			} else {
+				dst.f64[i] = float64(falseArray.i64[i])
+			}
+		}
+	case dst.dtype == DenseArrayI64 && trueArray.dtype == DenseArrayI64 && falseArray.dtype == DenseArrayI64:
+		for i, keep := range mask {
+			if keep {
+				dst.i64[i] = trueArray.i64[i]
+			} else {
+				dst.i64[i] = falseArray.i64[i]
+			}
+		}
+	case dst.dtype == DenseArrayBool && trueArray.dtype == DenseArrayBool && falseArray.dtype == DenseArrayBool:
+		for i, keep := range mask {
+			if keep {
+				dst.bools[i] = trueArray.bools[i]
+			} else {
+				dst.bools[i] = falseArray.bools[i]
+			}
+		}
+	case trueArray.dtype == DenseArrayBool || falseArray.dtype == DenseArrayBool:
+		return true, ErrDenseArrayDType
+	default:
+		return false, nil
+	}
+	dst.bumpVersion()
+	return true, nil
+}
+
+func denseArraySumSelect(mask *DenseArray, trueValue, falseValue Value, length int) (Value, error) {
+	if mask == nil || mask.dtype != DenseArrayBool {
+		return NilValue(), fmt.Errorf("dense array sumSelect mask must be bool")
+	}
+	if mask.Len() != length {
+		return NilValue(), ErrDenseArrayLength
+	}
+	trueArray, falseArray := trueValue.DenseArray(), falseValue.DenseArray()
+	if trueArray != nil && trueArray.Len() != length {
+		return NilValue(), ErrDenseArrayLength
+	}
+	if falseArray != nil && falseArray.Len() != length {
+		return NilValue(), ErrDenseArrayLength
+	}
+	if trueArray != nil && falseArray != nil {
+		switch {
+		case trueArray.dtype == DenseArrayF64 && falseArray.dtype == DenseArrayF64:
+			return FloatValue(denseArraySumSelectF64F64(mask.bools, trueArray.f64, falseArray.f64)), nil
+		case trueArray.dtype == DenseArrayI64 && falseArray.dtype == DenseArrayI64:
+			return IntValue(denseArraySumSelectI64I64(mask.bools, trueArray.i64, falseArray.i64)), nil
+		case trueArray.dtype == DenseArrayBool || falseArray.dtype == DenseArrayBool:
+			return NilValue(), ErrDenseArrayDType
+		}
+	}
+	dtype, err := denseArraySelectDType(trueValue, falseValue, length)
+	if err != nil {
+		return NilValue(), err
+	}
+	switch dtype {
+	case DenseArrayF64:
+		tv := denseArrayF64Selector(trueValue)
+		fv := denseArrayF64Selector(falseValue)
+		sum := 0.0
+		for i, keep := range mask.bools {
+			if keep {
+				sum += tv(i)
+			} else {
+				sum += fv(i)
+			}
+		}
+		return FloatValue(sum), nil
+	case DenseArrayI64:
+		tv := denseArrayI64Selector(trueValue)
+		fv := denseArrayI64Selector(falseValue)
+		var sum int64
+		for i, keep := range mask.bools {
+			if keep {
+				sum += tv(i)
+			} else {
+				sum += fv(i)
+			}
+		}
+		return IntValue(sum), nil
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
+func denseArraySumSelectF64F64(mask []bool, ifTrue, ifFalse []float64) float64 {
+	n := len(mask)
+	if n == 0 {
+		return 0
+	}
+	_, _, _ = mask[n-1], ifTrue[n-1], ifFalse[n-1]
+	sum0, sum1, sum2, sum3 := 0.0, 0.0, 0.0, 0.0
+	sum4, sum5, sum6, sum7 := 0.0, 0.0, 0.0, 0.0
+	i := 0
+	limit := n - n%8
+	for ; i < limit; i += 8 {
+		if mask[i] {
+			sum0 += ifTrue[i]
+		} else {
+			sum0 += ifFalse[i]
+		}
+		if mask[i+1] {
+			sum1 += ifTrue[i+1]
+		} else {
+			sum1 += ifFalse[i+1]
+		}
+		if mask[i+2] {
+			sum2 += ifTrue[i+2]
+		} else {
+			sum2 += ifFalse[i+2]
+		}
+		if mask[i+3] {
+			sum3 += ifTrue[i+3]
+		} else {
+			sum3 += ifFalse[i+3]
+		}
+		if mask[i+4] {
+			sum4 += ifTrue[i+4]
+		} else {
+			sum4 += ifFalse[i+4]
+		}
+		if mask[i+5] {
+			sum5 += ifTrue[i+5]
+		} else {
+			sum5 += ifFalse[i+5]
+		}
+		if mask[i+6] {
+			sum6 += ifTrue[i+6]
+		} else {
+			sum6 += ifFalse[i+6]
+		}
+		if mask[i+7] {
+			sum7 += ifTrue[i+7]
+		} else {
+			sum7 += ifFalse[i+7]
+		}
+	}
+	sum := sum0 + sum1 + sum2 + sum3 + sum4 + sum5 + sum6 + sum7
+	for ; i < n; i++ {
+		if mask[i] {
+			sum += ifTrue[i]
+		} else {
+			sum += ifFalse[i]
+		}
+	}
+	return sum
+}
+
+func denseArraySumSelectI64I64(mask []bool, ifTrue, ifFalse []int64) int64 {
+	n := len(mask)
+	if n == 0 {
+		return 0
+	}
+	_, _, _ = mask[n-1], ifTrue[n-1], ifFalse[n-1]
+	var sum0, sum1, sum2, sum3 int64
+	var sum4, sum5, sum6, sum7 int64
+	i := 0
+	limit := n - n%8
+	for ; i < limit; i += 8 {
+		if mask[i] {
+			sum0 += ifTrue[i]
+		} else {
+			sum0 += ifFalse[i]
+		}
+		if mask[i+1] {
+			sum1 += ifTrue[i+1]
+		} else {
+			sum1 += ifFalse[i+1]
+		}
+		if mask[i+2] {
+			sum2 += ifTrue[i+2]
+		} else {
+			sum2 += ifFalse[i+2]
+		}
+		if mask[i+3] {
+			sum3 += ifTrue[i+3]
+		} else {
+			sum3 += ifFalse[i+3]
+		}
+		if mask[i+4] {
+			sum4 += ifTrue[i+4]
+		} else {
+			sum4 += ifFalse[i+4]
+		}
+		if mask[i+5] {
+			sum5 += ifTrue[i+5]
+		} else {
+			sum5 += ifFalse[i+5]
+		}
+		if mask[i+6] {
+			sum6 += ifTrue[i+6]
+		} else {
+			sum6 += ifFalse[i+6]
+		}
+		if mask[i+7] {
+			sum7 += ifTrue[i+7]
+		} else {
+			sum7 += ifFalse[i+7]
+		}
+	}
+	sum := sum0 + sum1 + sum2 + sum3 + sum4 + sum5 + sum6 + sum7
+	for ; i < n; i++ {
+		if mask[i] {
+			sum += ifTrue[i]
+		} else {
+			sum += ifFalse[i]
+		}
+	}
+	return sum
+}
+
+func denseArrayF64SelectorFast(v Value) (func(int) float64, bool) {
+	if arr := v.DenseArray(); arr != nil {
+		switch arr.dtype {
+		case DenseArrayF64:
+			return func(i int) float64 { return arr.f64[i] }, true
+		case DenseArrayI64:
+			return func(i int) float64 { return float64(arr.i64[i]) }, true
+		default:
+			return nil, false
+		}
+	}
+	if !v.IsNumber() {
+		return nil, false
+	}
+	x := v.Number()
+	return func(int) float64 { return x }, true
+}
+
+func denseArrayI64SelectorFast(v Value) (func(int) int64, bool) {
+	if arr := v.DenseArray(); arr != nil && arr.dtype == DenseArrayI64 {
+		return func(i int) int64 { return arr.i64[i] }, true
+	}
+	if !v.IsInt() {
+		return nil, false
+	}
+	x := v.Int()
+	return func(int) int64 { return x }, true
+}
+
+func denseArrayBoolSelectorFast(v Value) (func(int) bool, bool) {
+	if arr := v.DenseArray(); arr != nil && arr.dtype == DenseArrayBool {
+		return func(i int) bool { return arr.bools[i] }, true
+	}
+	if !v.IsBool() {
+		return nil, false
+	}
+	x := v.Bool()
+	return func(int) bool { return x }, true
+}
+
+func denseArraySelectFast(mask []bool, trueValue, falseValue Value, length int) (*DenseArray, bool, error) {
+	trueArray, falseArray := trueValue.DenseArray(), falseValue.DenseArray()
+	if trueArray != nil && trueArray.Len() != length {
+		return nil, true, ErrDenseArrayLength
+	}
+	if falseArray != nil && falseArray.Len() != length {
+		return nil, true, ErrDenseArrayLength
+	}
+	switch {
+	case trueArray != nil && falseArray != nil:
+		return denseArraySelectArrayArrayFast(mask, trueArray, falseArray)
+	case trueArray != nil:
+		return denseArraySelectArrayScalarFast(mask, trueArray, falseValue)
+	case falseArray != nil:
+		return denseArraySelectScalarArrayFast(mask, trueValue, falseArray)
+	default:
+		return denseArraySelectScalarScalarFast(mask, trueValue, falseValue)
+	}
+}
+
+func denseArraySelectArrayArrayFast(mask []bool, trueArray, falseArray *DenseArray) (*DenseArray, bool, error) {
+	switch {
+	case trueArray.dtype == DenseArrayF64 && falseArray.dtype == DenseArrayF64:
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.f64[i]
+			} else {
+				out[i] = falseArray.f64[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	case trueArray.dtype == DenseArrayI64 && falseArray.dtype == DenseArrayI64:
+		out := make([]int64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.i64[i]
+			} else {
+				out[i] = falseArray.i64[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, true, nil
+	case trueArray.dtype == DenseArrayBool && falseArray.dtype == DenseArrayBool:
+		out := make([]bool, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.bools[i]
+			} else {
+				out[i] = falseArray.bools[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, true, nil
+	case trueArray.dtype == DenseArrayBool || falseArray.dtype == DenseArrayBool:
+		return nil, true, ErrDenseArrayDType
+	case trueArray.dtype == DenseArrayF64 && falseArray.dtype == DenseArrayI64:
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.f64[i]
+			} else {
+				out[i] = float64(falseArray.i64[i])
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	case trueArray.dtype == DenseArrayI64 && falseArray.dtype == DenseArrayF64:
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = float64(trueArray.i64[i])
+			} else {
+				out[i] = falseArray.f64[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func denseArraySelectArrayScalarFast(mask []bool, trueArray *DenseArray, falseValue Value) (*DenseArray, bool, error) {
+	switch {
+	case trueArray.dtype == DenseArrayF64 && falseValue.IsNumber():
+		x := falseValue.Number()
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.f64[i]
+			} else {
+				out[i] = x
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	case trueArray.dtype == DenseArrayI64 && falseValue.IsInt():
+		x := falseValue.Int()
+		out := make([]int64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.i64[i]
+			} else {
+				out[i] = x
+			}
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, true, nil
+	case trueArray.dtype == DenseArrayI64 && falseValue.IsNumber():
+		x := falseValue.Number()
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = float64(trueArray.i64[i])
+			} else {
+				out[i] = x
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	case trueArray.dtype == DenseArrayBool && falseValue.IsBool():
+		x := falseValue.Bool()
+		out := make([]bool, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = trueArray.bools[i]
+			} else {
+				out[i] = x
+			}
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, true, nil
+	case trueArray.dtype == DenseArrayBool || falseValue.IsBool():
+		return nil, true, ErrDenseArrayDType
+	default:
+		return nil, false, nil
+	}
+}
+
+func denseArraySelectScalarArrayFast(mask []bool, trueValue Value, falseArray *DenseArray) (*DenseArray, bool, error) {
+	switch {
+	case falseArray.dtype == DenseArrayF64 && trueValue.IsNumber():
+		x := trueValue.Number()
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = x
+			} else {
+				out[i] = falseArray.f64[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	case falseArray.dtype == DenseArrayI64 && trueValue.IsInt():
+		x := trueValue.Int()
+		out := make([]int64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = x
+			} else {
+				out[i] = falseArray.i64[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, true, nil
+	case falseArray.dtype == DenseArrayI64 && trueValue.IsNumber():
+		x := trueValue.Number()
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = x
+			} else {
+				out[i] = float64(falseArray.i64[i])
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	case falseArray.dtype == DenseArrayBool && trueValue.IsBool():
+		x := trueValue.Bool()
+		out := make([]bool, len(mask))
+		for i, keep := range mask {
+			if keep {
+				out[i] = x
+			} else {
+				out[i] = falseArray.bools[i]
+			}
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, true, nil
+	case falseArray.dtype == DenseArrayBool || trueValue.IsBool():
+		return nil, true, ErrDenseArrayDType
+	default:
+		return nil, false, nil
+	}
+}
+
+func denseArraySelectScalarScalarFast(mask []bool, trueValue, falseValue Value) (*DenseArray, bool, error) {
+	switch {
+	case trueValue.IsBool() || falseValue.IsBool():
+		if !trueValue.IsBool() || !falseValue.IsBool() {
+			return nil, true, ErrDenseArrayDType
+		}
+		t, f := trueValue.Bool(), falseValue.Bool()
+		out := make([]bool, len(mask))
+		for i, keep := range mask {
+			out[i] = f
+			if keep {
+				out[i] = t
+			}
+		}
+		return &DenseArray{dtype: DenseArrayBool, bools: out}, true, nil
+	case trueValue.IsInt() && falseValue.IsInt():
+		t, f := trueValue.Int(), falseValue.Int()
+		out := make([]int64, len(mask))
+		for i, keep := range mask {
+			out[i] = f
+			if keep {
+				out[i] = t
+			}
+		}
+		return &DenseArray{dtype: DenseArrayI64, i64: out}, true, nil
+	case trueValue.IsNumber() && falseValue.IsNumber():
+		t, f := trueValue.Number(), falseValue.Number()
+		out := make([]float64, len(mask))
+		for i, keep := range mask {
+			out[i] = f
+			if keep {
+				out[i] = t
+			}
+		}
+		return &DenseArray{dtype: DenseArrayF64, f64: out}, true, nil
+	default:
+		return nil, false, nil
+	}
+}
+
+func denseArraySelectDType(trueValue, falseValue Value, length int) (DenseArrayDType, error) {
+	trueKind, err := denseArraySelectOperandKind(trueValue, length)
+	if err != nil {
+		return DenseArrayF64, err
+	}
+	falseKind, err := denseArraySelectOperandKind(falseValue, length)
+	if err != nil {
+		return DenseArrayF64, err
+	}
+	if trueKind == DenseArrayBool || falseKind == DenseArrayBool {
+		if trueKind == DenseArrayBool && falseKind == DenseArrayBool {
+			return DenseArrayBool, nil
+		}
+		return DenseArrayF64, ErrDenseArrayDType
+	}
+	if trueKind == DenseArrayF64 || falseKind == DenseArrayF64 {
+		return DenseArrayF64, nil
+	}
+	return DenseArrayI64, nil
+}
+
+func denseArraySelectOperandKind(v Value, length int) (DenseArrayDType, error) {
+	if arr := v.DenseArray(); arr != nil {
+		if arr.Len() != length {
+			return DenseArrayF64, ErrDenseArrayLength
+		}
+		return arr.dtype, nil
+	}
+	switch {
+	case v.IsBool():
+		return DenseArrayBool, nil
+	case v.IsInt():
+		return DenseArrayI64, nil
+	case v.IsNumber():
+		return DenseArrayF64, nil
+	default:
+		return DenseArrayF64, ErrDenseArrayScalar
+	}
+}
+
+func denseArrayF64Selector(v Value) func(int) float64 {
+	if arr := v.DenseArray(); arr != nil {
+		switch arr.dtype {
+		case DenseArrayF64:
+			return func(i int) float64 { return arr.f64[i] }
+		case DenseArrayI64:
+			return func(i int) float64 { return float64(arr.i64[i]) }
+		}
+	}
+	x := v.Number()
+	return func(int) float64 { return x }
+}
+
+func denseArrayI64Selector(v Value) func(int) int64 {
+	if arr := v.DenseArray(); arr != nil && arr.dtype == DenseArrayI64 {
+		return func(i int) int64 { return arr.i64[i] }
+	}
+	x := v.Int()
+	return func(int) int64 { return x }
+}
+
+func denseArrayBoolSelector(v Value) func(int) bool {
+	if arr := v.DenseArray(); arr != nil && arr.dtype == DenseArrayBool {
+		return func(i int) bool { return arr.bools[i] }
+	}
+	x := v.Bool()
+	return func(int) bool { return x }
+}
+
 func (a *DenseArray) Slice(start, end int) (*DenseArray, error) {
 	if a == nil {
 		return nil, ErrDenseArrayOperand
@@ -665,6 +1401,23 @@ func denseArrayOneBasedIndex(index int64, length int) (int, error) {
 		return 0, fmt.Errorf("dense array index out of range")
 	}
 	return int(index - 1), nil
+}
+
+func DenseArrayIndexFromValue(index Value, length int) (int, bool, error) {
+	if index.IsInt() {
+		i, err := denseArrayOneBasedIndex(index.Int(), length)
+		return i, true, err
+	}
+	if index.IsFloat() {
+		f := index.Float()
+		i := int64(f)
+		if f != float64(i) {
+			return 0, false, nil
+		}
+		out, err := denseArrayOneBasedIndex(i, length)
+		return out, true, err
+	}
+	return 0, false, nil
 }
 
 func denseArrayBoolCount(xs []bool) int {

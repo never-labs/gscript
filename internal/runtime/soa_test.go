@@ -91,6 +91,11 @@ updated := soa.column(points, "x")
 geMask := soa.mask(points, "x", ">=", 3)
 colMask := soa.mask(points, "x", "<", "y")
 boolMask := soa.mask(soa.withColumn(points, "alive", []bool{true, false, true}), "alive", "==", true)
+selectedScalar := soa.select(points, geMask, "x", 0)
+selectedColumn := soa.select(points, colMask, "x", "y")
+selectedBool := soa.select(points, boolMask, true, false)
+selectIntoOK := soa.selectInto(points, "y", geMask, "x", 0)
+sumSelected := soa.sumSelect(points, geMask, "x", 0)
 window := soa.slice(points, 2, 3)
 filtered := soa.filter(points, []bool{true, false, true})
 compacted := soa.compact(points, []bool{false, true, true})
@@ -137,6 +142,16 @@ fillWhereOK := soa.fillWhere(filled, "ok", []bool{true, false, true}, true)
 	assertDenseBool(t, interp.GetGlobal("geMask"), []bool{false, true, true})
 	assertDenseBool(t, interp.GetGlobal("colMask"), []bool{true, false, true})
 	assertDenseBool(t, interp.GetGlobal("boolMask"), []bool{true, false, true})
+	assertDenseF64(t, interp.GetGlobal("selectedScalar"), []float64{0, 42, 3})
+	assertDenseF64(t, interp.GetGlobal("selectedColumn"), []float64{1, 20, 3})
+	assertDenseBool(t, interp.GetGlobal("selectedBool"), []bool{true, false, true})
+	if got := interp.GetGlobal("selectIntoOK"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("selectIntoOK = %v, want true", got)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("points").SoA(), "y")), []float64{0, 42, 3})
+	if got := interp.GetGlobal("sumSelected"); !got.IsFloat() || got.Float() != 45 {
+		t.Fatalf("sumSelected = %v, want 45", got)
+	}
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("window").SoA(), "x")), []float64{42, 3})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("filtered").SoA(), "x")), []float64{1, 3})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("compacted").SoA(), "x")), []float64{42, 3})
@@ -401,6 +416,9 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	statsWhere := lib.RawGetString("statsWhere").GoFunction()
 	countWhere := lib.RawGetString("countWhere").GoFunction()
 	maskFn := lib.RawGetString("mask").GoFunction()
+	selectFn := lib.RawGetString("select").GoFunction()
+	selectInto := lib.RawGetString("selectInto").GoFunction()
+	sumSelect := lib.RawGetString("sumSelect").GoFunction()
 	if lenFn == nil || lenFn.FastArg1 == nil {
 		t.Fatal("soa.len FastArg1 is nil")
 	}
@@ -478,6 +496,15 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if maskFn == nil || maskFn.FastArg4 == nil {
 		t.Fatal("soa.mask FastArg4 is nil")
+	}
+	if selectFn == nil || selectFn.FastArg4 == nil {
+		t.Fatal("soa.select FastArg4 is nil")
+	}
+	if selectInto == nil || selectInto.FastArg5 == nil {
+		t.Fatal("soa.selectInto FastArg5 is nil")
+	}
+	if sumSelect == nil || sumSelect.FastArg4 == nil {
+		t.Fatal("soa.sumSelect FastArg4 is nil")
 	}
 
 	s, err := NewSoA(map[string]*DenseArray{
@@ -611,6 +638,29 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertDenseBool(t, got, []bool{false, true, true})
+	selectS, err := NewSoA(map[string]*DenseArray{
+		"x": NewDenseArrayF64([]float64{1, 2, 3}),
+		"y": NewDenseArrayF64([]float64{10, 20, 30}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = selectFn.FastArg4(SoAValue(selectS), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})), StringValue("x"), StringValue("y"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDenseF64(t, got, []float64{1, 20, 3})
+	if got, err := selectInto.FastArg5(SoAValue(selectS), StringValue("y"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})), StringValue("x"), FloatValue(0)); err != nil || !got.Bool() {
+		t.Fatalf("soa.selectInto FastArg5 got=%s err=%v", got.String(), err)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, selectS, "y")), []float64{1, 0, 3})
+	got, err = sumSelect.FastArg4(SoAValue(selectS), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})), StringValue("x"), FloatValue(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.IsFloat() || got.Float() != 4 {
+		t.Fatalf("soa.sumSelect FastArg4 = %s, want 4", got.String())
+	}
 }
 
 func BenchmarkDenseArrayFilterF64(b *testing.B) {

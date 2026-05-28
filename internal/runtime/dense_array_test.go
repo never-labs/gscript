@@ -168,6 +168,47 @@ func TestDenseArrayReduceRejectsBoolAndEmpty(t *testing.T) {
 	}
 }
 
+func TestArrayStdlibSumFastArg(t *testing.T) {
+	lib := buildArrayLib()
+	sum := lib.RawGetString("sum").GoFunction()
+	if sum == nil || sum.FastArg1 == nil {
+		t.Fatal("array.sum FastArg1 is nil")
+	}
+	got, err := sum.FastArg1(DenseArrayValue(NewDenseArrayF64([]float64{1.5, 2.5, 3})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.IsFloat() || got.Float() != 7 {
+		t.Fatalf("array.sum f64 = %s, want 7", got.String())
+	}
+	got, err = sum.FastArg1(DenseArrayValue(NewDenseArrayI64([]int64{1, 2, 3})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.IsInt() || got.Int() != 6 {
+		t.Fatalf("array.sum i64 = %s, want 6", got.String())
+	}
+}
+
+func TestDenseArrayIndexFromValue(t *testing.T) {
+	idx, ok, err := DenseArrayIndexFromValue(IntValue(2), 3)
+	if err != nil || !ok || idx != 1 {
+		t.Fatalf("int index = %d/%v/%v, want 1/true/nil", idx, ok, err)
+	}
+	idx, ok, err = DenseArrayIndexFromValue(FloatValue(3), 3)
+	if err != nil || !ok || idx != 2 {
+		t.Fatalf("float integer index = %d/%v/%v, want 2/true/nil", idx, ok, err)
+	}
+	_, ok, err = DenseArrayIndexFromValue(FloatValue(1.5), 3)
+	if err != nil || ok {
+		t.Fatalf("fractional index ok=%v err=%v, want false/nil", ok, err)
+	}
+	_, ok, err = DenseArrayIndexFromValue(FloatValue(4), 3)
+	if err == nil || !ok {
+		t.Fatalf("out-of-range index ok=%v err=%v, want true/error", ok, err)
+	}
+}
+
 func assertDenseI64(t *testing.T, v Value, want []int64) {
 	t.Helper()
 	arr := v.DenseArray()

@@ -240,6 +240,75 @@ func (s *SoA) FillWhere(columnName string, mask *DenseArray, value Value) error 
 	return col.FillWhere(mask, value)
 }
 
+func (s *SoA) Select(mask *DenseArray, trueValue, falseValue Value) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return nil, fmt.Errorf("soa select mask must be a bool dense array")
+	}
+	trueResolved, err := s.resolveSelectOperand(trueValue)
+	if err != nil {
+		return nil, err
+	}
+	falseResolved, err := s.resolveSelectOperand(falseValue)
+	if err != nil {
+		return nil, err
+	}
+	return denseArraySelect(mask, trueResolved, falseResolved, s.length)
+}
+
+func (s *SoA) SelectInto(dstName string, mask *DenseArray, trueValue, falseValue Value) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return fmt.Errorf("soa selectInto mask must be a bool dense array")
+	}
+	dst, ok := s.Column(dstName)
+	if !ok {
+		return fmt.Errorf("soa column %q not found", dstName)
+	}
+	trueResolved, err := s.resolveSelectOperand(trueValue)
+	if err != nil {
+		return err
+	}
+	falseResolved, err := s.resolveSelectOperand(falseValue)
+	if err != nil {
+		return err
+	}
+	return denseArraySelectInto(dst, mask, trueResolved, falseResolved, s.length)
+}
+
+func (s *SoA) SumSelect(mask *DenseArray, trueValue, falseValue Value) (Value, error) {
+	if s == nil {
+		return NilValue(), fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return NilValue(), fmt.Errorf("soa sumSelect mask must be a bool dense array")
+	}
+	trueResolved, err := s.resolveSelectOperand(trueValue)
+	if err != nil {
+		return NilValue(), err
+	}
+	falseResolved, err := s.resolveSelectOperand(falseValue)
+	if err != nil {
+		return NilValue(), err
+	}
+	return denseArraySumSelect(mask, trueResolved, falseResolved, s.length)
+}
+
+func (s *SoA) resolveSelectOperand(v Value) (Value, error) {
+	if v.IsString() {
+		col, ok := s.Column(v.Str())
+		if !ok {
+			return NilValue(), fmt.Errorf("soa column %q not found", v.Str())
+		}
+		return DenseArrayValue(col), nil
+	}
+	return v, nil
+}
+
 func (s *SoA) bumpShapeVersion() {
 	if s == nil {
 		return

@@ -207,6 +207,62 @@ func buildSoALib() *Table {
 		return []Value{BoolValue(true)}, nil
 	}, soaFillWhereValue)
 
+	setFastArg4("select", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.select", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsDenseArray() {
+			return nil, fmt.Errorf("soa.select: argument 2 must be a bool dense array")
+		}
+		if len(args) < 4 {
+			return nil, fmt.Errorf("soa.select: arguments 3 and 4 are required")
+		}
+		out, err := s.Select(args[1].DenseArray(), args[2], args[3])
+		if err != nil {
+			return nil, err
+		}
+		return []Value{DenseArrayValue(out)}, nil
+	}, soaSelectValue)
+
+	setFastArg5("selectInto", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.selectInto", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.selectInto: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsDenseArray() {
+			return nil, fmt.Errorf("soa.selectInto: argument 3 must be a bool dense array")
+		}
+		if len(args) < 5 {
+			return nil, fmt.Errorf("soa.selectInto: arguments 4 and 5 are required")
+		}
+		if err := s.SelectInto(args[1].Str(), args[2].DenseArray(), args[3], args[4]); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaSelectIntoValue)
+
+	setFastArg4("sumSelect", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.sumSelect", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsDenseArray() {
+			return nil, fmt.Errorf("soa.sumSelect: argument 2 must be a bool dense array")
+		}
+		if len(args) < 4 {
+			return nil, fmt.Errorf("soa.sumSelect: arguments 3 and 4 are required")
+		}
+		out, err := s.SumSelect(args[1].DenseArray(), args[2], args[3])
+		if err != nil {
+			return nil, err
+		}
+		return []Value{out}, nil
+	}, soaSumSelectValue)
+
 	setFastArg3("slice", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.slice", args, 0)
 		if err != nil {
@@ -796,6 +852,46 @@ func soaFillWhereValue(soaValue, columnValue, maskValue, fillValue Value) (Value
 		return NilValue(), err
 	}
 	return BoolValue(true), nil
+}
+
+func soaSelectValue(soaValue, maskValue, trueValue, falseValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.select: argument 1 must be soa")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.select: argument 2 must be a bool dense array")
+	}
+	out, err := soaValue.SoA().Select(maskValue.DenseArray(), trueValue, falseValue)
+	if err != nil {
+		return NilValue(), err
+	}
+	return DenseArrayValue(out), nil
+}
+
+func soaSelectIntoValue(soaValue, dstValue, maskValue, trueValue, falseValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.selectInto: argument 1 must be soa")
+	}
+	if !dstValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.selectInto: argument 2 must be a string")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.selectInto: argument 3 must be a bool dense array")
+	}
+	if err := soaValue.SoA().SelectInto(dstValue.Str(), maskValue.DenseArray(), trueValue, falseValue); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
+func soaSumSelectValue(soaValue, maskValue, trueValue, falseValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.sumSelect: argument 1 must be soa")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.sumSelect: argument 2 must be a bool dense array")
+	}
+	return soaValue.SoA().SumSelect(maskValue.DenseArray(), trueValue, falseValue)
 }
 
 func soaUnzipValue(soaValue Value) (Value, error) {

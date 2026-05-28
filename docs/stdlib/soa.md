@@ -179,6 +179,36 @@ ahead := soa.mask(points, "x", ">=", "target_x")
 active := soa.compact(points, moving)
 ```
 
+### `soa.select(s, mask, if_true, if_false) -> dense array`
+
+Returns a dense array by selecting one value per row from `if_true` when
+`mask[i]` is true, otherwise from `if_false`.
+
+`if_true` and `if_false` may be numeric or bool scalars, or strings naming
+columns in `s`. Numeric selections return `i64` when both sides are integer,
+otherwise `f64`; bool selections require both sides to be bool.
+
+```gscript
+moving := soa.mask(points, "velocity", ">", 0)
+signed_speed := soa.select(points, moving, "velocity", 0)
+visible := soa.select(points, moving, true, false)
+```
+
+### `soa.selectInto(s, dst, mask, if_true, if_false) -> true`
+
+Writes the same selection result into an existing destination column. Use this
+form in hot loops when the output shape is stable and a reusable scratch column
+can avoid allocating a new dense array every iteration.
+
+### `soa.sumSelect(s, mask, if_true, if_false) -> number`
+
+Fuses `soa.select` with a numeric sum reduction. Use this when the selected
+temporary is only needed for an aggregate:
+
+```gscript
+total := soa.sumSelect(points, moving, "velocity", 0)
+```
+
 ## Fused Column Kernels
 
 The current native SoA kernels operate over numeric dense columns and mutate the
@@ -273,6 +303,9 @@ is zero, and `min`, `max`, and `mean` are `nil`.
 - Prefer `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` over
   manual row loops when the operation fits their contracts.
 - Use `soa.mask` to produce reusable dense masks from column comparisons.
+- Use `soa.select` for branch-free mask selection into a dense temporary.
+- Use `soa.selectInto` when a dense scratch/output column can be reused.
+- Use `soa.sumSelect` when a selected dense temporary would only be summed.
 - For masked aggregates, prefer `soa.sumWhere` over `soa.filter` plus `soa.sum`
   when you do not need the compacted rows.
 - For compact/filter pipelines, keep the mask as a bool dense array and use

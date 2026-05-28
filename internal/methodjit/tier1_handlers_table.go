@@ -213,6 +213,25 @@ func (e *BaselineJITEngine) handleGetTable(ctx *ExecContext, regs []runtime.Valu
 				}
 			}
 		}
+	} else if tblVal.IsDenseArray() {
+		if absA < len(regs) {
+			if idx, ok, err := runtime.DenseArrayIndexFromValue(key, tblVal.DenseArray().Len()); ok || err != nil {
+				if err != nil {
+					return err
+				}
+				v, err := tblVal.DenseArray().At(idx)
+				if err != nil {
+					return err
+				}
+				regs[absA] = v
+				pc := int(ctx.BaselinePC) - 1
+				if proto.Feedback != nil && pc >= 0 && pc < len(proto.Feedback) {
+					proto.Feedback[pc].Result.Observe(v.Type())
+				}
+			} else {
+				regs[absA] = runtime.NilValue()
+			}
+		}
 	} else if absA < len(regs) {
 		regs[absA] = runtime.NilValue()
 	}
@@ -286,6 +305,15 @@ func (e *BaselineJITEngine) handleSetTable(ctx *ExecContext, regs []runtime.Valu
 			proto.Feedback[pc].ObserveKind(uint8(tbl.GetArrayKind()))
 			if proto.TableKeyFeedback != nil && pc < len(proto.TableKeyFeedback) {
 				proto.TableKeyFeedback[pc].ObserveTableAccess(tbl, key, val, vm.TableAccessKindSet, beforeLen, beforeFieldIdx)
+			}
+		}
+	} else if tblVal.IsDenseArray() {
+		if idx, ok, err := runtime.DenseArrayIndexFromValue(key, tblVal.DenseArray().Len()); ok || err != nil {
+			if err != nil {
+				return err
+			}
+			if err := tblVal.DenseArray().Set(idx, val); err != nil {
+				return err
 			}
 		}
 	}

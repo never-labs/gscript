@@ -36,6 +36,31 @@ func compileAndRun(t *testing.T, src string) map[string]runtime.Value {
 	return globals
 }
 
+func TestDenseArrayNumericLiteralIndex(t *testing.T) {
+	globals := compileAndRun(t, `
+func make_selected() {
+    cols := soa.zip({x: []f64{1, 2, 3}, y: []f64{10, 20, 30}})
+    mask := []bool{true, false, true}
+    selected := soa.select(cols, mask, "x", "y")
+    inside := selected[1] + selected[2] + selected[3]
+    return selected, inside
+}
+arr, inside := make_selected()
+outside := arr[1] + arr[2] + arr[3]
+arr[2] = 7
+updated := arr[1] + arr[2] + arr[3]
+`)
+	if got := globals["inside"]; !got.IsFloat() || got.Float() != 24 {
+		t.Fatalf("inside = %s, want 24", got.String())
+	}
+	if got := globals["outside"]; !got.IsFloat() || got.Float() != 24 {
+		t.Fatalf("outside = %s, want 24", got.String())
+	}
+	if got := globals["updated"]; !got.IsFloat() || got.Float() != 11 {
+		t.Fatalf("updated = %s, want 11", got.String())
+	}
+}
+
 func TestCompileAnnotatesProtoCallAndGlobalFacts(t *testing.T) {
 	src := `
 func leaf(x) {
