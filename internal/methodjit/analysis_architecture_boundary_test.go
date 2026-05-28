@@ -123,12 +123,109 @@ func TestProductionCodeUsesNumericFactsBoundary(t *testing.T) {
 	}
 }
 
+func TestProductionCodeKeepsAnalysisFactFallbacksAtCompatibilityBoundaries(t *testing.T) {
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatalf("glob methodjit files: %v", err)
+	}
+	allowedFuncs := map[string]bool{
+		"callABIAnnotationConfigWithDefaults":            true,
+		"collectStableGlobalArrayElementFacts":           true,
+		"callABIFeedbackCalleeProto":                     true,
+		"fieldShapeCalleeProtos":                         true,
+		"fieldShapeCalleeCases":                          true,
+		"fieldShapeCalleeSummary":                        true,
+		"fieldShapeCalleeABISummary":                     true,
+		"specGuardKindSuppressed":                        true,
+		"getFieldReceiverFixedShapeFact":                 true,
+		"inlineConfigWithDefaults":                       true,
+		"inlineFeedbackCallee":                           true,
+		"inlineFeedbackFieldShapeCase":                   true,
+		"fieldShapeInlineSplitEligibilitySummary":        true,
+		"functionNumericFacts":                           true,
+		"functionCallFacts":                              true,
+		"functionSpeculationFacts":                       true,
+		"functionTableShapeFacts":                        true,
+		"functionLoopSpecializationFacts":                true,
+		"functionGlobalFacts":                            true,
+		"newPassContext":                                 true,
+		"newPassContextWithAllowedDomains":               true,
+		"newPassContextWithAllowedDomainsAndEnforcement": true,
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") || file == "analysis_result.go" || file == "pass_context.go" ||
+			!analysisFactFallbackConstrainedFile(file) ||
+			analysisFactFallbackBoundaryFile(file) {
+			continue
+		}
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		for _, decl := range parsed.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok || !isFunctionFactAccessorCall(call) {
+					return true
+				}
+				if allowedFuncs[fn.Name.Name] {
+					return true
+				}
+				pos := fset.Position(call.Pos())
+				t.Fatalf("%s calls %s outside a compatibility boundary; pass facts explicitly through PassContext/config", pos, functionFactAccessorName(call))
+				return true
+			})
+		}
+	}
+}
+
+func analysisFactFallbackConstrainedFile(file string) bool {
+	base := filepath.Base(file)
+	return strings.HasPrefix(base, "pass_") ||
+		strings.HasPrefix(base, "tier2_optimizer_modules_")
+}
+
+func analysisFactFallbackBoundaryFile(file string) bool {
+	base := filepath.Base(file)
+	return strings.HasPrefix(base, "emit_") ||
+		strings.HasPrefix(base, "tiering_") ||
+		strings.HasPrefix(base, "facts_") ||
+		base == "interp.go"
+}
+
 func legacyTableShapeField(name string) bool {
 	switch name {
 	case "FieldPolyShapeFacts", "FieldPolyShapeReceivers", "FieldPolyShapeCatalog", "FieldCallPolyLenFusions":
 		return true
 	default:
 		return false
+	}
+}
+
+func isFunctionFactAccessorCall(call *ast.CallExpr) bool {
+	return functionFactAccessorName(call) != ""
+}
+
+func functionFactAccessorName(call *ast.CallExpr) string {
+	ident, ok := call.Fun.(*ast.Ident)
+	if !ok {
+		return ""
+	}
+	switch ident.Name {
+	case "functionNumericFacts",
+		"functionCallFacts",
+		"functionSpeculationFacts",
+		"functionTableShapeFacts",
+		"functionLoopSpecializationFacts",
+		"functionGlobalFacts":
+		return ident.Name
+	default:
+		return ""
 	}
 }
 
