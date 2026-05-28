@@ -353,7 +353,7 @@ func (vm *VM) ExecuteStdStringFindCall(absSlot, nArgs, rawC int) (bool, error) {
 		return handled, err
 	}
 	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
-	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{r0, r1}[:n])
+	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)
 	return true, nil
 }
 
@@ -373,7 +373,7 @@ func (vm *VM) ExecuteStdStringMatchCall(absSlot, nArgs, rawC int) (bool, error) 
 		return handled, err
 	}
 	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
-	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{r0, r1}[:n])
+	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)
 	return true, nil
 }
 
@@ -415,10 +415,10 @@ func (vm *VM) ExecuteStdNextCall(absSlot, nArgs, rawC int) (bool, error) {
 		if !key.IsNil() && tbl.RawGet(key).IsNil() {
 			return true, fmt.Errorf("invalid key to 'next'")
 		}
-		vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{runtime.NilValue()})
+		vm.storeFixedFastCallResult(absSlot, rawC, runtime.NilValue(), runtime.NilValue(), 1)
 		return true, nil
 	}
-	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{nk, nv})
+	vm.storeFixedFastCallResult(absSlot, rawC, nk, nv, 2)
 	return true, nil
 }
 
