@@ -135,6 +135,21 @@ func TestWithMaxStepsLimitsInterpreterExecution(t *testing.T) {
 	}
 }
 
+func TestWithMaxStepsLimitsEmptyInterpreterLoop(t *testing.T) {
+	vm := gs.New(gs.WithMaxSteps(8))
+	err := vm.Exec(`for {}`)
+	if err == nil {
+		t.Fatal("expected step limit error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "steps" || budgetErr.Limit != 8 {
+		t.Fatalf("budget = %s %d, want steps 8", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
 func TestWithMaxStepsAllowsInterpreterExecutionWithinBudget(t *testing.T) {
 	vm := gs.New(gs.WithMaxSteps(64))
 	if err := vm.Exec(`

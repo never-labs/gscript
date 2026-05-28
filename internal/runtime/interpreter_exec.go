@@ -492,6 +492,9 @@ func (interp *Interpreter) execIf(s *ast.IfStmt, env *Environment) ([]Value, boo
 // ------------------------------------------------------------------
 func (interp *Interpreter) execFor(s *ast.ForStmt, env *Environment) ([]Value, bool, bool, bool, error) {
 	for {
+		if err := interp.checkStepBudget(); err != nil {
+			return nil, false, false, false, err
+		}
 		if s.Cond != nil {
 			cond, err := interp.evalExprSingle(s.Cond, env)
 			if err != nil {
@@ -528,6 +531,9 @@ func (interp *Interpreter) execForNum(s *ast.ForNumStmt, env *Environment) ([]Va
 		return nil, false, false, false, err
 	}
 	for {
+		if err := interp.checkStepBudget(); err != nil {
+			return nil, false, false, false, err
+		}
 		// Evaluate condition
 		cond, err := interp.evalExprSingle(s.Cond, loopEnv)
 		if err != nil {
@@ -569,6 +575,9 @@ func (interp *Interpreter) execForRange(s *ast.ForRangeStmt, env *Environment) (
 		tbl := iterVal.Table()
 		var key Value = NilValue()
 		for {
+			if err := interp.checkStepBudget(); err != nil {
+				return nil, false, false, false, err
+			}
 			nextKey, nextVal, ok := tbl.Next(key)
 			if !ok {
 				break
@@ -599,6 +608,9 @@ func (interp *Interpreter) execForRange(s *ast.ForRangeStmt, env *Environment) (
 	if iterVal.IsFunction() {
 		// Iterator function: call repeatedly until nil
 		for {
+			if err := interp.checkStepBudget(); err != nil {
+				return nil, false, false, false, err
+			}
 			results, err := interp.callFunction(iterVal, nil)
 			if err != nil {
 				return nil, false, false, false, err
@@ -632,6 +644,9 @@ func (interp *Interpreter) execForRange(s *ast.ForRangeStmt, env *Environment) (
 	if iterVal.IsChannel() {
 		ch := iterVal.Channel()
 		for {
+			if err := interp.checkStepBudget(); err != nil {
+				return nil, false, false, false, err
+			}
 			val, ok := ch.Recv()
 			if !ok {
 				break
