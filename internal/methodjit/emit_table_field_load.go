@@ -824,7 +824,7 @@ func (ec *emitContext) fieldLoadTypeCheckElided(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil {
 		return false
 	}
-	return ec.fn.Analysis.TableShapeFacts().ShapeFieldTypeElidedLoad(instr.ID)
+	return functionTableShapeFacts(ec.fn).ShapeFieldTypeElidedLoad(instr.ID)
 }
 
 // emitGetFieldExit emits a table-exit for OpGetField when no inline cache

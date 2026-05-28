@@ -635,10 +635,10 @@ func (ec *emitContext) emitIntModZeroDeopt() {
 // fits in the int48 signed range. When true, the emitter may skip the
 // SBFX+CMP+B.NE overflow check (saves 3 ARM64 instructions per op).
 func (ec *emitContext) int48Safe(id int) bool {
-	if ec.fn == nil || ec.fn.Analysis == nil {
+	if ec.fn == nil {
 		return false
 	}
-	numeric := ec.fn.Analysis.NumericFacts()
+	numeric := functionNumericFacts(ec.fn)
 	if numeric.IsInt48Safe(id) {
 		return true
 	}

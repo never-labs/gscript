@@ -184,6 +184,38 @@ func TestProductionCodeKeepsAnalysisFactFallbacksAtCompatibilityBoundaries(t *te
 	}
 }
 
+func TestEmittersUseFactAccessBoundaries(t *testing.T) {
+	files, err := filepath.Glob("emit_*.go")
+	if err != nil {
+		t.Fatalf("glob emitter files: %v", err)
+	}
+	for _, file := range files {
+		if strings.HasSuffix(file, "_test.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		parsed, err := parser.ParseFile(fset, file, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		ast.Inspect(parsed, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || !analysisFactAccessorName(sel.Sel.Name) {
+				return true
+			}
+			if isSelectorNamed(sel.X, "Analysis") {
+				pos := fset.Position(sel.Pos())
+				t.Fatalf("%s directly calls Analysis.%s in emitter; use function*Facts helpers", pos, sel.Sel.Name)
+			}
+			return true
+		})
+	}
+}
+
 func analysisFactFallbackConstrainedFile(file string) bool {
 	base := filepath.Base(file)
 	return strings.HasPrefix(base, "pass_") ||
@@ -226,6 +258,20 @@ func functionFactAccessorName(call *ast.CallExpr) string {
 		return ident.Name
 	default:
 		return ""
+	}
+}
+
+func analysisFactAccessorName(name string) bool {
+	switch name {
+	case "NumericFacts",
+		"CallFacts",
+		"SpeculationFacts",
+		"TableShapeFacts",
+		"LoopSpecializationFacts",
+		"GlobalFacts":
+		return true
+	default:
+		return false
 	}
 }
 

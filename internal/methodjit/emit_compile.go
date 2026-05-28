@@ -269,7 +269,9 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 	nativeCallCalleeResumeSafe := tier2NativeCallCalleeResumeSafe(fn)
 	rawIntSelfABI := AnalyzeRawIntSelfABI(fn.Proto)
 	typedSelfABI := AnalyzeTypedSelfABI(fn.Proto)
-	typedPeerABI := AnalyzeTypedPeerABIWithFactsAndGlobals(fn.Proto, nil, nil, fn.Analysis.GlobalFacts().NumericGlobalValuesMap(), fn.Analysis.GlobalFacts().GlobalArrayElementFactsMap())
+	globalFacts := functionGlobalFacts(fn)
+	tableShapeFacts := functionTableShapeFacts(fn)
+	typedPeerABI := AnalyzeTypedPeerABIWithFactsAndGlobals(fn.Proto, nil, nil, globalFacts.NumericGlobalValuesMap(), globalFacts.GlobalArrayElementFactsMap())
 	typedEntryABI := typedSelfABI
 	if !typedEntryABI.Eligible && typedPeerABI.Eligible {
 		typedEntryABI = typedPeerABI
@@ -344,7 +346,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		nativeCallCalleeResumeSafe: nativeCallCalleeResumeSafe,
 		rawIntSelfABI:              rawIntSelfABI,
 		typedSelfABI:               typedEntryABI,
-		entryShapeGuards:           fn.Analysis.TableShapeFacts().FixedShapeEntryGuardMap(),
+		entryShapeGuards:           tableShapeFacts.FixedShapeEntryGuardMap(),
 		traceNativeCalls:           opts.TraceNativeCalls,
 		printNativeCallTrace:       opts.PrintNativeCallTrace,
 	}
@@ -502,7 +504,7 @@ func CompileWithOptions(fn *Function, alloc *RegAllocation, opts CompileOptions)
 		CallCachePCs:             ec.callCachePCs,
 		NewTableCaches:           ec.newTableCaches,
 		FixedTableArgSlots:       ec.fixedTableArgSlots,
-		FixedRecordNewTableSites: fn.Analysis.TableShapeFacts().FixedRecordNewTableSiteMap(),
+		FixedRecordNewTableSites: tableShapeFacts.FixedRecordNewTableSiteMap(),
 		StringConstTables:        fn.StringConstTables,
 		StringFormatPatterns:     fn.StringFormatPatterns,
 		StringSplitSubSpecs:      fn.StringSplitSubSpecs,

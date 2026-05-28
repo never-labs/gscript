@@ -28,7 +28,7 @@ func (ec *emitContext) emitCallNativeTypedPeerIfEligible(instr *Instr) bool {
 	if ec == nil || ec.fn == nil || instr == nil {
 		return false
 	}
-	desc, ok := ec.fn.Analysis.CallFacts().CallABI(instr.ID)
+	desc, ok := functionCallFacts(ec.fn).CallABI(instr.ID)
 	if !ok || !desc.TypedPeer || desc.Callee == nil {
 		return false
 	}

@@ -379,7 +379,7 @@ func (ec *emitContext) emitCallNativeRawIntPeerIfEligible(instr *Instr) bool {
 		return false
 	}
 	if ec.fn != nil {
-		if desc, ok := ec.fn.Analysis.CallFacts().CallABI(instr.ID); ok {
+		if desc, ok := functionCallFacts(ec.fn).CallABI(instr.ID); ok {
 			ec.traceNativeCallEmit(instr, "raw-int peer", callee, &desc)
 		} else {
 			ec.traceNativeCallEmit(instr, "raw-int peer", callee, nil)
@@ -549,7 +549,7 @@ func (ec *emitContext) rawIntPeerCallee(instr *Instr) *vm.FuncProto {
 	if len(instr.Args) < 2 {
 		return nil
 	}
-	desc, ok := ec.fn.Analysis.CallFacts().CallABI(instr.ID)
+	desc, ok := functionCallFacts(ec.fn).CallABI(instr.ID)
 	if !ok || desc.Callee == nil || !desc.RawIntReturn || desc.NumRets != 1 {
 		return nil
 	}
