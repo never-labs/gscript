@@ -274,6 +274,7 @@ func runCallABIModule(fn *Function, optCtx *Tier2OptimizerContext, passCtx *Pass
 		Globals:                 ctxGlobals(optCtx),
 		NumericGlobalValues:     globalFacts.NumericGlobalValuesMap(),
 		GlobalArrayElementFacts: globalArrayFacts,
+		TableShapes:             tableShapes,
 		DependencyRegistry:      ctxDependencyRegistry(optCtx),
 	})(fn)
 }

@@ -26,6 +26,11 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 	if fn == nil {
 		return fn
 	}
+	tableShapes := config.TableShapes
+	if tableShapes == nil {
+		tableShapes = functionTableShapeFacts(fn)
+	}
+	config.TableShapes = tableShapes
 	globals := callABIMergeGlobals(config.Globals, callABIStableGlobals(fn.Proto))
 	callFacts := functionCallFacts(fn)
 	callFacts.SetCallABIs(nil)
@@ -50,9 +55,9 @@ func AnnotateCallABIs(fn *Function, config CallABIAnnotationConfig) *Function {
 			}
 			desc, reason := callABIDescriptorFor(fn, instr, globals, tails, shiftAddOverflowVersions, config)
 			if desc.Callee == nil {
-				if summary := fieldShapeCalleeSummary(fn, instr); summary != "" {
+				if summary := fieldShapeCalleeSummaryWithFacts(fn, tableShapes, instr); summary != "" {
 					reason = reason + "; field-shape polymorphic callee set: " + summary
-					if abiSummary := fieldShapeCalleeABISummary(fn, instr); abiSummary != "" {
+					if abiSummary := fieldShapeCalleeABISummaryWithFacts(fn, tableShapes, instr); abiSummary != "" {
 						reason = reason + "; ABI candidates: " + abiSummary
 					}
 				}
@@ -261,10 +266,10 @@ func callABITypedPeerDescriptorFor(fn *Function, instr *Instr, callee *vm.FuncPr
 	if fn == nil || instr == nil || callee == nil {
 		return CallABIDescriptor{}, false, ""
 	}
-	argFacts := callABITypedPeerArgFacts(fn, instr, callee)
+	argFacts := callABITypedPeerArgFacts(fn, config.TableShapes, instr, callee)
 	arrayElementArgFacts := profiledFixedShapeArrayElementArgFactsForProto(callee)
 	arrayElementArgFacts = mergeFixedShapeTableFacts(arrayElementArgFacts,
-		callABITypedPeerArrayElementArgFacts(fn, instr, config.Globals))
+		callABITypedPeerArrayElementArgFacts(fn, config.TableShapes, instr, config.Globals))
 	if len(config.Globals) > 0 {
 		arrayElementArgFacts = mergeFixedShapeTableFacts(arrayElementArgFacts,
 			inferGuardedFixedShapeArrayElementArgFactsForProto(callee, config.Globals))
@@ -383,19 +388,19 @@ func callABIRefineTypedPeerParamsFromFeedback(fn *Function, instr *Instr, params
 	return out
 }
 
-func callABITypedPeerArgFacts(fn *Function, instr *Instr, callee *vm.FuncProto) map[int]FixedShapeTableFact {
-	cases := fieldShapeCalleeCases(fn, instr)
+func callABITypedPeerArgFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr, callee *vm.FuncProto) map[int]FixedShapeTableFact {
+	cases := fieldShapeCalleeCasesWithFacts(fn, tableShapes, instr)
 	if len(cases) != 1 || cases[0].VMProto != callee || cases[0].ReceiverFact.ShapeID == 0 {
 		return nil
 	}
 	return map[int]FixedShapeTableFact{0: cases[0].ReceiverFact}
 }
 
-func callABITypedPeerArrayElementArgFacts(fn *Function, instr *Instr, globals map[string]*vm.FuncProto) map[int]FixedShapeTableFact {
+func callABITypedPeerArrayElementArgFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr, globals map[string]*vm.FuncProto) map[int]FixedShapeTableFact {
 	if fn == nil || instr == nil || len(instr.Args) < 2 {
 		return nil
 	}
-	arrayFacts := inferLocalArrayElementTableFacts(fn, currentFixedShapeTableFacts(fn, functionTableShapeFacts(fn)))
+	arrayFacts := inferLocalArrayElementTableFacts(fn, currentFixedShapeTableFacts(fn, tableShapes))
 	arrayFacts = mergeFixedShapeTableFacts(arrayFacts, inferArrayElementValuesForArgs(fn, globals))
 	if len(arrayFacts) == 0 {
 		return nil
@@ -635,6 +640,10 @@ func fieldShapeCalleeProtos(fn *Function, instr *Instr) []*vm.FuncProto {
 }
 
 func fieldShapeCalleeCases(fn *Function, instr *Instr) []FieldPolyShapeCase {
+	return fieldShapeCalleeCasesWithFacts(fn, functionTableShapeFacts(fn), instr)
+}
+
+func fieldShapeCalleeCasesWithFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr) []FieldPolyShapeCase {
 	if fn == nil || instr == nil || instr.Op != OpCall || len(instr.Args) == 0 ||
 		instr.Args[0] == nil || instr.Args[0].Def == nil {
 		return nil
@@ -643,7 +652,10 @@ func fieldShapeCalleeCases(fn *Function, instr *Instr) []FieldPolyShapeCase {
 	if calleeLoad.Op != OpGetField {
 		return nil
 	}
-	cases, _ := functionTableShapeFacts(fn).FieldPolyShapeCases(calleeLoad.ID)
+	if tableShapes == nil {
+		return nil
+	}
+	cases, _ := tableShapes.FieldPolyShapeCases(calleeLoad.ID)
 	if len(cases) == 0 {
 		return nil
 	}
@@ -651,7 +663,11 @@ func fieldShapeCalleeCases(fn *Function, instr *Instr) []FieldPolyShapeCase {
 }
 
 func fieldShapeCalleeSummary(fn *Function, instr *Instr) string {
-	cases := fieldShapeCalleeCases(fn, instr)
+	return fieldShapeCalleeSummaryWithFacts(fn, functionTableShapeFacts(fn), instr)
+}
+
+func fieldShapeCalleeSummaryWithFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr) string {
+	cases := fieldShapeCalleeCasesWithFacts(fn, tableShapes, instr)
 	if len(cases) == 0 {
 		return ""
 	}
@@ -667,7 +683,11 @@ func fieldShapeCalleeSummary(fn *Function, instr *Instr) string {
 }
 
 func fieldShapeCalleeABISummary(fn *Function, instr *Instr) string {
-	cases := fieldShapeCalleeCases(fn, instr)
+	return fieldShapeCalleeABISummaryWithFacts(fn, functionTableShapeFacts(fn), instr)
+}
+
+func fieldShapeCalleeABISummaryWithFacts(fn *Function, tableShapes *TableShapeFacts, instr *Instr) string {
+	cases := fieldShapeCalleeCasesWithFacts(fn, tableShapes, instr)
 	if len(cases) == 0 {
 		return ""
 	}

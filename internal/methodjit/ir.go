@@ -215,6 +215,7 @@ type CallABIAnnotationConfig struct {
 	Globals                 map[string]*vm.FuncProto
 	NumericGlobalValues     map[string]runtime.Value
 	GlobalArrayElementFacts map[string]FixedShapeTableFact
+	TableShapes             *TableShapeFacts
 	DependencyRegistry      *CompilationDependencyRegistry
 }
 
