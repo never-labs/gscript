@@ -105,9 +105,9 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		{
 			Name:     "StableFieldCalleeGuard",
 			Phase:    Tier2PhaseTableFieldLower,
-			Requires: analysisFacts(AnalysisFactCallABIs),
+			Requires: analysisFacts(AnalysisFactFieldPolyShapeFacts),
 			RunWithContext: func(fn *Function, opts *Tier2PipelineOpts, ctx *Tier2OptimizerContext) (*Function, error) {
-				return StableFieldCalleeGuardPassWith(ctxDependencyRegistry(ctx))(fn)
+				return StableFieldCalleeGuardPassCtx(ctxDependencyRegistry(ctx))(newPassContext(fn, opts, stableFieldCalleeGuardPassAllowedDomains, passContextEnforce))
 			},
 		},
 		tier2PassModuleWith("TableArrayLower (post-FieldSvalsLower)", Tier2PhaseTableFieldLower, nil, nil, TableArrayLowerPass),

@@ -16,13 +16,28 @@ func StableFieldCalleeGuardPass(fn *Function) (*Function, error) {
 	return StableFieldCalleeGuardPassWith(nil)(fn)
 }
 
+var stableFieldCalleeGuardPassAllowedDomains = allowedDomainsForModule(
+	analysisFacts(AnalysisFactFieldPolyShapeFacts),
+	nil,
+	nil,
+)
+
 func StableFieldCalleeGuardPassWith(registry *CompilationDependencyRegistry) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return stableFieldCalleeGuardPass(fn, registry)
+		return StableFieldCalleeGuardPassCtx(registry)(newPassContext(fn, nil, stableFieldCalleeGuardPassAllowedDomains, false))
 	}
 }
 
-func stableFieldCalleeGuardPass(fn *Function, registry *CompilationDependencyRegistry) (*Function, error) {
+func StableFieldCalleeGuardPassCtx(registry *CompilationDependencyRegistry) func(*PassContext) (*Function, error) {
+	return func(ctx *PassContext) (*Function, error) {
+		if ctx == nil {
+			return nil, nil
+		}
+		return stableFieldCalleeGuardPass(ctx.Func(), ctx.TableShape(), registry)
+	}
+}
+
+func stableFieldCalleeGuardPass(fn *Function, tableShapes *TableShapeFacts, registry *CompilationDependencyRegistry) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -54,7 +69,7 @@ func stableFieldCalleeGuardPass(fn *Function, registry *CompilationDependencyReg
 					fmt.Sprintf("shape=%d field=%d may be written in this function", shapeID, fieldIdx))
 				continue
 			}
-			closure := stableFieldCalleeExactClosure(fn, instr, shapeID, fieldIdx)
+			closure := stableFieldCalleeExactClosure(fn, tableShapes, instr, shapeID, fieldIdx)
 			if closure == 0 || !runtimeShapeFieldClosureStable(shapeID, fieldIdx, closure) {
 				out = append(out, instr)
 				continue
@@ -156,11 +171,14 @@ func runtimeShapeFieldClosureStable(shapeID uint32, fieldIdx int, closure uintpt
 	return stable && got == closure && runtime.ShapeFieldVMClosureEpochPtr(shapeID, fieldIdx) != nil
 }
 
-func stableFieldCalleeExactClosure(fn *Function, instr *Instr, shapeID uint32, fieldIdx int) uintptr {
+func stableFieldCalleeExactClosure(fn *Function, tableShapes *TableShapeFacts, instr *Instr, shapeID uint32, fieldIdx int) uintptr {
 	if fn == nil || instr == nil || shapeID == 0 || fieldIdx < 0 || instr.Aux == 0 {
 		return 0
 	}
-	cases, _ := functionTableShapeFacts(fn).FieldPolyShapeCases(instr.ID)
+	if tableShapes == nil {
+		return 0
+	}
+	cases, _ := tableShapes.FieldPolyShapeCases(instr.ID)
 	if len(cases) != 1 {
 		return 0
 	}
