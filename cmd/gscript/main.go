@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -142,6 +143,39 @@ func main() {
 		*useVM = true
 	}
 
+	runOpts := cliRunOptions{
+		UseVM:        *useVM,
+		UseJIT:       *useJIT,
+		ShowJITStats: *jitStats,
+		JIT: jitCLIOptions{
+			TimelinePath:              *jitTimeline,
+			TimelineFormat:            *jitTimelineFormat,
+			WarmDumpDir:               *jitDumpWarm,
+			WarmDumpProto:             *jitDumpProto,
+			ShowExitStats:             *exitStats,
+			ShowExitStatsJSON:         *exitStatsJSON,
+			ShowTier2PerfStats:        *tier2PerfStats,
+			ShowTier2PerfStatsJSON:    *tier2PerfStatsJSON,
+			ShowTier2SpecStateJSON:    *tier2SpecStateJSON,
+			ShowTier2SpecWorklistJSON: *tier2SpecWorklistJSON,
+			ShowCoroutineStats:        *coroutineStats,
+			ShowPathStats:             *pathStats,
+			ShowPathStatsJSON:         *pathStatsJSON,
+		},
+	}
+
+	args := flag.Args()
+	if len(args) > 0 && args[0] == "test" {
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, "usage: gscript test <path-or-dir>")
+			os.Exit(2)
+		}
+		if ok := runTests(args[1], runOpts, os.Stderr); !ok {
+			os.Exit(1)
+		}
+		return
+	}
+
 	interp := runtime.New()
 
 	if *eval != "" {
@@ -157,7 +191,6 @@ func main() {
 		return
 	}
 
-	args := flag.Args()
 	if len(args) == 0 {
 		// REPL mode
 		interp.SetArgs("<repl>", nil)
@@ -167,44 +200,20 @@ func main() {
 
 	// Execute file
 	filename := args[0]
-
-	interp.SetArgs(filename, args[1:])
-
-	// Set script directory for require
-	absPath, _ := filepath.Abs(filename)
-	interp.SetScriptDir(filepath.Dir(absPath))
-
-	if *useVM {
-		if err := runFileVM(interp, filename, *useJIT, *jitStats, jitCLIOptions{
-			TimelinePath:              *jitTimeline,
-			TimelineFormat:            *jitTimelineFormat,
-			WarmDumpDir:               *jitDumpWarm,
-			WarmDumpProto:             *jitDumpProto,
-			ShowExitStats:             *exitStats,
-			ShowExitStatsJSON:         *exitStatsJSON,
-			ShowTier2PerfStats:        *tier2PerfStats,
-			ShowTier2PerfStatsJSON:    *tier2PerfStatsJSON,
-			ShowTier2SpecStateJSON:    *tier2SpecStateJSON,
-			ShowTier2SpecWorklistJSON: *tier2SpecWorklistJSON,
-			ShowCoroutineStats:        *coroutineStats,
-			ShowPathStats:             *pathStats,
-			ShowPathStatsJSON:         *pathStatsJSON,
-		}); err != nil {
-			if exit, ok := processExit(err); ok {
-				os.Exit(exit.Code)
-			}
-			fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
-			os.Exit(1)
+	if err := runScriptFile(interp, filename, args[1:], runOpts); err != nil {
+		if exit, ok := processExit(err); ok {
+			os.Exit(exit.Code)
 		}
-	} else {
-		if err := runFile(interp, filename); err != nil {
-			if exit, ok := processExit(err); ok {
-				os.Exit(exit.Code)
-			}
-			fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
-			os.Exit(1)
-		}
+		fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
+		os.Exit(1)
 	}
+}
+
+type cliRunOptions struct {
+	UseVM        bool
+	UseJIT       bool
+	ShowJITStats bool
+	JIT          jitCLIOptions
 }
 
 func processExit(err error) (*runtime.ProcessExitError, bool) {
@@ -213,6 +222,72 @@ func processExit(err error) (*runtime.ProcessExitError, bool) {
 		return exit, true
 	}
 	return nil, false
+}
+
+func runScriptFile(interp *runtime.Interpreter, filename string, args []string, opts cliRunOptions) error {
+	interp.SetArgs(filename, args)
+
+	// Set script directory for require.
+	absPath, _ := filepath.Abs(filename)
+	interp.SetScriptDir(filepath.Dir(absPath))
+
+	if opts.UseVM {
+		return runFileVM(interp, filename, opts.UseJIT, opts.ShowJITStats, opts.JIT)
+	}
+	return runFile(interp, filename)
+}
+
+func runTests(path string, opts cliRunOptions, errw io.Writer) bool {
+	files, err := testFiles(path)
+	if err != nil {
+		fmt.Fprintf(errw, "%s: %v\n", path, err)
+		return false
+	}
+
+	ok := true
+	for _, filename := range files {
+		interp := runtime.New()
+		if err := runScriptFile(interp, filename, nil, opts); err != nil {
+			if exit, isExit := processExit(err); isExit && exit.Code == 0 {
+				continue
+			}
+			fmt.Fprintf(errw, "%s: %v\n", filename, err)
+			ok = false
+		}
+	}
+	return ok
+}
+
+func testFiles(path string) ([]string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		if filepath.Ext(path) != ".gs" {
+			return nil, fmt.Errorf("test file must have .gs extension")
+		}
+		return []string{path}, nil
+	}
+
+	var files []string
+	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(p) == ".gs" {
+			files = append(files, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(files)
+	return files, nil
 }
 
 func runFile(interp *runtime.Interpreter, filename string) error {
