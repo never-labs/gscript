@@ -46,8 +46,8 @@ func overflowBoxingPassCtx(ctx *PassContext, forceBoxIntIDs map[int]bool) (*Func
 	fn.ensureAnalysis()
 	// Reach the declared numeric domain through the gated accessor; the
 	// int48-safety/range predicates below consume it.
-	_ = ctx.Numeric()
-	return overflowBoxingPass(fn, forceBoxIntIDs)
+	numeric := ctx.Numeric()
+	return overflowBoxingPass(fn, forceBoxIntIDs, numeric)
 }
 
 // LateModuloMultiplyOverflowBoxingPass repairs a narrow late-pipeline hazard:
@@ -65,14 +65,14 @@ func LateModuloMultiplyOverflowBoxingPass(fn *Function) (*Function, error) {
 	return forceBoxIntArithmeticOnly(fn, force), nil
 }
 
-func overflowBoxingPass(fn *Function, forceBoxIntIDs map[int]bool) (*Function, error) {
+func overflowBoxingPass(fn *Function, forceBoxIntIDs map[int]bool, numeric *NumericFacts) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 
 	loopCarriedDeps := collectPhiArithmeticDeps(fn)
-	overflowCheckedRaw := collectOverflowCheckedLinearInductionDeps(fn)
-	for id := range collectModuloAdditiveAccumulatorDeps(fn) {
+	overflowCheckedRaw := collectOverflowCheckedLinearInductionDeps(fn, numeric)
+	for id := range collectModuloAdditiveAccumulatorDeps(fn, numeric) {
 		overflowCheckedRaw[id] = true
 	}
 	boxed := make(map[int]bool)
@@ -84,7 +84,7 @@ func overflowBoxingPass(fn *Function, forceBoxIntIDs map[int]bool) (*Function, e
 			}
 			if loopCarriedDeps[instr.ID] &&
 				!overflowCheckedRaw[instr.ID] &&
-				isUnsafeIntArithmetic(fn, instr) {
+				isUnsafeIntArithmetic(instr, numeric) {
 				boxed[instr.ID] = true
 			}
 		}
@@ -112,7 +112,7 @@ func overflowBoxingPass(fn *Function, forceBoxIntIDs map[int]bool) (*Function, e
 					if anyArgBoxed(instr, boxed) ||
 						(loopCarriedDeps[instr.ID] &&
 							!overflowCheckedRaw[instr.ID] &&
-							isUnsafeIntArithmetic(fn, instr)) {
+							isUnsafeIntArithmetic(instr, numeric)) {
 						boxed[instr.ID] = true
 						changed = true
 					}
@@ -385,7 +385,7 @@ func multiplicativeModuloValueDependsOnPhi(v *Value, phiID int, keep map[int]boo
 // checks. This deliberately rejects multiplicative/division recurrences such
 // as LCGs, where overflow is predictable and boxed arithmetic avoids repeated
 // deopts.
-func collectModuloAdditiveAccumulatorDeps(fn *Function) map[int]bool {
+func collectModuloAdditiveAccumulatorDeps(fn *Function, numeric *NumericFacts) map[int]bool {
 	keep := make(map[int]bool)
 	if fn == nil || len(fn.Blocks) == 0 {
 		return keep
@@ -418,7 +418,7 @@ func collectModuloAdditiveAccumulatorDeps(fn *Function) map[int]bool {
 				}
 				if update == nil || update.Op != OpModInt || !positiveConstModDivisor(update) ||
 					!additiveModuloExprDependsOnPhi(update, phi.ID, local, make(map[int]bool)) ||
-					additiveModuloExprHasNonInt48Leaf(fn, update, phi.ID, make(map[int]bool)) {
+					additiveModuloExprHasNonInt48Leaf(update, phi.ID, make(map[int]bool), numeric) {
 					allModuloUpdates = false
 					break
 				}
@@ -436,7 +436,7 @@ func collectModuloAdditiveAccumulatorDeps(fn *Function) map[int]bool {
 	return keep
 }
 
-func additiveModuloExprHasNonInt48Leaf(fn *Function, instr *Instr, phiID int, seen map[int]bool) bool {
+func additiveModuloExprHasNonInt48Leaf(instr *Instr, phiID int, seen map[int]bool, numeric *NumericFacts) bool {
 	if instr == nil {
 		return false
 	}
@@ -445,25 +445,27 @@ func additiveModuloExprHasNonInt48Leaf(fn *Function, instr *Instr, phiID int, se
 	}
 	seen[instr.ID] = true
 	for _, arg := range instr.Args {
-		if additiveModuloValueHasNonInt48Leaf(fn, arg, phiID, seen) {
+		if additiveModuloValueHasNonInt48Leaf(arg, phiID, seen, numeric) {
 			return true
 		}
 	}
 	return false
 }
 
-func additiveModuloValueHasNonInt48Leaf(fn *Function, v *Value, phiID int, seen map[int]bool) bool {
+func additiveModuloValueHasNonInt48Leaf(v *Value, phiID int, seen map[int]bool, numeric *NumericFacts) bool {
 	if v == nil || v.Def == nil || v.ID == phiID {
 		return false
 	}
 	switch v.Def.Op {
 	case OpAddInt, OpSubInt, OpNegInt, OpModInt:
-		return additiveModuloExprHasNonInt48Leaf(fn, v.Def, phiID, seen)
+		return additiveModuloExprHasNonInt48Leaf(v.Def, phiID, seen, numeric)
 	case OpConstInt:
 		return v.Def.Aux < MinInt48 || v.Def.Aux > MaxInt48
 	default:
-		if r, ok := functionNumericFacts(fn).IntRange(v.ID); ok && r.known {
-			return !r.fitsInt48()
+		if numeric != nil {
+			if r, ok := numeric.IntRange(v.ID); ok && r.known {
+				return !r.fitsInt48()
+			}
 		}
 		return false
 	}
@@ -636,7 +638,7 @@ func collectPhiArithmeticDeps(fn *Function) map[int]bool {
 	return deps
 }
 
-func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
+func isUnsafeIntArithmetic(instr *Instr, numeric *NumericFacts) bool {
 	if instr == nil {
 		return false
 	}
@@ -648,9 +650,9 @@ func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
 		if instr.Aux2 != 0 {
 			return false
 		}
-		return !functionNumericFacts(fn).IsInt48Safe(instr.ID)
+		return numeric == nil || !numeric.IsInt48Safe(instr.ID)
 	case OpDivIntExact:
-		return !functionNumericFacts(fn).IsInt48Safe(instr.ID)
+		return numeric == nil || !numeric.IsInt48Safe(instr.ID)
 	default:
 		return false
 	}
@@ -669,7 +671,7 @@ func isUnsafeIntArithmetic(fn *Function, instr *Instr) bool {
 // overflow check before the next iteration observes the value. Keeping the Phi
 // raw avoids boxing monotonic induction loops, while multiplicative/modulo
 // recurrences such as LCGs remain boxed to avoid predictable deopt storms.
-func collectOverflowCheckedLinearInductionDeps(fn *Function) map[int]bool {
+func collectOverflowCheckedLinearInductionDeps(fn *Function, numeric *NumericFacts) map[int]bool {
 	keep := make(map[int]bool)
 	if fn == nil || len(fn.Blocks) == 0 {
 		return keep
@@ -699,7 +701,7 @@ func collectOverflowCheckedLinearInductionDeps(fn *Function) map[int]bool {
 				continue
 			}
 			step := linearInductionStepValue(update, phi.ID)
-			if !nonNegativeLoopInvariantStep(fn, step, li.headerBlocks[header.ID]) {
+			if !nonNegativeLoopInvariantStep(step, li.headerBlocks[header.ID], numeric) {
 				continue
 			}
 			keep[phi.ID] = true
@@ -788,7 +790,7 @@ func linearInductionStepValue(update *Instr, phiID int) *Value {
 	return nil
 }
 
-func nonNegativeLoopInvariantStep(fn *Function, step *Value, body map[int]bool) bool {
+func nonNegativeLoopInvariantStep(step *Value, body map[int]bool, numeric *NumericFacts) bool {
 	if step == nil || step.Def == nil {
 		return false
 	}
@@ -798,7 +800,6 @@ func nonNegativeLoopInvariantStep(fn *Function, step *Value, body map[int]bool) 
 	if c, ok := constIntFromValue(step); ok {
 		return c >= 0
 	}
-	numeric := functionNumericFacts(fn)
 	if numeric == nil {
 		return false
 	}
