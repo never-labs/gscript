@@ -25,6 +25,7 @@ func buildOpSpec(op Op) (OpSpec, bool) {
 	applyOpSpecBackendPolicies(op, &spec)
 	applyOpSpecFieldPolicies(op, &spec)
 	applyOpSpecValuePolicies(op, &spec)
+	applyOpSpecOraclePolicies(op, &spec)
 	applyOpSpecLICMPolicies(op, &spec)
 	applyOpSpecNumericPolicies(op, &spec)
 	applyOpSpecFieldBarrierPolicies(op, &spec)

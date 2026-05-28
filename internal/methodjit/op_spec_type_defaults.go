@@ -8,6 +8,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		SuccCount:                  OpCountAny,
 		EmitterFamily:              family,
 		MayDeopt:                   mayDeopt,
+		OracleSupport:              OpOracleExecutable,
 		TableArrayGPRInvariantRank: 1,
 		TableArrayKeyArgIndex:      -1,
 		TypeSpecializeIntOp:        OpMax,
@@ -22,6 +23,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 func opTerminatorSpec(name string, args OpArgPolicy, argCount OpCountPolicy, succCount int) OpSpec {
 	spec := opSpec(name, OpEmitterControl, args, OpSideEffectControl, false)
 	spec.Terminator = true
+	spec.OracleSupport = OpOracleTerminator
 	spec.ArgCount = argCount
 	spec.SuccCount = succCount
 	return spec

@@ -21,6 +21,9 @@ const maxInterpDepth = 200
 // Interpret executes the CFG SSA IR of a function with the given arguments.
 // Returns the function's return values, matching VM.Execute semantics exactly.
 func Interpret(fn *Function, args []runtime.Value) ([]runtime.Value, error) {
+	if err := ValidateOracleSupport(fn); err != nil {
+		return nil, err
+	}
 	return interpretImpl(fn, args, 0)
 }
 
@@ -1088,6 +1091,15 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 			return nil, false, fmt.Errorf("IR interpreter: cannot convert indexed field to float")
 		}
 		s.values[instr.ID] = runtime.FloatValue(val.Number())
+
+	case OpFieldStore:
+		tbl := s.val(instr.Args[0])
+		fieldIdx := int(instr.Aux)
+		val := s.val(instr.Args[1])
+		if !tbl.IsTable() {
+			return nil, false, fmt.Errorf("OpFieldStore: arg 0 not a table")
+		}
+		tbl.Table().SvalsSet(fieldIdx, val)
 
 	case OpSetField:
 		tbl := s.val(instr.Args[0])

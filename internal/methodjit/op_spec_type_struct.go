@@ -12,6 +12,7 @@ type OpSpec struct {
 	KeepUnused    bool
 	EmitterFamily OpEmitterFamily
 	MayDeopt      bool
+	OracleSupport OpOracleSupport
 
 	// Runtime replay, deopt, and side-effect contracts.
 	NativeReplayMayExit              bool

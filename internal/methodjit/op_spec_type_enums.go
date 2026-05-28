@@ -43,6 +43,55 @@ const (
 	OpEmitterSpecial
 )
 
+func (f OpEmitterFamily) String() string {
+	switch f {
+	case OpEmitterConst:
+		return "const"
+	case OpEmitterSlot:
+		return "slot"
+	case OpEmitterArithmetic:
+		return "arithmetic"
+	case OpEmitterMatrix:
+		return "matrix"
+	case OpEmitterSpecialization:
+		return "specialization"
+	case OpEmitterCompare:
+		return "compare"
+	case OpEmitterString:
+		return "string"
+	case OpEmitterTable:
+		return "table"
+	case OpEmitterField:
+		return "field"
+	case OpEmitterGlobal:
+		return "global"
+	case OpEmitterUpvalue:
+		return "upvalue"
+	case OpEmitterConversion:
+		return "conversion"
+	case OpEmitterGuard:
+		return "guard"
+	case OpEmitterControl:
+		return "control"
+	case OpEmitterCall:
+		return "call"
+	case OpEmitterLoop:
+		return "loop"
+	case OpEmitterClosure:
+		return "closure"
+	case OpEmitterVararg:
+		return "vararg"
+	case OpEmitterConcurrency:
+		return "concurrency"
+	case OpEmitterPhi:
+		return "phi"
+	case OpEmitterSpecial:
+		return "special"
+	default:
+		return "invalid"
+	}
+}
+
 // OpArgPolicy summarizes how an op consumes Args/Aux metadata.
 type OpArgPolicy uint8
 
@@ -56,6 +105,27 @@ const (
 	OpArgVariadicAux
 	OpArgControl
 )
+
+func (p OpArgPolicy) String() string {
+	switch p {
+	case OpArgNone:
+		return "none"
+	case OpArgFixed:
+		return "fixed"
+	case OpArgVariadic:
+		return "variadic"
+	case OpArgAux:
+		return "aux"
+	case OpArgFixedAux:
+		return "fixed+aux"
+	case OpArgVariadicAux:
+		return "variadic+aux"
+	case OpArgControl:
+		return "control"
+	default:
+		return "invalid"
+	}
+}
 
 // OpBackendPolicy describes backend-local cache and verification effects that
 // are easy to miss in emit_dispatch.go.
@@ -104,3 +174,28 @@ const (
 	OpNonNegativeExactDivPositiveDivisor
 	OpNonNegativeForwardArg
 )
+
+type OpOracleSupport uint8
+
+const (
+	OpOracleInvalid OpOracleSupport = iota
+	OpOracleExecutable
+	OpOracleTerminator
+	OpOraclePseudo
+	OpOracleUnsupported
+)
+
+func (s OpOracleSupport) String() string {
+	switch s {
+	case OpOracleExecutable:
+		return "executable"
+	case OpOracleTerminator:
+		return "terminator"
+	case OpOraclePseudo:
+		return "pseudo"
+	case OpOracleUnsupported:
+		return "unsupported"
+	default:
+		return "invalid"
+	}
+}
