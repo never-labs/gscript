@@ -90,15 +90,7 @@ func loweredTableArrayLoadTableValue(instr *Instr) (*Value, bool) {
 	if instr == nil || instr.Op != OpTableArrayLoad || len(instr.Args) < 1 || instr.Args[0] == nil {
 		return nil, false
 	}
-	data := instr.Args[0].Def
-	if data == nil || data.Op != OpTableArrayData || len(data.Args) < 1 || data.Args[0] == nil {
-		return nil, false
-	}
-	header := data.Args[0].Def
-	if header == nil || header.Op != OpTableArrayHeader || len(header.Args) < 1 || header.Args[0] == nil {
-		return nil, false
-	}
-	return header.Args[0], true
+	return tableArrayTableValueForDataValue(instr.Args[0])
 }
 
 func setLoweredTableArrayPipelineKind(load *Instr, kind int64) {
@@ -107,14 +99,14 @@ func setLoweredTableArrayPipelineKind(load *Instr, kind int64) {
 	}
 	data := load.Args[0].Def
 	length := load.Args[1].Def
-	if data == nil || data.Op != OpTableArrayData || length == nil || length.Op != OpTableArrayLen {
+	if data == nil || tableArrayFactRole(data.Op) != OpTableArrayFactData || length == nil || tableArrayFactRole(length.Op) != OpTableArrayFactLen {
 		return
 	}
 	if len(data.Args) < 1 || data.Args[0] == nil || len(length.Args) < 1 || length.Args[0] == nil {
 		return
 	}
 	header := data.Args[0].Def
-	if header == nil || header.Op != OpTableArrayHeader || length.Args[0].ID != header.ID {
+	if header == nil || tableArrayFactRole(header.Op) != OpTableArrayFactHeader || length.Args[0].ID != header.ID {
 		return
 	}
 	header.Aux = kind

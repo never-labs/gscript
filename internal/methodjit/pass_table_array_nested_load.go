@@ -29,7 +29,7 @@ func TableArrayNestedLoadPass(fn *Function) (*Function, error) {
 			data := instr.Args[0].Def
 			length := instr.Args[1].Def
 			if data == nil || length == nil ||
-				data.Op != OpTableArrayData || length.Op != OpTableArrayLen ||
+				tableArrayFactRole(data.Op) != OpTableArrayFactData || tableArrayFactRole(length.Op) != OpTableArrayFactLen ||
 				data.Block != block || length.Block != block ||
 				len(data.Args) < 1 || len(length.Args) < 1 ||
 				data.Args[0] == nil || length.Args[0] == nil ||
@@ -37,7 +37,7 @@ func TableArrayNestedLoadPass(fn *Function) (*Function, error) {
 				continue
 			}
 			header := data.Args[0].Def
-			if header == nil || header.Op != OpTableArrayHeader || header.Block != block ||
+			if header == nil || tableArrayFactRole(header.Op) != OpTableArrayFactHeader || header.Block != block ||
 				len(header.Args) < 1 || header.Args[0] == nil {
 				continue
 			}
@@ -107,12 +107,5 @@ func tableArrayNestedLoadSafeSpan(block *Block, rowLoad, finalLoad *Instr) bool 
 }
 
 func tableArrayHeaderTableValue(v *Value) (*Value, bool) {
-	if v == nil || v.Def == nil || v.Def.Op != OpTableArrayData || len(v.Def.Args) < 1 || v.Def.Args[0] == nil {
-		return nil, false
-	}
-	header := v.Def.Args[0].Def
-	if header == nil || header.Op != OpTableArrayHeader || len(header.Args) < 1 || header.Args[0] == nil {
-		return nil, false
-	}
-	return header.Args[0], true
+	return tableArrayTableValueForDataValue(v)
 }

@@ -190,6 +190,25 @@ func (s *tableArrayFactSet) CompleteFacts() []tableArrayCompleteFact {
 	return out
 }
 
+func tableArrayHeaderForDataValue(v *Value) (*Instr, bool) {
+	if v == nil || v.Def == nil || tableArrayFactRole(v.Def.Op) != OpTableArrayFactData || len(v.Def.Args) < 1 || v.Def.Args[0] == nil {
+		return nil, false
+	}
+	header := v.Def.Args[0].Def
+	if header == nil || tableArrayFactRole(header.Op) != OpTableArrayFactHeader || len(header.Args) < 1 || header.Args[0] == nil {
+		return nil, false
+	}
+	return header, true
+}
+
+func tableArrayTableValueForDataValue(v *Value) (*Value, bool) {
+	header, ok := tableArrayHeaderForDataValue(v)
+	if !ok {
+		return nil, false
+	}
+	return header.Args[0], true
+}
+
 func (s *tableArrayFactSet) InvalidateTable(tableID int) bool {
 	var killedHeaders []int
 	for key, fact := range s.headersByTable {
