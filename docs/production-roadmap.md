@@ -40,6 +40,10 @@ Supporting audits:
   the path to removing unexplained `low_resolution` cells.
 - `docs/cli-audit.md` records the current command-line surface and the command
   set expected from a standalone language.
+- `docs/data-oriented-design.md` records the Odin-derived design slice for
+  typed dense arrays, vectors, matrices, SoA layout, runtime specialization, and
+  the kill features that keep the work out of parser/runtime scope until the
+  semantics are ready.
 
 ## Phase Plan
 
