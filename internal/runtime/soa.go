@@ -391,6 +391,19 @@ func (s *SoA) CountWhere(mask *DenseArray) (Value, error) {
 	return IntValue(int64(denseArrayBoolCount(mask.bools))), nil
 }
 
+func (s *SoA) IndicesWhere(mask *DenseArray) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return nil, fmt.Errorf("soa indicesWhere mask must be a bool dense array")
+	}
+	if mask.Len() != s.length {
+		return nil, ErrDenseArrayLength
+	}
+	return denseArrayIndicesWhere(mask)
+}
+
 func (s *SoA) Mask(columnName, op string, rhs Value) (*DenseArray, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")
@@ -452,6 +465,20 @@ func (s *SoA) Gather(indices *DenseArray) (*SoA, error) {
 		cols[name] = col
 	}
 	return NewSoA(cols)
+}
+
+func (s *SoA) ScatterInto(dstName string, indices *DenseArray, values Value) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if indices == nil || indices.DType() != DenseArrayI64 {
+		return fmt.Errorf("soa scatterInto indices must be an i64 dense array")
+	}
+	dst, ok := s.Column(dstName)
+	if !ok {
+		return fmt.Errorf("soa column %q not found", dstName)
+	}
+	return denseArrayScatterInto(dst, indices, values)
 }
 
 func (s *SoA) ColumnDescriptor(name string) (SoAColumnDescriptor, bool) {

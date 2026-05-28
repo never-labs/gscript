@@ -235,6 +235,8 @@ Current API contract:
 | `soa.selectInto(s, dst, mask, if_true, if_false)` | Writes a mask selection into an existing destination column. |
 | `soa.sumSelect(s, mask, if_true, if_false)` | Sums a mask selection without materializing a temporary dense array. |
 | `soa.gather(s, indices)` | Returns an independent SoA containing rows addressed by a one-based i64 dense index vector. Duplicates and index order are preserved. |
+| `soa.indicesWhere(s, mask)` | Converts a bool dense mask into a one-based i64 dense index vector. |
+| `soa.scatterInto(s, dst, indices, values)` | Writes scalar or dense values into a column at one-based dense indexes. Duplicate indexes are last-write-wins. |
 | `soa.addScaled(s, dst, src, scale)` | In-place numeric kernel: `dst[i] = dst[i] + src[i] * scale`. |
 | `soa.affine(s, dst, src, scale, bias)` | In-place numeric kernel: `dst[i] = src[i] * scale + bias`. |
 | `soa.affineWhere(s, dst, src, scale, mask, bias)` | In-place masked affine kernel that updates only mask-true rows. |
@@ -273,6 +275,8 @@ Hot path guidance:
 - for gather-style selection, keep row indexes in a dense integer array and
   treat the result as an independent SoA that may contain duplicates in the
   requested order;
+- use `soa.indicesWhere` and `soa.scatterInto` when a sparse update pipeline
+  needs to expose selected row indexes explicitly;
 - keep column dtypes and lengths stable so layout and column-version facts stay
   reusable by runtime specialization;
 - prefer `soa.shape` for diagnostics, not for application-level branching on

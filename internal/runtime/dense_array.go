@@ -1195,6 +1195,95 @@ func denseArrayValidateGatherIndices(indices *DenseArray, length int) error {
 	return nil
 }
 
+func denseArrayIndicesWhere(mask *DenseArray) (*DenseArray, error) {
+	if mask == nil || mask.dtype != DenseArrayBool {
+		return nil, fmt.Errorf("dense array indicesWhere mask must be bool")
+	}
+	out := make([]int64, 0, denseArrayBoolCount(mask.bools))
+	for i, keep := range mask.bools {
+		if keep {
+			out = append(out, int64(i+1))
+		}
+	}
+	return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
+}
+
+func denseArrayScatterInto(dst, indices *DenseArray, values Value) error {
+	if dst == nil || indices == nil {
+		return ErrDenseArrayOperand
+	}
+	if err := denseArrayValidateGatherIndices(indices, dst.Len()); err != nil {
+		return err
+	}
+	src := values.DenseArray()
+	if src != nil && src.Len() != indices.Len() {
+		return ErrDenseArrayLength
+	}
+	switch dst.dtype {
+	case DenseArrayF64:
+		if src != nil {
+			switch src.dtype {
+			case DenseArrayF64:
+				for i, index := range indices.i64 {
+					dst.f64[index-1] = src.f64[i]
+				}
+			case DenseArrayI64:
+				for i, index := range indices.i64 {
+					dst.f64[index-1] = float64(src.i64[i])
+				}
+			default:
+				return ErrDenseArrayDType
+			}
+		} else {
+			if !values.IsNumber() {
+				return fmt.Errorf("dense array f64 scatter value must be numeric")
+			}
+			x := values.Number()
+			for _, index := range indices.i64 {
+				dst.f64[index-1] = x
+			}
+		}
+	case DenseArrayI64:
+		if src != nil {
+			if src.dtype != DenseArrayI64 {
+				return ErrDenseArrayDType
+			}
+			for i, index := range indices.i64 {
+				dst.i64[index-1] = src.i64[i]
+			}
+		} else {
+			if !values.IsInt() {
+				return fmt.Errorf("dense array i64 scatter value must be integer")
+			}
+			x := values.Int()
+			for _, index := range indices.i64 {
+				dst.i64[index-1] = x
+			}
+		}
+	case DenseArrayBool:
+		if src != nil {
+			if src.dtype != DenseArrayBool {
+				return ErrDenseArrayDType
+			}
+			for i, index := range indices.i64 {
+				dst.bools[index-1] = src.bools[i]
+			}
+		} else {
+			if !values.IsBool() {
+				return fmt.Errorf("dense array bool scatter value must be boolean")
+			}
+			x := values.Bool()
+			for _, index := range indices.i64 {
+				dst.bools[index-1] = x
+			}
+		}
+	default:
+		return ErrDenseArrayDType
+	}
+	dst.bumpVersion()
+	return nil
+}
+
 func (a *DenseArray) SumWhere(mask *DenseArray) (Value, error) {
 	if a == nil || mask == nil {
 		return NilValue(), ErrDenseArrayOperand

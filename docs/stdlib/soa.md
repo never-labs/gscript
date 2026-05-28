@@ -33,6 +33,8 @@ print(soa.row(points, 2).id)  // 102
   dense-column copies.
 - `soa.mask` builds a bool dense array from a column comparison. The mask can
   feed `soa.filter`, `soa.compact`, `soa.affineWhere`, and `*Where` reducers.
+- `soa.indicesWhere` converts a bool mask into a one-based `[]i64` index vector
+  for gather/scatter pipelines.
 - `soa.sumWhere` reduces a numeric column over a bool mask without
   materializing a filtered SoA first.
 
@@ -158,6 +160,29 @@ replaying an externally computed order.
 
 ```gscript
 picked := soa.gather(points, [3]i64{3, 1, 3})
+```
+
+### `soa.indicesWhere(s, mask) -> []i64`
+
+Returns the one-based indexes where `mask` is true. The mask length must match
+the SoA length.
+
+```gscript
+moving := soa.mask(points, "velocity", ">", 0)
+movingRows := soa.indicesWhere(points, moving)
+picked := soa.gather(points, movingRows)
+```
+
+### `soa.scatterInto(s, column, indices, values) -> true`
+
+Writes `values` into `column` at one-based `indices`. `values` can be a scalar
+or a dense array with the same length as `indices`; duplicate indexes use
+last-write-wins order.
+
+```gscript
+rows := soa.indicesWhere(points, moving)
+soa.scatterInto(points, "visible", rows, true)
+soa.scatterInto(points, "score", rows, []f64{1.0, 2.0, 3.0})
 ```
 
 ### `soa.compact(s, mask) -> soa`
@@ -312,6 +337,8 @@ is zero, and `min`, `max`, and `mean` are `nil`.
   `soa.compact` or `soa.filter` once before downstream kernels.
 - For gather-style pipelines, keep selection positions in a dense i64 array so
   `soa.gather` can preserve order and duplicates without row tables.
+- Use `soa.indicesWhere` and `soa.scatterInto` for sparse update pipelines where
+  the selected row set should stay explicit.
 - Keep numeric columns dense and stable. Replacing columns or changing lengths
   prevents specialization from reusing prior layout facts.
 - Use `soa.row` and `soa.setRow` at API boundaries, not inside high-iteration

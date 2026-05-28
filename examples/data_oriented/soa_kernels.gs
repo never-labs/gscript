@@ -86,12 +86,16 @@ check("filter", soa.len(active) == 2 && soa.column(active, "x")[2] == 8)
 picked := soa.gather(points, [3]i64{4, 1, 4})
 check("gather preserves order", soa.len(picked) == 3 && soa.column(picked, "id")[1] == 104)
 check("gather preserves duplicates", soa.column(picked, "id")[3] == 104)
+pickedRows := soa.indicesWhere(points, []bool{false, true, false, true})
+check("indicesWhere", pickedRows[1] == 2 && pickedRows[2] == 4)
+check("scatterInto scalar", soa.scatterInto(points, "id", pickedRows, 900) && soa.column(points, "id")[2] == 900 && soa.column(points, "id")[4] == 900)
+check("scatterInto dense", soa.scatterInto(points, "y", pickedRows, []f64{77, 88}) && soa.column(points, "y")[2] == 77 && soa.column(points, "y")[4] == 88)
 
 // Current compact/filter spelling: compute or reuse a bool dense mask, compact
 // all columns together, then keep using column kernels on the resulting SoA.
 movingMask := []bool{true, true, false, true}
 moving := soa.compact(points, movingMask)
-check("compact/filter keeps alignment", soa.len(moving) == 3 && soa.column(moving, "id")[2] == 202)
+check("compact/filter keeps alignment", soa.len(moving) == 3 && soa.column(moving, "id")[2] == 900)
 
 // Masked aggregate spelling: reduce the hot column directly over the mask
 // when the compacted rows are not needed downstream.

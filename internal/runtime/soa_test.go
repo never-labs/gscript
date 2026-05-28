@@ -96,6 +96,8 @@ selectedColumn := soa.select(points, colMask, "x", "y")
 selectedBool := soa.select(points, boolMask, true, false)
 selectIntoOK := soa.selectInto(points, "y", geMask, "x", 0)
 sumSelected := soa.sumSelect(points, geMask, "x", 0)
+selectedIdx := soa.indicesWhere(points, geMask)
+scatterOK := soa.scatterInto(points, "y", selectedIdx, []f64{100, 300})
 window := soa.slice(points, 2, 3)
 filtered := soa.filter(points, []bool{true, false, true})
 compacted := soa.compact(points, []bool{false, true, true})
@@ -148,10 +150,14 @@ fillWhereOK := soa.fillWhere(filled, "ok", []bool{true, false, true}, true)
 	if got := interp.GetGlobal("selectIntoOK"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("selectIntoOK = %v, want true", got)
 	}
-	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("points").SoA(), "y")), []float64{0, 42, 3})
 	if got := interp.GetGlobal("sumSelected"); !got.IsFloat() || got.Float() != 45 {
 		t.Fatalf("sumSelected = %v, want 45", got)
 	}
+	assertDenseI64(t, interp.GetGlobal("selectedIdx"), []int64{2, 3})
+	if got := interp.GetGlobal("scatterOK"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("scatterOK = %v, want true", got)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("points").SoA(), "y")), []float64{0, 100, 300})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("window").SoA(), "x")), []float64{42, 3})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("filtered").SoA(), "x")), []float64{1, 3})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("compacted").SoA(), "x")), []float64{42, 3})
@@ -404,6 +410,8 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	filter := lib.RawGetString("filter").GoFunction()
 	compact := lib.RawGetString("compact").GoFunction()
 	gather := lib.RawGetString("gather").GoFunction()
+	indicesWhere := lib.RawGetString("indicesWhere").GoFunction()
+	scatterInto := lib.RawGetString("scatterInto").GoFunction()
 	addScaled := lib.RawGetString("addScaled").GoFunction()
 	affine := lib.RawGetString("affine").GoFunction()
 	affineWhere := lib.RawGetString("affineWhere").GoFunction()
@@ -457,6 +465,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if gather == nil || gather.FastArg2 == nil {
 		t.Fatal("soa.gather FastArg2 is nil")
+	}
+	if indicesWhere == nil || indicesWhere.FastArg2 == nil {
+		t.Fatal("soa.indicesWhere FastArg2 is nil")
+	}
+	if scatterInto == nil || scatterInto.FastArg4 == nil {
+		t.Fatal("soa.scatterInto FastArg4 is nil")
 	}
 	if addScaled == nil || addScaled.FastArg4 == nil {
 		t.Fatal("soa.addScaled FastArg4 is nil")
@@ -565,6 +579,21 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	if got, err := gather.FastArg2(soaValue, DenseArrayValue(NewDenseArrayI64([]int64{3, 1}))); err != nil || !got.IsSoA() || got.SoA().Len() != 2 {
 		t.Fatalf("soa.gather FastArg2 got=%s err=%v", got.String(), err)
 	}
+	idxValue, err := indicesWhere.FastArg2(soaValue, DenseArrayValue(NewDenseArrayBool([]bool{false, true, true})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDenseI64(t, idxValue, []int64{2, 3})
+	scatterS, err := NewSoA(map[string]*DenseArray{
+		"x": NewDenseArrayF64([]float64{1, 2, 3}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := scatterInto.FastArg4(SoAValue(scatterS), StringValue("x"), idxValue, DenseArrayValue(NewDenseArrayF64([]float64{100, 300}))); err != nil || !got.Bool() {
+		t.Fatalf("soa.scatterInto FastArg4 got=%s err=%v", got.String(), err)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, scatterS, "x")), []float64{1, 100, 300})
 	if got, err := addScaled.FastArg4(soaValue, StringValue("x"), StringValue("v"), FloatValue(0.5)); err != nil || !got.Bool() {
 		t.Fatalf("soa.addScaled FastArg4 got=%s err=%v", got.String(), err)
 	}

@@ -326,6 +326,41 @@ func buildSoALib() *Table {
 		return []Value{SoAValue(out)}, nil
 	}, soaGatherValue)
 
+	setFastArg2("indicesWhere", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.indicesWhere", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsDenseArray() {
+			return nil, fmt.Errorf("soa.indicesWhere: argument 2 must be a bool dense array")
+		}
+		out, err := s.IndicesWhere(args[1].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{DenseArrayValue(out)}, nil
+	}, soaIndicesWhereValue)
+
+	setFastArg4("scatterInto", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.scatterInto", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.scatterInto: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsDenseArray() {
+			return nil, fmt.Errorf("soa.scatterInto: argument 3 must be an i64 dense array")
+		}
+		if len(args) < 4 {
+			return nil, fmt.Errorf("soa.scatterInto: argument 4 is required")
+		}
+		if err := s.ScatterInto(args[1].Str(), args[2].DenseArray(), args[3]); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaScatterIntoValue)
+
 	set("row", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.row", args, 0)
 		if err != nil {
@@ -966,6 +1001,36 @@ func soaGatherValue(soaValue, indicesValue Value) (Value, error) {
 		return NilValue(), err
 	}
 	return SoAValue(out), nil
+}
+
+func soaIndicesWhereValue(soaValue, maskValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.indicesWhere: argument 1 must be soa")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.indicesWhere: argument 2 must be a bool dense array")
+	}
+	out, err := soaValue.SoA().IndicesWhere(maskValue.DenseArray())
+	if err != nil {
+		return NilValue(), err
+	}
+	return DenseArrayValue(out), nil
+}
+
+func soaScatterIntoValue(soaValue, dstValue, indicesValue, valuesValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.scatterInto: argument 1 must be soa")
+	}
+	if !dstValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.scatterInto: argument 2 must be a string")
+	}
+	if !indicesValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.scatterInto: argument 3 must be an i64 dense array")
+	}
+	if err := soaValue.SoA().ScatterInto(dstValue.Str(), indicesValue.DenseArray(), valuesValue); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
 }
 
 func soaSumWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
