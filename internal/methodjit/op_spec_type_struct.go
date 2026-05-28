@@ -60,6 +60,9 @@ type OpSpec struct {
 	ClosureScalarStoreClosureArgIndex int
 	ClosureScalarStoreValueArgIndex   int
 	TableArrayFactRole                OpTableArrayFactRole
+	TableIntArraySwapPairsBodyBenign  bool
+	TableIntArrayCopyPrefixBodyBenign bool
+	TableIntArrayReverseBodyBenign    bool
 
 	// Optimizer admission and numeric specialization contracts.
 	LICMHoistable               bool

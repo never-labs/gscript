@@ -309,6 +309,9 @@ func matchSwapPairsBody(body *Block, idx *Value) (swapPairsBodyMatch, bool) {
 		if instr == nil {
 			continue
 		}
+		if tableIntArraySwapPairsBodyBenign(instr.Op) {
+			continue
+		}
 		switch instr.Op {
 		case OpTableArraySwap:
 			if swap != nil || len(instr.Args) < 5 || (instr.Aux != int64(vm.FBKindInt) && instr.Aux != int64(vm.FBKindFloat)) {
@@ -318,8 +321,6 @@ func matchSwapPairsBody(body *Block, idx *Value) (swapPairsBodyMatch, bool) {
 				return match, false
 			}
 			swap = instr
-		case OpAddInt, OpGuardTableKind, OpJump, OpNop:
-			continue
 		default:
 			return match, false
 		}
@@ -347,6 +348,9 @@ func matchCopyPrefixBody(body *Block, bodySet map[int]bool, idx *Value) (copyPre
 		if instr == nil {
 			continue
 		}
+		if tableIntArrayCopyPrefixBodyBenign(instr.Op) {
+			continue
+		}
 		switch instr.Op {
 		case OpTableArrayLoad:
 			if len(instr.Args) < 3 || instr.Aux != int64(vm.FBKindInt) || !sameSSAValue(instr.Args[2], idx) {
@@ -372,8 +376,6 @@ func matchCopyPrefixBody(body *Block, bodySet map[int]bool, idx *Value) (copyPre
 				return match, false
 			}
 			store = instr
-		case OpAddInt, OpGuardTableKind, OpJump:
-			continue
 		default:
 			return match, false
 		}
@@ -482,6 +484,9 @@ func matchReversePrefixBody(body *Block, loPhi, hiPhi *Value) (reversePrefixBody
 		if instr == nil {
 			continue
 		}
+		if tableIntArrayReverseBodyBenign(instr.Op) {
+			continue
+		}
 		switch instr.Op {
 		case OpTableArraySwap:
 			if len(instr.Args) < 5 || instr.Aux != int64(vm.FBKindInt) {
@@ -523,8 +528,6 @@ func matchReversePrefixBody(body *Block, loPhi, hiPhi *Value) (reversePrefixBody
 			} else {
 				return match, false
 			}
-		case OpAddInt, OpSubInt, OpGuardTableKind, OpJump, OpNop:
-			continue
 		default:
 			return match, false
 		}

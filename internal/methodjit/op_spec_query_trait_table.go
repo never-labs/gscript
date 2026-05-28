@@ -154,6 +154,21 @@ func tableArrayFactRole(op Op) OpTableArrayFactRole {
 	return spec.TableArrayFactRole
 }
 
+func tableIntArraySwapPairsBodyBenign(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableIntArraySwapPairsBodyBenign
+}
+
+func tableIntArrayCopyPrefixBodyBenign(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableIntArrayCopyPrefixBodyBenign
+}
+
+func tableIntArrayReverseBodyBenign(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.TableIntArrayReverseBodyBenign
+}
+
 func opIsTableArrayStoreLoopCandidate(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.TableArrayStoreLoopCandidate

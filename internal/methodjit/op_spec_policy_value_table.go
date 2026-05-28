@@ -46,3 +46,24 @@ var opTableArrayLenArgIndexPolicies = [...]uint8{
 	OpTableArrayLoad:  2,
 	OpTableArrayStore: 3,
 }
+
+var opTableIntArraySwapPairsBodyBenignPolicies = [...]bool{
+	OpAddInt:         true,
+	OpGuardTableKind: true,
+	OpJump:           true,
+	OpNop:            true,
+}
+
+var opTableIntArrayCopyPrefixBodyBenignPolicies = [...]bool{
+	OpAddInt:         true,
+	OpGuardTableKind: true,
+	OpJump:           true,
+}
+
+var opTableIntArrayReverseBodyBenignPolicies = [...]bool{
+	OpAddInt:         true,
+	OpSubInt:         true,
+	OpGuardTableKind: true,
+	OpJump:           true,
+	OpNop:            true,
+}

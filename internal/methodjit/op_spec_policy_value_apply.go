@@ -52,4 +52,13 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opTableArrayLenArgIndexPolicies) && opTableArrayLenArgIndexPolicies[op] != 0 {
 		spec.TableArrayLenArgIndex = int(opTableArrayLenArgIndexPolicies[op]) - 1
 	}
+	if int(op) < len(opTableIntArraySwapPairsBodyBenignPolicies) {
+		spec.TableIntArraySwapPairsBodyBenign = opTableIntArraySwapPairsBodyBenignPolicies[op]
+	}
+	if int(op) < len(opTableIntArrayCopyPrefixBodyBenignPolicies) {
+		spec.TableIntArrayCopyPrefixBodyBenign = opTableIntArrayCopyPrefixBodyBenignPolicies[op]
+	}
+	if int(op) < len(opTableIntArrayReverseBodyBenignPolicies) {
+		spec.TableIntArrayReverseBodyBenign = opTableIntArrayReverseBodyBenignPolicies[op]
+	}
 }
