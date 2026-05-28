@@ -83,6 +83,18 @@ It checks README and `docs/**/*.md` relative `.md` links, and verifies fenced
 code blocks that mention `production_check`, `performance_gate`,
 `diagnostics_bundle`, or `release_artifacts` point at executable scripts.
 
+The release artifact smoke is:
+
+```bash
+bash scripts/release_artifacts_check.sh
+```
+
+By default it dry-runs `scripts/release_artifacts.sh` and verifies the planned
+binary, metadata, checksum paths, and metadata fields without building or
+writing `dist/`. Before publishing a tag or release candidate, run it with
+`--build` to build into a temporary directory, verify the generated
+`SHA256SUMS`, and execute the built CLI against `tests/01_basic.gs`.
+
 ### CI Quick Gates
 
 The minimum CI gate is intentionally small and does not publish release
@@ -164,6 +176,7 @@ not run the performance gate.
 go run ./cmd/gscript tests/01_basic.gs
 go run ./cmd/gscript -jit benchmarks/suite/table_field_access.gs
 go run ./cmd/dump_bytecode tests/01_basic.gs
+bash scripts/release_artifacts_check.sh --build
 ```
 
 Expected result:
@@ -172,6 +185,8 @@ Expected result:
 - JIT can be enabled explicitly;
 - diagnostic commands produce useful output without depending on local temp
   state.
+- the release artifact script has a validated dry-run plan, real local build,
+  and matching SHA256 checksums before artifact publication.
 
 ## Documentation Checklist
 
