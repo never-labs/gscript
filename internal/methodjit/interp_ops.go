@@ -39,16 +39,19 @@ func (s *interpState) execCall(instr *Instr) (runtime.Value, error) {
 	}
 
 	// For non-self calls, use the VM to execute.
-	return s.callViaVM(fnVal, callArgs)
+	results, err := s.callViaVM(fnVal, callArgs)
+	if err != nil {
+		return runtime.NilValue(), err
+	}
+	if len(results) > 0 {
+		return results[0], nil
+	}
+	return runtime.NilValue(), nil
 }
 
 // callViaVM executes a function call using the VM interpreter.
-func (s *interpState) callViaVM(fnVal runtime.Value, args []runtime.Value) (runtime.Value, error) {
-	// Create a minimal VM to execute the call.
-	globals := make(map[string]runtime.Value)
-	v := vm.New(globals)
-	defer v.Close()
-
+func (s *interpState) callViaVM(fnVal runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	v := s.vm()
 	// Populate VM globals with any function protos known to the caller.
 	// This lets residual cross-function calls (e.g., after bounded recursive
 	// inlining) resolve their callees when the VM executes their bytecode.
@@ -62,14 +65,66 @@ func (s *interpState) callViaVM(fnVal runtime.Value, args []runtime.Value) (runt
 		})
 	}
 
-	results, err := v.CallValue(fnVal, args)
+	return v.CallValue(fnVal, args)
+}
+
+func (s *interpState) execTForCall(instr *Instr) ([]runtime.Value, error) {
+	key := instr.SourcePC
+	if !instr.HasSource {
+		key = instr.ID
+	}
+	resultIndex := int(instr.Aux2)
+	if resultIndex > 0 {
+		if cached, ok := s.tforResults[key]; ok {
+			return cached, nil
+		}
+	}
+	if len(instr.Args) == 0 {
+		return nil, fmt.Errorf("IR interpreter: OpTForCall with no callee")
+	}
+	fnVal := s.val(instr.Args[0])
+	args := make([]runtime.Value, len(instr.Args)-1)
+	for i := 1; i < len(instr.Args); i++ {
+		args[i-1] = s.val(instr.Args[i])
+	}
+	results, err := s.callViaVM(fnVal, args)
 	if err != nil {
-		return runtime.NilValue(), err
+		return nil, err
 	}
-	if len(results) > 0 {
-		return results[0], nil
+	n := int(instr.Aux)
+	if n < 0 {
+		n = 0
 	}
-	return runtime.NilValue(), nil
+	if len(results) < n {
+		padded := make([]runtime.Value, n)
+		copy(padded, results)
+		for i := len(results); i < n; i++ {
+			padded[i] = runtime.NilValue()
+		}
+		results = padded
+	}
+	s.tforResults[key] = results
+	return results, nil
+}
+
+func (s *interpState) tableGet(table, key runtime.Value) (runtime.Value, error) {
+	return s.vm().TableGetForJIT(table, key)
+}
+
+func (s *interpState) vm() *vm.VM {
+	if s.hostVM != nil {
+		return s.hostVM
+	}
+	globals := make(map[string]runtime.Value)
+	s.hostVM = vm.New(globals)
+	return s.hostVM
+}
+
+func (s *interpState) close() {
+	if s.hostVM != nil {
+		s.hostVM.Close()
+		s.hostVM = nil
+	}
 }
 
 // getGlobal looks up a global variable by name.
@@ -89,6 +144,12 @@ func (s *interpState) getGlobal(name string) runtime.Value {
 	if p, ok := s.fn.Analysis.GlobalFacts().GlobalProto(name); ok && p != nil {
 		cl := vm.NewClosure(p)
 		return runtime.VMClosureFastValue(unsafe.Pointer(cl))
+	}
+	if s.hostVM == nil {
+		return s.vm().GetGlobal(name)
+	}
+	if v := s.hostVM.GetGlobal(name); !v.IsNil() {
+		return v
 	}
 	return runtime.NilValue()
 }

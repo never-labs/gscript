@@ -6,6 +6,7 @@ package methodjit
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/gscript/gscript/internal/lexer"
@@ -353,6 +354,143 @@ func TestInterp_Boolean(t *testing.T) {
 		t.Fatalf("empty result for f(-1)")
 	}
 	assertValuesEqual(t, "f(-1)", irResultNeg[0], vmResultNeg[0])
+}
+
+func TestInterp_TestSetShortCircuit(t *testing.T) {
+	src := `func f(a, b) { return a || b, a && b }`
+	proto := compileFunction(t, src)
+	fn := BuildGraph(proto)
+
+	args := []runtime.Value{runtime.BoolValue(false), runtime.IntValue(7)}
+	irResult, err := Interpret(fn, args)
+	if err != nil {
+		t.Fatalf("IR interpreter error: %v", err)
+	}
+	vmResult := runVM(t, src, args)
+	if len(irResult) != len(vmResult) {
+		t.Fatalf("result count mismatch: IR=%d, VM=%d", len(irResult), len(vmResult))
+	}
+	for i := range irResult {
+		assertValuesEqual(t, "short-circuit", irResult[i], vmResult[i])
+	}
+}
+
+func TestInterp_VarargFixedAndAllReturn(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "fixed_assignment",
+			src:  `func f(...) { a, b, c := ...; return a + b + c }`,
+		},
+		{
+			name: "return_all",
+			src:  `func f(...) { return ... }`,
+		},
+	}
+	args := []runtime.Value{runtime.IntValue(2), runtime.IntValue(3), runtime.IntValue(5)}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			proto := compileFunction(t, tt.src)
+			fn := BuildGraph(proto)
+			irResult, err := Interpret(fn, args)
+			if err != nil {
+				t.Fatalf("IR interpreter error: %v", err)
+			}
+			vmResult := runVM(t, tt.src, args)
+			if len(irResult) != len(vmResult) {
+				t.Fatalf("result count mismatch: IR=%d, VM=%d", len(irResult), len(vmResult))
+			}
+			for i := range irResult {
+				assertValuesEqual(t, tt.name, irResult[i], vmResult[i])
+			}
+		})
+	}
+}
+
+func TestInterp_SelfOpcodeMethodCall(t *testing.T) {
+	const methodName = "m260"
+	var src strings.Builder
+	src.WriteString("func f(obj) {\n")
+	src.WriteString("  x := \"seed\"\n")
+	for i := 0; i < 270; i++ {
+		src.WriteString("  x = \"dummy")
+		src.WriteString(runtime.IntValue(int64(i)).String())
+		src.WriteString("\"\n")
+	}
+	src.WriteString("  return obj:")
+	src.WriteString(methodName)
+	src.WriteString("()\n}")
+
+	proto := compileFunction(t, src.String())
+	fn := BuildGraph(proto)
+	if !functionHasOp(fn, OpSelf) {
+		t.Fatal("test did not compile to OpSelf")
+	}
+
+	tbl := runtime.NewTable()
+	tbl.RawSetString("x", runtime.IntValue(42))
+	tbl.RawSetString(methodName, runtime.FunctionValue(&runtime.GoFunction{
+		Name: methodName,
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			return []runtime.Value{args[0].Table().RawGetString("x")}, nil
+		},
+	}))
+	args := []runtime.Value{runtime.TableValue(tbl)}
+	irResult, err := Interpret(fn, args)
+	if err != nil {
+		t.Fatalf("IR interpreter error: %v", err)
+	}
+	vmResult := runVM(t, src.String(), args)
+	if len(irResult) != len(vmResult) {
+		t.Fatalf("result count mismatch: IR=%d, VM=%d", len(irResult), len(vmResult))
+	}
+	assertValuesEqual(t, "method call", irResult[0], vmResult[0])
+}
+
+func TestInterp_GenericForIterator(t *testing.T) {
+	src := `func f(iter) { s := 0; for k, v := range iter { s = s + v }; return s }`
+	proto := compileFunction(t, src)
+	fn := BuildGraph(proto)
+	if !functionHasOp(fn, OpTForCall) || !functionHasOp(fn, OpTForLoop) {
+		t.Fatal("test did not compile to generic-for IR ops")
+	}
+
+	iter := runtime.FunctionValue(&runtime.GoFunction{
+		Name: "test.iter",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			next := int64(1)
+			if len(args) > 1 && args[1].IsInt() {
+				next = args[1].Int() + 1
+			}
+			if next > 3 {
+				return []runtime.Value{runtime.NilValue()}, nil
+			}
+			return []runtime.Value{runtime.IntValue(next), runtime.IntValue(next * 10)}, nil
+		},
+	})
+	args := []runtime.Value{iter}
+	irResult, err := Interpret(fn, args)
+	if err != nil {
+		t.Fatalf("IR interpreter error: %v", err)
+	}
+	vmResult := runVM(t, src, args)
+	if len(irResult) != len(vmResult) {
+		t.Fatalf("result count mismatch: IR=%d, VM=%d", len(irResult), len(vmResult))
+	}
+	assertValuesEqual(t, "generic for", irResult[0], vmResult[0])
+}
+
+func functionHasOp(fn *Function, op Op) bool {
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instrs {
+			if instr.Op == op {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // TestInterp_MatchesVM runs all test programs through both interpreters

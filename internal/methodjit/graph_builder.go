@@ -622,26 +622,31 @@ func (b *graphBuilder) emitBlocks() {
 				val := b.readVariable(bOp, block)
 				cond := b.emit(block, OpGuardTruthy, TypeBool, []*Value{val}, 0, 0)
 
-				// If the test passes (doesn't skip), R(A) = R(B).
-				// We handle this by writing the variable in both successor blocks.
-				// For now, write it in the current block (conservative).
-				b.writeVariable(a, block, val)
-
 				pc++
 				jmpInst := code[pc]
 				jmpSbx := vm.DecodesBx(jmpInst)
 				jmpTarget := pc + 1 + jmpSbx
 				fallthroughPC := pc + 1
 
-				trueBlock := b.blockForPC(fallthroughPC)
-				falseBlock := b.blockForPC(jmpTarget)
+				fallthroughBlock := b.blockForPC(fallthroughPC)
+				jumpTargetBlock := b.blockForPC(jmpTarget)
+				assignBlock := b.newBlock()
+				testSet := b.emit(assignBlock, OpTestSet, TypeAny, []*Value{val}, int64(c), 0)
+				b.writeVariable(a, assignBlock, testSet.Value())
+				b.addEdge(assignBlock, jumpTargetBlock)
+				b.emit(assignBlock, OpJump, TypeUnknown, nil, 0, 0)
+				assignBlock.sealed = true
 
 				if c == 0 {
-					b.addEdge(block, trueBlock)
-					b.addEdge(block, falseBlock)
+					// Truthy skips the following JMP and leaves R(A) unchanged;
+					// falsy assigns R(A)=R(B), then takes the JMP target.
+					b.addEdge(block, fallthroughBlock)
+					b.addEdge(block, assignBlock)
 				} else {
-					b.addEdge(block, falseBlock)
-					b.addEdge(block, trueBlock)
+					// Falsy skips the following JMP and leaves R(A) unchanged;
+					// truthy assigns R(A)=R(B), then takes the JMP target.
+					b.addEdge(block, assignBlock)
+					b.addEdge(block, fallthroughBlock)
 				}
 				b.emit(block, OpBranch, TypeUnknown, []*Value{cond.Value()}, 0, 0)
 				terminated[startPC] = true
@@ -1021,9 +1026,12 @@ func (b *graphBuilder) emitBlocks() {
 				fn := b.readVariable(a, block)
 				arg1 := b.readVariable(a+1, block)
 				arg2 := b.readVariable(a+2, block)
-				callInstr := b.emit(block, OpCall, TypeAny, []*Value{fn, arg1, arg2}, 0, 0)
 				for i := 0; i < c; i++ {
+					callInstr := b.emit(block, OpTForCall, TypeAny, []*Value{fn, arg1, arg2}, int64(c), int64(i))
 					b.writeVariable(a+3+i, block, callInstr.Value())
+				}
+				if c == 0 {
+					b.lastMultiRetReg = a + 2
 				}
 
 			case vm.OP_TFORLOOP:
@@ -1031,8 +1039,7 @@ func (b *graphBuilder) emitBlocks() {
 				sbx := vm.DecodesBx(inst)
 				// if R(A+1) != nil { R(A) = R(A+1); PC += sBx }
 				val := b.readVariable(a+1, block)
-				nilVal := b.emit(block, OpConstNil, TypeNil, nil, 0, 0)
-				cond := b.emit(block, OpEq, TypeBool, []*Value{val, nilVal.Value()}, 0, 0)
+				loopCond := b.emit(block, OpTForLoop, TypeAny, []*Value{val}, 0, 0)
 
 				// Write R(A) = R(A+1) (done before branching, body will see it).
 				b.writeVariable(a, block, val)
@@ -1046,28 +1053,20 @@ func (b *graphBuilder) emitBlocks() {
 				// Succs[0] = loop (not nil), Succs[1] = exit (nil).
 				b.addEdge(block, bodyBlock)
 				b.addEdge(block, exitBlock)
-				// Use NotEq logic: branch on "not nil" → body.
-				// Actually, the cond is "val == nil". We want:
-				// if cond (is nil) → exit, else → body.
-				// So Succs[0] should be exit (cond true), Succs[1] body (cond false).
-				// But we wired body first. Let's use a Not.
-				notCond := b.emit(block, OpNot, TypeBool, []*Value{cond.Value()}, 0, 0)
-				b.emit(block, OpBranch, TypeUnknown, []*Value{notCond.Value()}, 0, 0)
+				b.emit(block, OpBranch, TypeUnknown, []*Value{loopCond.Value()}, 0, 0)
 				terminated[startPC] = true
 				b.sealBlock(bodyBlock)
 
 			case vm.OP_VARARG:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)
-				// Emit OpVararg so it goes through op-exit. The Go-side handler
-				// copies varargs from the VM frame into the register file.
-				// Aux = dest register (a), Aux2 = count (b).
-				instr := b.emit(block, OpVararg, TypeAny, nil, int64(a), int64(bOp))
 				if bOp >= 2 {
 					for i := 0; i < bOp-1; i++ {
+						instr := b.emit(block, OpVararg, TypeAny, nil, int64(i), int64(bOp))
 						b.writeVariable(a+i, block, instr.Value())
 					}
 				} else {
+					instr := b.emit(block, OpVararg, TypeAny, nil, 0, int64(bOp))
 					b.writeVariable(a, block, instr.Value())
 				}
 				// Track top for subsequent B=0 call.

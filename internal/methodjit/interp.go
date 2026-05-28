@@ -34,10 +34,14 @@ func interpretImpl(fn *Function, args []runtime.Value, depth int) ([]runtime.Val
 	}
 
 	s := &interpState{
-		fn:     fn,
-		values: make(map[int]runtime.Value),
-		depth:  depth,
+		fn:          fn,
+		values:      make(map[int]runtime.Value),
+		branchConds: make(map[int]bool),
+		tforResults: make(map[int][]runtime.Value),
+		varargs:     fixedVarargs(fn, args),
+		depth:       depth,
 	}
+	defer s.close()
 
 	// Load function arguments into parameter LoadSlot values.
 	// The entry block starts with LoadSlot instructions for each parameter.
@@ -49,10 +53,23 @@ func interpretImpl(fn *Function, args []runtime.Value, depth int) ([]runtime.Val
 
 // interpState holds the mutable state for one IR interpretation.
 type interpState struct {
-	fn     *Function
-	values map[int]runtime.Value // value ID → runtime value
-	depth  int
-	prev   *Block // previous block (for phi resolution)
+	fn          *Function
+	values      map[int]runtime.Value // value ID -> runtime value
+	branchConds map[int]bool          // value ID -> control result for non-Branch control ops
+	tforResults map[int][]runtime.Value
+	varargs     []runtime.Value
+	hostVM      *vm.VM
+	depth       int
+	prev        *Block // previous block (for phi resolution)
+}
+
+func fixedVarargs(fn *Function, args []runtime.Value) []runtime.Value {
+	if fn == nil || fn.Proto == nil || len(args) <= fn.Proto.NumParams {
+		return nil
+	}
+	va := make([]runtime.Value, len(args)-fn.Proto.NumParams)
+	copy(va, args[fn.Proto.NumParams:])
+	return va
 }
 
 // loadParams initializes parameter values from the LoadSlot instructions
@@ -826,6 +843,15 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 			tbl.Table().RawSet(key, val)
 		}
 
+	case OpSelf:
+		tbl := s.val(instr.Args[0])
+		key := s.val(instr.Args[1])
+		val, err := s.tableGet(tbl, key)
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = val
+
 	case OpTableArrayHeader:
 		tbl := s.val(instr.Args[0])
 		if !tbl.IsTable() {
@@ -1279,9 +1305,18 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		// Handled by resolveTerminator and the main loop.
 		// OpReturn is handled below.
 		if instr.Op == OpReturn {
-			results := make([]runtime.Value, len(instr.Args))
-			for i, arg := range instr.Args {
-				results[i] = s.val(arg)
+			if len(instr.Args) == 1 {
+				if results, ok := s.varargReturnValues(instr.Args[0]); ok {
+					return results, true, nil
+				}
+			}
+			results := make([]runtime.Value, 0, len(instr.Args))
+			for _, arg := range instr.Args {
+				if vals, ok := s.varargReturnValues(arg); ok {
+					results = append(results, vals...)
+				} else {
+					results = append(results, s.val(arg))
+				}
 			}
 			return results, true, nil
 		}
@@ -1297,6 +1332,65 @@ func (s *interpState) execInstr(instr *Instr, block *Block) ([]runtime.Value, bo
 		return nil, false, fmt.Errorf("IR interpreter: OpResume not supported")
 	case OpYield:
 		return nil, false, fmt.Errorf("IR interpreter: OpYield not supported")
+	case OpForPrep:
+		if len(instr.Args) < 2 {
+			return nil, false, fmt.Errorf("IR interpreter: OpForPrep with insufficient args")
+		}
+		idx, step := s.val(instr.Args[0]), s.val(instr.Args[1])
+		var dst runtime.Value
+		if !runtime.SubNums(&dst, &idx, &step) {
+			return nil, false, fmt.Errorf("IR interpreter: cannot forprep %s and %s", idx.TypeName(), step.TypeName())
+		}
+		s.values[instr.ID] = dst
+		s.branchConds[instr.ID] = true
+	case OpForLoop:
+		if len(instr.Args) < 3 {
+			return nil, false, fmt.Errorf("IR interpreter: OpForLoop with insufficient args")
+		}
+		idx, limit, step := s.val(instr.Args[0]), s.val(instr.Args[1]), s.val(instr.Args[2])
+		next, cont, err := interpForLoopNext(idx, limit, step)
+		if err != nil {
+			return nil, false, err
+		}
+		s.values[instr.ID] = next
+		s.branchConds[instr.ID] = cont
+	case OpTForCall:
+		results, err := s.execTForCall(instr)
+		if err != nil {
+			return nil, false, err
+		}
+		resultIndex := int(instr.Aux2)
+		if resultIndex >= 0 && resultIndex < len(results) {
+			s.values[instr.ID] = results[resultIndex]
+		} else {
+			s.values[instr.ID] = runtime.NilValue()
+		}
+	case OpTForLoop:
+		if len(instr.Args) == 0 {
+			return nil, false, fmt.Errorf("IR interpreter: OpTForLoop with no args")
+		}
+		v := s.val(instr.Args[0])
+		s.values[instr.ID] = v
+		s.branchConds[instr.ID] = !v.IsNil()
+	case OpVararg:
+		idx := int(instr.Aux)
+		if idx >= 0 && idx < len(s.varargs) {
+			s.values[instr.ID] = s.varargs[idx]
+		} else {
+			s.values[instr.ID] = runtime.NilValue()
+		}
+	case OpTestSet:
+		if len(instr.Args) == 0 {
+			return nil, false, fmt.Errorf("IR interpreter: OpTestSet with no args")
+		}
+		v := s.val(instr.Args[0])
+		pass := v.Truthy() == (instr.Aux != 0)
+		s.branchConds[instr.ID] = pass
+		if pass {
+			s.values[instr.ID] = v
+		} else {
+			s.values[instr.ID] = runtime.NilValue()
+		}
 
 	// ---------- Closure ----------
 	case OpClosure:
@@ -1350,9 +1444,58 @@ func (s *interpState) resolveTerminator(instr *Instr, block *Block) (*Block, err
 		// Return is handled in execInstr; should not reach here.
 		return nil, nil
 
+	case OpForPrep:
+		if len(block.Succs) > 0 {
+			return block.Succs[0], nil
+		}
+		return nil, fmt.Errorf("IR interpreter: OpForPrep with no successors")
+
+	case OpForLoop, OpTForLoop:
+		if len(block.Succs) < 2 {
+			return nil, fmt.Errorf("IR interpreter: %s with insufficient succs", instr.Op)
+		}
+		if s.branchConds[instr.ID] {
+			return block.Succs[0], nil
+		}
+		return block.Succs[1], nil
+
 	default:
 		return nil, fmt.Errorf("IR interpreter: block B%d ends with non-terminator %s", block.ID, instr.Op)
 	}
+}
+
+func (s *interpState) varargReturnValues(v *Value) ([]runtime.Value, bool) {
+	if v == nil || v.Def == nil || v.Def.Op != OpVararg || v.Def.Aux2 != 0 {
+		return nil, false
+	}
+	start := int(v.Def.Aux)
+	if start < 0 {
+		start = 0
+	}
+	if start >= len(s.varargs) {
+		return nil, true
+	}
+	out := make([]runtime.Value, len(s.varargs)-start)
+	copy(out, s.varargs[start:])
+	return out, true
+}
+
+func interpForLoopNext(idx, limit, step runtime.Value) (runtime.Value, bool, error) {
+	if idx.IsInt() && limit.IsInt() && step.IsInt() {
+		next := idx.Int() + step.Int()
+		if step.Int() > 0 {
+			return runtime.IntValue(next), next <= limit.Int(), nil
+		}
+		return runtime.IntValue(next), next >= limit.Int(), nil
+	}
+	if !idx.IsNumber() || !limit.IsNumber() || !step.IsNumber() {
+		return runtime.NilValue(), false, fmt.Errorf("IR interpreter: cannot forloop %s, %s, %s", idx.TypeName(), limit.TypeName(), step.TypeName())
+	}
+	next := idx.Number() + step.Number()
+	if step.Number() > 0 {
+		return runtime.FloatValue(next), next <= limit.Number(), nil
+	}
+	return runtime.FloatValue(next), next >= limit.Number(), nil
 }
 
 func tableKindMatchesFeedback(kind runtime.ArrayKind, fbKind uint8) bool {
