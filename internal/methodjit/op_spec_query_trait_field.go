@@ -5,6 +5,11 @@ func opIsFieldNumFusionGapSafe(op Op) bool {
 	return ok && spec.FieldNumFusionGapSafe
 }
 
+func fieldNumFusionLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.FieldNumFusionLoweredOp, ok && spec.FieldNumFusionLoweredOp != OpMax
+}
+
 func fieldShapeSplitInlineOpSafe(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.FieldShapeSplitInlineSafe

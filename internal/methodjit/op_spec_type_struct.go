@@ -98,6 +98,7 @@ type OpSpec struct {
 	FieldSvalsLoweredOp               Op
 	FieldLenFoldBarrier               bool
 	FieldCallPolyLenFusionBarrier     bool
+	FieldNumFusionLoweredOp           Op
 
 	// Integer range, boxing, narrowing, and recurrence contracts.
 	BoxableIntArithmetic           bool

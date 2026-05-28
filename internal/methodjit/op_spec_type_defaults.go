@@ -30,6 +30,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		TypeSpecializeStringOp:            OpMax,
 		RawIntSpecializedOp:               OpMax,
 		FieldSvalsLoweredOp:               OpMax,
+		FieldNumFusionLoweredOp:           OpMax,
 		CallUserArgStart:                  -1,
 		ExactIntNarrowOp:                  OpMax,
 		MatrixLoweredOp:                   OpMax,

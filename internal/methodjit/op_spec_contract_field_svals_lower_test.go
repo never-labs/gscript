@@ -21,3 +21,12 @@ func TestFieldSvalsLoweringTargetsLiveInOpSpec(t *testing.T) {
 		t.Fatalf("AddInt FieldSvals lowered op = %s, %v; want OpMax, false", lowered, ok)
 	}
 }
+
+func TestFieldNumFusionLoweringTargetsLiveInOpSpec(t *testing.T) {
+	if lowered, ok := fieldNumFusionLoweredOp(OpGetField); !ok || lowered != OpGetFieldNumToFloat {
+		t.Fatalf("GetField numeric-fusion lowered op = %s, %v; want GetFieldNumToFloat, true", lowered, ok)
+	}
+	if lowered, ok := fieldNumFusionLoweredOp(OpNumToFloat); ok || lowered != OpMax {
+		t.Fatalf("NumToFloat numeric-fusion lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
+}

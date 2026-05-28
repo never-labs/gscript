@@ -81,3 +81,7 @@ var opFieldCallPolyLenFusionBarrierPolicies = [...]bool{
 	OpJump:                       true,
 	OpBranch:                     true,
 }
+
+var opFieldNumFusionLoweredOpPolicies = [...]opTargetPolicy{
+	OpGetField: {Op: OpGetFieldNumToFloat, Set: true},
+}

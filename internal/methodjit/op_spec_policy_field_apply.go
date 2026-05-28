@@ -87,4 +87,7 @@ func applyOpSpecFieldLenBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldCallPolyLenFusionBarrierPolicies) {
 		spec.FieldCallPolyLenFusionBarrier = opFieldCallPolyLenFusionBarrierPolicies[op]
 	}
+	if int(op) < len(opFieldNumFusionLoweredOpPolicies) && opFieldNumFusionLoweredOpPolicies[op].Set {
+		spec.FieldNumFusionLoweredOp = opFieldNumFusionLoweredOpPolicies[op].Op
+	}
 }

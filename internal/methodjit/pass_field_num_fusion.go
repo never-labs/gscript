@@ -22,7 +22,11 @@ func FieldNumToFloatFusionPass(fn *Function) (*Function, error) {
 				continue
 			}
 			get := instr.Args[0].Def
-			if get == nil || get.Op != OpGetField || get.Block != block || len(get.Args) != 1 {
+			if get == nil {
+				continue
+			}
+			lowered, ok := fieldNumFusionLoweredOp(get.Op)
+			if !ok || lowered != OpGetFieldNumToFloat || get.Block != block || len(get.Args) != 1 {
 				continue
 			}
 			getPos, ok := pos[get.ID]
@@ -35,7 +39,7 @@ func FieldNumToFloatFusionPass(fn *Function) (*Function, error) {
 				continue
 			}
 
-			get.Op = OpGetFieldNumToFloat
+			get.Op = lowered
 			get.Type = TypeFloat
 			replaceValueUses(fn, instr.ID, get.Value(), get.ID)
 			instr.Op = OpNop
