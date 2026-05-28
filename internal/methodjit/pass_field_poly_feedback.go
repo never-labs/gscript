@@ -90,7 +90,7 @@ type setFieldAppendShapeCase struct {
 	PostShape   *rt.Shape
 }
 
-func fixedShapeAppendSetFieldCases(fn *Function, instr *Instr) []setFieldAppendShapeCase {
+func fixedShapeAppendSetFieldCases(fn *Function, tableShapes *TableShapeFacts, instr *Instr) []setFieldAppendShapeCase {
 	if fn == nil || instr == nil || instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[1] == nil {
 		return nil
 	}
@@ -98,7 +98,10 @@ func fixedShapeAppendSetFieldCases(fn *Function, instr *Instr) []setFieldAppendS
 	if field == "" || !valueProvenNonNil(instr.Args[1]) {
 		return nil
 	}
-	facts := functionTableShapeFacts(fn).FixedShapeTableMap()
+	if tableShapes == nil {
+		return nil
+	}
+	facts := tableShapes.FixedShapeTableMap()
 	if len(facts) == 0 {
 		return nil
 	}

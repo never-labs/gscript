@@ -199,7 +199,7 @@ func (ec *emitContext) emitSetFieldAppendShapeCases(instr *Instr) bool {
 	if ec == nil || instr == nil || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil {
 		return false
 	}
-	cases := fixedShapeAppendSetFieldCases(ec.fn, instr)
+	cases := fixedShapeAppendSetFieldCases(ec.fn, functionTableShapeFacts(ec.fn), instr)
 	if len(cases) == 0 {
 		return false
 	}

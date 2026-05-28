@@ -186,8 +186,8 @@ func fixedShapeTableFactsPass(fn *Function, config FixedShapeTableFactsConfig, t
 	annotateFixedShapeStringValueAccesses(fn, tableShapes, facts)
 	propagateFixedShapePhiFacts(fn, facts)
 	annotateFixedShapeGetFields(fn, tableShapes, numeric, facts)
-	annotateFixedShapeSetFields(fn, facts)
-	propagateShapeCacheFromSetFieldToGetField(fn, facts)
+	annotateFixedShapeSetFields(fn, tableShapes, facts)
+	propagateShapeCacheFromSetFieldToGetField(fn, tableShapes, facts)
 	annotateFixedShapeArrayElementAccesses(fn, numeric, facts)
 	forwardFixedShapeGetFields(fn, facts)
 	return fn, nil

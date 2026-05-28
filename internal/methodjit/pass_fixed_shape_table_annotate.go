@@ -579,7 +579,7 @@ func fixedShapeFactForFieldSvals(tableShapes *TableShapeFacts, facts map[int]Fix
 	return FixedShapeTableFact{}, false
 }
 
-func annotateFixedShapeSetFields(fn *Function, facts map[int]FixedShapeTableFact) {
+func annotateFixedShapeSetFields(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact) {
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr.Op != OpSetField || len(instr.Args) < 2 || instr.Args[0] == nil || instr.Args[1] == nil {
@@ -598,6 +598,10 @@ func annotateFixedShapeSetFields(fn *Function, facts map[int]FixedShapeTableFact
 			}
 			idx, ok := fact.fieldIndex(name)
 			if !ok {
+				if cases := fixedShapeAppendSetFieldCases(fn, tableShapes, instr); len(cases) > 0 {
+					functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
+						fmt.Sprintf("prefilled append-shape setfield cache with %d shapes", len(cases)))
+				}
 				continue
 			}
 			instr.Aux2 = int64(fact.ShapeID)<<32 | int64(uint32(idx))
@@ -622,7 +626,7 @@ func annotateFixedShapeSetFields(fn *Function, facts map[int]FixedShapeTableFact
 //  2. For each GetField whose table argument is a Phi where at least one input
 //     has a known fixed-shape fact with the same shape, propagate the shape
 //     cache and field type.
-func propagateShapeCacheFromSetFieldToGetField(fn *Function, facts map[int]FixedShapeTableFact) {
+func propagateShapeCacheFromSetFieldToGetField(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact) {
 	if fn == nil || len(facts) == 0 {
 		return
 	}
@@ -750,12 +754,11 @@ func propagateShapeCacheFromSetFieldToGetField(fn *Function, facts map[int]Fixed
 	}
 
 	// Now annotate GetField instructions that don't yet have a shape cache.
-	tableShapes := functionTableShapeFacts(fn)
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
 			if instr.Op != OpGetField || len(instr.Args) == 0 || instr.Args[0] == nil || instr.Aux2 != 0 {
 				if instr.Op == OpSetField && instr.Aux2 == 0 {
-					if cases := fixedShapeAppendSetFieldCases(fn, instr); len(cases) > 0 {
+					if cases := fixedShapeAppendSetFieldCases(fn, tableShapes, instr); len(cases) > 0 {
 						functionRemarks(fn).Add("FixedShapeTableFacts", "changed", block.ID, instr.ID, instr.Op,
 							fmt.Sprintf("prefilled append-shape setfield cache with %d shapes", len(cases)))
 					}
