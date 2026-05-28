@@ -98,3 +98,25 @@ var opStaticTableLenInvalidatorPolicies = [...]bool{
 	OpSetTable: true,
 	OpAppend:   true,
 }
+
+var opClosureScalarLocalUseAnyPolicies = [...]bool{
+	OpNop: true,
+}
+
+var opClosureScalarLocalUseArgIndexPolicies = [...]uint8{
+	OpGuardCalleeProto: 1,
+	OpGetUpval:         1,
+	OpSetUpval:         2,
+}
+
+var opClosureScalarLoadClosureArgIndexPolicies = [...]uint8{
+	OpGetUpval: 1,
+}
+
+var opClosureScalarStoreClosureArgIndexPolicies = [...]uint8{
+	OpSetUpval: 2,
+}
+
+var opClosureScalarStoreValueArgIndexPolicies = [...]uint8{
+	OpSetUpval: 1,
+}

@@ -72,6 +72,12 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 			t.Fatalf("%s table-array access layout default = table %d data %d len %d, want all -1",
 				op, spec.TableArrayTableArgIndex, spec.TableArrayDataArgIndex, spec.TableArrayLenArgIndex)
 		}
+		if spec.ClosureScalarLocalUseArgIndex != -1 || spec.ClosureScalarLoadClosureArgIndex != -1 ||
+			spec.ClosureScalarStoreClosureArgIndex != -1 || spec.ClosureScalarStoreValueArgIndex != -1 {
+			t.Fatalf("%s closure scalar arg defaults=%d/%d/%d/%d, want all -1",
+				op, spec.ClosureScalarLocalUseArgIndex, spec.ClosureScalarLoadClosureArgIndex,
+				spec.ClosureScalarStoreClosureArgIndex, spec.ClosureScalarStoreValueArgIndex)
+		}
 		if spec.LoadElimTableCacheKeyArgIndex != -1 || spec.LoadElimTableCacheValueArgIndex != -1 {
 			t.Fatalf("%s load-elim table-cache arg defaults=%d/%d, want both -1",
 				op, spec.LoadElimTableCacheKeyArgIndex, spec.LoadElimTableCacheValueArgIndex)

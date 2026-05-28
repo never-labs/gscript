@@ -50,19 +50,24 @@ func closureScalarSingleBackedge(li *loopInfo, header *Block) *Block {
 
 func promoteClosureUpvalueInLoop(fn *Function, header, body *Block) {
 	for idx, set := range body.Instrs {
-		if set == nil || set.Op != OpSetUpval || len(set.Args) < 2 || set.Args[1] == nil {
+		if set == nil {
 			continue
 		}
-		key := upvalueKey{closureID: set.Args[1].ID, upval: set.Aux}
+		closureArg, ok := closureScalarStoreClosureArgIndex(set.Op)
+		valueArg, valueOK := closureScalarStoreValueArgIndex(set.Op)
+		if !ok || !valueOK || len(set.Args) <= closureArg || set.Args[closureArg] == nil || len(set.Args) <= valueArg || set.Args[valueArg] == nil {
+			continue
+		}
+		key := upvalueKey{closureID: set.Args[closureArg].ID, upval: set.Aux}
 		get := firstPriorGetUpval(body.Instrs[:idx], key)
-		if get == nil || (get.Type != TypeInt && get.Type != TypeFloat) || get.Type != set.Args[0].Def.Type {
+		if get == nil || (get.Type != TypeInt && get.Type != TypeFloat) || set.Args[valueArg].Def == nil || get.Type != set.Args[valueArg].Def.Type {
 			continue
 		}
 		init := &Instr{
 			ID:    fn.newValueID(),
 			Op:    OpGetUpval,
 			Type:  get.Type,
-			Args:  []*Value{set.Args[1]},
+			Args:  []*Value{set.Args[closureArg]},
 			Aux:   set.Aux,
 			Block: header.Preds[0],
 		}
@@ -80,7 +85,7 @@ func promoteClosureUpvalueInLoop(fn *Function, header, body *Block) {
 		}
 		for _, pred := range header.Preds {
 			if pred == body {
-				phi.Args = append(phi.Args, set.Args[0])
+				phi.Args = append(phi.Args, set.Args[valueArg])
 			} else {
 				phi.Args = append(phi.Args, init.Value())
 			}
@@ -90,7 +95,7 @@ func promoteClosureUpvalueInLoop(fn *Function, header, body *Block) {
 		get.Op = OpNop
 		get.Args = nil
 		get.Type = TypeUnknown
-		if inlinedClosureValueDoesNotEscape(fn, set.Args[1]) {
+		if inlinedClosureValueDoesNotEscape(fn, set.Args[closureArg]) {
 			set.Op = OpNop
 			set.Args = nil
 			set.Type = TypeUnknown
@@ -114,10 +119,14 @@ func closureScalarPreheader(header, body *Block) *Block {
 
 func firstPriorGetUpval(instrs []*Instr, key upvalueKey) *Instr {
 	for _, instr := range instrs {
-		if instr == nil || instr.Op != OpGetUpval || len(instr.Args) < 1 || instr.Args[0] == nil {
+		if instr == nil {
 			continue
 		}
-		if instr.Args[0].ID == key.closureID && instr.Aux == key.upval {
+		closureArg, ok := closureScalarLoadClosureArgIndex(instr.Op)
+		if !ok || len(instr.Args) <= closureArg || instr.Args[closureArg] == nil {
+			continue
+		}
+		if instr.Args[closureArg].ID == key.closureID && instr.Aux == key.upval {
 			return instr
 		}
 	}
@@ -179,16 +188,12 @@ func inlinedClosureValueDoesNotEscape(fn *Function, closure *Value) bool {
 }
 
 func closureUseKeepsValueLocal(instr *Instr, argIdx int, roots map[int]bool) bool {
-	switch instr.Op {
-	case OpGuardCalleeProto:
-		return argIdx == 0
-	case OpGetUpval:
-		return argIdx == 0
-	case OpSetUpval:
-		return argIdx == 1
-	case OpNop:
-		return true
-	default:
+	if instr == nil {
 		return false
 	}
+	if closureScalarLocalUseAny(instr.Op) {
+		return true
+	}
+	localArg, ok := closureScalarLocalUseArgIndex(instr.Op)
+	return ok && argIdx == localArg
 }

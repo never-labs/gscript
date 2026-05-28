@@ -42,20 +42,24 @@ type OpSpec struct {
 	LoadElimFactBarrier               bool
 
 	// Result representation and value-lowering contracts.
-	NoSSAResult                   bool
-	RawIntResult                  bool
-	RawTablePtrResult             bool
-	RawDataPtrResult              bool
-	RawFloatResult                bool
-	MatrixNative                  bool
-	TableArrayGPRInvariant        bool
-	TableArrayGPRInvariantRank    int
-	TableArrayGPRInvariantUseMask uint8
-	TableArrayKeyArgIndex         int
-	TableArrayTableArgIndex       int
-	TableArrayDataArgIndex        int
-	TableArrayLenArgIndex         int
-	TableArrayFactRole            OpTableArrayFactRole
+	NoSSAResult                       bool
+	RawIntResult                      bool
+	RawTablePtrResult                 bool
+	RawDataPtrResult                  bool
+	RawFloatResult                    bool
+	MatrixNative                      bool
+	TableArrayGPRInvariant            bool
+	TableArrayGPRInvariantRank        int
+	TableArrayGPRInvariantUseMask     uint8
+	TableArrayKeyArgIndex             int
+	TableArrayTableArgIndex           int
+	TableArrayDataArgIndex            int
+	TableArrayLenArgIndex             int
+	ClosureScalarLocalUseArgIndex     int
+	ClosureScalarLoadClosureArgIndex  int
+	ClosureScalarStoreClosureArgIndex int
+	ClosureScalarStoreValueArgIndex   int
+	TableArrayFactRole                OpTableArrayFactRole
 
 	// Optimizer admission and numeric specialization contracts.
 	LICMHoistable               bool
@@ -150,6 +154,7 @@ type OpSpec struct {
 	StaticTableLenBuilder      bool
 	StaticTableLenInitializer  bool
 	StaticTableLenInvalidator  bool
+	ClosureScalarLocalUseAny   bool
 	FixedResultType            Type
 	ProvesNonNilResult         bool
 	GuardProvenResultType      Type

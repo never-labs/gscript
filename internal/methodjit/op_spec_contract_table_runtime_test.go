@@ -74,6 +74,46 @@ func TestTableRuntimeTypeContractsLiveInOpSpec(t *testing.T) {
 		}
 	}
 	for _, tc := range []struct {
+		op              Op
+		localArg        int
+		loadArg         int
+		storeClosureArg int
+		storeValueArg   int
+	}{
+		{OpGuardCalleeProto, 0, -1, -1, -1},
+		{OpGetUpval, 0, 0, -1, -1},
+		{OpSetUpval, 1, -1, 1, 0},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok {
+			t.Fatalf("%s closure scalar contract should have OpSpec", tc.op)
+		}
+		if got, ok := closureScalarLocalUseArgIndex(tc.op); !ok || got != tc.localArg {
+			t.Fatalf("%s closure scalar local-use arg = %d/%v, want %d/true", tc.op, got, ok, tc.localArg)
+		}
+		if tc.loadArg >= 0 {
+			if got, ok := closureScalarLoadClosureArgIndex(tc.op); !ok || got != tc.loadArg {
+				t.Fatalf("%s closure scalar load closure arg = %d/%v, want %d/true", tc.op, got, ok, tc.loadArg)
+			}
+		}
+		if tc.storeClosureArg >= 0 {
+			if got, ok := closureScalarStoreClosureArgIndex(tc.op); !ok || got != tc.storeClosureArg {
+				t.Fatalf("%s closure scalar store closure arg = %d/%v, want %d/true", tc.op, got, ok, tc.storeClosureArg)
+			}
+		}
+		if tc.storeValueArg >= 0 {
+			if got, ok := closureScalarStoreValueArgIndex(tc.op); !ok || got != tc.storeValueArg {
+				t.Fatalf("%s closure scalar store value arg = %d/%v, want %d/true", tc.op, got, ok, tc.storeValueArg)
+			}
+		}
+		if tc.op != OpSetUpval && spec.ClosureScalarStoreClosureArgIndex >= 0 {
+			t.Fatalf("%s should not be a closure scalar store", tc.op)
+		}
+	}
+	if spec, ok := OpNop.Spec(); !ok || !spec.ClosureScalarLocalUseAny || !closureScalarLocalUseAny(OpNop) {
+		t.Fatalf("%s closure scalar local-use-any contract should be driven by OpSpec", OpNop)
+	}
+	for _, tc := range []struct {
 		op  Op
 		typ Type
 	}{

@@ -35,6 +35,21 @@ func applyOpSpecTypeRuntimePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opStaticTableLenInvalidatorPolicies) {
 		spec.StaticTableLenInvalidator = opStaticTableLenInvalidatorPolicies[op]
 	}
+	if int(op) < len(opClosureScalarLocalUseAnyPolicies) {
+		spec.ClosureScalarLocalUseAny = opClosureScalarLocalUseAnyPolicies[op]
+	}
+	if int(op) < len(opClosureScalarLocalUseArgIndexPolicies) && opClosureScalarLocalUseArgIndexPolicies[op] != 0 {
+		spec.ClosureScalarLocalUseArgIndex = int(opClosureScalarLocalUseArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opClosureScalarLoadClosureArgIndexPolicies) && opClosureScalarLoadClosureArgIndexPolicies[op] != 0 {
+		spec.ClosureScalarLoadClosureArgIndex = int(opClosureScalarLoadClosureArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opClosureScalarStoreClosureArgIndexPolicies) && opClosureScalarStoreClosureArgIndexPolicies[op] != 0 {
+		spec.ClosureScalarStoreClosureArgIndex = int(opClosureScalarStoreClosureArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opClosureScalarStoreValueArgIndexPolicies) && opClosureScalarStoreValueArgIndexPolicies[op] != 0 {
+		spec.ClosureScalarStoreValueArgIndex = int(opClosureScalarStoreValueArgIndexPolicies[op]) - 1
+	}
 }
 
 func applyOpSpecTypeResultPolicies(op Op, spec *OpSpec) {

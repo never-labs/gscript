@@ -96,6 +96,31 @@ func opIsStaticTableLenInvalidator(op Op) bool {
 	return ok && spec.StaticTableLenInvalidator
 }
 
+func closureScalarLocalUseAny(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.ClosureScalarLocalUseAny
+}
+
+func closureScalarLocalUseArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.ClosureScalarLocalUseArgIndex, ok && spec.ClosureScalarLocalUseArgIndex >= 0
+}
+
+func closureScalarLoadClosureArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.ClosureScalarLoadClosureArgIndex, ok && spec.ClosureScalarLoadClosureArgIndex >= 0
+}
+
+func closureScalarStoreClosureArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.ClosureScalarStoreClosureArgIndex, ok && spec.ClosureScalarStoreClosureArgIndex >= 0
+}
+
+func closureScalarStoreValueArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.ClosureScalarStoreValueArgIndex, ok && spec.ClosureScalarStoreValueArgIndex >= 0
+}
+
 func tableArrayKeyArgIndex(op Op) (int, bool) {
 	spec, ok := op.Spec()
 	return spec.TableArrayKeyArgIndex, ok && spec.TableArrayKeyArgIndex >= 0
