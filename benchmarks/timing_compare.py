@@ -70,6 +70,22 @@ HOT_SCALE_PROFILE = [
     "extended/log_tokenize_format:PASSES=24",
     "variants/closure_accumulator_variant:INT_REPS=8000000",
     "variants/closure_accumulator_variant:FLOAT_REPS=8000000",
+    "official/call_len_pairs_metamethod_hot:GROUPS=1920",
+    "official/call_len_pairs_metamethod_hot:REPS=1920",
+    "official/calls_vararg_coroutine_hot:N_CALLS=880000",
+    "official/calls_vararg_coroutine_hot:N_CORO=360000",
+    "official/defer_protected_hot:PROTECTED_N=720000",
+    "official/defer_protected_hot:COROUTINE_N=180000",
+    "official/events_metamethod_hot:N=2400000",
+    "official/math_bit_utf8_hot:N=720000",
+    "official/nextvar_table_hot:SIZE=5200",
+    "official/nextvar_table_hot:REPS=180",
+    "official/nextvar_table_hot:ALLOC_N=1400",
+    "official/nextvar_table_hot:ALLOC_REPS=360",
+    "official/regexp_random_hot:N=144000",
+    "official/stdlib_host_hot:N=28000",
+    "official/table_sort_proxy_hot:N=840",
+    "official/table_sort_proxy_hot:PASSES=3000",
 ]
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
@@ -155,6 +171,7 @@ class SubjectResult:
     t2_failed: int = 0
     exit_total: int = 0
     note: str = ""
+    diagnostic: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -476,6 +493,85 @@ def summarize_subject(subject: str, mode: str, samples: list[Sample], repeat: in
     )
 
 
+def max_sample_total(samples: list[Sample], attr: str) -> float | None:
+    values = [getattr(sample, attr) for sample in samples if getattr(sample, attr) is not None]
+    return max(values) if values else None
+
+
+def low_resolution_samples(samples: list[Sample]) -> list[Sample]:
+    return [sample for sample in samples if sample.status == "low_resolution"]
+
+
+def scale_arg_values(overrides: list[ScaleOverride]) -> list[str]:
+    return [f"{override.selector + ':' if override.selector else ''}{override.name}={override.value}" for override in overrides]
+
+
+def recommended_scale_args(spec: BenchmarkSpec, applied_overrides: list[ScaleOverride]) -> list[str]:
+    if applied_overrides:
+        return scale_arg_values(applied_overrides)
+    profile = scale_overrides_for(spec, parse_scale_overrides(HOT_SCALE_PROFILE))
+    return scale_arg_values(profile)
+
+
+def subject_diagnostic(
+    spec: BenchmarkSpec,
+    subject: SubjectResult,
+    samples: list[Sample],
+    applied_overrides: list[ScaleOverride],
+    args: argparse.Namespace,
+) -> dict[str, object]:
+    low_samples = low_resolution_samples(samples)
+    wall_timed = source_is_wall_timed(subject)
+    diagnostic: dict[str, object] = {
+        "repeat": subject.repeat,
+        "max_repeat": args.max_repeat,
+        "min_sample_seconds": args.min_sample_seconds,
+        "timer_resolution": args.timer_resolution,
+        "min_wall_repeat": args.min_wall_repeat,
+        "wall_fallback": not args.no_wall_fallback,
+        "time_source": args.time_source,
+        "scale_profile": args.scale_profile,
+        "scale": scale_arg_values(applied_overrides),
+    }
+    script_total = max_sample_total(samples, "script_total_seconds")
+    wall_total = max_sample_total(samples, "wall_total_seconds")
+    if script_total is not None:
+        diagnostic["max_script_total_seconds"] = script_total
+    if wall_total is not None:
+        diagnostic["max_wall_total_seconds"] = wall_total
+    if low_samples:
+        scale_args = recommended_scale_args(spec, applied_overrides)
+        recommendation: dict[str, object] = {
+            "reason": "script Time total is below timer resolution or --min-sample-seconds",
+            "min_sample_seconds": max(args.min_sample_seconds, args.timer_resolution * 50.0),
+            "max_repeat": max(args.max_repeat, subject.repeat * 2),
+            "min_wall_repeat": max(args.min_wall_repeat, 8),
+            "time_source": "script",
+            "scale": scale_args,
+        }
+        rerun_args = ["--time-source=script"]
+        if scale_args:
+            rerun_args.extend(f"--scale {value}" for value in scale_args)
+        else:
+            recommendation["scale_note"] = "no built-in top-level --scale parameter is available for this benchmark"
+        rerun_args.extend(
+            [
+                f"--min-sample-seconds {recommendation['min_sample_seconds']:.3f}",
+                f"--max-repeat {recommendation['max_repeat']}",
+                f"--min-wall-repeat {recommendation['min_wall_repeat']}",
+            ]
+        )
+        recommendation["rerun_args"] = " ".join(rerun_args)
+        diagnostic["low_resolution"] = recommendation
+    elif wall_timed:
+        diagnostic["wall_repeat"] = {
+            "reason": "sample used repeated command wall time; measurements include process startup overhead",
+            "recommendation": "scale workload enough for script_repeat or rerun with --time-source=script",
+            "min_wall_repeat": args.min_wall_repeat,
+        }
+    return diagnostic
+
+
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
     specs: list[BenchmarkSpec] = []
     if "suite" in groups:
@@ -759,7 +855,9 @@ def run_subject(
             )
         )
     measured = samples[1:] if len(samples) > 1 else samples
-    return summarize_subject(subject, mode, measured, repeat)
+    result = summarize_subject(subject, mode, measured, repeat)
+    result.diagnostic = subject_diagnostic(spec, result, measured, overrides, args)
+    return result
 
 
 def seconds(result: SubjectResult | None) -> float | None:
@@ -886,6 +984,38 @@ def fmt_scale(scale: dict[str, str]) -> str:
     return ", ".join(f"{name}:{value}" for name, value in sorted(scale.items()))
 
 
+def diagnostic_low_resolution_rows(
+    results: list[BenchmarkResult], modes: list[str]
+) -> list[tuple[BenchmarkResult, str, str, SubjectResult, dict[str, object]]]:
+    out: list[tuple[BenchmarkResult, str, str, SubjectResult, dict[str, object]]] = []
+    for row in results:
+        for mode in modes:
+            for subject_name, subject in row.modes.get(mode, {}).items():
+                recommendation = subject.diagnostic.get("low_resolution") if subject.diagnostic else None
+                if isinstance(recommendation, dict):
+                    out.append((row, mode, subject_name, subject, recommendation))
+    return out
+
+
+def diagnostic_wall_rows(
+    results: list[BenchmarkResult], modes: list[str]
+) -> list[tuple[BenchmarkResult, str, str, SubjectResult, dict[str, object]]]:
+    out: list[tuple[BenchmarkResult, str, str, SubjectResult, dict[str, object]]] = []
+    for row in results:
+        for mode in modes:
+            for subject_name, subject in row.modes.get(mode, {}).items():
+                wall = subject.diagnostic.get("wall_repeat") if subject.diagnostic else None
+                if isinstance(wall, dict):
+                    out.append((row, mode, subject_name, subject, wall))
+    return out
+
+
+def fmt_list(value: object) -> str:
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) if value else "-"
+    return str(value) if value else "-"
+
+
 def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Namespace) -> str:
     lines = [
         "# Timing Compare",
@@ -897,6 +1027,8 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
         f"- wall fallback: {'disabled' if args.no_wall_fallback else 'enabled'}",
         f"- time source: {args.time_source}",
         f"- min wall repeat: {args.min_wall_repeat}",
+        f"- max repeat: {args.max_repeat}",
+        f"- scale profile: {args.scale_profile}",
         f"- scale overrides: {', '.join(args.scale_values) if args.scale_values else 'none'}",
         "",
         "## Measurements",
@@ -931,6 +1063,67 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                         str(current.exit_total if current else 0),
                         source_pair(current, luajit),
                         result_note(current),
+                    ]
+                )
+            + " |"
+        )
+
+    low_rows = diagnostic_low_resolution_rows(results, modes)
+    if low_rows:
+        lines.extend(
+            [
+                "",
+                "## Low-Resolution Diagnostics",
+                "",
+                "| Benchmark | Mode | Subject | Repeat | Script total | Wall total | Recommended scale | Recommended min sample | Recommended repeat | Rerun args |",
+                "|---|---|---|---:|---:|---:|---|---:|---:|---|",
+            ]
+        )
+        for row, mode, subject_name, subject, recommendation in low_rows:
+            diagnostic = subject.diagnostic
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        f"{row.group}/{row.benchmark}",
+                        mode,
+                        subject_name,
+                        str(subject.repeat),
+                        fmt_seconds(diagnostic.get("max_script_total_seconds") if isinstance(diagnostic.get("max_script_total_seconds"), float) else None),
+                        fmt_seconds(diagnostic.get("max_wall_total_seconds") if isinstance(diagnostic.get("max_wall_total_seconds"), float) else None),
+                        fmt_list(recommendation.get("scale")),
+                        f"{float(recommendation.get('min_sample_seconds', 0.0)):.3f}s",
+                        str(recommendation.get("max_repeat", "-")),
+                        str(recommendation.get("rerun_args", "-")),
+                    ]
+                )
+                + " |"
+            )
+
+    wall_rows = diagnostic_wall_rows(results, modes)
+    if wall_rows:
+        lines.extend(
+            [
+                "",
+                "## Wall-Repeat Diagnostics",
+                "",
+                "| Benchmark | Mode | Subject | Source | Repeat | Min wall repeat | Scale | Note |",
+                "|---|---|---|---|---:|---:|---|---|",
+            ]
+        )
+        for row, mode, subject_name, subject, wall in wall_rows:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        f"{row.group}/{row.benchmark}",
+                        mode,
+                        subject_name,
+                        subject.source or "-",
+                        str(subject.repeat),
+                        str(wall.get("min_wall_repeat", "-")),
+                        fmt_list(subject.diagnostic.get("scale") if subject.diagnostic else []),
+                        str(wall.get("recommendation", "-")),
                     ]
                 )
                 + " |"
@@ -1116,6 +1309,7 @@ def main() -> int:
             "min_wall_repeat": args.min_wall_repeat,
             "wall_fallback": not args.no_wall_fallback,
             "time_source": args.time_source,
+            "scale_profile": args.scale_profile,
             "scale": args.scale_values,
             "results": [asdict(row) for row in results],
         }
