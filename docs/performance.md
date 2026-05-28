@@ -82,14 +82,27 @@ bash scripts/performance_gate.sh
 ```
 
 The gate measures a representative core-hot subset from `suite`, `extended`,
-and `official_hot` with `timing_compare.py --scale-profile=hot`. It writes
-`timing_gate.json` / `timing_gate.md` and then runs a `strict_guard.py` truth
-pass over the requested selectors, or a smaller VM-safe truth subset for the
-default core profile, unless `--no-strict` is supplied. The JSON validator sorts all
-current/clean-HEAD rows by slowdown, fails script-timed rows above the default
-12% regression threshold, uses a wider 30% threshold for wall-timed rows because
-they include process startup/parse/compile noise, and fails rows that remain
-`low_resolution`, `missing`, `timeout`, or `error`.
+and `official_hot` with `timing_compare.py --scale-profile=hot`. The full
+release variant is:
+
+```bash
+bash scripts/performance_gate.sh --full
+```
+
+The gate writes `timing_gate.json` / `timing_gate.md` and then runs a
+`strict_guard.py` truth pass over the requested selectors, or a smaller VM-safe
+truth subset for the default core profile, unless `--no-strict` is supplied.
+The JSON validator sorts all current/clean-HEAD rows by slowdown, fails
+script-timed rows above the default 12% regression threshold, uses a wider 30%
+threshold for wall-timed rows because they include process startup/parse/compile
+noise, and fails rows that remain `low_resolution`, `missing`, `timeout`, or
+`error`.
+
+`scripts/production_check.sh` is the release-gate entrypoint. Its default
+`--full` mode calls `bash scripts/performance_gate.sh --full`; when `luajit` is
+not on `PATH`, it appends `--no-luajit` so the GScript current-vs-HEAD gate and
+strict truth pass still run. `scripts/production_check.sh --quick` intentionally
+skips this gate and stays limited to short correctness checks.
 
 Useful variants:
 

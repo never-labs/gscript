@@ -80,23 +80,29 @@ add_go_test() {
     fi
 }
 
-add_python_gate() {
-    local name="$1"
-    local script="$2"
-    local cmd="$3"
+add_performance_gate() {
+    local cmd="bash scripts/performance_gate.sh --full"
 
     if ! have_cmd python3; then
-        add_skip "$name" "missing python3"
+        add_skip "Performance Gate" "missing python3"
         return
     fi
-    if [ ! -f "$script" ]; then
-        add_skip "$name" "missing $script"
+    if [ ! -f scripts/performance_gate.sh ]; then
+        add_skip "Performance Gate" "missing scripts/performance_gate.sh"
+        return
+    fi
+    if [ ! -f benchmarks/timing_compare.py ]; then
+        add_skip "Performance Gate" "missing benchmarks/timing_compare.py"
+        return
+    fi
+    if [ ! -f benchmarks/strict_guard.py ]; then
+        add_skip "Performance Gate" "missing benchmarks/strict_guard.py"
         return
     fi
     if ! have_cmd luajit; then
         cmd="$cmd --no-luajit"
     fi
-    add_run "$name" "$cmd"
+    add_run "Performance Gate" "$cmd"
 }
 
 add_release_smoke() {
@@ -136,10 +142,7 @@ build_full_plan() {
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Official Lua Compatibility Surface" \
         "go test ./tests -run Official -count=1"
-    add_python_gate "Benchmark Truth Pass" "benchmarks/timing_compare.py" \
-        "python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 --sort=luajit-gap --json /tmp/gscript_timing_compare.json --markdown /tmp/gscript_timing_compare.md"
-    add_python_gate "Strict Regression Guard" "benchmarks/strict_guard.py" \
-        "python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90 --json /tmp/gscript_strict_guard.json --markdown /tmp/gscript_strict_guard.md"
+    add_performance_gate
     add_release_smoke
 }
 

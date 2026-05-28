@@ -60,7 +60,9 @@ quick benchmark/strict-guard summaries when those local tools are available.
 
 Use `scripts/production_check.sh --quick` for a short preflight that runs the
 core Go package tests, feature/integration checks, and the standard-library
-contract check without the long benchmark passes. Use
+contract check without the long benchmark passes. The default `--full` mode
+runs the correctness gates, the release smoke, and the repeatable performance
+gate through `scripts/performance_gate.sh --full`. Use
 `scripts/production_check.sh --list` to print the available command subset for
 the current checkout. If LuaJIT is unavailable, benchmark commands that support
 it are run with `--no-luajit`; if optional tools such as `pytest` are absent,
@@ -119,14 +121,10 @@ Expected result:
 - `tests/official_lua_cases/MISSING_CAPABILITIES.md` records deliberate
   GScript differences and future host-language-shaped capabilities.
 
-### Benchmark Truth Pass
+### Performance Gate
 
 ```bash
-python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
-  --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
-  --sort=luajit-gap \
-  --json /tmp/gscript_timing_compare.json \
-  --markdown /tmp/gscript_timing_compare.md
+bash scripts/performance_gate.sh --full
 ```
 
 Expected result:
@@ -135,21 +133,14 @@ Expected result:
 - official hot cases do not report unexplained `low_resolution` results;
 - any wall-time fallback is marked as startup-sensitive, not hot-loop evidence;
 - LuaJIT gaps are triaged before release notes claim a performance win.
-
-### Strict Regression Guard
-
-```bash
-python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90 \
-  --json /tmp/gscript_strict_guard.json \
-  --markdown /tmp/gscript_strict_guard.md
-```
-
-Expected result:
-
 - suite, extended, and variant checksums match;
 - VM, default JIT, and no-filter JIT agree on output;
 - suspicious benchmark wins are reviewed for runtime-discovered specialization
   rather than benchmark-specific protocol matching.
+
+`scripts/production_check.sh` runs this command in default `--full` mode and
+adds `--no-luajit` automatically when `luajit` is unavailable. Quick mode does
+not run the performance gate.
 
 ### Release Smoke
 
