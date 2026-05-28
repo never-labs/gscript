@@ -55,6 +55,19 @@ func (s *tableArrayFactSet) LookupHeader(instr *Instr) *Value {
 	return fact.header
 }
 
+func (s *tableArrayFactSet) LookupByRole(role OpTableArrayFactRole, instr *Instr) *Value {
+	switch role {
+	case OpTableArrayFactHeader:
+		return s.LookupHeader(instr)
+	case OpTableArrayFactLen:
+		return s.LookupLen(instr)
+	case OpTableArrayFactData:
+		return s.LookupData(instr)
+	default:
+		return nil
+	}
+}
+
 func (s *tableArrayFactSet) RecordHeader(instr *Instr) {
 	if instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil {
 		return

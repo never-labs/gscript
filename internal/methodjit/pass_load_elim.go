@@ -169,6 +169,21 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 			}
 
 			if !handled {
+				factRole := tableArrayFactRole(instr.Op)
+				if factRole != OpTableArrayFactNone {
+					if orig := tableArrayFacts.LookupByRole(factRole, instr); orig != nil {
+						origInstr := orig.Def
+						replaceAllUses(fn, instr.ID, origInstr)
+						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+							"reused earlier table-array fact result")
+					} else {
+						tableArrayFacts.RecordByRole(factRole, instr)
+					}
+					handled = true
+				}
+			}
+
+			if !handled {
 				switch instr.Op {
 				case OpGetGlobal:
 					// R53: globals are read-only for the body of a function in
@@ -207,36 +222,6 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 							"reused earlier MatrixStride result")
 					} else {
 						matrixStrideAvail[instr.Args[0].ID] = instr.ID
-					}
-
-				case OpTableArrayHeader:
-					if orig := tableArrayFacts.LookupHeader(instr); orig != nil {
-						origInstr := orig.Def
-						replaceAllUses(fn, instr.ID, origInstr)
-						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"reused earlier TableArrayHeader result")
-					} else {
-						tableArrayFacts.RecordHeader(instr)
-					}
-
-				case OpTableArrayLen:
-					if orig := tableArrayFacts.LookupLen(instr); orig != nil {
-						origInstr := orig.Def
-						replaceAllUses(fn, instr.ID, origInstr)
-						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"reused earlier TableArrayLen result")
-					} else {
-						tableArrayFacts.RecordLen(instr)
-					}
-
-				case OpTableArrayData:
-					if orig := tableArrayFacts.LookupData(instr); orig != nil {
-						origInstr := orig.Def
-						replaceAllUses(fn, instr.ID, origInstr)
-						functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-							"reused earlier TableArrayData result")
-					} else {
-						tableArrayFacts.RecordData(instr)
 					}
 
 				case OpSetGlobal:
