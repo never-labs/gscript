@@ -329,6 +329,8 @@ func TestSoASliceFilterAndUnzipCopyColumns(t *testing.T) {
 
 func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	lib := buildSoALib()
+	lenFn := lib.RawGetString("len").GoFunction()
+	column := lib.RawGetString("column").GoFunction()
 	unzip := lib.RawGetString("unzip").GoFunction()
 	slice := lib.RawGetString("slice").GoFunction()
 	filter := lib.RawGetString("filter").GoFunction()
@@ -345,6 +347,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	maxWhere := lib.RawGetString("maxWhere").GoFunction()
 	statsWhere := lib.RawGetString("statsWhere").GoFunction()
 	countWhere := lib.RawGetString("countWhere").GoFunction()
+	if lenFn == nil || lenFn.FastArg1 == nil {
+		t.Fatal("soa.len FastArg1 is nil")
+	}
+	if column == nil || column.FastArg2 == nil {
+		t.Fatal("soa.column FastArg2 is nil")
+	}
 	if unzip == nil || unzip.FastArg1 == nil {
 		t.Fatal("soa.unzip FastArg1 is nil")
 	}
@@ -405,6 +413,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	soaValue := SoAValue(s)
+	if got, err := lenFn.FastArg1(soaValue); err != nil || got.Int() != 3 {
+		t.Fatalf("soa.len FastArg1 got=%s err=%v", got.String(), err)
+	}
+	if got, err := column.FastArg2(soaValue, StringValue("x")); err != nil || !got.IsDenseArray() {
+		t.Fatalf("soa.column FastArg2 got=%s err=%v", got.String(), err)
+	}
 	if got, err := unzip.FastArg1(soaValue); err != nil || !got.IsTable() {
 		t.Fatalf("soa.unzip FastArg1 got=%s err=%v", got.String(), err)
 	}

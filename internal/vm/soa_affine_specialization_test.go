@@ -296,6 +296,48 @@ func add_scaled_kernel(cols, scale) {
 	benchmarkFloatSink = x[len(x)-1]
 }
 
+func BenchmarkSoAStdlibLenFastArg(b *testing.B) {
+	src := `
+func len_kernel(cols) {
+    return soa.len(cols)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "len_kernel")
+	defer v.Close()
+	soa := mustBenchSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = float64(results[0].Int())
+	}
+}
+
+func BenchmarkSoAStdlibColumnFastArg(b *testing.B) {
+	src := `
+func column_kernel(cols) {
+    return soa.column(cols, "x")
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "column_kernel")
+	defer v.Close()
+	soa := mustBenchSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = float64(results[0].DenseArray().Len())
+	}
+}
+
 func BenchmarkDenseArrayAddScaledVMFallback(b *testing.B) {
 	src := `
 func add_scaled_loop(cols, scale) {

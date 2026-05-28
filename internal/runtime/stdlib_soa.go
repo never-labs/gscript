@@ -49,13 +49,13 @@ func buildSoALib() *Table {
 		return []Value{SoAValue(s)}, nil
 	})
 
-	set("len", func(args []Value) ([]Value, error) {
+	setFastArg1("len", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.len", args, 0)
 		if err != nil {
 			return nil, err
 		}
 		return []Value{IntValue(int64(s.Len()))}, nil
-	})
+	}, soaLenValue)
 
 	set("columns", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.columns", args, 0)
@@ -93,7 +93,7 @@ func buildSoALib() *Table {
 		return []Value{TableValue(soaShapeTable(s))}, nil
 	})
 
-	set("column", func(args []Value) ([]Value, error) {
+	setFastArg2("column", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.column", args, 0)
 		if err != nil {
 			return nil, err
@@ -106,7 +106,7 @@ func buildSoALib() *Table {
 			return []Value{NilValue()}, nil
 		}
 		return []Value{DenseArrayValue(col)}, nil
-	})
+	}, soaColumnValue)
 
 	setFastArg3("slice", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.slice", args, 0)
@@ -491,6 +491,27 @@ func soaSumValue(soaValue, columnValue Value) (Value, error) {
 		return NilValue(), fmt.Errorf("soa.sum: argument 2 must be a string")
 	}
 	return soaValue.SoA().Sum(columnValue.Str())
+}
+
+func soaLenValue(soaValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.len: argument 1 must be soa")
+	}
+	return IntValue(int64(soaValue.SoA().Len())), nil
+}
+
+func soaColumnValue(soaValue, nameValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.column: argument 1 must be soa")
+	}
+	if !nameValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.column: argument 2 must be a string")
+	}
+	col, ok := soaValue.SoA().Column(nameValue.Str())
+	if !ok {
+		return NilValue(), nil
+	}
+	return DenseArrayValue(col), nil
 }
 
 func soaUnzipValue(soaValue Value) (Value, error) {
