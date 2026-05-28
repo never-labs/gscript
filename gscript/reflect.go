@@ -26,6 +26,10 @@ func ToValue(v interface{}) (runtime.Value, error) {
 		return runtime.NilValue(), nil
 	}
 
+	if pv, ok := v.(Value); ok {
+		return fromPublic(pv), nil
+	}
+
 	// Pass through if already a runtime.Value
 	if rv, ok := v.(runtime.Value); ok {
 		return rv, nil
@@ -129,6 +133,9 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 func FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	if target == nil {
 		return fromValueDefault(val)
+	}
+	if target == reflect.TypeOf(Value{}) {
+		return reflect.ValueOf(toPublic(val)), nil
 	}
 
 	// Handle pointer targets
