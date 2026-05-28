@@ -271,12 +271,13 @@ func callReturnProjectionFacts() []AnalysisFact {
 }
 
 func runCallABIModule(fn *Function, optCtx *Tier2OptimizerContext, passCtx *PassContext) (*Function, error) {
-	if fn == nil || fn.Analysis == nil {
+	if fn == nil {
 		return AnnotateCallABIsPass(CallABIAnnotationConfig{
 			Globals:            ctxGlobals(optCtx),
 			DependencyRegistry: ctxDependencyRegistry(optCtx),
 		})(fn)
 	}
+	fn.ensureAnalysis()
 	globalFacts := passCtx.Global()
 	tableShapes := passCtx.TableShape()
 	globalArrayFacts := mergeGlobalArrayElementFacts(globalFacts.GlobalArrayElementFactsMap(), collectStableGlobalArrayElementFactsWithFacts(fn, tableShapes))
