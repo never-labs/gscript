@@ -129,7 +129,7 @@ func tier2TableFieldNativeLoweringModules(globals map[string]*vm.FuncProto) []Ti
 		tier2PassModuleWith("LateModuloMultiplyOverflowBoxing", Tier2PhaseTableFieldLower, nil, nil, LateModuloMultiplyOverflowBoxingPass),
 		tier2PassModuleWithCtxUpdates("ProfiledStringLenFold", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactIntRanges, AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactProfiledIntRanges), ProfiledStringLenFoldPassCtx),
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-TableFieldLower)", Tier2PhaseTableFieldLower, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
-		tier2PassModuleWith("TableArrayStaticBounds", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactIntRanges), analysisFacts(AnalysisFactTableArrayBoundsSafe), TableArrayStaticBoundsPass),
+		tier2PassModuleWithCtx("TableArrayStaticBounds", Tier2PhaseTableFieldLower, analysisFacts(AnalysisFactIntRanges), analysisFacts(AnalysisFactTableArrayBoundsSafe), TableArrayStaticBoundsPassCtx),
 		tier2PassModuleWith("DCE (post-TableArrayStoreLower)", Tier2PhaseTableFieldLower, nil, nil, DCEPass),
 	}
 }

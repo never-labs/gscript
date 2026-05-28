@@ -4,6 +4,18 @@ package methodjit
 // table comes from a dominating SetList construction and RangeAnalysis proves
 // the key stays inside the constructed array length.
 func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
+	if fn == nil {
+		return fn, nil
+	}
+	fn.ensureAnalysis()
+	return tableArrayStaticBoundsPass(fn, functionNumericFacts(fn), functionLoopSpecializationFacts(fn))
+}
+
+func TableArrayStaticBoundsPassCtx(ctx *PassContext) (*Function, error) {
+	return tableArrayStaticBoundsPass(ctx.Func(), ctx.Numeric(), ctx.LoopSpecialization())
+}
+
+func tableArrayStaticBoundsPass(fn *Function, numeric *NumericFacts, loopFacts *LoopSpecializationFacts) (*Function, error) {
 	if fn == nil || len(fn.Blocks) == 0 {
 		return fn, nil
 	}
@@ -42,7 +54,7 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 			if !ok || lenValue == nil || keyValue == nil || lenValue.Def == nil {
 				continue
 			}
-			keyNonNegative, keyMax, keyMaxKnown := tableArrayStaticKeyBounds(fn, li, keyValue, keyUpperGuards, dom, block.ID)
+			keyNonNegative, keyMax, keyMaxKnown := tableArrayStaticKeyBounds(numeric, li, keyValue, keyUpperGuards, dom, block.ID)
 			lenInstr := lenValue.Def
 			if lenInstr.Op != OpTableArrayLen || len(lenInstr.Args) < 1 || lenInstr.Args[0] == nil {
 				continue
@@ -51,29 +63,29 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 			if tableID, ok := headers[lenInstr.Args[0].ID]; ok {
 				if fact, ok := staticTableLenFactForLen(facts[tableID], dom, order, block.ID, instr.ID); ok && fact.length >= 0 {
 					if keyNonNegative {
-						markTableArrayLowerBoundSafe(fn, instr)
+						markTableArrayLowerBoundSafe(loopFacts, instr)
 					}
 					if keyNonNegative && keyMaxKnown && keyMax <= fact.length {
-						markTableArrayUpperBoundSafe(fn, instr)
+						markTableArrayUpperBoundSafe(loopFacts, instr)
 						functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
 							"static SetList length and key range prove table-array bounds")
 						continue
 					}
 				}
 			}
-			if lenMax, ok := profiledTableArrayLenMax(fn, lenInstr); ok && keyNonNegative {
-				markTableArrayLowerBoundSafe(fn, instr)
+			if lenMax, ok := profiledTableArrayLenMax(numeric, lenInstr); ok && keyNonNegative {
+				markTableArrayLowerBoundSafe(loopFacts, instr)
 				if keyMaxKnown && keyMax <= lenMax {
-					markTableArrayUpperBoundSafe(fn, instr)
+					markTableArrayUpperBoundSafe(loopFacts, instr)
 					functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
 						"profiled table-array length and key range prove table-array bounds")
 					continue
 				}
 			}
 			if lenMax, ok := profiledTableAccessLenMax(fn, instr); ok && keyNonNegative {
-				markTableArrayLowerBoundSafe(fn, instr)
+				markTableArrayLowerBoundSafe(loopFacts, instr)
 				if keyMaxKnown && keyMax <= lenMax {
-					markTableArrayUpperBoundSafe(fn, instr)
+					markTableArrayUpperBoundSafe(loopFacts, instr)
 					functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
 						"profiled table access length and key range prove table-array bounds")
 					continue
@@ -82,10 +94,10 @@ func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
 
 			if maxSafe, ok := dominatingTableArrayLenGuardMaxSafe(lenGuards[lenInstr.ID], dom, order, block.ID, instr.ID); ok {
 				if keyNonNegative {
-					markTableArrayLowerBoundSafe(fn, instr)
+					markTableArrayLowerBoundSafe(loopFacts, instr)
 				}
 				if keyMaxKnown && keyMax <= maxSafe {
-					markTableArrayUpperBoundSafe(fn, instr)
+					markTableArrayUpperBoundSafe(loopFacts, instr)
 					functionRemarks(fn).Add("TableArrayStaticBounds", "changed", block.ID, instr.ID, instr.Op,
 						"dominating array-len guard and key range prove table-array bounds")
 				}
@@ -120,18 +132,19 @@ type keyUpperGuardFact struct {
 	max         int64
 }
 
-func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards map[int][]keyUpperGuardFact, dom *domInfo, blockID int) (bool, int64, bool) {
+func tableArrayStaticKeyBounds(numeric *NumericFacts, li *loopInfo, key *Value, guards map[int][]keyUpperGuardFact, dom *domInfo, blockID int) (bool, int64, bool) {
 	if key == nil {
 		return false, 0, false
 	}
 	nonNegative := false
 	var max int64
 	maxKnown := false
-	numeric := functionNumericFacts(fn)
-	if r, ok := numeric.IntRange(key.ID); ok && r.known {
-		nonNegative = r.min >= 0
-		max = r.max
-		maxKnown = true
+	if numeric != nil {
+		if r, ok := numeric.IntRange(key.ID); ok && r.known {
+			nonNegative = r.min >= 0
+			max = r.max
+			maxKnown = true
+		}
 	}
 	if c, ok := constIntFromValue(key); ok {
 		nonNegative = c >= 0
@@ -140,7 +153,7 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 			maxKnown = true
 		}
 	}
-	if numeric.IsIntNonNegative(key.ID) {
+	if numeric != nil && numeric.IsIntNonNegative(key.ID) {
 		nonNegative = true
 	}
 	if tableArrayKeyNonNegativeFromInduction(li, key) {
@@ -155,11 +168,10 @@ func tableArrayStaticKeyBounds(fn *Function, li *loopInfo, key *Value, guards ma
 	return nonNegative, max, maxKnown
 }
 
-func profiledTableArrayLenMax(fn *Function, lenInstr *Instr) (int64, bool) {
-	if fn == nil || lenInstr == nil || len(lenInstr.Args) < 1 || lenInstr.Args[0] == nil {
+func profiledTableArrayLenMax(numeric *NumericFacts, lenInstr *Instr) (int64, bool) {
+	if numeric == nil || lenInstr == nil || len(lenInstr.Args) < 1 || lenInstr.Args[0] == nil {
 		return 0, false
 	}
-	numeric := functionNumericFacts(fn)
 	if r, ok := numeric.IntRange(lenInstr.ID); ok && r.known && r.max >= 0 {
 		return r.max, true
 	}
@@ -396,10 +408,16 @@ func tableArrayLenGuardDominates(fact tableArrayLenGuardFact, dom *domInfo, orde
 	return dom != nil && dom.dominates(fact.blockID, blockID)
 }
 
-func markTableArrayLowerBoundSafe(fn *Function, instr *Instr) {
-	functionLoopSpecializationFacts(fn).RecordTableArrayLowerBoundSafe(instr.ID)
+func markTableArrayLowerBoundSafe(loopFacts *LoopSpecializationFacts, instr *Instr) {
+	if loopFacts == nil || instr == nil {
+		return
+	}
+	loopFacts.RecordTableArrayLowerBoundSafe(instr.ID)
 }
 
-func markTableArrayUpperBoundSafe(fn *Function, instr *Instr) {
-	functionLoopSpecializationFacts(fn).RecordTableArrayUpperBoundSafe(instr.ID)
+func markTableArrayUpperBoundSafe(loopFacts *LoopSpecializationFacts, instr *Instr) {
+	if loopFacts == nil || instr == nil {
+		return
+	}
+	loopFacts.RecordTableArrayUpperBoundSafe(instr.ID)
 }

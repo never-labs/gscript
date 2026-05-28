@@ -138,7 +138,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 		tier2PassModuleWithCtxUpdates("RangeAnalysis (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, rangeAnalysisFacts(), RangeAnalysisPassCtx),
 		tier2PassModuleWithCtx("IntAlgebraSimplify", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), nil, IntAlgebraSimplifyPassCtx),
 		tier2PassModuleWithCtxUpdates("TableArrayStaticBounds (post-RangeAnalysis)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges), analysisFacts(AnalysisFactTableArrayBoundsSafe), func(ctx *PassContext) (*Function, error) {
-			return TableArrayStaticBoundsPass(ctx.Func())
+			return TableArrayStaticBoundsPassCtx(ctx)
 		}),
 		tier2PassModuleWith("DCE (post-UnrollAndJam)", Tier2PhaseLoopPost, nil, nil, DCEPass),
 		tier2PassModuleWithCtxProvidesUpdatesOptionalReads("LoopRegionVersioning", Tier2PhaseLoopPost,
@@ -148,7 +148,7 @@ func tier2LoopPostModules() []Tier2OptimizerModule {
 			analysisFacts(AnalysisFactGlobals),
 			LoopRegionVersioningPassCtx),
 		tier2PassModuleWithCtxUpdates("TableArrayStaticBounds (post-LoopRegionVersioning)", Tier2PhaseLoopPost, analysisFacts(AnalysisFactIntRanges, AnalysisFactRecordArrayLoopSpecialization), analysisFacts(AnalysisFactTableArrayBoundsSafe), func(ctx *PassContext) (*Function, error) {
-			return TableArrayStaticBoundsPass(ctx.Func())
+			return TableArrayStaticBoundsPassCtx(ctx)
 		}),
 		tier2PassModuleWith("ScalarPromotion", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), nil, ScalarPromotionPass),
 		tier2PassModuleWithCtx("TableArrayDataPtrFact", Tier2PhaseLoopPost, analysisFacts(AnalysisFactFixedShapeTables), analysisFacts(AnalysisFactTableArrayDataPtrs), TableArrayDataPtrFactPassCtx),
