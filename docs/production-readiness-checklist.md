@@ -40,6 +40,20 @@ Supporting audit docs:
 These are the current best known commands. They should be promoted into a
 single CI workflow or release script once their outputs are stable.
 
+The local release-gate entrypoint is:
+
+```bash
+scripts/production_check.sh
+```
+
+Use `scripts/production_check.sh --quick` for a short preflight that runs the
+core Go package tests, feature/integration checks, and the standard-library
+contract check without the long benchmark passes. Use
+`scripts/production_check.sh --list` to print the available command subset for
+the current checkout. If LuaJIT is unavailable, benchmark commands that support
+it are run with `--no-luajit`; if optional tools such as `pytest` are absent,
+the script reports that clearly instead of failing before the Go gates run.
+
 ### Correctness
 
 ```bash
