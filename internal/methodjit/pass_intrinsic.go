@@ -48,67 +48,14 @@ func IntrinsicPass(fn *Function) (*Function, []string) {
 				continue
 			}
 
-			// math.sqrt(x) — 1-arg float → float.
-			if moduleName == "math" && fieldName == "sqrt" && len(instr.Args) == 2 {
-				xArg := instr.Args[1]
-				instr.Op = OpSqrt
-				instr.Type = TypeFloat
-				instr.Args = []*Value{xArg}
-				instr.Aux = 0
-				instr.Aux2 = 0
-				notes = append(notes, "intrinsic: math.sqrt → OpSqrt")
-				continue
-			}
-
-			// math.floor(x) — 1-arg number → int.
-			if moduleName == "math" && fieldName == "floor" && len(instr.Args) == 2 {
-				xArg := instr.Args[1]
-				instr.Op = OpFloor
-				instr.Type = TypeInt
-				instr.Args = []*Value{xArg}
-				instr.Aux = 0
-				instr.Aux2 = 0
-				notes = append(notes, "intrinsic: math.floor → OpFloor")
+			if lowering, ok := lookupIntrinsicCallLowering(moduleName, fieldName, len(instr.Args)-1); ok {
+				applyIntrinsicCallLowering(instr, lowering)
+				notes = append(notes, lowering.note)
 				continue
 			}
 
 			if note, ok := lowerStringFormatIntrinsicCall(fn, instr, moduleName, fieldName); ok {
 				notes = append(notes, note)
-				continue
-			}
-
-			// R43 Phase 2 DenseMatrix intrinsics.
-			// matrix.dense(rows, cols) — 2-arg → table.
-			if moduleName == "matrix" && fieldName == "dense" && len(instr.Args) == 3 {
-				rows, cols := instr.Args[1], instr.Args[2]
-				instr.Op = OpMatrixDense
-				instr.Type = TypeTable
-				instr.Args = []*Value{rows, cols}
-				instr.Aux = 0
-				instr.Aux2 = 0
-				notes = append(notes, "intrinsic: matrix.dense → OpMatrixDense")
-				continue
-			}
-			// matrix.getf(m, i, j) — 3-arg → float.
-			if moduleName == "matrix" && fieldName == "getf" && len(instr.Args) == 4 {
-				m, i, j := instr.Args[1], instr.Args[2], instr.Args[3]
-				instr.Op = OpMatrixGetF
-				instr.Type = TypeFloat
-				instr.Args = []*Value{m, i, j}
-				instr.Aux = 0
-				instr.Aux2 = 0
-				notes = append(notes, "intrinsic: matrix.getf → OpMatrixGetF")
-				continue
-			}
-			// matrix.setf(m, i, j, v) — 4-arg → (no return).
-			if moduleName == "matrix" && fieldName == "setf" && len(instr.Args) == 5 {
-				m, i, j, v := instr.Args[1], instr.Args[2], instr.Args[3], instr.Args[4]
-				instr.Op = OpMatrixSetF
-				instr.Type = TypeUnknown
-				instr.Args = []*Value{m, i, j, v}
-				instr.Aux = 0
-				instr.Aux2 = 0
-				notes = append(notes, "intrinsic: matrix.setf → OpMatrixSetF")
 				continue
 			}
 		}
