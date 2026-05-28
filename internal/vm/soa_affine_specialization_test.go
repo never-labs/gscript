@@ -326,6 +326,49 @@ func affine_many_kernel(cols, scale, bias) {
 	benchmarkFloatSink = x[len(x)-1]
 }
 
+func BenchmarkSoAStdlibSlice(b *testing.B) {
+	src := `
+func slice_kernel(cols, first, last) {
+    return soa.slice(cols, first, last)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "slice_kernel")
+	defer v.Close()
+	soa := mustBenchParticleSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.IntValue(2048), runtime.IntValue(24575)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = float64(results[0].SoA().Len())
+	}
+}
+
+func BenchmarkSoAStdlibFilter(b *testing.B) {
+	src := `
+func filter_kernel(cols, mask) {
+    return soa.filter(cols, mask)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "filter_kernel")
+	defer v.Close()
+	soa := mustBenchParticleSoA(b, 32768)
+	mask := runtime.NewDenseArrayBool(makeAlternatingMask(32768))
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.DenseArrayValue(mask)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = float64(results[0].SoA().Len())
+	}
+}
+
 func BenchmarkDenseArraySumVMFallback(b *testing.B) {
 	src := `
 func sum_loop(cols) {
@@ -501,6 +544,14 @@ func mustBenchParticleSoA(b testing.TB, n int) *runtime.SoA {
 		b.Fatal(err)
 	}
 	return soa
+}
+
+func makeAlternatingMask(n int) []bool {
+	mask := make([]bool, n)
+	for i := range mask {
+		mask[i] = i%2 == 0
+	}
+	return mask
 }
 
 func testSoAColumns(t testing.TB, soa *runtime.SoA) ([]float64, []float64) {

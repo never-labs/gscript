@@ -166,6 +166,91 @@ func (a *DenseArray) Bool() ([]bool, bool) {
 	return a.bools, true
 }
 
+func (a *DenseArray) Clone() (*DenseArray, error) {
+	if a == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		return NewDenseArrayF64(a.f64), nil
+	case DenseArrayI64:
+		return NewDenseArrayI64(a.i64), nil
+	case DenseArrayBool:
+		return NewDenseArrayBool(a.bools), nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
+func (a *DenseArray) Slice(start, end int) (*DenseArray, error) {
+	if a == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if start < 0 || end < start || end > a.Len() {
+		return nil, fmt.Errorf("dense array slice out of range")
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		return NewDenseArrayF64(a.f64[start:end]), nil
+	case DenseArrayI64:
+		return NewDenseArrayI64(a.i64[start:end]), nil
+	case DenseArrayBool:
+		return NewDenseArrayBool(a.bools[start:end]), nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
+func (a *DenseArray) Filter(mask *DenseArray) (*DenseArray, error) {
+	if a == nil || mask == nil {
+		return nil, ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return nil, fmt.Errorf("dense array filter mask must be bool")
+	}
+	if a.Len() != mask.Len() {
+		return nil, ErrDenseArrayLength
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		out := make([]float64, 0, denseArrayBoolCount(mask.bools))
+		for i, keep := range mask.bools {
+			if keep {
+				out = append(out, a.f64[i])
+			}
+		}
+		return NewDenseArrayF64(out), nil
+	case DenseArrayI64:
+		out := make([]int64, 0, denseArrayBoolCount(mask.bools))
+		for i, keep := range mask.bools {
+			if keep {
+				out = append(out, a.i64[i])
+			}
+		}
+		return NewDenseArrayI64(out), nil
+	case DenseArrayBool:
+		out := make([]bool, 0, denseArrayBoolCount(mask.bools))
+		for i, keep := range mask.bools {
+			if keep {
+				out = append(out, a.bools[i])
+			}
+		}
+		return NewDenseArrayBool(out), nil
+	default:
+		return nil, ErrDenseArrayDType
+	}
+}
+
+func denseArrayBoolCount(xs []bool) int {
+	n := 0
+	for _, v := range xs {
+		if v {
+			n++
+		}
+	}
+	return n
+}
+
 func (a *DenseArray) At(i int) (Value, error) {
 	if a == nil {
 		return NilValue(), ErrDenseArrayOperand

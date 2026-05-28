@@ -37,6 +37,13 @@ type SoAAffineTerm struct {
 	Bias  float64
 }
 
+type soaAffinePlan struct {
+	dst   *DenseArray
+	src   *DenseArray
+	scale float64
+	bias  float64
+}
+
 func NewSoA(columns map[string]*DenseArray) (*SoA, error) {
 	if len(columns) == 0 {
 		return nil, fmt.Errorf("soa requires at least one column")
@@ -114,6 +121,60 @@ func (s *SoA) Column(name string) (*DenseArray, bool) {
 	}
 	col, ok := s.columns[name]
 	return col, ok
+}
+
+func (s *SoA) Unzip() (map[string]*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	out := make(map[string]*DenseArray, len(s.columns))
+	for _, name := range s.names {
+		col, err := s.columns[name].Clone()
+		if err != nil {
+			return nil, fmt.Errorf("soa column %q: %w", name, err)
+		}
+		out[name] = col
+	}
+	return out, nil
+}
+
+func (s *SoA) Slice(start, end int) (*SoA, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if start < 0 || end < start || end > s.length {
+		return nil, fmt.Errorf("soa slice out of range")
+	}
+	cols := make(map[string]*DenseArray, len(s.columns))
+	for _, name := range s.names {
+		col, err := s.columns[name].Slice(start, end)
+		if err != nil {
+			return nil, fmt.Errorf("soa column %q: %w", name, err)
+		}
+		cols[name] = col
+	}
+	return NewSoA(cols)
+}
+
+func (s *SoA) Filter(mask *DenseArray) (*SoA, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return nil, fmt.Errorf("soa filter mask must be a bool dense array")
+	}
+	if mask.Len() != s.length {
+		return nil, ErrDenseArrayLength
+	}
+	cols := make(map[string]*DenseArray, len(s.columns))
+	for _, name := range s.names {
+		col, err := s.columns[name].Filter(mask)
+		if err != nil {
+			return nil, fmt.Errorf("soa column %q: %w", name, err)
+		}
+		cols[name] = col
+	}
+	return NewSoA(cols)
 }
 
 func (s *SoA) ColumnDescriptor(name string) (SoAColumnDescriptor, bool) {
@@ -256,35 +317,33 @@ func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
 	if len(terms) == 0 {
 		return nil
 	}
-	plans := make([]struct {
-		dst   *DenseArray
-		src   *DenseArray
-		scale float64
-		bias  float64
-	}, len(terms))
-	writes := make(map[string]struct{}, len(terms))
+	var stackPlans [8]soaAffinePlan
+	plans := stackPlans[:]
+	if len(terms) > len(stackPlans) {
+		plans = make([]soaAffinePlan, len(terms))
+	} else {
+		plans = plans[:len(terms)]
+	}
 	for i, term := range terms {
 		if term.Dst == "" || term.Src == "" {
 			return fmt.Errorf("soa.affineMany: term %d has empty column name", i+1)
 		}
-		if _, exists := writes[term.Dst]; exists {
-			return fmt.Errorf("soa.affineMany: duplicate destination column %q", term.Dst)
+		for j := 0; j < i; j++ {
+			if terms[j].Dst == term.Dst {
+				return fmt.Errorf("soa.affineMany: duplicate destination column %q", term.Dst)
+			}
 		}
-		writes[term.Dst] = struct{}{}
 		dst, src, err := s.numericColumns(term.Dst, term.Src)
 		if err != nil {
 			return fmt.Errorf("soa.affineMany term %d: %w", i+1, err)
 		}
-		plans[i] = struct {
-			dst   *DenseArray
-			src   *DenseArray
-			scale float64
-			bias  float64
-		}{dst: dst, src: src, scale: term.Scale, bias: term.Bias}
+		plans[i] = soaAffinePlan{dst: dst, src: src, scale: term.Scale, bias: term.Bias}
 	}
 	for i, term := range terms {
-		if _, aliased := writes[term.Src]; aliased {
-			return fmt.Errorf("soa.affineMany: source column %q in term %d is also written; split dependent updates to preserve order", term.Src, i+1)
+		for _, candidate := range terms {
+			if candidate.Dst == term.Src {
+				return fmt.Errorf("soa.affineMany: source column %q in term %d is also written; split dependent updates to preserve order", term.Src, i+1)
+			}
 		}
 	}
 	for _, plan := range plans {

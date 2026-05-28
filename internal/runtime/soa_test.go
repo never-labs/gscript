@@ -80,11 +80,14 @@ ys := xs * 10
 points := soa.zip({x: xs, y: ys})
 n := soa.len(points)
 cols := soa.columns(points)
+unzipped := soa.unzip(points)
 xcol := soa.column(points, "x")
 row := soa.row(points, 2)
 row.x = 42
 ok := soa.setRow(points, 2, row)
 updated := soa.column(points, "x")
+window := soa.slice(points, 2, 3)
+filtered := soa.filter(points, []bool{true, false, true})
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +97,7 @@ updated := soa.column(points, "x")
 	if got := interp.GetGlobal("cols").Table().RawGetInt(1); !got.IsString() || got.Str() != "x" {
 		t.Fatalf("cols[1] = %v, want x", got)
 	}
+	assertDenseF64(t, interp.GetGlobal("unzipped").Table().RawGetString("y"), []float64{10, 20, 30})
 	assertDenseF64(t, interp.GetGlobal("xcol"), []float64{1, 42, 3})
 	if got := interp.GetGlobal("row").Table().RawGetString("y"); !got.IsFloat() || got.Float() != 20 {
 		t.Fatalf("row.y = %v, want 20", got)
@@ -102,6 +106,8 @@ updated := soa.column(points, "x")
 		t.Fatalf("ok = %v, want true", got)
 	}
 	assertDenseF64(t, interp.GetGlobal("updated"), []float64{1, 42, 3})
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("window").SoA(), "x")), []float64{42, 3})
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("filtered").SoA(), "x")), []float64{1, 3})
 }
 
 func TestSoANativeColumnKernels(t *testing.T) {
@@ -188,16 +194,66 @@ func TestSoASnapshotAndAffineManyGuards(t *testing.T) {
 	}
 }
 
+func TestSoASliceFilterAndUnzipCopyColumns(t *testing.T) {
+	s, err := NewSoA(map[string]*DenseArray{
+		"x":     NewDenseArrayF64([]float64{1, 2, 3, 4}),
+		"id":    NewDenseArrayI64([]int64{10, 20, 30, 40}),
+		"alive": NewDenseArrayBool([]bool{true, false, true, false}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	window, err := s.Slice(1, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, window, "x")), []float64{2, 3})
+	assertDenseI64(t, DenseArrayValue(mustSoATestColumn(t, window, "id")), []int64{20, 30})
+
+	mask, _ := s.Column("alive")
+	filtered, err := s.Filter(mask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, filtered, "x")), []float64{1, 3})
+	assertDenseI64(t, DenseArrayValue(mustSoATestColumn(t, filtered, "id")), []int64{10, 30})
+
+	unzipped, err := s.Unzip()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := unzipped["x"].Set(0, FloatValue(99)); err != nil {
+		t.Fatal(err)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, s, "x")), []float64{1, 2, 3, 4})
+}
+
 func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	lib := buildSoALib()
+	unzip := lib.RawGetString("unzip").GoFunction()
+	slice := lib.RawGetString("slice").GoFunction()
+	filter := lib.RawGetString("filter").GoFunction()
 	addScaled := lib.RawGetString("addScaled").GoFunction()
 	affine := lib.RawGetString("affine").GoFunction()
+	affineMany := lib.RawGetString("affineMany").GoFunction()
 	sum := lib.RawGetString("sum").GoFunction()
+	if unzip == nil || unzip.FastArg1 == nil {
+		t.Fatal("soa.unzip FastArg1 is nil")
+	}
+	if slice == nil || slice.FastArg3 == nil {
+		t.Fatal("soa.slice FastArg3 is nil")
+	}
+	if filter == nil || filter.FastArg2 == nil {
+		t.Fatal("soa.filter FastArg2 is nil")
+	}
 	if addScaled == nil || addScaled.FastArg4 == nil {
 		t.Fatal("soa.addScaled FastArg4 is nil")
 	}
 	if affine == nil || affine.FastArg5 == nil {
 		t.Fatal("soa.affine FastArg5 is nil")
+	}
+	if affineMany == nil || affineMany.FastArg2 == nil {
+		t.Fatal("soa.affineMany FastArg2 is nil")
 	}
 	if sum == nil || sum.FastArg2 == nil {
 		t.Fatal("soa.sum FastArg2 is nil")
@@ -211,11 +267,30 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	soaValue := SoAValue(s)
+	if got, err := unzip.FastArg1(soaValue); err != nil || !got.IsTable() {
+		t.Fatalf("soa.unzip FastArg1 got=%s err=%v", got.String(), err)
+	}
+	if got, err := slice.FastArg3(soaValue, IntValue(2), IntValue(3)); err != nil || !got.IsSoA() || got.SoA().Len() != 2 {
+		t.Fatalf("soa.slice FastArg3 got=%s err=%v", got.String(), err)
+	}
+	if got, err := filter.FastArg2(soaValue, DenseArrayValue(NewDenseArrayBool([]bool{true, false, true}))); err != nil || !got.IsSoA() || got.SoA().Len() != 2 {
+		t.Fatalf("soa.filter FastArg2 got=%s err=%v", got.String(), err)
+	}
 	if got, err := addScaled.FastArg4(soaValue, StringValue("x"), StringValue("v"), FloatValue(0.5)); err != nil || !got.Bool() {
 		t.Fatalf("soa.addScaled FastArg4 got=%s err=%v", got.String(), err)
 	}
 	if got, err := affine.FastArg5(soaValue, StringValue("v"), StringValue("x"), FloatValue(2), FloatValue(1)); err != nil || !got.Bool() {
 		t.Fatalf("soa.affine FastArg5 got=%s err=%v", got.String(), err)
+	}
+	terms := NewTable()
+	term := NewTable()
+	term.RawSetString("dst", StringValue("x"))
+	term.RawSetString("src", StringValue("v"))
+	term.RawSetString("scale", FloatValue(0.1))
+	term.RawSetString("bias", FloatValue(0))
+	terms.RawSetInt(1, TableValue(term))
+	if got, err := affineMany.FastArg2(soaValue, TableValue(terms)); err != nil || !got.Bool() {
+		t.Fatalf("soa.affineMany FastArg2 got=%s err=%v", got.String(), err)
 	}
 	got, err := sum.FastArg2(soaValue, StringValue("v"))
 	if err != nil {
@@ -236,4 +311,13 @@ func runSource(interp *Interpreter, src string) error {
 		return err
 	}
 	return interp.Exec(prog)
+}
+
+func mustSoATestColumn(t testing.TB, s *SoA, name string) *DenseArray {
+	t.Helper()
+	col, ok := s.Column(name)
+	if !ok {
+		t.Fatalf("missing soa column %q", name)
+	}
+	return col
 }

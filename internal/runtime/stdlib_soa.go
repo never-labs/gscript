@@ -8,8 +8,14 @@ func buildSoALib() *Table {
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn}))
 	}
+	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
+		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn, FastArg1: fast}))
+	}
 	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn, FastArg2: fast}))
+	}
+	setFastArg3 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value, Value) (Value, error)) {
+		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn, FastArg3: fast}))
 	}
 	setFastArg4 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value, Value, Value) (Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "soa." + name, Fn: fn, FastArg4: fast}))
@@ -60,6 +66,22 @@ func buildSoALib() *Table {
 		return []Value{TableValue(out)}, nil
 	})
 
+	setFastArg1("unzip", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.unzip", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		cols, err := s.Unzip()
+		if err != nil {
+			return nil, err
+		}
+		out := NewTable()
+		for _, name := range s.ColumnNames() {
+			out.RawSetString(name, DenseArrayValue(cols[name]))
+		}
+		return []Value{TableValue(out)}, nil
+	}, soaUnzipValue)
+
 	set("shape", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.shape", args, 0)
 		if err != nil {
@@ -82,6 +104,39 @@ func buildSoALib() *Table {
 		}
 		return []Value{DenseArrayValue(col)}, nil
 	})
+
+	setFastArg3("slice", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.slice", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsInt() {
+			return nil, fmt.Errorf("soa.slice: argument 2 must be an integer")
+		}
+		if len(args) < 3 || !args[2].IsInt() {
+			return nil, fmt.Errorf("soa.slice: argument 3 must be an integer")
+		}
+		out, err := s.Slice(int(args[1].Int()-1), int(args[2].Int()))
+		if err != nil {
+			return nil, err
+		}
+		return []Value{SoAValue(out)}, nil
+	}, soaSliceValue)
+
+	setFastArg2("filter", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.filter", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsDenseArray() {
+			return nil, fmt.Errorf("soa.filter: argument 2 must be a bool dense array")
+		}
+		out, err := s.Filter(args[1].DenseArray())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{SoAValue(out)}, nil
+	}, soaFilterValue)
 
 	set("row", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.row", args, 0)
@@ -148,7 +203,7 @@ func buildSoALib() *Table {
 		return []Value{BoolValue(true)}, nil
 	}, soaAffineValue)
 
-	set("affineMany", func(args []Value) ([]Value, error) {
+	setFastArg2("affineMany", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.affineMany", args, 0)
 		if err != nil {
 			return nil, err
@@ -164,7 +219,7 @@ func buildSoALib() *Table {
 			return nil, err
 		}
 		return []Value{BoolValue(true)}, nil
-	})
+	}, soaAffineManyValue)
 
 	setFastArg2("sum", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.sum", args, 0)
@@ -245,6 +300,23 @@ func soaAffineValue(soaValue, dstValue, srcValue, scaleValue, biasValue Value) (
 	return BoolValue(true), nil
 }
 
+func soaAffineManyValue(soaValue, termsValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.affineMany: argument 1 must be soa")
+	}
+	if !termsValue.IsTable() {
+		return NilValue(), fmt.Errorf("soa.affineMany: argument 2 must be a table of affine terms")
+	}
+	terms, err := soaAffineTermsFromTable(termsValue.Table())
+	if err != nil {
+		return NilValue(), err
+	}
+	if err := soaValue.SoA().AffineMany(terms); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
 func soaSumValue(soaValue, columnValue Value) (Value, error) {
 	if !soaValue.IsSoA() {
 		return NilValue(), fmt.Errorf("soa.sum: argument 1 must be soa")
@@ -253,6 +325,52 @@ func soaSumValue(soaValue, columnValue Value) (Value, error) {
 		return NilValue(), fmt.Errorf("soa.sum: argument 2 must be a string")
 	}
 	return soaValue.SoA().Sum(columnValue.Str())
+}
+
+func soaUnzipValue(soaValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.unzip: argument 1 must be soa")
+	}
+	cols, err := soaValue.SoA().Unzip()
+	if err != nil {
+		return NilValue(), err
+	}
+	out := NewTable()
+	for _, name := range soaValue.SoA().ColumnNames() {
+		out.RawSetString(name, DenseArrayValue(cols[name]))
+	}
+	return TableValue(out), nil
+}
+
+func soaSliceValue(soaValue, firstValue, lastValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.slice: argument 1 must be soa")
+	}
+	if !firstValue.IsInt() {
+		return NilValue(), fmt.Errorf("soa.slice: argument 2 must be an integer")
+	}
+	if !lastValue.IsInt() {
+		return NilValue(), fmt.Errorf("soa.slice: argument 3 must be an integer")
+	}
+	out, err := soaValue.SoA().Slice(int(firstValue.Int()-1), int(lastValue.Int()))
+	if err != nil {
+		return NilValue(), err
+	}
+	return SoAValue(out), nil
+}
+
+func soaFilterValue(soaValue, maskValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.filter: argument 1 must be soa")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.filter: argument 2 must be a bool dense array")
+	}
+	out, err := soaValue.SoA().Filter(maskValue.DenseArray())
+	if err != nil {
+		return NilValue(), err
+	}
+	return SoAValue(out), nil
 }
 
 func soaShapeTable(s *SoA) *Table {
