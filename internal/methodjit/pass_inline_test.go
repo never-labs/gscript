@@ -32,8 +32,9 @@ func buildInlineTestIR(t *testing.T, src, callerName string) (*Function, InlineC
 
 	fn := BuildGraph(callerProto)
 	config := InlineConfig{
-		Globals: globals,
-		MaxSize: 30,
+		Globals:     globals,
+		GlobalFacts: functionGlobalFacts(fn),
+		MaxSize:     30,
 	}
 	return fn, config
 }

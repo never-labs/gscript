@@ -76,6 +76,12 @@ func tier2EarlyCanonicalModules(globals map[string]*vm.FuncProto) []Tier2Optimiz
 func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tier2OptimizerModule {
 	fixedShapeFacts := fixedShapeTableFacts()
 	fixedShapePostInlineAllowed := allowedDomainsForModule(nil, nil, fixedShapeFacts)
+	inlineAllowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactInlineComplete, AnalysisFactFixedShapeTables),
+		analysisFacts(AnalysisFactSpecDependencyProtos),
+		nil,
+		analysisFacts(AnalysisFactGlobals),
+	)
 	modules := []Tier2OptimizerModule{
 		tier2PassModuleWithCtx("FieldShapeCallSplitPreInline", Tier2PhaseInlineCall, analysisFacts(AnalysisFactFieldPolyShapeFacts), nil, FieldShapeCallSplitPreInlinePassCtx),
 		{
@@ -94,8 +100,10 @@ func tier2InlineCallModules(globals map[string]*vm.FuncProto, maxSize int) []Tie
 					}
 					return fn, nil
 				}
+				passCtx := newPassContext(fn, opts, inlineAllowed, passContextEnforce)
 				config := InlineConfig{
 					Globals:                  globals,
+					GlobalFacts:              passCtx.Global(),
 					MaxSize:                  maxSize,
 					MaxRecursion:             8,
 					MaxCumulativeSize:        120,

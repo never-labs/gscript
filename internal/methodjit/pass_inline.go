@@ -48,6 +48,7 @@ func countOpHelper(fn *Function, op Op) int {
 // InlineConfig configures the function inlining pass.
 type InlineConfig struct {
 	Globals                  map[string]*vm.FuncProto // global function name -> proto
+	GlobalFacts              *GlobalFacts             // optional diagnostics/oracle fact sink for residual calls
 	MaxSize                  int                      // max callee bytecode count (default 30)
 	MaxRecursion             int                      // max inlining depth for self/mutually-recursive callees (0 = no recursive inlining)
 	MaxCumulativeSize        int                      // R166: V8-style cumulative-bytecode cap across all inlines in this compilation (0 = unbounded, preserves R73 behavior)
@@ -83,12 +84,11 @@ func InlinePassWith(config InlineConfig) PassFunc {
 	// isRecursive-veto behavior). Callers that want bounded recursive
 	// inlining set this explicitly (e.g., 2 for Tier 2).
 	return func(fn *Function) (*Function, error) {
-		// Expose the globals table on the Function so the IR correctness
-		// oracle (Interpret) can resolve residual cross-function calls left
-		// behind by bounded recursive inlining. Production code paths don't
-		// read this field.
-		if globals := functionGlobalFacts(fn); globals != nil && !globals.GlobalsPopulated() && config.Globals != nil {
-			globals.SetGlobals(config.Globals)
+		// Expose globals to the IR correctness oracle so it can resolve
+		// residual cross-function calls left behind by bounded recursive
+		// inlining. Production code paths don't read this fact.
+		if config.GlobalFacts != nil && !config.GlobalFacts.GlobalsPopulated() && config.Globals != nil {
+			config.GlobalFacts.SetGlobals(config.Globals)
 		}
 		// recursionCounts tracks, per callee proto, how many times that proto
 		// has been inlined into this caller across the whole fixpoint. It is
