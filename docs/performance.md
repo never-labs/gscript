@@ -65,6 +65,29 @@ Use the benchmark tools for different jobs:
 | `benchmarks/profile_exits.py` | Exit/deopt attribution; use it to explain timing, not as the success metric. |
 | `benchmarks/official_perf_coverage.py` | Coverage audit from official semantic cases to hot performance cases. |
 
+### Data-Oriented Array / SoA Benchmark Plan
+
+Data-oriented array work must ship with a direct AoS-vs-SoA performance witness.
+Until the GScript typed-array/SoA backend is merged, the checked-in harness uses
+Go-side references for the expected storage paths and marks every JSON row with
+`backend_status=pending_gscript_typed_array_soa_backend`.
+
+Runnable entry points:
+
+```bash
+go test ./benchmarks/data_oriented -bench=. -run '^$' -benchtime=1s
+go run ./benchmarks/data_oriented/cmd/data_oriented_bench \
+  -particles=32768 -steps=64 -vectors=65536 -repeats=5 \
+  > /tmp/gscript_data_oriented_bench.json
+go run ./cmd/gscript examples/data_oriented/particle_integration.gs
+```
+
+The JSON schema is `gscript.data_oriented_benchmark.v1`; rows include
+`benchmark`, `layout`, `implementation`, `backend_status`, problem size,
+repeat count, seconds, per-item nanoseconds, throughput, and checksum. When the
+typed-array backend lands, add matching GScript SoA rows without changing those
+field names so `performance_gate` can ingest the same artifact.
+
 Default local timing command:
 
 ```bash

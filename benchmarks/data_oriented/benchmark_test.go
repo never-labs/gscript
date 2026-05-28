@@ -1,0 +1,37 @@
+package dataoriented
+
+import "testing"
+
+var sinkFloat float64
+
+func BenchmarkParticleIntegrationAoS(b *testing.B) {
+	ps := NewParticlesAoS(DefaultParticles)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = IntegrateAoS(ps, DefaultSteps, 0.016)
+	}
+}
+
+func BenchmarkParticleIntegrationSoA(b *testing.B) {
+	ps := NewParticlesSoA(DefaultParticles)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = IntegrateSoA(ps, DefaultSteps, 0.016)
+	}
+}
+
+func BenchmarkVectorNormalizeAoS(b *testing.B) {
+	vs := NewVec3AoS(DefaultVectors)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = NormalizeAoS(vs)
+	}
+}
+
+func BenchmarkVectorNormalizeSoA(b *testing.B) {
+	vs := NewVec3SoA(DefaultVectors)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		sinkFloat = NormalizeSoA(vs)
+	}
+}
