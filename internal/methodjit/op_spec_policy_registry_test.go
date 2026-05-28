@@ -114,6 +114,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opModuloReducibleCallFloorPolicies", opModuloReducibleCallFloorPolicies},
 		{"opCallFloorProjectionOpPolicies", opCallFloorProjectionOpPolicies},
 		{"opFieldCallFloorProjectionOpPolicies", opFieldCallFloorProjectionOpPolicies},
+		{"opFieldCalleeGuardLoweredOpPolicies", opFieldCalleeGuardLoweredOpPolicies},
 		{"opCallFloorSpecStableCalleePolicies", opCallFloorSpecStableCalleePolicies},
 		{"opCallFloorSpecFieldShapePolicies", opCallFloorSpecFieldShapePolicies},
 		{"opTier2LoopCallPolicies", opTier2LoopCallPolicies},

@@ -40,10 +40,11 @@ func guardFieldCalleePass(fn *Function, tableShapes *TableShapeFacts) (*Function
 			if instr == nil {
 				continue
 			}
-			if instr.Op == OpGuardCalleeProto && len(instr.Args) == 1 && instr.Args[0] != nil {
+			lowered, ok := fieldCalleeGuardLoweredOp(instr.Op)
+			if ok && lowered == OpGuardFieldCalleeProto && len(instr.Args) == 1 && instr.Args[0] != nil {
 				load := instr.Args[0].Def
 				if aux2, c, hasCase, ok := guardFieldCalleeLoadAux2ForGuardWithFacts(load, instr.Aux, tableShapes); ok {
-					instr.Op = OpGuardFieldCalleeProto
+					instr.Op = lowered
 					instr.Args = []*Value{load.Args[0]}
 					instr.Aux2 = aux2
 					if hasCase {

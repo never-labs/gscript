@@ -41,6 +41,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "TableArrayLoweredOp", spec.TableArrayLoweredOp)
 		assertOpSpecTarget(t, op, "CallFloorProjectionOp", spec.CallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCallFloorProjectionOp", spec.FieldCallFloorProjectionOp)
+		assertOpSpecTarget(t, op, "FieldCalleeGuardLoweredOp", spec.FieldCalleeGuardLoweredOp)
 	}
 	if len(seenNames) != int(OpMax) {
 		t.Fatalf("OpSpec name lookup saw %d names, want %d", len(seenNames), OpMax)
@@ -97,6 +98,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.CallFloorProjectionOp != OpMax || spec.FieldCallFloorProjectionOp != OpMax {
 			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax",
 				op, spec.CallFloorProjectionOp, spec.FieldCallFloorProjectionOp)
+		}
+		if spec.FieldCalleeGuardLoweredOp != OpMax {
+			t.Fatalf("%s FieldCalleeGuardLoweredOp default=%s, want OpMax", op, spec.FieldCalleeGuardLoweredOp)
 		}
 		if spec.ClosureScalarLocalUseArgIndex != -1 || spec.ClosureScalarLoadClosureArgIndex != -1 ||
 			spec.ClosureScalarStoreClosureArgIndex != -1 || spec.ClosureScalarStoreValueArgIndex != -1 {
@@ -156,6 +160,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := fieldCallFloorProjectionOp(op); ok {
 			t.Fatalf("%s should not report a field-call-floor projection target", op)
+		}
+		if _, ok := fieldCalleeGuardLoweredOp(op); ok {
+			t.Fatalf("%s should not report a field-callee guard lowering target", op)
 		}
 	}
 }

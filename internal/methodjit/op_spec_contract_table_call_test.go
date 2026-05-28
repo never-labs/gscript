@@ -12,6 +12,12 @@ func TestTableCallContractsLiveInOpSpec(t *testing.T) {
 	if lowered, ok := callFloorProjectionOp(OpCallFloor); ok || lowered != OpMax {
 		t.Fatalf("CallFloor projection target = %s, %v; want OpMax, false", lowered, ok)
 	}
+	if lowered, ok := fieldCalleeGuardLoweredOp(OpGuardCalleeProto); !ok || lowered != OpGuardFieldCalleeProto {
+		t.Fatalf("field callee guard target = %s, %v; want GuardFieldCalleeProto, true", lowered, ok)
+	}
+	if lowered, ok := fieldCalleeGuardLoweredOp(OpGuardFieldCalleeProto); ok || lowered != OpMax {
+		t.Fatalf("GuardFieldCalleeProto lowering target = %s, %v; want OpMax, false", lowered, ok)
+	}
 	for _, op := range []Op{OpGetField, OpGetFieldNumToFloat, OpSetField} {
 		spec, ok := op.Spec()
 		if !ok || !spec.NeedsTier2FieldCache {

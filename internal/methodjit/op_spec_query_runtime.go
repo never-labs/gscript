@@ -168,6 +168,11 @@ func fieldCallFloorProjectionOp(op Op) (Op, bool) {
 	return spec.FieldCallFloorProjectionOp, ok && spec.FieldCallFloorProjectionOp != OpMax
 }
 
+func fieldCalleeGuardLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.FieldCalleeGuardLoweredOp, ok && spec.FieldCalleeGuardLoweredOp != OpMax
+}
+
 func isCallResultRangeGuardCandidate(instr *Instr) bool {
 	if instr == nil {
 		return false

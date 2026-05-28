@@ -39,6 +39,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		BoxedFallbackOp:                   OpMax,
 		CallFloorProjectionOp:             OpMax,
 		FieldCallFloorProjectionOp:        OpMax,
+		FieldCalleeGuardLoweredOp:         OpMax,
 	}
 }
 

@@ -19,6 +19,10 @@ var opFieldCallFloorProjectionOpPolicies = [...]opTargetPolicy{
 	OpCall: {Op: OpFieldCallFloor, Set: true},
 }
 
+var opFieldCalleeGuardLoweredOpPolicies = [...]opTargetPolicy{
+	OpGuardCalleeProto: {Op: OpGuardFieldCalleeProto, Set: true},
+}
+
 var opCallFloorSpecStableCalleePolicies = [...]bool{
 	OpCallFloor: true,
 }

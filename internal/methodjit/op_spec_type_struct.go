@@ -142,6 +142,7 @@ type OpSpec struct {
 	ModuloReducibleCallFloor      bool
 	CallFloorProjectionOp         Op
 	FieldCallFloorProjectionOp    Op
+	FieldCalleeGuardLoweredOp     Op
 	CallFloorSpecStableCallee     bool
 	CallFloorSpecFieldShape       bool
 	Tier2LoopCall                 bool
