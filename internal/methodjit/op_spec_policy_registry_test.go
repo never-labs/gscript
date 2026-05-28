@@ -51,6 +51,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opLocalStringArrayTableUseRolePolicies", opLocalStringArrayTableUseRolePolicies},
 		{"opLocalStringArrayTableArgIndexPolicies", opLocalStringArrayTableArgIndexPolicies},
 		{"opReadonlyTableParamUseRolePolicies", opReadonlyTableParamUseRolePolicies},
+		{"opInlineAllocationRolePolicies", opInlineAllocationRolePolicies},
 		{"opOracleSupportPolicies", opOracleSupportPolicies},
 		{"opOracleUnsupportedReasonPolicies", opOracleUnsupportedReasonPolicies},
 		{"opLICMHoistablePolicies", opLICMHoistablePolicies},

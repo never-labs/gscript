@@ -118,3 +118,10 @@ var opReadonlyTableParamUseRolePolicies = [...]OpReadonlyTableParamUseRole{
 	OpFieldCallFloor:             OpReadonlyTableParamUseCallEscape,
 	OpSelf:                       OpReadonlyTableParamUseCallEscape,
 }
+
+var opInlineAllocationRolePolicies = [...]OpInlineAllocationRole{
+	OpNewTable:      OpInlineAllocationDynamic,
+	OpNewFixedTable: OpInlineAllocationFixed,
+	OpSetField:      OpInlineAllocationFieldInit,
+	OpSetList:       OpInlineAllocationArrayInit,
+}

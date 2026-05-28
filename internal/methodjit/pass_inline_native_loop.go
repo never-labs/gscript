@@ -159,8 +159,8 @@ func calleeHasAllocationIR(calleeFn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpNewTable, OpNewFixedTable, OpSetList:
+			switch inlineAllocationRole(instr.Op) {
+			case OpInlineAllocationDynamic, OpInlineAllocationFixed, OpInlineAllocationArrayInit:
 				return true
 			}
 		}
@@ -177,10 +177,10 @@ func calleeOnlyFixedTableAlloc(calleeFn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpNewFixedTable:
+			switch inlineAllocationRole(instr.Op) {
+			case OpInlineAllocationFixed:
 				// ok
-			case OpNewTable, OpSetList:
+			case OpInlineAllocationDynamic, OpInlineAllocationArrayInit:
 				return false
 			}
 		}
@@ -203,20 +203,20 @@ func calleeIsSimpleConstructor(calleeFn *Function) bool {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpNewTable:
+			switch inlineAllocationRole(instr.Op) {
+			case OpInlineAllocationDynamic:
 				allocCount++
 				if allocCount > 1 {
 					return false
 				}
 				allocID = instr.ID
-			case OpSetField:
+			case OpInlineAllocationFieldInit:
 				if len(instr.Args) == 0 || instr.Args[0] == nil || instr.Args[0].ID != allocID {
 					return false
 				}
-			case OpSetList:
+			case OpInlineAllocationArrayInit:
 				return false
-			case OpNewFixedTable:
+			case OpInlineAllocationFixed:
 				// handled by calleeOnlyFixedTableAlloc; not our pattern
 				return false
 			}

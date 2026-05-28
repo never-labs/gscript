@@ -79,4 +79,7 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opReadonlyTableParamUseRolePolicies) {
 		spec.ReadonlyTableParamUseRole = opReadonlyTableParamUseRolePolicies[op]
 	}
+	if int(op) < len(opInlineAllocationRolePolicies) {
+		spec.InlineAllocationRole = opInlineAllocationRolePolicies[op]
+	}
 }

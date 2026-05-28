@@ -69,6 +69,7 @@ type OpSpec struct {
 	LocalStringArrayTableUseRole      OpLocalStringArrayTableUseRole
 	LocalStringArrayTableArgIndex     int
 	ReadonlyTableParamUseRole         OpReadonlyTableParamUseRole
+	InlineAllocationRole              OpInlineAllocationRole
 
 	// Optimizer admission and numeric specialization contracts.
 	LICMHoistable               bool
