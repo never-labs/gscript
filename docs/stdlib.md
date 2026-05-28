@@ -41,6 +41,25 @@
 
 同名能力的分工应保持清楚：`os` 提供 Lua 风格薄包装，`process` 提供可捕获、可测试的进程控制；`path` 是 host filepath，`url` 是 URL；`string` 处理 Lua pattern/byte string，`regexp` 处理 RE2；`math.random` 是兼容入口，`rand` 是确定性和扩展随机工具。
 
+## `path` 模块
+
+`path` 模块映射 Go `path/filepath`，处理宿主操作系统文件路径，不处理 URL path。URL 拆分和拼接应使用 `url` 模块；文件枚举 glob 属于 `fs` 模块。
+
+| API | 返回 | 说明 |
+|---|---|---|
+| `path.separator` | string | 宿主路径分隔符，等价于 Go `os.PathSeparator`。 |
+| `path.listSeparator` | string | 宿主 PATH 列表分隔符，等价于 Go `os.PathListSeparator`。 |
+| `path.clean(p)` | string | 清理 `.`、`..` 和重复分隔符，等价于 `filepath.Clean`。 |
+| `path.join(...)` | string | 拼接并清理路径片段，等价于 `filepath.Join`；无参数返回空字符串。 |
+| `path.base(p)` | string | 返回路径最后一个元素，等价于 `filepath.Base`。 |
+| `path.dir(p)` | string | 返回路径目录部分，等价于 `filepath.Dir`。 |
+| `path.ext(p)` | string | 返回最后一个路径元素的扩展名，等价于 `filepath.Ext`。 |
+| `path.isAbs(p)` / `path.isabs(p)` | bool | 判断路径是否为宿主绝对路径；`isabs` 是兼容别名。 |
+| `path.abs(p)` | string 或 `nil, err` | 返回绝对路径，外部失败时返回 `nil, err`。 |
+| `path.rel(base, target)` | string 或 `nil, err` | 返回 `target` 相对 `base` 的路径，不能构造时返回 `nil, err`。 |
+| `path.split(p)` | `dir, file` | 拆成目录和文件名，等价于 `filepath.Split`；目录保留尾部分隔符。 |
+| `path.match(pattern, name)` | bool 或 `false, err` | 使用 `filepath.Match` 语法匹配单个路径名；pattern 语法错误时返回 `false, err`。 |
+
 ## 宿主能力与权限
 
 生产级标准库需要一层统一的 capability policy：

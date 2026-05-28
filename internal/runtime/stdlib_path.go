@@ -66,13 +66,20 @@ func buildPathLib() *Table {
 		return []Value{StringValue(abs)}, nil
 	})
 
+	setIsAbs := func(name string) {
+		set(name, func(args []Value) ([]Value, error) {
+			if len(args) < 1 {
+				return nil, fmt.Errorf("bad argument #1 to 'path.%s' (string expected)", name)
+			}
+			return []Value{BoolValue(filepath.IsAbs(args[0].Str()))}, nil
+		})
+	}
+
 	// path.isAbs(p) -> bool
-	set("isAbs", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'path.isAbs' (string expected)")
-		}
-		return []Value{BoolValue(filepath.IsAbs(args[0].Str()))}, nil
-	})
+	setIsAbs("isAbs")
+
+	// path.isabs(p) -> bool
+	setIsAbs("isabs")
 
 	// path.clean(p) -> string
 	set("clean", func(args []Value) ([]Value, error) {

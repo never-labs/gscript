@@ -52,6 +52,15 @@ func TestPath_Join_WithSlashes(t *testing.T) {
 	}
 }
 
+func TestPath_Join_Empty(t *testing.T) {
+	interp := runWithPath(t, `
+		result := path.join()
+	`)
+	if interp.GetGlobal("result").Str() != filepath.Join() {
+		t.Errorf("expected empty join result, got '%s'", interp.GetGlobal("result").Str())
+	}
+}
+
 // ==================================================================
 // path.dir
 // ==================================================================
@@ -121,14 +130,18 @@ func TestPath_Abs(t *testing.T) {
 
 func TestPath_IsAbs(t *testing.T) {
 	interp := runWithPath(t, `
-		r1 := path.isAbs("/usr/bin")
+		r1 := path.isAbs(path.abs("."))
 		r2 := path.isAbs("relative/path")
+		r3 := path.isabs(path.abs("."))
 	`)
-	if !interp.GetGlobal("r1").Bool() {
-		t.Errorf("expected /usr/bin to be absolute")
-	}
 	if interp.GetGlobal("r2").Bool() {
 		t.Errorf("expected relative/path to not be absolute")
+	}
+	if !interp.GetGlobal("r1").Bool() {
+		t.Errorf("expected path.abs('.') to be absolute")
+	}
+	if !interp.GetGlobal("r3").Bool() {
+		t.Errorf("expected path.isabs alias to match path.isAbs")
 	}
 }
 
@@ -171,12 +184,19 @@ func TestPath_Match(t *testing.T) {
 	interp := runWithPath(t, `
 		r1 := path.match("*.go", "main.go")
 		r2 := path.match("*.go", "main.txt")
+		r3, err := path.match("[", "main.go")
 	`)
 	if !interp.GetGlobal("r1").Bool() {
 		t.Errorf("expected match('*.go', 'main.go') = true")
 	}
 	if interp.GetGlobal("r2").Bool() {
 		t.Errorf("expected match('*.go', 'main.txt') = false")
+	}
+	if interp.GetGlobal("r3").Bool() {
+		t.Errorf("expected invalid match pattern to return false")
+	}
+	if interp.GetGlobal("err").Str() == "" {
+		t.Errorf("expected invalid match pattern to return an error string")
 	}
 }
 
@@ -194,6 +214,18 @@ func TestPath_Rel(t *testing.T) {
 	}
 }
 
+func TestPath_Rel_Error(t *testing.T) {
+	interp := runWithPath(t, `
+		result, err := path.rel("relative/base", path.abs("."))
+	`)
+	if !interp.GetGlobal("result").IsNil() {
+		t.Errorf("expected rel with mixed absolute and relative paths to return nil")
+	}
+	if interp.GetGlobal("err").Str() == "" {
+		t.Errorf("expected rel with mixed absolute and relative paths to return an error string")
+	}
+}
+
 // ==================================================================
 // path.separator, path.listSeparator
 // ==================================================================
@@ -208,5 +240,32 @@ func TestPath_Separator(t *testing.T) {
 	}
 	if interp.GetGlobal("lsep").Str() != string(os.PathListSeparator) {
 		t.Errorf("expected listSeparator='%s', got '%s'", string(os.PathListSeparator), interp.GetGlobal("lsep").Str())
+	}
+}
+
+func TestPath_ExportsCommonFilepathOps(t *testing.T) {
+	lib := buildPathLib()
+	for _, name := range []string{
+		"clean",
+		"join",
+		"base",
+		"dir",
+		"ext",
+		"isAbs",
+		"isabs",
+		"abs",
+		"rel",
+		"split",
+		"match",
+	} {
+		if got := lib.RawGetString(name); !got.IsFunction() {
+			t.Fatalf("path.%s is not exported as a function", name)
+		}
+	}
+	if lib.RawGetString("separator").Str() != string(os.PathSeparator) {
+		t.Fatalf("path.separator mismatch")
+	}
+	if lib.RawGetString("listSeparator").Str() != string(os.PathListSeparator) {
+		t.Fatalf("path.listSeparator mismatch")
 	}
 }
