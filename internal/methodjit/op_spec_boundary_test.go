@@ -1,9 +1,6 @@
 package methodjit
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -54,28 +51,7 @@ func TestOpSpecDirectAccessStaysBehindQueryBoundary(t *testing.T) {
 }
 
 func fileHasDirectSpecCall(path string) (bool, error) {
-	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
-	if err != nil {
-		return false, err
-	}
-	found := false
-	ast.Inspect(parsed, func(node ast.Node) bool {
-		if found {
-			return false
-		}
-		call, ok := node.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		sel, ok := call.Fun.(*ast.SelectorExpr)
-		if ok && sel.Sel.Name == "Spec" {
-			found = true
-			return false
-		}
-		return true
-	})
-	return found, nil
+	return fileHasSelectorCall(path, "Spec")
 }
 
 func TestOpSpecAggregateFilesStayThin(t *testing.T) {
@@ -230,44 +206,5 @@ func TestOpSpecPolicyApplyEntrypointsOnlyOrchestrateSubdomains(t *testing.T) {
 }
 
 func funcHasPolicyTableIndex(path, funcName string) (bool, error) {
-	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
-	if err != nil {
-		return false, err
-	}
-	for _, decl := range parsed.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != funcName {
-			continue
-		}
-		found := false
-		ast.Inspect(fn.Body, func(node ast.Node) bool {
-			if found {
-				return false
-			}
-			index, ok := node.(*ast.IndexExpr)
-			if !ok {
-				return true
-			}
-			ident, ok := index.X.(*ast.Ident)
-			if ok && strings.HasSuffix(ident.Name, "Policies") {
-				found = true
-				return false
-			}
-			return true
-		})
-		return found, nil
-	}
-	return false, os.ErrNotExist
-}
-
-func countLines(src []byte) int {
-	if len(src) == 0 {
-		return 0
-	}
-	lines := strings.Count(string(src), "\n")
-	if src[len(src)-1] != '\n' {
-		lines++
-	}
-	return lines
+	return funcHasIdentIndexSuffix(path, funcName, "Policies")
 }
