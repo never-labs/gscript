@@ -6,6 +6,18 @@ no benchmark scripts or harness code were changed.
 
 ## Current Commands
 
+Repeatable performance gate for core hot paths:
+
+```bash
+bash scripts/performance_gate.sh
+```
+
+Short smoke gate:
+
+```bash
+bash scripts/performance_gate.sh --smoke
+```
+
 Primary full timing command documented in `benchmarks/README.md` and
 `docs/performance.md`:
 
@@ -52,6 +64,16 @@ the parser exposes `--all-groups`. Treat `--all` as stale documentation unless
 the harness grows that alias.
 
 ## Current State
+
+`scripts/performance_gate.sh` is the stable gate entrypoint for performance
+regression checks. It deliberately stays outside the JIT/VM implementation: it
+selects representative hot benchmarks, invokes `timing_compare.py` with
+calibrated repeats and the hot scale profile, validates the JSON artifact, and
+then invokes `strict_guard.py` for the requested selector set, or a smaller
+VM-safe truth subset for the default core profile, unless disabled. The validator
+prints a sorted current/clean-HEAD slowdown table, fails ordinary script-timed
+rows above the configured threshold, applies a separate wider threshold to
+wall-timed rows, and fails any row that remains low-resolution or unavailable.
 
 `timing_compare.py` is the main full timing harness. It exports a clean `HEAD`
 snapshot, builds current and `HEAD` binaries, optionally runs LuaJIT, and
@@ -105,6 +127,12 @@ right measurement for startup/end-to-end latency, but it can mis-rank hot-loop
 throughput. `timing_compare.py` already suppresses Current/LuaJIT gap ranking
 when either side is wall-timed, but the raw table still needs explicit source
 fields.
+
+The performance gate treats wall-timed current/HEAD rows as noisier evidence:
+they stay visible in the sorted table and can still fail when the regression is
+large enough, but they use a wider threshold than script-timed rows. This keeps
+startup fallback from hiding severe slowdowns without letting process startup
+jitter dominate hot-loop decisions.
 
 Timer semantic risk: GScript `time.since()` and Lua `os.clock()` may not have
 identical semantics. The GScript timer appears to be wall-style elapsed time,
@@ -162,6 +190,11 @@ Every benchmark report row should expose these fields, even if some are empty:
 | `commit` / `dirty` | Git identity and dirty-worktree flag. |
 
 ## P0 Fixes
+
+Completed: add a repeatable performance gate entrypoint. `scripts/performance_gate.sh`
+now wraps `timing_compare.py` and `strict_guard.py`, records JSON/Markdown
+artifacts, sorts current/HEAD results, fails low-resolution/unavailable rows,
+and applies separate script-time vs wall-time regression thresholds.
 
 1. Make `logical` a first-class timing source. `official/defer_protected_hot`
    should not appear as ordinary `script_repeat`; reports should display

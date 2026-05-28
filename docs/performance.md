@@ -57,6 +57,7 @@ Use the benchmark tools for different jobs:
 
 | Tool | Production role |
 |---|---|
+| `scripts/performance_gate.sh` | Repeatable core-hot-path gate: wraps `timing_compare.py`, optionally runs `strict_guard.py`, sorts current/HEAD deltas, marks startup-noise/low-resolution rows, and fails obvious regressions. |
 | `benchmarks/timing_compare.py` | Primary local timing harness: current checkout vs clean `HEAD` vs LuaJIT, calibrated repeats, confidence intervals, and gap ranking. |
 | `benchmarks/strict_guard.py` | Correctness and generalization oracle for release/regression gates. |
 | `benchmarks/regression_guard.sh` | Baseline regression gate for default JIT performance. |
@@ -72,6 +73,31 @@ python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --sort=luajit-gap \
   --json /tmp/gscript_timing_compare.json \
   --markdown /tmp/gscript_timing_compare.md
+```
+
+Default repeatable performance gate:
+
+```bash
+bash scripts/performance_gate.sh
+```
+
+The gate measures a representative core-hot subset from `suite`, `extended`,
+and `official_hot` with `timing_compare.py --scale-profile=hot`. It writes
+`timing_gate.json` / `timing_gate.md` and then runs a `strict_guard.py` truth
+pass over the requested selectors, or a smaller VM-safe truth subset for the
+default core profile, unless `--no-strict` is supplied. The JSON validator sorts all
+current/clean-HEAD rows by slowdown, fails script-timed rows above the default
+12% regression threshold, uses a wider 30% threshold for wall-timed rows because
+they include process startup/parse/compile noise, and fails rows that remain
+`low_resolution`, `missing`, `timeout`, or `error`.
+
+Useful variants:
+
+```bash
+bash scripts/performance_gate.sh --smoke
+bash scripts/performance_gate.sh --bench suite/spectral_norm --bench official/nextvar_table_hot
+bash scripts/performance_gate.sh --full --runs=5 --warmup=1 --out-dir /tmp/gscript_perf_full
+bash scripts/performance_gate.sh --validate-only /tmp/gscript_perf_full/timing_gate.json
 ```
 
 Rules for benchmark quality:
@@ -161,6 +187,7 @@ signals stay reliable:
 |---|---|---|---|
 | Correctness smoke | every PR | `go test ./... -count=1 -p 1 -timeout=600s` | no test failures |
 | Benchmark coverage | every PR touching runtime/JIT/benchmarks | `bash benchmarks/coverage_guard.sh` | official hot coverage remains mapped |
+| Core performance gate | performance-sensitive PRs | `bash scripts/performance_gate.sh --smoke` or default gate | no low-resolution rows and no obvious current/HEAD regression |
 | Regression guard | performance-sensitive PRs and nightly | `bash benchmarks/regression_guard.sh --runs=3 --threshold=10` | no default-JIT row more than 10% slower than baseline |
 | Strict truth pass | nightly and release candidates | `python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90` | no checksum drift; suspicious wins reviewed |
 | Publish-grade run | release candidate | `bash benchmarks/regression_guard.sh --runs=5 --timeout=90` plus full `timing_compare.py` | report archived and baseline decision made |
