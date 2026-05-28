@@ -38,6 +38,42 @@ external contract because Go `internal` packages cannot be imported by
 embedders outside the parent tree. Any production embedding API must avoid
 requiring external users to name `internal/runtime` types.
 
+## Tested public examples
+
+The public surface has executable Go examples in
+`examples/embedding/embedding_test.go` and package-level examples in
+`gscript/example_test.go`. They are normal Go example tests, so
+`go test ./examples/embedding ./gscript` verifies that snippets for
+`Compile`/`Run`, public `Value`, host function binding, `WithSandbox`,
+`WithMaxSteps`, and structured errors continue to compile and match their
+documented output.
+
+For example, a host can compile once, run on a VM, then inspect globals:
+
+```go
+prog, err := gs.Compile(`result := 40 + 2`, gs.WithSourceName("calc.gs"))
+if err != nil {
+    panic(err)
+}
+vm := gs.New(gs.WithVM())
+if err := vm.Run(prog); err != nil {
+    panic(err)
+}
+result, err := vm.Get("result")
+if err != nil {
+    panic(err)
+}
+fmt.Println(prog.SourceName(), result)
+```
+
+Structured errors use standard Go error APIs:
+
+```go
+var gsErr *gs.Error
+var hostErr *gs.HostCallbackError
+fmt.Println(errors.As(err, &gsErr), errors.As(err, &hostErr))
+```
+
 ## Current execution model
 
 `New` creates a tree-walking interpreter by default. `WithVM` switches `Exec`
