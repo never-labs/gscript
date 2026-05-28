@@ -11,9 +11,30 @@ import (
 // separate from Table so data-oriented code can opt into columnar layout without
 // inheriting table/hash/metatable semantics on hot paths.
 type SoA struct {
-	names   []string
-	columns map[string]*DenseArray
-	length  int
+	names        []string
+	columns      map[string]*DenseArray
+	length       int
+	shapeVersion uint64
+}
+
+type SoAColumnDescriptor struct {
+	Name    string
+	DType   DenseArrayDType
+	Len     int
+	Version uint64
+}
+
+type SoAShapeSnapshot struct {
+	ShapeVersion uint64
+	Length       int
+	Columns      []SoAColumnDescriptor
+}
+
+type SoAAffineTerm struct {
+	Dst   string
+	Src   string
+	Scale float64
+	Bias  float64
 }
 
 func NewSoA(columns map[string]*DenseArray) (*SoA, error) {
@@ -39,7 +60,7 @@ func NewSoA(columns map[string]*DenseArray) (*SoA, error) {
 		copied[name] = col
 	}
 	sort.Strings(names)
-	return &SoA{names: names, columns: copied, length: length}, nil
+	return &SoA{names: names, columns: copied, length: length, shapeVersion: 1}, nil
 }
 
 func SoAValue(s *SoA) Value {
@@ -73,6 +94,13 @@ func (s *SoA) Len() int {
 	return s.length
 }
 
+func (s *SoA) ShapeVersion() uint64 {
+	if s == nil {
+		return 0
+	}
+	return s.shapeVersion
+}
+
 func (s *SoA) ColumnNames() []string {
 	if s == nil {
 		return nil
@@ -86,6 +114,83 @@ func (s *SoA) Column(name string) (*DenseArray, bool) {
 	}
 	col, ok := s.columns[name]
 	return col, ok
+}
+
+func (s *SoA) ColumnDescriptor(name string) (SoAColumnDescriptor, bool) {
+	col, ok := s.Column(name)
+	if !ok {
+		return SoAColumnDescriptor{}, false
+	}
+	return SoAColumnDescriptor{
+		Name:    name,
+		DType:   col.DType(),
+		Len:     col.Len(),
+		Version: col.Version(),
+	}, true
+}
+
+func (s *SoA) Snapshot(columnNames ...string) (SoAShapeSnapshot, error) {
+	if s == nil {
+		return SoAShapeSnapshot{}, fmt.Errorf("soa is nil")
+	}
+	names := columnNames
+	if len(names) == 0 {
+		names = s.names
+	}
+	cols := make([]SoAColumnDescriptor, 0, len(names))
+	for _, name := range names {
+		desc, ok := s.ColumnDescriptor(name)
+		if !ok {
+			return SoAShapeSnapshot{}, fmt.Errorf("soa column %q not found", name)
+		}
+		cols = append(cols, desc)
+	}
+	return SoAShapeSnapshot{
+		ShapeVersion: s.shapeVersion,
+		Length:       s.length,
+		Columns:      cols,
+	}, nil
+}
+
+func (s *SoA) ValidateSnapshot(snapshot SoAShapeSnapshot) bool {
+	if s == nil || s.shapeVersion != snapshot.ShapeVersion || s.length != snapshot.Length {
+		return false
+	}
+	for _, want := range snapshot.Columns {
+		got, ok := s.ColumnDescriptor(want.Name)
+		if !ok || got.DType != want.DType || got.Len != want.Len || got.Version != want.Version {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *SoA) ValidateSnapshotForWrites(snapshot SoAShapeSnapshot, writeNames ...string) bool {
+	if s == nil || s.shapeVersion != snapshot.ShapeVersion || s.length != snapshot.Length {
+		return false
+	}
+	for _, want := range snapshot.Columns {
+		got, ok := s.ColumnDescriptor(want.Name)
+		if !ok || got.DType != want.DType || got.Len != want.Len {
+			return false
+		}
+		if soaNameInList(want.Name, writeNames) {
+			continue
+		}
+		if got.Version != want.Version {
+			return false
+		}
+	}
+	return true
+}
+
+func soaNameInList(name string, names []string) bool {
+	for _, candidate := range names {
+		if name == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *SoA) Row(i int) (*Table, error) {
@@ -142,6 +247,52 @@ func (s *SoA) Affine(dstName, srcName string, scale, bias float64) error {
 		return err
 	}
 	return denseArrayAffine(dst, src, scale, bias)
+}
+
+func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if len(terms) == 0 {
+		return nil
+	}
+	plans := make([]struct {
+		dst   *DenseArray
+		src   *DenseArray
+		scale float64
+		bias  float64
+	}, len(terms))
+	writes := make(map[string]struct{}, len(terms))
+	for i, term := range terms {
+		if term.Dst == "" || term.Src == "" {
+			return fmt.Errorf("soa.affineMany: term %d has empty column name", i+1)
+		}
+		if _, exists := writes[term.Dst]; exists {
+			return fmt.Errorf("soa.affineMany: duplicate destination column %q", term.Dst)
+		}
+		writes[term.Dst] = struct{}{}
+		dst, src, err := s.numericColumns(term.Dst, term.Src)
+		if err != nil {
+			return fmt.Errorf("soa.affineMany term %d: %w", i+1, err)
+		}
+		plans[i] = struct {
+			dst   *DenseArray
+			src   *DenseArray
+			scale float64
+			bias  float64
+		}{dst: dst, src: src, scale: term.Scale, bias: term.Bias}
+	}
+	for i, term := range terms {
+		if _, aliased := writes[term.Src]; aliased {
+			return fmt.Errorf("soa.affineMany: source column %q in term %d is also written; split dependent updates to preserve order", term.Src, i+1)
+		}
+	}
+	for _, plan := range plans {
+		if err := denseArrayAffine(plan.dst, plan.src, plan.scale, plan.bias); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *SoA) Sum(columnName string) (Value, error) {

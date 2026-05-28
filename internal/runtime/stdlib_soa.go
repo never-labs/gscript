@@ -60,6 +60,14 @@ func buildSoALib() *Table {
 		return []Value{TableValue(out)}, nil
 	})
 
+	set("shape", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.shape", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{TableValue(soaShapeTable(s))}, nil
+	})
+
 	set("column", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.column", args, 0)
 		if err != nil {
@@ -139,6 +147,24 @@ func buildSoALib() *Table {
 		}
 		return []Value{BoolValue(true)}, nil
 	}, soaAffineValue)
+
+	set("affineMany", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.affineMany", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsTable() {
+			return nil, fmt.Errorf("soa.affineMany: argument 2 must be a table of affine terms")
+		}
+		terms, err := soaAffineTermsFromTable(args[1].Table())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.AffineMany(terms); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	})
 
 	setFastArg2("sum", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.sum", args, 0)
@@ -227,4 +253,57 @@ func soaSumValue(soaValue, columnValue Value) (Value, error) {
 		return NilValue(), fmt.Errorf("soa.sum: argument 2 must be a string")
 	}
 	return soaValue.SoA().Sum(columnValue.Str())
+}
+
+func soaShapeTable(s *SoA) *Table {
+	snapshot, _ := s.Snapshot()
+	out := NewTable()
+	out.RawSetString("length", IntValue(int64(snapshot.Length)))
+	out.RawSetString("version", IntValue(int64(snapshot.ShapeVersion)))
+	cols := NewTable()
+	for i, desc := range snapshot.Columns {
+		col := NewTable()
+		col.RawSetString("name", StringValue(desc.Name))
+		col.RawSetString("dtype", StringValue(desc.DType.String()))
+		col.RawSetString("length", IntValue(int64(desc.Len)))
+		col.RawSetString("version", IntValue(int64(desc.Version)))
+		cols.RawSetInt(int64(i+1), TableValue(col))
+	}
+	out.RawSetString("columns", TableValue(cols))
+	return out
+}
+
+func soaAffineTermsFromTable(tbl *Table) ([]SoAAffineTerm, error) {
+	n := tbl.Length()
+	terms := make([]SoAAffineTerm, 0, n)
+	for i := 1; i <= n; i++ {
+		v := tbl.RawGetInt(int64(i))
+		if !v.IsTable() {
+			return nil, fmt.Errorf("soa.affineMany: term %d must be a table", i)
+		}
+		termTable := v.Table()
+		dst := termTable.RawGetString("dst")
+		src := termTable.RawGetString("src")
+		scale := termTable.RawGetString("scale")
+		bias := termTable.RawGetString("bias")
+		if !dst.IsString() || !src.IsString() {
+			return nil, fmt.Errorf("soa.affineMany: term %d requires string dst and src", i)
+		}
+		if !scale.IsNumber() {
+			return nil, fmt.Errorf("soa.affineMany: term %d requires numeric scale", i)
+		}
+		if bias.IsNil() {
+			bias = IntValue(0)
+		}
+		if !bias.IsNumber() {
+			return nil, fmt.Errorf("soa.affineMany: term %d requires numeric bias", i)
+		}
+		terms = append(terms, SoAAffineTerm{
+			Dst:   dst.Str(),
+			Src:   src.Str(),
+			Scale: scale.Number(),
+			Bias:  bias.Number(),
+		})
+	}
+	return terms, nil
 }

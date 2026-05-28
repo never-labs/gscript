@@ -79,10 +79,12 @@ SoA must be measured on two classes of workload:
 - column-subset workloads such as `particle_subset_x`, where a hot loop touches
   only a few columns and SoA should win through dense contiguous access.
 
-The first native SoA kernel layer is `soa.addScaled`, `soa.affine`, and
-`soa.sum`: these execute fused column loops over stable dense columns. They are
-the semantic target for later ARM64/NEON emission; until then they provide the
-portable native baseline that JIT lowering must match or beat.
+The first native SoA kernel layer is `soa.addScaled`, `soa.affine`,
+`soa.affineMany`, and `soa.sum`: these execute fused column loops over stable
+dense columns. `soa.shape` exposes the layout facts used by guarded
+specialization: length, shape version, column dtype, column length, and column
+version. They are the semantic target for later ARM64/NEON emission; until then
+they provide the portable native baseline that JIT lowering must match or beat.
 
 Runnable entry points:
 
@@ -92,6 +94,7 @@ go run ./benchmarks/data_oriented/cmd/data_oriented_bench \
   -particles=32768 -steps=64 -vectors=65536 -repeats=5 \
   > /tmp/gscript_data_oriented_bench.json
 go run ./cmd/gscript examples/data_oriented/particle_integration.gs
+go run ./cmd/gscript examples/data_oriented/soa_kernels.gs
 ```
 
 The JSON schema is `gscript.data_oriented_benchmark.v1`; rows include

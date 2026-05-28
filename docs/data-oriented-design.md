@@ -175,6 +175,17 @@ Acceptance:
 
 Add structure-of-arrays values for records with homogeneous-length columns.
 
+Current implementation status:
+
+- `soa.zip`, `soa.len`, `soa.columns`, `soa.column`, `soa.row`, and
+  `soa.setRow` are available;
+- `soa.shape` exposes layout diagnostics: length, shape version, column names,
+  element kinds, column lengths, and column versions;
+- `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` provide fused
+  column kernels over dense columns;
+- row access materializes an ordinary table and is intended for boundary code,
+  debugging, and tests, not hot loops.
+
 Deliverables:
 
 - `soa.zip` and `soa.unzip` equivalents for named dense arrays;
@@ -194,6 +205,15 @@ Acceptance:
 ### Phase D: Runtime specialization and JIT kernels
 
 Specialize dense, vector, matrix, and SoA operations after semantics are stable.
+
+Current implementation status:
+
+- dense arrays and SoA columns expose dtype, length, shape, and column-version
+  facts that runtime specializations can snapshot and validate;
+- the first SoA runtime specialization recognizes a column affine loop and
+  routes it to a fused runtime kernel with guarded fallback;
+- native ARM64/NEON loop-body emission is still future work. The current fast
+  path is portable runtime specialization, not direct SIMD machine code.
 
 Deliverables:
 

@@ -109,11 +109,18 @@ func TestSoANativeColumnKernels(t *testing.T) {
 	if err := runSource(interp, `
 xs := []f64{1, 2, 3}
 vx := []f64{10, 20, 30}
-points := soa.zip({x: xs, vx: vx})
+vy := []f64{1, 2, 3}
+points := soa.zip({x: xs, vx: vx, y: []f64{0, 0, 0}, vy: vy})
 ok1 := soa.addScaled(points, "x", "vx", 0.5)
 sum1 := soa.sum(points, "x")
 ok2 := soa.affine(points, "x", "vx", 2, 1)
 sum2 := soa.sum(points, "x")
+ok3 := soa.affineMany(points, {
+    {dst: "x", src: "vx", scale: 0.25, bias: 0.5},
+    {dst: "y", src: "vy", scale: 10, bias: 1},
+})
+sum3 := soa.sum(points, "x") + soa.sum(points, "y")
+shape := soa.shape(points)
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -128,6 +135,56 @@ sum2 := soa.sum(points, "x")
 	}
 	if got := interp.GetGlobal("sum2"); !got.IsFloat() || got.Float() != 123 {
 		t.Fatalf("sum2 = %v, want 123", got)
+	}
+	if got := interp.GetGlobal("ok3"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("ok3 = %v, want true", got)
+	}
+	if got := interp.GetGlobal("sum3"); !got.IsFloat() || got.Float() != 79.5 {
+		t.Fatalf("sum3 = %v, want 79.5", got)
+	}
+	shape := interp.GetGlobal("shape").Table()
+	if got := shape.RawGetString("length"); !got.IsInt() || got.Int() != 3 {
+		t.Fatalf("shape.length = %v, want 3", got)
+	}
+}
+
+func TestSoASnapshotAndAffineManyGuards(t *testing.T) {
+	s, err := NewSoA(map[string]*DenseArray{
+		"x":  NewDenseArrayF64([]float64{1, 2}),
+		"y":  NewDenseArrayF64([]float64{3, 4}),
+		"vx": NewDenseArrayF64([]float64{10, 20}),
+		"vy": NewDenseArrayF64([]float64{30, 40}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := s.Snapshot("x", "y", "vx", "vy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.ValidateSnapshot(snapshot) {
+		t.Fatal("fresh SoA snapshot did not validate")
+	}
+	if err := s.AffineMany([]SoAAffineTerm{
+		{Dst: "x", Src: "vx", Scale: 0.5, Bias: 1},
+		{Dst: "y", Src: "vy", Scale: 0.25, Bias: -1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if s.ValidateSnapshot(snapshot) {
+		t.Fatal("snapshot should be invalid after fused column writes")
+	}
+	x, _ := s.Column("x")
+	y, _ := s.Column("y")
+	assertDenseF64(t, DenseArrayValue(x), []float64{6, 11})
+	assertDenseF64(t, DenseArrayValue(y), []float64{6.5, 9})
+
+	err = s.AffineMany([]SoAAffineTerm{
+		{Dst: "x", Src: "vx", Scale: 1, Bias: 0},
+		{Dst: "vx", Src: "y", Scale: 1, Bias: 0},
+	})
+	if err == nil || !strings.Contains(err.Error(), "also written") {
+		t.Fatalf("dependent affineMany error = %v, want dependency rejection", err)
 	}
 }
 

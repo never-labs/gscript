@@ -59,6 +59,40 @@ func TestSoAColumnAffineUpdateRuntimeSpecialization(t *testing.T) {
 	}
 }
 
+func TestSoAColumnAffineUpdateRefreshesGuardAfterColumnMutation(t *testing.T) {
+	proto, v := compileSpectralSpecializationTestProgram(t, soaAffineUpdateSource)
+	defer v.Close()
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatal(err)
+	}
+	soa := mustTestSoA(t, []float64{1, 2}, []float64{0, 0})
+	fn := v.GetGlobal("affine_update")
+	for _, scale := range []float64{2, 3} {
+		if _, err := v.CallValue(fn, []runtime.Value{
+			runtime.SoAValue(soa),
+			runtime.FloatValue(scale),
+			runtime.FloatValue(1),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		x, ok := soa.Column("x")
+		if !ok {
+			t.Fatal("missing x column")
+		}
+		x0, err := x.At(0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := x.Set(0, runtime.FloatValue(x0.Number()+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, y := testSoAColumns(t, soa)
+	if y[0] != 7 || y[1] != 7 {
+		t.Fatalf("y = %v, want [7 7]", y)
+	}
+}
+
 func TestSoAColumnAffineUpdateIgnoresBenchmarkMetadata(t *testing.T) {
 	proto, v := compileSpectralSpecializationTestProgram(t, soaAffineUpdateSource)
 	defer v.Close()
@@ -267,6 +301,31 @@ func sum_kernel(cols) {
 	}
 }
 
+func BenchmarkSoAStdlibAffineMany(b *testing.B) {
+	src := `
+func affine_many_kernel(cols, scale, bias) {
+    soa.affineMany(cols, {
+        {dst: "x", src: "vx", scale: scale, bias: bias},
+        {dst: "y", src: "vy", scale: scale, bias: bias},
+    })
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "affine_many_kernel")
+	defer v.Close()
+	soa := mustBenchParticleSoA(b, 32768)
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.FloatValue(1.00001), runtime.FloatValue(0.25)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := v.CallValue(fn, args); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+	x, _ := testSoAColumns(b, soa)
+	benchmarkFloatSink = x[len(x)-1]
+}
+
 func BenchmarkDenseArraySumVMFallback(b *testing.B) {
 	src := `
 func sum_loop(cols) {
@@ -417,6 +476,31 @@ func mustBenchSoA(b testing.TB, n int) *runtime.SoA {
 		x[i] = 1 + float64(i)*0.001
 	}
 	return mustTestSoA(b, x, y)
+}
+
+func mustBenchParticleSoA(b testing.TB, n int) *runtime.SoA {
+	b.Helper()
+	x := make([]float64, n)
+	y := make([]float64, n)
+	vx := make([]float64, n)
+	vy := make([]float64, n)
+	for i := range x {
+		f := 1 + float64(i)*0.001
+		x[i] = f
+		y[i] = f * 2
+		vx[i] = 0.1 + f*0.01
+		vy[i] = 0.2 + f*0.02
+	}
+	soa, err := runtime.NewSoA(map[string]*runtime.DenseArray{
+		"x":  runtime.NewDenseArrayF64(x),
+		"y":  runtime.NewDenseArrayF64(y),
+		"vx": runtime.NewDenseArrayF64(vx),
+		"vy": runtime.NewDenseArrayF64(vy),
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	return soa
 }
 
 func testSoAColumns(t testing.TB, soa *runtime.SoA) ([]float64, []float64) {

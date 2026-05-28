@@ -5,6 +5,7 @@ import "github.com/gscript/gscript/internal/runtime"
 type soaColumnAffineUpdateSpec struct {
 	srcName string
 	dstName string
+	guard   runtime.SoAShapeSnapshot
 }
 
 type soaColumnAffineUpdateCache struct {
@@ -103,7 +104,21 @@ func (vm *VM) runSoAColumnAffineUpdateRuntimeSpecialization(cl *Closure, args []
 	if !ok {
 		return false, nil
 	}
-	if err := args[0].SoA().Affine(spec.dstName, spec.srcName, args[1].Number(), args[2].Number()); err != nil {
+	s := args[0].SoA()
+	if len(spec.guard.Columns) > 0 && !s.ValidateSnapshotForWrites(spec.guard, spec.dstName) {
+		spec.guard = runtime.SoAShapeSnapshot{}
+	}
+	if len(spec.guard.Columns) == 0 {
+		guard, err := s.Snapshot(spec.dstName, spec.srcName)
+		if err != nil {
+			return false, nil
+		}
+		spec.guard = guard
+		if cl != nil && cl.Proto != nil && cl.Proto.SoAColumnAffineUpdateSpecialization != nil {
+			cl.Proto.SoAColumnAffineUpdateSpecialization.spec = spec
+		}
+	}
+	if err := s.Affine(spec.dstName, spec.srcName, args[1].Number(), args[2].Number()); err != nil {
 		return false, nil
 	}
 	return true, nil

@@ -34,10 +34,11 @@ func (dt DenseArrayDType) String() string {
 // DenseArray is a compact, homogeneous array value for data-oriented helpers.
 // Exactly one backing slice is populated according to dtype.
 type DenseArray struct {
-	dtype DenseArrayDType
-	f64   []float64
-	i64   []int64
-	bools []bool
+	dtype   DenseArrayDType
+	version uint64
+	f64     []float64
+	i64     []int64
+	bools   []bool
 }
 
 func NewDenseArrayF64(values []float64) *DenseArray {
@@ -109,6 +110,23 @@ func (a *DenseArray) DType() DenseArrayDType {
 		return DenseArrayF64
 	}
 	return a.dtype
+}
+
+func (a *DenseArray) Version() uint64 {
+	if a == nil {
+		return 0
+	}
+	return a.version
+}
+
+func (a *DenseArray) bumpVersion() {
+	if a == nil {
+		return
+	}
+	a.version++
+	if a.version == 0 {
+		a.version = 1
+	}
 }
 
 func (a *DenseArray) Len() int {
@@ -193,6 +211,7 @@ func (a *DenseArray) Set(i int, v Value) error {
 	default:
 		return ErrDenseArrayDType
 	}
+	a.bumpVersion()
 	return nil
 }
 
@@ -477,6 +496,7 @@ func denseArrayAddScaled(dst, src *DenseArray, scale float64) error {
 		default:
 			return ErrDenseArrayDType
 		}
+		dst.bumpVersion()
 		return nil
 	}
 	if dst.dtype == DenseArrayI64 && src.dtype == DenseArrayI64 && scale == float64(int64(scale)) {
@@ -484,6 +504,7 @@ func denseArrayAddScaled(dst, src *DenseArray, scale float64) error {
 		for i := range dst.i64 {
 			dst.i64[i] += src.i64[i] * s
 		}
+		dst.bumpVersion()
 		return nil
 	}
 	return fmt.Errorf("dense array addScaled requires f64 destination or integral i64 scale")
@@ -511,6 +532,7 @@ func denseArrayAffine(dst, src *DenseArray, scale, bias float64) error {
 	default:
 		return ErrDenseArrayDType
 	}
+	dst.bumpVersion()
 	return nil
 }
 
