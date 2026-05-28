@@ -46,7 +46,9 @@ The public surface has executable Go examples in
 `go test ./examples/embedding ./gscript` verifies that snippets for
 `Compile`/`Run`, public `Value`, host function binding, `WithSandbox`,
 `WithMaxSteps`, and structured errors continue to compile and match their
-documented output.
+documented output. See the
+[embedding examples index](../examples/embedding/README.md) for the concise
+example-by-example coverage list.
 
 For example, a host can compile once, run on a VM, then inspect globals:
 
