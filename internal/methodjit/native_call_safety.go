@@ -103,9 +103,11 @@ func tier2ValueIsLocalTableAllocation(v *Value, seen map[int]bool) bool {
 		return true
 	}
 	seen[v.ID] = true
-	switch v.Def.Op {
-	case OpNewTable, OpNewFixedTable:
+	switch inlineAllocationRole(v.Def.Op) {
+	case OpInlineAllocationDynamic, OpInlineAllocationFixed:
 		return true
+	}
+	switch v.Def.Op {
 	case OpPhi:
 		if len(v.Def.Args) == 0 {
 			return false
