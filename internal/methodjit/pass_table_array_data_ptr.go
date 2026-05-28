@@ -72,10 +72,3 @@ func collectTableArrayDataPtrFacts(fn *Function) map[int]TableArrayDataPtrFact {
 	}
 	return facts
 }
-
-func (f *Function) tableArrayDataPtrFact(valueID int) (TableArrayDataPtrFact, bool) {
-	if f == nil {
-		return TableArrayDataPtrFact{}, false
-	}
-	return f.Analysis.LoopSpecializationFacts().TableArrayDataPtr(valueID)
-}
