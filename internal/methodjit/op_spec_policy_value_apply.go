@@ -67,4 +67,7 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFixedShapeArrayElementReadRolePolicies) {
 		spec.FixedShapeArrayElementReadRole = opFixedShapeArrayElementReadRolePolicies[op]
 	}
+	if int(op) < len(opFixedShapeReturnArrayElementRolePolicies) {
+		spec.FixedShapeReturnArrayElementRole = opFixedShapeReturnArrayElementRolePolicies[op]
+	}
 }

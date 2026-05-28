@@ -65,6 +65,7 @@ type OpSpec struct {
 	TableIntArrayReverseBodyBenign    bool
 	FixedShapeArrayElementWriteRole   OpFixedShapeArrayElementWriteRole
 	FixedShapeArrayElementReadRole    OpFixedShapeArrayElementReadRole
+	FixedShapeReturnArrayElementRole  OpFixedShapeReturnArrayElementRole
 
 	// Optimizer admission and numeric specialization contracts.
 	LICMHoistable               bool

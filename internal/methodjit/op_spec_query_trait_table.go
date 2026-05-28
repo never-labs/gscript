@@ -185,6 +185,14 @@ func fixedShapeArrayElementReadRole(op Op) OpFixedShapeArrayElementReadRole {
 	return spec.FixedShapeArrayElementReadRole
 }
 
+func fixedShapeReturnArrayElementRole(op Op) OpFixedShapeReturnArrayElementRole {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpFixedShapeReturnArrayElementNone
+	}
+	return spec.FixedShapeReturnArrayElementRole
+}
+
 func opIsTableArrayStoreLoopCandidate(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.TableArrayStoreLoopCandidate

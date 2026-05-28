@@ -78,3 +78,10 @@ var opFixedShapeArrayElementReadRolePolicies = [...]OpFixedShapeArrayElementRead
 	OpGetTable:       OpFixedShapeArrayElementReadDirect,
 	OpTableArrayLoad: OpFixedShapeArrayElementReadLoweredArray,
 }
+
+var opFixedShapeReturnArrayElementRolePolicies = [...]OpFixedShapeReturnArrayElementRole{
+	OpSetTable: OpFixedShapeReturnArrayElementStore,
+	OpAppend:   OpFixedShapeReturnArrayElementInvalidator,
+	OpSetList:  OpFixedShapeReturnArrayElementInvalidator,
+	OpSetField: OpFixedShapeReturnArrayElementInvalidator,
+}

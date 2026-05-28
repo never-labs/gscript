@@ -35,3 +35,23 @@ func TestFixedShapeArrayElementContractsLiveInOpSpec(t *testing.T) {
 		t.Fatalf("%s should not report fixed-shape array-element read role", OpLen)
 	}
 }
+
+func TestFixedShapeReturnArrayElementContractsLiveInOpSpec(t *testing.T) {
+	for _, tc := range []struct {
+		op   Op
+		role OpFixedShapeReturnArrayElementRole
+	}{
+		{OpSetTable, OpFixedShapeReturnArrayElementStore},
+		{OpAppend, OpFixedShapeReturnArrayElementInvalidator},
+		{OpSetList, OpFixedShapeReturnArrayElementInvalidator},
+		{OpSetField, OpFixedShapeReturnArrayElementInvalidator},
+	} {
+		spec, ok := tc.op.Spec()
+		if !ok || spec.FixedShapeReturnArrayElementRole != tc.role || fixedShapeReturnArrayElementRole(tc.op) != tc.role {
+			t.Fatalf("%s fixed-shape return array-element role should be driven by OpSpec", tc.op)
+		}
+	}
+	if fixedShapeReturnArrayElementRole(OpGetTable) != OpFixedShapeReturnArrayElementNone {
+		t.Fatalf("%s should not report fixed-shape return array-element role", OpGetTable)
+	}
+}

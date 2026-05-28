@@ -225,3 +225,11 @@ const (
 	OpFixedShapeArrayElementReadDirect
 	OpFixedShapeArrayElementReadLoweredArray
 )
+
+type OpFixedShapeReturnArrayElementRole uint8
+
+const (
+	OpFixedShapeReturnArrayElementNone OpFixedShapeReturnArrayElementRole = iota
+	OpFixedShapeReturnArrayElementStore
+	OpFixedShapeReturnArrayElementInvalidator
+)

@@ -44,8 +44,8 @@ func AnalyzeFixedShapeArrayElementReturnFact(proto *vm.FuncProto, globals map[st
 			if len(instr.Args) == 0 || instr.Args[0] == nil || !returned[instr.Args[0].ID] {
 				continue
 			}
-			switch instr.Op {
-			case OpSetTable:
+			switch fixedShapeReturnArrayElementRole(instr.Op) {
+			case OpFixedShapeReturnArrayElementStore:
 				if len(instr.Args) < 3 || instr.Args[2] == nil {
 					return FixedShapeTableFact{}, false
 				}
@@ -61,7 +61,7 @@ func AnalyzeFixedShapeArrayElementReturnFact(proto *vm.FuncProto, globals map[st
 				if out.ShapeID != fact.ShapeID || !out.sameShape(fact) {
 					return FixedShapeTableFact{}, false
 				}
-			case OpAppend, OpSetList, OpSetField:
+			case OpFixedShapeReturnArrayElementInvalidator:
 				return FixedShapeTableFact{}, false
 			}
 		}

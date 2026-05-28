@@ -47,6 +47,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opTableIntArrayReverseBodyBenignPolicies", opTableIntArrayReverseBodyBenignPolicies},
 		{"opFixedShapeArrayElementWriteRolePolicies", opFixedShapeArrayElementWriteRolePolicies},
 		{"opFixedShapeArrayElementReadRolePolicies", opFixedShapeArrayElementReadRolePolicies},
+		{"opFixedShapeReturnArrayElementRolePolicies", opFixedShapeReturnArrayElementRolePolicies},
 		{"opOracleSupportPolicies", opOracleSupportPolicies},
 		{"opOracleUnsupportedReasonPolicies", opOracleUnsupportedReasonPolicies},
 		{"opLICMHoistablePolicies", opLICMHoistablePolicies},
