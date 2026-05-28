@@ -111,6 +111,14 @@ func opIsFieldSvalsGlobalBarrier(instr *Instr) bool {
 	return ok && spec.FieldSvalsGlobalBarrier
 }
 
+func fieldSvalsFirstArgMutationBarrier(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.FieldSvalsFirstArgMutationBarrier
+}
+
 func valueProvenNonNil(v *Value) bool {
 	if v == nil || v.Def == nil {
 		return false

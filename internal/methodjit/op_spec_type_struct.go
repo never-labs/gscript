@@ -77,10 +77,11 @@ type OpSpec struct {
 	NumericOperand              bool
 
 	// Field/cache barrier contracts.
-	FieldSvalsCrossBlockBarrier   bool
-	FieldSvalsGlobalBarrier       bool
-	FieldLenFoldBarrier           bool
-	FieldCallPolyLenFusionBarrier bool
+	FieldSvalsCrossBlockBarrier       bool
+	FieldSvalsGlobalBarrier           bool
+	FieldSvalsFirstArgMutationBarrier bool
+	FieldLenFoldBarrier               bool
+	FieldCallPolyLenFusionBarrier     bool
 
 	// Integer range, boxing, narrowing, and recurrence contracts.
 	BoxableIntArithmetic           bool

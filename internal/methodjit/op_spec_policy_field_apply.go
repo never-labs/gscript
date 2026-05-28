@@ -72,6 +72,9 @@ func applyOpSpecFieldSvalsBarrierPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFieldSvalsGlobalBarrierPolicies) {
 		spec.FieldSvalsGlobalBarrier = opFieldSvalsGlobalBarrierPolicies[op]
 	}
+	if int(op) < len(opFieldSvalsFirstArgMutationBarrierPolicies) {
+		spec.FieldSvalsFirstArgMutationBarrier = opFieldSvalsFirstArgMutationBarrierPolicies[op]
+	}
 }
 
 func applyOpSpecFieldLenBarrierPolicies(op Op, spec *OpSpec) {

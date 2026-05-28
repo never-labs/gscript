@@ -578,9 +578,7 @@ func fieldSvalsGlobalBarrier(instr *Instr) bool {
 	if instr.Op == OpSetField {
 		return len(instr.Args) == 0 || instr.Args[0] == nil
 	}
-	switch instr.Op {
-	case OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-		OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix:
+	if fieldSvalsFirstArgMutationBarrier(instr) {
 		return len(instr.Args) == 0 || instr.Args[0] == nil
 	}
 	return opIsFieldSvalsGlobalBarrier(instr)

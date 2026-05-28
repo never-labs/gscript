@@ -28,6 +28,15 @@ var opFieldSvalsGlobalBarrierPolicies = [...]bool{
 	OpSetUpval:       true,
 }
 
+var opFieldSvalsFirstArgMutationBarrierPolicies = [...]bool{
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+}
+
 var opFieldLenFoldBarrierPolicies = [...]bool{
 	OpCall:                true,
 	OpSetField:            true,
