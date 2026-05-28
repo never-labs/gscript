@@ -1237,6 +1237,12 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			a := DecodeA(inst)
 			b := DecodeB(inst) // array hint
 			c := DecodeC(inst) // hash hint
+			if handled, err := vm.trySoAAffineManyLiteralRuntimeSpecialization(frame, base, frame.pc-1); handled {
+				if err != nil {
+					return nil, wrapLineErr(frame, err)
+				}
+				break
+			}
 			vm.regs[base+a] = runtime.FreshTableValue(runtime.NewTableSized(b, c))
 
 		case OP_NEWOBJECT2:

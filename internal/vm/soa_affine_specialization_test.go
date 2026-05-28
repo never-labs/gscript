@@ -155,6 +155,49 @@ func rewrite_columns(records, mul, add) {
 	}
 }
 
+func TestSoAAffineManyLiteralRuntimeSpecialization(t *testing.T) {
+	src := `
+func affine_many_kernel(cols, scale, bias) {
+    soa.affineMany(cols, {
+        {dst: "x", src: "vx", scale: scale, bias: bias},
+        {dst: "y", src: "vy", scale: scale, bias: bias},
+    })
+}
+`
+	proto, v := compileSpectralSpecializationTestProgram(t, src)
+	defer v.Close()
+	fn := findTestProtoByName(proto, "affine_many_kernel")
+	if fn == nil {
+		t.Fatal("missing affine_many_kernel proto")
+	}
+	if _, ok := soaAffineManyLiteralSpecForProto(fn, 3); !ok {
+		t.Fatalf("soa affineMany literal specialization did not recognize bytecode:\n%s", Disassemble(fn))
+	}
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatal(err)
+	}
+	soa := mustBenchParticleSoA(t, 4)
+	stats := runtime.EnableRuntimePathStats()
+	defer runtime.DisableRuntimePathStats()
+	if _, err := v.CallValue(v.GetGlobal("affine_many_kernel"), []runtime.Value{
+		runtime.SoAValue(soa),
+		runtime.FloatValue(2),
+		runtime.FloatValue(1),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := runtimeRuntimeSpecializationHitCount(stats, RuntimeSpecializationRouteCallSiteNoResult, "soa_affine_many_literal"); got != 1 {
+		t.Fatalf("soa_affine_many_literal hit count = %d, want 1", got)
+	}
+	x, y := testSoAColumns(t, soa)
+	if math.Abs(x[0]-1.22) > 1e-12 || math.Abs(x[3]-1.22006) > 1e-12 {
+		t.Fatalf("x = %v, want affine vx*2+1", x)
+	}
+	if math.Abs(y[0]-1.44) > 1e-12 || math.Abs(y[3]-1.44012) > 1e-12 {
+		t.Fatalf("y = %v, want affine vy*2+1", y)
+	}
+}
+
 func TestSoAColumnAffineUpdateSupportsI64SourceColumn(t *testing.T) {
 	proto, v := compileSpectralSpecializationTestProgram(t, soaAffineUpdateSource)
 	defer v.Close()
