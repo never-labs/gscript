@@ -57,40 +57,14 @@ func collectStaticTableLenFacts(fn *Function) map[int][]staticTableLenFact {
 			if instr == nil {
 				continue
 			}
-			switch instr.Op {
-			case OpNewTable:
+			switch {
+			case opIsStaticTableLenBuilder(instr.Op):
 				newTables[instr.ID] = true
-			case OpSetList:
-				if len(instr.Args) < 1 || instr.Args[0] == nil {
-					continue
-				}
-				for _, arg := range instr.Args[1:] {
-					if arg != nil && newTables[arg.ID] {
-						invalid[arg.ID] = true
-					}
-				}
-				tableID := instr.Args[0].ID
-				if !newTables[tableID] || invalid[tableID] {
-					continue
-				}
-				end := instr.Aux + int64(len(instr.Args)-1) - 1
-				if end < 0 {
-					continue
-				}
-				facts[tableID] = append(facts[tableID], staticTableLenFact{
-					blockID: block.ID,
-					instrID: instr.ID,
-					length:  end,
-				})
-			case OpSetTable, OpAppend:
-				if len(instr.Args) >= 1 && instr.Args[0] != nil {
-					invalid[instr.Args[0].ID] = true
-				}
-				for _, arg := range instr.Args[1:] {
-					if arg != nil && newTables[arg.ID] {
-						invalid[arg.ID] = true
-					}
-				}
+			case opIsStaticTableLenInitializer(instr.Op):
+				recordStaticTableLenInitializer(block, instr, newTables, invalid, facts)
+			case opIsStaticTableLenInvalidator(instr.Op):
+				invalidateStaticTableLenFirstArg(instr, invalid)
+				invalidateStaticTableLenValueArgs(instr, newTables, invalid)
 			default:
 				if opIsCallLikeFactBarrier(instr.Op) {
 					for _, arg := range instr.Args {
@@ -112,6 +86,43 @@ func collectStaticTableLenFacts(fn *Function) map[int][]staticTableLenFact {
 		delete(facts, tableID)
 	}
 	return facts
+}
+
+func recordStaticTableLenInitializer(block *Block, instr *Instr, newTables map[int]bool, invalid map[int]bool, facts map[int][]staticTableLenFact) {
+	if block == nil || instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil {
+		return
+	}
+	invalidateStaticTableLenValueArgs(instr, newTables, invalid)
+	tableID := instr.Args[0].ID
+	if !newTables[tableID] || invalid[tableID] {
+		return
+	}
+	end := instr.Aux + int64(len(instr.Args)-1) - 1
+	if end < 0 {
+		return
+	}
+	facts[tableID] = append(facts[tableID], staticTableLenFact{
+		blockID: block.ID,
+		instrID: instr.ID,
+		length:  end,
+	})
+}
+
+func invalidateStaticTableLenFirstArg(instr *Instr, invalid map[int]bool) {
+	if instr != nil && len(instr.Args) >= 1 && instr.Args[0] != nil {
+		invalid[instr.Args[0].ID] = true
+	}
+}
+
+func invalidateStaticTableLenValueArgs(instr *Instr, newTables map[int]bool, invalid map[int]bool) {
+	if instr == nil {
+		return
+	}
+	for _, arg := range instr.Args[1:] {
+		if arg != nil && newTables[arg.ID] {
+			invalid[arg.ID] = true
+		}
+	}
 }
 
 func staticTableLenBenignUse(instr *Instr, tableID int) bool {

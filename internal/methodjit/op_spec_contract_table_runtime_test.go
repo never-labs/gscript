@@ -61,6 +61,18 @@ func TestTableRuntimeTypeContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s static table len benign-use contract should be driven by OpSpec", op)
 		}
 	}
+	if spec, ok := OpNewTable.Spec(); !ok || !spec.StaticTableLenBuilder || !opIsStaticTableLenBuilder(OpNewTable) {
+		t.Fatalf("%s static table len builder contract should be driven by OpSpec", OpNewTable)
+	}
+	if spec, ok := OpSetList.Spec(); !ok || !spec.StaticTableLenInitializer || !opIsStaticTableLenInitializer(OpSetList) {
+		t.Fatalf("%s static table len initializer contract should be driven by OpSpec", OpSetList)
+	}
+	for _, op := range []Op{OpSetTable, OpAppend} {
+		spec, ok := op.Spec()
+		if !ok || !spec.StaticTableLenInvalidator || !opIsStaticTableLenInvalidator(op) {
+			t.Fatalf("%s static table len invalidator contract should be driven by OpSpec", op)
+		}
+	}
 	for _, tc := range []struct {
 		op  Op
 		typ Type

@@ -61,6 +61,29 @@ func TestStaticTableLenFold_RejectsDynamicLengthMutation(t *testing.T) {
 	}
 }
 
+func TestStaticTableLenFold_RejectsAppendMutation(t *testing.T) {
+	fn := &Function{Proto: &vm.FuncProto{Name: "static_table_len_append"}, NumRegs: 1}
+	b := &Block{ID: 0, defs: make(map[int]*Value)}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+
+	tbl := &Instr{ID: fn.newValueID(), Op: OpNewTable, Type: TypeTable, Block: b}
+	val := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 1, Block: b}
+	setList := &Instr{ID: fn.newValueID(), Op: OpSetList, Type: TypeUnknown, Aux: 1, Args: []*Value{tbl.Value(), val.Value()}, Block: b}
+	appendInstr := &Instr{ID: fn.newValueID(), Op: OpAppend, Type: TypeUnknown, Args: []*Value{tbl.Value(), val.Value()}, Block: b}
+	ln := &Instr{ID: fn.newValueID(), Op: OpLen, Type: TypeInt, Args: []*Value{tbl.Value()}, Block: b}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Type: TypeUnknown, Args: []*Value{ln.Value()}, Block: b}
+	b.Instrs = []*Instr{tbl, val, setList, appendInstr, ln, ret}
+
+	out, err := StaticTableLenFoldPass(fn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ln.Op != OpLen {
+		t.Fatalf("Len folded despite Append mutation:\n%s", Print(out))
+	}
+}
+
 func TestStaticTableLenFold_RejectsTablePassedToCall(t *testing.T) {
 	fn := &Function{Proto: &vm.FuncProto{Name: "static_table_len_call"}, NumRegs: 1}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}

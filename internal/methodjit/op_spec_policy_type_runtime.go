@@ -85,3 +85,16 @@ var opStaticTableLenBenignUsePolicies = [...]bool{
 	OpGetTable:         true,
 	OpTableArrayHeader: true,
 }
+
+var opStaticTableLenBuilderPolicies = [...]bool{
+	OpNewTable: true,
+}
+
+var opStaticTableLenInitializerPolicies = [...]bool{
+	OpSetList: true,
+}
+
+var opStaticTableLenInvalidatorPolicies = [...]bool{
+	OpSetTable: true,
+	OpAppend:   true,
+}

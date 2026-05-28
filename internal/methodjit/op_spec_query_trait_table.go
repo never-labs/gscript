@@ -81,6 +81,21 @@ func opIsStaticTableLenBenignUse(op Op) bool {
 	return ok && spec.StaticTableLenBenignUse
 }
 
+func opIsStaticTableLenBuilder(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.StaticTableLenBuilder
+}
+
+func opIsStaticTableLenInitializer(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.StaticTableLenInitializer
+}
+
+func opIsStaticTableLenInvalidator(op Op) bool {
+	spec, ok := op.Spec()
+	return ok && spec.StaticTableLenInvalidator
+}
+
 func tableArrayKeyArgIndex(op Op) (int, bool) {
 	spec, ok := op.Spec()
 	return spec.TableArrayKeyArgIndex, ok && spec.TableArrayKeyArgIndex >= 0

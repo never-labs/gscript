@@ -147,6 +147,9 @@ type OpSpec struct {
 	PureNumericUnknownValue    bool
 	TableArraySwapPureBetween  bool
 	StaticTableLenBenignUse    bool
+	StaticTableLenBuilder      bool
+	StaticTableLenInitializer  bool
+	StaticTableLenInvalidator  bool
 	FixedResultType            Type
 	ProvesNonNilResult         bool
 	GuardProvenResultType      Type

@@ -26,6 +26,15 @@ func applyOpSpecTypeRuntimePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opStaticTableLenBenignUsePolicies) {
 		spec.StaticTableLenBenignUse = opStaticTableLenBenignUsePolicies[op]
 	}
+	if int(op) < len(opStaticTableLenBuilderPolicies) {
+		spec.StaticTableLenBuilder = opStaticTableLenBuilderPolicies[op]
+	}
+	if int(op) < len(opStaticTableLenInitializerPolicies) {
+		spec.StaticTableLenInitializer = opStaticTableLenInitializerPolicies[op]
+	}
+	if int(op) < len(opStaticTableLenInvalidatorPolicies) {
+		spec.StaticTableLenInvalidator = opStaticTableLenInvalidatorPolicies[op]
+	}
 }
 
 func applyOpSpecTypeResultPolicies(op Op, spec *OpSpec) {
