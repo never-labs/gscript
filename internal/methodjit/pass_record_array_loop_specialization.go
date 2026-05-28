@@ -12,13 +12,21 @@ type tableFieldUpdatePair struct {
 // and field stores. The generated op is parameterized by a runtime-built
 // RecordArrayLoopSpecializationSpec rather than by source-program identity.
 func RecordArrayLoopSpecializationPass(fn *Function) (*Function, error) {
+	return recordArrayLoopSpecializationPass(fn, functionLoopSpecializationFacts(fn))
+}
+
+func RecordArrayLoopSpecializationPassCtx(ctx *PassContext) (*Function, error) {
+	return recordArrayLoopSpecializationPass(ctx.Func(), ctx.LoopSpecialization())
+}
+
+func recordArrayLoopSpecializationPass(fn *Function, loopFacts *LoopSpecializationFacts) (*Function, error) {
 	if fn == nil {
 		return fn, nil
 	}
 	fn.ensureAnalysis()
 	changed := false
 	for _, header := range append([]*Block(nil), fn.Blocks...) {
-		if lowerRecordArrayLoopSpecialization(fn, header) {
+		if lowerRecordArrayLoopSpecialization(fn, header, loopFacts) {
 			changed = true
 		}
 	}
@@ -28,8 +36,8 @@ func RecordArrayLoopSpecializationPass(fn *Function) (*Function, error) {
 	return fn, nil
 }
 
-func lowerRecordArrayLoopSpecialization(fn *Function, header *Block) bool {
-	if fn == nil || header == nil || len(header.Preds) != 2 || len(header.Succs) != 2 {
+func lowerRecordArrayLoopSpecialization(fn *Function, header *Block, loopFacts *LoopSpecializationFacts) bool {
+	if fn == nil || header == nil || loopFacts == nil || len(header.Preds) != 2 || len(header.Succs) != 2 {
 		return false
 	}
 	var next, limit *Value
@@ -65,7 +73,7 @@ func lowerRecordArrayLoopSpecialization(fn *Function, header *Block) bool {
 	}
 	spec.specialization.Cache = &RecordArrayLoopSpecializationCache{}
 	fn.RecordArrayLoopCaches = append(fn.RecordArrayLoopCaches, spec.specialization.Cache)
-	functionLoopSpecializationFacts(fn).SetRecordArrayLoopSpecialization(op.ID, spec.specialization)
+	loopFacts.SetRecordArrayLoopSpecialization(op.ID, spec.specialization)
 	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Block: header}
 	header.Instrs = []*Instr{op, ret}
 	header.Preds = []*Block{pre}
