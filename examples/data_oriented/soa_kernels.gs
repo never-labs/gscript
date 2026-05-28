@@ -72,6 +72,8 @@ check("compact/filter keeps alignment", soa.len(moving) == 3 && soa.column(movin
 // Masked aggregate spelling: reduce the hot column directly over the mask
 // when the compacted rows are not needed downstream.
 check("masked aggregate sumWhere", soa.sumWhere(points, "velocity", movingMask) == 70)
+check("masked aggregate minWhere", soa.minWhere(points, "velocity", movingMask) == 10)
+check("masked aggregate maxWhere", soa.maxWhere(points, "velocity", movingMask) == 40)
 check("masked aggregate countWhere", soa.countWhere(points, movingMask) == 3)
 
 columns := soa.unzip(points)

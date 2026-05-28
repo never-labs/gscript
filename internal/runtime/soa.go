@@ -415,6 +415,36 @@ func (s *SoA) SumWhere(columnName string, mask *DenseArray) (Value, error) {
 	return col.SumWhere(mask)
 }
 
+func (s *SoA) MinWhere(columnName string, mask *DenseArray) (Value, error) {
+	col, err := s.maskedAggregateColumn("soa minWhere", columnName, mask)
+	if err != nil {
+		return NilValue(), err
+	}
+	return col.MinWhere(mask)
+}
+
+func (s *SoA) MaxWhere(columnName string, mask *DenseArray) (Value, error) {
+	col, err := s.maskedAggregateColumn("soa maxWhere", columnName, mask)
+	if err != nil {
+		return NilValue(), err
+	}
+	return col.MaxWhere(mask)
+}
+
+func (s *SoA) maskedAggregateColumn(op, columnName string, mask *DenseArray) (*DenseArray, error) {
+	if s == nil {
+		return nil, fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return nil, fmt.Errorf("%s mask must be a bool dense array", op)
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return nil, fmt.Errorf("soa column %q not found", columnName)
+	}
+	return col, nil
+}
+
 func (s *SoA) numericColumns(dstName, srcName string) (*DenseArray, *DenseArray, error) {
 	if s == nil {
 		return nil, nil, fmt.Errorf("soa is nil")

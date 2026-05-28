@@ -91,6 +91,8 @@ filtered := soa.filter(points, []bool{true, false, true})
 compacted := soa.compact(points, []bool{false, true, true})
 gathered := soa.gather(points, []i64{3, 1})
 maskedSum := soa.sumWhere(points, "x", []bool{true, false, true})
+maskedMin := soa.minWhere(points, "x", []bool{true, false, true})
+maskedMax := soa.maxWhere(points, "x", []bool{true, false, true})
 maskedCount := soa.countWhere(points, []bool{true, false, true})
 `); err != nil {
 		t.Fatal(err)
@@ -116,6 +118,12 @@ maskedCount := soa.countWhere(points, []bool{true, false, true})
 	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("gathered").SoA(), "x")), []float64{3, 1})
 	if got := interp.GetGlobal("maskedSum"); !got.IsFloat() || got.Float() != 4 {
 		t.Fatalf("maskedSum = %v, want 4", got)
+	}
+	if got := interp.GetGlobal("maskedMin"); !got.IsFloat() || got.Float() != 1 {
+		t.Fatalf("maskedMin = %v, want 1", got)
+	}
+	if got := interp.GetGlobal("maskedMax"); !got.IsFloat() || got.Float() != 3 {
+		t.Fatalf("maskedMax = %v, want 3", got)
 	}
 	if got := interp.GetGlobal("maskedCount"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("maskedCount = %v, want 2", got)
@@ -250,6 +258,20 @@ func TestSoASliceFilterAndUnzipCopyColumns(t *testing.T) {
 	if !sum.IsFloat() || sum.Float() != 4 {
 		t.Fatalf("SumWhere = %s, want 4", sum.String())
 	}
+	min, err := s.MinWhere("x", mask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !min.IsFloat() || min.Float() != 1 {
+		t.Fatalf("MinWhere = %s, want 1", min.String())
+	}
+	max, err := s.MaxWhere("x", mask)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !max.IsFloat() || max.Float() != 3 {
+		t.Fatalf("MaxWhere = %s, want 3", max.String())
+	}
 	count, err := s.CountWhere(mask)
 	if err != nil {
 		t.Fatal(err)
@@ -280,6 +302,8 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	affineMany := lib.RawGetString("affineMany").GoFunction()
 	sum := lib.RawGetString("sum").GoFunction()
 	sumWhere := lib.RawGetString("sumWhere").GoFunction()
+	minWhere := lib.RawGetString("minWhere").GoFunction()
+	maxWhere := lib.RawGetString("maxWhere").GoFunction()
 	countWhere := lib.RawGetString("countWhere").GoFunction()
 	if unzip == nil || unzip.FastArg1 == nil {
 		t.Fatal("soa.unzip FastArg1 is nil")
@@ -313,6 +337,12 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if sumWhere == nil || sumWhere.FastArg3 == nil {
 		t.Fatal("soa.sumWhere FastArg3 is nil")
+	}
+	if minWhere == nil || minWhere.FastArg3 == nil {
+		t.Fatal("soa.minWhere FastArg3 is nil")
+	}
+	if maxWhere == nil || maxWhere.FastArg3 == nil {
+		t.Fatal("soa.maxWhere FastArg3 is nil")
 	}
 	if countWhere == nil || countWhere.FastArg2 == nil {
 		t.Fatal("soa.countWhere FastArg2 is nil")
@@ -370,6 +400,20 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if got.Number() != 50 {
 		t.Fatalf("soa.sumWhere FastArg3 = %s, want 50", got.String())
+	}
+	got, err = minWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number() != 13 {
+		t.Fatalf("soa.minWhere FastArg3 = %s, want 13", got.String())
+	}
+	got, err = maxWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number() != 37 {
+		t.Fatalf("soa.maxWhere FastArg3 = %s, want 37", got.String())
 	}
 	got, err = countWhere.FastArg2(soaValue, DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {

@@ -179,8 +179,15 @@ mask := []bool{true, false, true}
 total := soa.sumWhere(points, "x", mask)
 ```
 
-Future aggregate-family helpers may include `soa.minWhere`, `soa.maxWhere`,
-and similar reducers.
+### `soa.minWhere(s, column, mask) -> number`
+
+Returns the minimum numeric column value over mask-true rows. It errors if no
+rows are selected.
+
+### `soa.maxWhere(s, column, mask) -> number`
+
+Returns the maximum numeric column value over mask-true rows. It errors if no
+rows are selected.
 
 ### `soa.countWhere(s, mask) -> integer`
 
@@ -211,8 +218,7 @@ Returns the number of mask-true rows without materializing a filtered SoA.
 - Columns cannot be appended, removed, or resized through the `soa` API yet.
 - `soa.zip` does not deep-copy columns. It keeps the provided dense arrays.
 - Row views are copies, not live proxies.
-- Additional masked aggregate helpers beyond `sumWhere` and `countWhere` are
-  reserved directions and are not available yet.
+- Additional masked aggregate helpers can follow the same `*Where` contract.
 - `soa.slice`, `soa.filter`, and `soa.unzip` copy dense columns rather than
   returning zero-copy views.
 - The current fast path is a portable runtime kernel layer. Direct SIMD/native

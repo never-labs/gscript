@@ -478,6 +478,36 @@ func count_where_kernel(cols, mask) {
 	}
 }
 
+func BenchmarkSoAStdlibMinWhere(b *testing.B) {
+	benchmarkSoAMaskedColumnAggregate(b, "minWhere")
+}
+
+func BenchmarkSoAStdlibMaxWhere(b *testing.B) {
+	benchmarkSoAMaskedColumnAggregate(b, "maxWhere")
+}
+
+func benchmarkSoAMaskedColumnAggregate(b *testing.B, name string) {
+	src := `
+func aggregate_where_kernel(cols, mask) {
+    return soa.` + name + `(cols, "x", mask)
+}
+`
+	v, fn := compileBenchmarkFunction(b, src, "aggregate_where_kernel")
+	defer v.Close()
+	soa := mustBenchParticleSoA(b, 32768)
+	mask := runtime.NewDenseArrayBool(makeAlternatingMask(32768))
+	args := []runtime.Value{runtime.SoAValue(soa), runtime.DenseArrayValue(mask)}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		results, err := v.CallValue(fn, args)
+		if err != nil {
+			b.Fatal(err)
+		}
+		benchmarkFloatSink = results[0].Number()
+	}
+}
+
 func BenchmarkDenseArraySumVMFallback(b *testing.B) {
 	src := `
 func sum_loop(cols) {

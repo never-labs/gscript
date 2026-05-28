@@ -329,6 +329,64 @@ func (a *DenseArray) SumWhere(mask *DenseArray) (Value, error) {
 	}
 }
 
+func (a *DenseArray) MinWhere(mask *DenseArray) (Value, error) {
+	return a.extremeWhere(mask, false)
+}
+
+func (a *DenseArray) MaxWhere(mask *DenseArray) (Value, error) {
+	return a.extremeWhere(mask, true)
+}
+
+func (a *DenseArray) extremeWhere(mask *DenseArray, max bool) (Value, error) {
+	if a == nil || mask == nil {
+		return NilValue(), ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return NilValue(), fmt.Errorf("dense array min/max mask must be bool")
+	}
+	if a.Len() != mask.Len() {
+		return NilValue(), ErrDenseArrayLength
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		var out float64
+		seen := false
+		for i, keep := range mask.bools {
+			if !keep {
+				continue
+			}
+			v := a.f64[i]
+			if !seen || (max && v > out) || (!max && v < out) {
+				out = v
+				seen = true
+			}
+		}
+		if !seen {
+			return NilValue(), ErrDenseArrayEmpty
+		}
+		return FloatValue(out), nil
+	case DenseArrayI64:
+		var out int64
+		seen := false
+		for i, keep := range mask.bools {
+			if !keep {
+				continue
+			}
+			v := a.i64[i]
+			if !seen || (max && v > out) || (!max && v < out) {
+				out = v
+				seen = true
+			}
+		}
+		if !seen {
+			return NilValue(), ErrDenseArrayEmpty
+		}
+		return IntValue(out), nil
+	default:
+		return NilValue(), ErrDenseArrayDType
+	}
+}
+
 func denseArrayOneBasedIndex(index int64, length int) (int, error) {
 	if index < 1 || index > int64(length) {
 		return 0, fmt.Errorf("dense array index out of range")

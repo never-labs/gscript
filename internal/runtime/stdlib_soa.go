@@ -271,22 +271,28 @@ func buildSoALib() *Table {
 	}, soaSumValue)
 
 	setFastArg3("sumWhere", func(args []Value) ([]Value, error) {
-		s, err := requireSoAArg("soa.sumWhere", args, 0)
-		if err != nil {
-			return nil, err
-		}
-		if len(args) < 2 || !args[1].IsString() {
-			return nil, fmt.Errorf("soa.sumWhere: argument 2 must be a string")
-		}
-		if len(args) < 3 || !args[2].IsDenseArray() {
-			return nil, fmt.Errorf("soa.sumWhere: argument 3 must be a bool dense array")
-		}
-		v, err := s.SumWhere(args[1].Str(), args[2].DenseArray())
+		v, err := soaMaskedAggregateArgs("soa.sumWhere", args, (*SoA).SumWhere)
 		if err != nil {
 			return nil, err
 		}
 		return []Value{v}, nil
 	}, soaSumWhereValue)
+
+	setFastArg3("minWhere", func(args []Value) ([]Value, error) {
+		v, err := soaMaskedAggregateArgs("soa.minWhere", args, (*SoA).MinWhere)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaMinWhereValue)
+
+	setFastArg3("maxWhere", func(args []Value) ([]Value, error) {
+		v, err := soaMaskedAggregateArgs("soa.maxWhere", args, (*SoA).MaxWhere)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaMaxWhereValue)
 
 	setFastArg2("countWhere", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.countWhere", args, 0)
@@ -324,6 +330,20 @@ func requireSoAKernelArgs(name string, args []Value) (dst, src string, scale flo
 		return "", "", 0, fmt.Errorf("%s: argument 4 must be numeric", name)
 	}
 	return args[1].Str(), args[2].Str(), args[3].Number(), nil
+}
+
+func soaMaskedAggregateArgs(name string, args []Value, fn func(*SoA, string, *DenseArray) (Value, error)) (Value, error) {
+	s, err := requireSoAArg(name, args, 0)
+	if err != nil {
+		return NilValue(), err
+	}
+	if len(args) < 2 || !args[1].IsString() {
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a string", name)
+	}
+	if len(args) < 3 || !args[2].IsDenseArray() {
+		return NilValue(), fmt.Errorf("%s: argument 3 must be a bool dense array", name)
+	}
+	return fn(s, args[1].Str(), args[2].DenseArray())
 }
 
 func soaAddScaledValue(soaValue, dstValue, srcValue, scaleValue Value) (Value, error) {
@@ -469,16 +489,28 @@ func soaGatherValue(soaValue, indicesValue Value) (Value, error) {
 }
 
 func soaSumWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
+	return soaMaskedAggregateValue("soa.sumWhere", soaValue, columnValue, maskValue, (*SoA).SumWhere)
+}
+
+func soaMinWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
+	return soaMaskedAggregateValue("soa.minWhere", soaValue, columnValue, maskValue, (*SoA).MinWhere)
+}
+
+func soaMaxWhereValue(soaValue, columnValue, maskValue Value) (Value, error) {
+	return soaMaskedAggregateValue("soa.maxWhere", soaValue, columnValue, maskValue, (*SoA).MaxWhere)
+}
+
+func soaMaskedAggregateValue(name string, soaValue, columnValue, maskValue Value, fn func(*SoA, string, *DenseArray) (Value, error)) (Value, error) {
 	if !soaValue.IsSoA() {
-		return NilValue(), fmt.Errorf("soa.sumWhere: argument 1 must be soa")
+		return NilValue(), fmt.Errorf("%s: argument 1 must be soa", name)
 	}
 	if !columnValue.IsString() {
-		return NilValue(), fmt.Errorf("soa.sumWhere: argument 2 must be a string")
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a string", name)
 	}
 	if !maskValue.IsDenseArray() {
-		return NilValue(), fmt.Errorf("soa.sumWhere: argument 3 must be a bool dense array")
+		return NilValue(), fmt.Errorf("%s: argument 3 must be a bool dense array", name)
 	}
-	return soaValue.SoA().SumWhere(columnValue.Str(), maskValue.DenseArray())
+	return fn(soaValue.SoA(), columnValue.Str(), maskValue.DenseArray())
 }
 
 func soaCountWhereValue(soaValue, maskValue Value) (Value, error) {

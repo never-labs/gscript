@@ -216,13 +216,15 @@ Current API contract:
 | `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
 | `soa.sumWhere(s, column, mask)` | Reduces a numeric dense column over mask-true rows without compacting all columns first. |
+| `soa.minWhere(s, column, mask)` | Returns the minimum numeric dense-column value over mask-true rows. |
+| `soa.maxWhere(s, column, mask)` | Returns the maximum numeric dense-column value over mask-true rows. |
 | `soa.countWhere(s, mask)` | Counts mask-true rows without compacting all columns first. |
 
 Reserved array-programming API shape:
 
 | API | Intended contract |
 |---|---|
-| Additional aggregate-family helpers | `soa.minWhere` and `soa.maxWhere` should follow `soa.sumWhere` semantics without building row tables. |
+| Additional aggregate-family helpers | Future reducers should follow `soa.sumWhere` semantics without building row tables. |
 
 Hot path guidance:
 
