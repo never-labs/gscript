@@ -12,11 +12,15 @@ const boolFillFlagNoStrideOverflow int64 = 1
 // Dynamic stride loops are admitted only when range analysis proves a positive
 // stride; codegen still guards kind and bounds and falls back through RawSetInt.
 func BoolTableFillLoopPass(fn *Function) (*Function, error) {
-	if fn == nil {
-		return fn, nil
+	if fn != nil {
+		fn.ensureAnalysis()
 	}
-	fn.ensureAnalysis()
-	return boolTableFillLoopPass(fn, functionNumericFacts(fn))
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
+		nil,
+		nil,
+	)
+	return BoolTableFillLoopPassCtx(newPassContext(fn, nil, allowed, false))
 }
 
 func BoolTableFillLoopPassCtx(ctx *PassContext) (*Function, error) {

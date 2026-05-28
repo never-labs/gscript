@@ -12,11 +12,15 @@ package methodjit
 // The generated op has a guarded packed-bool native path; the TieringManager
 // table-exit path resumes with VM table-get semantics for guard misses.
 func BoolTableCountLoopPass(fn *Function) (*Function, error) {
-	if fn == nil {
-		return fn, nil
+	if fn != nil {
+		fn.ensureAnalysis()
 	}
-	fn.ensureAnalysis()
-	return boolTableCountLoopPass(fn, functionNumericFacts(fn))
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactIntRanges),
+		nil,
+		nil,
+	)
+	return BoolTableCountLoopPassCtx(newPassContext(fn, nil, allowed, false))
 }
 
 func BoolTableCountLoopPassCtx(ctx *PassContext) (*Function, error) {

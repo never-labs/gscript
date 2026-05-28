@@ -4,11 +4,15 @@ package methodjit
 // table comes from a dominating SetList construction and RangeAnalysis proves
 // the key stays inside the constructed array length.
 func TableArrayStaticBoundsPass(fn *Function) (*Function, error) {
-	if fn == nil {
-		return fn, nil
+	if fn != nil {
+		fn.ensureAnalysis()
 	}
-	fn.ensureAnalysis()
-	return tableArrayStaticBoundsPass(fn, functionNumericFacts(fn), functionLoopSpecializationFacts(fn))
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactIntRanges),
+		analysisFacts(AnalysisFactTableArrayBoundsSafe),
+		nil,
+	)
+	return TableArrayStaticBoundsPassCtx(newPassContext(fn, nil, allowed, false))
 }
 
 func TableArrayStaticBoundsPassCtx(ctx *PassContext) (*Function, error) {

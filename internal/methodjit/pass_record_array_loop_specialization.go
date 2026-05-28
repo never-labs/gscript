@@ -12,7 +12,15 @@ type tableFieldUpdatePair struct {
 // and field stores. The generated op is parameterized by a runtime-built
 // RecordArrayLoopSpecializationSpec rather than by source-program identity.
 func RecordArrayLoopSpecializationPass(fn *Function) (*Function, error) {
-	return recordArrayLoopSpecializationPass(fn, functionLoopSpecializationFacts(fn))
+	if fn != nil {
+		fn.ensureAnalysis()
+	}
+	allowed := allowedDomainsForModule(
+		analysisFacts(AnalysisFactFixedShapeTables, AnalysisFactCallABIs),
+		analysisFacts(AnalysisFactRecordArrayLoopSpecialization, AnalysisFactRecordArrayLoopCaches),
+		nil,
+	)
+	return RecordArrayLoopSpecializationPassCtx(newPassContext(fn, nil, allowed, false))
 }
 
 func RecordArrayLoopSpecializationPassCtx(ctx *PassContext) (*Function, error) {
