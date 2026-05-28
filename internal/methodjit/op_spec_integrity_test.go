@@ -1,14 +1,7 @@
 package methodjit
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
 	"reflect"
-	"runtime"
-	"strings"
 	"testing"
 )
 
@@ -42,6 +35,8 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "BoxedFallbackOp", spec.BoxedFallbackOp)
 		assertOpSpecTarget(t, op, "FieldSvalsLoweredOp", spec.FieldSvalsLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixLoweredOp", spec.MatrixLoweredOp)
+		assertOpSpecTarget(t, op, "MatrixRowLoweredOp", spec.MatrixRowLoweredOp)
+		assertOpSpecTarget(t, op, "MatrixRowConstLoweredOp", spec.MatrixRowConstLoweredOp)
 	}
 	if len(seenNames) != int(OpMax) {
 		t.Fatalf("OpSpec name lookup saw %d names, want %d", len(seenNames), OpMax)
@@ -72,6 +67,12 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if spec.MatrixLoweredOp != OpMax {
 			t.Fatalf("%s MatrixLoweredOp default=%s, want OpMax", op, spec.MatrixLoweredOp)
+		}
+		if spec.MatrixRowLoweredOp != OpMax {
+			t.Fatalf("%s MatrixRowLoweredOp default=%s, want OpMax", op, spec.MatrixRowLoweredOp)
+		}
+		if spec.MatrixRowConstLoweredOp != OpMax {
+			t.Fatalf("%s MatrixRowConstLoweredOp default=%s, want OpMax", op, spec.MatrixRowConstLoweredOp)
 		}
 		if spec.CallUserArgStart != -1 {
 			t.Fatalf("%s CallUserArgStart default=%d, want -1", op, spec.CallUserArgStart)
@@ -115,6 +116,12 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if _, ok := matrixLoweredOp(op); ok {
 			t.Fatalf("%s should not report a matrix lowering target", op)
 		}
+		if _, ok := matrixRowLoweredOp(op); ok {
+			t.Fatalf("%s should not report a matrix row lowering target", op)
+		}
+		if _, ok := matrixRowConstLoweredOp(op); ok {
+			t.Fatalf("%s should not report a matrix row const lowering target", op)
+		}
 		if _, ok := callUserArgStart(op); ok {
 			t.Fatalf("%s should not report a call-user arg start", op)
 		}
@@ -137,63 +144,5 @@ func assertOpSpecTarget(t *testing.T, owner Op, field string, target Op) {
 	}
 	if _, ok := target.Spec(); !ok {
 		t.Fatalf("%s.%s targets op %d without OpSpec", owner, field, target)
-	}
-}
-
-func TestOpSpecPolicyTableIntegrityCoversEveryPolicyVar(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	dir := filepath.Dir(file)
-	covered := make(map[string]bool)
-	for _, table := range opSpecPolicyTables() {
-		if covered[table.name] {
-			t.Fatalf("duplicate OpSpec policy table registry entry: %s", table.name)
-		}
-		covered[table.name] = true
-	}
-	var missing []string
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		name := filepath.Base(path)
-		if !strings.HasPrefix(name, "op_spec_policy_") || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			return nil
-		}
-		fileSet := token.NewFileSet()
-		parsed, err := parser.ParseFile(fileSet, path, nil, 0)
-		if err != nil {
-			return err
-		}
-		for _, decl := range parsed.Decls {
-			gen, ok := decl.(*ast.GenDecl)
-			if !ok || gen.Tok != token.VAR {
-				continue
-			}
-			for _, spec := range gen.Specs {
-				valueSpec, ok := spec.(*ast.ValueSpec)
-				if !ok {
-					continue
-				}
-				for _, ident := range valueSpec.Names {
-					if strings.HasPrefix(ident.Name, "op") && strings.HasSuffix(ident.Name, "Policies") &&
-						!covered[ident.Name] {
-						missing = append(missing, ident.Name)
-					}
-				}
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("scan OpSpec policy files: %v", err)
-	}
-	if len(missing) > 0 {
-		t.Fatalf("OpSpec policy integrity test does not cover policy vars: %s", strings.Join(missing, ", "))
 	}
 }

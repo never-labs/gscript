@@ -31,6 +31,12 @@ func applyOpSpecValueMatrixPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opMatrixLoweredOpPolicies) && opMatrixLoweredOpPolicies[op].Set {
 		spec.MatrixLoweredOp = opMatrixLoweredOpPolicies[op].Op
 	}
+	if int(op) < len(opMatrixRowLoweredOpPolicies) && opMatrixRowLoweredOpPolicies[op].Set {
+		spec.MatrixRowLoweredOp = opMatrixRowLoweredOpPolicies[op].Op
+	}
+	if int(op) < len(opMatrixRowConstLoweredOpPolicies) && opMatrixRowConstLoweredOpPolicies[op].Set {
+		spec.MatrixRowConstLoweredOp = opMatrixRowConstLoweredOpPolicies[op].Op
+	}
 }
 
 func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {

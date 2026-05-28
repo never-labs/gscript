@@ -36,6 +36,8 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opRawFloatResultPolicies", opRawFloatResultPolicies},
 		{"opMatrixNativePolicies", opMatrixNativePolicies},
 		{"opMatrixLoweredOpPolicies", opMatrixLoweredOpPolicies},
+		{"opMatrixRowLoweredOpPolicies", opMatrixRowLoweredOpPolicies},
+		{"opMatrixRowConstLoweredOpPolicies", opMatrixRowConstLoweredOpPolicies},
 		{"opTableArrayGPRInvariantPolicies", opTableArrayGPRInvariantPolicies},
 		{"opTableArrayGPRInvariantRankPolicies", opTableArrayGPRInvariantRankPolicies},
 		{"opTableArrayGPRInvariantUseMaskPolicies", opTableArrayGPRInvariantUseMaskPolicies},

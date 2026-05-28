@@ -19,3 +19,13 @@ var opMatrixLoweredOpPolicies = [...]opTargetPolicy{
 	OpMatrixGetF: {Op: OpMatrixLoadFAt, Set: true},
 	OpMatrixSetF: {Op: OpMatrixStoreFAt, Set: true},
 }
+
+var opMatrixRowLoweredOpPolicies = [...]opTargetPolicy{
+	OpMatrixLoadFAt:  {Op: OpMatrixLoadFRow, Set: true},
+	OpMatrixStoreFAt: {Op: OpMatrixStoreFRow, Set: true},
+}
+
+var opMatrixRowConstLoweredOpPolicies = [...]opTargetPolicy{
+	OpMatrixLoadFAt:  {Op: OpMatrixLoadFRowConst, Set: true},
+	OpMatrixStoreFAt: {Op: OpMatrixStoreFRowConst, Set: true},
+}

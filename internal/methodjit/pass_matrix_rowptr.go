@@ -64,25 +64,15 @@ func MatrixRowPtrFactoringPass(fn *Function) (*Function, error) {
 				functionRemarks(fn).Add("MatrixRowPtrFactoring", "changed", block.ID, row.ID, OpMatrixRowPtr,
 					"factored repeated dense-matrix row address")
 			}
-			switch instr.Op {
-			case OpMatrixLoadFAt:
-				if col, ok := constIntFromValue(instr.Args[3]); ok && col >= 0 && col <= 4095 {
-					instr.Op = OpMatrixLoadFRowConst
-					instr.Args = []*Value{row.Value()}
-					instr.Aux = col
-				} else {
-					instr.Op = OpMatrixLoadFRow
-					instr.Args = []*Value{row.Value(), instr.Args[3]}
-				}
-			case OpMatrixStoreFAt:
-				if col, ok := constIntFromValue(instr.Args[3]); ok && col >= 0 && col <= 4095 {
-					instr.Op = OpMatrixStoreFRowConst
-					instr.Args = []*Value{row.Value(), instr.Args[4]}
-					instr.Aux = col
-				} else {
-					instr.Op = OpMatrixStoreFRow
-					instr.Args = []*Value{row.Value(), instr.Args[3], instr.Args[4]}
-				}
+			rowOp, _ := matrixRowLoweredOp(instr.Op)
+			rowConstOp, hasRowConstOp := matrixRowConstLoweredOp(instr.Op)
+			if col, ok := constIntFromValue(instr.Args[3]); ok && col >= 0 && col <= 4095 && hasRowConstOp {
+				instr.Op = rowConstOp
+				instr.Aux = col
+				instr.Args = matrixRowConstArgs(row.Value(), instr)
+			} else {
+				instr.Op = rowOp
+				instr.Args = matrixRowArgs(row.Value(), instr)
 			}
 			newInstrs = append(newInstrs, instr)
 		}
@@ -95,16 +85,10 @@ func matrixRowAccessKey(instr *Instr) (matrixRowKey, bool) {
 	if instr == nil {
 		return matrixRowKey{}, false
 	}
-	switch instr.Op {
-	case OpMatrixLoadFAt:
-		if len(instr.Args) < 4 {
-			return matrixRowKey{}, false
-		}
-	case OpMatrixStoreFAt:
-		if len(instr.Args) < 5 {
-			return matrixRowKey{}, false
-		}
-	default:
+	if _, ok := matrixRowLoweredOp(instr.Op); !ok {
+		return matrixRowKey{}, false
+	}
+	if len(instr.Args) < 4 || instr.Op == OpMatrixStoreFAt && len(instr.Args) < 5 {
 		return matrixRowKey{}, false
 	}
 	return matrixRowKey{
@@ -112,4 +96,18 @@ func matrixRowAccessKey(instr *Instr) (matrixRowKey, bool) {
 		strideID: instr.Args[1].ID,
 		rowID:    instr.Args[2].ID,
 	}, true
+}
+
+func matrixRowConstArgs(row *Value, instr *Instr) []*Value {
+	if instr.Op == OpMatrixStoreFRowConst {
+		return []*Value{row, instr.Args[4]}
+	}
+	return []*Value{row}
+}
+
+func matrixRowArgs(row *Value, instr *Instr) []*Value {
+	if instr.Op == OpMatrixStoreFRow {
+		return []*Value{row, instr.Args[3], instr.Args[4]}
+	}
+	return []*Value{row, instr.Args[3]}
 }

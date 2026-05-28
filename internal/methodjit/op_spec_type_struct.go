@@ -49,6 +49,8 @@ type OpSpec struct {
 	RawFloatResult                    bool
 	MatrixNative                      bool
 	MatrixLoweredOp                   Op
+	MatrixRowLoweredOp                Op
+	MatrixRowConstLoweredOp           Op
 	TableArrayGPRInvariant            bool
 	TableArrayGPRInvariantRank        int
 	TableArrayGPRInvariantUseMask     uint8

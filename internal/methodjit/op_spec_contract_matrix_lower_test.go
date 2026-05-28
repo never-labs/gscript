@@ -20,3 +20,30 @@ func TestMatrixLoweringTargetsLiveInOpSpec(t *testing.T) {
 		t.Fatalf("MatrixLoadFAt matrix lowered op = %s, %v; want OpMax, false", lowered, ok)
 	}
 }
+
+func TestMatrixRowLoweringTargetsLiveInOpSpec(t *testing.T) {
+	cases := []struct {
+		op       Op
+		row      Op
+		rowConst Op
+	}{
+		{OpMatrixLoadFAt, OpMatrixLoadFRow, OpMatrixLoadFRowConst},
+		{OpMatrixStoreFAt, OpMatrixStoreFRow, OpMatrixStoreFRowConst},
+	}
+	for _, tc := range cases {
+		got, ok := matrixRowLoweredOp(tc.op)
+		if !ok || got != tc.row {
+			t.Fatalf("%s matrix row lowered op = %s, %v; want %s, true", tc.op, got, ok, tc.row)
+		}
+		gotConst, ok := matrixRowConstLoweredOp(tc.op)
+		if !ok || gotConst != tc.rowConst {
+			t.Fatalf("%s matrix row const lowered op = %s, %v; want %s, true", tc.op, gotConst, ok, tc.rowConst)
+		}
+	}
+	if lowered, ok := matrixRowLoweredOp(OpMatrixGetF); ok || lowered != OpMax {
+		t.Fatalf("MatrixGetF matrix row lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
+	if lowered, ok := matrixRowConstLoweredOp(OpMatrixGetF); ok || lowered != OpMax {
+		t.Fatalf("MatrixGetF matrix row const lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
+}

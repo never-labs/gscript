@@ -32,6 +32,8 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		CallUserArgStart:                  -1,
 		ExactIntNarrowOp:                  OpMax,
 		MatrixLoweredOp:                   OpMax,
+		MatrixRowLoweredOp:                OpMax,
+		MatrixRowConstLoweredOp:           OpMax,
 		BoxedFallbackOp:                   OpMax,
 	}
 }
