@@ -183,15 +183,15 @@ Current implementation status:
   returning independent dense-column copies;
 - `soa.gather` preserves column alignment while materializing rows from a
   one-based i64 dense index vector;
-- `soa.sumWhere` reduces a numeric column over mask-true rows without
+- `soa.sumWhere`, `soa.minWhere`, `soa.meanWhere`, `soa.maxWhere`,
+  `soa.countWhere`, and `soa.statsWhere` reduce over mask-true rows without
   materializing a filtered SoA first;
 - `soa.shape` exposes layout diagnostics: length, shape version, column names,
   element kinds, column lengths, and column versions;
-- `soa.addScaled`, `soa.affine`, `soa.affineMany`, and `soa.sum` provide fused
-  column kernels over dense columns;
-- the array-programming surface still reserves additional masked aggregate
-  helpers for subset pipelines that should stay columnar instead of
-  materializing row tables;
+- `soa.addScaled`, `soa.affine`, `soa.affineWhere`, `soa.affineMany`, and
+  `soa.sum` provide fused column kernels over dense columns;
+- `soa.compact` is available as the array-programming spelling for
+  `soa.filter`;
 - row access materializes an ordinary table and is intended for boundary code,
   debugging, and tests, not hot loops.
 
@@ -235,14 +235,13 @@ Hot path guidance:
 - use `soa.row` and `soa.setRow` for boundary conversion, debugging, and tests;
 - batch independent column updates with `soa.affineMany` rather than repeated
   row materialization;
-- for masked aggregates today, prefer `filtered := soa.filter(s, mask)` followed
-  by `soa.sum(filtered, column)`; do not loop through `soa.row` just to test a
-  predicate and accumulate a numeric column;
+- for masked aggregates, prefer `soa.sumWhere` or `soa.statsWhere` over
+  `soa.filter` plus a later aggregate when the compacted rows are not needed;
 - for compact/filter pipelines, build or reuse a bool dense mask, call
   `soa.filter`, then continue with column kernels on the returned independent
   SoA;
-- for future gather-style selection, keep row indexes in a dense integer array
-  and treat the result as an independent SoA that may contain duplicates in the
+- for gather-style selection, keep row indexes in a dense integer array and
+  treat the result as an independent SoA that may contain duplicates in the
   requested order;
 - keep column dtypes and lengths stable so layout and column-version facts stay
   reusable by runtime specialization;
@@ -253,8 +252,7 @@ Current limitations:
 
 - there is no parser-level SoA syntax and no live row proxy;
 - SoA columns cannot be appended, removed, or resized through the `soa` API yet;
-- `soa.gather`, `soa.compact`, and fused masked aggregate helpers are reserved
-  API directions and are not implemented in the current stdlib surface;
+- `soa.zip` keeps the provided dense arrays rather than deep-copying them;
 - `soa.slice`, `soa.filter`, and `soa.unzip` copy columns instead of creating
   zero-copy views;
 - direct SIMD/native loop-body emission is still future work; current kernels

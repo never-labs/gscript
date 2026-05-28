@@ -1,14 +1,16 @@
 # GScript Benchmark Suite
 
-15 benchmarks covering compute, recursion, table/array, function calls, strings, and closures.
+Benchmarks cover core suite, extended workloads, anti-overfit variants,
+official-case hot paths, and data-oriented SoA kernels.
 
 ## Recommended Entry Points
 
 ```bash
 # Optimization timing: current worktree vs clean HEAD vs LuaJIT.
 # This is the default entry point for deciding whether a local optimization
-# is real. It supports suite/extended/variants/official, calibrated repeats,
-# confidence intervals, parameter scaling, and explicit timing sources.
+# is real. It supports suite/extended/variants/official/data_oriented,
+# calibrated repeats, confidence intervals, parameter scaling, and explicit
+# timing sources.
 python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
   --time-source=auto --min-sample-seconds=0.100 --max-repeat=128 \
   --sort=luajit-gap \
