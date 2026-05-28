@@ -1,6 +1,8 @@
 package methodjit
 
 import (
+	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -48,4 +50,30 @@ func TestPrintOpAuditMatrix(t *testing.T) {
 		t.Fatalf("matrix header missing expected columns:\n%s", matrix)
 	}
 	t.Logf("\n%s", matrix)
+}
+
+func TestWriteOpAuditMatrixJSON(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteOpAuditMatrixJSON(&buf); err != nil {
+		t.Fatalf("WriteOpAuditMatrixJSON: %v", err)
+	}
+	var rows []OpAuditRow
+	if err := json.Unmarshal(buf.Bytes(), &rows); err != nil {
+		t.Fatalf("unmarshal audit JSON: %v\n%s", err, buf.String())
+	}
+	if len(rows) != int(OpMax) {
+		t.Fatalf("audit JSON rows=%d, want %d", len(rows), OpMax)
+	}
+	if rows[0].Name == "" || rows[0].Validator == "" {
+		t.Fatalf("first audit JSON row missing expected fields: %+v", rows[0])
+	}
+	var raw []map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &raw); err != nil {
+		t.Fatalf("unmarshal raw audit JSON: %v", err)
+	}
+	for _, key := range []string{"op", "name", "validator", "builder", "oracle", "emitter", "regalloc", "deopt"} {
+		if _, ok := raw[0][key]; !ok {
+			t.Fatalf("audit JSON first row missing key %q: %v", key, raw[0])
+		}
+	}
 }

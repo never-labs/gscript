@@ -39,6 +39,7 @@ type diagProtoStats struct {
 	PipelineStages      []PipelineStageTiming `json:"pipeline_stages,omitempty"`
 	ModuleContracts     []Tier2ModuleContract `json:"module_contracts,omitempty"`
 	ModuleReasons       []Tier2ModuleReason   `json:"module_reasons,omitempty"`
+	OpAudit             []OpAuditRow          `json:"op_audit,omitempty"`
 }
 
 // TestDiagDump writes diagnostic artifacts for one benchmark to disk. It
@@ -90,6 +91,7 @@ func TestDiagDump(t *testing.T) {
 				PipelineStages:      art.PipelineStages,
 				ModuleContracts:     art.ModuleContracts,
 				ModuleReasons:       art.ModuleReasons,
+				OpAudit:             art.OpAudit,
 			})
 			continue
 		}
@@ -180,6 +182,7 @@ func diagArtifactIRContent(art *DiagArtifact) string {
 	irContent += "--- Pipeline summary ---\n" + FormatPipelineStageTimings(art.PipelineStages) + "\n"
 	irContent += "--- Module contracts ---\n" + FormatTier2ModuleContracts(art.ModuleContracts) + "\n"
 	irContent += "--- Module reasons ---\n" + FormatTier2ModuleReasons(art.ModuleReasons) + "\n"
+	irContent += "--- Op audit ---\n" + FormatOpAuditMatrix() + "\n"
 	irContent += "--- IR (after full Tier 2 pipeline) ---\n" + art.IRAfter
 	return irContent
 }
@@ -196,6 +199,7 @@ func diagStatsFromArtifact(art *DiagArtifact) diagProtoStats {
 		PipelineStages:      art.PipelineStages,
 		ModuleContracts:     art.ModuleContracts,
 		ModuleReasons:       art.ModuleReasons,
+		OpAudit:             append([]OpAuditRow(nil), art.OpAudit...),
 	}
 }
 
@@ -223,6 +227,7 @@ func TestDiagDumpArtifactIncludesModuleContractsAndReasons(t *testing.T) {
 				Reason:     "range facts changed",
 			},
 		},
+		OpAudit: []OpAuditRow{{Name: "Yield", Oracle: "unsupported(coroutine)"}},
 	}
 
 	ir := diagArtifactIRContent(art)
@@ -233,6 +238,8 @@ func TestDiagDumpArtifactIncludesModuleContractsAndReasons(t *testing.T) {
 		"provides:",
 		"--- Module reasons ---",
 		`reason="range facts changed"`,
+		"--- Op audit ---",
+		"unsupported(coroutine)",
 	} {
 		if !strings.Contains(ir, want) {
 			t.Fatalf("diag IR content missing %q:\n%s", want, ir)
@@ -245,6 +252,9 @@ func TestDiagDumpArtifactIncludesModuleContractsAndReasons(t *testing.T) {
 	}
 	if len(stats.ModuleReasons) != 1 || stats.ModuleReasons[0].Reason != "range facts changed" {
 		t.Fatalf("stats missing module reasons: %+v", stats.ModuleReasons)
+	}
+	if len(stats.OpAudit) != 1 || stats.OpAudit[0].Name != "Yield" {
+		t.Fatalf("stats missing op audit: %+v", stats.OpAudit)
 	}
 }
 

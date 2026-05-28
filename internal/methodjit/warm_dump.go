@@ -67,6 +67,7 @@ type WarmDumpRecord struct {
 
 type warmDumpManifest struct {
 	ProtoFilter string                  `json:"proto_filter,omitempty"`
+	OpAudit     []OpAuditRow            `json:"op_audit,omitempty"`
 	Protos      []warmDumpProtoManifest `json:"protos"`
 }
 
@@ -261,7 +262,7 @@ func (s *WarmDumpSession) write(tm *TieringManager, top *vm.FuncProto) error {
 	}
 
 	protos := collectWarmDumpProtos(top)
-	manifest := warmDumpManifest{ProtoFilter: s.protoName}
+	manifest := warmDumpManifest{ProtoFilter: s.protoName, OpAudit: OpAuditMatrix()}
 	pcMap := warmDumpPCMap{Version: 1, ProtoFilter: s.protoName}
 	var symbolLines []string
 	usedNames := make(map[string]int)

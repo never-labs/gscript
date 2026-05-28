@@ -1,19 +1,21 @@
 package methodjit
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
 type OpAuditRow struct {
-	Op        Op
-	Name      string
-	Validator string
-	Builder   string
-	Oracle    string
-	Emitter   string
-	Regalloc  string
-	Deopt     string
+	Op        Op     `json:"op"`
+	Name      string `json:"name"`
+	Validator string `json:"validator"`
+	Builder   string `json:"builder"`
+	Oracle    string `json:"oracle"`
+	Emitter   string `json:"emitter"`
+	Regalloc  string `json:"regalloc"`
+	Deopt     string `json:"deopt"`
 }
 
 func OpAuditMatrix() []OpAuditRow {
@@ -67,6 +69,12 @@ func FormatOpAuditMatrix() string {
 		)
 	}
 	return b.String()
+}
+
+func WriteOpAuditMatrixJSON(w io.Writer) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(OpAuditMatrix())
 }
 
 func writeOpAuditRow(b *strings.Builder, widths []int, cols ...string) {

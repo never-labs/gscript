@@ -67,6 +67,7 @@ type DiagArtifact struct {
 	ModuleContracts     []Tier2ModuleContract
 	ModuleReasons       []Tier2ModuleReason
 	ModuleFactDiffs     []Tier2ModuleFactDiff
+	OpAudit             []OpAuditRow
 	CompiledCode        []byte         // copy of cf.Code bytes
 	InsnCount           int            // total ARM64 instructions
 	InsnHistogram       map[string]int // class -> count
@@ -106,6 +107,7 @@ func (tm *TieringManager) CompileForDiagnostics(proto *vm.FuncProto) (*DiagArtif
 		ModuleContracts:     moduleContractsFromRuns(trace.ModuleRuns),
 		ModuleReasons:       moduleReasonsFromRuns(trace.ModuleRuns),
 		ModuleFactDiffs:     moduleFactDiffsFromRuns(trace.ModuleRuns),
+		OpAudit:             OpAuditMatrix(),
 		CompileErr:          err,
 	}
 

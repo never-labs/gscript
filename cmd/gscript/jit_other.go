@@ -20,3 +20,7 @@ func cliEnableJIT(_ *bytecodevm.VM, opts jitCLIOptions) (jitStatsReporter, error
 func cliPrintMethodJITOpAudit(_ io.Writer) error {
 	return fmt.Errorf("MethodJIT op audit unavailable on this platform")
 }
+
+func cliPrintMethodJITOpAuditJSON(_ io.Writer) error {
+	return fmt.Errorf("MethodJIT op audit unavailable on this platform")
+}

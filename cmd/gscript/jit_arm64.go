@@ -40,6 +40,10 @@ func cliPrintMethodJITOpAudit(w io.Writer) error {
 	return err
 }
 
+func cliPrintMethodJITOpAuditJSON(w io.Writer) error {
+	return methodjit.WriteOpAuditMatrixJSON(w)
+}
+
 // tieringManagerReporter adapts *methodjit.TieringManager to the jitStatsReporter
 // interface used by the CLI's -jit-stats flag.
 type tieringManagerReporter struct {

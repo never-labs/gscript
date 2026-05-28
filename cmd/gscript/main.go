@@ -78,6 +78,7 @@ func main() {
 	tier2SpecStateJSON := flag.Bool("tier2-spec-state-json", false, "print Tier 2 specialization/version state as JSON after execution")
 	tier2SpecWorklistJSON := flag.Bool("tier2-spec-worklist-json", false, "print prioritized Tier 2 self-driving worklist as JSON after execution")
 	jitOpAudit := flag.Bool("jit-op-audit", false, "print MethodJIT op audit matrix and exit")
+	jitOpAuditJSON := flag.Bool("jit-op-audit-json", false, "print MethodJIT op audit matrix as JSON and exit")
 	coroutineStats := flag.Bool("coroutine-stats", false, "print VM coroutine runtime statistics after execution")
 	pathStats := flag.Bool("runtime-path-stats", false, "print runtime path counters after execution")
 	pathStatsJSON := flag.Bool("runtime-path-stats-json", false, "print runtime path counters as JSON after execution")
@@ -85,6 +86,13 @@ func main() {
 
 	if *jitOpAudit {
 		if err := cliPrintMethodJITOpAudit(os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *jitOpAuditJSON {
+		if err := cliPrintMethodJITOpAuditJSON(os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
