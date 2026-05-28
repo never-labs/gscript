@@ -85,7 +85,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("hash", TableValue(buildHashLib()))
 
 	// --- File system & paths ---
-	interp.globals.Define("fs", TableValue(buildFSLib()))
+	interp.globals.Define("fs", TableValue(buildFSLib(interp.filesystemRoot)))
 	interp.globals.Define("path", TableValue(buildPathLib()))
 
 	// --- Time & networking ---

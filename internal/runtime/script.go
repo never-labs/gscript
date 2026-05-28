@@ -78,7 +78,15 @@ func (interp *Interpreter) EvalString(src string, options ...ScriptOption) ([]Va
 
 // LoadFile parses a file and returns a callable chunk without running it.
 func (interp *Interpreter) LoadFile(filename string, options ...ScriptOption) (Value, error) {
+	if !interp.filesystemEnabled {
+		return NilValue(), fmt.Errorf("filesystem access disabled")
+	}
 	filename = interp.resolveScriptPath(filename)
+	resolved, err := interp.resolveFilesystemPath(filename)
+	if err != nil {
+		return NilValue(), err
+	}
+	filename = resolved
 	src, err := os.ReadFile(filename)
 	if err != nil {
 		return NilValue(), fmt.Errorf("cannot open %s: %s", filename, err)

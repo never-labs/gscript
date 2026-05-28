@@ -677,8 +677,16 @@ func (interp *Interpreter) registerBuiltins() {
 				interp.markPackageLoaded(name, module)
 				return []Value{module}, nil
 			}
+			if !interp.moduleLoading {
+				return nil, fmt.Errorf("module loading disabled")
+			}
 
 			filename := interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+			resolved, err := interp.resolveFilesystemPath(filename)
+			if err != nil {
+				return nil, err
+			}
+			filename = resolved
 			if _, err := os.Stat(filename); err != nil {
 				return nil, fmt.Errorf("module '%s' not found", name)
 			}
@@ -702,6 +710,9 @@ func (interp *Interpreter) registerBuiltins() {
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) < 1 || !args[0].IsString() {
 				return nil, fmt.Errorf("bad argument #1 to 'dofile' (string expected)")
+			}
+			if !interp.filesystemEnabled {
+				return nil, fmt.Errorf("filesystem access disabled")
 			}
 			filename := args[0].Str()
 			return interp.RunFile(filename)
@@ -731,6 +742,9 @@ func (interp *Interpreter) registerBuiltins() {
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) < 1 || !args[0].IsString() {
 				return nil, fmt.Errorf("bad argument #1 to 'loadfile' (string expected)")
+			}
+			if !interp.filesystemEnabled {
+				return []Value{NilValue(), StringValue("filesystem access disabled")}, nil
 			}
 			var opt Value
 			if len(args) >= 2 {

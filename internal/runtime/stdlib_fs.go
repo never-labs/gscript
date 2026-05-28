@@ -5,10 +5,49 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
+func (interp *Interpreter) resolveFilesystemPath(path string) (string, error) {
+	return resolveSandboxPath(interp.filesystemRoot, path)
+}
+
+func resolveSandboxPath(root, path string) (string, error) {
+	if root == "" {
+		return path, nil
+	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	absRoot = filepath.Clean(absRoot)
+	var candidate string
+	if filepath.IsAbs(path) {
+		candidate = filepath.Clean(path)
+	} else {
+		candidate = filepath.Clean(filepath.Join(absRoot, path))
+	}
+	absCandidate, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", err
+	}
+	absCandidate = filepath.Clean(absCandidate)
+	if absCandidate == absRoot {
+		return absCandidate, nil
+	}
+	prefix := absRoot + string(os.PathSeparator)
+	if strings.HasPrefix(absCandidate, prefix) {
+		return absCandidate, nil
+	}
+	return "", fmt.Errorf("filesystem access denied: path escapes root")
+}
+
 // buildFSLib creates the "fs" standard library table.
-func buildFSLib() *Table {
+func buildFSLib(roots ...string) *Table {
+	root := ""
+	if len(roots) > 0 {
+		root = roots[0]
+	}
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -23,8 +62,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.exists' (string expected)")
 		}
-		p := args[0].Str()
-		_, err := os.Stat(p)
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{BoolValue(false)}, nil
+		}
+		_, err = os.Stat(p)
 		return []Value{BoolValue(err == nil)}, nil
 	})
 
@@ -33,7 +75,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.isfile' (string expected)")
 		}
-		info, err := os.Stat(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{BoolValue(false)}, nil
+		}
+		info, err := os.Stat(p)
 		if err != nil {
 			return []Value{BoolValue(false)}, nil
 		}
@@ -45,7 +91,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.isdir' (string expected)")
 		}
-		info, err := os.Stat(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{BoolValue(false)}, nil
+		}
+		info, err := os.Stat(p)
 		if err != nil {
 			return []Value{BoolValue(false)}, nil
 		}
@@ -57,7 +107,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.stat' (string expected)")
 		}
-		info, err := os.Stat(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		info, err := os.Stat(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -76,7 +130,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.readfile' (string expected)")
 		}
-		data, err := os.ReadFile(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		data, err := os.ReadFile(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -88,7 +146,11 @@ func buildFSLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.writefile' (path and content expected)")
 		}
-		err := os.WriteFile(args[0].Str(), []byte(args[1].Str()), 0644)
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.WriteFile(p, []byte(args[1].Str()), 0644)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -100,7 +162,11 @@ func buildFSLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.appendfile' (path and content expected)")
 		}
-		f, err := os.OpenFile(args[0].Str(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -117,7 +183,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.remove' (string expected)")
 		}
-		err := os.Remove(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.Remove(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -129,7 +199,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.removeAll' (string expected)")
 		}
-		err := os.RemoveAll(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.RemoveAll(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -141,7 +215,15 @@ func buildFSLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'fs.rename' (oldpath and newpath expected)")
 		}
-		err := os.Rename(args[0].Str(), args[1].Str())
+		oldPath, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		newPath, err := resolveSandboxPath(root, args[1].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.Rename(oldPath, newPath)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -153,7 +235,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.mkdir' (string expected)")
 		}
-		err := os.Mkdir(args[0].Str(), 0755)
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.Mkdir(p, 0755)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -165,7 +251,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.mkdirAll' (string expected)")
 		}
-		err := os.MkdirAll(args[0].Str(), 0755)
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.MkdirAll(p, 0755)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -177,7 +267,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.readdir' (string expected)")
 		}
-		entries, err := os.ReadDir(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		entries, err := os.ReadDir(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -202,7 +296,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.glob' (string expected)")
 		}
-		matches, err := filepath.Glob(args[0].Str())
+		pattern, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		matches, err := filepath.Glob(pattern)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -219,7 +317,14 @@ func buildFSLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'fs.copy' (src and dst expected)")
 		}
 		srcPath := args[0].Str()
-		dstPath := args[1].Str()
+		srcPath, err := resolveSandboxPath(root, srcPath)
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		dstPath, err := resolveSandboxPath(root, args[1].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
 
 		srcFile, err := os.Open(srcPath)
 		if err != nil {
@@ -242,6 +347,13 @@ func buildFSLib() *Table {
 
 	// fs.tempdir() -> string
 	set("tempdir", func(args []Value) ([]Value, error) {
+		if root != "" {
+			p, err := resolveSandboxPath(root, ".")
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{StringValue(p)}, nil
+		}
 		return []Value{StringValue(os.TempDir())}, nil
 	})
 
@@ -251,6 +363,16 @@ func buildFSLib() *Table {
 		prefix := ""
 		if len(args) >= 1 && !args[0].IsNil() {
 			dir = args[0].Str()
+		}
+		if root != "" {
+			if dir == "" {
+				dir = "."
+			}
+			resolvedDir, err := resolveSandboxPath(root, dir)
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			dir = resolvedDir
 		}
 		if len(args) >= 2 && !args[1].IsNil() {
 			prefix = args[1].Str()
@@ -266,6 +388,13 @@ func buildFSLib() *Table {
 
 	// fs.cwd() -> string or nil, errMsg
 	set("cwd", func(args []Value) ([]Value, error) {
+		if root != "" {
+			p, err := resolveSandboxPath(root, ".")
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			return []Value{StringValue(p)}, nil
+		}
 		dir, err := os.Getwd()
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -278,7 +407,11 @@ func buildFSLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'fs.chdir' (string expected)")
 		}
-		err := os.Chdir(args[0].Str())
+		p, err := resolveSandboxPath(root, args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		err = os.Chdir(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}

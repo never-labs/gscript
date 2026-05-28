@@ -20,7 +20,8 @@ type VM struct {
 // New creates a new GScript VM with the given options.
 func New(opts ...Option) *VM {
 	o := vmOptions{
-		libs: LibAll,
+		libs:         LibAll,
+		capabilities: CapAll,
 	}
 	for _, opt := range opts {
 		opt(&o)
@@ -32,6 +33,9 @@ func newVM(o vmOptions) *VM {
 	interp := runtime.New()
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)
+	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
+	interp.SetFilesystemRoot(o.filesystemRoot)
+	interp.SetFilesystemEnabled(o.capabilities&CapFilesystem != 0)
 	if o.maxSteps > 0 {
 		interp.SetMaxSteps(o.maxSteps)
 		o.useJIT = false
@@ -129,6 +133,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetStringMeta(vm.interp.StringMeta())
 			bvm.SetScriptDir(vm.interp.ScriptDir())
 			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
+			vm.applyBytecodeCapabilities(bvm)
 			if vm.opts.maxSteps > 0 {
 				bvm.SetMaxSteps(vm.opts.maxSteps)
 			}
@@ -157,6 +162,30 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 		return err
 	}
 	return nil
+}
+
+func (vm *VM) applyBytecodeCapabilities(bvm *bytecodevm.VM) {
+	if vm.opts.capabilities&CapModuleLoading == 0 || vm.opts.filesystemRoot != "" {
+		vm.copyInterpreterGlobalToBytecode(bvm, "require")
+	}
+	if vm.opts.capabilities&CapFilesystem == 0 {
+		for _, name := range []string{"fs", "dofile", "loadfile"} {
+			bvm.DeleteGlobal(name)
+		}
+	} else if vm.opts.filesystemRoot != "" {
+		for _, name := range []string{"dofile", "loadfile"} {
+			vm.copyInterpreterGlobalToBytecode(bvm, name)
+		}
+	}
+}
+
+func (vm *VM) copyInterpreterGlobalToBytecode(bvm *bytecodevm.VM, name string) {
+	val := vm.interp.GetGlobal(name)
+	if val.IsNil() {
+		bvm.DeleteGlobal(name)
+		return
+	}
+	bvm.SetGlobal(name, val)
 }
 
 func stdlibAllowedNames(libs LibFlags) map[string]bool {

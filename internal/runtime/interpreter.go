@@ -15,6 +15,9 @@ type Interpreter struct {
 	modules           map[string]Value // require() cache
 	stringMeta        *Table           // metatable for string values (__index → string lib)
 	scriptDir         string           // directory of the main script (for require path resolution)
+	moduleLoading     bool             // require() may load .gs files from the filesystem
+	filesystemEnabled bool             // script-side file APIs may access the filesystem
+	filesystemRoot    string           // optional root for script-side filesystem access
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -32,10 +35,12 @@ type Interpreter struct {
 // New creates a new Interpreter with built-in globals.
 func New() *Interpreter {
 	interp := &Interpreter{
-		globals:   NewEnvironment(nil),
-		modules:   make(map[string]Value),
-		gcMode:    "incremental",
-		gcRunning: true,
+		globals:           NewEnvironment(nil),
+		modules:           make(map[string]Value),
+		gcMode:            "incremental",
+		gcRunning:         true,
+		moduleLoading:     true,
+		filesystemEnabled: true,
 	}
 	interp.registerBuiltins()
 	interp.registerStdlib()
@@ -103,6 +108,40 @@ func (interp *Interpreter) SetScriptDir(dir string) {
 // ScriptDir returns the directory used for relative script/module loading.
 func (interp *Interpreter) ScriptDir() string {
 	return interp.scriptDir
+}
+
+// SetModuleLoading controls whether require() may load .gs files from the
+// filesystem. Requiring already-registered stdlib modules remains controlled by
+// RestrictStdlib.
+func (interp *Interpreter) SetModuleLoading(enabled bool) {
+	interp.moduleLoading = enabled
+}
+
+// SetFilesystemEnabled controls script-side filesystem APIs such as fs,
+// dofile, and loadfile.
+func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
+	interp.filesystemEnabled = enabled
+	if enabled {
+		return
+	}
+	interp.globals.Delete("fs")
+	delete(interp.modules, "fs")
+	interp.markPackageLoaded("fs", NilValue())
+	interp.globals.Delete("dofile")
+	interp.globals.Delete("loadfile")
+}
+
+// SetFilesystemRoot confines script-side file paths to root when root is not
+// empty. It refreshes fs in place so existing package.loaded.fs references see
+// the same policy.
+func (interp *Interpreter) SetFilesystemRoot(root string) {
+	interp.filesystemRoot = root
+	if v, ok := interp.globals.Get("fs"); ok && v.IsTable() {
+		fs := TableValue(buildFSLib(root))
+		interp.globals.Define("fs", fs)
+		interp.modules["fs"] = fs
+		interp.markPackageLoaded("fs", fs)
+	}
 }
 
 func (interp *Interpreter) builtinModule(name string) (Value, bool) {

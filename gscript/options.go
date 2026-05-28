@@ -77,13 +77,30 @@ const (
 		LibTime | LibRand
 )
 
+// CapabilityFlags controls host capabilities that are separate from selecting
+// which standard-library tables exist.
+type CapabilityFlags uint64
+
+const (
+	CapModuleLoading CapabilityFlags = 1 << iota // require() may load .gs files from the host filesystem
+	CapFilesystem                                // script file APIs may access the host filesystem
+
+	// CapAll enables every host capability (default, for compatibility).
+	CapAll = CapModuleLoading | CapFilesystem
+
+	// CapSafe disables host filesystem-backed capabilities.
+	CapSafe CapabilityFlags = 0
+)
+
 type vmOptions struct {
-	libs        LibFlags
-	requirePath string
-	maxSteps    int64
-	printFunc   func(args ...interface{})
-	useVM       bool // use bytecode VM instead of tree-walker
-	useJIT      bool // enable JIT compilation (implies useVM)
+	libs           LibFlags
+	capabilities   CapabilityFlags
+	requirePath    string
+	filesystemRoot string
+	maxSteps       int64
+	printFunc      func(args ...interface{})
+	useVM          bool // use bytecode VM instead of tree-walker
+	useJIT         bool // enable JIT compilation (implies useVM)
 }
 
 // Option configures a VM instance.
@@ -93,6 +110,57 @@ type Option func(*vmOptions)
 // Default: LibAll
 func WithLibs(libs LibFlags) Option {
 	return func(o *vmOptions) { o.libs = libs }
+}
+
+// WithCapabilities sets which host capabilities are available to scripts.
+// Default: CapAll. Use CapSafe with LibSafe for an in-process sandbox that has
+// no script module loading and no filesystem-backed script APIs.
+func WithCapabilities(caps CapabilityFlags) Option {
+	return func(o *vmOptions) { o.capabilities = caps }
+}
+
+// WithModuleLoading controls whether require() may load .gs files from the
+// host filesystem. Requiring enabled built-in standard libraries is still
+// allowed, because that is controlled by WithLibs.
+func WithModuleLoading(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapModuleLoading
+		} else {
+			o.capabilities &^= CapModuleLoading
+		}
+	}
+}
+
+// WithFilesystem controls filesystem-backed script APIs such as fs, dofile,
+// and loadfile. It does not affect host-side ExecFile/CompileFile calls.
+func WithFilesystem(enabled bool) Option {
+	return func(o *vmOptions) {
+		if enabled {
+			o.capabilities |= CapFilesystem
+		} else {
+			o.capabilities &^= CapFilesystem
+		}
+	}
+}
+
+// WithFilesystemRoot confines fs module paths and script-side file loading to
+// root. Relative script paths are resolved inside root. An empty root leaves
+// filesystem paths unrestricted.
+func WithFilesystemRoot(root string) Option {
+	return func(o *vmOptions) {
+		o.filesystemRoot = root
+		o.capabilities |= CapFilesystem
+	}
+}
+
+// WithSandbox selects the safe standard library set and disables host
+// filesystem-backed capabilities.
+func WithSandbox() Option {
+	return func(o *vmOptions) {
+		o.libs = LibSafe
+		o.capabilities = CapSafe
+	}
 }
 
 // WithRequirePath sets the base directory for require() module loading.

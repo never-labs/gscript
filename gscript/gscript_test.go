@@ -1049,6 +1049,145 @@ func TestWithLibsRestrictsBytecodeVM(t *testing.T) {
 	}
 }
 
+func TestWithSandboxDisablesFilesystemCapabilities(t *testing.T) {
+	vm := gs.New(gs.WithSandbox())
+	if err := vm.Exec(`hasJSON := type(json)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"fs", "dofile", "loadfile"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+	got, err := vm.Get("hasJSON")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "table" {
+		t.Fatalf("hasJSON = %v, want table", got)
+	}
+}
+
+func TestWithModuleLoadingFalseAllowsStdlibRequireButBlocksFileModules(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "helper.gs"), []byte(`return { value: 42 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithRequirePath(dir), gs.WithModuleLoading(false))
+	if err := vm.Exec(`result := type(require("json"))`); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "table" {
+		t.Fatalf("stdlib require result = %v, want table", got)
+	}
+	err = vm.Exec(`require("helper")`)
+	if err == nil || !strings.Contains(err.Error(), "module loading disabled") {
+		t.Fatalf("require helper error = %v, want module loading disabled", err)
+	}
+}
+
+func TestWithModuleLoadingFalseRestrictsBytecodeVM(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "helper.gs"), []byte(`return { value: 42 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithRequirePath(dir), gs.WithModuleLoading(false), gs.WithVM())
+	if err := vm.Exec(`stdlibResult := type(require("json"))`); err != nil {
+		t.Fatalf("stdlib require should still work with module loading disabled: %v", err)
+	}
+	got, err := vm.Get("stdlibResult")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "table" {
+		t.Fatalf("stdlibResult = %v, want table", got)
+	}
+	err = vm.Exec(`require("helper")`)
+	if err == nil {
+		t.Fatal("expected require to fail when module loading is disabled")
+	}
+}
+
+func TestWithFilesystemFalseRemovesFilesystemGlobals(t *testing.T) {
+	vm := gs.New(gs.WithFilesystem(false))
+	for _, name := range []string{"fs", "dofile", "loadfile"} {
+		got, err := vm.Get(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != nil {
+			t.Fatalf("%s = %v, want nil", name, got)
+		}
+	}
+}
+
+func TestWithFilesystemRootConfinesFSModule(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+	if err := os.Mkdir(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "outside.txt"), []byte("outside"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibFS), gs.WithFilesystemRoot(root))
+	if err := vm.Exec(`
+		inside, insideErr := fs.readfile("inside.txt")
+		outside, outsideErr := fs.readfile("../outside.txt")
+	`); err != nil {
+		t.Fatal(err)
+	}
+	inside, err := vm.Get("inside")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inside != "inside" {
+		t.Fatalf("inside = %v, want inside", inside)
+	}
+	outside, err := vm.Get("outside")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outside != nil {
+		t.Fatalf("outside = %v, want nil", outside)
+	}
+	outsideErr, err := vm.Get("outsideErr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg, ok := outsideErr.(string); !ok || !strings.Contains(msg, "escapes root") {
+		t.Fatalf("outsideErr = %v, want escapes root string", outsideErr)
+	}
+}
+
+func TestWithFilesystemRootConfinesBytecodeRequire(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "root")
+	if err := os.Mkdir(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(base, "outside.gs"), []byte(`return { value: 99 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithRequirePath(root), gs.WithFilesystemRoot(root), gs.WithVM())
+	err := vm.Exec(`require("../outside")`)
+	if err == nil || !strings.Contains(err.Error(), "escapes root") {
+		t.Fatalf("require outside error = %v, want escapes root", err)
+	}
+}
+
 func TestEachPublicLibFlagExposesNamedGlobal(t *testing.T) {
 	tests := []struct {
 		name   string
