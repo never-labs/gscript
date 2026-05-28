@@ -664,11 +664,19 @@ found in the reviewed scope. README and docs recommend direct commands:
 ```bash
 go test ./... -count=1 -p 1 -timeout=600s
 scripts/docs_check.sh
+scripts/worktree_audit.sh
 python3 benchmarks/timing_compare.py --all --runs 7 --warmup 2 --timeout 900 --time-source script
 ```
 
 `docs/testing-matrix.md` documents more precise correctness and performance
 commands.
+
+`scripts/worktree_audit.sh` is a read-only guard for agent-heavy local
+development. It reports worktrees that `git worktree list --porcelain` marks as
+prunable, worktrees with tracked or untracked changes, and worktrees whose
+branch is ahead of or behind its upstream. The default mode is informational and
+exits 0; `--fail-on-findings` exits 1 when the audit finds any residue. The
+script never removes or prunes worktrees.
 
 ### Gaps
 
@@ -678,6 +686,8 @@ commands.
   documentation links and release-script command references have
   `scripts/docs_check.sh`.
 - No benchmark guard profile with explicit thresholds for PR vs release.
+- Worktree hygiene is currently a local script rather than part of a canonical
+  CI/developer profile.
 
 ### Recommendations
 
@@ -708,6 +718,7 @@ Suggested profile commands:
 ```bash
 # smoke
 go test ./cmd/... ./gscript ./internal/... ./tests -count=1 -timeout=120s
+scripts/worktree_audit.sh
 
 # pr
 go test ./... -count=1 -p 1 -timeout=600s
