@@ -8,7 +8,12 @@ const callSiteRuntimeSpecializationMinStableObservations = 2
 
 func CallSiteRuntimeSpecializationExitPass(globals map[string]*vm.FuncProto) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return annotateCallSiteRuntimeSpecializationExits(fn, globals, functionCallFacts(fn)), nil
+		allowed := allowedDomainsForModule(
+			analysisFacts(AnalysisFactCallABIs),
+			analysisFacts(AnalysisFactCallSiteNoResultRuntimeSpecializations, AnalysisFactCallSiteNoResultRuntimeSpecializationBatches),
+			nil,
+		)
+		return CallSiteRuntimeSpecializationExitPassCtx(globals)(newPassContext(fn, nil, allowed, false))
 	}
 }
 

@@ -9,7 +9,12 @@ import (
 
 func GuardedConstCallFoldPass(globals map[string]*vm.FuncProto) PassFunc {
 	return func(fn *Function) (*Function, error) {
-		return annotateGuardedConstCallFolds(fn, globals, functionCallFacts(fn)), nil
+		allowed := allowedDomainsForModule(
+			analysisFacts(AnalysisFactCallABIs),
+			analysisFacts(AnalysisFactGuardedConstCallFolds),
+			nil,
+		)
+		return GuardedConstCallFoldPassCtx(globals)(newPassContext(fn, nil, allowed, false))
 	}
 }
 
