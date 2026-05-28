@@ -43,6 +43,21 @@ func applyOpSpecFieldLoadPolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opLoadElimShapeFactKillerPolicies) {
 		spec.LoadElimShapeFactKiller = opLoadElimShapeFactKillerPolicies[op]
 	}
+	if int(op) < len(opLoadElimDynamicTableCacheMutationPolicies) {
+		spec.LoadElimDynamicTableCacheMutation = opLoadElimDynamicTableCacheMutationPolicies[op]
+	}
+	if int(op) < len(opLoadElimTypedArrayFactMutationPolicies) {
+		spec.LoadElimTypedArrayFactMutation = opLoadElimTypedArrayFactMutationPolicies[op]
+	}
+	if int(op) < len(opLoadElimTableCacheKeyArgIndexPolicies) && opLoadElimTableCacheKeyArgIndexPolicies[op] != 0 {
+		spec.LoadElimTableCacheKeyArgIndex = int(opLoadElimTableCacheKeyArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opLoadElimTableCacheValueArgIndexPolicies) && opLoadElimTableCacheValueArgIndexPolicies[op] != 0 {
+		spec.LoadElimTableCacheValueArgIndex = int(opLoadElimTableCacheValueArgIndexPolicies[op]) - 1
+	}
+	if int(op) < len(opLoadElimFactBarrierPolicies) {
+		spec.LoadElimFactBarrier = opLoadElimFactBarrierPolicies[op]
+	}
 }
 
 func applyOpSpecFieldBarrierPolicies(op Op, spec *OpSpec) {

@@ -18,12 +18,12 @@
 // Invalidation rules:
 //   - OpSetField on the same (obj, field) kills the previous entry,
 //     then records the stored value for forwarding.
-//   - OpSetTable / OpAppend / OpSetList on an object kill typed table-array
-//     header/len/data facts for that object, because the array kind, length,
-//     or backing data pointer may change.
-//   - OpCall / OpSelf conservatively clear the entire available map
-//     and the guard available map, because a call could mutate any table
-//     or change runtime types.
+//   - OpSpec load-elim table mutation traits decide which first-arg table ops
+//     kill dynamic table-cache entries and typed table-array header/len/data
+//     facts.
+//   - OpSpec load-elim fact barriers conservatively clear the entire available
+//     map and the guard available map, because they could mutate any table or
+//     change runtime types.
 //
 // R53: CSE for pure ops. OpGetGlobal with the same index is CSE'd within
 // a block (globals' identity is stable during a function's body —
@@ -376,128 +376,27 @@ func LoadEliminationPass(fn *Function) (*Function, error) {
 					// It increased register pressure by extending SSA value
 					// lifetimes in boolean-table loops.
 
-				case OpSetTable:
-					if len(instr.Args) < 3 {
-						continue
-					}
-					// Any SetTable on t invalidates ALL entries for that obj at
-					// non-matching keys (aliasing unknown). Keep only the
-					// just-written entry.
-					objID := instr.Args[0].ID
-					for k := range tableAvail {
-						if k.objID == objID {
-							delete(tableAvail, k)
-							functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-								"SetTable invalidated dynamic-key table cache")
-						}
-					}
-					// Record the stored value for future GetTable(t, k).
-					key := tableKey{objID: objID, keyID: instr.Args[1].ID}
-					tableAvail[key] = instr.Args[2].ID
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"recorded SetTable value for forwarding")
-					if tableArrayFacts.InvalidateTable(objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"table mutation invalidated typed array facts")
-					}
-
-				case OpTableArrayStore:
-					if len(instr.Args) < 5 || instr.Args[0] == nil || instr.Args[3] == nil {
-						continue
-					}
-					objID := instr.Args[0].ID
-					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"typed array store invalidated dynamic-key table cache")
-					}
-					tableAvail[tableKey{objID: objID, keyID: instr.Args[3].ID}] = instr.Args[4].ID
-					functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
-						"recorded typed array store value for forwarding")
-
-				case OpTableArraySwap:
-					if len(instr.Args) < 1 || instr.Args[0] == nil {
-						continue
-					}
-					objID := instr.Args[0].ID
-					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"typed array swap invalidated dynamic-key table cache")
-					}
-
-				case OpTableArraySwapPairs:
-					if len(instr.Args) < 1 || instr.Args[0] == nil {
-						continue
-					}
-					objID := instr.Args[0].ID
-					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"typed array pair-swap specialization invalidated dynamic-key table cache")
-					}
-					if tableArrayFacts.InvalidateTable(objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"typed array pair-swap specialization invalidated typed array facts")
-					}
-
-				case OpTableIntArrayReversePrefix:
-					if len(instr.Args) < 1 || instr.Args[0] == nil {
-						continue
-					}
-					objID := instr.Args[0].ID
-					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"int-array prefix specialization invalidated dynamic-key table cache")
-					}
-					if tableArrayFacts.InvalidateTable(objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"int-array prefix specialization invalidated typed array facts")
-					}
-
-				case OpTableIntArrayCopyPrefix:
-					if len(instr.Args) < 1 || instr.Args[0] == nil {
-						continue
-					}
-					objID := instr.Args[0].ID
-					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"int-array copy specialization invalidated dynamic-key table cache")
-					}
-					if tableArrayFacts.InvalidateTable(objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"int-array copy specialization invalidated typed array facts")
-					}
-
-				case OpAppend, OpSetList:
-					if len(instr.Args) < 1 {
-						continue
-					}
-					objID := instr.Args[0].ID
-					if invalidateDynamicTableCacheForObject(tableAvail, objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"array mutation invalidated dynamic-key table cache")
-					}
-					if tableArrayFacts.InvalidateTable(objID) {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"array mutation invalidated typed array facts")
-					}
-
-				case OpCall, OpResume, OpSelf:
-					// Conservative: a call could mutate any table or change types.
-					if len(available) > 0 || len(guardAvail) > 0 || len(globalConstGuardAvail) > 0 || len(globalAvail) > 0 || len(upvalAvail) > 0 ||
-						len(matrixFlatAvail) > 0 || len(matrixStrideAvail) > 0 || len(tableAvail) > 0 ||
-						!tableArrayFacts.Empty() {
-						functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
-							"call invalidated available load/guard facts")
-					}
-					available = make(map[loadKey]int)
-					guardAvail = make(map[guardKey]int)
-					globalConstGuardAvail = make(map[globalConstGuardKey]bool)
-					globalAvail = make(map[int64]int)
-					upvalAvail = make(map[upvalueKey]int)
-					matrixFlatAvail = make(map[int]int)
-					matrixStrideAvail = make(map[int]int)
-					tableArrayFacts.Reset()
-					tableAvail = make(map[tableKey]int)
 				}
+			}
+
+			applyLoadElimTableMutation(fn, block, instr, tableAvail, &tableArrayFacts)
+			if loadElimFactBarrier(instr) {
+				// Conservative: a call could mutate any table or change types.
+				if len(available) > 0 || len(guardAvail) > 0 || len(globalConstGuardAvail) > 0 || len(globalAvail) > 0 || len(upvalAvail) > 0 ||
+					len(matrixFlatAvail) > 0 || len(matrixStrideAvail) > 0 || len(tableAvail) > 0 ||
+					!tableArrayFacts.Empty() {
+					functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+						"call invalidated available load/guard facts")
+				}
+				available = make(map[loadKey]int)
+				guardAvail = make(map[guardKey]int)
+				globalConstGuardAvail = make(map[globalConstGuardKey]bool)
+				globalAvail = make(map[int64]int)
+				upvalAvail = make(map[upvalueKey]int)
+				matrixFlatAvail = make(map[int]int)
+				matrixStrideAvail = make(map[int]int)
+				tableArrayFacts.Reset()
+				tableAvail = make(map[tableKey]int)
 			}
 
 			if loadElimKillsPureCSE(instr) {
@@ -862,6 +761,35 @@ func invalidateDynamicTableCacheForObject(tableAvail map[tableKey]int, objID int
 		}
 	}
 	return changed
+}
+
+func applyLoadElimTableMutation(fn *Function, block *Block, instr *Instr, tableAvail map[tableKey]int, tableArrayFacts *tableArrayFactSet) {
+	if instr == nil || (!loadElimDynamicTableCacheMutation(instr) && !loadElimTypedArrayFactMutation(instr)) {
+		return
+	}
+	if len(instr.Args) < 1 || instr.Args[0] == nil {
+		return
+	}
+	objID := instr.Args[0].ID
+	if loadElimDynamicTableCacheMutation(instr) {
+		if invalidateDynamicTableCacheForObject(tableAvail, objID) {
+			functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+				"table mutation invalidated dynamic-key table cache")
+		}
+		if keyIdx, hasKey := loadElimTableCacheKeyArgIndex(instr.Op); hasKey {
+			if valueIdx, hasValue := loadElimTableCacheValueArgIndex(instr.Op); hasValue &&
+				len(instr.Args) > keyIdx && len(instr.Args) > valueIdx &&
+				instr.Args[keyIdx] != nil && instr.Args[valueIdx] != nil {
+				tableAvail[tableKey{objID: objID, keyID: instr.Args[keyIdx].ID}] = instr.Args[valueIdx].ID
+				functionRemarks(fn).Add("LoadElim", "changed", block.ID, instr.ID, instr.Op,
+					"recorded table mutation value for forwarding")
+			}
+		}
+	}
+	if loadElimTypedArrayFactMutation(instr) && tableArrayFacts.InvalidateTable(objID) {
+		functionRemarks(fn).Add("LoadElim", "missed", block.ID, instr.ID, instr.Op,
+			"table mutation invalidated typed array facts")
+	}
 }
 
 func pureTypedCSEKey(instr *Instr) (pureCSEKey, bool) {

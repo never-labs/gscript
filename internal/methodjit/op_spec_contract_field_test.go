@@ -136,6 +136,47 @@ func TestLoadElimContractsLiveInOpSpec(t *testing.T) {
 			t.Fatalf("%s should clear shape facts through OpSpec, got %v", op, out)
 		}
 	}
+
+	for _, op := range []Op{OpSetTable, OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs, OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix, OpAppend, OpSetList} {
+		spec, ok := op.Spec()
+		if !ok || !spec.LoadElimDynamicTableCacheMutation || !loadElimDynamicTableCacheMutation(&Instr{Op: op}) {
+			t.Fatalf("%s dynamic table-cache mutation contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpSetTable, OpTableArraySwapPairs, OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix, OpAppend, OpSetList} {
+		spec, ok := op.Spec()
+		if !ok || !spec.LoadElimTypedArrayFactMutation || !loadElimTypedArrayFactMutation(&Instr{Op: op}) {
+			t.Fatalf("%s typed-array fact mutation contract should be driven by OpSpec", op)
+		}
+	}
+	for _, op := range []Op{OpTableArrayStore, OpTableArraySwap} {
+		spec, ok := op.Spec()
+		if !ok || spec.LoadElimTypedArrayFactMutation || loadElimTypedArrayFactMutation(&Instr{Op: op}) {
+			t.Fatalf("%s should preserve typed-array facts on the continuing path", op)
+		}
+	}
+	for _, tc := range []struct {
+		op       Op
+		keyArg   int
+		valueArg int
+	}{
+		{OpSetTable, 1, 2},
+		{OpTableArrayStore, 3, 4},
+	} {
+		spec, ok := tc.op.Spec()
+		keyArg, keyOK := loadElimTableCacheKeyArgIndex(tc.op)
+		valueArg, valueOK := loadElimTableCacheValueArgIndex(tc.op)
+		if !ok || spec.LoadElimTableCacheKeyArgIndex != tc.keyArg || spec.LoadElimTableCacheValueArgIndex != tc.valueArg ||
+			!keyOK || !valueOK || keyArg != tc.keyArg || valueArg != tc.valueArg {
+			t.Fatalf("%s table-cache forwarding arg layout should be driven by OpSpec", tc.op)
+		}
+	}
+	for _, op := range []Op{OpCall, OpResume, OpSelf} {
+		spec, ok := op.Spec()
+		if !ok || !spec.LoadElimFactBarrier || !loadElimFactBarrier(&Instr{Op: op}) {
+			t.Fatalf("%s load-elim fact barrier contract should be driven by OpSpec", op)
+		}
+	}
 }
 
 func TestTypeAndBarrierContractsLiveInOpSpec(t *testing.T) {

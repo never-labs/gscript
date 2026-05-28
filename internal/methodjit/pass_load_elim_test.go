@@ -142,6 +142,85 @@ func TestLoadElimination_TableShapeIDCSE(t *testing.T) {
 	}
 }
 
+func TestLoadElimination_TableMutationTraitsDriveDynamicCache(t *testing.T) {
+	fn := &Function{Proto: &vm.FuncProto{Name: "table_mutation_traits_dynamic_cache"}, NumRegs: 4}
+	b := &Block{ID: 0, defs: make(map[int]*Value)}
+
+	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
+	key1 := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 1, Block: b}
+	val1 := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 11, Block: b}
+	set := &Instr{ID: fn.newValueID(), Op: OpSetTable, Args: []*Value{tbl.Value(), key1.Value(), val1.Value()}, Block: b}
+	get1 := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeAny, Args: []*Value{tbl.Value(), key1.Value()}, Block: b}
+
+	data := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeUnknown, Aux: 1, Block: b}
+	length := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 8, Block: b}
+	key2 := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 2, Block: b}
+	val2 := &Instr{ID: fn.newValueID(), Op: OpConstInt, Type: TypeInt, Aux: 22, Block: b}
+	store := &Instr{ID: fn.newValueID(), Op: OpTableArrayStore, Aux: int64(vm.FBKindInt),
+		Args: []*Value{tbl.Value(), data.Value(), length.Value(), key2.Value(), val2.Value()}, Block: b}
+	get2 := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeAny, Args: []*Value{tbl.Value(), key2.Value()}, Block: b}
+	swap := &Instr{ID: fn.newValueID(), Op: OpTableArraySwap, Aux: int64(vm.FBKindInt),
+		Args: []*Value{tbl.Value(), key1.Value(), key2.Value()}, Block: b}
+	get3 := &Instr{ID: fn.newValueID(), Op: OpGetTable, Type: TypeAny, Args: []*Value{tbl.Value(), key2.Value()}, Block: b}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn, Args: []*Value{get1.Value(), get2.Value(), get3.Value()}, Block: b}
+
+	b.Instrs = []*Instr{tbl, key1, val1, set, get1, data, length, key2, val2, store, get2, swap, get3, ret}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+
+	out, err := LoadEliminationPass(fn)
+	if err != nil {
+		t.Fatalf("LoadEliminationPass error: %v", err)
+	}
+	if ret.Args[0].ID != val1.ID {
+		t.Fatalf("SetTable should forward through dynamic table cache, got v%d want v%d\n%s", ret.Args[0].ID, val1.ID, Print(out))
+	}
+	if ret.Args[1].ID != val2.ID {
+		t.Fatalf("TableArrayStore should forward through dynamic table cache, got v%d want v%d\n%s", ret.Args[1].ID, val2.ID, Print(out))
+	}
+	if ret.Args[2].ID != get3.ID {
+		t.Fatalf("TableArraySwap should invalidate dynamic table cache, got v%d want v%d\n%s", ret.Args[2].ID, get3.ID, Print(out))
+	}
+}
+
+func TestLoadElimination_TableMutationTraitsDriveTypedArrayFacts(t *testing.T) {
+	fn := &Function{Proto: &vm.FuncProto{Name: "table_mutation_traits_typed_array_facts"}, NumRegs: 1}
+	b := &Block{ID: 0, defs: make(map[int]*Value)}
+	kind := int64(vm.FBKindInt)
+
+	tbl := &Instr{ID: fn.newValueID(), Op: OpLoadSlot, Type: TypeTable, Aux: 0, Block: b}
+	h1 := &Instr{ID: fn.newValueID(), Op: OpTableArrayHeader, Type: TypeTable, Aux: kind, Args: []*Value{tbl.Value()}, Block: b}
+	l1 := &Instr{ID: fn.newValueID(), Op: OpTableArrayLen, Type: TypeInt, Aux: kind, Args: []*Value{h1.Value()}, Block: b}
+	d1 := &Instr{ID: fn.newValueID(), Op: OpTableArrayData, Type: TypeUnknown, Aux: kind, Args: []*Value{h1.Value()}, Block: b}
+	swap := &Instr{ID: fn.newValueID(), Op: OpTableArraySwap, Aux: kind, Args: []*Value{tbl.Value()}, Block: b}
+	h2 := &Instr{ID: fn.newValueID(), Op: OpTableArrayHeader, Type: TypeTable, Aux: kind, Args: []*Value{tbl.Value()}, Block: b}
+	l2 := &Instr{ID: fn.newValueID(), Op: OpTableArrayLen, Type: TypeInt, Aux: kind, Args: []*Value{h2.Value()}, Block: b}
+	d2 := &Instr{ID: fn.newValueID(), Op: OpTableArrayData, Type: TypeUnknown, Aux: kind, Args: []*Value{h2.Value()}, Block: b}
+	swapPairs := &Instr{ID: fn.newValueID(), Op: OpTableArraySwapPairs, Aux: kind, Args: []*Value{tbl.Value()}, Block: b}
+	h3 := &Instr{ID: fn.newValueID(), Op: OpTableArrayHeader, Type: TypeTable, Aux: kind, Args: []*Value{tbl.Value()}, Block: b}
+	l3 := &Instr{ID: fn.newValueID(), Op: OpTableArrayLen, Type: TypeInt, Aux: kind, Args: []*Value{h3.Value()}, Block: b}
+	d3 := &Instr{ID: fn.newValueID(), Op: OpTableArrayData, Type: TypeUnknown, Aux: kind, Args: []*Value{h3.Value()}, Block: b}
+	ret := &Instr{ID: fn.newValueID(), Op: OpReturn,
+		Args: []*Value{h2.Value(), l2.Value(), d2.Value(), h3.Value(), l3.Value(), d3.Value()}, Block: b}
+
+	b.Instrs = []*Instr{tbl, h1, l1, d1, swap, h2, l2, d2, swapPairs, h3, l3, d3, ret}
+	fn.Entry = b
+	fn.Blocks = []*Block{b}
+
+	out, err := LoadEliminationPass(fn)
+	if err != nil {
+		t.Fatalf("LoadEliminationPass error: %v", err)
+	}
+	if ret.Args[0].ID != h1.ID || ret.Args[1].ID != l1.ID || ret.Args[2].ID != d1.ID {
+		t.Fatalf("TableArraySwap should preserve typed-array facts, ret args = v%d/v%d/v%d want v%d/v%d/v%d\n%s",
+			ret.Args[0].ID, ret.Args[1].ID, ret.Args[2].ID, h1.ID, l1.ID, d1.ID, Print(out))
+	}
+	if ret.Args[3].ID != h3.ID || ret.Args[4].ID != l3.ID || ret.Args[5].ID != d3.ID {
+		t.Fatalf("TableArraySwapPairs should invalidate typed-array facts, ret args = v%d/v%d/v%d want v%d/v%d/v%d\n%s",
+			ret.Args[3].ID, ret.Args[4].ID, ret.Args[5].ID, h3.ID, l3.ID, d3.ID, Print(out))
+	}
+}
+
 func TestLoadElimination_CrossBlockTableShapeIDCSE(t *testing.T) {
 	fn := &Function{
 		Proto:   &vm.FuncProto{Name: "cross_block_table_shape_id_cse"},

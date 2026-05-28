@@ -25,16 +25,16 @@ type OpSpec struct {
 	RestartVisibleSideEffect         bool
 
 	// Field, shape, and load-elimination contracts.
-	FieldShapeSplitInlineSafe        bool
-	FieldShapePreEffectInlineSafe    bool
-	FieldShapeInlineSideEffect       bool
-	FieldShapePostEffectInlineUnsafe bool
-	GlobalConstUnsafe                bool
-	NestedCallLike                   bool
-	LoadElimConstCSE                 bool
-	LiteralConst                     bool
-	LoadElimPureCSE                  bool
-	LoadElimShapeFactKiller          bool
+	FieldShapeSplitInlineSafe         bool
+	FieldShapePreEffectInlineSafe     bool
+	FieldShapeInlineSideEffect        bool
+	FieldShapePostEffectInlineUnsafe  bool
+	GlobalConstUnsafe                 bool
+	NestedCallLike                    bool
+	LoadElimConstCSE                  bool
+	LiteralConst                      bool
+	LoadElimPureCSE                   bool
+	LoadElimShapeFactKiller           bool
 	LoadElimDynamicTableCacheMutation bool
 	LoadElimTypedArrayFactMutation    bool
 	LoadElimTableCacheKeyArgIndex     int

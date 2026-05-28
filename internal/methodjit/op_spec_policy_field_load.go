@@ -58,3 +58,41 @@ var opLoadElimShapeFactKillerPolicies = [...]bool{
 	OpResume:                     true,
 	OpSelf:                       true,
 }
+
+var opLoadElimDynamicTableCacheMutationPolicies = [...]bool{
+	OpSetTable:                   true,
+	OpTableArrayStore:            true,
+	OpTableArraySwap:             true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpAppend:                     true,
+	OpSetList:                    true,
+}
+
+var opLoadElimTypedArrayFactMutationPolicies = [...]bool{
+	OpSetTable:                   true,
+	OpTableArraySwapPairs:        true,
+	OpTableBoolArrayFill:         true,
+	OpTableIntArrayReversePrefix: true,
+	OpTableIntArrayCopyPrefix:    true,
+	OpAppend:                     true,
+	OpSetList:                    true,
+}
+
+var opLoadElimTableCacheKeyArgIndexPolicies = [...]uint8{
+	OpSetTable:        2,
+	OpTableArrayStore: 4,
+}
+
+var opLoadElimTableCacheValueArgIndexPolicies = [...]uint8{
+	OpSetTable:        3,
+	OpTableArrayStore: 5,
+}
+
+var opLoadElimFactBarrierPolicies = [...]bool{
+	OpCall:   true,
+	OpResume: true,
+	OpSelf:   true,
+}

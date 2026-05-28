@@ -52,6 +52,40 @@ func loadElimFieldFactWideKiller(instr *Instr) bool {
 	return ok && spec.FieldFactWideKiller
 }
 
+func loadElimDynamicTableCacheMutation(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimDynamicTableCacheMutation
+}
+
+func loadElimTypedArrayFactMutation(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimTypedArrayFactMutation
+}
+
+func loadElimTableCacheKeyArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.LoadElimTableCacheKeyArgIndex, ok && spec.LoadElimTableCacheKeyArgIndex >= 0
+}
+
+func loadElimTableCacheValueArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.LoadElimTableCacheValueArgIndex, ok && spec.LoadElimTableCacheValueArgIndex >= 0
+}
+
+func loadElimFactBarrier(instr *Instr) bool {
+	if instr == nil {
+		return false
+	}
+	spec, ok := instr.Op.Spec()
+	return ok && spec.LoadElimFactBarrier
+}
+
 func fieldLenFoldBarrier(instr *Instr) bool {
 	if instr == nil {
 		return false
