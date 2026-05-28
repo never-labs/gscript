@@ -215,6 +215,31 @@ func (s *SoA) AppendRow(row *Table) error {
 	return nil
 }
 
+func (s *SoA) Fill(columnName string, value Value) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return fmt.Errorf("soa column %q not found", columnName)
+	}
+	return col.Fill(value)
+}
+
+func (s *SoA) FillWhere(columnName string, mask *DenseArray, value Value) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return fmt.Errorf("soa fillWhere mask must be a bool dense array")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return fmt.Errorf("soa column %q not found", columnName)
+	}
+	return col.FillWhere(mask, value)
+}
+
 func (s *SoA) bumpShapeVersion() {
 	if s == nil {
 		return

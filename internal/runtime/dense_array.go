@@ -265,6 +265,75 @@ func (a *DenseArray) CanAppend(v Value) error {
 	return nil
 }
 
+func (a *DenseArray) Fill(v Value) error {
+	if err := a.CanAppend(v); err != nil {
+		return err
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		x := v.Number()
+		for i := range a.f64 {
+			a.f64[i] = x
+		}
+	case DenseArrayI64:
+		x := v.Int()
+		for i := range a.i64 {
+			a.i64[i] = x
+		}
+	case DenseArrayBool:
+		x := v.Bool()
+		for i := range a.bools {
+			a.bools[i] = x
+		}
+	default:
+		return ErrDenseArrayDType
+	}
+	a.bumpVersion()
+	return nil
+}
+
+func (a *DenseArray) FillWhere(mask *DenseArray, v Value) error {
+	if a == nil || mask == nil {
+		return ErrDenseArrayOperand
+	}
+	if mask.dtype != DenseArrayBool {
+		return fmt.Errorf("dense array fillWhere mask must be bool")
+	}
+	if a.Len() != mask.Len() {
+		return ErrDenseArrayLength
+	}
+	if err := a.CanAppend(v); err != nil {
+		return err
+	}
+	switch a.dtype {
+	case DenseArrayF64:
+		x := v.Number()
+		for i, keep := range mask.bools {
+			if keep {
+				a.f64[i] = x
+			}
+		}
+	case DenseArrayI64:
+		x := v.Int()
+		for i, keep := range mask.bools {
+			if keep {
+				a.i64[i] = x
+			}
+		}
+	case DenseArrayBool:
+		x := v.Bool()
+		for i, keep := range mask.bools {
+			if keep {
+				a.bools[i] = x
+			}
+		}
+	default:
+		return ErrDenseArrayDType
+	}
+	a.bumpVersion()
+	return nil
+}
+
 func (a *DenseArray) Slice(start, end int) (*DenseArray, error) {
 	if a == nil {
 		return nil, ErrDenseArrayOperand

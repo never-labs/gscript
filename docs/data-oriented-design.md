@@ -183,6 +183,8 @@ Current implementation status:
   dense-column references;
 - `soa.resize` and `soa.appendRow` mutate all columns together while preserving
   alignment;
+- `soa.fill` and `soa.fillWhere` provide full-column and masked-column
+  initialization/update kernels;
 - `soa.unzip`, `soa.slice`, and `soa.filter` preserve column alignment while
   returning independent dense-column copies;
 - `soa.gather` preserves column alignment while materializing rows from a
@@ -214,6 +216,8 @@ Current API contract:
 | `soa.dropColumn(s, name)` | Returns a new SoA layout without `name`. At least one column must remain. |
 | `soa.resize(s, length)` | Resizes all columns in place, zero-filling when growing and truncating when shrinking. |
 | `soa.appendRow(s, row)` | Appends one row in place after validating every column field. |
+| `soa.fill(s, column, value)` | Fills a column in place with a scalar value accepted by the column dtype. |
+| `soa.fillWhere(s, column, mask, value)` | Fills only mask-true rows in a column. |
 | `soa.shape(s)` | Returns `{length, version, columns}` where each column reports `{name, dtype, length, version}` for diagnostics and guarded specialization. |
 | `soa.row(s, index)` | Returns a copied one-based row table. Mutating it does not write back. |
 | `soa.setRow(s, index, row)` | Writes every column from a table field of the same name and returns `true`. Missing or incompatible fields are errors. |

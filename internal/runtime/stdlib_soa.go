@@ -170,6 +170,43 @@ func buildSoALib() *Table {
 		return []Value{BoolValue(true)}, nil
 	}, soaAppendRowValue)
 
+	setFastArg3("fill", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.fill", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.fill: argument 2 must be a string")
+		}
+		if len(args) < 3 {
+			return nil, fmt.Errorf("soa.fill: argument 3 is required")
+		}
+		if err := s.Fill(args[1].Str(), args[2]); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaFillValue)
+
+	setFastArg4("fillWhere", func(args []Value) ([]Value, error) {
+		s, err := requireSoAArg("soa.fillWhere", args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(args) < 2 || !args[1].IsString() {
+			return nil, fmt.Errorf("soa.fillWhere: argument 2 must be a string")
+		}
+		if len(args) < 3 || !args[2].IsDenseArray() {
+			return nil, fmt.Errorf("soa.fillWhere: argument 3 must be a bool dense array")
+		}
+		if len(args) < 4 {
+			return nil, fmt.Errorf("soa.fillWhere: argument 4 is required")
+		}
+		if err := s.FillWhere(args[1].Str(), args[2].DenseArray(), args[3]); err != nil {
+			return nil, err
+		}
+		return []Value{BoolValue(true)}, nil
+	}, soaFillWhereValue)
+
 	setFastArg3("slice", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.slice", args, 0)
 		if err != nil {
@@ -727,6 +764,35 @@ func soaAppendRowValue(soaValue, rowValue Value) (Value, error) {
 		return NilValue(), fmt.Errorf("soa.appendRow: argument 2 must be a table")
 	}
 	if err := soaValue.SoA().AppendRow(rowValue.Table()); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
+func soaFillValue(soaValue, columnValue, fillValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.fill: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.fill: argument 2 must be a string")
+	}
+	if err := soaValue.SoA().Fill(columnValue.Str(), fillValue); err != nil {
+		return NilValue(), err
+	}
+	return BoolValue(true), nil
+}
+
+func soaFillWhereValue(soaValue, columnValue, maskValue, fillValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.fillWhere: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.fillWhere: argument 2 must be a string")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.fillWhere: argument 3 must be a bool dense array")
+	}
+	if err := soaValue.SoA().FillWhere(columnValue.Str(), maskValue.DenseArray(), fillValue); err != nil {
 		return NilValue(), err
 	}
 	return BoolValue(true), nil

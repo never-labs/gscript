@@ -87,6 +87,16 @@ truncates all columns together.
 Appends one row in place. `row` must be a table containing a non-nil field for
 every column, and each value must match the column element type.
 
+### `soa.fill(s, column, value) -> true`
+
+Fills one column in place with `value`. The value must match the column element
+type: numeric for `f64`, integer for `i64`, and boolean for `bool`.
+
+### `soa.fillWhere(s, column, mask, value) -> true`
+
+Fills only mask-true rows in one column. `mask` must be a bool dense array with
+the same length as `s`.
+
 ### `soa.shape(s) -> table`
 
 Returns layout diagnostics:

@@ -32,6 +32,8 @@ scratch := soa.zip({x: []f64{1, 2}, id: []i64{10, 20}, ok: []bool{true, false}})
 check("resize grow", soa.resize(scratch, 3) && soa.len(scratch) == 3 && soa.column(scratch, "x")[3] == 0)
 check("appendRow", soa.appendRow(scratch, {x: 4, id: 40, ok: true}) && soa.len(scratch) == 4)
 check("resize shrink", soa.resize(scratch, 2) && soa.len(scratch) == 2 && soa.column(scratch, "id")[2] == 20)
+check("fill", soa.fill(scratch, "x", 7) && soa.column(scratch, "x")[1] == 7 && soa.column(scratch, "x")[2] == 7)
+check("fillWhere", soa.fillWhere(scratch, "ok", []bool{true, false}, true) && soa.column(scratch, "ok")[1])
 
 row := soa.row(points, 2)
 check("row copy", row.id == 102 && row.x == 2)
