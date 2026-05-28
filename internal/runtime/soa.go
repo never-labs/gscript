@@ -202,9 +202,12 @@ func (s *SoA) Gather(indices *DenseArray) (*SoA, error) {
 	if indices == nil || indices.DType() != DenseArrayI64 {
 		return nil, fmt.Errorf("soa gather indices must be an i64 dense array")
 	}
+	if err := denseArrayValidateGatherIndices(indices, s.length); err != nil {
+		return nil, err
+	}
 	cols := make(map[string]*DenseArray, len(s.columns))
 	for _, name := range s.names {
-		col, err := s.columns[name].Gather(indices)
+		col, err := s.columns[name].gatherValidatedI64(indices.i64)
 		if err != nil {
 			return nil, fmt.Errorf("soa column %q: %w", name, err)
 		}

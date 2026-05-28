@@ -261,40 +261,50 @@ func (a *DenseArray) Gather(indices *DenseArray) (*DenseArray, error) {
 	if indices.dtype != DenseArrayI64 {
 		return nil, fmt.Errorf("dense array gather indices must be i64")
 	}
+	if err := denseArrayValidateGatherIndices(indices, a.Len()); err != nil {
+		return nil, err
+	}
+	return a.gatherValidatedI64(indices.i64)
+}
+
+func (a *DenseArray) gatherValidatedI64(indices []int64) (*DenseArray, error) {
+	if a == nil {
+		return nil, ErrDenseArrayOperand
+	}
 	switch a.dtype {
 	case DenseArrayF64:
-		out := make([]float64, len(indices.i64))
-		for i, index := range indices.i64 {
-			pos, err := denseArrayOneBasedIndex(index, len(a.f64))
-			if err != nil {
-				return nil, err
-			}
-			out[i] = a.f64[pos]
+		out := make([]float64, len(indices))
+		for i, index := range indices {
+			out[i] = a.f64[index-1]
 		}
 		return &DenseArray{dtype: DenseArrayF64, f64: out}, nil
 	case DenseArrayI64:
-		out := make([]int64, len(indices.i64))
-		for i, index := range indices.i64 {
-			pos, err := denseArrayOneBasedIndex(index, len(a.i64))
-			if err != nil {
-				return nil, err
-			}
-			out[i] = a.i64[pos]
+		out := make([]int64, len(indices))
+		for i, index := range indices {
+			out[i] = a.i64[index-1]
 		}
 		return &DenseArray{dtype: DenseArrayI64, i64: out}, nil
 	case DenseArrayBool:
-		out := make([]bool, len(indices.i64))
-		for i, index := range indices.i64 {
-			pos, err := denseArrayOneBasedIndex(index, len(a.bools))
-			if err != nil {
-				return nil, err
-			}
-			out[i] = a.bools[pos]
+		out := make([]bool, len(indices))
+		for i, index := range indices {
+			out[i] = a.bools[index-1]
 		}
 		return &DenseArray{dtype: DenseArrayBool, bools: out}, nil
 	default:
 		return nil, ErrDenseArrayDType
 	}
+}
+
+func denseArrayValidateGatherIndices(indices *DenseArray, length int) error {
+	if indices == nil || indices.dtype != DenseArrayI64 {
+		return fmt.Errorf("dense array gather indices must be i64")
+	}
+	for _, index := range indices.i64 {
+		if index < 1 || index > int64(length) {
+			return fmt.Errorf("dense array index out of range")
+		}
+	}
+	return nil
 }
 
 func (a *DenseArray) SumWhere(mask *DenseArray) (Value, error) {
