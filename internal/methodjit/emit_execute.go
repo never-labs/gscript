@@ -531,6 +531,7 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 		if tableSlot < len(regs) && cf.Proto != nil && constIdx < len(cf.Proto.Constants) {
 			tblVal := regs[tableSlot]
 			fieldName := cf.Proto.Constants[constIdx].Str()
+			pc := int(ctx.TableKeySlot)
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
 				var result runtime.Value
@@ -544,7 +545,19 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 						return err
 					}
 				} else {
-					result = tbl.RawGetString(fieldName)
+					if tier2TableExitFieldCachePC(cf.Proto, pc, vm.OP_GETFIELD, constIdx) {
+						ensureFieldCache(cf.Proto)
+						if pc < len(cf.Proto.FieldCache) {
+							result = tbl.RawGetStringCached(fieldName, &cf.Proto.FieldCache[pc])
+						} else {
+							result = tbl.RawGetString(fieldName)
+						}
+						if cf.Proto.FieldAccessFeedback != nil && pc < len(cf.Proto.FieldAccessFeedback) {
+							cf.Proto.FieldAccessFeedback[pc].ObserveFieldCache(cf.Proto.FieldCache[pc], result, vm.TableAccessKindGet)
+						}
+					} else {
+						result = tbl.RawGetString(fieldName)
+					}
 				}
 				if resultSlot < len(regs) {
 					regs[resultSlot] = result
@@ -563,6 +576,7 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 			tblVal := regs[tableSlot]
 			fieldName := cf.Proto.Constants[constIdx].Str()
 			valVal := regs[valSlot]
+			pc := int(ctx.TableKeySlot)
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
 				if tbl.HasMetatable() {
@@ -574,7 +588,19 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 					}
 					break
 				}
-				tbl.RawSetString(fieldName, valVal)
+				if tier2TableExitFieldCachePC(cf.Proto, pc, vm.OP_SETFIELD, constIdx) {
+					ensureFieldCache(cf.Proto)
+					if pc < len(cf.Proto.FieldCache) {
+						tbl.RawSetStringCached(fieldName, valVal, &cf.Proto.FieldCache[pc])
+					} else {
+						tbl.RawSetString(fieldName, valVal)
+					}
+					if cf.Proto.FieldAccessFeedback != nil && pc < len(cf.Proto.FieldAccessFeedback) {
+						cf.Proto.FieldAccessFeedback[pc].ObserveFieldCache(cf.Proto.FieldCache[pc], valVal, vm.TableAccessKindSet)
+					}
+				} else {
+					tbl.RawSetString(fieldName, valVal)
+				}
 			}
 		}
 
@@ -582,6 +608,24 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 		return fmt.Errorf("unknown table op %d", ctx.TableOp)
 	}
 	return nil
+}
+
+func tier2TableExitFieldCachePC(proto *vm.FuncProto, pc int, op vm.Opcode, constIdx int) bool {
+	if proto == nil || pc < 0 || pc >= len(proto.Code) || constIdx < 0 {
+		return false
+	}
+	inst := proto.Code[pc]
+	if vm.DecodeOp(inst) != op {
+		return false
+	}
+	switch op {
+	case vm.OP_GETFIELD:
+		return vm.DecodeC(inst) == constIdx
+	case vm.OP_SETFIELD:
+		return vm.DecodeB(inst) == constIdx
+	default:
+		return false
+	}
 }
 
 // executeOpExit handles a generic op-exit for the standalone Execute path.
