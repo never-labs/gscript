@@ -31,18 +31,11 @@ func lowerTableArrayStoresInBlock(fn *Function, block *Block) {
 		if instr == nil {
 			continue
 		}
+		if facts.RecordByRole(tableArrayFactRole(instr.Op), instr) {
+			continue
+		}
+
 		switch instr.Op {
-		case OpTableArrayHeader:
-			if len(instr.Args) >= 1 && instr.Args[0] != nil && tableArrayLowerableKind(instr.Aux) {
-				facts.RecordHeader(instr)
-			}
-
-		case OpTableArrayLen:
-			facts.RecordLen(instr)
-
-		case OpTableArrayData:
-			facts.RecordData(instr)
-
 		case OpSetTable:
 			if len(instr.Args) < 3 || instr.Args[0] == nil || !tableArrayLowerableKind(instr.Aux2) {
 				if len(instr.Args) >= 1 && instr.Args[0] != nil {

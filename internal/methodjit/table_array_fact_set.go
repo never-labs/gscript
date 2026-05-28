@@ -72,6 +72,25 @@ func (s *tableArrayFactSet) RecordHeader(instr *Instr) {
 	s.headersByID[instr.ID] = fact
 }
 
+func (s *tableArrayFactSet) RecordByRole(role OpTableArrayFactRole, instr *Instr) bool {
+	switch role {
+	case OpTableArrayFactHeader:
+		if instr == nil || !tableArrayLowerableKind(instr.Aux) {
+			return false
+		}
+		s.RecordHeader(instr)
+		return true
+	case OpTableArrayFactLen:
+		s.RecordLen(instr)
+		return true
+	case OpTableArrayFactData:
+		s.RecordData(instr)
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *tableArrayFactSet) LookupLen(instr *Instr) *Value {
 	if instr == nil || len(instr.Args) < 1 || instr.Args[0] == nil {
 		return nil
