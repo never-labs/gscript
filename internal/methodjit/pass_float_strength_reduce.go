@@ -49,11 +49,7 @@ func FloatStrengthReductionPass(fn *Function) (*Function, error) {
 			block.Instrs[i] = c
 			i++
 
-			instr.Op = OpMulFloat
-			instr.Type = TypeFloat
-			instr.Args = []*Value{instr.Args[0], c.Value()}
-			instr.Aux = 0
-			instr.Aux2 = 0
+			rewriteInstr(instr, OpMulFloat, TypeFloat, []*Value{instr.Args[0], c.Value()}, 0, 0)
 			functionRemarks(fn).Add("FloatStrengthReduction", "changed", block.ID, instr.ID, instr.Op,
 				reason)
 		}
@@ -97,13 +93,8 @@ func rewriteAffineFloatScale(fn *Function, block *Block, idx int, instr *Instr, 
 	block.Instrs = append(block.Instrs, nil)
 	copy(block.Instrs[idx+1:], block.Instrs[idx:])
 	block.Instrs[idx] = biasConst
-	instr.Op = OpFMA
-	instr.Type = TypeFloat
-	instr.Args = []*Value{base, scaleArg, biasConst.Value()}
-	instr.Aux = 0
-	instr.Aux2 = 0
-	addArg.Def.Op = OpNop
-	addArg.Def.Args = nil
+	rewriteInstr(instr, OpFMA, TypeFloat, []*Value{base, scaleArg, biasConst.Value()}, 0, 0)
+	rewriteInstrToNop(addArg.Def)
 	functionRemarks(fn).Add("FloatStrengthReduction", "changed", block.ID, instr.ID, instr.Op,
 		"folded affine float recurrence scale into FMA")
 	return true

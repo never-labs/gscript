@@ -95,15 +95,13 @@ func FMAFusionPass(fn *Function) (*Function, error) {
 			// Rewrite Add → FMA(y, z, acc).
 			yArg := mulInstr.Args[0]
 			zArg := mulInstr.Args[1]
-			instr.Op = OpFMA
-			instr.Args = []*Value{yArg, zArg, accArg}
+			rewriteInstr(instr, OpFMA, instr.Type, []*Value{yArg, zArg, accArg}, instr.Aux, instr.Aux2)
 			// Type stays TypeFloat (same as AddFloat).
 
 			// The Mul is now dead (single-use, user was rewritten to not
 			// reference it). Mark as OpNop so DCE cleans it up; leaving
 			// the instruction in place keeps SSA value IDs stable.
-			mulInstr.Op = OpNop
-			mulInstr.Args = nil
+			rewriteInstrToNop(mulInstr)
 		}
 	}
 	for _, block := range fn.Blocks {
@@ -119,10 +117,8 @@ func FMAFusionPass(fn *Function) (*Function, error) {
 				continue
 			}
 			accArg := instr.Args[0]
-			instr.Op = OpFMSUB
-			instr.Args = []*Value{rhs.Def.Args[0], rhs.Def.Args[1], accArg}
-			rhs.Def.Op = OpNop
-			rhs.Def.Args = nil
+			rewriteInstr(instr, OpFMSUB, instr.Type, []*Value{rhs.Def.Args[0], rhs.Def.Args[1], accArg}, instr.Aux, instr.Aux2)
+			rewriteInstrToNop(rhs.Def)
 		}
 	}
 	return fn, nil
