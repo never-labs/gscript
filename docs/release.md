@@ -95,24 +95,38 @@ Each tagged release should publish:
 - optional debug symbols or diagnostic bundles when native JIT support is
   shipped.
 
-Artifact builds should be reproducible from a clean checkout:
+Artifact builds should be reproducible from a clean checkout. Pass
+`--version vX.Y.Z` for release-candidate and tagged-release artifact names when
+the build is not running from an exact tag:
 
 ```bash
 git status --short
 go test ./... -count=1 -p 1 -timeout=600s
-bash scripts/release_artifacts.sh
+bash scripts/release_artifacts.sh --version vX.Y.Z
 ```
 
 The local artifact script builds only the current platform CLI binary and writes
 all outputs under `dist/` by default. It also records git, Go, and platform
 metadata and writes `SHA256SUMS` for the generated binary and metadata file. It
-does not tag, publish, upload, or create a release.
+does not tag, publish, upload, or create a release. Without `--version`, the
+script uses an exact git tag when available, otherwise `dev-<commit>`.
+
+Use `--dry-run` to inspect the planned binary, metadata, and checksum paths
+before building. Dry-run mode prints the metadata content that would be written
+and does not create the output directory, compile the binary, or write files:
+
+```bash
+bash scripts/release_artifacts.sh --version vX.Y.Z \
+  --output-dir /tmp/gscript-release-smoke \
+  --dry-run
+```
 
 Use a temporary output directory for local smoke tests without touching `dist/`:
 
 ```bash
-bash scripts/release_artifacts.sh --output-dir /tmp/gscript-release-smoke
-/tmp/gscript-release-smoke/gscript_dev-<commit>_<goos>_<goarch> -e 'print("ok")'
+bash scripts/release_artifacts.sh --version vX.Y.Z \
+  --output-dir /tmp/gscript-release-smoke
+/tmp/gscript-release-smoke/gscript_vX.Y.Z_<goos>_<goarch> -e 'print("ok")'
 cat /tmp/gscript-release-smoke/SHA256SUMS
 ```
 

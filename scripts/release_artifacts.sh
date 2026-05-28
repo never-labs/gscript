@@ -3,9 +3,17 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/release_artifacts.sh [--output-dir DIR]
+Usage: scripts/release_artifacts.sh [--output-dir DIR] [--version VERSION] [--dry-run]
 
 Build the current-platform gscript CLI release artifact locally.
+
+Options:
+  -o, --output-dir DIR  Write artifacts under DIR instead of dist/
+      --version VERSION Use VERSION in artifact names and metadata instead of
+                        the exact tag or dev-<commit> default
+      --dry-run         Print planned output files and metadata; do not build
+                        or write any files
+  -h, --help            Show this help
 
 Outputs:
   DIR/gscript_<version>_<goos>_<goarch>[.exe]
@@ -19,6 +27,8 @@ USAGE
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 out_dir="$repo_root/dist"
+requested_version=""
+dry_run="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -29,6 +39,22 @@ while [[ $# -gt 0 ]]; do
       fi
       out_dir="$2"
       shift 2
+      ;;
+    --version)
+      if [[ $# -lt 2 ]]; then
+        echo "error: $1 requires a version" >&2
+        exit 2
+      fi
+      if [[ -z "$2" ]]; then
+        echo "error: $1 requires a non-empty version" >&2
+        exit 2
+      fi
+      requested_version="$2"
+      shift 2
+      ;;
+    --dry-run)
+      dry_run="true"
+      shift
       ;;
     -h|--help)
       usage
@@ -44,9 +70,6 @@ done
 
 cd "$repo_root"
 
-mkdir -p "$out_dir"
-out_dir="$(cd "$out_dir" && pwd -P)"
-
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "error: required command not found: $1" >&2
@@ -56,6 +79,15 @@ require_cmd() {
 
 require_cmd git
 require_cmd go
+
+if [[ "$out_dir" != /* ]]; then
+  out_dir="$repo_root/$out_dir"
+fi
+
+if [[ "$dry_run" == "false" ]]; then
+  mkdir -p "$out_dir"
+  out_dir="$(cd "$out_dir" && pwd -P)"
+fi
 
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -88,7 +120,9 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
 exact_tag="$(git describe --tags --exact-match 2>/dev/null || true)"
 describe="$(git describe --tags --always --dirty 2>/dev/null || git rev-parse --short HEAD)"
 
-if [[ -n "$exact_tag" ]]; then
+if [[ -n "$requested_version" ]]; then
+  version="$requested_version"
+elif [[ -n "$exact_tag" ]]; then
   version="$exact_tag"
 else
   version="dev-$short_commit"
@@ -111,11 +145,9 @@ metadata_name="${artifact_base}_metadata.txt"
 binary_path="$out_dir/$binary_name"
 metadata_path="$out_dir/$metadata_name"
 checksums_path="$out_dir/SHA256SUMS"
+build_time_utc="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
-echo "building $binary_name"
-go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/gscript
-
-{
+write_metadata() {
   echo "artifact=$binary_name"
   echo "module=$module_path"
   echo "version=$version"
@@ -132,8 +164,23 @@ go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/gscript
   echo "gohostarch=$gohostarch"
   echo "cgo_enabled=$cgo_enabled"
   echo "platform_uname=$(uname -srm 2>/dev/null || true)"
-  echo "build_time_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-} >"$metadata_path"
+  echo "build_time_utc=$build_time_utc"
+}
+
+if [[ "$dry_run" == "true" ]]; then
+  echo "dry-run: would write $binary_path"
+  echo "dry-run: would write $metadata_path"
+  echo "dry-run: would write $checksums_path"
+  echo
+  echo "metadata:"
+  write_metadata
+  exit 0
+fi
+
+echo "building $binary_name"
+go build -trimpath -ldflags="-s -w" -o "$binary_path" ./cmd/gscript
+
+write_metadata >"$metadata_path"
 
 (
   cd "$out_dir"
