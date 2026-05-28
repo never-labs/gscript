@@ -57,6 +57,10 @@ var opFieldLenFoldBarrierPolicies = [...]bool{
 	OpSetList:             true,
 }
 
+var opFieldLenLoweredOpPolicies = [...]opTargetPolicy{
+	OpLen: {Op: OpFieldPolyLen, Set: true},
+}
+
 var opFieldCallPolyLenFusionBarrierPolicies = [...]bool{
 	OpSetField:                   true,
 	OpSetTable:                   true,

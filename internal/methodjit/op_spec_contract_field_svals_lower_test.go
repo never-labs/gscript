@@ -30,3 +30,12 @@ func TestFieldNumFusionLoweringTargetsLiveInOpSpec(t *testing.T) {
 		t.Fatalf("NumToFloat numeric-fusion lowered op = %s, %v; want OpMax, false", lowered, ok)
 	}
 }
+
+func TestFieldLenLoweringTargetsLiveInOpSpec(t *testing.T) {
+	if lowered, ok := fieldLenLoweredOp(OpLen); !ok || lowered != OpFieldPolyLen {
+		t.Fatalf("Len field-len lowered op = %s, %v; want FieldPolyLen, true", lowered, ok)
+	}
+	if lowered, ok := fieldLenLoweredOp(OpFieldPolyLen); ok || lowered != OpMax {
+		t.Fatalf("FieldPolyLen field-len lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
+}

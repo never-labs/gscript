@@ -77,6 +77,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opFieldSvalsFirstArgMutationBarrierPolicies", opFieldSvalsFirstArgMutationBarrierPolicies},
 		{"opFieldSvalsLoweredOpPolicies", opFieldSvalsLoweredOpPolicies},
 		{"opFieldLenFoldBarrierPolicies", opFieldLenFoldBarrierPolicies},
+		{"opFieldLenLoweredOpPolicies", opFieldLenLoweredOpPolicies},
 		{"opFieldCallPolyLenFusionBarrierPolicies", opFieldCallPolyLenFusionBarrierPolicies},
 		{"opFieldNumFusionLoweredOpPolicies", opFieldNumFusionLoweredOpPolicies},
 		{"opBoxableIntArithmeticPolicies", opBoxableIntArithmeticPolicies},

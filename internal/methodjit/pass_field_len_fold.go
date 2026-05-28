@@ -273,7 +273,11 @@ func lowerFieldPolyLen(fn *Function, lenInstr, get *Instr, mutations fieldLenMut
 			numeric.RecordProfiledIntRange(lenInstr.ID, r)
 		}
 	}
-	lenInstr.Op = OpFieldPolyLen
+	lowered, ok := fieldLenLoweredOp(lenInstr.Op)
+	if !ok || lowered != OpFieldPolyLen {
+		return false
+	}
+	lenInstr.Op = lowered
 	lenInstr.Type = TypeInt
 	lenInstr.Args = []*Value{get.Args[0]}
 	lenInstr.Aux = get.Aux

@@ -34,6 +34,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "ExactIntNarrowOp", spec.ExactIntNarrowOp)
 		assertOpSpecTarget(t, op, "BoxedFallbackOp", spec.BoxedFallbackOp)
 		assertOpSpecTarget(t, op, "FieldSvalsLoweredOp", spec.FieldSvalsLoweredOp)
+		assertOpSpecTarget(t, op, "FieldLenLoweredOp", spec.FieldLenLoweredOp)
 		assertOpSpecTarget(t, op, "FieldNumFusionLoweredOp", spec.FieldNumFusionLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixLoweredOp", spec.MatrixLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixRowLoweredOp", spec.MatrixRowLoweredOp)
@@ -69,11 +70,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.BoxedFallbackOp != OpMax {
 			t.Fatalf("%s BoxedFallbackOp default=%s, want OpMax", op, spec.BoxedFallbackOp)
 		}
-		if spec.FieldSvalsLoweredOp != OpMax {
-			t.Fatalf("%s FieldSvalsLoweredOp default=%s, want OpMax", op, spec.FieldSvalsLoweredOp)
-		}
-		if spec.FieldNumFusionLoweredOp != OpMax {
-			t.Fatalf("%s FieldNumFusionLoweredOp default=%s, want OpMax", op, spec.FieldNumFusionLoweredOp)
+		if spec.FieldSvalsLoweredOp != OpMax || spec.FieldLenLoweredOp != OpMax || spec.FieldNumFusionLoweredOp != OpMax {
+			t.Fatalf("%s field lowering defaults=%s/%s/%s, want OpMax/OpMax/OpMax",
+				op, spec.FieldSvalsLoweredOp, spec.FieldLenLoweredOp, spec.FieldNumFusionLoweredOp)
 		}
 		if spec.MatrixLoweredOp != OpMax {
 			t.Fatalf("%s MatrixLoweredOp default=%s, want OpMax", op, spec.MatrixLoweredOp)
@@ -138,6 +137,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := fieldSvalsLoweredOp(op); ok {
 			t.Fatalf("%s should not report a FieldSvals lowering target", op)
+		}
+		if _, ok := fieldLenLoweredOp(op); ok {
+			t.Fatalf("%s should not report a FieldLen lowering target", op)
 		}
 		if _, ok := fieldNumFusionLoweredOp(op); ok {
 			t.Fatalf("%s should not report a field numeric-fusion lowering target", op)

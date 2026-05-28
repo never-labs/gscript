@@ -20,6 +20,11 @@ func fieldSvalsLoweredOp(op Op) (Op, bool) {
 	return spec.FieldSvalsLoweredOp, ok && spec.FieldSvalsLoweredOp != OpMax
 }
 
+func fieldLenLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.FieldLenLoweredOp, ok && spec.FieldLenLoweredOp != OpMax
+}
+
 func opIsLiteralConst(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.LiteralConst
