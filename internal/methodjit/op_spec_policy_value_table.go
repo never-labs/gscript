@@ -97,3 +97,24 @@ var opLocalStringArrayTableArgIndexPolicies = [...]uint8{
 	OpLen:              1,
 	OpTableArrayHeader: 1,
 }
+
+var opReadonlyTableParamUseRolePolicies = [...]OpReadonlyTableParamUseRole{
+	OpGetTable:                   OpReadonlyTableParamUseBenign,
+	OpLen:                        OpReadonlyTableParamUseBenign,
+	OpReturn:                     OpReadonlyTableParamUseBenign,
+	OpSetTable:                   OpReadonlyTableParamUseFirstArgMutation,
+	OpSetField:                   OpReadonlyTableParamUseFirstArgMutation,
+	OpFieldStore:                 OpReadonlyTableParamUseFirstArgMutation,
+	OpSetList:                    OpReadonlyTableParamUseFirstArgMutation,
+	OpAppend:                     OpReadonlyTableParamUseFirstArgMutation,
+	OpTableArrayStore:            OpReadonlyTableParamUseFirstArgMutation,
+	OpTableArraySwap:             OpReadonlyTableParamUseFirstArgMutation,
+	OpTableArraySwapPairs:        OpReadonlyTableParamUseFirstArgMutation,
+	OpTableBoolArrayFill:         OpReadonlyTableParamUseFirstArgMutation,
+	OpTableIntArrayReversePrefix: OpReadonlyTableParamUseFirstArgMutation,
+	OpTableIntArrayCopyPrefix:    OpReadonlyTableParamUseFirstArgMutation,
+	OpCall:                       OpReadonlyTableParamUseCallEscape,
+	OpCallFloor:                  OpReadonlyTableParamUseCallEscape,
+	OpFieldCallFloor:             OpReadonlyTableParamUseCallEscape,
+	OpSelf:                       OpReadonlyTableParamUseCallEscape,
+}

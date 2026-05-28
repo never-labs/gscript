@@ -1215,20 +1215,14 @@ func calleeArgFieldsReadonly(proto *vm.FuncProto, paramIdx int) bool {
 				if opIsFieldRead(instr.Op) {
 					continue
 				}
-				switch instr.Op {
-				case OpGetTable, OpLen, OpReturn:
+				switch readonlyTableParamUseRole(instr.Op) {
+				case OpReadonlyTableParamUseBenign:
 					continue
-				case OpSetTable:
+				case OpReadonlyTableParamUseFirstArgMutation:
 					if argIdx == 0 {
 						return false
 					}
-				case OpSetField, OpFieldStore, OpSetList, OpAppend,
-					OpTableArrayStore, OpTableArraySwap, OpTableArraySwapPairs,
-					OpTableBoolArrayFill, OpTableIntArrayReversePrefix, OpTableIntArrayCopyPrefix:
-					if argIdx == 0 {
-						return false
-					}
-				case OpCall, OpCallFloor, OpFieldCallFloor, OpSelf:
+				case OpReadonlyTableParamUseCallEscape:
 					return false
 				default:
 					if argIdx == 0 {

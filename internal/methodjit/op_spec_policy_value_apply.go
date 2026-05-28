@@ -76,4 +76,7 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opLocalStringArrayTableArgIndexPolicies) && opLocalStringArrayTableArgIndexPolicies[op] != 0 {
 		spec.LocalStringArrayTableArgIndex = int(opLocalStringArrayTableArgIndexPolicies[op]) - 1
 	}
+	if int(op) < len(opReadonlyTableParamUseRolePolicies) {
+		spec.ReadonlyTableParamUseRole = opReadonlyTableParamUseRolePolicies[op]
+	}
 }

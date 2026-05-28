@@ -1,0 +1,10 @@
+package methodjit
+
+type OpReadonlyTableParamUseRole uint8
+
+const (
+	OpReadonlyTableParamUseNone OpReadonlyTableParamUseRole = iota
+	OpReadonlyTableParamUseBenign
+	OpReadonlyTableParamUseFirstArgMutation
+	OpReadonlyTableParamUseCallEscape
+)
