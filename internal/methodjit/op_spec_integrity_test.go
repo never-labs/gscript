@@ -39,6 +39,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "MatrixLoweredOp", spec.MatrixLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixRowLoweredOp", spec.MatrixRowLoweredOp)
 		assertOpSpecTarget(t, op, "MatrixRowConstLoweredOp", spec.MatrixRowConstLoweredOp)
+		assertOpSpecTarget(t, op, "MatrixNestedLoweredOp", spec.MatrixNestedLoweredOp)
 		assertOpSpecTarget(t, op, "TableArrayLoweredOp", spec.TableArrayLoweredOp)
 		assertOpSpecTarget(t, op, "TableArrayNestedLoweredOp", spec.TableArrayNestedLoweredOp)
 		assertOpSpecTarget(t, op, "TableArraySwapLoweredOp", spec.TableArraySwapLoweredOp)
@@ -82,8 +83,8 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		if spec.MatrixRowLoweredOp != OpMax {
 			t.Fatalf("%s MatrixRowLoweredOp default=%s, want OpMax", op, spec.MatrixRowLoweredOp)
 		}
-		if spec.MatrixRowConstLoweredOp != OpMax {
-			t.Fatalf("%s MatrixRowConstLoweredOp default=%s, want OpMax", op, spec.MatrixRowConstLoweredOp)
+		if spec.MatrixRowConstLoweredOp != OpMax || spec.MatrixNestedLoweredOp != OpMax {
+			t.Fatalf("%s matrix nested defaults=%s/%s, want OpMax/OpMax", op, spec.MatrixRowConstLoweredOp, spec.MatrixNestedLoweredOp)
 		}
 		if spec.CallUserArgStart != -1 {
 			t.Fatalf("%s CallUserArgStart default=%d, want -1", op, spec.CallUserArgStart)
@@ -153,6 +154,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := matrixRowConstLoweredOp(op); ok {
 			t.Fatalf("%s should not report a matrix row const lowering target", op)
+		}
+		if _, ok := matrixNestedLoweredOp(op); ok {
+			t.Fatalf("%s should not report a matrix nested lowering target", op)
 		}
 		if _, ok := callUserArgStart(op); ok {
 			t.Fatalf("%s should not report a call-user arg start", op)

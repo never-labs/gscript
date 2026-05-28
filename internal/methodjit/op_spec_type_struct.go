@@ -51,6 +51,7 @@ type OpSpec struct {
 	MatrixLoweredOp                   Op
 	MatrixRowLoweredOp                Op
 	MatrixRowConstLoweredOp           Op
+	MatrixNestedLoweredOp             Op
 	TableArrayGPRInvariant            bool
 	TableArrayGPRInvariantRank        int
 	TableArrayGPRInvariantUseMask     uint8

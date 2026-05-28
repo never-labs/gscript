@@ -39,6 +39,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		MatrixLoweredOp:                   OpMax,
 		MatrixRowLoweredOp:                OpMax,
 		MatrixRowConstLoweredOp:           OpMax,
+		MatrixNestedLoweredOp:             OpMax,
 		BoxedFallbackOp:                   OpMax,
 		CallFloorProjectionOp:             OpMax,
 		FieldCallFloorProjectionOp:        OpMax,

@@ -47,3 +47,12 @@ func TestMatrixRowLoweringTargetsLiveInOpSpec(t *testing.T) {
 		t.Fatalf("MatrixGetF matrix row const lowered op = %s, %v; want OpMax, false", lowered, ok)
 	}
 }
+
+func TestMatrixNestedLoweringTargetsLiveInOpSpec(t *testing.T) {
+	if lowered, ok := matrixNestedLoweredOp(OpTableArrayNestedLoad); !ok || lowered != OpMatrixLoadFAt {
+		t.Fatalf("TableArrayNestedLoad matrix nested lowered op = %s, %v; want MatrixLoadFAt, true", lowered, ok)
+	}
+	if lowered, ok := matrixNestedLoweredOp(OpMatrixLoadFAt); ok || lowered != OpMax {
+		t.Fatalf("MatrixLoadFAt matrix nested lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
+}

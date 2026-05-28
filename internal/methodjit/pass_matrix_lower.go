@@ -138,7 +138,8 @@ func DenseMatrixNestedLoadLowerPass(fn *Function) (*Function, error) {
 			flat.copySourceFrom(instr)
 			stride.copySourceFrom(instr)
 			newInstrs = append(newInstrs, flat, stride)
-			instr.Op = OpMatrixLoadFAt
+			lowered, _ := matrixNestedLoweredOp(instr.Op)
+			instr.Op = lowered
 			instr.Args = []*Value{flat.Value(), stride.Value(), i, j}
 			instr.Aux = 0
 			instr.Aux2 = 0
@@ -153,8 +154,11 @@ func DenseMatrixNestedLoadLowerPass(fn *Function) (*Function, error) {
 
 func denseMatrixNestedLoadLowerable(fn *Function, instr *Instr) bool {
 	if fn == nil || fn.Proto == nil || fn.Proto.TableKeyFeedback == nil || instr == nil ||
-		instr.Op != OpTableArrayNestedLoad || instr.Type != TypeFloat || len(instr.Args) < 5 ||
+		instr.Type != TypeFloat || len(instr.Args) < 5 ||
 		!instr.HasSource || instr.SourcePC < 0 || instr.SourcePC >= len(fn.Proto.TableKeyFeedback) {
+		return false
+	}
+	if lowered, ok := matrixNestedLoweredOp(instr.Op); !ok || lowered != OpMatrixLoadFAt {
 		return false
 	}
 	return fn.Proto.TableKeyFeedback[instr.SourcePC].DenseMatrix == vm.FBDenseMatrixYes

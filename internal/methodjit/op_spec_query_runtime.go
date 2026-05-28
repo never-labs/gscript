@@ -81,6 +81,11 @@ func matrixRowConstLoweredOp(op Op) (Op, bool) {
 	return spec.MatrixRowConstLoweredOp, ok && spec.MatrixRowConstLoweredOp != OpMax
 }
 
+func matrixNestedLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.MatrixNestedLoweredOp, ok && spec.MatrixNestedLoweredOp != OpMax
+}
+
 func tableArrayLoweredOp(op Op) (Op, bool) {
 	spec, ok := op.Spec()
 	return spec.TableArrayLoweredOp, ok && spec.TableArrayLoweredOp != OpMax

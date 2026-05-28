@@ -29,3 +29,7 @@ var opMatrixRowConstLoweredOpPolicies = [...]opTargetPolicy{
 	OpMatrixLoadFAt:  {Op: OpMatrixLoadFRowConst, Set: true},
 	OpMatrixStoreFAt: {Op: OpMatrixStoreFRowConst, Set: true},
 }
+
+var opMatrixNestedLoweredOpPolicies = [...]opTargetPolicy{
+	OpTableArrayNestedLoad: {Op: OpMatrixLoadFAt, Set: true},
+}
