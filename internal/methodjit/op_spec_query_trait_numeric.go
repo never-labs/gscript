@@ -38,6 +38,11 @@ func opIsFusableComparison(op Op) bool {
 	return ok && spec.FusableComparison
 }
 
+func modZeroCompareLoweredOp(op Op) (Op, bool) {
+	spec, ok := op.Spec()
+	return spec.ModZeroCompareLoweredOp, ok && spec.ModZeroCompareLoweredOp != OpMax
+}
+
 func opIsNativeNumericValueProducer(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.NativeNumericValueProducer

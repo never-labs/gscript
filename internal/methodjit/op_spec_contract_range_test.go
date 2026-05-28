@@ -3,6 +3,14 @@ package methodjit
 import "testing"
 
 func TestRangeAndBackendContractsLiveInOpSpec(t *testing.T) {
+	for _, op := range []Op{OpEq, OpEqInt} {
+		if lowered, ok := modZeroCompareLoweredOp(op); !ok || lowered != OpModZeroInt {
+			t.Fatalf("%s mod-zero compare lowered op = %s, %v; want ModZeroInt, true", op, lowered, ok)
+		}
+	}
+	if lowered, ok := modZeroCompareLoweredOp(OpLtInt); ok || lowered != OpMax {
+		t.Fatalf("LtInt mod-zero compare lowered op = %s, %v; want OpMax, false", lowered, ok)
+	}
 	for _, op := range []Op{OpConstInt, OpLen, OpTableArrayLen, OpGuardIntRange, OpAddInt, OpMulInt, OpModInt, OpDivIntExact, OpPhi, OpBoxInt, OpUnboxInt} {
 		spec, ok := op.Spec()
 		if !ok || !spec.NonNegativeDerivationCandidate || spec.NonNegativeDerivationKind == OpNonNegativeNone || !opCanDeriveNonNegative(&Instr{Op: op}) {

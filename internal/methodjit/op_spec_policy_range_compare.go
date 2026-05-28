@@ -10,6 +10,11 @@ var opFusableComparisonPolicies = [...]bool{
 	OpLeFloat:    true,
 }
 
+var opModZeroCompareLoweredOpPolicies = [...]opTargetPolicy{
+	OpEq:    {Op: OpModZeroInt, Set: true},
+	OpEqInt: {Op: OpModZeroInt, Set: true},
+}
+
 var opLoopBoundComparisonPolicies = [...]bool{
 	OpLtInt: true,
 	OpLeInt: true,

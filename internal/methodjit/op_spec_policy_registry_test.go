@@ -88,6 +88,7 @@ func opSpecPolicyTables() []opSpecPolicyTable {
 		{"opNonNegativeDerivationKindPolicies", opNonNegativeDerivationKindPolicies},
 		{"opInt48RuntimeValuePolicies", opInt48RuntimeValuePolicies},
 		{"opFusableComparisonPolicies", opFusableComparisonPolicies},
+		{"opModZeroCompareLoweredOpPolicies", opModZeroCompareLoweredOpPolicies},
 		{"opLoopBoundComparisonPolicies", opLoopBoundComparisonPolicies},
 		{"opConstPoolUserPolicies", opConstPoolUserPolicies},
 		{"opRawStringResultPolicies", opRawStringResultPolicies},

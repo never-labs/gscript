@@ -38,6 +38,9 @@ func applyOpSpecRangeComparePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFusableComparisonPolicies) {
 		spec.FusableComparison = opFusableComparisonPolicies[op]
 	}
+	if int(op) < len(opModZeroCompareLoweredOpPolicies) && opModZeroCompareLoweredOpPolicies[op].Set {
+		spec.ModZeroCompareLoweredOp = opModZeroCompareLoweredOpPolicies[op].Op
+	}
 	if int(op) < len(opLoopBoundComparisonPolicies) {
 		spec.LoopBoundComparison = opLoopBoundComparisonPolicies[op]
 	}

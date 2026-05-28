@@ -112,6 +112,7 @@ type OpSpec struct {
 	NonNegativeDerivationKind      OpNonNegativeDerivationKind
 	Int48RuntimeValue              bool
 	FusableComparison              bool
+	ModZeroCompareLoweredOp        Op
 	LoopBoundComparison            bool
 
 	// String, unroll, and reduction contracts.

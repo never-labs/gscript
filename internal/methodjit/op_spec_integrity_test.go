@@ -45,6 +45,7 @@ func TestOpSpecLookupAndTargetIntegrity(t *testing.T) {
 		assertOpSpecTarget(t, op, "CallFloorProjectionOp", spec.CallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCallFloorProjectionOp", spec.FieldCallFloorProjectionOp)
 		assertOpSpecTarget(t, op, "FieldCalleeGuardLoweredOp", spec.FieldCalleeGuardLoweredOp)
+		assertOpSpecTarget(t, op, "ModZeroCompareLoweredOp", spec.ModZeroCompareLoweredOp)
 	}
 	if len(seenNames) != int(OpMax) {
 		t.Fatalf("OpSpec name lookup saw %d names, want %d", len(seenNames), OpMax)
@@ -103,11 +104,10 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 			t.Fatalf("%s TableArraySwapLoweredOp default=%s, want OpMax", op, spec.TableArraySwapLoweredOp)
 		}
 		if spec.CallFloorProjectionOp != OpMax || spec.FieldCallFloorProjectionOp != OpMax {
-			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax",
-				op, spec.CallFloorProjectionOp, spec.FieldCallFloorProjectionOp)
+			t.Fatalf("%s call projection defaults=%s/%s, want OpMax/OpMax", op, spec.CallFloorProjectionOp, spec.FieldCallFloorProjectionOp)
 		}
-		if spec.FieldCalleeGuardLoweredOp != OpMax {
-			t.Fatalf("%s FieldCalleeGuardLoweredOp default=%s, want OpMax", op, spec.FieldCalleeGuardLoweredOp)
+		if spec.FieldCalleeGuardLoweredOp != OpMax || spec.ModZeroCompareLoweredOp != OpMax {
+			t.Fatalf("%s guard/mod lowering defaults=%s/%s, want OpMax/OpMax", op, spec.FieldCalleeGuardLoweredOp, spec.ModZeroCompareLoweredOp)
 		}
 		if spec.ClosureScalarLocalUseArgIndex != -1 || spec.ClosureScalarLoadClosureArgIndex != -1 ||
 			spec.ClosureScalarStoreClosureArgIndex != -1 || spec.ClosureScalarStoreValueArgIndex != -1 {
@@ -179,6 +179,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 		}
 		if _, ok := fieldCalleeGuardLoweredOp(op); ok {
 			t.Fatalf("%s should not report a field-callee guard lowering target", op)
+		}
+		if _, ok := modZeroCompareLoweredOp(op); ok {
+			t.Fatalf("%s should not report a mod-zero compare lowering target", op)
 		}
 	}
 }
