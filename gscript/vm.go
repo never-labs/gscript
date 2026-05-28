@@ -25,7 +25,10 @@ func New(opts ...Option) *VM {
 	for _, opt := range opts {
 		opt(&o)
 	}
+	return newVM(o)
+}
 
+func newVM(o vmOptions) *VM {
 	interp := runtime.New()
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)

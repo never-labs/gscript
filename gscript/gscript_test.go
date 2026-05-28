@@ -398,6 +398,44 @@ func TestRegisterFunc_error(t *testing.T) {
 	}
 }
 
+func TestRegisterFunc_panicReturnsError(t *testing.T) {
+	vm := gs.New()
+	err := vm.RegisterFunc("explode", func() int64 {
+		panic("boom")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = vm.Call("explode")
+	if err == nil {
+		t.Fatal("expected error from panic")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "explode") || !strings.Contains(msg, "boom") {
+		t.Fatalf("panic error = %q, want function name and panic value", msg)
+	}
+}
+
+func TestRegisterFunc_panicFromScriptReturnsError(t *testing.T) {
+	vm := gs.New()
+	err := vm.RegisterFunc("explodeFromScript", func() {
+		panic("script boom")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Exec(`explodeFromScript()`)
+	if err == nil {
+		t.Fatal("expected error from script-called panic")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "explodeFromScript") || !strings.Contains(msg, "script boom") {
+		t.Fatalf("panic error = %q, want function name and panic value", msg)
+	}
+}
+
 func TestRegisterFunc_fromScript(t *testing.T) {
 	var output []string
 	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
@@ -781,6 +819,112 @@ func TestPool_Do(t *testing.T) {
 	// VM should be returned to pool
 	if pool.Size() != 1 {
 		t.Fatalf("expected pool size 1 after Do, got %d", pool.Size())
+	}
+}
+
+func TestPoolPreservesStateByDefault(t *testing.T) {
+	pool := gs.NewPool(1, func() *gs.VM {
+		return gs.New()
+	})
+
+	vm := pool.Get()
+	if err := vm.Set("x", int64(42)); err != nil {
+		t.Fatal(err)
+	}
+	pool.Put(vm)
+
+	reused := pool.Get()
+	got, err := reused.Get("x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(42) {
+		t.Fatalf("x = %v (%T), want int64(42)", got, got)
+	}
+}
+
+func TestPoolWithResetClearsGlobalsBeforeReuse(t *testing.T) {
+	pool := gs.NewPoolWithReset(1, func() *gs.VM {
+		return gs.New()
+	}, func(vm *gs.VM) bool {
+		vm.Reset()
+		return true
+	})
+
+	vm := pool.Get()
+	if err := vm.Set("x", int64(42)); err != nil {
+		t.Fatal(err)
+	}
+	pool.Put(vm)
+
+	reused := pool.Get()
+	got, err := reused.Get("x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Fatalf("x = %v (%T), want nil after reset", got, got)
+	}
+}
+
+func TestPoolWithResetCanDiscardVM(t *testing.T) {
+	created := 0
+	pool := gs.NewPoolWithReset(1, func() *gs.VM {
+		created++
+		vm := gs.New()
+		if err := vm.Set("id", int64(created)); err != nil {
+			t.Fatal(err)
+		}
+		return vm
+	}, func(vm *gs.VM) bool {
+		return false
+	})
+
+	first := pool.Get()
+	pool.Put(first)
+	if pool.Size() != 0 {
+		t.Fatalf("expected discarded VM to leave pool empty, got size %d", pool.Size())
+	}
+	second := pool.Get()
+	got, err := second.Get("id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(2) {
+		t.Fatalf("id = %v (%T), want int64(2)", got, got)
+	}
+}
+
+func TestVMResetClearsGlobalsAndModuleCache(t *testing.T) {
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "helper.gs")
+	if err := os.WriteFile(modPath, []byte(`return { value: 1 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := gs.New(gs.WithRequirePath(dir))
+	if err := vm.Exec(`helper := require("helper"); extra := 99`); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(modPath, []byte(`return { value: 2 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm.Reset()
+	if got, err := vm.Get("extra"); err != nil {
+		t.Fatal(err)
+	} else if got != nil {
+		t.Fatalf("extra = %v (%T), want nil after reset", got, got)
+	}
+	if err := vm.Exec(`helper := require("helper"); result := helper.value`); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(2) {
+		t.Fatalf("result = %v (%T), want int64(2)", got, got)
 	}
 }
 

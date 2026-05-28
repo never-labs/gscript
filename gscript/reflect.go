@@ -329,87 +329,93 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 	// Check if last return type is error
 	hasError := fnType.NumOut() > 0 && fnType.Out(fnType.NumOut()-1).Implements(errorType)
 
-	return &runtime.GoFunction{
-		Name: fnType.String(),
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			numIn := fnType.NumIn()
-			isVariadic := fnType.IsVariadic()
-
-			in := make([]reflect.Value, numIn)
-
-			for i := 0; i < numIn; i++ {
-				if isVariadic && i == numIn-1 {
-					// Variadic last param: collect remaining args
-					sliceType := fnType.In(i)
-					elemType := sliceType.Elem()
-					remaining := len(args) - i
-					if remaining < 0 {
-						remaining = 0
-					}
-					slice := reflect.MakeSlice(sliceType, remaining, remaining)
-					for j := 0; j < remaining; j++ {
-						var gsVal runtime.Value
-						if i+j < len(args) {
-							gsVal = args[i+j]
-						} else {
-							gsVal = runtime.NilValue()
-						}
-						rv, err := FromValue(gsVal, elemType)
-						if err != nil {
-							return nil, fmt.Errorf("arg %d: %v", i+j, err)
-						}
-						slice.Index(j).Set(rv)
-					}
-					in[i] = slice
-					break
-				}
-				argType := fnType.In(i)
-				var gsVal runtime.Value
-				if i < len(args) {
-					gsVal = args[i]
-				} else {
-					gsVal = runtime.NilValue()
-				}
-				rv, err := FromValue(gsVal, argType)
-				if err != nil {
-					return nil, fmt.Errorf("arg %d: %v", i, err)
-				}
-				in[i] = rv
+	gf := &runtime.GoFunction{Name: fnType.String()}
+	gf.Fn = func(args []runtime.Value) (results []runtime.Value, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				results = nil
+				err = fmt.Errorf("host function %s panicked: %v", gf.Name, r)
 			}
+		}()
 
-			// Call the function
-			var out []reflect.Value
-			if isVariadic {
-				out = fn.Call(in)
+		numIn := fnType.NumIn()
+		isVariadic := fnType.IsVariadic()
+
+		in := make([]reflect.Value, numIn)
+
+		for i := 0; i < numIn; i++ {
+			if isVariadic && i == numIn-1 {
+				// Variadic last param: collect remaining args
+				sliceType := fnType.In(i)
+				elemType := sliceType.Elem()
+				remaining := len(args) - i
+				if remaining < 0 {
+					remaining = 0
+				}
+				slice := reflect.MakeSlice(sliceType, remaining, remaining)
+				for j := 0; j < remaining; j++ {
+					var gsVal runtime.Value
+					if i+j < len(args) {
+						gsVal = args[i+j]
+					} else {
+						gsVal = runtime.NilValue()
+					}
+					rv, err := FromValue(gsVal, elemType)
+					if err != nil {
+						return nil, fmt.Errorf("arg %d: %v", i+j, err)
+					}
+					slice.Index(j).Set(rv)
+				}
+				in[i] = slice
+				break
+			}
+			argType := fnType.In(i)
+			var gsVal runtime.Value
+			if i < len(args) {
+				gsVal = args[i]
 			} else {
-				// Pad missing args with zero values
-				for len(in) < numIn {
-					in = append(in, reflect.Zero(fnType.In(len(in))))
-				}
-				out = fn.Call(in[:numIn])
+				gsVal = runtime.NilValue()
 			}
+			rv, err := FromValue(gsVal, argType)
+			if err != nil {
+				return nil, fmt.Errorf("arg %d: %v", i, err)
+			}
+			in[i] = rv
+		}
 
-			// Process output
-			numOut := len(out)
-			if hasError && numOut > 0 {
-				lastOut := out[numOut-1]
-				if !lastOut.IsNil() {
-					return nil, lastOut.Interface().(error)
-				}
-				out = out[:numOut-1]
+		// Call the function
+		var out []reflect.Value
+		if isVariadic {
+			out = fn.Call(in)
+		} else {
+			// Pad missing args with zero values
+			for len(in) < numIn {
+				in = append(in, reflect.Zero(fnType.In(len(in))))
 			}
+			out = fn.Call(in[:numIn])
+		}
 
-			result := make([]runtime.Value, 0, len(out))
-			for _, rv := range out {
-				gsVal, err := reflectToValue(rv)
-				if err != nil {
-					return nil, err
-				}
-				result = append(result, gsVal)
+		// Process output
+		numOut := len(out)
+		if hasError && numOut > 0 {
+			lastOut := out[numOut-1]
+			if !lastOut.IsNil() {
+				return nil, lastOut.Interface().(error)
 			}
-			return result, nil
-		},
-	}, nil
+			out = out[:numOut-1]
+		}
+
+		result := make([]runtime.Value, 0, len(out))
+		for _, rv := range out {
+			gsVal, err := reflectToValue(rv)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, gsVal)
+		}
+		return result, nil
+	}
+	return gf, nil
 }
 
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
