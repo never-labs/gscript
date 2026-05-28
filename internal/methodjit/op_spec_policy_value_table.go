@@ -85,3 +85,15 @@ var opFixedShapeReturnArrayElementRolePolicies = [...]OpFixedShapeReturnArrayEle
 	OpSetList:  OpFixedShapeReturnArrayElementInvalidator,
 	OpSetField: OpFixedShapeReturnArrayElementInvalidator,
 }
+
+var opLocalStringArrayTableUseRolePolicies = [...]OpLocalStringArrayTableUseRole{
+	OpSetTable:         OpLocalStringArrayTableUseStore,
+	OpLen:              OpLocalStringArrayTableUseRead,
+	OpTableArrayHeader: OpLocalStringArrayTableUseRead,
+}
+
+var opLocalStringArrayTableArgIndexPolicies = [...]uint8{
+	OpSetTable:         1,
+	OpLen:              1,
+	OpTableArrayHeader: 1,
+}

@@ -66,6 +66,8 @@ type OpSpec struct {
 	FixedShapeArrayElementWriteRole   OpFixedShapeArrayElementWriteRole
 	FixedShapeArrayElementReadRole    OpFixedShapeArrayElementReadRole
 	FixedShapeReturnArrayElementRole  OpFixedShapeReturnArrayElementRole
+	LocalStringArrayTableUseRole      OpLocalStringArrayTableUseRole
+	LocalStringArrayTableArgIndex     int
 
 	// Optimizer admission and numeric specialization contracts.
 	LICMHoistable               bool

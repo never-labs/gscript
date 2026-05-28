@@ -354,7 +354,7 @@ func localStringArrayTables(fn *Function) map[int]bool {
 	}
 	for _, block := range fn.Blocks {
 		for _, instr := range block.Instrs {
-			if instr == nil || instr.Op != OpSetTable || len(instr.Args) < 3 || instr.Args[0] == nil {
+			if instr == nil || localStringArrayTableUseRole(instr.Op) != OpLocalStringArrayTableUseStore || len(instr.Args) < 3 || instr.Args[0] == nil {
 				continue
 			}
 			tableID := instr.Args[0].ID
@@ -370,14 +370,14 @@ func localStringArrayTables(fn *Function) map[int]bool {
 }
 
 func localStringArrayTableUseOK(instr *Instr, argIdx, tableID int) bool {
-	switch instr.Op {
-	case OpSetTable:
-		return argIdx == 0 && len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID
-	case OpLen, OpTableArrayHeader:
-		return argIdx == 0 && len(instr.Args) >= 1 && instr.Args[0] != nil && instr.Args[0].ID == tableID
-	default:
+	if instr == nil || localStringArrayTableUseRole(instr.Op) == OpLocalStringArrayTableUseNone {
 		return false
 	}
+	tableArg, ok := localStringArrayTableArgIndex(instr.Op)
+	if !ok || argIdx != tableArg || len(instr.Args) <= tableArg || instr.Args[tableArg] == nil {
+		return false
+	}
+	return instr.Args[tableArg].ID == tableID
 }
 
 func localStringArrayStoredValueOK(v *Value, tableID int, data map[int]int) bool {

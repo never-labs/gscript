@@ -78,6 +78,9 @@ func TestOpSpecUnsetSentinelsDoNotLookLikePolicies(t *testing.T) {
 				op, spec.ClosureScalarLocalUseArgIndex, spec.ClosureScalarLoadClosureArgIndex,
 				spec.ClosureScalarStoreClosureArgIndex, spec.ClosureScalarStoreValueArgIndex)
 		}
+		if spec.LocalStringArrayTableArgIndex != -1 {
+			t.Fatalf("%s LocalStringArrayTableArgIndex default=%d, want -1", op, spec.LocalStringArrayTableArgIndex)
+		}
 		if spec.LoadElimTableCacheKeyArgIndex != -1 || spec.LoadElimTableCacheValueArgIndex != -1 {
 			t.Fatalf("%s load-elim table-cache arg defaults=%d/%d, want both -1",
 				op, spec.LoadElimTableCacheKeyArgIndex, spec.LoadElimTableCacheValueArgIndex)

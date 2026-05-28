@@ -233,3 +233,11 @@ const (
 	OpFixedShapeReturnArrayElementStore
 	OpFixedShapeReturnArrayElementInvalidator
 )
+
+type OpLocalStringArrayTableUseRole uint8
+
+const (
+	OpLocalStringArrayTableUseNone OpLocalStringArrayTableUseRole = iota
+	OpLocalStringArrayTableUseStore
+	OpLocalStringArrayTableUseRead
+)

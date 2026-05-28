@@ -193,6 +193,19 @@ func fixedShapeReturnArrayElementRole(op Op) OpFixedShapeReturnArrayElementRole 
 	return spec.FixedShapeReturnArrayElementRole
 }
 
+func localStringArrayTableUseRole(op Op) OpLocalStringArrayTableUseRole {
+	spec, ok := op.Spec()
+	if !ok {
+		return OpLocalStringArrayTableUseNone
+	}
+	return spec.LocalStringArrayTableUseRole
+}
+
+func localStringArrayTableArgIndex(op Op) (int, bool) {
+	spec, ok := op.Spec()
+	return spec.LocalStringArrayTableArgIndex, ok && spec.LocalStringArrayTableArgIndex >= 0
+}
+
 func opIsTableArrayStoreLoopCandidate(op Op) bool {
 	spec, ok := op.Spec()
 	return ok && spec.TableArrayStoreLoopCandidate

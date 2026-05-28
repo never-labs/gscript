@@ -70,4 +70,10 @@ func applyOpSpecValueTablePolicies(op Op, spec *OpSpec) {
 	if int(op) < len(opFixedShapeReturnArrayElementRolePolicies) {
 		spec.FixedShapeReturnArrayElementRole = opFixedShapeReturnArrayElementRolePolicies[op]
 	}
+	if int(op) < len(opLocalStringArrayTableUseRolePolicies) {
+		spec.LocalStringArrayTableUseRole = opLocalStringArrayTableUseRolePolicies[op]
+	}
+	if int(op) < len(opLocalStringArrayTableArgIndexPolicies) && opLocalStringArrayTableArgIndexPolicies[op] != 0 {
+		spec.LocalStringArrayTableArgIndex = int(opLocalStringArrayTableArgIndexPolicies[op]) - 1
+	}
 }

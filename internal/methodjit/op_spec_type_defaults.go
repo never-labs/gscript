@@ -18,6 +18,7 @@ func opSpec(name string, family OpEmitterFamily, args OpArgPolicy, effect OpSide
 		ClosureScalarLoadClosureArgIndex:  -1,
 		ClosureScalarStoreClosureArgIndex: -1,
 		ClosureScalarStoreValueArgIndex:   -1,
+		LocalStringArrayTableArgIndex:     -1,
 		LoadElimTableCacheKeyArgIndex:     -1,
 		LoadElimTableCacheValueArgIndex:   -1,
 		TypeSpecializeIntOp:               OpMax,
