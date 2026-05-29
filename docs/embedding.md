@@ -35,7 +35,8 @@ extensions:
   `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithMaxHostResultBytes`,
   `WithMaxModuleBytes`, `WithMaxModuleDepth`,
   `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, `WithPrint`,
-  `WithDynamicEval`, `WithVM`, `WithJIT`, and `WithTracing`.
+  `WithDynamicEval`, `WithEnvironmentAllowlist`, `WithVM`, `WithJIT`, and
+  `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -263,6 +264,10 @@ Current sandbox gaps:
 - `WithDynamicEval(false)` disables script-side string compilation APIs such
   as `load`, `loadstring`, `script.compile`, and `script.eval`. Host-side
   `Compile`/`Exec` calls are unaffected.
+- `WithEnvironmentAllowlist(names...)` limits script-side environment reads
+  and writes to specific variable names. It filters `os.getenv`,
+  `os.environ`, `os.expand`, and `process.env`, and rejects `os.setenv` /
+  `os.unsetenv` for variables outside the allowlist.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven
@@ -271,7 +276,7 @@ Current sandbox gaps:
   confinement directory. It does not yet have separate read roots and write
   roots, byte limits, symlink policy, special-file policy, or per-operation
   audit events.
-- No public host policy for network, process, environment, debug
+- No public host policy for network, process, debug
   introspection, or host callbacks beyond coarse stdlib removal.
 - No public loader interface for resolving, validating, caching, or auditing
   modules.
@@ -401,7 +406,8 @@ boundaries. Timeouts should return a distinguishable error, for example
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
 `WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
 `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
-`WithDynamicEval(false)` are the first production-limits APIs. A full
+`WithDynamicEval(false)`, plus `WithEnvironmentAllowlist`, are the first
+production-limits APIs. A full
 production limits object should still cover wall time, allocation/table sizes,
 module count, and host-call duration policy.
 
@@ -472,7 +478,7 @@ prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
 `WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
 `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
-`WithDynamicEval(false)`.
+`WithDynamicEval(false)`, plus `WithEnvironmentAllowlist`.
 
 `WithSecurity(SecurityPolicy{...})` is the grouped form of the same controls.
 It is intended for production embedders that want one auditable policy object

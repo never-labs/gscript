@@ -82,9 +82,9 @@ The stdlib surface includes host-effect modules such as `io`, `fs`, `net`,
 `http`, `os`, `process`, `script`, `debug`, and `testkit`. In production these
 modules must be considered capabilities, not ordinary libraries. The current
 `CapabilityFlags` layer is intentionally smaller than the future
-`SecurityPolicy`: it covers module loading and filesystem-backed script APIs,
-but not network, process, environment, debug introspection, memory, or host
-callback effects yet.
+`SecurityPolicy`: it covers module loading, filesystem-backed script APIs, and
+environment allowlists, but not network, process, debug introspection, memory,
+or host callback effects yet.
 
 ## Default Security Configuration
 
@@ -104,6 +104,7 @@ loading, JIT policy, step budget, native-call budget, call-depth budget,
 script goroutine limit, channel-capacity limit, host-result byte limit,
 module-byte limit, module-depth limit, filesystem read-byte limit, and
 filesystem write-byte limit, and dynamic-eval disablement.
+Environment reads can also be narrowed to a named allowlist.
 
 `SecuritySandbox()` currently means:
 
@@ -121,7 +122,7 @@ filesystem write-byte limit, and dynamic-eval disablement.
 
 This is an in-process sandbox boundary, not a complete isolation boundary. It
 does not currently add memory budgets, wall-clock preemption, network/process
-policy, environment policy, debug redaction, or host-callback capability
+policy, debug redaction, or host-callback capability
 wrapping. For untrusted scripts, embedders should combine `SecuritySandbox()`
 with `WithMaxSteps`, context deadlines, explicit host bindings, and OS-level
 isolation where needed.
@@ -379,7 +380,9 @@ Process policy:
 OS/environment policy:
 
 - `os.getenv`, `process.env`, and related APIs should use an environment
-  allowlist.
+  allowlist. Current public API exposes this as
+  `WithEnvironmentAllowlist(names...)` and
+  `SecurityPolicy.EnvironmentAllowlist`.
 - Time and randomness are safe by default, but deterministic sandboxes should
   allow injected clocks and random sources.
 

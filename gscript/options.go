@@ -109,6 +109,7 @@ type vmOptions struct {
 	requirePath     string
 	filesystemRoot  string
 	dynamicEval     bool
+	environmentVars []string
 	maxSteps        int64
 	maxNativeCalls  int64
 	maxCallDepth    int64
@@ -139,6 +140,7 @@ type SecurityPolicy struct {
 	MaxModuleDepth          int64
 	MaxFilesystemReadBytes  int64
 	MaxFilesystemWriteBytes int64
+	EnvironmentAllowlist    []string
 	DisableDynamicEval      bool
 	DisableJIT              bool
 	DisableModuleLoading    bool
@@ -247,6 +249,13 @@ func WithEnvironmentWrite(enabled bool) Option {
 	}
 }
 
+// WithEnvironmentAllowlist restricts script-side environment APIs to the named
+// variables. Passing no names allows no variables; omit this option to keep the
+// default unrestricted behavior when environment access is otherwise enabled.
+func WithEnvironmentAllowlist(names ...string) Option {
+	return func(o *vmOptions) { o.environmentVars = append([]string(nil), names...) }
+}
+
 // WithFilesystemRoot confines fs module paths and script-side file loading to
 // root. Relative script paths are resolved inside root. An empty root leaves
 // filesystem paths unrestricted.
@@ -330,6 +339,9 @@ func WithSecurity(policy SecurityPolicy) Option {
 		}
 		if policy.MaxFilesystemWriteBytes > 0 {
 			o.maxFSWriteBytes = policy.MaxFilesystemWriteBytes
+		}
+		if policy.EnvironmentAllowlist != nil {
+			o.environmentVars = append([]string(nil), policy.EnvironmentAllowlist...)
 		}
 		if policy.DisableDynamicEval {
 			o.dynamicEval = false

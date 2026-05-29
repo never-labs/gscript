@@ -26,6 +26,9 @@ type Interpreter struct {
 	filesystemWrite   bool             // fs write operations are enabled
 	filesystemRoot    string           // optional root for script-side filesystem access
 	dynamicEval       bool             // script-side string compile/eval is enabled
+	environmentRead   bool             // script-side environment reads are enabled
+	environmentWrite  bool             // script-side environment writes are enabled
+	allowedEnv        map[string]bool  // nil means all environment variables are allowed
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -65,6 +68,8 @@ func New() *Interpreter {
 		filesystemRead:    true,
 		filesystemWrite:   true,
 		dynamicEval:       true,
+		environmentRead:   true,
+		environmentWrite:  true,
 		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()

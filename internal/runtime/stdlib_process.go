@@ -244,10 +244,13 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 
 	// process.env() -- return table of all environment variables
 	set("env", func(args []Value) ([]Value, error) {
+		if interp != nil && !interp.environmentRead {
+			return nil, fmt.Errorf("environment read access disabled")
+		}
 		tbl := NewTable()
 		for _, e := range os.Environ() {
 			parts := strings.SplitN(e, "=", 2)
-			if len(parts) == 2 {
+			if len(parts) == 2 && (interp == nil || interp.allowedEnv == nil || interp.allowedEnv[parts[0]]) {
 				tbl.RawSet(StringValue(parts[0]), StringValue(parts[1]))
 			}
 		}

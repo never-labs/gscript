@@ -1741,6 +1741,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxModuleDepth:          1,
 		MaxFilesystemReadBytes:  128,
 		MaxFilesystemWriteBytes: 128,
+		EnvironmentAllowlist:    []string{"GSCRIPT_PUBLIC_ENV_CAP_TEST"},
 		DisableDynamicEval:      true,
 	}))
 	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
@@ -1816,6 +1817,66 @@ func TestEnvironmentCapabilities(t *testing.T) {
 			}
 			if got != "visible" {
 				t.Fatalf("value = %v, want visible", got)
+			}
+		})
+	}
+}
+
+func TestEnvironmentAllowlist(t *testing.T) {
+	t.Setenv("GSCRIPT_PUBLIC_ENV_ALLOWED", "visible")
+	t.Setenv("GSCRIPT_PUBLIC_ENV_BLOCKED", "secret")
+
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithEnvironmentAllowlist("GSCRIPT_PUBLIC_ENV_ALLOWED")}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+				allowed := os.getenv("GSCRIPT_PUBLIC_ENV_ALLOWED")
+				blocked := os.getenv("GSCRIPT_PUBLIC_ENV_BLOCKED")
+				expanded := os.expand("$GSCRIPT_PUBLIC_ENV_ALLOWED:$GSCRIPT_PUBLIC_ENV_BLOCKED")
+				all := os.environ()
+				procEnv := process.env()
+			`); err != nil {
+				t.Fatal(err)
+			}
+			for name, want := range map[string]interface{}{
+				"allowed":  "visible",
+				"blocked":  nil,
+				"expanded": "visible:",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != want {
+					t.Fatalf("%s = %v, want %v", name, got, want)
+				}
+			}
+			for _, tableName := range []string{"all", "procEnv"} {
+				got, err := vm.Get(tableName)
+				if err != nil {
+					t.Fatal(err)
+				}
+				env, ok := got.(map[string]interface{})
+				if !ok {
+					t.Fatalf("%s = %T, want map", tableName, got)
+				}
+				if env["GSCRIPT_PUBLIC_ENV_ALLOWED"] != "visible" {
+					t.Fatalf("%s allowed = %v, want visible", tableName, env["GSCRIPT_PUBLIC_ENV_ALLOWED"])
+				}
+				if _, ok := env["GSCRIPT_PUBLIC_ENV_BLOCKED"]; ok {
+					t.Fatalf("%s exposed blocked environment variable", tableName)
+				}
+			}
+			err := vm.Exec(`os.setenv("GSCRIPT_PUBLIC_ENV_BLOCKED", "changed")`)
+			if err == nil || !strings.Contains(err.Error(), "environment variable not allowed") {
+				t.Fatalf("setenv blocked err = %v, want environment variable not allowed", err)
 			}
 		})
 	}

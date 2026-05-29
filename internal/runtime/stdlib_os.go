@@ -11,15 +11,37 @@ import (
 var startTime = time.Now()
 
 func buildOSLib() *Table {
-	return buildOSLibWithEnvironment(true, true)
+	return buildOSLibWithEnvironment(true, true, nil)
 }
 
 // SetEnvironmentCapabilities controls script-side environment variable read and
 // write access independently. It refreshes os in place so package.loaded.os
 // observes the same policy.
 func (interp *Interpreter) SetEnvironmentCapabilities(read, write bool) {
+	interp.environmentRead = read
+	interp.environmentWrite = write
+	interp.refreshOSLib()
+}
+
+// SetEnvironmentAllowlist restricts script-side environment APIs to the named
+// variables. A nil slice allows all environment variables; an empty non-nil
+// slice allows none.
+func (interp *Interpreter) SetEnvironmentAllowlist(names []string) {
+	if names == nil {
+		interp.allowedEnv = nil
+	} else {
+		allowed := make(map[string]bool, len(names))
+		for _, name := range names {
+			allowed[name] = true
+		}
+		interp.allowedEnv = allowed
+	}
+	interp.refreshOSLib()
+}
+
+func (interp *Interpreter) refreshOSLib() {
 	if v, ok := interp.globals.Get("os"); ok && v.IsTable() {
-		osLib := TableValue(buildOSLibWithEnvironment(read, write))
+		osLib := TableValue(buildOSLibWithEnvironment(interp.environmentRead, interp.environmentWrite, interp.allowedEnv))
 		interp.globals.Define("os", osLib)
 		interp.modules["os"] = osLib
 		interp.markPackageLoaded("os", osLib)
@@ -27,8 +49,14 @@ func (interp *Interpreter) SetEnvironmentCapabilities(read, write bool) {
 }
 
 // buildOSLibWithEnvironment creates the "os" standard library table.
-func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
+func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) *Table {
 	t := NewTable()
+	envAllowed := func(name string) bool {
+		return allowedEnv == nil || allowedEnv[name]
+	}
+	envDenied := func(name string) error {
+		return fmt.Errorf("environment variable not allowed: %s", name)
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -110,7 +138,11 @@ func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'os.getenv' (string expected)")
 		}
-		val, ok := os.LookupEnv(args[0].Str())
+		name := args[0].Str()
+		if !envAllowed(name) {
+			return []Value{NilValue()}, nil
+		}
+		val, ok := os.LookupEnv(name)
 		if !ok {
 			return []Value{NilValue()}, nil
 		}
@@ -157,7 +189,11 @@ func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'os.setenv' (string expected)")
 		}
-		err := os.Setenv(args[0].Str(), args[1].Str())
+		name := args[0].Str()
+		if !envAllowed(name) {
+			return nil, envDenied(name)
+		}
+		err := os.Setenv(name, args[1].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -169,7 +205,11 @@ func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'os.unsetenv' (string expected)")
 		}
-		err := os.Unsetenv(args[0].Str())
+		name := args[0].Str()
+		if !envAllowed(name) {
+			return nil, envDenied(name)
+		}
+		err := os.Unsetenv(name)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -181,7 +221,7 @@ func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
 		tbl := NewTable()
 		for _, e := range os.Environ() {
 			parts := strings.SplitN(e, "=", 2)
-			if len(parts) == 2 {
+			if len(parts) == 2 && envAllowed(parts[0]) {
 				tbl.RawSet(StringValue(parts[0]), StringValue(parts[1]))
 			}
 		}
@@ -219,7 +259,12 @@ func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
 		if !arg.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'os.expand' (string expected)")
 		}
-		return StringValue(os.ExpandEnv(arg.Str())), nil
+		return StringValue(os.Expand(arg.Str(), func(name string) string {
+			if !envAllowed(name) {
+				return ""
+			}
+			return os.Getenv(name)
+		})), nil
 	}
 	setFastArg1("expand", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {

@@ -45,6 +45,9 @@ func newVM(o vmOptions) *VM {
 		o.capabilities&CapEnvironmentRead != 0,
 		o.capabilities&CapEnvironmentWrite != 0,
 	)
+	if o.environmentVars != nil {
+		interp.SetEnvironmentAllowlist(o.environmentVars)
+	}
 	if o.maxSteps > 0 {
 		interp.SetMaxSteps(o.maxSteps)
 		o.useJIT = false
