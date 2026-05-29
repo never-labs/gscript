@@ -2,7 +2,7 @@ group := sync.group()
 out := make(chan, 4)
 
 for i := 1; i <= 4; i++ {
-    group.start(func(v) {
+    group.start(func(ctx, v) {
         out <- v * v
     }, i)
 }

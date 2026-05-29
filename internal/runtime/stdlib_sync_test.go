@@ -45,19 +45,61 @@ func TestSyncTaskGroup(t *testing.T) {
 	interp := runSyncTestScript(t, `
 group := sync.group()
 for i := 1; i <= 4; i++ {
-    group.start(func(v) {
+    group.start(func(ctx, v) {
         if v == 3 {
             error("bad task")
         }
     }, i)
 }
 ok, err, count := group.wait()
+ctxCancelled := group.context().cancelled()
 `)
 	if got := interp.GetGlobal("ok"); !got.IsBool() || got.Bool() {
 		t.Fatalf("ok = %v, want false", got)
 	}
 	if got := interp.GetGlobal("err"); !got.IsString() || got.Str() == "" {
 		t.Fatalf("err = %v, want non-empty string", got)
+	}
+	if got := interp.GetGlobal("count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("count = %v, want 1", got)
+	}
+	if got := interp.GetGlobal("ctxCancelled"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("ctxCancelled = %v, want true", got)
+	}
+}
+
+func TestSyncTaskGroupCancelsSiblingTasks(t *testing.T) {
+	interp := runSyncTestScript(t, `
+group := sync.group()
+ctx := group.context()
+out := make(chan, 2)
+
+group.start(func(ctx) {
+    error("first failure")
+})
+
+group.start(func(ctx) {
+    ok, err := time.sleep(ctx, 0.05)
+    out <- ok
+    out <- err
+})
+
+ok, err, count := group.wait()
+sleptOK := <-out
+sleepErr := <-out
+cancelled := ctx.cancelled()
+`)
+	if got := interp.GetGlobal("ok"); !got.IsBool() || got.Bool() {
+		t.Fatalf("ok = %v, want false", got)
+	}
+	if got := interp.GetGlobal("cancelled"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("cancelled = %v, want true", got)
+	}
+	if got := interp.GetGlobal("sleptOK"); !got.IsBool() || got.Bool() {
+		t.Fatalf("sleptOK = %v, want false", got)
+	}
+	if got := interp.GetGlobal("sleepErr"); !got.IsString() || got.Str() != "cancelled" {
+		t.Fatalf("sleepErr = %v, want cancelled", got)
 	}
 	if got := interp.GetGlobal("count"); !got.IsInt() || got.Int() != 1 {
 		t.Fatalf("count = %v, want 1", got)

@@ -2357,13 +2357,14 @@ func TestSyncGroupUsesIsolatedChildVMs(t *testing.T) {
 	proto := compileProto(t, `
 group := sync.group()
 for i := 1; i <= 4; i++ {
-	group.start(func(v) {
+	group.start(func(ctx, v) {
 		if v == 3 {
 			error("group-fail")
 		}
 	}, i)
 }
 ok, err, count := group.wait()
+ctxCancelled := group.context().cancelled()
 `)
 	globals := runtime.NewInterpreterGlobals()
 	v := New(globals)
@@ -2381,6 +2382,9 @@ ok, err, count := group.wait()
 		t.Fatalf("err = %v, want group-fail string", got)
 	}
 	expectGlobalInt(t, globals, "count", 1)
+	if got := globals["ctxCancelled"]; !got.IsBool() || !got.Bool() {
+		t.Fatalf("ctxCancelled = %v, want true", got)
+	}
 }
 
 func TestSelectDefaultWhenNoChannelReady(t *testing.T) {

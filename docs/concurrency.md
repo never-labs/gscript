@@ -45,7 +45,7 @@ The implementation uses isolated child VMs for `go` calls. Globals are snapshott
 
 `sync.waitgroup()` mirrors Go's coarse task-join pattern for scripts that need to wait for a fixed set of goroutines.
 
-`sync.group()` is the structured-concurrency form for joining background tasks and collecting failures. Use `group.start(fn, ...args)` to launch a task and `ok, err, count := group.wait()` to wait for completion. It returns `ok=true` when all tasks succeed; otherwise `ok=false`, `err` is the first error string, and `count` is the number of failed tasks. The group also exposes a `"go"` field for dynamic access, but the normal dot-call spelling is `start` because `go` is a statement keyword.
+`sync.group()` is the structured-concurrency form for joining background tasks and collecting failures. Use `group.start(fn, ...args)` to launch a task and `ok, err, count := group.wait()` to wait for completion. Each task receives the group context as its first argument. `group.context()` returns that context, and the group cancels it when the first task fails. It returns `ok=true` when all tasks succeed; otherwise `ok=false`, `err` is the first error string, and `count` is the number of failed tasks. `sync.group(ctx)` binds an existing context instead of creating one. The group also exposes a `"go"` field for dynamic access, but the normal dot-call spelling is `start` because `go` is a statement keyword.
 
 `sync.mutex()`, `sync.rwmutex()`, and `sync.once()` are host-backed coarse synchronization primitives. They are intended for shared heap objects that are explicitly touched by goroutines, without adding locks to ordinary local computation.
 

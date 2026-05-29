@@ -14,6 +14,9 @@ type scriptTaskGroup struct {
 	mu       sync.Mutex
 	firstErr error
 	errCount int
+	ctx      Value
+	cancel   Value
+	call     SyncFunctionCaller
 }
 
 type scriptOnce struct {
@@ -57,10 +60,28 @@ func BuildSyncLibWithTaskLauncher(call SyncFunctionCaller, launch SyncTaskLaunch
 	t.RawSetString("group", FunctionValue(&GoFunction{
 		Name: "sync.group",
 		Fn: func(args []Value) ([]Value, error) {
-			return []Value{TableValue(newScriptTaskGroupTable(launch))}, nil
+			return syncGroupFromArgs(call, launch, args)
 		},
 	}))
 	return t
+}
+
+func syncGroupFromArgs(call SyncFunctionCaller, launch SyncTaskLauncher, args []Value) ([]Value, error) {
+	if len(args) == 0 || args[0].IsNil() {
+		state := newScriptContextState()
+		ctx := TableValue(newScriptContextTable(state))
+		cancel := scriptContextCancelValue(state)
+		return []Value{TableValue(newScriptTaskGroupTable(call, launch, ctx, cancel))}, nil
+	}
+	if !args[0].IsTable() {
+		return nil, fmt.Errorf("sync.group: context table expected")
+	}
+	ctx := args[0]
+	cancel := NilValue()
+	if c := ctx.Table().RawGetString("cancel"); c.IsFunction() {
+		cancel = c
+	}
+	return []Value{TableValue(newScriptTaskGroupTable(call, launch, ctx, cancel))}, nil
 }
 
 func defaultSyncTaskLauncher(call SyncFunctionCaller) SyncTaskLauncher {
@@ -130,8 +151,8 @@ func waitGroupAdd(state *scriptWaitGroup, delta int) (err error) {
 	return nil
 }
 
-func newScriptTaskGroupTable(launch SyncTaskLauncher) *Table {
-	state := &scriptTaskGroup{}
+func newScriptTaskGroupTable(call SyncFunctionCaller, launch SyncTaskLauncher, ctx, cancel Value) *Table {
+	state := &scriptTaskGroup{ctx: ctx, cancel: cancel, call: call}
 	if launch == nil {
 		launch = defaultSyncTaskLauncher(func(Value, []Value) ([]Value, error) {
 			return nil, fmt.Errorf("sync.group: no task launcher configured")
@@ -147,6 +168,9 @@ func newScriptTaskGroupTable(launch SyncTaskLauncher) *Table {
 			}
 			fn := args[0]
 			taskArgs := append([]Value(nil), args[1:]...)
+			if !state.ctx.IsNil() {
+				taskArgs = append([]Value{state.ctx}, taskArgs...)
+			}
 			state.wg.Add(1)
 			launch(fn, taskArgs, func(err error) {
 				state.record(err)
@@ -167,6 +191,19 @@ func newScriptTaskGroupTable(launch SyncTaskLauncher) *Table {
 			return []Value{BoolValue(true), NilValue(), IntValue(0)}, nil
 		},
 	}))
+	t.RawSetString("context", FunctionValue(&GoFunction{
+		Name: "sync.group.context",
+		Fn: func(args []Value) ([]Value, error) {
+			return []Value{state.ctx}, nil
+		},
+	}))
+	t.RawSetString("cancel", FunctionValue(&GoFunction{
+		Name: "sync.group.cancel",
+		Fn: func(args []Value) ([]Value, error) {
+			state.cancelGroup()
+			return []Value{NilValue()}, nil
+		},
+	}))
 	return t
 }
 
@@ -174,12 +211,17 @@ func (g *scriptTaskGroup) record(err error) {
 	if err == nil {
 		return
 	}
+	shouldCancel := false
 	g.mu.Lock()
 	if g.firstErr == nil {
 		g.firstErr = err
+		shouldCancel = true
 	}
 	g.errCount++
 	g.mu.Unlock()
+	if shouldCancel {
+		g.cancelGroup()
+	}
 }
 
 func (g *scriptTaskGroup) error() error {
@@ -192,6 +234,13 @@ func (g *scriptTaskGroup) errorCount() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.errCount
+}
+
+func (g *scriptTaskGroup) cancelGroup() {
+	if g == nil || g.cancel.IsNil() || g.call == nil {
+		return
+	}
+	_, _ = g.call(g.cancel, nil)
 }
 
 func newScriptMutexTable() *Table {

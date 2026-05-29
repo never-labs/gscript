@@ -5,7 +5,7 @@ func run(workers, n) {
     group := sync.group()
     out := make(chan, workers)
     for w := 1; w <= workers; w++ {
-        group.start(func(id) {
+        group.start(func(ctx, id) {
             sum := 0
             for i := 1; i <= n; i++ {
                 sum = sum + i + id
