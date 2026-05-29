@@ -104,38 +104,42 @@ const (
 )
 
 type vmOptions struct {
-	libs           LibFlags
-	capabilities   CapabilityFlags
-	requirePath    string
-	filesystemRoot string
-	maxSteps       int64
-	maxNativeCalls int64
-	maxCallDepth   int64
-	maxGoroutines  int64
-	maxChannelCap  int64
-	maxHostResult  int64
-	maxModuleBytes int64
-	maxModuleDepth int64
-	printFunc      func(args ...interface{})
-	useVM          bool // use bytecode VM instead of tree-walker
-	useJIT         bool // enable JIT compilation (implies useVM)
+	libs            LibFlags
+	capabilities    CapabilityFlags
+	requirePath     string
+	filesystemRoot  string
+	maxSteps        int64
+	maxNativeCalls  int64
+	maxCallDepth    int64
+	maxGoroutines   int64
+	maxChannelCap   int64
+	maxHostResult   int64
+	maxModuleBytes  int64
+	maxModuleDepth  int64
+	maxFSReadBytes  int64
+	maxFSWriteBytes int64
+	printFunc       func(args ...interface{})
+	useVM           bool // use bytecode VM instead of tree-walker
+	useJIT          bool // enable JIT compilation (implies useVM)
 }
 
 // SecurityPolicy groups production sandbox controls behind one auditable
 // embedding option. Zero-valued fields keep existing defaults.
 type SecurityPolicy struct {
-	Libs                 LibFlags
-	Capabilities         CapabilityFlags
-	MaxSteps             int64
-	MaxNativeCalls       int64
-	MaxCallDepth         int64
-	MaxGoroutines        int64
-	MaxChannelCapacity   int64
-	MaxHostResultBytes   int64
-	MaxModuleBytes       int64
-	MaxModuleDepth       int64
-	DisableJIT           bool
-	DisableModuleLoading bool
+	Libs                    LibFlags
+	Capabilities            CapabilityFlags
+	MaxSteps                int64
+	MaxNativeCalls          int64
+	MaxCallDepth            int64
+	MaxGoroutines           int64
+	MaxChannelCapacity      int64
+	MaxHostResultBytes      int64
+	MaxModuleBytes          int64
+	MaxModuleDepth          int64
+	MaxFilesystemReadBytes  int64
+	MaxFilesystemWriteBytes int64
+	DisableJIT              bool
+	DisableModuleLoading    bool
 }
 
 // Option configures a VM instance.
@@ -310,6 +314,12 @@ func WithSecurity(policy SecurityPolicy) Option {
 		if policy.MaxModuleDepth > 0 {
 			o.maxModuleDepth = policy.MaxModuleDepth
 		}
+		if policy.MaxFilesystemReadBytes > 0 {
+			o.maxFSReadBytes = policy.MaxFilesystemReadBytes
+		}
+		if policy.MaxFilesystemWriteBytes > 0 {
+			o.maxFSWriteBytes = policy.MaxFilesystemWriteBytes
+		}
 		if policy.DisableJIT {
 			o.useJIT = false
 		}
@@ -402,6 +412,25 @@ func WithMaxModuleBytes(max int64) Option {
 // cannot bypass file-loading checks.
 func WithMaxModuleDepth(max int64) Option {
 	return func(o *vmOptions) { o.maxModuleDepth = max }
+}
+
+// WithMaxFilesystemReadBytes limits bytes read into memory by fs.readfile()
+// and fs.copy(). It does not limit host-side CompileFile/ExecFile calls or
+// script source loading, which is controlled by WithMaxModuleBytes.
+//
+// When a filesystem-read limit is set, JIT execution is disabled so native code
+// cannot bypass filesystem checks.
+func WithMaxFilesystemReadBytes(max int64) Option {
+	return func(o *vmOptions) { o.maxFSReadBytes = max }
+}
+
+// WithMaxFilesystemWriteBytes limits bytes written by fs.writefile(),
+// fs.appendfile(), and fs.copy().
+//
+// When a filesystem-write limit is set, JIT execution is disabled so native
+// code cannot bypass filesystem checks.
+func WithMaxFilesystemWriteBytes(max int64) Option {
+	return func(o *vmOptions) { o.maxFSWriteBytes = max }
 }
 
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.

@@ -75,6 +75,14 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxModuleDepth(o.maxModuleDepth)
 		o.useJIT = false
 	}
+	if o.maxFSReadBytes > 0 {
+		interp.SetMaxFilesystemReadBytes(o.maxFSReadBytes)
+		o.useJIT = false
+	}
+	if o.maxFSWriteBytes > 0 {
+		interp.SetMaxFilesystemWriteBytes(o.maxFSWriteBytes)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {

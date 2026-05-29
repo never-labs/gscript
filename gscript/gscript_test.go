@@ -1681,18 +1681,20 @@ func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
 
 func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 	vm := gs.New(gs.WithJIT(), gs.WithSecurity(gs.SecurityPolicy{
-		Libs:                 gs.LibSafe,
-		Capabilities:         gs.CapSafe,
-		DisableModuleLoading: true,
-		DisableJIT:           true,
-		MaxSteps:             32,
-		MaxNativeCalls:       4,
-		MaxCallDepth:         8,
-		MaxGoroutines:        1,
-		MaxChannelCapacity:   2,
-		MaxHostResultBytes:   4,
-		MaxModuleBytes:       128,
-		MaxModuleDepth:       1,
+		Libs:                    gs.LibSafe,
+		Capabilities:            gs.CapSafe,
+		DisableModuleLoading:    true,
+		DisableJIT:              true,
+		MaxSteps:                32,
+		MaxNativeCalls:          4,
+		MaxCallDepth:            8,
+		MaxGoroutines:           1,
+		MaxChannelCapacity:      2,
+		MaxHostResultBytes:      4,
+		MaxModuleBytes:          128,
+		MaxModuleDepth:          1,
+		MaxFilesystemReadBytes:  128,
+		MaxFilesystemWriteBytes: 128,
 	}))
 	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
 		t.Fatal(err)
@@ -2056,6 +2058,86 @@ func TestFilesystemReadCapabilityControlsBytecodeFileLoadGlobals(t *testing.T) {
 				if gotType := publicAPIType(got); gotType != tc.wantFiles {
 					t.Fatalf("%s type = %v, want %s", name, gotType, tc.wantFiles)
 				}
+			}
+		})
+	}
+}
+
+func TestMaxFilesystemReadBytesLimitsFSReadFile(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "big.txt"), []byte("12345"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibFS),
+				gs.WithFilesystemRoot(root),
+				gs.WithMaxFilesystemReadBytes(4),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`content, readErr := fs.readfile("big.txt")`); err != nil {
+				t.Fatal(err)
+			}
+			content, err := vm.Get("content")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if content != nil {
+				t.Fatalf("content = %v, want nil", content)
+			}
+			readErr, err := vm.Get("readErr")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if msg, ok := readErr.(string); !ok || !strings.Contains(msg, "filesystem read byte limit exceeded (4)") {
+				t.Fatalf("readErr = %v, want read byte budget string", readErr)
+			}
+		})
+	}
+}
+
+func TestMaxFilesystemWriteBytesLimitsFSWriteFile(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibFS),
+				gs.WithFilesystemRoot(root),
+				gs.WithMaxFilesystemWriteBytes(4),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`ok, writeErr := fs.writefile("big.txt", "12345")`); err != nil {
+				t.Fatal(err)
+			}
+			ok, err := vm.Get("ok")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ok != nil {
+				t.Fatalf("ok = %v, want nil", ok)
+			}
+			writeErr, err := vm.Get("writeErr")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if msg, ok := writeErr.(string); !ok || !strings.Contains(msg, "filesystem write byte limit exceeded (4)") {
+				t.Fatalf("writeErr = %v, want write byte budget string", writeErr)
+			}
+			if _, err := os.Stat(filepath.Join(root, "big.txt")); !os.IsNotExist(err) {
+				t.Fatalf("big.txt stat err = %v, want not exist", err)
 			}
 		})
 	}

@@ -102,7 +102,8 @@ also exposes `WithSecurity(SecurityPolicy)`. The first implementation groups
 the controls that exist today: stdlib preset, host capabilities, module
 loading, JIT policy, step budget, native-call budget, call-depth budget,
 script goroutine limit, channel-capacity limit, host-result byte limit,
-module-byte limit, and module-depth limit.
+module-byte limit, module-depth limit, filesystem read-byte limit, and
+filesystem write-byte limit.
 
 `SecuritySandbox()` currently means:
 
@@ -176,6 +177,10 @@ Required controls:
   Host-side `CompileFile`/`ExecFile` calls are not counted.
 - `WithMaxModuleDepth`: limits nested filesystem-backed `require` chains.
   Built-in and preloaded modules do not consume this budget.
+- `WithMaxFilesystemReadBytes`: limits bytes read into memory by `fs.readfile`
+  and `fs.copy`.
+- `WithMaxFilesystemWriteBytes`: limits bytes written by `fs.writefile`,
+  `fs.appendfile`, and `fs.copy`.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
@@ -333,9 +338,13 @@ Current public root confinement:
 - Escapes through `..` are rejected with a filesystem access error. This
   applies to `fs` operations and script/module file loading paths that route
   through the interpreter-backed policy.
+- `WithMaxFilesystemReadBytes` limits `fs.readfile` and source-side `fs.copy`
+  reads; `WithMaxFilesystemWriteBytes` limits `fs.writefile`, `fs.appendfile`,
+  and destination-side `fs.copy` writes.
 - The current implementation performs lexical/absolute path cleaning. Full
   symlink-resolution policy, special-file denial, separate read/write roots,
-  and per-operation byte limits remain production roadmap items.
+  finer-grained operation permissions, and per-directory byte policy remain
+  production roadmap items.
 - When read and write access are both disabled, `fs`, `dofile`, and
   `loadfile` are removed from script
   globals. It does not by itself define the logical stdlib allowlist; use

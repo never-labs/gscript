@@ -50,12 +50,9 @@ func (interp *Interpreter) SetFilesystemCapabilities(read, write bool) {
 		return
 	}
 	interp.filesystemEnabled = true
-	if v, ok := interp.globals.Get("fs"); ok && v.IsTable() {
-		fs := TableValue(buildFSLibWithCapabilities(interp.filesystemRoot, read, write))
-		interp.globals.Define("fs", fs)
-		interp.modules["fs"] = fs
-		interp.markPackageLoaded("fs", fs)
-	}
+	interp.filesystemRead = read
+	interp.filesystemWrite = write
+	interp.refreshFSLib()
 	if !read {
 		interp.globals.Delete("dofile")
 		interp.globals.Delete("loadfile")
@@ -68,10 +65,10 @@ func buildFSLib(roots ...string) *Table {
 	if len(roots) > 0 {
 		root = roots[0]
 	}
-	return buildFSLibWithCapabilities(root, true, true)
+	return buildFSLibWithCapabilities(root, true, true, 0, 0)
 }
 
-func buildFSLibWithCapabilities(root string, read, write bool) *Table {
+func buildFSLibWithCapabilities(root string, read, write bool, maxReadBytes, maxWriteBytes int64) *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -106,6 +103,25 @@ func buildFSLibWithCapabilities(root string, read, write bool) *Table {
 			}
 			return fn(args)
 		})
+	}
+	checkReadSize := func(path string) error {
+		if maxReadBytes <= 0 {
+			return nil
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if info.Size() > maxReadBytes {
+			return fmt.Errorf("filesystem read byte limit exceeded (%d)", maxReadBytes)
+		}
+		return nil
+	}
+	checkWriteSize := func(size int64) error {
+		if maxWriteBytes <= 0 || size <= maxWriteBytes {
+			return nil
+		}
+		return fmt.Errorf("filesystem write byte limit exceeded (%d)", maxWriteBytes)
 	}
 
 	// fs.exists(path) -> bool
@@ -185,6 +201,9 @@ func buildFSLibWithCapabilities(root string, read, write bool) *Table {
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
+		if err := checkReadSize(p); err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
 		data, err := os.ReadFile(p)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -201,6 +220,9 @@ func buildFSLibWithCapabilities(root string, read, write bool) *Table {
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
+		if err := checkWriteSize(int64(len(args[1].Str()))); err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
 		err = os.WriteFile(p, []byte(args[1].Str()), 0644)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -215,6 +237,9 @@ func buildFSLibWithCapabilities(root string, read, write bool) *Table {
 		}
 		p, err := resolveSandboxPath(root, args[0].Str())
 		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if err := checkWriteSize(int64(len(args[1].Str()))); err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -375,6 +400,18 @@ func buildFSLibWithCapabilities(root string, read, write bool) *Table {
 		dstPath, err := resolveSandboxPath(root, args[1].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if err := checkReadSize(srcPath); err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+		if maxWriteBytes > 0 {
+			info, err := os.Stat(srcPath)
+			if err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
+			if err := checkWriteSize(info.Size()); err != nil {
+				return []Value{NilValue(), StringValue(err.Error())}, nil
+			}
 		}
 
 		srcFile, err := os.Open(srcPath)

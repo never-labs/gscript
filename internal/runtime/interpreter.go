@@ -22,6 +22,8 @@ type Interpreter struct {
 	scriptDir         string           // directory of the main script (for require path resolution)
 	moduleLoading     bool             // require() may load .gs files from the filesystem
 	filesystemEnabled bool             // script-side file APIs may access the filesystem
+	filesystemRead    bool             // fs read operations are enabled
+	filesystemWrite   bool             // fs write operations are enabled
 	filesystemRoot    string           // optional root for script-side filesystem access
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
@@ -44,6 +46,8 @@ type Interpreter struct {
 	maxHostResult     int64 // <=0 means unlimited
 	maxModuleBytes    int64 // <=0 means unlimited
 	maxModuleDepth    int64 // <=0 means unlimited
+	maxFSReadBytes    int64 // <=0 means unlimited
+	maxFSWriteBytes   int64 // <=0 means unlimited
 	moduleDepth       int64
 	ctx               context.Context
 }
@@ -57,6 +61,8 @@ func New() *Interpreter {
 		gcRunning:         true,
 		moduleLoading:     true,
 		filesystemEnabled: true,
+		filesystemRead:    true,
+		filesystemWrite:   true,
 		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()
@@ -165,7 +171,10 @@ func (interp *Interpreter) SetModuleLoading(enabled bool) {
 // dofile, and loadfile.
 func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 	interp.filesystemEnabled = enabled
+	interp.filesystemRead = enabled
+	interp.filesystemWrite = enabled
 	if enabled {
+		interp.refreshFSLib()
 		return
 	}
 	interp.globals.Delete("fs")
@@ -180,8 +189,15 @@ func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 // the same policy.
 func (interp *Interpreter) SetFilesystemRoot(root string) {
 	interp.filesystemRoot = root
+	interp.refreshFSLib()
+}
+
+func (interp *Interpreter) refreshFSLib() {
+	if !interp.filesystemEnabled {
+		return
+	}
 	if v, ok := interp.globals.Get("fs"); ok && v.IsTable() {
-		fs := TableValue(buildFSLib(root))
+		fs := TableValue(buildFSLibWithCapabilities(interp.filesystemRoot, interp.filesystemRead, interp.filesystemWrite, interp.maxFSReadBytes, interp.maxFSWriteBytes))
 		interp.globals.Define("fs", fs)
 		interp.modules["fs"] = fs
 		interp.markPackageLoaded("fs", fs)
@@ -300,6 +316,20 @@ func (interp *Interpreter) SetMaxModuleBytes(max int64) {
 // and pre-registered modules do not consume this budget.
 func (interp *Interpreter) SetMaxModuleDepth(max int64) {
 	interp.maxModuleDepth = max
+}
+
+// SetMaxFilesystemReadBytes limits bytes read into memory by fs.readfile and
+// fs.copy. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxFilesystemReadBytes(max int64) {
+	interp.maxFSReadBytes = max
+	interp.refreshFSLib()
+}
+
+// SetMaxFilesystemWriteBytes limits bytes written by fs.writefile,
+// fs.appendfile, and fs.copy. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxFilesystemWriteBytes(max int64) {
+	interp.maxFSWriteBytes = max
+	interp.refreshFSLib()
 }
 
 // SetContext installs a host cancellation context checked at interpreter

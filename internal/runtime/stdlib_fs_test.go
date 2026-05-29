@@ -42,7 +42,7 @@ func runWithFSPathCaps(t *testing.T, src string, read, write bool) (*Interpreter
 		t.Fatalf("parse error: %v", err)
 	}
 	interp := New()
-	interp.globals.Define("fs", TableValue(buildFSLibWithCapabilities("", read, write)))
+	interp.globals.Define("fs", TableValue(buildFSLibWithCapabilities("", read, write, 0, 0)))
 	interp.globals.Define("path", TableValue(buildPathLib()))
 	// Provide the temp dir as a global for tests to use
 	interp.globals.Define("tmpDir", StringValue(tmpDir))

@@ -33,8 +33,9 @@ extensions:
   `WithFilesystemWrite`, `WithFilesystemRoot`, `WithRequirePath`,
   `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
   `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithMaxHostResultBytes`,
-  `WithMaxModuleBytes`, `WithMaxModuleDepth`, `WithPrint`, `WithVM`,
-  `WithJIT`, and `WithTracing`.
+  `WithMaxModuleBytes`, `WithMaxModuleDepth`,
+  `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, `WithPrint`,
+  `WithVM`, `WithJIT`, and `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -256,6 +257,9 @@ Current sandbox gaps:
 - `WithMaxModuleBytes` limits bytes read by script-side loading APIs such as
   `require`, `dofile`, `loadfile`, and `script.loadFile`.
 - `WithMaxModuleDepth` limits nested filesystem-backed `require` chains.
+- `WithMaxFilesystemReadBytes` limits bytes read into memory by `fs.readfile`
+  and `fs.copy`; `WithMaxFilesystemWriteBytes` limits `fs.writefile`,
+  `fs.appendfile`, and `fs.copy` writes.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven
@@ -392,8 +396,9 @@ boundaries. Timeouts should return a distinguishable error, for example
 
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
-`WithMaxHostResultBytes`, `WithMaxModuleBytes`, and `WithMaxModuleDepth` are
-the first production-limits APIs. A full
+`WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
+`WithMaxFilesystemReadBytes`, and `WithMaxFilesystemWriteBytes` are the first
+production-limits APIs. A full
 production limits object should still cover wall time, allocation/table sizes,
 module count, and host-call duration policy.
 
@@ -462,7 +467,8 @@ safe built-in modules require-able.
 prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
-`WithMaxHostResultBytes`, `WithMaxModuleBytes`, and `WithMaxModuleDepth`.
+`WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
+`WithMaxFilesystemReadBytes`, and `WithMaxFilesystemWriteBytes`.
 
 `WithSecurity(SecurityPolicy{...})` is the grouped form of the same controls.
 It is intended for production embedders that want one auditable policy object
@@ -470,7 +476,8 @@ instead of a long option list. The current struct covers implemented controls:
 stdlib preset, host capability bits, module loading, JIT disablement, step
 budget, native-call budget, call-depth budget, script goroutine limit,
 channel-capacity limit, host-result byte limit, module-byte limit, and
-module-depth limit.
+module-depth limit, filesystem read-byte limit, and filesystem write-byte
+limit.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the

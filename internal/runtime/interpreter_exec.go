@@ -286,6 +286,8 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				maxHostResult:    interp.maxHostResult,
 				maxModuleBytes:   interp.maxModuleBytes,
 				maxModuleDepth:   interp.maxModuleDepth,
+				maxFSReadBytes:   interp.maxFSReadBytes,
+				maxFSWriteBytes:  interp.maxFSWriteBytes,
 			}
 			childInterp.callFunction(fn, args)
 		}()
@@ -319,6 +321,8 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				maxHostResult:    interp.maxHostResult,
 				maxModuleBytes:   interp.maxModuleBytes,
 				maxModuleDepth:   interp.maxModuleDepth,
+				maxFSReadBytes:   interp.maxFSReadBytes,
+				maxFSWriteBytes:  interp.maxFSWriteBytes,
 			}
 			childInterp.callFunction(method, args)
 		}()
