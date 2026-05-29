@@ -782,6 +782,48 @@ func (s *SoA) Sum(columnName string) (Value, error) {
 	return DenseArrayReduce(DenseArrayReduceSum, col)
 }
 
+func (s *SoA) Min(columnName string) (Value, error) {
+	return s.reduceColumn(columnName, DenseArrayReduceMin)
+}
+
+func (s *SoA) Max(columnName string) (Value, error) {
+	return s.reduceColumn(columnName, DenseArrayReduceMax)
+}
+
+func (s *SoA) Mean(columnName string) (Value, error) {
+	return s.reduceColumn(columnName, DenseArrayReduceMean)
+}
+
+func (s *SoA) Stats(columnName string) (*Table, error) {
+	v, err := s.StatsValue(columnName)
+	if err != nil {
+		return nil, err
+	}
+	return v.Table(), nil
+}
+
+func (s *SoA) StatsValue(columnName string) (Value, error) {
+	if s == nil {
+		return NilValue(), fmt.Errorf("soa is nil")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return NilValue(), fmt.Errorf("soa column %q not found", columnName)
+	}
+	return col.StatsValue()
+}
+
+func (s *SoA) reduceColumn(columnName string, op DenseArrayReduceOp) (Value, error) {
+	if s == nil {
+		return NilValue(), fmt.Errorf("soa is nil")
+	}
+	col, ok := s.Column(columnName)
+	if !ok {
+		return NilValue(), fmt.Errorf("soa column %q not found", columnName)
+	}
+	return DenseArrayReduce(op, col)
+}
+
 func (s *SoA) SumWhere(columnName string, mask *DenseArray) (Value, error) {
 	if s == nil {
 		return NilValue(), fmt.Errorf("soa is nil")

@@ -402,6 +402,14 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 		if tableSlot < len(regs) && keySlot < len(regs) {
 			tblVal := regs[tableSlot]
 			keyVal := regs[keySlot]
+			if keyVal.IsString() {
+				if v, ok := tblVal.FixedRecordRawGetString(keyVal.Str()); ok {
+					if resultSlot < len(regs) {
+						regs[resultSlot] = v
+					}
+					break
+				}
+			}
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
 				var result runtime.Value
@@ -556,6 +564,12 @@ func (cf *CompiledFunction) executeTableExit(ctx *ExecContext, regs []runtime.Va
 			tblVal := regs[tableSlot]
 			fieldName := cf.Proto.Constants[constIdx].Str()
 			pc := int(ctx.TableKeySlot)
+			if v, ok := tblVal.FixedRecordRawGetString(fieldName); ok {
+				if resultSlot < len(regs) {
+					regs[resultSlot] = v
+				}
+				break
+			}
 			if tblVal.IsTable() {
 				tbl := tblVal.Table()
 				var result runtime.Value

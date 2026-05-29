@@ -1580,6 +1580,14 @@ func (a *DenseArray) StatsWhere(mask *DenseArray) (*Table, error) {
 	}
 }
 
+func (a *DenseArray) Stats() (*Table, error) {
+	v, err := a.StatsValue()
+	if err != nil {
+		return nil, err
+	}
+	return v.Table(), nil
+}
+
 func (a *DenseArray) extremeWhere(mask *DenseArray, max bool) (Value, error) {
 	if a == nil || mask == nil {
 		return NilValue(), ErrDenseArrayOperand

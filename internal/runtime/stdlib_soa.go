@@ -326,20 +326,14 @@ func buildSoALib() *Table {
 		return []Value{SoAValue(out)}, nil
 	}, soaGatherValue)
 
+	indicesCache := &soaIndicesWhereCache{}
 	setFastArg2("indicesWhere", func(args []Value) ([]Value, error) {
-		s, err := requireSoAArg("soa.indicesWhere", args, 0)
+		out, err := indicesCache.args("soa.indicesWhere", args)
 		if err != nil {
 			return nil, err
 		}
-		if len(args) < 2 || !args[1].IsDenseArray() {
-			return nil, fmt.Errorf("soa.indicesWhere: argument 2 must be a bool dense array")
-		}
-		out, err := s.IndicesWhere(args[1].DenseArray())
-		if err != nil {
-			return nil, err
-		}
-		return []Value{DenseArrayValue(out)}, nil
-	}, soaIndicesWhereValue)
+		return []Value{out}, nil
+	}, indicesCache.value)
 
 	setFastArg4("scatterInto", func(args []Value) ([]Value, error) {
 		s, err := requireSoAArg("soa.scatterInto", args, 0)
@@ -490,6 +484,39 @@ func buildSoALib() *Table {
 		}
 		return []Value{v}, nil
 	}, soaSumValue)
+
+	setFastArg2("min", func(args []Value) ([]Value, error) {
+		v, err := soaColumnReduceArgs("soa.min", args, (*SoA).Min)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaMinValue)
+
+	setFastArg2("max", func(args []Value) ([]Value, error) {
+		v, err := soaColumnReduceArgs("soa.max", args, (*SoA).Max)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaMaxValue)
+
+	setFastArg2("mean", func(args []Value) ([]Value, error) {
+		v, err := soaColumnReduceArgs("soa.mean", args, (*SoA).Mean)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, soaMeanValue)
+
+	statsCache := &soaStatsCache{}
+	setFastArg2("stats", func(args []Value) ([]Value, error) {
+		v, err := statsCache.args("soa.stats", args)
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
+	}, statsCache.value)
 
 	setFastArg3("sumWhere", func(args []Value) ([]Value, error) {
 		v, err := soaMaskedAggregateArgs("soa.sumWhere", args, (*SoA).SumWhere)
@@ -655,26 +682,14 @@ func buildSoALib() *Table {
 		return []Value{v}, nil
 	}, soaCountWhereValue)
 
+	maskCache := &soaMaskCache{}
 	setFastArg4("mask", func(args []Value) ([]Value, error) {
-		s, err := requireSoAArg("soa.mask", args, 0)
+		out, err := maskCache.args("soa.mask", args)
 		if err != nil {
 			return nil, err
 		}
-		if len(args) < 2 || !args[1].IsString() {
-			return nil, fmt.Errorf("soa.mask: argument 2 must be a string")
-		}
-		if len(args) < 3 || !args[2].IsString() {
-			return nil, fmt.Errorf("soa.mask: argument 3 must be a comparison string")
-		}
-		if len(args) < 4 {
-			return nil, fmt.Errorf("soa.mask: argument 4 is required")
-		}
-		out, err := s.Mask(args[1].Str(), args[2].Str(), args[3])
-		if err != nil {
-			return nil, err
-		}
-		return []Value{DenseArrayValue(out)}, nil
-	}, soaMaskValue)
+		return []Value{out}, nil
+	}, maskCache.value)
 
 	return t
 }
@@ -882,13 +897,234 @@ func (c *soaAffineManyTermCache) clearPlan() {
 }
 
 func soaSumValue(soaValue, columnValue Value) (Value, error) {
+	return soaColumnReduceValue("soa.sum", soaValue, columnValue, (*SoA).Sum)
+}
+
+func soaMinValue(soaValue, columnValue Value) (Value, error) {
+	return soaColumnReduceValue("soa.min", soaValue, columnValue, (*SoA).Min)
+}
+
+func soaMaxValue(soaValue, columnValue Value) (Value, error) {
+	return soaColumnReduceValue("soa.max", soaValue, columnValue, (*SoA).Max)
+}
+
+func soaMeanValue(soaValue, columnValue Value) (Value, error) {
+	return soaColumnReduceValue("soa.mean", soaValue, columnValue, (*SoA).Mean)
+}
+
+type soaStatsCache struct {
+	soa     *SoA
+	column  string
+	array   *DenseArray
+	version uint64
+	valueV  Value
+}
+
+func (c *soaStatsCache) value(soaValue, columnValue Value) (Value, error) {
 	if !soaValue.IsSoA() {
-		return NilValue(), fmt.Errorf("soa.sum: argument 1 must be soa")
+		return NilValue(), fmt.Errorf("soa.stats: argument 1 must be soa")
 	}
 	if !columnValue.IsString() {
-		return NilValue(), fmt.Errorf("soa.sum: argument 2 must be a string")
+		return NilValue(), fmt.Errorf("soa.stats: argument 2 must be a string")
 	}
-	return soaValue.SoA().Sum(columnValue.Str())
+	s := soaValue.SoA()
+	name := columnValue.Str()
+	col, ok := s.Column(name)
+	if !ok {
+		return NilValue(), fmt.Errorf("soa column %q not found", name)
+	}
+	version := col.Version()
+	if c.soa == s && c.array == col && c.column == name && c.version == version && !c.valueV.IsNil() {
+		return c.valueV, nil
+	}
+	v, err := col.StatsValue()
+	if err != nil {
+		return NilValue(), err
+	}
+	c.soa = s
+	c.column = name
+	c.array = col
+	c.version = version
+	c.valueV = v
+	return v, nil
+}
+
+func (c *soaStatsCache) args(name string, args []Value) (Value, error) {
+	if len(args) < 2 {
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a string", name)
+	}
+	return c.value(args[0], args[1])
+}
+
+func soaStatsValue(soaValue, columnValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.stats: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.stats: argument 2 must be a string")
+	}
+	return soaValue.SoA().StatsValue(columnValue.Str())
+}
+
+type soaIndicesWhereCache struct {
+	soa           *SoA
+	mask          *DenseArray
+	maskVersion   uint64
+	result        *DenseArray
+	resultVersion uint64
+}
+
+func (c *soaIndicesWhereCache) value(soaValue, maskValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.indicesWhere: argument 1 must be soa")
+	}
+	if !maskValue.IsDenseArray() {
+		return NilValue(), fmt.Errorf("soa.indicesWhere: argument 2 must be a bool dense array")
+	}
+	s := soaValue.SoA()
+	mask := maskValue.DenseArray()
+	if mask == nil || mask.DType() != DenseArrayBool {
+		return NilValue(), fmt.Errorf("soa indicesWhere mask must be a bool dense array")
+	}
+	maskVersion := mask.Version()
+	if c.soa == s && c.mask == mask && c.maskVersion == maskVersion && c.result != nil && c.result.Version() == c.resultVersion {
+		return DenseArrayValue(c.result), nil
+	}
+	out, err := s.IndicesWhere(mask)
+	if err != nil {
+		return NilValue(), err
+	}
+	c.soa = s
+	c.mask = mask
+	c.maskVersion = maskVersion
+	c.result = out
+	c.resultVersion = out.Version()
+	return DenseArrayValue(out), nil
+}
+
+func (c *soaIndicesWhereCache) args(name string, args []Value) (Value, error) {
+	if len(args) < 2 {
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a bool dense array", name)
+	}
+	return c.value(args[0], args[1])
+}
+
+type soaMaskCache struct {
+	next int
+	rows [2]soaMaskCacheEntry
+}
+
+type soaMaskCacheEntry struct {
+	soa           *SoA
+	leftName      string
+	op            string
+	rhs           Value
+	left          *DenseArray
+	right         *DenseArray
+	leftVersion   uint64
+	rightVersion  uint64
+	result        *DenseArray
+	resultVersion uint64
+}
+
+func (c *soaMaskCache) value(soaValue, columnValue, opValue, rhsValue Value) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("soa.mask: argument 1 must be soa")
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.mask: argument 2 must be a string")
+	}
+	if !opValue.IsString() {
+		return NilValue(), fmt.Errorf("soa.mask: argument 3 must be a comparison string")
+	}
+	s := soaValue.SoA()
+	leftName := columnValue.Str()
+	op := opValue.Str()
+	left, ok := s.Column(leftName)
+	if !ok {
+		return NilValue(), fmt.Errorf("soa column %q not found", leftName)
+	}
+	var right *DenseArray
+	if rhsValue.IsString() {
+		var ok bool
+		right, ok = s.Column(rhsValue.Str())
+		if !ok {
+			return NilValue(), fmt.Errorf("soa column %q not found", rhsValue.Str())
+		}
+	} else if rhsValue.IsDenseArray() {
+		right = rhsValue.DenseArray()
+	}
+	leftVersion := left.Version()
+	rightVersion := uint64(0)
+	if right != nil {
+		rightVersion = right.Version()
+	}
+	for i := range c.rows {
+		row := &c.rows[i]
+		if row.soa == s &&
+			row.left == left &&
+			row.right == right &&
+			row.leftName == leftName &&
+			row.op == op &&
+			row.rhs == rhsValue &&
+			row.leftVersion == leftVersion &&
+			row.rightVersion == rightVersion &&
+			row.result != nil &&
+			row.result.Version() == row.resultVersion {
+			return DenseArrayValue(row.result), nil
+		}
+	}
+	out, err := s.Mask(leftName, op, rhsValue)
+	if err != nil {
+		return NilValue(), err
+	}
+	row := &c.rows[c.next%len(c.rows)]
+	c.next++
+	row.soa = s
+	row.leftName = leftName
+	row.op = op
+	row.rhs = rhsValue
+	row.left = left
+	row.right = right
+	row.leftVersion = leftVersion
+	row.rightVersion = rightVersion
+	row.result = out
+	row.resultVersion = out.Version()
+	return DenseArrayValue(out), nil
+}
+
+func (c *soaMaskCache) args(name string, args []Value) (Value, error) {
+	if len(args) < 2 || !args[1].IsString() {
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a string", name)
+	}
+	if len(args) < 3 || !args[2].IsString() {
+		return NilValue(), fmt.Errorf("%s: argument 3 must be a comparison string", name)
+	}
+	if len(args) < 4 {
+		return NilValue(), fmt.Errorf("%s: argument 4 is required", name)
+	}
+	return c.value(args[0], args[1], args[2], args[3])
+}
+
+func soaColumnReduceArgs(name string, args []Value, fn func(*SoA, string) (Value, error)) (Value, error) {
+	s, err := requireSoAArg(name, args, 0)
+	if err != nil {
+		return NilValue(), err
+	}
+	if len(args) < 2 || !args[1].IsString() {
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a string", name)
+	}
+	return fn(s, args[1].Str())
+}
+
+func soaColumnReduceValue(name string, soaValue, columnValue Value, fn func(*SoA, string) (Value, error)) (Value, error) {
+	if !soaValue.IsSoA() {
+		return NilValue(), fmt.Errorf("%s: argument 1 must be soa", name)
+	}
+	if !columnValue.IsString() {
+		return NilValue(), fmt.Errorf("%s: argument 2 must be a string", name)
+	}
+	return fn(soaValue.SoA(), columnValue.Str())
 }
 
 func soaLenValue(soaValue Value) (Value, error) {

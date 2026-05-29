@@ -286,6 +286,24 @@ dependent updates into separate calls to preserve order.
 
 Reduces one numeric dense column and returns its sum.
 
+### `soa.min(s, column) -> number`
+
+Returns the minimum value in one numeric dense column.
+
+### `soa.max(s, column) -> number`
+
+Returns the maximum value in one numeric dense column.
+
+### `soa.mean(s, column) -> number`
+
+Returns the arithmetic mean of one numeric dense column as a float.
+
+### `soa.stats(s, column) -> table`
+
+Computes `count`, `sum`, `min`, `max`, and `mean` for one numeric dense column
+in a single pass. Prefer this over separate `min`, `max`, and `mean` calls when
+multiple aggregate values are needed.
+
 ### `soa.scan(s, column) -> dense array`
 
 Returns an inclusive prefix sum for a numeric dense column. The output dtype

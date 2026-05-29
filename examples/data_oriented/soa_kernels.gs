@@ -55,6 +55,9 @@ check("addScaled result", soa.column(points, "x")[1] == 6 && soa.column(points, 
 check("affine", soa.affine(points, "x", "velocity", 2, 1))
 check("affine result", soa.column(points, "x")[3] == 61)
 check("sum", soa.sum(points, "x") == 204)
+check("min/max/mean", soa.min(points, "x") == 21 && soa.max(points, "x") == 81 && soa.mean(points, "x") == 51)
+fullStats := soa.stats(points, "x")
+check("stats", fullStats.count == 4 && fullStats.mean == 51)
 
 check("affineWhere", soa.affineWhere(points, "x", "velocity", 0.1, []bool{true, false, true, false}, 1))
 check("affineWhere masked result", soa.column(points, "x")[1] == 2 && soa.column(points, "x")[2] == 41)

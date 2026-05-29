@@ -116,6 +116,10 @@ maskedMean := soa.meanWhere(points, "x", []bool{true, false, true})
 maskedMax := soa.maxWhere(points, "x", []bool{true, false, true})
 maskedStats := soa.statsWhere(points, "x", []bool{true, false, true})
 maskedCount := soa.countWhere(points, []bool{true, false, true})
+fullMin := soa.min(points, "x")
+fullMax := soa.max(points, "x")
+fullMean := soa.mean(points, "x")
+fullStats := soa.stats(points, "x")
 resized := soa.zip({x: []f64{1, 2}, id: []i64{10, 20}, ok: []bool{true, false}})
 resizeGrowOK := soa.resize(resized, 3)
 resizeAppendOK := soa.appendRow(resized, {x: 4, id: 40, ok: true})
@@ -207,6 +211,18 @@ fillWhereOK := soa.fillWhere(filled, "ok", []bool{true, false, true}, true)
 	}
 	if got := interp.GetGlobal("maskedCount"); !got.IsInt() || got.Int() != 2 {
 		t.Fatalf("maskedCount = %v, want 2", got)
+	}
+	if got := interp.GetGlobal("fullMin"); !got.IsFloat() || got.Float() != 1 {
+		t.Fatalf("fullMin = %v, want 1", got)
+	}
+	if got := interp.GetGlobal("fullMax"); !got.IsFloat() || got.Float() != 42 {
+		t.Fatalf("fullMax = %v, want 42", got)
+	}
+	if got := interp.GetGlobal("fullMean"); !got.IsFloat() || got.Float() != 46.0/3.0 {
+		t.Fatalf("fullMean = %v, want %v", got, 46.0/3.0)
+	}
+	if got := interp.GetGlobal("fullStats").Table().RawGetString("mean"); !got.IsFloat() || got.Float() != 46.0/3.0 {
+		t.Fatalf("fullStats.mean = %v, want %v", got, 46.0/3.0)
 	}
 	if got := interp.GetGlobal("resizeGrowOK"); !got.IsBool() || !got.Bool() {
 		t.Fatalf("resizeGrowOK = %v, want true", got)
@@ -441,6 +457,10 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	affineWhere := lib.RawGetString("affineWhere").GoFunction()
 	affineMany := lib.RawGetString("affineMany").GoFunction()
 	sum := lib.RawGetString("sum").GoFunction()
+	minFn := lib.RawGetString("min").GoFunction()
+	maxFn := lib.RawGetString("max").GoFunction()
+	meanFn := lib.RawGetString("mean").GoFunction()
+	statsFn := lib.RawGetString("stats").GoFunction()
 	sumWhere := lib.RawGetString("sumWhere").GoFunction()
 	scan := lib.RawGetString("scan").GoFunction()
 	scanInto := lib.RawGetString("scanInto").GoFunction()
@@ -519,6 +539,18 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if sum == nil || sum.FastArg2 == nil {
 		t.Fatal("soa.sum FastArg2 is nil")
+	}
+	if minFn == nil || minFn.FastArg2 == nil {
+		t.Fatal("soa.min FastArg2 is nil")
+	}
+	if maxFn == nil || maxFn.FastArg2 == nil {
+		t.Fatal("soa.max FastArg2 is nil")
+	}
+	if meanFn == nil || meanFn.FastArg2 == nil {
+		t.Fatal("soa.mean FastArg2 is nil")
+	}
+	if statsFn == nil || statsFn.FastArg2 == nil {
+		t.Fatal("soa.stats FastArg2 is nil")
 	}
 	if sumWhere == nil || sumWhere.FastArg3 == nil {
 		t.Fatal("soa.sumWhere FastArg3 is nil")
@@ -667,6 +699,34 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 	if got.Number() != 39 {
 		t.Fatalf("soa.sum FastArg2 = %s, want 39", got.String())
+	}
+	got, err = minFn.FastArg2(soaValue, StringValue("v"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number() != 4 {
+		t.Fatalf("soa.min FastArg2 = %s, want 4", got.String())
+	}
+	got, err = maxFn.FastArg2(soaValue, StringValue("v"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number() != 25 {
+		t.Fatalf("soa.max FastArg2 = %s, want 25", got.String())
+	}
+	got, err = meanFn.FastArg2(soaValue, StringValue("v"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number() != 13 {
+		t.Fatalf("soa.mean FastArg2 = %s, want 13", got.String())
+	}
+	got, err = statsFn.FastArg2(soaValue, StringValue("v"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Table().RawGetString("mean").Number() != 13 {
+		t.Fatalf("soa.stats FastArg2 mean = %s, want 13", got.Table().RawGetString("mean").String())
 	}
 	got, err = sumWhere.FastArg3(soaValue, StringValue("v"), DenseArrayValue(NewDenseArrayBool([]bool{true, false, true})))
 	if err != nil {

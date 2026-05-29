@@ -248,6 +248,10 @@ Current API contract:
 | `soa.affineWhere(s, dst, src, scale, mask, bias)` | In-place masked affine kernel that updates only mask-true rows. |
 | `soa.affineMany(s, terms)` | Runs independent affine terms. Destination columns must be unique, and a source column may not also be written in the same call. |
 | `soa.sum(s, column)` | Reduces a numeric dense column and returns the sum. |
+| `soa.min(s, column)` | Returns the minimum numeric dense-column value. |
+| `soa.max(s, column)` | Returns the maximum numeric dense-column value. |
+| `soa.mean(s, column)` | Returns the mean numeric dense-column value as a float. |
+| `soa.stats(s, column)` | Computes count, sum, min, max, and mean in one full-column pass. |
 | `soa.scan(s, column)` | Returns an inclusive prefix sum dense array for a numeric column. |
 | `soa.scanInto(s, dst, src)` | Writes an inclusive prefix sum from `src` into `dst`. |
 | `soa.clamp(s, column, min, max)` | Returns a dense array with a numeric column clamped to `min..max`. |
