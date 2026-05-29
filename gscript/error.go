@@ -213,6 +213,7 @@ func runtimeError(err error, file string) *Error {
 var (
 	stepBudgetErrorRE       = regexp.MustCompile(`execution step limit exceeded \(([0-9]+)\)`)
 	nativeCallBudgetErrorRE = regexp.MustCompile(`native call limit exceeded \(([0-9]+)\)`)
+	callDepthBudgetErrorRE  = regexp.MustCompile(`call depth limit exceeded \(([0-9]+)\)`)
 )
 
 func budgetErrorFrom(err error) *BudgetError {
@@ -233,6 +234,11 @@ func budgetErrorFrom(err error) *BudgetError {
 	if len(matches) == 2 {
 		limit, _ := strconv.ParseInt(matches[1], 10, 64)
 		return &BudgetError{Resource: "native_calls", Limit: limit, Err: err}
+	}
+	matches = callDepthBudgetErrorRE.FindStringSubmatch(msg)
+	if len(matches) == 2 {
+		limit, _ := strconv.ParseInt(matches[1], 10, 64)
+		return &BudgetError{Resource: "call_depth", Limit: limit, Err: err}
 	}
 	return nil
 }

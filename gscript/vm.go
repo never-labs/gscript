@@ -51,6 +51,10 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxNativeCalls(o.maxNativeCalls)
 		o.useJIT = false
 	}
+	if o.maxCallDepth > 0 {
+		interp.SetMaxCallDepth(o.maxCallDepth)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -153,6 +157,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxNativeCalls > 0 {
 				bvm.SetMaxNativeCalls(vm.opts.maxNativeCalls)
 			}
+			if vm.opts.maxCallDepth > 0 {
+				bvm.SetMaxCallDepth(vm.opts.maxCallDepth)
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -162,6 +169,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			}
 			if vm.opts.maxNativeCalls > 0 {
 				bvm.SetMaxNativeCalls(vm.opts.maxNativeCalls)
+			}
+			if vm.opts.maxCallDepth > 0 {
+				bvm.SetMaxCallDepth(vm.opts.maxCallDepth)
 			}
 		}
 		bvm.SetContext(activeRunContext(ctx))

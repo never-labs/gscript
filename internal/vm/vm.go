@@ -103,6 +103,7 @@ type VM struct {
 	steps                int64
 	maxNativeCalls       int64 // <=0 means unlimited
 	nativeCalls          int64
+	maxCallDepth         int64 // <=0 means the VM default
 	ctx                  context.Context
 }
 
@@ -128,6 +129,12 @@ func (vm *VM) SetMaxSteps(max int64) {
 func (vm *VM) SetMaxNativeCalls(max int64) {
 	vm.maxNativeCalls = max
 	vm.nativeCalls = 0
+}
+
+// SetMaxCallDepth sets the maximum number of active bytecode call frames. A
+// non-positive value restores the VM default.
+func (vm *VM) SetMaxCallDepth(max int64) {
+	vm.maxCallDepth = max
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -175,6 +182,13 @@ func (vm *VM) recordFastNativeCall(gf *runtime.GoFunction) error {
 	}
 	runtime.RecordRuntimePathNativeCallFastFor(gf)
 	return nil
+}
+
+func (vm *VM) callDepthLimit() int {
+	if vm.maxCallDepth > 0 && vm.maxCallDepth < int64(maxCallDepth) {
+		return int(vm.maxCallDepth)
+	}
+	return maxCallDepth
 }
 
 // Regs returns the register file. Used by the JIT executor.
@@ -265,11 +279,12 @@ func (vm *VM) PushFrameWithBorrowedVarargs(cl *Closure, base int, varargs []runt
 }
 
 func (vm *VM) ensureFrameSlot() bool {
+	limit := vm.callDepthLimit()
+	if vm.frameCount >= limit {
+		return false
+	}
 	if vm.frameCount < len(vm.frames) {
 		return true
-	}
-	if vm.frameCount >= maxCallDepth {
-		return false
 	}
 	newLen := len(vm.frames) * 2
 	if newLen == 0 {
@@ -278,8 +293,8 @@ func (vm *VM) ensureFrameSlot() bool {
 	if newLen <= vm.frameCount {
 		newLen = vm.frameCount + 1
 	}
-	if newLen > maxCallDepth {
-		newLen = maxCallDepth
+	if newLen > limit {
+		newLen = limit
 	}
 	newFrames := make([]CallFrame, newLen)
 	copy(newFrames, vm.frames)
@@ -756,6 +771,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		coroutineStats:     parent.coroutineStats,
 		maxSteps:           parent.maxSteps,
 		maxNativeCalls:     parent.maxNativeCalls,
+		maxCallDepth:       parent.maxCallDepth,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -833,6 +849,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		debugSink:          parent.debugSink,
 		maxSteps:           parent.maxSteps,
 		maxNativeCalls:     parent.maxNativeCalls,
+		maxCallDepth:       parent.maxCallDepth,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()
@@ -1018,7 +1035,7 @@ func (vm *VM) call(cl *Closure, args []runtime.Value, base int, numResults int) 
 
 	// Push frame
 	if !vm.ensureFrameSlot() {
-		return nil, fmt.Errorf("stack overflow (max call depth %d)", maxCallDepth)
+		return nil, fmt.Errorf("call depth limit exceeded (%d)", vm.callDepthLimit())
 	}
 	frame := &vm.frames[vm.frameCount]
 	frame.closure = cl
@@ -2302,7 +2319,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						}
 
 						if !vm.ensureFrameSlot() {
-							return nil, fmt.Errorf("stack overflow (max call depth %d)", maxCallDepth)
+							return nil, fmt.Errorf("call depth limit exceeded (%d)", vm.callDepthLimit())
 						}
 						newFrame := &vm.frames[vm.frameCount]
 						newFrame.closure = frame.closure
@@ -2407,7 +2424,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 
 				// Push new frame
 				if !vm.ensureFrameSlot() {
-					return nil, fmt.Errorf("stack overflow (max call depth %d)", maxCallDepth)
+					return nil, fmt.Errorf("call depth limit exceeded (%d)", vm.callDepthLimit())
 				}
 				newFrame := &vm.frames[vm.frameCount]
 				newFrame.closure = cl
@@ -2536,7 +2553,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 							}
 
 							if !vm.ensureFrameSlot() {
-								return nil, fmt.Errorf("stack overflow (max call depth %d)", maxCallDepth)
+								return nil, fmt.Errorf("call depth limit exceeded (%d)", vm.callDepthLimit())
 							}
 							newFrame := &vm.frames[vm.frameCount]
 							newFrame.closure = cl

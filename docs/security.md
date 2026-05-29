@@ -152,6 +152,9 @@ Required controls:
   host callbacks. This exists today for interpreter and bytecode VM execution,
   including bytecode stdlib fast paths. Setting this option disables JIT until
   compiled code debits the same counter.
+- `WithMaxCallDepth`: limits active function call depth in the interpreter and
+  bytecode VM. Setting this option disables JIT until compiled calls use the
+  same frame-depth checks.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
@@ -219,7 +222,8 @@ Call depth limits need to cover all call routes:
 
 Required controls:
 
-- `MaxCallDepth`: total active script frames.
+- `WithMaxCallDepth`: total active script/native frames. This exists today for
+  the interpreter and bytecode VM.
 - `MaxNativeCallDepth`: script to Go to script nesting.
 - `MaxMetaDepth`: `__index`, `__newindex`, `__call`, comparison, arithmetic,
   and `__tostring` recursion.

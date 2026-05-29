@@ -810,6 +810,9 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	}
 
 	if gf := fn.GoFunction(); gf != nil {
+		if err := interp.checkCallDepthBudget(); err != nil {
+			return nil, err
+		}
 		if err := interp.checkNativeCallBudget(); err != nil {
 			return nil, err
 		}
@@ -832,6 +835,9 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	cl := fn.Closure()
 	if cl == nil {
 		return nil, fmt.Errorf("attempt to call a nil function")
+	}
+	if err := interp.checkCallDepthBudget(); err != nil {
+		return nil, err
 	}
 
 	// Create a new environment for the function body.

@@ -246,6 +246,26 @@ func TestWithMaxNativeCallsLimitsInterpreterHostCalls(t *testing.T) {
 	}
 }
 
+func TestWithMaxCallDepthLimitsInterpreterRecursion(t *testing.T) {
+	vm := gs.New(gs.WithMaxCallDepth(8))
+	err := vm.Exec(`
+		func recurse(n) {
+			return recurse(n + 1)
+		}
+		recurse(0)
+	`)
+	if err == nil {
+		t.Fatal("expected call depth budget error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "call_depth" || budgetErr.Limit != 8 {
+		t.Fatalf("budget = %s %d, want call_depth 8", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
 func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
 	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
 	err := vm.Exec(`
@@ -323,6 +343,26 @@ func TestWithMaxNativeCallsLimitsBytecodeFastStdlibCalls(t *testing.T) {
 	}
 	if budgetErr.Resource != "native_calls" || budgetErr.Limit != 2 {
 		t.Fatalf("budget = %s %d, want native_calls 2", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
+func TestWithMaxCallDepthLimitsBytecodeRecursion(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithMaxCallDepth(8))
+	err := vm.Exec(`
+		func recurse(n) {
+			return recurse(n + 1)
+		}
+		recurse(0)
+	`)
+	if err == nil {
+		t.Fatal("expected call depth budget error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "call_depth" || budgetErr.Limit != 8 {
+		t.Fatalf("budget = %s %d, want call_depth 8", budgetErr.Resource, budgetErr.Limit)
 	}
 }
 

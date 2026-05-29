@@ -110,6 +110,7 @@ type vmOptions struct {
 	filesystemRoot string
 	maxSteps       int64
 	maxNativeCalls int64
+	maxCallDepth   int64
 	printFunc      func(args ...interface{})
 	useVM          bool // use bytecode VM instead of tree-walker
 	useJIT         bool // enable JIT compilation (implies useVM)
@@ -276,6 +277,15 @@ func WithMaxSteps(max int64) Option {
 // cannot bypass host-call budget checkpoints.
 func WithMaxNativeCalls(max int64) Option {
 	return func(o *vmOptions) { o.maxNativeCalls = max }
+}
+
+// WithMaxCallDepth limits active script/native function call depth. A
+// non-positive value uses the runtime default.
+//
+// When a call-depth limit is set, JIT execution is disabled so native code
+// cannot bypass frame-depth checkpoints.
+func WithMaxCallDepth(max int64) Option {
+	return func(o *vmOptions) { o.maxCallDepth = max }
 }
 
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.

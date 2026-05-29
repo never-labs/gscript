@@ -35,6 +35,7 @@ type Interpreter struct {
 	steps             int64
 	maxNativeCalls    int64 // <=0 means unlimited
 	nativeCalls       int64
+	maxCallDepth      int64 // <=0 means unlimited
 	ctx               context.Context
 }
 
@@ -255,6 +256,12 @@ func (interp *Interpreter) SetMaxNativeCalls(max int64) {
 	interp.nativeCalls = 0
 }
 
+// SetMaxCallDepth sets the maximum number of active function calls. A
+// non-positive value disables the limit.
+func (interp *Interpreter) SetMaxCallDepth(max int64) {
+	interp.maxCallDepth = max
+}
+
 // SetContext installs a host cancellation context checked at interpreter
 // statement/loop checkpoints. A nil context disables cancellation polling.
 func (interp *Interpreter) SetContext(ctx context.Context) {
@@ -290,6 +297,16 @@ func (interp *Interpreter) checkNativeCallBudget() error {
 	interp.nativeCalls++
 	if interp.nativeCalls > interp.maxNativeCalls {
 		return fmt.Errorf("native call limit exceeded (%d)", interp.maxNativeCalls)
+	}
+	return nil
+}
+
+func (interp *Interpreter) checkCallDepthBudget() error {
+	if interp.maxCallDepth <= 0 {
+		return nil
+	}
+	if int64(len(interp.callStack)) >= interp.maxCallDepth {
+		return fmt.Errorf("call depth limit exceeded (%d)", interp.maxCallDepth)
 	}
 	return nil
 }
