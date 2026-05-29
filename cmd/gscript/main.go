@@ -184,13 +184,7 @@ func main() {
 
 	args := flag.Args()
 	if len(args) > 0 && args[0] == "test" {
-		if len(args) != 2 {
-			fmt.Fprintln(os.Stderr, "usage: gscript test <path-or-dir>")
-			os.Exit(2)
-		}
-		if ok := runTests(args[1], runOpts, os.Stderr); !ok {
-			os.Exit(1)
-		}
+		os.Exit(runTestCommand(args[1:], runOpts, os.Stdout, os.Stderr))
 		return
 	}
 
@@ -718,19 +712,89 @@ func runScriptFile(interp *runtime.Interpreter, filename string, args []string, 
 	return runFile(interp, filename)
 }
 
+func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	format := fs.String("format", "text", "output format: text or json")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *format != "text" && *format != "json" {
+		fmt.Fprintf(errw, "gscript test: unsupported --format %q (want text or json)\n", *format)
+		return 2
+	}
+	paths := fs.Args()
+	if len(paths) != 1 {
+		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] <path-or-dir>")
+		return 2
+	}
+	result := runTestsDetailed(paths[0], opts, errw, *format == "text")
+	if *format == "json" {
+		if err := json.NewEncoder(outw).Encode(result); err != nil {
+			fmt.Fprintf(errw, "gscript test: write json: %v\n", err)
+			return 1
+		}
+	}
+	if !result.OK {
+		return 1
+	}
+	return 0
+}
+
+type testRunResult struct {
+	OK     bool             `json:"ok"`
+	Total  int              `json:"total"`
+	Passed int              `json:"passed"`
+	Failed int              `json:"failed"`
+	Files  []testFileResult `json:"files"`
+}
+
+type testFileResult struct {
+	File       string `json:"file"`
+	OK         bool   `json:"ok"`
+	Golden     string `json:"golden,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Expected   string `json:"expected,omitempty"`
+	Actual     string `json:"actual,omitempty"`
+	ExitCodeOK bool   `json:"exit_code_ok,omitempty"`
+}
+
 func runTests(path string, opts cliRunOptions, errw io.Writer) bool {
+	return runTestsDetailed(path, opts, errw, true).OK
+}
+
+func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool) testRunResult {
 	files, err := testFiles(path)
 	if err != nil {
-		fmt.Fprintf(errw, "%s: %v\n", path, err)
-		return false
+		if text {
+			fmt.Fprintf(errw, "%s: %v\n", path, err)
+		}
+		return testRunResult{
+			OK:     false,
+			Total:  1,
+			Failed: 1,
+			Files:  []testFileResult{{File: path, OK: false, Error: err.Error()}},
+		}
 	}
 
-	ok := true
+	result := testRunResult{
+		OK:    true,
+		Total: len(files),
+		Files: make([]testFileResult, 0, len(files)),
+	}
 	for _, filename := range files {
+		fileResult := testFileResult{File: filename, OK: true}
 		golden, hasGolden, err := testGoldenOutputFile(filename)
+		if hasGolden {
+			fileResult.Golden = golden
+		}
 		if err != nil {
-			fmt.Fprintf(errw, "%s: %v\n", filename, err)
-			ok = false
+			fileResult.OK = false
+			fileResult.Error = fmt.Sprintf("stat golden %s: %v", golden, err)
+			if text {
+				fmt.Fprintf(errw, "%s: %s\n", filename, fileResult.Error)
+			}
+			result.Files = append(result.Files, fileResult)
 			continue
 		}
 
@@ -744,29 +808,51 @@ func runTests(path string, opts cliRunOptions, errw io.Writer) bool {
 		}
 		if runErr != nil {
 			if exit, isExit := processExit(runErr); isExit && exit.Code == 0 {
-				runErr = nil
+				fileResult.ExitCodeOK = true
 			} else {
-				fmt.Fprintf(errw, "%s: %v\n", filename, runErr)
-				ok = false
+				fileResult.OK = false
+				fileResult.Error = runErr.Error()
+				if text {
+					fmt.Fprintf(errw, "%s: %v\n", filename, runErr)
+				}
+				result.Files = append(result.Files, fileResult)
 				continue
 			}
 		}
 		if !hasGolden {
+			result.Files = append(result.Files, fileResult)
 			continue
 		}
 
 		expected, err := os.ReadFile(golden)
 		if err != nil {
-			fmt.Fprintf(errw, "%s: read golden %s: %v\n", filename, golden, err)
-			ok = false
+			fileResult.OK = false
+			fileResult.Error = fmt.Sprintf("read golden %s: %v", golden, err)
+			if text {
+				fmt.Fprintf(errw, "%s: %s\n", filename, fileResult.Error)
+			}
+			result.Files = append(result.Files, fileResult)
 			continue
 		}
 		if !bytes.Equal(stdout, expected) {
-			fmt.Fprintf(errw, "%s: stdout mismatch with %s\n%s", filename, golden, stdoutDiff(expected, stdout))
-			ok = false
+			fileResult.OK = false
+			fileResult.Expected = string(expected)
+			fileResult.Actual = string(stdout)
+			if text {
+				fmt.Fprintf(errw, "%s: stdout mismatch with %s\n%s", filename, golden, stdoutDiff(expected, stdout))
+			}
+		}
+		result.Files = append(result.Files, fileResult)
+	}
+	for _, file := range result.Files {
+		if file.OK {
+			result.Passed++
+		} else {
+			result.Failed++
 		}
 	}
-	return ok
+	result.OK = result.Failed == 0
+	return result
 }
 
 func testGoldenOutputFile(filename string) (string, bool, error) {

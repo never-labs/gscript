@@ -182,6 +182,80 @@ func TestRunTestsReportsGoldenStdoutMismatch(t *testing.T) {
 	}
 }
 
+func TestRunTestCommandJSONReportsResults(t *testing.T) {
+	dir := t.TempDir()
+	okPath := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(okPath, []byte("print(\"ok\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(okPath, ".gs")+".out", []byte("ok\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if !result.OK || result.Total != 1 || result.Passed != 1 || result.Failed != 0 {
+		t.Fatalf("result = %+v, want one passing test", result)
+	}
+	if len(result.Files) != 1 || result.Files[0].File != okPath || !result.Files[0].OK {
+		t.Fatalf("files = %+v, want passing %s", result.Files, okPath)
+	}
+}
+
+func TestRunTestCommandJSONReportsFailures(t *testing.T) {
+	dir := t.TempDir()
+	badPath := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(badPath, []byte("print(\"actual\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(badPath, ".gs")+".out", []byte("expected\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runTestCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if result.OK || result.Total != 1 || result.Passed != 0 || result.Failed != 1 {
+		t.Fatalf("result = %+v, want one failing test", result)
+	}
+	if len(result.Files) != 1 || result.Files[0].Error != "" || result.Files[0].Expected != "expected\n" || result.Files[0].Actual != "actual\n" {
+		t.Fatalf("file result = %+v, want stdout mismatch payload", result.Files)
+	}
+}
+
+func TestRunTestCommandRejectsUnsupportedFormat(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=xml", "x.gs"}, cliRunOptions{}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runTestCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "unsupported --format") {
+		t.Fatalf("stderr = %q, want unsupported format", stderr.String())
+	}
+}
+
 func TestFmtCheckReportsUnformattedFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "needs_fmt.gs")

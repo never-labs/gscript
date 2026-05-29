@@ -49,8 +49,9 @@ schema。
   `-tier2-perf-stats-json`、`-tier2-spec-state-json`、
   `-tier2-spec-worklist-json`、`-jit-op-audit`、`-jit-op-audit-json`、
   `-coroutine-stats`、`-runtime-path-stats`、`-runtime-path-stats-json`。
-- `gscript test <path-or-dir>` 递归运行 `.gs` 文件，可用同名 `.out` 做
-  stdout golden 对比。
+- `gscript test [--format=text|json] <path-or-dir>` 递归运行 `.gs` 文件，可用
+  同名 `.out` 做 stdout golden 对比；JSON output reports per-file status for
+  CI integrations.
 - `gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
   解析并规范基础空白。
 - `gscript lint [--format=text|json|sarif] <path-or-dir> [...]` 解析文件/目录并报告
