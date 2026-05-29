@@ -511,6 +511,17 @@ func (vm *VM) RegisterModule(name string, members Module) error {
 	return nil
 }
 
+// RegisterModuleFrom exposes exported fields and methods from source as a
+// Go-backed module. It is a convenience wrapper around ModuleFrom followed by
+// RegisterModule.
+func (vm *VM) RegisterModuleFrom(name string, source interface{}, opts ...ModuleFromOption) error {
+	members, err := ModuleFrom(source, opts...)
+	if err != nil {
+		return err
+	}
+	return vm.RegisterModule(name, members)
+}
+
 // BindStruct registers a Go struct type as a GScript class.
 // proto should be a zero value or example of the struct (e.g. Vec2{} or &Vec2{}).
 //

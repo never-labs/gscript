@@ -88,6 +88,21 @@ vm.RegisterModule("go/strings", gs.Module{"upper": strings.ToUpper})
 vm.Exec(`strings := require("go/strings"); result := strings.upper("hello")`)
 ```
 
+For service structs or third-party clients, `RegisterModuleFrom` can export
+public fields and methods without a hand-written module map:
+
+```go
+type Jobs struct{ Prefix string }
+func (j *Jobs) Label(id int64) string { return fmt.Sprintf("%s-%03d", j.Prefix, id) }
+
+vm.RegisterModuleFrom("go/jobs", &Jobs{Prefix: "job"})
+vm.Exec(`jobs := require("go/jobs"); result := jobs.label(7)`)
+```
+
+Exported Go names are lower-camel-cased by default (`Label` becomes `label`).
+Use `WithModuleExactNames` or `WithModuleNameMapper` when a host wants an exact
+or custom script-facing API.
+
 Registered host modules are available through `require(name)` even when
 filesystem-backed module loading is disabled. A sandboxed embedding should
 register only the `go/...` modules it intends scripts to access.

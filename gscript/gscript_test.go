@@ -15,6 +15,20 @@ import (
 	"github.com/gscript/gscript/internal/runtime"
 )
 
+type hostModuleService struct {
+	Prefix string
+	count  int64
+}
+
+func (s *hostModuleService) Label(id int64) string {
+	return fmt.Sprintf("%s-%03d", s.Prefix, id)
+}
+
+func (s *hostModuleService) Bump() int64 {
+	s.count++
+	return s.count
+}
+
 // --- Basic VM tests ---
 
 func TestExec(t *testing.T) {
@@ -534,6 +548,52 @@ result := strings.upper("hello")
 	}
 	if val != "HELLO" {
 		t.Fatalf("result = %v, want HELLO", val)
+	}
+}
+
+func TestRegisterModuleFromService(t *testing.T) {
+	vm := gs.New(gs.WithSandbox(), gs.WithModuleLoading(false))
+	service := &hostModuleService{Prefix: "job"}
+	if err := vm.RegisterModuleFrom("go/host", service); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Exec(`
+host := require("go/host")
+label := host.label(7)
+prefix := host.prefix
+first := host.bump()
+second := host.bump()
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := vm.Get("label"); err != nil || got != "job-007" {
+		t.Fatalf("label = %v, %v; want job-007, nil", got, err)
+	}
+	if got, err := vm.Get("prefix"); err != nil || got != "job" {
+		t.Fatalf("prefix = %v, %v; want job, nil", got, err)
+	}
+	if got, err := vm.Get("second"); err != nil || got != int64(2) {
+		t.Fatalf("second = %v, %v; want 2, nil", got, err)
+	}
+}
+
+func TestRegisterModuleFromExactNames(t *testing.T) {
+	vm := gs.New()
+	service := &hostModuleService{Prefix: "task"}
+	if err := vm.RegisterModuleFrom("go/exact", service, gs.WithModuleExactNames()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Exec(`
+host := require("go/exact")
+result := host.Label(3)
+`); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := vm.Get("result"); err != nil || got != "task-003" {
+		t.Fatalf("result = %v, %v; want task-003, nil", got, err)
 	}
 }
 
