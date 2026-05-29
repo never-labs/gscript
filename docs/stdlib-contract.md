@@ -64,7 +64,7 @@ JIT fast path policy:
 | `net` | Privileged host | network client/server helpers | runtime error for bad arguments; `nil, err` or result table for network failures | runtime specialization for stdlib host driver cases; VM fallback |
 | `os` | Privileged host | environment, args, pid/host, file remove/rename, process exit | runtime error for bad arguments; `nil, err` or sentinel for host failures depending on Lua-compatible API | VM fallback |
 | `path` | Bounded host | host filepath rules and current platform separators | runtime error for bad arguments; `nil, err` for invalid rel/match cases | VM fallback |
-| `process` | Privileged host | subprocess execution, shell, env, cwd, args, exit | runtime error for bad arguments; result table for run/exec; `nil, err` for lookup/setup failures | runtime specialization for stdlib host driver cases; VM fallback |
+| `process` | Privileged host | subprocess execution, cancellable run, shell, env, cwd, args, exit | runtime error for bad arguments; result table for run/exec/cancelled run; `nil, err` for lookup/setup failures | runtime specialization for stdlib host driver cases; VM fallback |
 | `rand` | Bounded host | PRNG state and random byte generation | runtime error for invalid ranges/options | VM fallback |
 | `regexp` | Pure | none; Go RE2 compile/match/replace/split | runtime error for bad arguments; `nil, err` for invalid patterns in non-must APIs | runtime specialization for regexp hot driver cases; VM fallback |
 | `rl` | Privileged host | optional raylib window, drawing, input, audio; default build is a stub | runtime error for invalid calls; stub-safe sentinel behavior when bindings are unavailable | VM fallback |

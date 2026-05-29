@@ -36,6 +36,7 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 	}
 
 	// process.run(cmd [, opts]) -- run command, return {ok, stdout, stderr, code}
+	// process.run(ctx, cmd [, opts]) -- run command until ctx is cancelled.
 	// opts: {stdin=str, env={}, dir=str, timeout=seconds}
 	// cmd can be a string (split by spaces) or a table of args
 	set("run", func(args []Value) ([]Value, error) {
@@ -43,17 +44,30 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'process.run'")
 		}
 
+		var done *Channel
+		var errFn Value
+		argOffset := 0
+		if d, e, ok := contextDoneAndErr(args[0]); ok {
+			done = d
+			errFn = e
+			argOffset = 1
+			if len(args) < 2 {
+				return nil, fmt.Errorf("bad argument #2 to 'process.run'")
+			}
+		}
+
 		var cmdArgs []string
-		if args[0].IsString() {
-			cmdArgs = strings.Fields(args[0].Str())
-		} else if args[0].IsTable() {
-			tbl := args[0].Table()
+		cmdVal := args[argOffset]
+		if cmdVal.IsString() {
+			cmdArgs = strings.Fields(cmdVal.Str())
+		} else if cmdVal.IsTable() {
+			tbl := cmdVal.Table()
 			length := tbl.Length()
 			for i := int64(1); i <= int64(length); i++ {
 				cmdArgs = append(cmdArgs, tbl.RawGet(IntValue(i)).String())
 			}
 		} else {
-			return nil, fmt.Errorf("bad argument #1 to 'process.run' (string or table expected)")
+			return nil, fmt.Errorf("bad argument #%d to 'process.run' (string or table expected)", argOffset+1)
 		}
 
 		if len(cmdArgs) == 0 {
@@ -65,8 +79,9 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		var dir string
 		var timeout time.Duration
 
-		if len(args) >= 2 && args[1].IsTable() {
-			opts := args[1].Table()
+		optsIndex := argOffset + 1
+		if len(args) > optsIndex && args[optsIndex].IsTable() {
+			opts := args[optsIndex].Table()
 			if v := opts.RawGet(StringValue("stdin")); v.IsString() {
 				stdinStr = v.Str()
 			}
@@ -86,13 +101,29 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 			}
 		}
 
-		var ctx context.Context
+		ctx := context.Background()
 		var cancel context.CancelFunc
 		if timeout > 0 {
-			ctx, cancel = context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+			ctx, cancel = context.WithTimeout(ctx, timeout)
 		} else {
-			ctx = context.Background()
+			ctx, cancel = context.WithCancel(ctx)
+		}
+		defer cancel()
+
+		stopWatch := make(chan struct{})
+		if done != nil {
+			defer close(stopWatch)
+			go func() {
+				select {
+				case _, ok := <-done.ch:
+					if !ok {
+						cancel()
+						return
+					}
+					cancel()
+				case <-stopWatch:
+				}
+			}()
 		}
 
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
@@ -112,8 +143,22 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		err := cmd.Run()
 		exitCode := 0
 		ok := true
+		cancelled := false
+		errVal := NilValue()
 		if err != nil {
 			ok = false
+			if ctx.Err() != nil {
+				cancelled = true
+				if done != nil {
+					errVal = contextErrValue(errFn)
+				} else if ctx.Err() == context.DeadlineExceeded {
+					errVal = StringValue("deadline exceeded")
+				} else {
+					errVal = StringValue(ctx.Err().Error())
+				}
+			} else {
+				errVal = StringValue(err.Error())
+			}
 			if exitErr, isExit := err.(*exec.ExitError); isExit {
 				exitCode = exitErr.ExitCode()
 			} else {
@@ -126,6 +171,8 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		result.RawSet(StringValue("stdout"), StringValue(stdout.String()))
 		result.RawSet(StringValue("stderr"), StringValue(stderr.String()))
 		result.RawSet(StringValue("code"), IntValue(int64(exitCode)))
+		result.RawSet(StringValue("cancelled"), BoolValue(cancelled))
+		result.RawSet(StringValue("err"), errVal)
 
 		return []Value{TableValue(result)}, nil
 	})

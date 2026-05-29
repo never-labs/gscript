@@ -34,6 +34,7 @@ Supported core forms:
 - `time.after(seconds)` for timeout channels in `select`
 - `context.withCancel()` and `context.withTimeout(seconds)` for shared cancellation
 - `time.sleep(ctx, seconds)` for cancellable sleep
+- `process.run(ctx, cmd, opts)` for cancellable subprocesses
 
 The implementation uses isolated child VMs for `go` calls. Globals are snapshotted for lock-light reads, while heap objects such as tables and channels are shared by pointer. This keeps ordinary single-threaded code on the existing fast path.
 
@@ -48,3 +49,5 @@ The implementation uses isolated child VMs for `go` calls. Globals are snapshott
 `context.withCancel()` returns `ctx, cancel`. `ctx.done` is closed when the context is cancelled, `ctx.cancelled()` reports the state, and `ctx.err()` returns `"cancelled"` or `"deadline exceeded"`. `context.withTimeout(seconds)` uses the same shape and cancels automatically after the deadline.
 
 `time.sleep(ctx, seconds)` returns `true, nil` when the sleep completes or `false, err` when `ctx.done` closes first. `time.sleep(seconds)` remains the simple blocking form.
+
+`process.run(ctx, cmd, opts)` kills the subprocess if `ctx.done` closes first and returns a result table with `ok=false`, `cancelled=true`, and `err`.

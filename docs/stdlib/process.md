@@ -6,7 +6,7 @@ The `process` library provides functions for running external commands and inter
 
 ### process.run(cmd [, opts]) -> table
 
-Run an external command and return a result table with `{ok, stdout, stderr, code}`.
+Run an external command and return a result table with `{ok, stdout, stderr, code, cancelled, err}`.
 
 `cmd` can be a string (split by spaces) or a table of arguments.
 
@@ -25,6 +25,16 @@ result := process.run("echo hello")
 
 result := process.run({"ls", "-la"})
 result := process.run("cat", {stdin: "hello"})
+```
+
+`process.run(ctx, cmd [, opts])` cancels the subprocess when `ctx.done` closes.
+
+```
+ctx, cancel := context.withTimeout(1.0)
+result := process.run(ctx, {"sh", "-c", "sleep 10"})
+-- result.ok == false
+-- result.cancelled == true
+-- result.err == "deadline exceeded"
 ```
 
 ### process.exec(cmd, ...) -> string [, error]

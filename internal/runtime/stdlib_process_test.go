@@ -71,6 +71,34 @@ func TestProcessRun(t *testing.T) {
 	}
 }
 
+func TestProcessRunContextCancelled(t *testing.T) {
+	interp := New()
+	interp.registerStdlib()
+	execOnInterp(t, interp, `
+ctx, cancel := context.withTimeout(0.01)
+_ = cancel
+result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
+`)
+
+	v := interp.GetGlobal("result")
+	if !v.IsTable() {
+		t.Fatalf("expected table result, got %s", v.TypeName())
+	}
+	tbl := v.Table()
+	if tbl.RawGet(StringValue("ok")).Bool() {
+		t.Fatalf("expected ok=false")
+	}
+	if !tbl.RawGet(StringValue("cancelled")).Bool() {
+		t.Fatalf("expected cancelled=true")
+	}
+	if got := tbl.RawGet(StringValue("err")); !got.IsString() || got.Str() != "deadline exceeded" {
+		t.Fatalf("err = %v, want deadline exceeded", got)
+	}
+	if strings.Contains(tbl.RawGet(StringValue("stdout")).Str(), "late") {
+		t.Fatalf("process was not cancelled before late output")
+	}
+}
+
 func TestProcessShell(t *testing.T) {
 	interp := New()
 	interp.globals.Define("process", TableValue(buildProcessLib()))
