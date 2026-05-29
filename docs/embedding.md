@@ -282,6 +282,8 @@ Current sandbox gaps:
 - `WithTestkitAccess(false)` disables script-visible `testkit` diagnostics.
 - `WithProcessExecution(false)` disables `process.run`, `process.exec`, and
   `process.which`; `WithProcessShell(false)` disables `process.shell`.
+  `process.run` working directories are confined by `WithFilesystemRoot` when
+  a filesystem root is configured.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven

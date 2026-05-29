@@ -139,6 +139,13 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 			}
 			if v := opts.RawGet(StringValue("dir")); v.IsString() {
 				dir = v.Str()
+				if interp != nil && interp.filesystemRoot != "" {
+					resolved, err := interp.resolveFilesystemPath(dir)
+					if err != nil {
+						return nil, err
+					}
+					dir = resolved
+				}
 			}
 			if v := opts.RawGet(StringValue("timeout")); v.IsNumber() {
 				timeout = time.Duration(toFloat(v) * float64(time.Second))

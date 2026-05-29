@@ -13,7 +13,8 @@ Run an external command and return a result table with `{ok, stdout, stderr, cod
 Options table:
 - `stdin` (string) -- string to pass as standard input
 - `env` (table) -- additional environment variables `{KEY: "value"}`
-- `dir` (string) -- working directory
+- `dir` (string) -- working directory; when the host configures
+  `WithFilesystemRoot`, this directory must stay inside that root
 - `timeout` (number) -- timeout in seconds
 
 ```

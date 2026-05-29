@@ -1947,6 +1947,32 @@ func TestWithProcessExecutionFalseBlocksRunExecAndWhich(t *testing.T) {
 	}
 }
 
+func TestWithFilesystemRootConfinesProcessRunDir(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibProcess),
+				gs.WithFilesystemRoot(root),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			src := fmt.Sprintf(`result := process.run({"pwd"}, {dir: %q})`, outside)
+			err := vm.Exec(src)
+			if err == nil || !strings.Contains(err.Error(), "filesystem access denied") {
+				t.Fatalf("process.run dir escape err = %v, want filesystem access denied", err)
+			}
+		})
+	}
+}
+
 func TestWithNetworkAccessFalseBlocksNetAndHTTP(t *testing.T) {
 	for _, tc := range []struct {
 		name string

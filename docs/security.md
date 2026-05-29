@@ -388,7 +388,8 @@ Process policy:
   execution is explicitly needed. Current public API exposes this as
   `WithProcessShell(enabled)` and `SecurityPolicy.DisableProcessShell`.
 - Environment default empty or allowlisted.
-- Working directory must pass filesystem policy.
+- `process.run` working directory must pass `WithFilesystemRoot` confinement
+  when a filesystem root is configured.
 - Enforce timeout, stdout/stderr byte limits, stdin byte limits, and process
   tree cleanup on cancellation. `WithMaxHostResultBytes` currently bounds
   captured `process.run`, `process.exec`, and `process.shell` output.
