@@ -332,7 +332,7 @@ func buildCapabilities() cliCapabilities {
 				Stability: "whitespace-normalizer",
 			},
 			Linter: cliLinterCapability{
-				Formats: []string{"text", "json"},
+				Formats: []string{"text", "json", "sarif"},
 				Codes:   []string{"GS0001", "GS1001"},
 			},
 			Test: cliTestCapability{
@@ -469,17 +469,17 @@ func parseLintDiagnosticPosition(message string) (int, int) {
 func runLintCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("lint", flag.ContinueOnError)
 	fs.SetOutput(errw)
-	format := fs.String("format", "text", "output format: text or json")
+	format := fs.String("format", "text", "output format: text, json, or sarif")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *format != "text" && *format != "json" {
-		fmt.Fprintf(errw, "gscript lint: unsupported --format %q (want text or json)\n", *format)
+	if *format != "text" && *format != "json" && *format != "sarif" {
+		fmt.Fprintf(errw, "gscript lint: unsupported --format %q (want text, json, or sarif)\n", *format)
 		return 2
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {
-		fmt.Fprintln(errw, "usage: gscript lint [--format=text|json] <path-or-dir> [...]")
+		fmt.Fprintln(errw, "usage: gscript lint [--format=text|json|sarif] <path-or-dir> [...]")
 		return 2
 	}
 
@@ -504,6 +504,11 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 			fmt.Fprintf(errw, "gscript lint: write json: %v\n", err)
 			return 1
 		}
+	} else if *format == "sarif" {
+		if err := writeLintSARIF(outw, diagnostics); err != nil {
+			fmt.Fprintf(errw, "gscript lint: write sarif: %v\n", err)
+			return 1
+		}
 	} else {
 		for _, diagnostic := range diagnostics {
 			if diagnostic.text != "" {
@@ -518,6 +523,114 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+type sarifLog struct {
+	Version string     `json:"version"`
+	Schema  string     `json:"$schema"`
+	Runs    []sarifRun `json:"runs"`
+}
+
+type sarifRun struct {
+	Tool    sarifTool     `json:"tool"`
+	Results []sarifResult `json:"results"`
+}
+
+type sarifTool struct {
+	Driver sarifDriver `json:"driver"`
+}
+
+type sarifDriver struct {
+	Name           string      `json:"name"`
+	InformationURI string      `json:"informationUri,omitempty"`
+	Rules          []sarifRule `json:"rules"`
+}
+
+type sarifRule struct {
+	ID               string             `json:"id"`
+	Name             string             `json:"name"`
+	ShortDescription sarifText          `json:"shortDescription"`
+	DefaultConfig    sarifDefaultConfig `json:"defaultConfiguration"`
+}
+
+type sarifDefaultConfig struct {
+	Level string `json:"level"`
+}
+
+type sarifText struct {
+	Text string `json:"text"`
+}
+
+type sarifResult struct {
+	RuleID    string          `json:"ruleId"`
+	Level     string          `json:"level"`
+	Message   sarifText       `json:"message"`
+	Locations []sarifLocation `json:"locations,omitempty"`
+}
+
+type sarifLocation struct {
+	PhysicalLocation sarifPhysicalLocation `json:"physicalLocation"`
+}
+
+type sarifPhysicalLocation struct {
+	ArtifactLocation sarifArtifactLocation `json:"artifactLocation"`
+	Region           sarifRegion           `json:"region,omitempty"`
+}
+
+type sarifArtifactLocation struct {
+	URI string `json:"uri"`
+}
+
+type sarifRegion struct {
+	StartLine   int `json:"startLine,omitempty"`
+	StartColumn int `json:"startColumn,omitempty"`
+}
+
+func writeLintSARIF(w io.Writer, diagnostics []lintDiagnostic) error {
+	log := sarifLog{
+		Version: "2.1.0",
+		Schema:  "https://json.schemastore.org/sarif-2.1.0.json",
+		Runs: []sarifRun{{
+			Tool: sarifTool{Driver: sarifDriver{
+				Name: "gscript lint",
+				Rules: []sarifRule{
+					{
+						ID:               "GS0001",
+						Name:             "file-discovery",
+						ShortDescription: sarifText{Text: "File discovery failed"},
+						DefaultConfig:    sarifDefaultConfig{Level: "error"},
+					},
+					{
+						ID:               "GS1001",
+						Name:             "syntax",
+						ShortDescription: sarifText{Text: "Lexer or parser error"},
+						DefaultConfig:    sarifDefaultConfig{Level: "error"},
+					},
+				},
+			}},
+			Results: make([]sarifResult, 0, len(diagnostics)),
+		}},
+	}
+	for _, diagnostic := range diagnostics {
+		result := sarifResult{
+			RuleID:  diagnostic.Code,
+			Level:   diagnostic.Severity,
+			Message: sarifText{Text: diagnostic.Message},
+			Locations: []sarifLocation{{
+				PhysicalLocation: sarifPhysicalLocation{
+					ArtifactLocation: sarifArtifactLocation{URI: filepath.ToSlash(diagnostic.File)},
+					Region: sarifRegion{
+						StartLine:   diagnostic.Line,
+						StartColumn: diagnostic.Column,
+					},
+				},
+			}},
+		}
+		log.Runs[0].Results = append(log.Runs[0].Results, result)
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(log)
 }
 
 func formatFile(filename string, write bool) (bool, error) {

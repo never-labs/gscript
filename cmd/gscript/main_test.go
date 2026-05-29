@@ -54,7 +54,7 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
 		t.Fatalf("commands = %#v, want capabilities/fmt/lint", caps.Commands)
 	}
-	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
+	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
 	}
 }
@@ -474,6 +474,47 @@ func TestLintJSONReportsEmptyDiagnosticsOnSuccess(t *testing.T) {
 	}
 }
 
+func TestLintSARIFReportsSyntaxErrors(t *testing.T) {
+	dir := t.TempDir()
+	badPath := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(badPath, []byte("func {\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format=sarif", badPath}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runLintCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+
+	var log sarifLog
+	if err := json.Unmarshal(stdout.Bytes(), &log); err != nil {
+		t.Fatalf("stdout is not SARIF JSON: %v; stdout = %q", err, stdout.String())
+	}
+	if log.Version != "2.1.0" || len(log.Runs) != 1 {
+		t.Fatalf("SARIF version/runs = %q/%d, want 2.1.0/1", log.Version, len(log.Runs))
+	}
+	if log.Runs[0].Tool.Driver.Name != "gscript lint" {
+		t.Fatalf("tool name = %q, want gscript lint", log.Runs[0].Tool.Driver.Name)
+	}
+	if len(log.Runs[0].Results) != 1 {
+		t.Fatalf("results len = %d, want 1", len(log.Runs[0].Results))
+	}
+	result := log.Runs[0].Results[0]
+	if result.RuleID != "GS1001" || result.Level != "error" {
+		t.Fatalf("result = %+v, want GS1001 error", result)
+	}
+	if !strings.Contains(result.Message.Text, "parse error") {
+		t.Fatalf("message = %q, want parse error", result.Message.Text)
+	}
+	if len(result.Locations) != 1 || result.Locations[0].PhysicalLocation.ArtifactLocation.URI != filepath.ToSlash(badPath) {
+		t.Fatalf("locations = %+v, want %s", result.Locations, filepath.ToSlash(badPath))
+	}
+}
+
 func TestLintRejectsUnsupportedFormat(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ok.gs")
@@ -482,7 +523,7 @@ func TestLintRejectsUnsupportedFormat(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runLintCommand([]string{"--format=sarif", path}, &stdout, &stderr)
+	code := runLintCommand([]string{"--format=xml", path}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("runLintCommand code = %d, want 2", code)
 	}

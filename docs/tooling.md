@@ -53,8 +53,9 @@ schema。
   stdout golden 对比。
 - `gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
   解析并规范基础空白。
-- `gscript lint [--format=text|json] <path-or-dir> [...]` 解析文件/目录并报告
-  `GS1001` 词法或语法错误。
+- `gscript lint [--format=text|json|sarif] <path-or-dir> [...]` 解析文件/目录并报告
+  `GS1001` 词法或语法错误；SARIF output is available for CI/code-scanning
+  integrations.
 - `gscript capabilities [--json]` reports the current binary's platform,
   execution backends, stdlib modules, supported subcommands, and stable tooling
   output formats for CI/editor integration.
@@ -218,6 +219,10 @@ for compatibility.
   }
 ]
 ```
+
+`--format=sarif` writes a SARIF 2.1.0 log to stdout using the same diagnostic
+codes. This makes parser/linter failures consumable by GitHub code scanning and
+other CI systems that understand SARIF.
 
 This provides a stable command entry point and file traversal path for future
 lint rules without introducing static-analysis behavior before the diagnostic
