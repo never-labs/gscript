@@ -55,6 +55,9 @@ schema。
   解析并规范基础空白。
 - `gscript lint [--format=text|json] <path-or-dir> [...]` 解析文件/目录并报告
   `GS1001` 词法或语法错误。
+- `gscript capabilities [--json]` reports the current binary's platform,
+  execution backends, stdlib modules, supported subcommands, and stable tooling
+  output formats for CI/editor integration.
 
 There are also developer binaries:
 
@@ -86,8 +89,8 @@ P0:
 P1:
 
 - Fold `dump` and `dump_bytecode` into `gscript inspect bytecode`.
-- Add `gscript capabilities --json` reporting platform, JIT availability,
-  stdlib modules, diagnostic support, and benchmark dependencies.
+- Extend `gscript capabilities --json` with benchmark dependencies, config
+  discovery, and diagnostic schema metadata as those surfaces stabilize.
 
 Suggested CLI:
 

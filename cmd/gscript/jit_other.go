@@ -24,3 +24,11 @@ func cliPrintMethodJITOpAudit(_ io.Writer) error {
 func cliPrintMethodJITOpAuditJSON(_ io.Writer) error {
 	return fmt.Errorf("MethodJIT op audit unavailable on this platform")
 }
+
+func cliJITAvailable() bool {
+	return false
+}
+
+func cliMethodJITAvailable() bool {
+	return false
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 )
@@ -23,6 +24,62 @@ func TestTestFilesSingleFile(t *testing.T) {
 	if len(files) != 1 || files[0] != path {
 		t.Fatalf("testFiles = %#v, want [%q]", files, path)
 	}
+}
+
+func TestCapabilitiesJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCapabilitiesCommand([]string{"--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCapabilitiesCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var caps cliCapabilities
+	if err := json.Unmarshal(stdout.Bytes(), &caps); err != nil {
+		t.Fatalf("stdout is not JSON capabilities: %v; stdout = %q", err, stdout.String())
+	}
+	if caps.SchemaVersion != 1 {
+		t.Fatalf("schema_version = %d, want 1", caps.SchemaVersion)
+	}
+	if caps.Platform.GOOS != goruntime.GOOS || caps.Platform.GOARCH != goruntime.GOARCH {
+		t.Fatalf("platform = %s/%s, want %s/%s", caps.Platform.GOOS, caps.Platform.GOARCH, goruntime.GOOS, goruntime.GOARCH)
+	}
+	if !caps.Execution.Interpreter || !caps.Execution.BytecodeVM {
+		t.Fatalf("execution capabilities = %+v, want interpreter and bytecode VM", caps.Execution)
+	}
+	if len(caps.StdlibModules) == 0 {
+		t.Fatal("stdlib_modules is empty")
+	}
+	if !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
+		t.Fatalf("commands = %#v, want capabilities/fmt/lint", caps.Commands)
+	}
+	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
+		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
+	}
+}
+
+func TestCapabilitiesRejectsExtraArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCapabilitiesCommand([]string{"extra"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCapabilitiesCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "usage: gscript capabilities") {
+		t.Fatalf("stderr = %q, want usage", stderr.String())
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestTestFilesDirectoryCollectsGSFilesSorted(t *testing.T) {

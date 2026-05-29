@@ -70,6 +70,8 @@ func init() {
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "capabilities":
+			os.Exit(runCapabilitiesCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "fmt":
 			os.Exit(runFmtCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "lint":
@@ -222,6 +224,122 @@ func main() {
 		}
 		fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
 		os.Exit(1)
+	}
+}
+
+type cliCapabilities struct {
+	SchemaVersion int                    `json:"schema_version"`
+	Platform      cliPlatformCapability  `json:"platform"`
+	Execution     cliExecutionCapability `json:"execution"`
+	Commands      []string               `json:"commands"`
+	StdlibModules []string               `json:"stdlib_modules"`
+	Tooling       cliToolingCapability   `json:"tooling"`
+}
+
+type cliPlatformCapability struct {
+	GOOS   string `json:"goos"`
+	GOARCH string `json:"goarch"`
+}
+
+type cliExecutionCapability struct {
+	Interpreter bool `json:"interpreter"`
+	BytecodeVM  bool `json:"bytecode_vm"`
+	JIT         bool `json:"jit"`
+	MethodJIT   bool `json:"method_jit"`
+}
+
+type cliToolingCapability struct {
+	Formatter cliFormatterCapability `json:"formatter"`
+	Linter    cliLinterCapability    `json:"linter"`
+	Test      cliTestCapability      `json:"test"`
+}
+
+type cliFormatterCapability struct {
+	Stdin     bool     `json:"stdin"`
+	Check     bool     `json:"check"`
+	Write     bool     `json:"write"`
+	Formats   []string `json:"formats"`
+	Stability string   `json:"stability"`
+}
+
+type cliLinterCapability struct {
+	Formats []string `json:"formats"`
+	Codes   []string `json:"codes"`
+}
+
+type cliTestCapability struct {
+	GoldenStdout bool `json:"golden_stdout"`
+	Directory    bool `json:"directory"`
+}
+
+func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("capabilities", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print capabilities as JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if len(fs.Args()) != 0 {
+		fmt.Fprintln(errw, "usage: gscript capabilities [--json]")
+		return 2
+	}
+	caps := buildCapabilities()
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(caps); err != nil {
+			fmt.Fprintf(errw, "gscript capabilities: write json: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+	fmt.Fprintf(outw, "platform: %s/%s\n", caps.Platform.GOOS, caps.Platform.GOARCH)
+	fmt.Fprintf(outw, "jit: %t\n", caps.Execution.JIT)
+	fmt.Fprintf(outw, "commands: %s\n", strings.Join(caps.Commands, ", "))
+	fmt.Fprintf(outw, "stdlib modules: %d\n", len(caps.StdlibModules))
+	return 0
+}
+
+func buildCapabilities() cliCapabilities {
+	modules := runtime.StdlibModuleNames()
+	sort.Strings(modules)
+	return cliCapabilities{
+		SchemaVersion: 1,
+		Platform: cliPlatformCapability{
+			GOOS:   goruntime.GOOS,
+			GOARCH: goruntime.GOARCH,
+		},
+		Execution: cliExecutionCapability{
+			Interpreter: true,
+			BytecodeVM:  true,
+			JIT:         cliJITAvailable(),
+			MethodJIT:   cliMethodJITAvailable(),
+		},
+		Commands: []string{
+			"capabilities",
+			"fmt",
+			"lint",
+			"run",
+			"test",
+		},
+		StdlibModules: modules,
+		Tooling: cliToolingCapability{
+			Formatter: cliFormatterCapability{
+				Stdin:     true,
+				Check:     true,
+				Write:     true,
+				Formats:   []string{"source"},
+				Stability: "whitespace-normalizer",
+			},
+			Linter: cliLinterCapability{
+				Formats: []string{"text", "json"},
+				Codes:   []string{"GS0001", "GS1001"},
+			},
+			Test: cliTestCapability{
+				GoldenStdout: true,
+				Directory:    true,
+			},
+		},
 	}
 }
 
