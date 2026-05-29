@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync/atomic"
 )
 
@@ -41,6 +42,9 @@ type Interpreter struct {
 	activeGoroutines  *atomic.Int64
 	maxChannelCap     int64 // <=0 means unlimited
 	maxHostResult     int64 // <=0 means unlimited
+	maxModuleBytes    int64 // <=0 means unlimited
+	maxModuleDepth    int64 // <=0 means unlimited
+	moduleDepth       int64
 	ctx               context.Context
 }
 
@@ -286,6 +290,18 @@ func (interp *Interpreter) SetMaxHostResultBytes(max int64) {
 	interp.maxHostResult = max
 }
 
+// SetMaxModuleBytes limits bytes read by script-side file loading APIs such as
+// require, dofile, and loadfile. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxModuleBytes(max int64) {
+	interp.maxModuleBytes = max
+}
+
+// SetMaxModuleDepth limits nested filesystem-backed require calls. Built-in
+// and pre-registered modules do not consume this budget.
+func (interp *Interpreter) SetMaxModuleDepth(max int64) {
+	interp.maxModuleDepth = max
+}
+
 // SetContext installs a host cancellation context checked at interpreter
 // statement/loop checkpoints. A nil context disables cancellation polling.
 func (interp *Interpreter) SetContext(ctx context.Context) {
@@ -369,4 +385,36 @@ func (interp *Interpreter) checkChannelCapacityBudget(capacity int) error {
 
 func (interp *Interpreter) checkHostResultBudget(values []Value) error {
 	return CheckHostResultBytes(interp.maxHostResult, values...)
+}
+
+func (interp *Interpreter) checkModuleFileBudget(filename string) error {
+	if interp.maxModuleBytes <= 0 {
+		return nil
+	}
+	info, err := os.Stat(filename)
+	if err != nil {
+		return err
+	}
+	if info.Size() > interp.maxModuleBytes {
+		return fmt.Errorf("module byte limit exceeded (%d)", interp.maxModuleBytes)
+	}
+	return nil
+}
+
+func (interp *Interpreter) enterModuleLoad() error {
+	if interp.maxModuleDepth <= 0 {
+		interp.moduleDepth++
+		return nil
+	}
+	if interp.moduleDepth >= interp.maxModuleDepth {
+		return fmt.Errorf("module depth limit exceeded (%d)", interp.maxModuleDepth)
+	}
+	interp.moduleDepth++
+	return nil
+}
+
+func (interp *Interpreter) leaveModuleLoad() {
+	if interp.moduleDepth > 0 {
+		interp.moduleDepth--
+	}
 }

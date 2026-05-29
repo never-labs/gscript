@@ -101,7 +101,8 @@ For applications that prefer one auditable configuration object, the public API
 also exposes `WithSecurity(SecurityPolicy)`. The first implementation groups
 the controls that exist today: stdlib preset, host capabilities, module
 loading, JIT policy, step budget, native-call budget, call-depth budget,
-script goroutine limit, channel-capacity limit, and host-result byte limit.
+script goroutine limit, channel-capacity limit, host-result byte limit,
+module-byte limit, and module-depth limit.
 
 `SecuritySandbox()` currently means:
 
@@ -170,6 +171,11 @@ Required controls:
 - `WithMaxHostResultBytes`: limits string bytes returned from one native Go
   call, including stdlib functions and registered host callbacks. Setting this
   option disables JIT until compiled native calls use the same result check.
+- `WithMaxModuleBytes`: limits bytes read by script-side module/file loading
+  APIs such as `require`, `dofile`, `loadfile`, and `script.loadFile`.
+  Host-side `CompileFile`/`ExecFile` calls are not counted.
+- `WithMaxModuleDepth`: limits nested filesystem-backed `require` chains.
+  Built-in and preloaded modules do not consume this budget.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;

@@ -67,6 +67,14 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxHostResultBytes(o.maxHostResult)
 		o.useJIT = false
 	}
+	if o.maxModuleBytes > 0 {
+		interp.SetMaxModuleBytes(o.maxModuleBytes)
+		o.useJIT = false
+	}
+	if o.maxModuleDepth > 0 {
+		interp.SetMaxModuleDepth(o.maxModuleDepth)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -181,6 +189,12 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxHostResult > 0 {
 				bvm.SetMaxHostResultBytes(vm.opts.maxHostResult)
 			}
+			if vm.opts.maxModuleBytes > 0 {
+				bvm.SetMaxModuleBytes(vm.opts.maxModuleBytes)
+			}
+			if vm.opts.maxModuleDepth > 0 {
+				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -202,6 +216,12 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			}
 			if vm.opts.maxHostResult > 0 {
 				bvm.SetMaxHostResultBytes(vm.opts.maxHostResult)
+			}
+			if vm.opts.maxModuleBytes > 0 {
+				bvm.SetMaxModuleBytes(vm.opts.maxModuleBytes)
+			}
+			if vm.opts.maxModuleDepth > 0 {
+				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
 		}
 		bvm.SetContext(activeRunContext(ctx))

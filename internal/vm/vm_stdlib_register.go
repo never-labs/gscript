@@ -1342,6 +1342,10 @@ func (vm *VM) RegisterLoaderLib() {
 		if _, err := os.Stat(filename); err != nil {
 			return nil, fmt.Errorf("module '%s' not found", name)
 		}
+		if err := vm.enterModuleLoad(); err != nil {
+			return nil, err
+		}
+		defer vm.leaveModuleLoad()
 		fn, err := vm.loadScriptFile(filename, runtime.NilValue())
 		if err != nil {
 			return nil, err

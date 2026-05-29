@@ -718,6 +718,10 @@ func (interp *Interpreter) registerBuiltins() {
 			if _, err := os.Stat(filename); err != nil {
 				return nil, fmt.Errorf("module '%s' not found", name)
 			}
+			if err := interp.enterModuleLoad(); err != nil {
+				return nil, err
+			}
+			defer interp.leaveModuleLoad()
 			result, err := interp.RunFile(filename)
 			if err != nil {
 				return nil, err

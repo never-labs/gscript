@@ -87,6 +87,9 @@ func (interp *Interpreter) LoadFile(filename string, options ...ScriptOption) (V
 		return NilValue(), err
 	}
 	filename = resolved
+	if err := interp.checkModuleFileBudget(filename); err != nil {
+		return NilValue(), err
+	}
 	src, err := os.ReadFile(filename)
 	if err != nil {
 		return NilValue(), fmt.Errorf("cannot open %s: %s", filename, err)

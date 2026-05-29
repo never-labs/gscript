@@ -114,6 +114,8 @@ type vmOptions struct {
 	maxGoroutines  int64
 	maxChannelCap  int64
 	maxHostResult  int64
+	maxModuleBytes int64
+	maxModuleDepth int64
 	printFunc      func(args ...interface{})
 	useVM          bool // use bytecode VM instead of tree-walker
 	useJIT         bool // enable JIT compilation (implies useVM)
@@ -130,6 +132,8 @@ type SecurityPolicy struct {
 	MaxGoroutines        int64
 	MaxChannelCapacity   int64
 	MaxHostResultBytes   int64
+	MaxModuleBytes       int64
+	MaxModuleDepth       int64
 	DisableJIT           bool
 	DisableModuleLoading bool
 }
@@ -300,6 +304,12 @@ func WithSecurity(policy SecurityPolicy) Option {
 		if policy.MaxHostResultBytes > 0 {
 			o.maxHostResult = policy.MaxHostResultBytes
 		}
+		if policy.MaxModuleBytes > 0 {
+			o.maxModuleBytes = policy.MaxModuleBytes
+		}
+		if policy.MaxModuleDepth > 0 {
+			o.maxModuleDepth = policy.MaxModuleDepth
+		}
 		if policy.DisableJIT {
 			o.useJIT = false
 		}
@@ -371,6 +381,27 @@ func WithMaxChannelCapacity(max int64) Option {
 // cannot bypass result materialization checks.
 func WithMaxHostResultBytes(max int64) Option {
 	return func(o *vmOptions) { o.maxHostResult = max }
+}
+
+// WithMaxModuleBytes limits bytes read by script-side module/file loading APIs
+// such as require(), dofile(), loadfile(), and script.loadFile(). It does not
+// limit host-side CompileFile/ExecFile calls. A non-positive value disables the
+// limit.
+//
+// When a module-byte limit is set, JIT execution is disabled so native code
+// cannot bypass file-loading checks.
+func WithMaxModuleBytes(max int64) Option {
+	return func(o *vmOptions) { o.maxModuleBytes = max }
+}
+
+// WithMaxModuleDepth limits nested filesystem-backed require() calls.
+// Built-in standard-library modules and already loaded package entries do not
+// consume this budget. A non-positive value disables the limit.
+//
+// When a module-depth limit is set, JIT execution is disabled so native code
+// cannot bypass file-loading checks.
+func WithMaxModuleDepth(max int64) Option {
+	return func(o *vmOptions) { o.maxModuleDepth = max }
 }
 
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.

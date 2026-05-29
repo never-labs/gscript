@@ -109,6 +109,9 @@ type VM struct {
 	activeGoroutines     *atomic.Int64
 	maxChannelCap        int64 // <=0 means unlimited
 	maxHostResult        int64 // <=0 means unlimited
+	maxModuleBytes       int64 // <=0 means unlimited
+	maxModuleDepth       int64 // <=0 means unlimited
+	moduleDepth          int64
 	ctx                  context.Context
 }
 
@@ -158,6 +161,18 @@ func (vm *VM) SetMaxChannelCapacity(max int64) {
 // single native Go call. A non-positive value disables the limit.
 func (vm *VM) SetMaxHostResultBytes(max int64) {
 	vm.maxHostResult = max
+}
+
+// SetMaxModuleBytes limits bytes read by script-side file loading APIs such
+// as require, dofile, and loadfile. A non-positive value disables the limit.
+func (vm *VM) SetMaxModuleBytes(max int64) {
+	vm.maxModuleBytes = max
+}
+
+// SetMaxModuleDepth limits nested filesystem-backed require calls. Built-in
+// and pre-registered modules do not consume this budget.
+func (vm *VM) SetMaxModuleDepth(max int64) {
+	vm.maxModuleDepth = max
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -248,6 +263,24 @@ func (vm *VM) checkChannelCapacityBudget(capacity int) error {
 
 func (vm *VM) checkHostResultBudget(values ...runtime.Value) error {
 	return runtime.CheckHostResultBytes(vm.maxHostResult, values...)
+}
+
+func (vm *VM) enterModuleLoad() error {
+	if vm.maxModuleDepth <= 0 {
+		vm.moduleDepth++
+		return nil
+	}
+	if vm.moduleDepth >= vm.maxModuleDepth {
+		return fmt.Errorf("module depth limit exceeded (%d)", vm.maxModuleDepth)
+	}
+	vm.moduleDepth++
+	return nil
+}
+
+func (vm *VM) leaveModuleLoad() {
+	if vm.moduleDepth > 0 {
+		vm.moduleDepth--
+	}
 }
 
 // Regs returns the register file. Used by the JIT executor.
@@ -836,6 +869,9 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		activeGoroutines:   parent.activeGoroutines,
 		maxChannelCap:      parent.maxChannelCap,
 		maxHostResult:      parent.maxHostResult,
+		maxModuleBytes:     parent.maxModuleBytes,
+		maxModuleDepth:     parent.maxModuleDepth,
+		moduleDepth:        parent.moduleDepth,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -918,6 +954,9 @@ func newIsolatedChildVM(parent *VM) *VM {
 		activeGoroutines:   parent.activeGoroutines,
 		maxChannelCap:      parent.maxChannelCap,
 		maxHostResult:      parent.maxHostResult,
+		maxModuleBytes:     parent.maxModuleBytes,
+		maxModuleDepth:     parent.maxModuleDepth,
+		moduleDepth:        parent.moduleDepth,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()

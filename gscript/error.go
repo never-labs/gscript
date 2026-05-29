@@ -217,6 +217,8 @@ var (
 	goroutineBudgetErrorRE  = regexp.MustCompile(`goroutine limit exceeded \(([0-9]+)\)`)
 	channelCapBudgetErrorRE = regexp.MustCompile(`channel capacity limit exceeded \(([0-9]+)\)`)
 	hostResultBudgetErrorRE = regexp.MustCompile(`host result byte limit exceeded \(([0-9]+)\)`)
+	moduleBytesBudgetRE     = regexp.MustCompile(`module byte limit exceeded \(([0-9]+)\)`)
+	moduleDepthBudgetRE     = regexp.MustCompile(`module depth limit exceeded \(([0-9]+)\)`)
 )
 
 func budgetErrorFrom(err error) *BudgetError {
@@ -257,6 +259,16 @@ func budgetErrorFrom(err error) *BudgetError {
 	if len(matches) == 2 {
 		limit, _ := strconv.ParseInt(matches[1], 10, 64)
 		return &BudgetError{Resource: "host_result_bytes", Limit: limit, Err: err}
+	}
+	matches = moduleBytesBudgetRE.FindStringSubmatch(msg)
+	if len(matches) == 2 {
+		limit, _ := strconv.ParseInt(matches[1], 10, 64)
+		return &BudgetError{Resource: "module_bytes", Limit: limit, Err: err}
+	}
+	matches = moduleDepthBudgetRE.FindStringSubmatch(msg)
+	if len(matches) == 2 {
+		limit, _ := strconv.ParseInt(matches[1], 10, 64)
+		return &BudgetError{Resource: "module_depth", Limit: limit, Err: err}
 	}
 	return nil
 }

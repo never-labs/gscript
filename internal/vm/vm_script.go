@@ -61,6 +61,9 @@ func (vm *VM) loadScriptFile(filename string, opt runtime.Value) ([]runtime.Valu
 		resolveDir = vm.scriptDir
 	}
 	resolved := vm.resolveScriptPathWithDir(filename, resolveDir)
+	if err := vm.checkModuleFileBudget(resolved); err != nil {
+		return nil, err
+	}
 	src, err := os.ReadFile(resolved)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open %s: %s", resolved, err)
@@ -74,6 +77,20 @@ func (vm *VM) loadScriptFile(filename string, opt runtime.Value) ([]runtime.Valu
 		}
 	}
 	return vm.compileScriptChunk(string(src), vmScriptConfigValue(cfg), cfg.sourceName)
+}
+
+func (vm *VM) checkModuleFileBudget(filename string) error {
+	if vm.maxModuleBytes <= 0 {
+		return nil
+	}
+	info, err := os.Stat(filename)
+	if err != nil {
+		return err
+	}
+	if info.Size() > vm.maxModuleBytes {
+		return fmt.Errorf("module byte limit exceeded (%d)", vm.maxModuleBytes)
+	}
+	return nil
 }
 
 func compileScriptSource(src string, sourceName string) (*FuncProto, error) {

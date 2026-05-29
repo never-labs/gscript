@@ -324,6 +324,35 @@ func TestWithMaxHostResultBytesLimitsInterpreterHostCallback(t *testing.T) {
 	}
 }
 
+func TestWithMaxModuleBytesLimitsInterpreterRequire(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "big.gs"), []byte(`return "12345"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithRequirePath(dir), gs.WithMaxModuleBytes(4))
+	err := vm.Exec(`require("big")`)
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) || budgetErr.Resource != "module_bytes" || budgetErr.Limit != 4 {
+		t.Fatalf("expected module_bytes budget 4, got %T %v", err, err)
+	}
+}
+
+func TestWithMaxModuleDepthLimitsInterpreterNestedRequire(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.gs"), []byte(`return require("b")`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.gs"), []byte(`return { ok: true }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithRequirePath(dir), gs.WithMaxModuleDepth(1))
+	err := vm.Exec(`require("a")`)
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) || budgetErr.Resource != "module_depth" || budgetErr.Limit != 1 {
+		t.Fatalf("expected module_depth budget 1, got %T %v", err, err)
+	}
+}
+
 func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
 	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
 	err := vm.Exec(`
@@ -489,6 +518,35 @@ func TestWithMaxHostResultBytesLimitsBytecodeFastStdlibResult(t *testing.T) {
 	}
 	if budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
 		t.Fatalf("budget = %s %d, want host_result_bytes 4", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
+func TestWithMaxModuleBytesLimitsBytecodeRequire(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "big.gs"), []byte(`return "12345"`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithVM(), gs.WithRequirePath(dir), gs.WithMaxModuleBytes(4))
+	err := vm.Exec(`require("big")`)
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) || budgetErr.Resource != "module_bytes" || budgetErr.Limit != 4 {
+		t.Fatalf("expected module_bytes budget 4, got %T %v", err, err)
+	}
+}
+
+func TestWithMaxModuleDepthLimitsBytecodeNestedRequire(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.gs"), []byte(`return require("b")`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.gs"), []byte(`return { ok: true }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	vm := gs.New(gs.WithVM(), gs.WithRequirePath(dir), gs.WithMaxModuleDepth(1))
+	err := vm.Exec(`require("a")`)
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) || budgetErr.Resource != "module_depth" || budgetErr.Limit != 1 {
+		t.Fatalf("expected module_depth budget 1, got %T %v", err, err)
 	}
 }
 
@@ -1633,6 +1691,8 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxGoroutines:        1,
 		MaxChannelCapacity:   2,
 		MaxHostResultBytes:   4,
+		MaxModuleBytes:       128,
+		MaxModuleDepth:       1,
 	}))
 	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
 		t.Fatal(err)
