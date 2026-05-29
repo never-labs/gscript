@@ -1743,6 +1743,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxFilesystemWriteBytes: 128,
 		EnvironmentAllowlist:    []string{"GSCRIPT_PUBLIC_ENV_CAP_TEST"},
 		DisableDynamicEval:      true,
+		DisableProcessShell:     true,
 	}))
 	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
 		t.Fatal(err)
@@ -1817,6 +1818,28 @@ func TestEnvironmentCapabilities(t *testing.T) {
 			}
 			if got != "visible" {
 				t.Fatalf("value = %v, want visible", got)
+			}
+		})
+	}
+}
+
+func TestWithProcessShellFalseBlocksShell(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibProcess),
+				gs.WithProcessShell(false),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`result := process.shell("echo blocked")`)
+			if err == nil || !strings.Contains(err.Error(), "process shell access disabled") {
+				t.Fatalf("process.shell err = %v, want process shell access disabled", err)
 			}
 		})
 	}

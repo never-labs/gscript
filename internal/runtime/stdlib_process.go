@@ -199,6 +199,9 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.shell' (string expected)")
 		}
+		if interp != nil && !interp.processShell {
+			return nil, fmt.Errorf("process shell access disabled")
+		}
 		cmd := exec.Command("/bin/sh", "-c", args[0].Str())
 		var stdout, stderr bytes.Buffer
 		cmd.Stdout = &stdout

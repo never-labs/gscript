@@ -23,6 +23,7 @@ func New(opts ...Option) *VM {
 		libs:         LibAll,
 		capabilities: CapAll,
 		dynamicEval:  true,
+		processShell: true,
 	}
 	for _, opt := range opts {
 		opt(&o)
@@ -36,6 +37,7 @@ func newVM(o vmOptions) *VM {
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
 	interp.SetDynamicEval(o.dynamicEval)
+	interp.SetProcessShell(o.processShell)
 	interp.SetFilesystemRoot(o.filesystemRoot)
 	interp.SetFilesystemCapabilities(
 		o.capabilities&CapFilesystemRead != 0,

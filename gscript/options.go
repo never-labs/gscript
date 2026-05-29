@@ -110,6 +110,7 @@ type vmOptions struct {
 	filesystemRoot  string
 	dynamicEval     bool
 	environmentVars []string
+	processShell    bool
 	maxSteps        int64
 	maxNativeCalls  int64
 	maxCallDepth    int64
@@ -142,6 +143,7 @@ type SecurityPolicy struct {
 	MaxFilesystemWriteBytes int64
 	EnvironmentAllowlist    []string
 	DisableDynamicEval      bool
+	DisableProcessShell     bool
 	DisableJIT              bool
 	DisableModuleLoading    bool
 }
@@ -256,6 +258,12 @@ func WithEnvironmentAllowlist(names ...string) Option {
 	return func(o *vmOptions) { o.environmentVars = append([]string(nil), names...) }
 }
 
+// WithProcessShell controls process.shell(). Other process APIs remain
+// controlled by LibProcess and future process policy.
+func WithProcessShell(enabled bool) Option {
+	return func(o *vmOptions) { o.processShell = enabled }
+}
+
 // WithFilesystemRoot confines fs module paths and script-side file loading to
 // root. Relative script paths are resolved inside root. An empty root leaves
 // filesystem paths unrestricted.
@@ -280,6 +288,7 @@ func WithSandbox() Option {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
 		o.dynamicEval = false
+		o.processShell = false
 	}
 }
 
@@ -292,6 +301,7 @@ func SecuritySandbox() Option {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
 		o.dynamicEval = false
+		o.processShell = false
 		o.useJIT = false
 	}
 }
@@ -345,6 +355,9 @@ func WithSecurity(policy SecurityPolicy) Option {
 		}
 		if policy.DisableDynamicEval {
 			o.dynamicEval = false
+		}
+		if policy.DisableProcessShell {
+			o.processShell = false
 		}
 		if policy.DisableJIT {
 			o.useJIT = false
