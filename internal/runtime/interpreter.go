@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructor New /
@@ -36,6 +37,9 @@ type Interpreter struct {
 	maxNativeCalls    int64 // <=0 means unlimited
 	nativeCalls       int64
 	maxCallDepth      int64 // <=0 means unlimited
+	maxGoroutines     int64 // <=0 means unlimited
+	activeGoroutines  *atomic.Int64
+	maxChannelCap     int64 // <=0 means unlimited
 	ctx               context.Context
 }
 
@@ -48,6 +52,7 @@ func New() *Interpreter {
 		gcRunning:         true,
 		moduleLoading:     true,
 		filesystemEnabled: true,
+		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()
 	interp.registerStdlib()
@@ -262,6 +267,18 @@ func (interp *Interpreter) SetMaxCallDepth(max int64) {
 	interp.maxCallDepth = max
 }
 
+// SetMaxGoroutines sets the maximum number of active script-created
+// goroutines. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxGoroutines(max int64) {
+	interp.maxGoroutines = max
+}
+
+// SetMaxChannelCapacity sets the maximum buffer capacity for script-created
+// channels. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxChannelCapacity(max int64) {
+	interp.maxChannelCap = max
+}
+
 // SetContext installs a host cancellation context checked at interpreter
 // statement/loop checkpoints. A nil context disables cancellation polling.
 func (interp *Interpreter) SetContext(ctx context.Context) {
@@ -309,4 +326,36 @@ func (interp *Interpreter) checkCallDepthBudget() error {
 		return fmt.Errorf("call depth limit exceeded (%d)", interp.maxCallDepth)
 	}
 	return nil
+}
+
+func (interp *Interpreter) reserveGoroutineBudget() error {
+	if interp.maxGoroutines <= 0 {
+		return nil
+	}
+	if interp.activeGoroutines == nil {
+		interp.activeGoroutines = &atomic.Int64{}
+	}
+	for {
+		current := interp.activeGoroutines.Load()
+		if current >= interp.maxGoroutines {
+			return fmt.Errorf("goroutine limit exceeded (%d)", interp.maxGoroutines)
+		}
+		if interp.activeGoroutines.CompareAndSwap(current, current+1) {
+			return nil
+		}
+	}
+}
+
+func (interp *Interpreter) releaseGoroutineBudget() {
+	if interp.maxGoroutines <= 0 || interp.activeGoroutines == nil {
+		return
+	}
+	interp.activeGoroutines.Add(-1)
+}
+
+func (interp *Interpreter) checkChannelCapacityBudget(capacity int) error {
+	if interp.maxChannelCap <= 0 || int64(capacity) <= interp.maxChannelCap {
+		return nil
+	}
+	return fmt.Errorf("channel capacity limit exceeded (%d)", interp.maxChannelCap)
 }

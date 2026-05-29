@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/gscript/gscript/internal/runtime"
@@ -104,6 +105,9 @@ type VM struct {
 	maxNativeCalls       int64 // <=0 means unlimited
 	nativeCalls          int64
 	maxCallDepth         int64 // <=0 means the VM default
+	maxGoroutines        int64 // <=0 means unlimited
+	activeGoroutines     *atomic.Int64
+	maxChannelCap        int64 // <=0 means unlimited
 	ctx                  context.Context
 }
 
@@ -135,6 +139,18 @@ func (vm *VM) SetMaxNativeCalls(max int64) {
 // non-positive value restores the VM default.
 func (vm *VM) SetMaxCallDepth(max int64) {
 	vm.maxCallDepth = max
+}
+
+// SetMaxGoroutines sets the maximum number of active script-created
+// goroutines. A non-positive value disables the limit.
+func (vm *VM) SetMaxGoroutines(max int64) {
+	vm.maxGoroutines = max
+}
+
+// SetMaxChannelCapacity sets the maximum buffer capacity for script-created
+// channels. A non-positive value disables the limit.
+func (vm *VM) SetMaxChannelCapacity(max int64) {
+	vm.maxChannelCap = max
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -189,6 +205,38 @@ func (vm *VM) callDepthLimit() int {
 		return int(vm.maxCallDepth)
 	}
 	return maxCallDepth
+}
+
+func (vm *VM) reserveGoroutineBudget() error {
+	if vm.maxGoroutines <= 0 {
+		return nil
+	}
+	if vm.activeGoroutines == nil {
+		vm.activeGoroutines = &atomic.Int64{}
+	}
+	for {
+		current := vm.activeGoroutines.Load()
+		if current >= vm.maxGoroutines {
+			return fmt.Errorf("goroutine limit exceeded (%d)", vm.maxGoroutines)
+		}
+		if vm.activeGoroutines.CompareAndSwap(current, current+1) {
+			return nil
+		}
+	}
+}
+
+func (vm *VM) releaseGoroutineBudget() {
+	if vm.maxGoroutines <= 0 || vm.activeGoroutines == nil {
+		return
+	}
+	vm.activeGoroutines.Add(-1)
+}
+
+func (vm *VM) checkChannelCapacityBudget(capacity int) error {
+	if vm.maxChannelCap <= 0 || int64(capacity) <= vm.maxChannelCap {
+		return nil
+	}
+	return fmt.Errorf("channel capacity limit exceeded (%d)", vm.maxChannelCap)
 }
 
 // Regs returns the register file. Used by the JIT executor.
@@ -720,6 +768,7 @@ func New(globals map[string]runtime.Value) *VM {
 		globalOverrideFast: -1,
 		globalsMu:          &sync.RWMutex{},
 		noGlobalLock:       true, // single-threaded by default
+		activeGoroutines:   &atomic.Int64{},
 	}
 	v.initTypeNameValues()
 	v.RegisterCoroutineLib()
@@ -772,6 +821,9 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		maxSteps:           parent.maxSteps,
 		maxNativeCalls:     parent.maxNativeCalls,
 		maxCallDepth:       parent.maxCallDepth,
+		maxGoroutines:      parent.maxGoroutines,
+		activeGoroutines:   parent.activeGoroutines,
+		maxChannelCap:      parent.maxChannelCap,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -850,6 +902,9 @@ func newIsolatedChildVM(parent *VM) *VM {
 		maxSteps:           parent.maxSteps,
 		maxNativeCalls:     parent.maxNativeCalls,
 		maxCallDepth:       parent.maxCallDepth,
+		maxGoroutines:      parent.maxGoroutines,
+		activeGoroutines:   parent.activeGoroutines,
+		maxChannelCap:      parent.maxChannelCap,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()
@@ -3189,7 +3244,11 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			for i := 0; i < nArgs; i++ {
 				args[i] = vm.regs[base+a+1+i]
 			}
+			if err := vm.reserveGoroutineBudget(); err != nil {
+				return nil, err
+			}
 			go func(fn runtime.Value, goArgs []runtime.Value) {
+				defer vm.releaseGoroutineBudget()
 				goVM := newIsolatedChildVM(vm)
 				defer goVM.Close()
 				defer func() {
@@ -3224,6 +3283,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				if err != nil {
 					return nil, err
 				}
+			}
+			if err := vm.checkChannelCapacityBudget(capacity); err != nil {
+				return nil, err
 			}
 			ch := runtime.NewChannel(capacity)
 			vm.regs[base+a] = runtime.ChannelValue(ch)

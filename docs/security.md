@@ -155,6 +155,12 @@ Required controls:
 - `WithMaxCallDepth`: limits active function call depth in the interpreter and
   bytecode VM. Setting this option disables JIT until compiled calls use the
   same frame-depth checks.
+- `WithMaxGoroutines`: limits active goroutines started by script `go`
+  statements. Setting this option disables JIT until compiled task creation
+  uses the same counter.
+- `WithMaxChannelCapacity`: limits the buffer capacity accepted by
+  `make(chan, n)` in the interpreter and bytecode VM. Setting this option
+  disables JIT until compiled channel creation uses the same check.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
@@ -250,9 +256,11 @@ Required controls:
 - `MaxCoroutines`: total live VM coroutines.
 - `MaxCoroutineStackBytes`: approximate retained register/frame memory per
   coroutine.
-- `MaxGoroutines`: script-created goroutines or background tasks.
+- `WithMaxGoroutines`: script-created goroutines or background tasks. This
+  exists today for `go` statements in the interpreter and bytecode VM.
 - `MaxChannels`: total live channels.
-- `MaxChannelCapacity`: per-channel buffer capacity.
+- `WithMaxChannelCapacity`: per-channel buffer capacity. This exists today for
+  script-created channels.
 - `MaxBlockedTasks`: tasks blocked on channel send/receive, sleep, network, or
   process waits.
 - `AllowBackgroundTasks`: default false in sandbox mode.

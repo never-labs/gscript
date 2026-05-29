@@ -156,6 +156,9 @@ func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value
 				return nil, err
 			}
 		}
+		if err := interp.checkChannelCapacityBudget(cap); err != nil {
+			return nil, err
+		}
 		ch := NewChannel(cap)
 		return []Value{ChannelValue(ch)}, nil
 

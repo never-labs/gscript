@@ -55,6 +55,14 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxCallDepth(o.maxCallDepth)
 		o.useJIT = false
 	}
+	if o.maxGoroutines > 0 {
+		interp.SetMaxGoroutines(o.maxGoroutines)
+		o.useJIT = false
+	}
+	if o.maxChannelCap > 0 {
+		interp.SetMaxChannelCapacity(o.maxChannelCap)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -160,6 +168,12 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxCallDepth > 0 {
 				bvm.SetMaxCallDepth(vm.opts.maxCallDepth)
 			}
+			if vm.opts.maxGoroutines > 0 {
+				bvm.SetMaxGoroutines(vm.opts.maxGoroutines)
+			}
+			if vm.opts.maxChannelCap > 0 {
+				bvm.SetMaxChannelCapacity(vm.opts.maxChannelCap)
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -172,6 +186,12 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			}
 			if vm.opts.maxCallDepth > 0 {
 				bvm.SetMaxCallDepth(vm.opts.maxCallDepth)
+			}
+			if vm.opts.maxGoroutines > 0 {
+				bvm.SetMaxGoroutines(vm.opts.maxGoroutines)
+			}
+			if vm.opts.maxChannelCap > 0 {
+				bvm.SetMaxChannelCapacity(vm.opts.maxChannelCap)
 			}
 		}
 		bvm.SetContext(activeRunContext(ctx))

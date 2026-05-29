@@ -111,6 +111,8 @@ type vmOptions struct {
 	maxSteps       int64
 	maxNativeCalls int64
 	maxCallDepth   int64
+	maxGoroutines  int64
+	maxChannelCap  int64
 	printFunc      func(args ...interface{})
 	useVM          bool // use bytecode VM instead of tree-walker
 	useJIT         bool // enable JIT compilation (implies useVM)
@@ -286,6 +288,25 @@ func WithMaxNativeCalls(max int64) Option {
 // cannot bypass frame-depth checkpoints.
 func WithMaxCallDepth(max int64) Option {
 	return func(o *vmOptions) { o.maxCallDepth = max }
+}
+
+// WithMaxGoroutines limits active goroutines started by script go statements.
+// A non-positive value disables the limit.
+//
+// When a goroutine limit is set, JIT execution is disabled so native code
+// cannot bypass task-creation checkpoints.
+func WithMaxGoroutines(max int64) Option {
+	return func(o *vmOptions) { o.maxGoroutines = max }
+}
+
+// WithMaxChannelCapacity limits the buffer capacity accepted by make(chan, n).
+// Unbuffered channels are still allowed. A non-positive value disables the
+// limit.
+//
+// When a channel-capacity limit is set, JIT execution is disabled so native
+// code cannot bypass channel-creation checkpoints.
+func WithMaxChannelCapacity(max int64) Option {
+	return func(o *vmOptions) { o.maxChannelCap = max }
 }
 
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.

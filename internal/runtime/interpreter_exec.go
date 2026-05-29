@@ -269,10 +269,20 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 		if err != nil {
 			return nil, false, false, false, err
 		}
+		if err := interp.reserveGoroutineBudget(); err != nil {
+			return nil, false, false, false, err
+		}
 		go func() {
+			defer interp.releaseGoroutineBudget()
 			childInterp := &Interpreter{
-				globals:    interp.globals,
-				stringMeta: interp.stringMeta,
+				globals:          interp.globals,
+				stringMeta:       interp.stringMeta,
+				maxSteps:         interp.maxSteps,
+				maxNativeCalls:   interp.maxNativeCalls,
+				maxCallDepth:     interp.maxCallDepth,
+				maxGoroutines:    interp.maxGoroutines,
+				activeGoroutines: interp.activeGoroutines,
+				maxChannelCap:    interp.maxChannelCap,
 			}
 			childInterp.callFunction(fn, args)
 		}()
@@ -289,10 +299,20 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 		if err != nil {
 			return nil, false, false, false, err
 		}
+		if err := interp.reserveGoroutineBudget(); err != nil {
+			return nil, false, false, false, err
+		}
 		go func() {
+			defer interp.releaseGoroutineBudget()
 			childInterp := &Interpreter{
-				globals:    interp.globals,
-				stringMeta: interp.stringMeta,
+				globals:          interp.globals,
+				stringMeta:       interp.stringMeta,
+				maxSteps:         interp.maxSteps,
+				maxNativeCalls:   interp.maxNativeCalls,
+				maxCallDepth:     interp.maxCallDepth,
+				maxGoroutines:    interp.maxGoroutines,
+				activeGoroutines: interp.activeGoroutines,
+				maxChannelCap:    interp.maxChannelCap,
 			}
 			childInterp.callFunction(method, args)
 		}()

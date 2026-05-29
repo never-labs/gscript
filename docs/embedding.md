@@ -31,8 +31,9 @@ extensions:
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`, `SecuritySandbox`,
   `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
   `WithFilesystemWrite`, `WithFilesystemRoot`, `WithRequirePath`,
-  `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`, `WithPrint`,
-  `WithVM`, `WithJIT`, and `WithTracing`.
+  `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
+  `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithPrint`, `WithVM`,
+  `WithJIT`, and `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -244,6 +245,10 @@ Current sandbox gaps:
 - `WithMaxCallDepth` limits active function call depth in the interpreter and
   bytecode VM. Setting it disables JIT until compiled calls consume the same
   frame-depth budget.
+- `WithMaxGoroutines` limits active goroutines started by script `go`
+  statements, and `WithMaxChannelCapacity` limits `make(chan, n)` buffer
+  sizes. Both disable JIT until compiled task/channel creation consumes the
+  same policy.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven
@@ -378,7 +383,8 @@ be checked by both interpreter and bytecode VM loops, not only at call
 boundaries. Timeouts should return a distinguishable error, for example
 `errors.Is(err, context.Canceled)` or `context.DeadlineExceeded`.
 
-`WithMaxSteps`, `WithMaxNativeCalls`, and `WithMaxCallDepth` are the first
+`WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
+`WithMaxGoroutines`, and `WithMaxChannelCapacity` are the first
 production-limits APIs. A full production limits object should still cover wall
 time, allocation/table sizes, module count, and host-call duration policy.
 
@@ -445,7 +451,8 @@ safe built-in modules require-able.
 `WithSandbox()` remains the compatibility shorthand for `LibSafe` plus
 `CapSafe`. It does not change execution mode, so production examples should
 prefer `SecuritySandbox()` and then opt into explicit budgets such as
-`WithMaxSteps`, `WithMaxNativeCalls`, and `WithMaxCallDepth`.
+`WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
+`WithMaxGoroutines`, and `WithMaxChannelCapacity`.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the
