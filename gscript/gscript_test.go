@@ -511,6 +511,129 @@ func TestRegisterTable(t *testing.T) {
 	}
 }
 
+func TestRegisterModuleRequire(t *testing.T) {
+	vm := gs.New(gs.WithSandbox())
+	err := vm.RegisterModule("go/strings", gs.Module{
+		"upper": strings.ToUpper,
+		"join":  strings.Join,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Exec(`
+strings := require("go/strings")
+result := strings.upper("hello")
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "HELLO" {
+		t.Fatalf("result = %v, want HELLO", val)
+	}
+}
+
+func TestRegisterModuleRequireBytecodeVM(t *testing.T) {
+	vm := gs.New(gs.WithVM())
+	err := vm.RegisterModule("go/strings", gs.Module{
+		"upper": strings.ToUpper,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Exec(`
+strings := require("go/strings")
+result := strings.upper("vm")
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "VM" {
+		t.Fatalf("result = %v, want VM", val)
+	}
+}
+
+func TestRegisterModuleRequireBytecodeVMAfterInit(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithModuleLoading(false))
+	if err := vm.Exec(`warmup := true`); err != nil {
+		t.Fatal(err)
+	}
+	err := vm.RegisterModule("go/strings", gs.Module{
+		"upper": strings.ToUpper,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Exec(`
+strings := require("go/strings")
+same := package.loaded["go/strings"] == strings
+result := strings.upper("late")
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "LATE" {
+		t.Fatalf("result = %v, want LATE", val)
+	}
+	same, err := vm.Get("same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same != true {
+		t.Fatalf("same = %v, want true", same)
+	}
+}
+
+func TestRegisterModuleRequireBytecodeVMNativeRequireAfterInit(t *testing.T) {
+	vm := gs.New(gs.WithVM())
+	if err := vm.Exec(`warmup := true`); err != nil {
+		t.Fatal(err)
+	}
+	err := vm.RegisterModule("go/strings", gs.Module{
+		"upper": strings.ToUpper,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.Exec(`
+strings := require("go/strings")
+same := package.loaded["go/strings"] == strings
+result := strings.upper("native")
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "NATIVE" {
+		t.Fatalf("result = %v, want NATIVE", val)
+	}
+	same, err := vm.Get("same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same != true {
+		t.Fatalf("same = %v, want true", same)
+	}
+}
+
 // --- Type conversion tests ---
 
 func TestToValue_slice(t *testing.T) {

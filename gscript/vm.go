@@ -265,6 +265,35 @@ func (vm *VM) syncBytecodeGlobals() {
 	}
 }
 
+func (vm *VM) snapshotGlobals() map[string]runtime.Value {
+	if vm.bvm != nil {
+		vm.syncBytecodeGlobals()
+	}
+	return vm.interp.ExportGlobals()
+}
+
+func (vm *VM) restoreGlobals(globals map[string]runtime.Value) {
+	vm.interp.ReplaceGlobals(globals)
+	vm.bvm = nil
+}
+
+func (vm *VM) preserveHotReloadState(before map[string]runtime.Value, _ *Program) {
+	after := vm.interp.ExportGlobals()
+	for name, old := range before {
+		current, ok := after[name]
+		if !ok || current.IsFunction() || old.IsFunction() {
+			continue
+		}
+		if old.IsTable() && current.IsTable() {
+			hotReloadMergeTables(old.Table(), current.Table(), make(map[*runtime.Table]bool))
+		}
+		vm.interp.AssignGlobal(name, old)
+		if vm.bvm != nil {
+			vm.bvm.SetGlobal(name, old)
+		}
+	}
+}
+
 // Call calls a named GScript function with Go arguments and returns Go values.
 // Args and return values are automatically converted via reflection.
 func (vm *VM) Call(name string, args ...interface{}) ([]interface{}, error) {
@@ -392,6 +421,9 @@ func (vm *VM) GetValue(name string) runtime.Value {
 // SetValue sets a global to a raw runtime.Value.
 func (vm *VM) SetValue(name string, val runtime.Value) {
 	vm.interp.SetGlobal(name, val)
+	if vm.bvm != nil {
+		vm.bvm.SetGlobal(name, val)
+	}
 }
 
 // RegisterFunc registers a Go function as a GScript global.
@@ -414,6 +446,9 @@ func (vm *VM) RegisterFunc(name string, fn interface{}) error {
 	}
 	wrapped.Name = name
 	vm.interp.SetGlobal(name, runtime.FunctionValue(wrapped))
+	if vm.bvm != nil {
+		vm.bvm.SetGlobal(name, runtime.FunctionValue(wrapped))
+	}
 	return nil
 }
 
@@ -435,6 +470,44 @@ func (vm *VM) RegisterTable(name string, members map[string]interface{}) error {
 		t.RawSet(runtime.StringValue(k), gsVal)
 	}
 	vm.interp.SetGlobal(name, runtime.TableValue(t))
+	if vm.bvm != nil {
+		vm.bvm.SetGlobal(name, runtime.TableValue(t))
+	}
+	return nil
+}
+
+// RegisterModule registers a Go-backed module for require(name).
+//
+// Go-backed host modules are explicit embedding capabilities: this API exposes
+// only the names the embedding application registers. Built-in stdlib modules
+// and filesystem-loaded .gs modules keep their existing controls. Registered
+// host modules remain available when filesystem module loading is disabled,
+// which makes them suitable for sandboxed embeddings that need a narrow Go API
+// surface.
+//
+// Example:
+//
+//	vm.RegisterModule("go/strings", gscript.Module{
+//	    "upper": strings.ToUpper,
+//	    "trim":  strings.TrimSpace,
+//	})
+func (vm *VM) RegisterModule(name string, members Module) error {
+	if name == "" {
+		return fmt.Errorf("RegisterModule: empty module name")
+	}
+	t := runtime.NewTable()
+	for k, v := range members {
+		gsVal, err := ToValue(v)
+		if err != nil {
+			return fmt.Errorf("RegisterModule %s.%s: %v", name, k, err)
+		}
+		t.RawSet(runtime.StringValue(k), gsVal)
+	}
+	val := runtime.TableValue(t)
+	vm.interp.SetModule(name, val)
+	if vm.bvm != nil {
+		vm.bvm.SetGlobal(name, val)
+	}
 	return nil
 }
 

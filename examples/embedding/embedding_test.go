@@ -3,6 +3,9 @@ package embedding_test
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	gs "github.com/gscript/gscript/gscript"
 )
@@ -85,6 +88,118 @@ func Example_hostFunctionBinding() {
 
 	// Output:
 	// job-007
+}
+
+func Example_hostModuleRequire() {
+	vm := gs.New(gs.WithSandbox(), gs.WithModuleLoading(false))
+	if err := vm.RegisterModule("go/strings", gs.Module{
+		"upper": strings.ToUpper,
+	}); err != nil {
+		panic(err)
+	}
+
+	if err := vm.Exec(`
+strings := require("go/strings")
+result := strings.upper("hello")
+`); err != nil {
+		panic(err)
+	}
+
+	result, err := vm.Get("result")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(result)
+
+	// Output:
+	// HELLO
+}
+
+func Example_hotLoader() {
+	dir, err := os.MkdirTemp("", "gscript-hotloader-*")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	path := filepath.Join(dir, "logic.gs")
+	if err := os.WriteFile(path, []byte(`func answer() { return 1 }`), 0644); err != nil {
+		panic(err)
+	}
+
+	loader := gs.NewHotLoader()
+	handle, err := loader.Load(path)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := os.WriteFile(path, []byte(`func answer() { return 2 }`), 0644); err != nil {
+		panic(err)
+	}
+	if err := loader.Reload(path); err != nil {
+		panic(err)
+	}
+
+	result, err := handle.Call(gs.New(), "answer")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(handle.Generation(), result[0])
+
+	if err := os.WriteFile(path, []byte(`func answer() {`), 0644); err != nil {
+		panic(err)
+	}
+	fmt.Println(loader.Reload(path) != nil, handle.Generation())
+
+	// Output:
+	// 2 2
+	// true 2
+}
+
+func Example_hotInstance() {
+	dir, err := os.MkdirTemp("", "gscript-hotinstance-*")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	path := filepath.Join(dir, "logic.gs")
+	if err := os.WriteFile(path, []byte(`
+counter := 0
+func inc() {
+	counter += 1
+	return counter
+}
+`), 0644); err != nil {
+		panic(err)
+	}
+
+	loader := gs.NewHotLoader()
+	inst, err := loader.LoadInstance(path)
+	if err != nil {
+		panic(err)
+	}
+	first, _ := inst.Call("inc")
+	second, _ := inst.Call("inc")
+
+	if err := os.WriteFile(path, []byte(`
+counter := 0
+func inc() {
+	counter += 10
+	return counter
+}
+`), 0644); err != nil {
+		panic(err)
+	}
+	if err := inst.Reload(); err != nil {
+		panic(err)
+	}
+	third, _ := inst.Call("inc")
+
+	fmt.Println(first[0], second[0], third[0])
+
+	// Output:
+	// 1 2 12
 }
 
 func Example_sandboxAndMaxSteps() {

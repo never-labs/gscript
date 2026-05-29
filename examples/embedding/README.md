@@ -13,6 +13,13 @@ their documented output in sync.
   inspection, and encoding a Go value for script use.
 - `Example_hostFunctionBinding` covers registering a reflected Go function with
   `RegisterFunc` and calling it from GScript.
+- `Example_hostModuleRequire` covers `RegisterModule`, `require("go/...")`,
+  and the distinction between explicit host modules and filesystem module
+  loading.
+- `Example_hotLoader` covers `HotLoader`, generation swaps, and failed reloads
+  preserving the previous compiled program.
+- `Example_hotInstance` covers online reload with persistent VM state,
+  automatic non-function global preservation, and function replacement.
 - `Example_sandboxAndMaxSteps` covers `WithSandbox`, disabled filesystem
   globals, and statement/instruction budgeting with `WithMaxSteps`.
 - `Example_structuredErrors` covers structured script and host callback errors

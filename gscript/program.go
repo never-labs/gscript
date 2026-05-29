@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/gscript/gscript/internal/ast"
 	"github.com/gscript/gscript/internal/lexer"
@@ -20,6 +21,7 @@ type Program struct {
 	sourceName string
 	scriptDir  string
 	ast        *ast.Program
+	protoMu    sync.Mutex
 	proto      *bytecodevm.FuncProto
 }
 
@@ -119,6 +121,8 @@ func compileSource(src, filename, scriptDir string) (*Program, error) {
 }
 
 func (p *Program) bytecodeProto() (*bytecodevm.FuncProto, error) {
+	p.protoMu.Lock()
+	defer p.protoMu.Unlock()
 	if p.proto != nil {
 		return p.proto, nil
 	}

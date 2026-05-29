@@ -19,10 +19,14 @@ extensions:
 
 - VM creation: `gscript.New(opts ...Option) *VM`.
 - Execution: `(*VM).Exec(src string) error` and `(*VM).ExecFile(path string) error`.
+- Compiled programs: `Compile`, `CompileFile`, `(*VM).Run`, `Program`, and
+  `Program.SourceName`.
 - Script function calls: `(*VM).Call(name string, args ...interface{}) ([]interface{}, error)`.
 - Function-value calls: `(*VM).CallValue(fn interface{}, args ...interface{}) ([]interface{}, error)` and the lower-level `(*VM).CallFunction(runtime.Value, []runtime.Value)`.
 - Globals: `Set`, `Get`, `SetValue`, and `GetValue`.
-- Go binding: `RegisterFunc`, `RegisterTable`, `BindStruct`, `BindStructWithConstructor`, and `BindMethod`.
+- Go binding: `RegisterFunc`, `RegisterTable`, `RegisterModule`, `BindStruct`,
+  `BindStructWithConstructor`, and `BindMethod`.
+- Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`,
   `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
@@ -45,8 +49,8 @@ The public surface has executable Go examples in
 `gscript/example_test.go`. They are normal Go example tests, so
 `go test ./examples/embedding ./gscript` verifies that snippets for
 `Compile`/`Run`, public `Value`, host function binding, `WithSandbox`,
-`WithMaxSteps`, and structured errors continue to compile and match their
-documented output. See the
+`WithMaxSteps`, hot loading, explicit Go-backed host modules, and structured
+errors continue to compile and match their documented output. See the
 [embedding examples index](../examples/embedding/README.md) for the concise
 example-by-example coverage list.
 
@@ -76,6 +80,18 @@ var hostErr *gs.HostCallbackError
 fmt.Println(errors.As(err, &gsErr), errors.As(err, &hostErr))
 ```
 
+Go-backed modules are explicit host capabilities:
+
+```go
+vm := gs.New(gs.WithSandbox(), gs.WithModuleLoading(false))
+vm.RegisterModule("go/strings", gs.Module{"upper": strings.ToUpper})
+vm.Exec(`strings := require("go/strings"); result := strings.upper("hello")`)
+```
+
+Registered host modules are available through `require(name)` even when
+filesystem-backed module loading is disabled. A sandboxed embedding should
+register only the `go/...` modules it intends scripts to access.
+
 ## Current execution model
 
 `New` creates a tree-walking interpreter by default. `WithVM` switches `Exec`
@@ -86,8 +102,24 @@ but the public `gscript.New()` default remains the interpreter path.
 `Exec` and `ExecFile` parse source every time. The bytecode path compiles to an
 internal `*vm.FuncProto` and persists the bytecode VM inside `gscript.VM` so
 subsequent `Call` operations can route bytecode closures correctly. There is
-no public compiled-program object, no public parse-only or compile-only API,
-and no reusable module/program artifact suitable for hot service paths.
+also a reusable `Program` from `Compile`/`CompileFile` for embedding code that
+wants an explicit compile step.
+
+`HotLoader` is the public hot-reload helper. It compiles files with
+`CompileFileContext`, stores the latest successful `Program` in an atomic
+`ModuleHandle`, increments a generation counter on successful reload, and keeps
+the previous generation active when recompilation fails. It does not watch the
+filesystem and does not register files into `require`; embedders call `Reload`
+from their own watcher, admin endpoint, or deployment hook.
+
+`HotInstance` adds online reload semantics on top of `HotLoader`: it owns a
+persistent VM, runs the initial program once, and on reload skips top-level
+initializers for existing non-function globals while replacing function
+definitions. Existing scalar/table/object state therefore survives ordinary
+code reloads automatically, new globals receive their defaults, and removed
+functions are not deleted by default. Compile failures and top-level runtime
+failures leave the previous generation installed. Running goroutines and
+externally saved old closures are not migrated.
 
 `ExecFile` sets the interpreter script directory from the file path. `WithRequirePath`
 sets the initial base directory used by `require` and script loading. Internal

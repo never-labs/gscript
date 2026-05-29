@@ -67,6 +67,16 @@ func (interp *Interpreter) ExportGlobals() map[string]Value {
 	return m
 }
 
+// ReplaceGlobals replaces the global binding set with values from globals.
+// It is intended for host-managed rollback/snapshot operations.
+func (interp *Interpreter) ReplaceGlobals(globals map[string]Value) {
+	env := NewEnvironment(nil)
+	for name, val := range globals {
+		env.Define(name, val)
+	}
+	interp.globals = env
+}
+
 // RestrictStdlib removes standard-library globals not present in allowed.
 func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
 	for _, name := range stdlibModuleNames {
@@ -92,6 +102,23 @@ func NewInterpreterGlobals() map[string]Value {
 // SetGlobal defines or overwrites a global variable.
 func (interp *Interpreter) SetGlobal(name string, val Value) {
 	interp.globals.Define(name, val)
+}
+
+// AssignGlobal updates an existing global binding in place when possible, or
+// defines it when absent. This preserves upvalue identity for closures that
+// already captured the global binding.
+func (interp *Interpreter) AssignGlobal(name string, val Value) {
+	if interp.globals.Set(name, val) {
+		return
+	}
+	interp.globals.Define(name, val)
+}
+
+// SetModule registers a prebuilt module value for require(name). Registered
+// modules are available even when filesystem-backed module loading is disabled.
+func (interp *Interpreter) SetModule(name string, val Value) {
+	interp.modules[name] = val
+	interp.markPackageLoaded(name, val)
 }
 
 // GetGlobal retrieves a global variable.
