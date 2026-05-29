@@ -10,6 +10,7 @@ var stdlibModuleNames = []string{
 	"color",
 	"compress",
 	"container",
+	"context",
 	"crypto",
 	"csv",
 	"debug",
@@ -145,6 +146,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Container data structures ---
 	interp.globals.Define("container", TableValue(buildContainerLib(interp)))
+	interp.globals.Define("context", TableValue(buildContextLib()))
 
 	// --- Logging ---
 	interp.globals.Define("log", TableValue(buildLogLib()))

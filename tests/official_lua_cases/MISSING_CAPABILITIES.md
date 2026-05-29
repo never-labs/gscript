@@ -117,6 +117,10 @@ set。后续实现时按 GScript/Go-host 直觉设计，不要求逐字复刻 Lu
 
 ## JIT capability matrix
 
+- `context`: script-level cancellable done channels (`background`, `withCancel`,
+  `withTimeout`) are documented as GScript host concurrency capability, not a Lua
+  official-library parity item.
+
 这些条目不是语言能力缺口。它们描述的是 native JIT 在 semantic-check 模式下主动退回 VM 的边界，或 methodjit 内部保留的 skipped 优化/正确性 repro。官方 translated correctness 仍由 VM 负责，`GSCRIPT_OFFICIAL_CHECK_JIT=1` 只要求 `gscript -jit` 输出一致，不要求每个 case 都 native 编译。
 
 | 范围 | 语言/VM 状态 | JIT 当前策略 | 后续方向 |

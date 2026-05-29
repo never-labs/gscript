@@ -48,6 +48,7 @@ JIT fast path policy:
 | `color` | Pure | none; color conversion and geometry helpers | runtime error | VM fallback |
 | `compress` | Pure | CPU/memory only through compression codecs | runtime error for bad argument shape; `nil, err` for malformed compressed data | VM fallback |
 | `container` | Pure | in-process set/queue/deque/stack/heap objects | runtime error; sentinel nil/false for empty pop/peek/lookup | VM callback and VM fallback |
+| `context` | Bounded host | in-process cancellation state and timeout-backed done channels | runtime error for invalid timeout arguments; sentinel nil for uncancelled error state | VM fallback |
 | `crypto` | Bounded host | cryptographic random source and AEAD primitives | runtime error for invalid arguments; `nil, err` for invalid keys/ciphertext | VM fallback |
 | `csv` | Pure | none; CSV parser/encoder over strings/tables | runtime error for bad options; `nil, err` for malformed input | VM fallback |
 | `debug` | Privileged host | stack, globals, Go stack, hook/sink diagnostics | runtime error; result tables for info/stack/value | VM fallback |
