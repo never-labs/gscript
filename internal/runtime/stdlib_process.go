@@ -151,10 +151,17 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 				timeout = time.Duration(toFloat(v) * float64(time.Second))
 			}
 			if v := opts.RawGet(StringValue("env")); v.IsTable() {
+				if interp != nil && !interp.environmentWrite {
+					return nil, fmt.Errorf("environment write access disabled")
+				}
 				envTbl := v.Table()
 				k, val, ok := envTbl.Next(NilValue())
 				for ok {
-					envVars = append(envVars, k.String()+"="+val.String())
+					name := k.String()
+					if interp != nil && interp.allowedEnv != nil && !interp.allowedEnv[name] {
+						return nil, fmt.Errorf("environment variable not allowed: %s", name)
+					}
+					envVars = append(envVars, name+"="+val.String())
 					k, val, ok = envTbl.Next(k)
 				}
 			}

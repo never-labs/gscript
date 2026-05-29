@@ -1973,6 +1973,40 @@ func TestWithFilesystemRootConfinesProcessRunDir(t *testing.T) {
 	}
 }
 
+func TestProcessRunEnvFollowsEnvironmentPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name+"/write-disabled", func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibProcess),
+				gs.WithEnvironmentWrite(false),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`result := process.run({"pwd"}, {env: {GSCRIPT_PROCESS_ENV_POLICY_TEST: "blocked"}})`)
+			if err == nil || !strings.Contains(err.Error(), "environment write access disabled") {
+				t.Fatalf("process.run env err = %v, want environment write access disabled", err)
+			}
+		})
+
+		t.Run(tc.name+"/allowlist", func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibProcess),
+				gs.WithEnvironmentAllowlist("GSCRIPT_PROCESS_ENV_ALLOWED"),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`result := process.run({"pwd"}, {env: {GSCRIPT_PROCESS_ENV_BLOCKED: "blocked"}})`)
+			if err == nil || !strings.Contains(err.Error(), "environment variable not allowed: GSCRIPT_PROCESS_ENV_BLOCKED") {
+				t.Fatalf("process.run env allowlist err = %v, want environment variable not allowed", err)
+			}
+		})
+	}
+}
+
 func TestWithNetworkAccessFalseBlocksNetAndHTTP(t *testing.T) {
 	for _, tc := range []struct {
 		name string

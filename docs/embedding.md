@@ -274,7 +274,8 @@ Current sandbox gaps:
 - `WithEnvironmentAllowlist(names...)` limits script-side environment reads
   and writes to specific variable names. It filters `os.getenv`,
   `os.environ`, `os.expand`, and `process.env`, and rejects `os.setenv` /
-  `os.unsetenv` for variables outside the allowlist.
+  `os.unsetenv` plus `process.run` environment overrides for variables outside
+  the allowlist.
 - `WithNetworkAccess(false)` disables host-backed network APIs in `net` and
   `http`.
 - `WithDebugAccess(false)` disables script-visible `debug` APIs while keeping
@@ -283,7 +284,8 @@ Current sandbox gaps:
 - `WithProcessExecution(false)` disables `process.run`, `process.exec`, and
   `process.which`; `WithProcessShell(false)` disables `process.shell`.
   `process.run` working directories are confined by `WithFilesystemRoot` when
-  a filesystem root is configured.
+  a filesystem root is configured, and its `env` option follows environment
+  write/allowlist policy.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven

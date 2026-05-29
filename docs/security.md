@@ -390,6 +390,8 @@ Process policy:
 - Environment default empty or allowlisted.
 - `process.run` working directory must pass `WithFilesystemRoot` confinement
   when a filesystem root is configured.
+- `process.run` environment overrides must pass environment write and
+  allowlist policy.
 - Enforce timeout, stdout/stderr byte limits, stdin byte limits, and process
   tree cleanup on cancellation. `WithMaxHostResultBytes` currently bounds
   captured `process.run`, `process.exec`, and `process.shell` output.
