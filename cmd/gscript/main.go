@@ -70,6 +70,8 @@ func init() {
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "bench":
+			os.Exit(runBenchCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "capabilities":
 			os.Exit(runCapabilitiesCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "check":
@@ -315,6 +317,7 @@ func buildCapabilities() cliCapabilities {
 			MethodJIT:   cliMethodJITAvailable(),
 		},
 		Commands: []string{
+			"bench",
 			"capabilities",
 			"check",
 			"config",

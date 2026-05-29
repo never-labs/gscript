@@ -425,6 +425,9 @@ Benchmark tooling is the most mature area:
   source tracking, confidence intervals, scaling, JSON and Markdown output.
 - `benchmarks/strict_guard.py` is the broad truth pass for suite, extended, and
   variants, with modes `vm`, `default`, `no_filter`, and `luajit`.
+- `gscript bench compare ...` and `gscript bench strict ...` are stable CLI
+  facades over those two Python harnesses; arguments after the mode are passed
+  through unchanged.
 - `benchmarks/diagnose.py` collects timing, exits, runtime-path counters,
   Tier 2 perf, speculation state/worklist, and optional pprof/warm dumps.
 - `benchmarks/triage.py`, `profile_exits.py`, `jit_addr_map.py`,
@@ -437,7 +440,8 @@ Benchmark tooling is the most mature area:
 
 - Benchmark entry points are powerful but fragmented across Python, shell, and
   Go test.
-- No single `gscript bench` UX for users or CI.
+- `gscript bench` exists as a thin facade, but benchmark profiles are not yet
+  centralized in project config.
 - Result schemas are close but not centralized/versioned.
 - No explicit machine-readable benchmark manifest schema beyond current JSON
   files and script conventions.
@@ -446,7 +450,7 @@ Benchmark tooling is the most mature area:
 
 P0:
 
-- Add `gscript bench` as a stable facade over existing harnesses.
+- Extend `gscript bench` with named profiles over existing harnesses.
 - Version benchmark result JSON schema.
 - Keep suite/extended/variants/official as separate groups; do not collapse to
   one score.
@@ -460,10 +464,10 @@ P1:
 Suggested CLI:
 
 ```bash
-gscript bench --group=suite --mode=default --mode=luajit --runs=5
+gscript bench compare --group=suite --mode=default --runs=5
+gscript bench strict --group=suite --group=extended --runs=3 --warmup=1
 gscript bench --profile=pr --json /tmp/bench.json --markdown /tmp/bench.md
 gscript bench diagnose --bench=suite/spectral_norm --pprof --warm-dump
-gscript bench strict --all-groups --runs=3 --warmup=1
 ```
 
 Suggested schema envelope:

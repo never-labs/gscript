@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
@@ -51,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
-		t.Fatalf("commands = %#v, want capabilities/check/config/fmt/lint", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/config/fmt/lint", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -83,6 +84,26 @@ func containsString(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GSCRIPT_TEST_HELPER") == "" {
+		return
+	}
+	switch os.Getenv("GSCRIPT_TEST_HELPER") {
+	case "bench":
+		_, _ = os.Stdout.WriteString("bench helper ok\n")
+		os.Exit(0)
+	default:
+		os.Exit(2)
+	}
+}
+
+func testHelperCommand(t *testing.T, helper string) (string, []string) {
+	t.Helper()
+	args := []string{"-test.run=TestHelperProcess", "--"}
+	t.Setenv("GSCRIPT_TEST_HELPER", helper)
+	return os.Args[0], args
 }
 
 func TestConfigCommandJSONDiscoversAndParsesProjectConfig(t *testing.T) {
@@ -226,6 +247,54 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 	if !report.Steps[2].Skipped || !report.Steps[2].OK {
 		t.Fatalf("test step = %+v, want skipped ok", report.Steps[2])
+	}
+}
+
+func TestBenchCommandDispatchesCompareHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotName string
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"compare", "--bench", "suite/mandelbrot"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "python3" {
+		t.Fatalf("python command = %q, want python3", gotName)
+	}
+	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "suite/mandelbrot" {
+		t.Fatalf("args = %#v, want timing_compare.py --bench suite/mandelbrot", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "bench helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}
+
+func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"strict", "--group", "suite"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "strict_guard.py")) || gotArgs[1] != "--group" || gotArgs[2] != "suite" {
+		t.Fatalf("args = %#v, want strict_guard.py --group suite", gotArgs)
 	}
 }
 
