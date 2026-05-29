@@ -88,6 +88,7 @@ schema。
   local CI profiles and can print the underlying commands before running them.
 - `gscript version [--json]` reports binary, platform, Go, and VCS build
   metadata for release/debugging provenance.
+- `gscript help [command]` lists supported commands and command-specific usage.
 
 There are also developer binaries:
 
@@ -826,6 +827,7 @@ gscript doc check
 gscript ci smoke|pr|perf|release
 gscript capabilities
 gscript version
+gscript help
 ```
 
 ## Non-Goals For The First Iteration

@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "version") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/ci/config/diag/doc/eval/fmt/inspect/lint/mod/repl/version", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "version") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/ci/config/diag/doc/eval/fmt/help/inspect/lint/mod/repl/version", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -103,6 +103,46 @@ func TestVersionCommandRejectsExtraArgs(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "usage: gscript version") {
 		t.Fatalf("stderr = %q, want usage", stderr.String())
+	}
+}
+
+func TestHelpCommandListsCommands(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runHelpCommand(nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runHelpCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{"usage: gscript <command>", "run", "version", "help"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout = %q, want %q", out, want)
+		}
+	}
+}
+
+func TestHelpCommandShowsCommandUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runHelpCommand([]string{"run"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runHelpCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "usage: gscript run") || !strings.Contains(out, "Run a script file") {
+		t.Fatalf("stdout = %q, want run usage", out)
+	}
+}
+
+func TestHelpCommandRejectsUnknownCommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runHelpCommand([]string{"missing"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runHelpCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "unknown command") {
+		t.Fatalf("stderr = %q, want unknown command", stderr.String())
 	}
 }
 

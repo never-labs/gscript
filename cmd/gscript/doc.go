@@ -123,6 +123,7 @@ func generateCLIReferenceMarkdown() []byte {
 		"doc":          "Generate and validate documentation references.",
 		"eval":         "Execute source passed on the command line.",
 		"fmt":          "Format or check GScript source files.",
+		"help":         "Show command help.",
 		"inspect":      "Inspect compiled artifacts.",
 		"lint":         "Report source diagnostics.",
 		"mod":          "Manage local module metadata and require graphs.",
