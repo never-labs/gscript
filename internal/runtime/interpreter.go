@@ -29,6 +29,7 @@ type Interpreter struct {
 	environmentRead   bool             // script-side environment reads are enabled
 	environmentWrite  bool             // script-side environment writes are enabled
 	allowedEnv        map[string]bool  // nil means all environment variables are allowed
+	processExecution  bool             // process.run/exec/which are enabled
 	processShell      bool             // process.shell is enabled
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
@@ -71,6 +72,7 @@ func New() *Interpreter {
 		dynamicEval:       true,
 		environmentRead:   true,
 		environmentWrite:  true,
+		processExecution:  true,
 		processShell:      true,
 		activeGoroutines:  &atomic.Int64{},
 	}
@@ -183,8 +185,13 @@ func (interp *Interpreter) SetDynamicEval(enabled bool) {
 	interp.dynamicEval = enabled
 }
 
-// SetProcessShell controls process.shell. Other process APIs remain controlled
-// by LibProcess and future process policy.
+// SetProcessExecution controls process.run, process.exec, and process.which.
+// process.shell has a separate switch because shell strings carry extra risk.
+func (interp *Interpreter) SetProcessExecution(enabled bool) {
+	interp.processExecution = enabled
+}
+
+// SetProcessShell controls process.shell.
 func (interp *Interpreter) SetProcessShell(enabled bool) {
 	interp.processShell = enabled
 }

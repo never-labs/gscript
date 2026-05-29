@@ -83,8 +83,9 @@ The stdlib surface includes host-effect modules such as `io`, `fs`, `net`,
 modules must be considered capabilities, not ordinary libraries. The current
 `CapabilityFlags` layer is intentionally smaller than the future
 `SecurityPolicy`: it covers module loading, filesystem-backed script APIs,
-environment allowlists, and the `process.shell` gate, but not network, broader
-process policy, debug introspection, memory, or host callback effects yet.
+environment allowlists, process execution gates, and the `process.shell` gate,
+but not network, executable allowlists, debug introspection, memory, or host
+callback effects yet.
 
 ## Default Security Configuration
 
@@ -368,6 +369,9 @@ Process policy:
 
 - Default deny.
 - Allow exact executables or command specs, not arbitrary shell strings.
+- `process.run`, `process.exec`, and `process.which` should be disableable as a
+  group. Current public API exposes this as `WithProcessExecution(enabled)` and
+  `SecurityPolicy.DisableProcessExecution`.
 - `process.shell` should be disabled for production policies unless shell
   execution is explicitly needed. Current public API exposes this as
   `WithProcessShell(enabled)` and `SecurityPolicy.DisableProcessShell`.

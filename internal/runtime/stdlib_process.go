@@ -43,6 +43,9 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'process.run'")
 		}
+		if interp != nil && !interp.processExecution {
+			return nil, fmt.Errorf("process execution access disabled")
+		}
 
 		var done *Channel
 		var errFn Value
@@ -182,6 +185,9 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.exec' (string expected)")
 		}
+		if interp != nil && !interp.processExecution {
+			return nil, fmt.Errorf("process execution access disabled")
+		}
 		cmdArgs := make([]string, len(args))
 		for i, a := range args {
 			cmdArgs[i] = a.String()
@@ -232,6 +238,9 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 	set("which", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.which' (string expected)")
+		}
+		if interp != nil && !interp.processExecution {
+			return nil, fmt.Errorf("process execution access disabled")
 		}
 		path, err := exec.LookPath(args[0].Str())
 		if err != nil {

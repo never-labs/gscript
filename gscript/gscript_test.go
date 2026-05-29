@@ -1743,6 +1743,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxFilesystemWriteBytes: 128,
 		EnvironmentAllowlist:    []string{"GSCRIPT_PUBLIC_ENV_CAP_TEST"},
 		DisableDynamicEval:      true,
+		DisableProcessExecution: true,
 		DisableProcessShell:     true,
 	}))
 	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
@@ -1840,6 +1841,34 @@ func TestWithProcessShellFalseBlocksShell(t *testing.T) {
 			err := vm.Exec(`result := process.shell("echo blocked")`)
 			if err == nil || !strings.Contains(err.Error(), "process shell access disabled") {
 				t.Fatalf("process.shell err = %v, want process shell access disabled", err)
+			}
+		})
+	}
+}
+
+func TestWithProcessExecutionFalseBlocksRunExecAndWhich(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibProcess),
+				gs.WithProcessExecution(false),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			for _, src := range []string{
+				`result := process.run("echo blocked")`,
+				`result := process.exec("echo", "blocked")`,
+				`result := process.which("echo")`,
+			} {
+				err := vm.Exec(src)
+				if err == nil || !strings.Contains(err.Error(), "process execution access disabled") {
+					t.Fatalf("%s err = %v, want process execution access disabled", src, err)
+				}
 			}
 		})
 	}

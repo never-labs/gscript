@@ -292,6 +292,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				environmentRead:  interp.environmentRead,
 				environmentWrite: interp.environmentWrite,
 				allowedEnv:       interp.allowedEnv,
+				processExecution: interp.processExecution,
 				processShell:     interp.processShell,
 			}
 			childInterp.callFunction(fn, args)
@@ -332,6 +333,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				environmentRead:  interp.environmentRead,
 				environmentWrite: interp.environmentWrite,
 				allowedEnv:       interp.allowedEnv,
+				processExecution: interp.processExecution,
 				processShell:     interp.processShell,
 			}
 			childInterp.callFunction(method, args)
