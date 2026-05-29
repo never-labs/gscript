@@ -72,7 +72,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("math", TableValue(buildMathLib()))
 
 	// IO library
-	interp.globals.Define("io", TableValue(buildIOLib()))
+	interp.globals.Define("io", TableValue(buildIOLib(interp)))
 
 	// OS library
 	interp.globals.Define("os", TableValue(buildOSLib()))

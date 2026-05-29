@@ -2155,6 +2155,109 @@ func TestWithFilesystemWriteFalseBlocksOSFileMutation(t *testing.T) {
 	}
 }
 
+func TestWithFilesystemCapabilitiesGateIOLibFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "in.txt"), []byte("hello"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			readOnly := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibIO),
+				gs.WithFilesystemRoot(root),
+				gs.WithFilesystemWrite(false),
+			}, tc.opts...)
+			vm := gs.New(readOnly...)
+			if err := vm.Exec(`f := io.open("in.txt", "r"); data := f:read("a"); f:close()`); err != nil {
+				t.Fatalf("io.open read in read-only filesystem failed: %v", err)
+			}
+			got, err := vm.Get("data")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "hello" {
+				t.Fatalf("data = %v, want hello", got)
+			}
+			for _, src := range []string{
+				`f := io.open("out.txt", "w")`,
+				`io.output("out.txt")`,
+				`tmp := io.tmpfile()`,
+			} {
+				err := vm.Exec(src)
+				if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
+					t.Fatalf("%s err = %v, want filesystem write access disabled", src, err)
+				}
+			}
+
+			writeOnly := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibIO),
+				gs.WithFilesystemRoot(root),
+				gs.WithFilesystemRead(false),
+			}, tc.opts...)
+			vm = gs.New(writeOnly...)
+			if err := vm.Exec(`f := io.open("out.txt", "w"); f:write("ok"); f:close()`); err != nil {
+				t.Fatalf("io.open write in write-only filesystem failed: %v", err)
+			}
+			for _, src := range []string{
+				`f := io.open("in.txt", "r")`,
+				`iter := io.lines("in.txt")`,
+				`io.input("in.txt")`,
+			} {
+				err := vm.Exec(src)
+				if err == nil || !strings.Contains(err.Error(), "filesystem read access disabled") {
+					t.Fatalf("%s err = %v, want filesystem read access disabled", src, err)
+				}
+			}
+		})
+	}
+}
+
+func TestWithFilesystemRootConfinesIOLibFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibIO),
+				gs.WithFilesystemRoot(root),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+				f := io.open("inside.txt", "w")
+				assert(f:write("ok"))
+				assert(f:close())
+			`); err != nil {
+				t.Fatalf("io.open inside root failed: %v", err)
+			}
+			if got, err := os.ReadFile(filepath.Join(root, "inside.txt")); err != nil || string(got) != "ok" {
+				t.Fatalf("inside file = %q err=%v, want ok", got, err)
+			}
+			err := vm.Exec(`f := io.open("../escape.txt", "w")`)
+			if err == nil || !strings.Contains(err.Error(), "filesystem access denied") {
+				t.Fatalf("io.open escape err = %v, want filesystem access denied", err)
+			}
+			if err := vm.Exec(`
+				tmp := io.tmpfile()
+				assert(tmp:write("x"))
+				assert(tmp:close())
+			`); err != nil {
+				t.Fatalf("io.tmpfile in root failed: %v", err)
+			}
+		})
+	}
+}
+
 func TestWithFilesystemRootConfinesOSFileMutation(t *testing.T) {
 	for _, tc := range []struct {
 		name string

@@ -95,8 +95,9 @@
 - `WithFilesystemRead(false)` 可在保留写能力时禁用读取入口；
   `WithFilesystemWrite(false)` 可在保留读能力时禁用变更入口；
   `WithFilesystem(false)` 同时清除读写能力并移除 `fs`、`dofile`、
-  `loadfile`。`os.remove`、`os.rename` 和 `os.tmpname` 也遵守写权限与
-  root confinement。
+  `loadfile`。`io.open`、`io.lines(filename)`、`io.input(filename)`、
+  `io.output(filename)`、`io.tmpfile`、`os.remove`、`os.rename` 和
+  `os.tmpname` 也遵守读写权限与 root confinement。
 - Options 按传入顺序应用；要组合 root confinement 和只读/只写能力，应先传
   `WithFilesystemRoot(root)`，再传 `WithFilesystemWrite(false)` 或
   `WithFilesystemRead(false)`。

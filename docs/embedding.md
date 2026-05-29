@@ -221,15 +221,17 @@ The current public API separates library visibility from host effects:
   still allows enabled built-in stdlib modules such as `json`.
 - `WithFilesystem(false)` clears both filesystem read and write capabilities.
   When both are disabled, `fs`, `dofile`, and `loadfile` are removed; this does
-  not change which safe built-in tables are present. OS file mutation helpers
-  such as `os.remove`, `os.rename`, and `os.tmpname` are also denied.
+  not change which safe built-in tables are present. `io` file operations and
+  OS file mutation helpers such as `os.remove`, `os.rename`, and `os.tmpname`
+  are also denied.
 - `WithFilesystemRead(false)` disables read APIs such as `fs.readfile`,
-  `fs.stat`, `fs.readdir`, `dofile`, and `loadfile` while leaving write access
+  `fs.stat`, `fs.readdir`, `io.open(..., "r")`, `io.lines(filename)`,
+  `io.input(filename)`, `dofile`, and `loadfile` while leaving write access
   unchanged.
 - `WithFilesystemWrite(false)` disables mutating APIs such as `fs.writefile`,
   `fs.remove`, `fs.rename`, `fs.mkdir`, `fs.chdir`, `fs.tempfile`,
-  `os.remove`, `os.rename`, and `os.tmpname` while leaving read access
-  unchanged.
+  `io.open(..., "w")`, `io.output(filename)`, `io.tmpfile`, `os.remove`,
+  `os.rename`, and `os.tmpname` while leaving read access unchanged.
 - `WithFilesystemRoot(root)` confines script-side paths to `root` and enables
   `CapFilesystem`, so it grants both read and write access unless followed by
   `WithFilesystemRead(false)` or `WithFilesystemWrite(false)`.

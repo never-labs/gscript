@@ -330,12 +330,14 @@ Current public root confinement:
   and enables `CapFilesystem`, the compatibility alias for both filesystem
   read and write access.
 - `WithFilesystemRead(false)` disables read APIs such as `fs.readfile`,
-  `fs.stat`, `fs.readdir`, `dofile`, and `loadfile`. If write access remains
-  enabled, `fs` can still expose write operations.
+  `fs.stat`, `fs.readdir`, `io.open(..., "r")`, `io.lines(filename)`,
+  `io.input(filename)`, `dofile`, and `loadfile`. If write access remains
+  enabled, `fs` and `io` can still expose write operations.
 - `WithFilesystemWrite(false)` disables mutating APIs such as `fs.writefile`,
   `fs.remove`, `fs.rename`, `fs.mkdir`, `fs.chdir`, `fs.tempfile`,
-  `os.remove`, `os.rename`, and `os.tmpname`. If read access remains enabled,
-  `fs` can still expose read operations and `dofile`/`loadfile`.
+  `io.open(..., "w")`, `io.output(filename)`, `io.tmpfile`, `os.remove`,
+  `os.rename`, and `os.tmpname`. If read access remains enabled, `fs` and `io`
+  can still expose read operations and `dofile`/`loadfile`.
 - `WithFilesystem(false)` disables both filesystem read and write access by
   clearing `CapFilesystem`.
 - Options are applied in order. To create a confined read-only filesystem, pass
@@ -344,8 +346,9 @@ Current public root confinement:
 - Relative paths are resolved under `root`; absolute paths are allowed only
   when their cleaned absolute form is equal to `root` or below it.
 - Escapes through `..` are rejected with a filesystem access error. This
-  applies to `fs` operations, OS file mutation helpers, and script/module file
-  loading paths that route through the interpreter-backed policy.
+  applies to `fs` operations, `io` file operations, OS file mutation helpers,
+  and script/module file loading paths that route through the
+  interpreter-backed policy.
 - `WithMaxFilesystemReadBytes` limits `fs.readfile` and source-side `fs.copy`
   reads; `WithMaxFilesystemWriteBytes` limits `fs.writefile`, `fs.appendfile`,
   and destination-side `fs.copy` writes.

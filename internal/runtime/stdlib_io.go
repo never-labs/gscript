@@ -24,8 +24,12 @@ type gscriptFileHandle struct {
 }
 
 // buildIOLib creates the "io" standard library table.
-func buildIOLib() *Table {
+func buildIOLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
 	currentInput := newFileHandle(os.Stdin, true)
 	currentOutput := newFileHandle(os.Stdout, true)
 	stdErr := newFileHandle(os.Stderr, true)
@@ -68,7 +72,11 @@ func buildIOLib() *Table {
 
 		if len(args) >= 1 && args[0].IsString() {
 			var err error
-			file, err := os.Open(args[0].Str())
+			filename, err := resolveIOPath(interp, args[0].Str(), true, false)
+			if err != nil {
+				return nil, err
+			}
+			file, err := os.Open(filename)
 			if err != nil {
 				return nil, fmt.Errorf("cannot open '%s': %s", args[0].Str(), err)
 			}
@@ -115,7 +123,12 @@ func buildIOLib() *Table {
 			return []Value{NilValue(), StringValue(fmt.Sprintf("invalid mode: %s", mode))}, nil
 		}
 
-		file, err := os.OpenFile(filename, flag, 0644)
+		read, write := fileModeAccess(flag)
+		resolved, err := resolveIOPath(interp, filename, read, write)
+		if err != nil {
+			return nil, err
+		}
+		file, err := os.OpenFile(resolved, flag, 0644)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -139,8 +152,11 @@ func buildIOLib() *Table {
 		if len(args) == 0 {
 			return []Value{TableValue(currentInput.table)}, nil
 		}
-		h, err := inputOutputTarget(args[0], os.O_RDONLY)
+		h, err := inputOutputTarget(interp, args[0], os.O_RDONLY)
 		if err != nil {
+			if strings.Contains(err.Error(), "filesystem ") {
+				return nil, err
+			}
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		currentInput = h
@@ -152,8 +168,11 @@ func buildIOLib() *Table {
 		if len(args) == 0 {
 			return []Value{TableValue(currentOutput.table)}, nil
 		}
-		h, err := inputOutputTarget(args[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+		h, err := inputOutputTarget(interp, args[0], os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 		if err != nil {
+			if strings.Contains(err.Error(), "filesystem ") {
+				return nil, err
+			}
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		currentOutput = h
@@ -176,7 +195,14 @@ func buildIOLib() *Table {
 
 	// io.tmpfile() -> temporary read/write file handle.
 	set("tmpfile", func(args []Value) ([]Value, error) {
-		file, err := os.CreateTemp("", "gscript-*")
+		if interp != nil && !interp.filesystemWrite {
+			return nil, fmt.Errorf("filesystem write access disabled")
+		}
+		dir := ""
+		if interp != nil && interp.filesystemRoot != "" {
+			dir = interp.filesystemRoot
+		}
+		file, err := os.CreateTemp(dir, "gscript-*")
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -189,6 +215,15 @@ func buildIOLib() *Table {
 	t.RawSet(StringValue("stderr"), TableValue(stdErr.table))
 
 	return t
+}
+
+func (interp *Interpreter) refreshIOLib() {
+	if v, ok := interp.globals.Get("io"); ok && v.IsTable() {
+		ioLib := TableValue(buildIOLib(interp))
+		interp.globals.Define("io", ioLib)
+		interp.modules["io"] = ioLib
+		interp.markPackageLoaded("io", ioLib)
+	}
 }
 
 func parseFileMode(mode string) (int, bool) {
@@ -211,9 +246,33 @@ func parseFileMode(mode string) (int, bool) {
 	}
 }
 
-func inputOutputTarget(v Value, stringMode int) (*gscriptFileHandle, error) {
+func fileModeAccess(flag int) (read, write bool) {
+	read = flag&os.O_WRONLY == 0 || flag&os.O_RDWR != 0
+	write = flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_APPEND) != 0
+	return read, write
+}
+
+func resolveIOPath(interp *Interpreter, path string, read, write bool) (string, error) {
+	if interp == nil {
+		return path, nil
+	}
+	if read && !interp.filesystemRead {
+		return "", fmt.Errorf("filesystem read access disabled")
+	}
+	if write && !interp.filesystemWrite {
+		return "", fmt.Errorf("filesystem write access disabled")
+	}
+	return resolveSandboxPath(interp.filesystemRoot, path)
+}
+
+func inputOutputTarget(interp *Interpreter, v Value, stringMode int) (*gscriptFileHandle, error) {
 	if v.IsString() {
-		file, err := os.OpenFile(v.Str(), stringMode, 0644)
+		read, write := fileModeAccess(stringMode)
+		path, err := resolveIOPath(interp, v.Str(), read, write)
+		if err != nil {
+			return nil, err
+		}
+		file, err := os.OpenFile(path, stringMode, 0644)
 		if err != nil {
 			return nil, err
 		}
