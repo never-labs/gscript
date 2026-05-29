@@ -371,6 +371,26 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	}
 }
 
+func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"diagnose", "--bench", "suite/sieve", "--no-timing"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "suite/sieve" || gotArgs[3] != "--no-timing" {
+		t.Fatalf("args = %#v, want diagnose.py --bench suite/sieve --no-timing", gotArgs)
+	}
+}
+
 func TestDiagCommandDispatchesDumpScript(t *testing.T) {
 	oldDiagExecCommand := diagExecCommand
 	t.Cleanup(func() { diagExecCommand = oldDiagExecCommand })

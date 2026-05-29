@@ -14,7 +14,7 @@ var benchExecCommand = exec.Command
 
 func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript bench [compare|strict] [benchmark-harness-flags...]")
+		fmt.Fprintln(errw, "usage: gscript bench [compare|strict|diagnose] [benchmark-harness-flags...]")
 		return 2
 	}
 	mode := args[0]
@@ -63,16 +63,18 @@ func benchScriptForMode(mode string) (string, error) {
 		return "timing_compare.py", nil
 	case "strict":
 		return "strict_guard.py", nil
+	case "diagnose":
+		return "diagnose.py", nil
 	case "help", "-h", "--help":
 		return "", flag.ErrHelp
 	default:
-		return "", fmt.Errorf("unknown bench mode %q (want compare or strict)", mode)
+		return "", fmt.Errorf("unknown bench mode %q (want compare, strict, or diagnose)", mode)
 	}
 }
 
 func findBenchmarkScript(name string) (string, error) {
 	if name == "" {
-		return "", errors.New("usage: gscript bench [compare|strict] [benchmark-harness-flags...]")
+		return "", errors.New("usage: gscript bench [compare|strict|diagnose] [benchmark-harness-flags...]")
 	}
 	dir, err := os.Getwd()
 	if err != nil {
