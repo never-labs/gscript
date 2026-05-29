@@ -78,6 +78,8 @@ func main() {
 			os.Exit(runCheckCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "config":
 			os.Exit(runConfigCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "eval":
+			os.Exit(runEvalCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "fmt":
 			os.Exit(runFmtCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "lint":
@@ -323,6 +325,7 @@ func buildCapabilities() cliCapabilities {
 			"capabilities",
 			"check",
 			"config",
+			"eval",
 			"fmt",
 			"lint",
 			"run",

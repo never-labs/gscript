@@ -62,6 +62,9 @@ schema。
   output formats for CI/editor integration.
 - `gscript run [--vm] [--jit=true|false] <file.gs> [args...]` is the explicit
   script execution subcommand; legacy `gscript <file.gs>` remains supported.
+- `gscript eval [--vm] [--jit=true|false] <source> [args...]` is the explicit
+  source-string execution subcommand; legacy `gscript -e <source>` remains
+  supported.
 - `gscript config [--json] [path]` walks upward from a file or directory,
   discovers `gscript.toml`, validates the supported project/tool keys, and
   reports the resolved project root for CI/editor integration.
@@ -90,7 +93,6 @@ There are also developer binaries:
 P0:
 
 - Continue introducing subcommands while preserving current invocation compatibility:
-  `gscript eval EXPR`,
   `gscript repl`, `gscript diag ...`.
 - Define common flags: `--json`, `--output PATH`, `--quiet`, `--verbose`,
   `--config PATH`, `--no-config`, `--color=auto|always|never`.
@@ -110,6 +112,7 @@ Suggested CLI:
 ```bash
 gscript run script.gs -- arg1 arg2
 gscript run --vm script.gs
+gscript eval 'print("hello")'
 gscript run --jit --diag=exit,tier2,runtime-path --json script.gs
 gscript inspect bytecode script.gs --proto sum
 gscript capabilities --json

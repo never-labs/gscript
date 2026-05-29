@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/config/fmt/lint", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/config/eval/fmt/lint", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -339,6 +339,32 @@ func TestRunCommandReportsUsage(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
 	if !strings.Contains(stderr.String(), "usage: gscript run") {
+		t.Fatalf("stderr = %q, want usage", stderr.String())
+	}
+}
+
+func TestEvalCommandExecutesSourceWithArgs(t *testing.T) {
+	src := `assert(arg[0] == "<eval>")
+assert(arg[1] == "one")
+assert(arg[2] == "two")
+`
+	var stdout, stderr bytes.Buffer
+	code := runEvalCommand([]string{"--vm", src, "one", "two"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEvalCommand code = %d, stderr = %q", code, stderr.String())
+	}
+}
+
+func TestEvalCommandReportsUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEvalCommand(nil, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runEvalCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "usage: gscript eval") {
 		t.Fatalf("stderr = %q, want usage", stderr.String())
 	}
 }
