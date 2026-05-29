@@ -86,6 +86,36 @@ eventCount := #events
 	}
 }
 
+func TestVMDebugSinkReceivesGoroutineErrors(t *testing.T) {
+	src := `
+events := {}
+done := make(chan, 1)
+
+func sinkFn(e) {
+  if e.type == "error" && e.kind == "goroutine" {
+    table.insert(events, e.name .. ":" .. e.error)
+    done <- e.stack
+  }
+}
+
+debug.setSink(sinkFn)
+go func() {
+  error("go-fail")
+}()
+stack := <-done
+debug.setSink(nil)
+
+eventCount := #events
+firstEvent := events[1]
+`
+	globals := compileAndRunWithSource(t, src, "vm_go_error_fixture.gs")
+	if got := globals["eventCount"].Int(); got != 1 {
+		t.Fatalf("eventCount = %d, want 1 goroutine error event", got)
+	}
+	expectStringGlobal(t, globals, "firstEvent", "go-fail")
+	expectStringGlobal(t, globals, "stack", "vm_go_error_fixture.gs")
+}
+
 func compileAndRunWithSource(t *testing.T, src, sourceName string) map[string]runtime.Value {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()

@@ -38,6 +38,8 @@ Supported core forms:
 
 The implementation uses isolated child VMs for `go` calls. Globals are snapshotted for lock-light reads, while heap objects such as tables and channels are shared by pointer. This keeps ordinary single-threaded code on the existing fast path.
 
+`go` is fire-and-forget: a goroutine failure does not turn into a parent return value. For diagnostics, set `debug.setSink(fn)`. Runtime failures from child goroutines emit `type="error"` and `kind="goroutine"` events with `name`, `error`, and `stack` fields.
+
 `select` without `default` blocks until a case is ready. `select` with `default` is non-blocking and covers polling, fan-in probes, timeout checks, and backpressure-aware sends without adding scheduler checks to ordinary code paths.
 
 `sync.waitgroup()` mirrors Go's coarse task-join pattern for scripts that need to wait for a fixed set of goroutines.

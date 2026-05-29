@@ -278,6 +278,25 @@ func (vm *VM) emitDebugSink(event *runtime.Table) error {
 	return err
 }
 
+func (vm *VM) emitGoroutineError(err error, fn runtime.Value) error {
+	if vm == nil || err == nil {
+		return nil
+	}
+	name := "goroutine"
+	if gf := fn.GoFunction(); gf != nil && gf.Name != "" {
+		name = gf.Name
+	} else if cl, ok := closureFromValue(fn); ok && cl != nil && cl.Proto != nil {
+		name = debugProtoName(cl.Proto)
+	}
+	msg := runtime.StringValue(err.Error())
+	event := runtime.DebugEventTable("error", "goroutine", name, msg)
+	event.RawSetString("stack", runtime.StringValue(formatVMDebugTraceback(err.Error(), vm.debugStackSnapshot())))
+	if hookErr := vm.emitDebugHook("error", "goroutine", name, msg); hookErr != nil {
+		return hookErr
+	}
+	return vm.emitDebugSink(event)
+}
+
 func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]runtime.Value, error) {
 	if gf == nil {
 		return nil, fmt.Errorf("attempt to call a nil native function")

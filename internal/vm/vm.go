@@ -774,6 +774,9 @@ func newIsolatedChildVM(parent *VM) *VM {
 		noGlobalLock:       true, // own copy, fully lock-free
 		stringMeta:         parent.stringMeta,
 		coroutineStats:     parent.coroutineStats,
+		debugHook:          parent.debugHook,
+		debugOpts:          parent.debugOpts,
+		debugSink:          parent.debugSink,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()
@@ -3069,10 +3072,19 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			go func(fn runtime.Value, goArgs []runtime.Value) {
 				goVM := newIsolatedChildVM(vm)
+				defer func() {
+					if r := recover(); r != nil {
+						_ = goVM.emitGoroutineError(fmt.Errorf("panic: %v", r), fn)
+					}
+				}()
 				if cl, ok := closureFromValue(fn); ok {
-					goVM.call(cl, goArgs, 0, 0)
+					if _, err := goVM.call(cl, goArgs, 0, 0); err != nil {
+						_ = goVM.emitGoroutineError(err, fn)
+					}
 				} else if gf := fn.GoFunction(); gf != nil {
-					gf.Fn(goArgs)
+					if _, err := gf.Fn(goArgs); err != nil {
+						_ = goVM.emitGoroutineError(err, fn)
+					}
 				}
 			}(fnVal, args)
 
