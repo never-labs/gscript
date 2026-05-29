@@ -65,6 +65,8 @@ schema。
 - `gscript eval [--vm] [--jit=true|false] <source> [args...]` is the explicit
   source-string execution subcommand; legacy `gscript -e <source>` remains
   supported.
+- `gscript repl` is the explicit interactive shell subcommand; legacy no-arg
+  invocation remains supported.
 - `gscript config [--json] [path]` walks upward from a file or directory,
   discovers `gscript.toml`, validates the supported project/tool keys, and
   reports the resolved project root for CI/editor integration.
@@ -93,7 +95,7 @@ There are also developer binaries:
 P0:
 
 - Continue introducing subcommands while preserving current invocation compatibility:
-  `gscript repl`, `gscript diag ...`.
+  `gscript diag ...`.
 - Define common flags: `--json`, `--output PATH`, `--quiet`, `--verbose`,
   `--config PATH`, `--no-config`, `--color=auto|always|never`.
 - Define exit codes: `0` success, `1` runtime/test failure, `2` usage/config
