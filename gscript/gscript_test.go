@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	gs "github.com/gscript/gscript/gscript"
 	"github.com/gscript/gscript/internal/runtime"
@@ -130,6 +131,39 @@ func TestContextEntrypointsRespectCanceledContext(t *testing.T) {
 	}
 	if _, err := vm.CallContext(ctx, "missing"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("CallContext err = %v, want context.Canceled", err)
+	}
+}
+
+func TestExecContextCancelsInterpreterLoop(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	vm := gs.New()
+	err := vm.ExecContext(ctx, `for {}`)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("ExecContext err = %v, want context deadline", err)
+	}
+}
+
+func TestExecContextCancelsBytecodeLoop(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	vm := gs.New(gs.WithVM())
+	err := vm.ExecContext(ctx, `for {}`)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("ExecContext err = %v, want context deadline", err)
+	}
+}
+
+func TestCallContextCancelsRunningFunction(t *testing.T) {
+	vm := gs.New()
+	if err := vm.Exec(`func spin() { for {} }`); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	_, err := vm.CallContext(ctx, "spin")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("CallContext err = %v, want context deadline", err)
 	}
 }
 

@@ -231,8 +231,10 @@ Current sandbox gaps:
   statements and bytecode instructions. It does not yet cover memory, table
   growth, string allocation, recursion depth, goroutine/thread usage, host-call
   duration, or wall-clock time.
-- Context-aware public entry points exist, but cancellation is not yet
-  preemptive inside long-running interpreter, bytecode VM, or JIT loops.
+- Context-aware public entry points now poll cancellation at interpreter
+  statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
+  loops and some blocking host operations still need broader policy-driven
+  cancellation coverage.
 - Filesystem policy currently has read/write capability bits plus one root
   confinement directory. It does not yet have separate read roots and write
   roots, byte limits, symlink policy, special-file policy, or per-operation

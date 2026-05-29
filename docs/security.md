@@ -147,7 +147,9 @@ Required controls:
 - `MaxNativeCalls`: limits calls from script into Go stdlib or host callbacks.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
-- `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`.
+- `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
+  public run/call entry points poll it in interpreter and bytecode VM
+  checkpoints.
 - `CheckInterval`: amortizes budget checks for hot loops without making
   cancellation unresponsive.
 
@@ -158,8 +160,9 @@ location when available, and budget counters. Do not panic. Do not call
 Implementation notes:
 
 - The first implementation stores a per-VM step counter in the runtime
-  interpreter and bytecode VM. A later shared `ExecutionBudget` should add
-  structured counters, deadline integration, and host-call accounting.
+  interpreter and bytecode VM, and the same checkpoints poll active public
+  execution contexts. A later shared `ExecutionBudget` should add structured
+  counters, deadline metadata, JIT polling, and host-call accounting.
 - Compile/JIT loop backedges should include budget polls. If a compiled path
   cannot poll correctly, it must side-exit to the interpreter before continuing.
 - Blocking stdlib operations must use the VM context so a timed-out script

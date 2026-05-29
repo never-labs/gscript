@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -100,6 +101,7 @@ type VM struct {
 	scriptDir            string
 	maxSteps             int64 // <=0 means unlimited
 	steps                int64
+	ctx                  context.Context
 }
 
 // SetMethodJIT sets the Method JIT engine for this VM.
@@ -119,17 +121,29 @@ func (vm *VM) SetMaxSteps(max int64) {
 	vm.steps = 0
 }
 
+// SetContext installs a host cancellation context checked at bytecode
+// instruction checkpoints. A nil context disables cancellation polling.
+func (vm *VM) SetContext(ctx context.Context) {
+	vm.ctx = ctx
+}
+
 func (vm *VM) resetStepBudget() {
 	vm.steps = 0
 }
 
 func (vm *VM) checkStepBudget() error {
-	if vm.maxSteps <= 0 {
-		return nil
+	if vm.ctx != nil {
+		select {
+		case <-vm.ctx.Done():
+			return vm.ctx.Err()
+		default:
+		}
 	}
-	vm.steps++
-	if vm.steps > vm.maxSteps {
-		return fmt.Errorf("execution step limit exceeded (%d)", vm.maxSteps)
+	if vm.maxSteps > 0 {
+		vm.steps++
+		if vm.steps > vm.maxSteps {
+			return fmt.Errorf("execution step limit exceeded (%d)", vm.maxSteps)
+		}
 	}
 	return nil
 }

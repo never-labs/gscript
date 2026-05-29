@@ -1,6 +1,9 @@
 package runtime
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // Core tree-walking interpreter: the Interpreter type, its constructor New /
 // NewInterpreterGlobals, and the global-environment / args / package-cache
@@ -30,6 +33,7 @@ type Interpreter struct {
 	gcRunning         bool             // host-facing collectgarbage running flag
 	maxSteps          int64            // <=0 means unlimited
 	steps             int64
+	ctx               context.Context
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -242,17 +246,29 @@ func (interp *Interpreter) SetMaxSteps(max int64) {
 	interp.steps = 0
 }
 
+// SetContext installs a host cancellation context checked at interpreter
+// statement/loop checkpoints. A nil context disables cancellation polling.
+func (interp *Interpreter) SetContext(ctx context.Context) {
+	interp.ctx = ctx
+}
+
 func (interp *Interpreter) resetStepBudget() {
 	interp.steps = 0
 }
 
 func (interp *Interpreter) checkStepBudget() error {
-	if interp.maxSteps <= 0 {
-		return nil
+	if interp.ctx != nil {
+		select {
+		case <-interp.ctx.Done():
+			return interp.ctx.Err()
+		default:
+		}
 	}
-	interp.steps++
-	if interp.steps > interp.maxSteps {
-		return fmt.Errorf("execution step limit exceeded (%d)", interp.maxSteps)
+	if interp.maxSteps > 0 {
+		interp.steps++
+		if interp.steps > interp.maxSteps {
+			return fmt.Errorf("execution step limit exceeded (%d)", interp.maxSteps)
+		}
 	}
 	return nil
 }

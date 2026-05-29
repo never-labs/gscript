@@ -126,6 +126,8 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 	if prog.scriptDir != "" {
 		vm.interp.SetScriptDir(prog.scriptDir)
 	}
+	vm.installRunContext(ctx)
+	defer vm.installRunContext(nil)
 	if vm.opts.useVM {
 		// Bytecode VM path
 		proto, err := prog.bytecodeProto()
@@ -150,6 +152,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 		} else if vm.opts.maxSteps > 0 {
 			bvm.SetMaxSteps(vm.opts.maxSteps)
 		}
+		bvm.SetContext(activeRunContext(ctx))
 		if _, err := bvm.Execute(proto); err != nil {
 			return runtimeError(err, prog.sourceName)
 		}
@@ -302,13 +305,14 @@ func (vm *VM) Call(name string, args ...interface{}) ([]interface{}, error) {
 
 // CallContext calls a named GScript function with Go arguments and returns Go values.
 //
-// Context cancellation is checked before starting and after completion. Runtime
-// preemption for long-running scripts is a separate sandbox/resource-control
-// feature and is not implied by this method.
+// Context cancellation is checked before starting, after completion, and at VM
+// execution checkpoints while the call is running.
 func (vm *VM) CallContext(ctx context.Context, name string, args ...interface{}) ([]interface{}, error) {
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
+	vm.installRunContext(ctx)
+	defer vm.installRunContext(nil)
 	fn := vm.interp.GetGlobal(name)
 	if fn.IsNil() {
 		return nil, &Error{Kind: ErrRuntime, Message: fmt.Sprintf("function %q not found", name)}
@@ -330,13 +334,14 @@ func (vm *VM) CallValue(fn interface{}, args ...interface{}) ([]interface{}, err
 
 // CallValueContext calls a GScript function value with Go arguments.
 //
-// Context cancellation is checked before starting and after completion. Runtime
-// preemption for long-running scripts is a separate sandbox/resource-control
-// feature and is not implied by this method.
+// Context cancellation is checked before starting, after completion, and at VM
+// execution checkpoints while the call is running.
 func (vm *VM) CallValueContext(ctx context.Context, fn interface{}, args ...interface{}) ([]interface{}, error) {
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
+	vm.installRunContext(ctx)
+	defer vm.installRunContext(nil)
 	var gsVal runtime.Value
 	if v, ok := fn.(runtime.Value); ok {
 		gsVal = v
@@ -388,6 +393,21 @@ func (vm *VM) callValue(fn runtime.Value, args ...interface{}) ([]interface{}, e
 		}
 	}
 	return out, nil
+}
+
+func activeRunContext(ctx context.Context) context.Context {
+	if ctx == nil || ctx.Done() == nil {
+		return nil
+	}
+	return ctx
+}
+
+func (vm *VM) installRunContext(ctx context.Context) {
+	active := activeRunContext(ctx)
+	vm.interp.SetContext(active)
+	if vm.bvm != nil {
+		vm.bvm.SetContext(active)
+	}
 }
 
 // Set sets a global variable to a Go value (auto-converted).
