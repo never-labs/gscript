@@ -84,6 +84,8 @@ schema。
 - `gscript mod init|graph|verify` provides a local package manifest and static
   `require("...")` graph workflow without introducing networked package
   fetching.
+- `gscript ci smoke|pr|perf|release [--list] [--no-luajit]` provides canonical
+  local CI profiles and can print the underlying commands before running them.
 
 There are also developer binaries:
 
@@ -718,7 +720,8 @@ python3 benchmarks/timing_compare.py --all --runs 7 --warmup 2 --timeout 900 --t
 ```
 
 `docs/testing-matrix.md` documents more precise correctness and performance
-commands.
+commands. `gscript ci smoke|pr|perf|release` wraps the common local gates and
+supports `--list` for hosted CI review/debugging.
 
 `scripts/worktree_audit.sh` is a read-only guard for agent-heavy local
 development. It reports worktrees that `git worktree list --porcelain` marks as
@@ -729,8 +732,10 @@ script never removes or prunes worktrees.
 
 ### Gaps
 
-- No canonical `ci` command for local and hosted CI parity.
-- No fast/slow/release split.
+- `gscript ci` provides canonical local profiles, but hosted workflow files are
+  not yet checked in.
+- Fast/slow/release split exists as CLI profiles, but thresholds and artifact
+  policy still live in shell scripts.
 - Formatter and linter checks are not yet part of a canonical CI profile;
   documentation links and release-script command references have
   `scripts/docs_check.sh`.
@@ -742,10 +747,8 @@ script never removes or prunes worktrees.
 
 P0:
 
-- Add one stable script or subcommand as the CI entry. Prefer `gscript ci` once
-  subcommands exist; until then add a small shell script in a later change.
-- Define profiles:
-  `smoke`, `pr`, `full`, `perf`, `release`.
+- Extend `gscript ci` with hosted workflow integration and artifact upload.
+- Keep profiles explicit: `smoke`, `pr`, `perf`, `release`.
 
 P1:
 

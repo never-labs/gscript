@@ -76,6 +76,8 @@ func main() {
 			os.Exit(runCapabilitiesCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "check":
 			os.Exit(runCheckCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "ci":
+			os.Exit(runCICommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "config":
 			os.Exit(runConfigCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "diag":
@@ -334,6 +336,7 @@ func buildCapabilities() cliCapabilities {
 			"bench",
 			"capabilities",
 			"check",
+			"ci",
 			"config",
 			"diag",
 			"doc",

@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/doc/eval/fmt/inspect/lint/mod/repl", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/ci/config/diag/doc/eval/fmt/inspect/lint/mod/repl", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -93,6 +93,9 @@ func TestHelperProcess(t *testing.T) {
 	switch os.Getenv("GSCRIPT_TEST_HELPER") {
 	case "bench":
 		_, _ = os.Stdout.WriteString("bench helper ok\n")
+		os.Exit(0)
+	case "ci":
+		_, _ = os.Stdout.WriteString("ci helper ok\n")
 		os.Exit(0)
 	case "diag":
 		_, _ = os.Stdout.WriteString("diag helper ok\n")
@@ -203,6 +206,57 @@ func TestConfigCommandReportsParseErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "GS9002") || !strings.Contains(stderr.String(), "tool.test.format") {
 		t.Fatalf("stderr = %q, want config parse diagnostic", stderr.String())
+	}
+}
+
+func TestCICommandListsProfiles(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"smoke", "--list"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{"go test", "gscript check", "worktree_audit.sh"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout = %q, want %q", out, want)
+		}
+	}
+}
+
+func TestCICommandRunsProfileCommands(t *testing.T) {
+	oldCIExecCommand := ciExecCommand
+	t.Cleanup(func() { ciExecCommand = oldCIExecCommand })
+	var commands []string
+	ciExecCommand = func(name string, args ...string) *exec.Cmd {
+		commands = append(commands, shellJoin(append([]string{name}, args...)))
+		helper, helperArgs := testHelperCommand(t, "ci")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"perf", "--no-luajit"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(commands) != 1 || !strings.Contains(commands[0], "performance_gate.sh") || !strings.Contains(commands[0], "--no-luajit") {
+		t.Fatalf("commands = %#v, want performance gate with --no-luajit", commands)
+	}
+	if !strings.Contains(stdout.String(), "ci helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}
+
+func TestCICommandRejectsUnknownProfile(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runCICommand([]string{"nightly"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runCICommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "unknown ci profile") {
+		t.Fatalf("stderr = %q, want unknown profile", stderr.String())
 	}
 }
 
