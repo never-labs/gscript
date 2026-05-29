@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -14,20 +13,35 @@ import (
 type httpScriptCaller func(Value, []Value) ([]Value, error)
 
 func httpLib(interp *Interpreter) *Table {
-	return buildHTTPLibWithPolicy(interp.callFunction, func() bool { return interp == nil || interp.networkAccess })
+	return buildHTTPLibWithPolicy(interp.callFunction, func() bool { return interp == nil || interp.networkAccess }, func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	})
 }
 
 func BuildHTTPLibWithCaller(call httpScriptCaller) *Table {
-	return buildHTTPLibWithPolicy(call, nil)
+	return buildHTTPLibWithPolicy(call, nil, nil)
 }
 
 func BuildHTTPLibWithCallerAndNetworkPolicy(call httpScriptCaller, networkAllowed func() bool) *Table {
-	return buildHTTPLibWithPolicy(call, networkAllowed)
+	return buildHTTPLibWithPolicy(call, networkAllowed, nil)
 }
 
-func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool) *Table {
+func BuildHTTPLibWithCallerAndPolicy(call httpScriptCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
+	return buildHTTPLibWithPolicy(call, networkAllowed, maxHostResult)
+}
+
+func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
 	t := NewTable()
 	var handlerMu sync.Mutex
+	hostResultLimit := func() int64 {
+		if maxHostResult == nil {
+			return 0
+		}
+		return maxHostResult()
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -52,12 +66,15 @@ func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool) *
 
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			// Build req table
-			req := buildRequestTable(r)
+			req, err := buildRequestTable(r, hostResultLimit())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+				return
+			}
 			// Build res table
 			res := buildResponseTable(w, r)
 
-			_, err := callHTTPHandler(call, &handlerMu, handler, req, res)
+			_, err = callHTTPHandler(call, &handlerMu, handler, req, res)
 			if err != nil {
 				http.Error(w, err.Error(), 500)
 			}
@@ -80,7 +97,10 @@ func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool) *
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
+		body, err := ReadAllWithHostResultLimit(resp.Body, hostResultLimit())
+		if err != nil {
+			return nil, err
+		}
 
 		result := NewTable()
 		result.RawSet(StringValue("status"), IntValue(int64(resp.StatusCode)))
@@ -96,14 +116,14 @@ func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool) *
 
 	// http.newRouter() - creates a router with route registration
 	set("newRouter", func(args []Value) ([]Value, error) {
-		return []Value{TableValue(buildRouterTable(call))}, nil
+		return []Value{TableValue(buildRouterTable(call, hostResultLimit))}, nil
 	})
 
 	return t
 }
 
 // buildRequestTable creates a GScript table representing an HTTP request.
-func buildRequestTable(r *http.Request) Value {
+func buildRequestTable(r *http.Request, maxHostResult int64) (Value, error) {
 	t := NewTable()
 
 	t.RawSet(StringValue("method"), StringValue(r.Method))
@@ -125,7 +145,10 @@ func buildRequestTable(r *http.Request) Value {
 	t.RawSet(StringValue("headers"), TableValue(headers))
 
 	// Body
-	body, _ := io.ReadAll(r.Body)
+	body, err := ReadAllWithHostResultLimit(r.Body, maxHostResult)
+	if err != nil {
+		return NilValue(), err
+	}
 	t.RawSet(StringValue("body"), StringValue(string(body)))
 
 	// req.param(name) - get query param
@@ -155,7 +178,7 @@ func buildRequestTable(r *http.Request) Value {
 		},
 	}))
 
-	return TableValue(t)
+	return TableValue(t), nil
 }
 
 // buildResponseTable creates a GScript table representing an HTTP response writer.
@@ -263,10 +286,16 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 }
 
 // buildRouterTable creates a router with route registration.
-func buildRouterTable(call httpScriptCaller) *Table {
+func buildRouterTable(call httpScriptCaller, maxHostResult func() int64) *Table {
 	t := NewTable()
 	mux := http.NewServeMux()
 	var handlerMu sync.Mutex
+	hostResultLimit := func() int64 {
+		if maxHostResult == nil {
+			return 0
+		}
+		return maxHostResult()
+	}
 
 	registerRoute := func(method, pattern string, handler Value) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -274,7 +303,11 @@ func buildRouterTable(call httpScriptCaller) *Table {
 				http.Error(w, "Method Not Allowed", 405)
 				return
 			}
-			req := buildRequestTable(r)
+			req, err := buildRequestTable(r, hostResultLimit())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusRequestEntityTooLarge)
+				return
+			}
 			res := buildResponseTable(w, r)
 			if _, err := callHTTPHandler(call, &handlerMu, handler, req, res); err != nil {
 				http.Error(w, err.Error(), 500)

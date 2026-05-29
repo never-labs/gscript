@@ -15,7 +15,10 @@ func TestHTTPBuildRequestTable(t *testing.T) {
 	req := httptest.NewRequest("GET", "/hello?name=world&foo=bar", nil)
 	req.Header.Set("Content-Type", "text/plain")
 
-	val := buildRequestTable(req)
+	val, err := buildRequestTable(req, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !val.IsTable() {
 		t.Fatalf("expected table, got %s", val.TypeName())
 	}
@@ -154,7 +157,10 @@ func TestHTTPEndToEnd(t *testing.T) {
 
 	// Get the buildResponseTable and buildRequestTable via a real handler
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqVal := buildRequestTable(r)
+		reqVal, err := buildRequestTable(r, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
 		resVal := buildResponseTable(w, r)
 
 		// Simulate calling: res.write("Hello " .. req.method)
@@ -205,7 +211,10 @@ func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := buildRequestTable(r)
+		req, err := buildRequestTable(r, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
 		res := buildResponseTable(w, r)
 		interp.callFunction(handlerFn, []Value{req, res})
 	}))

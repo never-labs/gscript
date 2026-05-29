@@ -37,7 +37,7 @@ func buildNetLib(interps ...*Interpreter) *Table {
 		if len(args) >= 2 {
 			opts = args[1]
 		}
-		return netDoRequest("GET", url, "", opts)
+		return netDoRequest(interp, "GET", url, "", opts)
 	})
 
 	// net.post(url, body [, opts]) -> response table or nil, errMsg
@@ -54,7 +54,7 @@ func buildNetLib(interps ...*Interpreter) *Table {
 		if len(args) >= 3 {
 			opts = args[2]
 		}
-		return netDoRequest("POST", url, body, opts)
+		return netDoRequest(interp, "POST", url, body, opts)
 	})
 
 	// net.put(url, body [, opts]) -> response table or nil, errMsg
@@ -71,7 +71,7 @@ func buildNetLib(interps ...*Interpreter) *Table {
 		if len(args) >= 3 {
 			opts = args[2]
 		}
-		return netDoRequest("PUT", url, body, opts)
+		return netDoRequest(interp, "PUT", url, body, opts)
 	})
 
 	// net.delete(url [, opts]) -> response table or nil, errMsg
@@ -87,7 +87,7 @@ func buildNetLib(interps ...*Interpreter) *Table {
 		if len(args) >= 2 {
 			opts = args[1]
 		}
-		return netDoRequest("DELETE", url, "", opts)
+		return netDoRequest(interp, "DELETE", url, "", opts)
 	})
 
 	// net.patch(url, body [, opts]) -> response table or nil, errMsg
@@ -104,7 +104,7 @@ func buildNetLib(interps ...*Interpreter) *Table {
 		if len(args) >= 3 {
 			opts = args[2]
 		}
-		return netDoRequest("PATCH", url, body, opts)
+		return netDoRequest(interp, "PATCH", url, body, opts)
 	})
 
 	// net.request(opts_table) -> response table or nil, errMsg
@@ -135,14 +135,14 @@ func buildNetLib(interps ...*Interpreter) *Table {
 			body = bodyVal.Str()
 		}
 
-		return netDoRequest(method, url, body, args[0])
+		return netDoRequest(interp, method, url, body, args[0])
 	})
 
 	return t
 }
 
 // netDoRequest performs an HTTP request and returns a GScript response table.
-func netDoRequest(method, url, body string, opts Value) ([]Value, error) {
+func netDoRequest(interp *Interpreter, method, url, body string, opts Value) ([]Value, error) {
 	// Build the request
 	var bodyReader io.Reader
 	if body != "" {
@@ -210,9 +210,13 @@ func netDoRequest(method, url, body string, opts Value) ([]Value, error) {
 	defer resp.Body.Close()
 
 	// Read body
-	bodyBytes, err := io.ReadAll(resp.Body)
+	var maxHostResult int64
+	if interp != nil {
+		maxHostResult = interp.maxHostResult
+	}
+	bodyBytes, err := ReadAllWithHostResultLimit(resp.Body, maxHostResult)
 	if err != nil {
-		return []Value{NilValue(), StringValue(err.Error())}, nil
+		return nil, err
 	}
 	bodyStr := string(bodyBytes)
 

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -339,6 +341,25 @@ func TestWithMaxHostResultBytesLimitsInterpreterProcessOutput(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsInterpreterNetworkResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "12345")
+	}))
+	defer server.Close()
+
+	for _, src := range []string{
+		fmt.Sprintf(`result := net.get(%q)`, server.URL),
+		fmt.Sprintf(`result := http.get(%q)`, server.URL),
+	} {
+		vm := gs.New(gs.WithLibs(gs.LibString|gs.LibNet|gs.LibHTTP), gs.WithMaxHostResultBytes(4))
+		err := vm.Exec(src)
+		var budgetErr *gs.BudgetError
+		if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+			t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+		}
+	}
+}
+
 func TestWithMaxModuleBytesLimitsInterpreterRequire(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "big.gs"), []byte(`return "12345"`), 0644); err != nil {
@@ -543,6 +564,25 @@ func TestWithMaxHostResultBytesLimitsBytecodeProcessOutput(t *testing.T) {
 		`result := process.shell("echo hello")`,
 	} {
 		vm := gs.New(gs.WithVM(), gs.WithLibs(gs.LibString|gs.LibProcess), gs.WithMaxHostResultBytes(4))
+		err := vm.Exec(src)
+		var budgetErr *gs.BudgetError
+		if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+			t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+		}
+	}
+}
+
+func TestWithMaxHostResultBytesLimitsBytecodeNetworkResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "12345")
+	}))
+	defer server.Close()
+
+	for _, src := range []string{
+		fmt.Sprintf(`result := net.get(%q)`, server.URL),
+		fmt.Sprintf(`result := http.get(%q)`, server.URL),
+	} {
+		vm := gs.New(gs.WithVM(), gs.WithLibs(gs.LibString|gs.LibNet|gs.LibHTTP), gs.WithMaxHostResultBytes(4))
 		err := vm.Exec(src)
 		var budgetErr *gs.BudgetError
 		if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {

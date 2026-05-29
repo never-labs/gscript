@@ -176,8 +176,10 @@ Required controls:
   `make(chan, n)` in the interpreter and bytecode VM. Setting this option
   disables JIT until compiled channel creation uses the same check.
 - `WithMaxHostResultBytes`: limits string bytes returned from one native Go
-  call, including stdlib functions and registered host callbacks. Setting this
-  option disables JIT until compiled native calls use the same result check.
+  call, including stdlib functions and registered host callbacks. Process
+  output and `net`/`http` response bodies are bounded while captured. Setting
+  this option disables JIT until compiled native calls use the same result
+  check.
 - `WithMaxModuleBytes`: limits bytes read by script-side module/file loading
   APIs such as `require`, `dofile`, `loadfile`, and `script.loadFile`.
   Host-side `CompileFile`/`ExecFile` calls are not counted.

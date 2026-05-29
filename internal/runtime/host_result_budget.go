@@ -1,6 +1,9 @@
 package runtime
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+)
 
 // CheckHostResultBytes verifies that native-call results do not exceed a host
 // materialization budget. It currently charges strings, including strings
@@ -45,4 +48,18 @@ func CheckHostResultBytes(max int64, values ...Value) error {
 		}
 	}
 	return nil
+}
+
+func ReadAllWithHostResultLimit(r io.Reader, max int64) ([]byte, error) {
+	if max <= 0 {
+		return io.ReadAll(r)
+	}
+	data, err := io.ReadAll(io.LimitReader(r, max+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > max {
+		return nil, fmt.Errorf("host result byte limit exceeded (%d)", max)
+	}
+	return data, nil
 }
