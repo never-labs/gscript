@@ -3096,6 +3096,37 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			vm.regs[base+a] = val
 			vm.regs[base+cc] = runtime.BoolValue(ok)
 
+		case OP_SELECT:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			cc := DecodeC(inst)
+			if cc <= 0 {
+				return nil, fmt.Errorf("select requires at least one case")
+			}
+			cases := make([]runtime.ChannelSelectCase, cc)
+			for i := 0; i < cc; i++ {
+				modeVal := vm.regs[base+b+i*3]
+				chVal := vm.regs[base+b+i*3+1]
+				val := vm.regs[base+b+i*3+2]
+				if !modeVal.IsInt() {
+					return nil, fmt.Errorf("select case mode is not integer")
+				}
+				if !chVal.IsChannel() {
+					return nil, fmt.Errorf("select case uses non-channel value (got %s)", chVal.TypeName())
+				}
+				cases[i] = runtime.ChannelSelectCase{
+					Kind:    runtime.ChannelSelectKind(modeVal.Int()),
+					Channel: chVal.Channel(),
+					Value:   val,
+				}
+			}
+			chosen, val, err := runtime.ChannelSelect(cases)
+			if err != nil {
+				return nil, err
+			}
+			vm.regs[base+a] = runtime.IntValue(int64(chosen + 1))
+			vm.regs[base+a+1] = val
+
 		default:
 			return nil, fmt.Errorf("unhandled opcode %d (%s)", op, OpName(op))
 		}

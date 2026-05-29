@@ -654,9 +654,6 @@ func (p *Parser) parseSelectStmt() (ast.Stmt, error) {
 	if _, err := p.expect(lexer.TOKEN_RBRACE); err != nil {
 		return nil, err
 	}
-	if stmt.Default == nil {
-		return nil, p.errorf("select currently requires a default clause")
-	}
 	return stmt, nil
 }
 

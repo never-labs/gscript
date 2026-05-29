@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/gscript/gscript/internal/ast"
+	"github.com/gscript/gscript/internal/runtime"
 )
 
 // --------------------------------------------------------------------
@@ -842,6 +843,13 @@ func (c *compiler) compileMakeChanExpr(e *ast.MakeChanExpr, dest int) error {
 }
 
 func (c *compiler) compileSelectStmt(s *ast.SelectStmt) error {
+	if s.Default == nil {
+		return c.compileBlockingSelectStmt(s)
+	}
+	return c.compileNonblockingSelectStmt(s)
+}
+
+func (c *compiler) compileNonblockingSelectStmt(s *ast.SelectStmt) error {
 	line := s.P.Line
 	base := c.nextReg
 	var endJumps []int
@@ -896,6 +904,71 @@ func (c *compiler) compileSelectStmt(s *ast.SelectStmt) error {
 			}
 		}
 		c.leaveScope()
+	}
+	for _, j := range endJumps {
+		c.patchJump(j)
+	}
+	c.nextReg = base
+	return nil
+}
+
+func (c *compiler) compileBlockingSelectStmt(s *ast.SelectStmt) error {
+	if len(s.Cases) == 0 {
+		return fmt.Errorf("line %d: select without cases requires a default clause", s.P.Line)
+	}
+	if len(s.Cases) > 85 {
+		return fmt.Errorf("line %d: select supports at most 85 cases", s.P.Line)
+	}
+
+	line := s.P.Line
+	base := c.nextReg
+	selectedReg := c.allocReg()
+	recvReg := c.allocReg()
+	caseBase := c.nextReg
+
+	for _, cls := range s.Cases {
+		modeReg := c.allocReg()
+		chReg := c.allocReg()
+		valReg := c.allocReg()
+		if cls.SendValue == nil {
+			c.emitAsBx(OP_LOADINT, modeReg, int(runtime.ChannelSelectRecv), cls.P.Line)
+			if err := c.compileExprTo(cls.Channel, chReg); err != nil {
+				return err
+			}
+			c.emitABC(OP_LOADNIL, valReg, 0, 0, cls.P.Line)
+		} else {
+			c.emitAsBx(OP_LOADINT, modeReg, int(runtime.ChannelSelectSend), cls.P.Line)
+			if err := c.compileExprTo(cls.Channel, chReg); err != nil {
+				return err
+			}
+			if err := c.compileExprTo(cls.SendValue, valReg); err != nil {
+				return err
+			}
+		}
+	}
+
+	c.emitABC(OP_SELECT, selectedReg, caseBase, len(s.Cases), line)
+	var endJumps []int
+	for i, cls := range s.Cases {
+		idxReg := c.allocReg()
+		c.emitAsBx(OP_LOADINT, idxReg, i+1, cls.P.Line)
+		c.emitABC(OP_EQ, 0, selectedReg, idxReg, cls.P.Line)
+		nextJump := c.emitJump(cls.P.Line)
+		c.freeReg()
+
+		c.enterScope()
+		if cls.SendValue == nil && cls.RecvName != "" {
+			localReg := c.addLocal(cls.RecvName)
+			c.emitABC(OP_MOVE, localReg, recvReg, 0, cls.P.Line)
+		}
+		for _, st := range cls.Body.Stmts {
+			if err := c.compileStmt(st); err != nil {
+				return err
+			}
+		}
+		c.leaveScope()
+		endJumps = append(endJumps, c.emitJump(line))
+		c.patchJump(nextJump)
 	}
 	for _, j := range endJumps {
 		c.patchJump(j)

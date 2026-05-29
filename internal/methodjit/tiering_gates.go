@@ -26,7 +26,7 @@ import (
 //   - VARARG: Tier 1 only until Tier 2 owns the vararg frame contract
 //
 // Only bytecodes that require VM-only control state are blocked:
-//   - GO, MAKECHAN, SEND, RECV, TRYSEND, TRYRECV
+//   - GO, MAKECHAN, SEND, RECV, TRYSEND, TRYRECV, SELECT
 //   - DEFER, SETGLOBALRO, CHECKCONST
 //
 // CALL is no longer blocked here. Instead, compileTier2 runs the inline pass to
@@ -41,7 +41,7 @@ func canPromoteToTier2(proto *vm.FuncProto) bool {
 		op := vm.DecodeOp(inst)
 		switch op {
 		// Goroutine/channel ops (not in Tier 2):
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV,
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_SELECT,
 			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return false
 		}
@@ -64,7 +64,7 @@ func firstUnsupportedTier2BytecodeGate(proto *vm.FuncProto) GateResult {
 	for _, inst := range proto.Code {
 		op := vm.DecodeOp(inst)
 		switch op {
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV,
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_SELECT,
 			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return blockGate("Tier2Bytecode", vm.OpName(op))
 		}
@@ -98,7 +98,7 @@ func canPromoteToTier2NoCalls(proto *vm.FuncProto) bool {
 		switch op {
 		case vm.OP_CALL:
 			return false
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV,
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_SELECT,
 			vm.OP_DEFER, vm.OP_SETGLOBALRO, vm.OP_CHECKCONST:
 			return false
 		}
@@ -226,7 +226,7 @@ func canPromoteWithInlining(proto *vm.FuncProto, globals map[string]*vm.FuncProt
 		case vm.OP_GETGLOBAL:
 			// GETGLOBAL is needed for CALL resolution — allowed
 			continue
-		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV:
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_SELECT:
 			// Goroutine/channel ops not in Tier 2
 			return false
 		}

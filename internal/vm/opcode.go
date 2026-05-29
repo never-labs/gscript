@@ -89,6 +89,7 @@ const (
 	OP_RECV     // A B : R(A) = <-R(B)
 	OP_TRYSEND  // A B C : R(C) = try R(A) <- R(B)
 	OP_TRYRECV  // A B C : R(A), R(C) = try <-R(B)
+	OP_SELECT   // A B C : R(A),R(A+1) = select cases at R(B).., C cases
 
 	OP_NEWOBJECTN  // A B C : R(A) = small string table, ctor=B, values starting at R(C)
 	OP_YIELD       // A B C : coroutine.yield(R(A+1)..R(A+B-1)); result convention matches CALL
@@ -243,6 +244,7 @@ var opNames = [...]string{
 	OP_RECV:        "RECV",
 	OP_TRYSEND:     "TRYSEND",
 	OP_TRYRECV:     "TRYRECV",
+	OP_SELECT:      "SELECT",
 	OP_SETLISTDYN:  "SETLISTDYN",
 	OP_CALLTABLE:   "CALLTABLE",
 	OP_SETTOP:      "SETTOP",

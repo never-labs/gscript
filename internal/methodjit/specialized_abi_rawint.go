@@ -160,7 +160,7 @@ func AnalyzeSpecializedABI(proto *vm.FuncProto) SpecializedABI {
 			vm.OP_SETLIST, vm.OP_APPEND, vm.OP_NOT, vm.OP_LEN, vm.OP_CONCAT,
 			vm.OP_POW, vm.OP_CLOSURE,
 			vm.OP_TFORCALL, vm.OP_TFORLOOP, vm.OP_VARARG, vm.OP_SELF,
-			vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV:
+			vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_SELECT:
 			return specializedABIReject("unsupported opcode")
 		default:
 			return specializedABIReject("unknown opcode")

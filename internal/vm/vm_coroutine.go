@@ -335,6 +335,13 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if a == payloadReg || cc == payloadReg {
 				return true
 			}
+		case OP_SELECT:
+			if payloadReg >= b && payloadReg < b+cc*3 {
+				return false
+			}
+			if a == payloadReg || a+1 == payloadReg {
+				return true
+			}
 		default:
 			if a == payloadReg {
 				return true

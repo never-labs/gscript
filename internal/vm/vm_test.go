@@ -2251,6 +2251,56 @@ default:
 	expectGlobalInt(t, g, "result", 55)
 }
 
+func TestSelectBlockingReceive(t *testing.T) {
+	g := compileAndRun(t, `
+left := make(chan)
+right := make(chan)
+go func() {
+	right <- 77
+}()
+result := 0
+select {
+case v := <-left:
+	result = v
+case v := <-right:
+	result = v
+}
+`)
+	expectGlobalInt(t, g, "result", 77)
+}
+
+func TestSelectBlockingSend(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan)
+go func() {
+	_ = <-ch
+}()
+result := 0
+select {
+case ch <- 88:
+	result = 88
+}
+`)
+	expectGlobalInt(t, g, "result", 88)
+}
+
+func TestSelectClosedReceiveReady(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 1)
+close(ch)
+result := 0
+select {
+case v := <-ch:
+	if v == nil {
+		result = 1
+	}
+default:
+	result = -1
+}
+`)
+	expectGlobalInt(t, g, "result", 1)
+}
+
 // ===== CHANNEL TESTS =====
 
 func TestChannelMakeAndType(t *testing.T) {

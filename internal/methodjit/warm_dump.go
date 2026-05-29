@@ -873,6 +873,7 @@ var opcodeNames = [...]string{
 	vm.OP_RECV:       "RECV",
 	vm.OP_TRYSEND:    "TRYSEND",
 	vm.OP_TRYRECV:    "TRYRECV",
+	vm.OP_SELECT:     "SELECT",
 }
 
 func disasmWarmARM64(code []byte) string {

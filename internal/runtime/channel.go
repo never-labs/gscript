@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 )
 
@@ -83,12 +84,73 @@ func (c *Channel) TryRecv() (Value, bool) {
 	select {
 	case val, ok := <-c.ch:
 		if !ok {
-			return NilValue(), false
+			return NilValue(), true
 		}
 		return val, true
 	default:
 		return NilValue(), false
 	}
+}
+
+type ChannelSelectKind uint8
+
+const (
+	ChannelSelectRecv ChannelSelectKind = iota
+	ChannelSelectSend
+)
+
+type ChannelSelectCase struct {
+	Kind    ChannelSelectKind
+	Channel *Channel
+	Value   Value
+}
+
+func ChannelSelect(cases []ChannelSelectCase) (chosen int, value Value, err error) {
+	defer func() {
+		if recover() != nil {
+			chosen = -1
+			value = NilValue()
+			err = fmt.Errorf("send on closed channel")
+		}
+	}()
+	if len(cases) == 0 {
+		return -1, NilValue(), fmt.Errorf("select requires at least one case")
+	}
+	reflectCases := make([]reflect.SelectCase, len(cases))
+	for i, cls := range cases {
+		if cls.Channel == nil {
+			return -1, NilValue(), fmt.Errorf("select case uses non-channel value")
+		}
+		switch cls.Kind {
+		case ChannelSelectRecv:
+			reflectCases[i] = reflect.SelectCase{
+				Dir:  reflect.SelectRecv,
+				Chan: reflect.ValueOf(cls.Channel.ch),
+			}
+		case ChannelSelectSend:
+			cls.Channel.mu.Lock()
+			closed := cls.Channel.closed
+			cls.Channel.mu.Unlock()
+			if closed {
+				return -1, NilValue(), fmt.Errorf("send on closed channel")
+			}
+			reflectCases[i] = reflect.SelectCase{
+				Dir:  reflect.SelectSend,
+				Chan: reflect.ValueOf(cls.Channel.ch),
+				Send: reflect.ValueOf(cls.Value),
+			}
+		default:
+			return -1, NilValue(), fmt.Errorf("invalid select case kind")
+		}
+	}
+	chosen, recv, ok := reflect.Select(reflectCases)
+	if cases[chosen].Kind == ChannelSelectRecv {
+		if !ok {
+			return chosen, NilValue(), nil
+		}
+		return chosen, recv.Interface().(Value), nil
+	}
+	return chosen, NilValue(), nil
 }
 
 // Recv receives a value from the channel. Blocks if the channel is empty.

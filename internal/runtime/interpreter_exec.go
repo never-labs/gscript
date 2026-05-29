@@ -321,6 +321,9 @@ func (interp *Interpreter) execSend(s *ast.SendStmt, env *Environment) ([]Value,
 }
 
 func (interp *Interpreter) execSelect(s *ast.SelectStmt, env *Environment) ([]Value, bool, bool, bool, error) {
+	if s.Default == nil {
+		return interp.execBlockingSelect(s, env)
+	}
 	for _, cls := range s.Cases {
 		chVal, err := interp.evalExprSingle(cls.Channel, env)
 		if err != nil {
@@ -358,6 +361,42 @@ func (interp *Interpreter) execSelect(s *ast.SelectStmt, env *Environment) ([]Va
 		return interp.execSelectBody(s.Default, "", NilValue(), env)
 	}
 	return nil, false, false, false, nil
+}
+
+func (interp *Interpreter) execBlockingSelect(s *ast.SelectStmt, env *Environment) ([]Value, bool, bool, bool, error) {
+	if len(s.Cases) == 0 {
+		return nil, false, false, false, fmt.Errorf("select requires at least one case")
+	}
+	cases := make([]ChannelSelectCase, len(s.Cases))
+	for i, cls := range s.Cases {
+		chVal, err := interp.evalExprSingle(cls.Channel, env)
+		if err != nil {
+			return nil, false, false, false, err
+		}
+		if !chVal.IsChannel() {
+			return nil, false, false, false, fmt.Errorf("select case uses non-channel value")
+		}
+		cases[i].Channel = chVal.Channel()
+		if cls.SendValue == nil {
+			cases[i].Kind = ChannelSelectRecv
+			continue
+		}
+		val, err := interp.evalExprSingle(cls.SendValue, env)
+		if err != nil {
+			return nil, false, false, false, err
+		}
+		cases[i].Kind = ChannelSelectSend
+		cases[i].Value = val
+	}
+	chosen, val, err := ChannelSelect(cases)
+	if err != nil {
+		return nil, false, false, false, err
+	}
+	cls := s.Cases[chosen]
+	if cls.SendValue != nil {
+		return interp.execSelectBody(cls.Body, "", NilValue(), env)
+	}
+	return interp.execSelectBody(cls.Body, cls.RecvName, val, env)
 }
 
 func (interp *Interpreter) execSelectBody(body *ast.BlockStmt, recvName string, recvVal Value, env *Environment) ([]Value, bool, bool, bool, error) {

@@ -1127,6 +1127,19 @@ func (b *graphBuilder) emitBlocks() {
 				b.writeVariable(a, block, valInstr.Value())
 				b.writeVariable(cOp, block, okInstr.Value())
 
+			case vm.OP_SELECT:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				cOp := vm.DecodeC(inst)
+				args := make([]*Value, 0, cOp*3)
+				for i := 0; i < cOp*3; i++ {
+					args = append(args, b.readVariable(bOp+i, block))
+				}
+				idxInstr := b.emit(block, OpNop, TypeInt, args, int64(cOp), 0)
+				valInstr := b.emit(block, OpNop, TypeAny, args, int64(cOp), 0)
+				b.writeVariable(a, block, idxInstr.Value())
+				b.writeVariable(a+1, block, valInstr.Value())
+
 			case vm.OP_YIELD:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)

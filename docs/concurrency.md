@@ -21,11 +21,11 @@ Supported core forms:
 - `<-ch`
 - `close(ch)`
 - `for v := range ch { ... }`
-- `select { case v := <-ch: ... default: ... }`
+- `select { case v := <-ch: ... }`
 - `select { case ch <- value: ... default: ... }`
 - `len(ch)` for queued buffered values
 - `cap(ch)` for channel capacity
 
 The implementation uses isolated child VMs for `go` calls. Globals are snapshotted for lock-light reads, while heap objects such as tables and channels are shared by pointer. This keeps ordinary single-threaded code on the existing fast path.
 
-`select` is currently implemented as a non-blocking statement with a required `default` clause. This covers polling, fan-in probes, timeout checks, and backpressure-aware sends without adding scheduler checks to ordinary code paths.
+`select` without `default` blocks until a case is ready. `select` with `default` is non-blocking and covers polling, fan-in probes, timeout checks, and backpressure-aware sends without adding scheduler checks to ordinary code paths.

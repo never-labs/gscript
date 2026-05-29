@@ -729,6 +729,8 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("TRYSEND    R%d <- R%d => R%d", a, b, cc)
 		case OP_TRYRECV:
 			desc = fmt.Sprintf("TRYRECV    R%d, R%d = <-R%d", a, cc, b)
+		case OP_SELECT:
+			desc = fmt.Sprintf("SELECT     R%d,R%d cases=R%d count=%d", a, a+1, b, cc)
 		case OP_SETTOP:
 			desc = fmt.Sprintf("SETTOP     R%d", a)
 		default:
