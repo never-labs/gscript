@@ -735,12 +735,9 @@ script never removes or prunes worktrees.
   not yet checked in.
 - Fast/slow/release split exists as CLI profiles, but thresholds and artifact
   policy still live in shell scripts.
-- Formatter and linter checks are not yet part of a canonical CI profile;
-  documentation links and release-script command references have
-  `scripts/docs_check.sh`.
-- No benchmark guard profile with explicit thresholds for PR vs release.
-- Worktree hygiene is currently a local script rather than part of a canonical
-  CI/developer profile.
+- Formatter, linter, docs, worktree audit, tests, and performance gates are
+  reachable through CLI profiles, but artifact upload/report retention is still
+  manual.
 
 ### Recommendations
 
@@ -788,18 +785,14 @@ python3 benchmarks/official_perf_coverage.py --check --json /tmp/official_perf_c
 1. Add `gscript run`, `eval`, `repl`, `inspect`, `diag`, `test`, `bench`, `doc`,
    `mod`, and `ci` command skeletons while preserving legacy flags.
 2. Add shared JSON diagnostic envelope and output routing.
-3. Add `gscript test` facade over existing Go semantic harnesses.
-4. Add `gscript bench` facade over `strict_guard.py`, `timing_compare.py`, and
-   `diagnose.py`.
-5. Centralize module resolution and document `require()` semantics.
+3. Centralize module resolution and document `require()` semantics.
 
 ### P1: Make CI And Developer Loops Reliable
 
-1. Add `gscript fmt --check` and `gscript lint --format=json|sarif`.
-2. Add CI profiles and hosted workflow.
-3. Add generated CLI/stdlib docs plus docs freshness checks.
-4. Add REPL completeness, history, and VM/JIT mode.
-5. Version benchmark, diagnostic, sourcemap, and test-report schemas.
+1. Add hosted workflow around `gscript ci`.
+2. Add generated docs freshness checks for committed reference files.
+3. Add REPL completeness, history, and VM/JIT mode.
+4. Version benchmark, diagnostic, sourcemap, and test-report schemas.
 
 ### P2: Build Ecosystem Tooling
 
@@ -821,9 +814,8 @@ gscript test
 gscript bench
 gscript bench diagnose
 gscript inspect bytecode
-gscript inspect sourcemap
-gscript diag collect
-gscript diag map-pc
+gscript diag dump
+gscript diag bundle
 gscript mod init
 gscript mod graph
 gscript mod verify
