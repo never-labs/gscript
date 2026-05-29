@@ -95,13 +95,14 @@
 - `WithFilesystemRead(false)` 可在保留写能力时禁用读取入口；
   `WithFilesystemWrite(false)` 可在保留读能力时禁用变更入口；
   `WithFilesystem(false)` 同时清除读写能力并移除 `fs`、`dofile`、
-  `loadfile`。
+  `loadfile`。`os.remove`、`os.rename` 和 `os.tmpname` 也遵守写权限与
+  root confinement。
 - Options 按传入顺序应用；要组合 root confinement 和只读/只写能力，应先传
   `WithFilesystemRoot(root)`，再传 `WithFilesystemWrite(false)` 或
   `WithFilesystemRead(false)`。
 - `WithModuleLoading(false)` 只关闭文件系统 `.gs` 模块加载；启用的内建
   标准库模块仍可通过 `require` 获得。
-- `fs`、`os.remove`、`os.rename`、`process.run`、`process.shell`、`http.listen`、`net/http client`、`debug.goStack`、`debug.globals` 应可按 interpreter 禁用或限制。
+- `process.run`、`process.shell`、`http.listen`、`net/http client`、`debug.goStack`、`debug.globals` 应可按 interpreter 禁用或限制。
 - 默认 CLI 可以保持当前完整能力；embedded runtime 应允许最小权限启动，再按模块或函数授予。
 - 所有后台 server、subprocess、timer、goroutine/channel 都必须有可关闭句柄或可取消 context，测试结束不得留下宿主资源。
 - 错误和诊断不能泄露超出权限的路径、环境变量或源码内容；debug 能力需要单独开关。

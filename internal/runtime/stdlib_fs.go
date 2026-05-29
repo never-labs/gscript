@@ -53,9 +53,11 @@ func (interp *Interpreter) SetFilesystemCapabilities(read, write bool) {
 	interp.filesystemRead = read
 	interp.filesystemWrite = write
 	interp.refreshFSLib()
+	interp.refreshOSLib()
 	if !read {
 		interp.globals.Delete("dofile")
 		interp.globals.Delete("loadfile")
+		interp.refreshOSLib()
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 var startTime = time.Now()
 
 func buildOSLib() *Table {
-	return buildOSLibWithEnvironment(true, true, nil)
+	return buildOSLibWithPolicy(true, true, nil, "", true)
 }
 
 // SetEnvironmentCapabilities controls script-side environment variable read and
@@ -41,7 +41,13 @@ func (interp *Interpreter) SetEnvironmentAllowlist(names []string) {
 
 func (interp *Interpreter) refreshOSLib() {
 	if v, ok := interp.globals.Get("os"); ok && v.IsTable() {
-		osLib := TableValue(buildOSLibWithEnvironment(interp.environmentRead, interp.environmentWrite, interp.allowedEnv))
+		osLib := TableValue(buildOSLibWithPolicy(
+			interp.environmentRead,
+			interp.environmentWrite,
+			interp.allowedEnv,
+			interp.filesystemRoot,
+			interp.filesystemWrite,
+		))
 		interp.globals.Define("os", osLib)
 		interp.modules["os"] = osLib
 		interp.markPackageLoaded("os", osLib)
@@ -50,6 +56,11 @@ func (interp *Interpreter) refreshOSLib() {
 
 // buildOSLibWithEnvironment creates the "os" standard library table.
 func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) *Table {
+	return buildOSLibWithPolicy(envRead, envWrite, allowedEnv, "", true)
+}
+
+// buildOSLibWithPolicy creates the "os" standard library table.
+func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fsRoot string, fsWrite bool) *Table {
 	t := NewTable()
 	envAllowed := func(name string) bool {
 		return allowedEnv == nil || allowedEnv[name]
@@ -86,6 +97,20 @@ func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]boo
 			}
 			return fn(args)
 		})
+	}
+	setFSWrite := func(name string, fn func([]Value) ([]Value, error)) {
+		set(name, func(args []Value) ([]Value, error) {
+			if !fsWrite {
+				return nil, fmt.Errorf("filesystem write access disabled")
+			}
+			return fn(args)
+		})
+	}
+	resolveFSWritePath := func(path string) (string, error) {
+		if !fsWrite {
+			return "", fmt.Errorf("filesystem write access disabled")
+		}
+		return resolveSandboxPath(fsRoot, path)
 	}
 
 	// os.time() -> unix timestamp
@@ -150,11 +175,15 @@ func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]boo
 	})
 
 	// os.remove(filename) -> true or nil, error
-	set("remove", func(args []Value) ([]Value, error) {
+	setFSWrite("remove", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'os.remove' (string expected)")
 		}
-		err := os.Remove(args[0].Str())
+		path, err := resolveFSWritePath(args[0].Str())
+		if err != nil {
+			return nil, err
+		}
+		err = os.Remove(path)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -162,11 +191,19 @@ func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]boo
 	})
 
 	// os.rename(old, new) -> true or nil, error
-	set("rename", func(args []Value) ([]Value, error) {
+	setFSWrite("rename", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'os.rename' (string expected)")
 		}
-		err := os.Rename(args[0].Str(), args[1].Str())
+		oldPath, err := resolveFSWritePath(args[0].Str())
+		if err != nil {
+			return nil, err
+		}
+		newPath, err := resolveFSWritePath(args[1].Str())
+		if err != nil {
+			return nil, err
+		}
+		err = os.Rename(oldPath, newPath)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -174,8 +211,12 @@ func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]boo
 	})
 
 	// os.tmpname() -> string
-	set("tmpname", func(args []Value) ([]Value, error) {
-		f, err := os.CreateTemp("", "gscript_*")
+	setFSWrite("tmpname", func(args []Value) ([]Value, error) {
+		dir := ""
+		if fsRoot != "" {
+			dir = fsRoot
+		}
+		f, err := os.CreateTemp(dir, "gscript_*")
 		if err != nil {
 			return nil, err
 		}

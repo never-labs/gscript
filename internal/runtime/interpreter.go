@@ -226,6 +226,7 @@ func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 	interp.filesystemWrite = enabled
 	if enabled {
 		interp.refreshFSLib()
+		interp.refreshOSLib()
 		return
 	}
 	interp.globals.Delete("fs")
@@ -233,6 +234,7 @@ func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 	interp.markPackageLoaded("fs", NilValue())
 	interp.globals.Delete("dofile")
 	interp.globals.Delete("loadfile")
+	interp.refreshOSLib()
 }
 
 // SetFilesystemRoot confines script-side file paths to root when root is not
@@ -241,6 +243,7 @@ func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 func (interp *Interpreter) SetFilesystemRoot(root string) {
 	interp.filesystemRoot = root
 	interp.refreshFSLib()
+	interp.refreshOSLib()
 }
 
 func (interp *Interpreter) refreshFSLib() {

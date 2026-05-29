@@ -2127,6 +2127,78 @@ func TestWithFilesystemFalseClearsRootEnabledFilesystem(t *testing.T) {
 	}
 }
 
+func TestWithFilesystemWriteFalseBlocksOSFileMutation(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibOS),
+				gs.WithFilesystemWrite(false),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			for _, src := range []string{
+				`ok := os.remove("blocked.txt")`,
+				`ok := os.rename("old.txt", "new.txt")`,
+				`name := os.tmpname()`,
+			} {
+				err := vm.Exec(src)
+				if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
+					t.Fatalf("%s err = %v, want filesystem write access disabled", src, err)
+				}
+			}
+		})
+	}
+}
+
+func TestWithFilesystemRootConfinesOSFileMutation(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "old.txt"), []byte("ok"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibOS),
+				gs.WithFilesystemRoot(root),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`ok := os.rename("old.txt", "new.txt")`); err != nil {
+				t.Fatalf("os.rename inside root failed: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "new.txt")); err != nil {
+				t.Fatalf("renamed file missing: %v", err)
+			}
+			err := vm.Exec(`ok := os.remove("../escape.txt")`)
+			if err == nil || !strings.Contains(err.Error(), "filesystem access denied") {
+				t.Fatalf("os.remove escape err = %v, want filesystem access denied", err)
+			}
+			if err := vm.Exec(`name := os.tmpname()`); err != nil {
+				t.Fatalf("os.tmpname in root failed: %v", err)
+			}
+			got, err := vm.Get("name")
+			if err != nil {
+				t.Fatal(err)
+			}
+			name, ok := got.(string)
+			if !ok || !strings.HasPrefix(name, root+string(os.PathSeparator)) {
+				t.Fatalf("tmpname = %v, want path inside %s", got, root)
+			}
+			_ = os.Remove(name)
+		})
+	}
+}
+
 func TestWithFilesystemReadOnlyAllowsReadAndBlocksWrite(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "inside.txt"), []byte("inside"), 0644); err != nil {
