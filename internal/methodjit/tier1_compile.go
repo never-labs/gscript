@@ -320,11 +320,17 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 		case vm.OP_RECV:
 			emitBaselineOpExit(asm, inst, pc, vm.OP_RECV)
 			resumePCs = append(resumePCs, pc+1)
+		case vm.OP_RECVOK:
+			emitBaselineOpExit(asm, inst, pc, vm.OP_RECVOK)
+			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_TRYSEND:
 			emitBaselineOpExit(asm, inst, pc, vm.OP_TRYSEND)
 			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_TRYRECV:
 			emitBaselineOpExit(asm, inst, pc, vm.OP_TRYRECV)
+			resumePCs = append(resumePCs, pc+1)
+		case vm.OP_TRYRECVOK:
+			emitBaselineOpExit(asm, inst, pc, vm.OP_TRYRECVOK)
 			resumePCs = append(resumePCs, pc+1)
 		case vm.OP_SELECT:
 			emitBaselineOpExit(asm, inst, pc, vm.OP_SELECT)

@@ -328,6 +328,13 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if b == payloadReg {
 				return false
 			}
+		case OP_RECVOK:
+			if a == payloadReg || cc == payloadReg {
+				return true
+			}
+			if b == payloadReg {
+				return false
+			}
 		case OP_TRYRECV:
 			if b == payloadReg {
 				return false
@@ -335,11 +342,18 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if a == payloadReg || cc == payloadReg {
 				return true
 			}
+		case OP_TRYRECVOK:
+			if b == payloadReg {
+				return false
+			}
+			if a == payloadReg || a+1 == payloadReg || cc == payloadReg {
+				return true
+			}
 		case OP_SELECT:
 			if payloadReg >= b && payloadReg < b+cc*3 {
 				return false
 			}
-			if a == payloadReg || a+1 == payloadReg {
+			if a == payloadReg || a+1 == payloadReg || a+2 == payloadReg {
 				return true
 			}
 		default:

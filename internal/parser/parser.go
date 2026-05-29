@@ -674,7 +674,34 @@ func (p *Parser) parseSelectCase() (ast.SelectCase, error) {
 		if err != nil {
 			return cls, err
 		}
-		if p.check(lexer.TOKEN_DECLARE) {
+		if p.check(lexer.TOKEN_COMMA) {
+			name, ok := first.(*ast.IdentExpr)
+			if !ok {
+				return cls, p.errorf("select receive declaration requires an identifier")
+			}
+			p.advance()
+			okExpr, err := p.parseExpr()
+			if err != nil {
+				return cls, err
+			}
+			okName, ok := okExpr.(*ast.IdentExpr)
+			if !ok {
+				return cls, p.errorf("select receive ok declaration requires an identifier")
+			}
+			if _, err := p.expect(lexer.TOKEN_DECLARE); err != nil {
+				return cls, err
+			}
+			if _, err := p.expect(lexer.TOKEN_ARROW); err != nil {
+				return cls, err
+			}
+			ch, err := p.parseExpr()
+			if err != nil {
+				return cls, err
+			}
+			cls.RecvName = name.Name
+			cls.RecvOkName = okName.Name
+			cls.Channel = ch
+		} else if p.check(lexer.TOKEN_DECLARE) {
 			name, ok := first.(*ast.IdentExpr)
 			if !ok {
 				return cls, p.errorf("select receive declaration requires an identifier")

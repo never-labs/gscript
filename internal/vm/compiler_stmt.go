@@ -74,6 +74,9 @@ func (c *compiler) compileDeclareStmt(s *ast.DeclareStmt) error {
 	nValues := len(s.Values)
 
 	if nValues == 1 && nNames > 1 {
+		if recv, ok := s.Values[0].(*ast.RecvExpr); ok && nNames == 2 {
+			return c.compileDeclareRecvOK(s, recv)
+		}
 		if call, ok := s.Values[0].(*ast.CallExpr); ok {
 			return c.compileDeclareMultiCall(s, call)
 		}
@@ -102,6 +105,22 @@ func (c *compiler) compileDeclareGlobals(s *ast.DeclareStmt) error {
 	nValues := len(s.Values)
 
 	if nValues == 1 && nNames > 1 {
+		if recv, ok := s.Values[0].(*ast.RecvExpr); ok && nNames == 2 {
+			tempBase := c.nextReg
+			if err := c.compileRecvOKExpr(recv, tempBase, tempBase+1); err != nil {
+				return err
+			}
+			for i, name := range s.Names {
+				nameK := c.stringConst(name)
+				if s.ReadOnly {
+					c.emitABx(OP_SETGLOBALRO, tempBase+i, nameK, s.P.Line)
+				} else {
+					c.emitABx(OP_SETGLOBAL, tempBase+i, nameK, s.P.Line)
+				}
+			}
+			c.nextReg = tempBase
+			return nil
+		}
 		if call, ok := s.Values[0].(*ast.CallExpr); ok {
 			tempBase := c.nextReg
 			if err := c.compileCallExprMulti(call, tempBase, nNames); err != nil {
@@ -197,6 +216,9 @@ func (c *compiler) compileAssignStmt(s *ast.AssignStmt) error {
 	nValues := len(s.Values)
 
 	if nValues == 1 && nTargets > 1 {
+		if recv, ok := s.Values[0].(*ast.RecvExpr); ok && nTargets == 2 {
+			return c.compileAssignRecvOK(s, recv)
+		}
 		if call, ok := s.Values[0].(*ast.CallExpr); ok {
 			return c.compileAssignMultiCall(s, call)
 		}
@@ -233,6 +255,14 @@ func (c *compiler) compileAdjustedExprList(values []ast.Expr, nResults int, line
 		}
 		if i == len(values)-1 {
 			switch v := values[i].(type) {
+			case *ast.RecvExpr:
+				if nResults-i >= 2 {
+					okReg := c.allocReg()
+					if okReg != reg+1 {
+						return fmt.Errorf("line %d: internal register allocation error for receive ok", line)
+					}
+					return c.compileRecvOKExpr(v, reg, okReg)
+				}
 			case *ast.CallExpr:
 				return c.compileCallExprMulti(v, reg, nResults-i)
 			case *ast.MethodCallExpr:
@@ -251,6 +281,43 @@ func (c *compiler) compileAdjustedExprList(values []ast.Expr, nResults int, line
 		}
 		c.nextReg = reg + 1
 	}
+	return nil
+}
+
+func (c *compiler) compileDeclareRecvOK(s *ast.DeclareStmt, recv *ast.RecvExpr) error {
+	tempBase := c.nextReg
+	if err := c.compileRecvOKExpr(recv, tempBase, tempBase+1); err != nil {
+		return err
+	}
+	c.nextReg = tempBase + 2
+	if c.nextReg > c.maxReg {
+		c.maxReg = c.nextReg
+	}
+	c.freeRegs(2)
+	for i, name := range s.Names {
+		reg := c.addLocalWithReadOnly(name, s.ReadOnly)
+		if reg != tempBase+i {
+			c.emitABC(OP_MOVE, reg, tempBase+i, 0, s.P.Line)
+		}
+	}
+	return nil
+}
+
+func (c *compiler) compileAssignRecvOK(s *ast.AssignStmt, recv *ast.RecvExpr) error {
+	tempBase := c.nextReg
+	if err := c.compileRecvOKExpr(recv, tempBase, tempBase+1); err != nil {
+		return err
+	}
+	c.nextReg = tempBase + 2
+	if c.nextReg > c.maxReg {
+		c.maxReg = c.nextReg
+	}
+	for i, target := range s.Targets {
+		if err := c.compileAssignTarget(target, tempBase+i, s.P.Line); err != nil {
+			return err
+		}
+	}
+	c.nextReg = tempBase
 	return nil
 }
 
@@ -826,6 +893,27 @@ func (c *compiler) compileRecvExpr(e *ast.RecvExpr, dest int) error {
 	return nil
 }
 
+func (c *compiler) compileRecvOKExpr(e *ast.RecvExpr, dest, okDest int) error {
+	line := e.P.Line
+	base := c.nextReg
+	if c.nextReg <= dest {
+		c.nextReg = dest + 1
+	}
+	if c.nextReg <= okDest {
+		c.nextReg = okDest + 1
+	}
+	if c.nextReg > c.maxReg {
+		c.maxReg = c.nextReg
+	}
+	chReg := c.allocReg()
+	if err := c.compileExprTo(e.Channel, chReg); err != nil {
+		return err
+	}
+	c.emitABC(OP_RECVOK, dest, chReg, okDest, line)
+	c.nextReg = base
+	return nil
+}
+
 func (c *compiler) compileMakeChanExpr(e *ast.MakeChanExpr, dest int) error {
 	line := e.P.Line
 	if e.Size != nil {
@@ -856,15 +944,27 @@ func (c *compiler) compileNonblockingSelectStmt(s *ast.SelectStmt) error {
 
 	for _, cls := range s.Cases {
 		caseBase := c.nextReg
-		okReg := c.allocReg()
+		readyReg := c.allocReg()
 		var recvReg int
+		var recvOKReg int
 		if cls.SendValue == nil {
 			recvReg = c.allocReg()
+			if cls.RecvOkName != "" {
+				if c.allocReg() != recvReg+1 {
+					return fmt.Errorf("line %d: internal register allocation error for select receive ok", cls.P.Line)
+				}
+				recvOKReg = c.allocReg()
+			}
 			chReg := c.allocReg()
 			if err := c.compileExprTo(cls.Channel, chReg); err != nil {
 				return err
 			}
-			c.emitABC(OP_TRYRECV, recvReg, chReg, okReg, cls.P.Line)
+			if cls.RecvOkName != "" {
+				c.emitABC(OP_TRYRECVOK, recvReg, chReg, recvOKReg, cls.P.Line)
+				readyReg = recvReg + 1
+			} else {
+				c.emitABC(OP_TRYRECV, recvReg, chReg, readyReg, cls.P.Line)
+			}
 		} else {
 			chReg := c.allocReg()
 			if err := c.compileExprTo(cls.Channel, chReg); err != nil {
@@ -874,16 +974,20 @@ func (c *compiler) compileNonblockingSelectStmt(s *ast.SelectStmt) error {
 			if err := c.compileExprTo(cls.SendValue, valReg); err != nil {
 				return err
 			}
-			c.emitABC(OP_TRYSEND, chReg, valReg, okReg, cls.P.Line)
+			c.emitABC(OP_TRYSEND, chReg, valReg, readyReg, cls.P.Line)
 		}
 		c.nextReg = caseBase + 1
-		c.emitABC(OP_TEST, okReg, 0, 0, cls.P.Line)
+		c.emitABC(OP_TEST, readyReg, 0, 0, cls.P.Line)
 		skipJump := c.emitJump(cls.P.Line)
 
 		c.enterScope()
 		if cls.SendValue == nil && cls.RecvName != "" {
 			localReg := c.addLocal(cls.RecvName)
 			c.emitABC(OP_MOVE, localReg, recvReg, 0, cls.P.Line)
+		}
+		if cls.SendValue == nil && cls.RecvOkName != "" {
+			localReg := c.addLocal(cls.RecvOkName)
+			c.emitABC(OP_MOVE, localReg, recvOKReg, 0, cls.P.Line)
 		}
 		for _, st := range cls.Body.Stmts {
 			if err := c.compileStmt(st); err != nil {
@@ -924,6 +1028,7 @@ func (c *compiler) compileBlockingSelectStmt(s *ast.SelectStmt) error {
 	base := c.nextReg
 	selectedReg := c.allocReg()
 	recvReg := c.allocReg()
+	recvOKReg := c.allocReg()
 	caseBase := c.nextReg
 
 	for _, cls := range s.Cases {
@@ -960,6 +1065,10 @@ func (c *compiler) compileBlockingSelectStmt(s *ast.SelectStmt) error {
 		if cls.SendValue == nil && cls.RecvName != "" {
 			localReg := c.addLocal(cls.RecvName)
 			c.emitABC(OP_MOVE, localReg, recvReg, 0, cls.P.Line)
+		}
+		if cls.SendValue == nil && cls.RecvOkName != "" {
+			localReg := c.addLocal(cls.RecvOkName)
+			c.emitABC(OP_MOVE, localReg, recvOKReg, 0, cls.P.Line)
 		}
 		for _, st := range cls.Body.Stmts {
 			if err := c.compileStmt(st); err != nil {

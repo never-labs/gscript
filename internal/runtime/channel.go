@@ -81,14 +81,19 @@ func (c *Channel) TrySend(val Value) (ok bool, err error) {
 }
 
 func (c *Channel) TryRecv() (Value, bool) {
+	val, ready, _ := c.TryRecvOK()
+	return val, ready
+}
+
+func (c *Channel) TryRecvOK() (Value, bool, bool) {
 	select {
 	case val, ok := <-c.ch:
 		if !ok {
-			return NilValue(), true
+			return NilValue(), true, false
 		}
-		return val, true
+		return val, true, true
 	default:
-		return NilValue(), false
+		return NilValue(), false, false
 	}
 }
 
@@ -105,21 +110,22 @@ type ChannelSelectCase struct {
 	Value   Value
 }
 
-func ChannelSelect(cases []ChannelSelectCase) (chosen int, value Value, err error) {
+func ChannelSelect(cases []ChannelSelectCase) (chosen int, value Value, recvOK bool, err error) {
 	defer func() {
 		if recover() != nil {
 			chosen = -1
 			value = NilValue()
+			recvOK = false
 			err = fmt.Errorf("send on closed channel")
 		}
 	}()
 	if len(cases) == 0 {
-		return -1, NilValue(), fmt.Errorf("select requires at least one case")
+		return -1, NilValue(), false, fmt.Errorf("select requires at least one case")
 	}
 	reflectCases := make([]reflect.SelectCase, len(cases))
 	for i, cls := range cases {
 		if cls.Channel == nil {
-			return -1, NilValue(), fmt.Errorf("select case uses non-channel value")
+			return -1, NilValue(), false, fmt.Errorf("select case uses non-channel value")
 		}
 		switch cls.Kind {
 		case ChannelSelectRecv:
@@ -132,7 +138,7 @@ func ChannelSelect(cases []ChannelSelectCase) (chosen int, value Value, err erro
 			closed := cls.Channel.closed
 			cls.Channel.mu.Unlock()
 			if closed {
-				return -1, NilValue(), fmt.Errorf("send on closed channel")
+				return -1, NilValue(), false, fmt.Errorf("send on closed channel")
 			}
 			reflectCases[i] = reflect.SelectCase{
 				Dir:  reflect.SelectSend,
@@ -140,17 +146,17 @@ func ChannelSelect(cases []ChannelSelectCase) (chosen int, value Value, err erro
 				Send: reflect.ValueOf(cls.Value),
 			}
 		default:
-			return -1, NilValue(), fmt.Errorf("invalid select case kind")
+			return -1, NilValue(), false, fmt.Errorf("invalid select case kind")
 		}
 	}
 	chosen, recv, ok := reflect.Select(reflectCases)
 	if cases[chosen].Kind == ChannelSelectRecv {
 		if !ok {
-			return chosen, NilValue(), nil
+			return chosen, NilValue(), false, nil
 		}
-		return chosen, recv.Interface().(Value), nil
+		return chosen, recv.Interface().(Value), true, nil
 	}
-	return chosen, NilValue(), nil
+	return chosen, NilValue(), false, nil
 }
 
 // Recv receives a value from the channel. Blocks if the channel is empty.

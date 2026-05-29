@@ -348,17 +348,17 @@ func (interp *Interpreter) execSelect(s *ast.SelectStmt, env *Environment) ([]Va
 			if !ok {
 				continue
 			}
-			return interp.execSelectBody(cls.Body, "", NilValue(), env)
+			return interp.execSelectBody(cls.Body, "", "", NilValue(), false, env)
 		}
 
-		val, ok := chVal.Channel().TryRecv()
-		if !ok {
+		val, ready, recvOK := chVal.Channel().TryRecvOK()
+		if !ready {
 			continue
 		}
-		return interp.execSelectBody(cls.Body, cls.RecvName, val, env)
+		return interp.execSelectBody(cls.Body, cls.RecvName, cls.RecvOkName, val, recvOK, env)
 	}
 	if s.Default != nil {
-		return interp.execSelectBody(s.Default, "", NilValue(), env)
+		return interp.execSelectBody(s.Default, "", "", NilValue(), false, env)
 	}
 	return nil, false, false, false, nil
 }
@@ -388,21 +388,24 @@ func (interp *Interpreter) execBlockingSelect(s *ast.SelectStmt, env *Environmen
 		cases[i].Kind = ChannelSelectSend
 		cases[i].Value = val
 	}
-	chosen, val, err := ChannelSelect(cases)
+	chosen, val, recvOK, err := ChannelSelect(cases)
 	if err != nil {
 		return nil, false, false, false, err
 	}
 	cls := s.Cases[chosen]
 	if cls.SendValue != nil {
-		return interp.execSelectBody(cls.Body, "", NilValue(), env)
+		return interp.execSelectBody(cls.Body, "", "", NilValue(), false, env)
 	}
-	return interp.execSelectBody(cls.Body, cls.RecvName, val, env)
+	return interp.execSelectBody(cls.Body, cls.RecvName, cls.RecvOkName, val, recvOK, env)
 }
 
-func (interp *Interpreter) execSelectBody(body *ast.BlockStmt, recvName string, recvVal Value, env *Environment) ([]Value, bool, bool, bool, error) {
+func (interp *Interpreter) execSelectBody(body *ast.BlockStmt, recvName, recvOkName string, recvVal Value, recvOK bool, env *Environment) ([]Value, bool, bool, bool, error) {
 	child := NewEnvironment(env)
 	if recvName != "" {
 		child.Define(recvName, recvVal)
+	}
+	if recvOkName != "" {
+		child.Define(recvOkName, BoolValue(recvOK))
 	}
 	return interp.execBlock(body, child)
 }

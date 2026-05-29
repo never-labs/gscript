@@ -125,7 +125,7 @@ func computeKnownIntSlots(proto *vm.FuncProto) (*knownIntInfo, bool) {
 		case vm.OP_CONCAT, vm.OP_LEN, vm.OP_POW, vm.OP_DIV,
 			vm.OP_CLOSURE, vm.OP_NEWOBJECT2, vm.OP_NEWOBJECTN, vm.OP_GETFIELD, vm.OP_SETFIELD, vm.OP_SELF,
 			vm.OP_VARARG, vm.OP_TFORCALL, vm.OP_TFORLOOP,
-			vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_SELECT, vm.OP_GO:
+			vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_RECVOK, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_TRYRECVOK, vm.OP_SELECT, vm.OP_GO:
 			return nil, false
 		case vm.OP_LOADK:
 			bx := vm.DecodeBx(inst)

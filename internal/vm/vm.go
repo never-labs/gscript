@@ -3101,6 +3101,18 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				vm.regs[base+a] = runtime.NilValue()
 			}
 
+		case OP_RECVOK:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			cc := DecodeC(inst)
+			chVal := vm.regs[base+b]
+			if !chVal.IsChannel() {
+				return nil, fmt.Errorf("receive from non-channel value (got %s)", chVal.TypeName())
+			}
+			val, ok := chVal.Channel().Recv()
+			vm.regs[base+a] = val
+			vm.regs[base+cc] = runtime.BoolValue(ok)
+
 		case OP_TRYSEND:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -3127,6 +3139,19 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			vm.regs[base+a] = val
 			vm.regs[base+cc] = runtime.BoolValue(ok)
 
+		case OP_TRYRECVOK:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			cc := DecodeC(inst)
+			chVal := vm.regs[base+b]
+			if !chVal.IsChannel() {
+				return nil, fmt.Errorf("receive from non-channel value (got %s)", chVal.TypeName())
+			}
+			val, ready, recvOK := chVal.Channel().TryRecvOK()
+			vm.regs[base+a] = val
+			vm.regs[base+a+1] = runtime.BoolValue(ready)
+			vm.regs[base+cc] = runtime.BoolValue(recvOK)
+
 		case OP_SELECT:
 			a := DecodeA(inst)
 			b := DecodeB(inst)
@@ -3151,12 +3176,13 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					Value:   val,
 				}
 			}
-			chosen, val, err := runtime.ChannelSelect(cases)
+			chosen, val, recvOK, err := runtime.ChannelSelect(cases)
 			if err != nil {
 				return nil, err
 			}
 			vm.regs[base+a] = runtime.IntValue(int64(chosen + 1))
 			vm.regs[base+a+1] = val
+			vm.regs[base+a+2] = runtime.BoolValue(recvOK)
 
 		default:
 			return nil, fmt.Errorf("unhandled opcode %d (%s)", op, OpName(op))

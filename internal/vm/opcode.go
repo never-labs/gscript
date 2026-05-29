@@ -84,12 +84,14 @@ const (
 	OP_GO // A B : go R(A)(R(A+1)..R(A+B-1)); B=0 use top
 
 	// Channel
-	OP_MAKECHAN // A B : R(A) = make(chan, B) — B=0 unbuffered
-	OP_SEND     // A B : R(A) <- R(B)
-	OP_RECV     // A B : R(A) = <-R(B)
-	OP_TRYSEND  // A B C : R(C) = try R(A) <- R(B)
-	OP_TRYRECV  // A B C : R(A), R(C) = try <-R(B)
-	OP_SELECT   // A B C : R(A),R(A+1) = select cases at R(B).., C cases
+	OP_MAKECHAN  // A B : R(A) = make(chan, B) — B=0 unbuffered
+	OP_SEND      // A B : R(A) <- R(B)
+	OP_RECV      // A B : R(A) = <-R(B)
+	OP_RECVOK    // A B C : R(A), R(C) = <-R(B)
+	OP_TRYSEND   // A B C : R(C) = try R(A) <- R(B)
+	OP_TRYRECV   // A B C : R(A), R(C) = try <-R(B)
+	OP_TRYRECVOK // A B C : R(A), R(A+1), R(C) = try <-R(B) value, ready, receive-ok
+	OP_SELECT    // A B C : R(A),R(A+1),R(A+2) = select chosen, value, receive-ok
 
 	OP_NEWOBJECTN  // A B C : R(A) = small string table, ctor=B, values starting at R(C)
 	OP_YIELD       // A B C : coroutine.yield(R(A+1)..R(A+B-1)); result convention matches CALL
@@ -242,8 +244,10 @@ var opNames = [...]string{
 	OP_MAKECHAN:    "MAKECHAN",
 	OP_SEND:        "SEND",
 	OP_RECV:        "RECV",
+	OP_RECVOK:      "RECVOK",
 	OP_TRYSEND:     "TRYSEND",
 	OP_TRYRECV:     "TRYRECV",
+	OP_TRYRECVOK:   "TRYRECVOK",
 	OP_SELECT:      "SELECT",
 	OP_SETLISTDYN:  "SETLISTDYN",
 	OP_CALLTABLE:   "CALLTABLE",

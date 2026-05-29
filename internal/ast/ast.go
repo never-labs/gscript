@@ -141,11 +141,12 @@ type SelectStmt struct {
 
 // SelectCase represents either a receive or send case inside select.
 type SelectCase struct {
-	P         Pos
-	RecvName  string // optional for: case name := <-ch:
-	Channel   Expr
-	SendValue Expr // nil means receive case; non-nil means send case
-	Body      *BlockStmt
+	P          Pos
+	RecvName   string // optional for: case name := <-ch:
+	RecvOkName string // optional for: case name, ok := <-ch:
+	Channel    Expr
+	SendValue  Expr // nil means receive case; non-nil means send case
+	Body       *BlockStmt
 }
 
 func (s *SelectStmt) nodeType() string { return "SelectStmt" }

@@ -167,8 +167,8 @@ func (interp *Interpreter) evalExprRaw(expr ast.Expr, env *Environment) ([]Value
 		if !chVal.IsChannel() {
 			return nil, fmt.Errorf("receive from non-channel value")
 		}
-		val, _ := chVal.Channel().Recv()
-		return []Value{val}, nil
+		val, ok := chVal.Channel().Recv()
+		return []Value{val, BoolValue(ok)}, nil
 
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", expr)

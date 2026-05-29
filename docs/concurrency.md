@@ -19,9 +19,11 @@ Supported core forms:
 - `make(chan)` and `make(chan, capacity)`
 - `ch <- value`
 - `<-ch`
+- `value, ok := <-ch`
 - `close(ch)`
 - `for v := range ch { ... }`
 - `select { case v := <-ch: ... }`
+- `select { case v, ok := <-ch: ... }`
 - `select { case ch <- value: ... default: ... }`
 - `len(ch)` for queued buffered values
 - `cap(ch)` for channel capacity

@@ -2301,6 +2301,44 @@ default:
 	expectGlobalInt(t, g, "result", 1)
 }
 
+func TestChannelReceiveCommaOK(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 1)
+ch <- 42
+v, ok1 := <-ch
+close(ch)
+empty, ok2 := <-ch
+result := v
+if ok1 {
+	result = result + 100
+}
+if empty == nil {
+	result = result + 1000
+}
+if !ok2 {
+	result = result + 10000
+}
+`)
+	expectGlobalInt(t, g, "result", 11142)
+}
+
+func TestSelectReceiveCommaOK(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 1)
+close(ch)
+result := 0
+select {
+case v, ok := <-ch:
+	if v == nil && !ok {
+		result = 7
+	}
+default:
+	result = -1
+}
+`)
+	expectGlobalInt(t, g, "result", 7)
+}
+
 // ===== CHANNEL TESTS =====
 
 func TestChannelMakeAndType(t *testing.T) {
