@@ -1,6 +1,8 @@
 package gscript_test
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -554,6 +556,42 @@ func TestWithMaxHostResultBytesLimitsBytecodeFastStdlibResult(t *testing.T) {
 	}
 	if budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
 		t.Fatalf("budget = %s %d, want host_result_bytes 4", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
+func TestWithMaxHostResultBytesLimitsCompressDecodeExpansion(t *testing.T) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write([]byte("12345")); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	blob := buf.String()
+
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibCompress),
+				gs.WithMaxHostResultBytes(4),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Set("blob", blob); err != nil {
+				t.Fatal(err)
+			}
+			err := vm.Exec(`value := compress.gzipDecode(blob)`)
+			var budgetErr *gs.BudgetError
+			if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+				t.Fatalf("expected host_result_bytes budget 4, got %T %v", err, err)
+			}
+		})
 	}
 }
 

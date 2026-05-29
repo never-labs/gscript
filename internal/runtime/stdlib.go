@@ -139,7 +139,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("encoding", TableValue(buildEncodingLib()))
 
 	// --- Compression ---
-	interp.globals.Define("compress", TableValue(buildCompressLib()))
+	interp.globals.Define("compress", TableValue(buildCompressLib(interp)))
 
 	// --- Cryptography ---
 	interp.globals.Define("crypto", TableValue(buildCryptoLib()))

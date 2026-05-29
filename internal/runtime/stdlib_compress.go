@@ -42,8 +42,18 @@ func compressLevelIndex(level int) (int, bool) {
 // buildCompressLib creates the "compress" standard library table.
 // Provides gzip, zlib, and deflate compression/decompression.
 // Inspired by Odin's compress package (gzip, zlib).
-func buildCompressLib() *Table {
+func buildCompressLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -134,7 +144,7 @@ func buildCompressLib() *Table {
 				return NilValue(), StringValue(err.Error()), 2, nil
 			}
 		}
-		decoded, err := io.ReadAll(r)
+		decoded, err := ReadAllWithHostResultLimit(r, maxHostResult())
 		closeErr := r.Close()
 		stdlibGzipReaderPool.Put(r)
 		if err != nil {
@@ -233,7 +243,7 @@ func buildCompressLib() *Table {
 			resetter, ok := newReader.(resetReadCloser)
 			if !ok {
 				defer newReader.Close()
-				decoded, err := io.ReadAll(newReader)
+				decoded, err := ReadAllWithHostResultLimit(newReader, maxHostResult())
 				if err != nil {
 					return NilValue(), StringValue(err.Error()), 2, nil
 				}
@@ -241,7 +251,7 @@ func buildCompressLib() *Table {
 			}
 			r = resetter
 		}
-		decoded, err := io.ReadAll(r)
+		decoded, err := ReadAllWithHostResultLimit(r, maxHostResult())
 		closeErr := r.Close()
 		stdlibZlibReaderPool.Put(r)
 		if err != nil {
@@ -335,7 +345,7 @@ func buildCompressLib() *Table {
 		} else {
 			r = flate.NewReader(src).(resetReadCloser)
 		}
-		decoded, err := io.ReadAll(r)
+		decoded, err := ReadAllWithHostResultLimit(r, maxHostResult())
 		closeErr := r.Close()
 		stdlibDeflateReaderPool.Put(r)
 		if err != nil {
