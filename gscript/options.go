@@ -119,6 +119,21 @@ type vmOptions struct {
 	useJIT         bool // enable JIT compilation (implies useVM)
 }
 
+// SecurityPolicy groups production sandbox controls behind one auditable
+// embedding option. Zero-valued fields keep existing defaults.
+type SecurityPolicy struct {
+	Libs                 LibFlags
+	Capabilities         CapabilityFlags
+	MaxSteps             int64
+	MaxNativeCalls       int64
+	MaxCallDepth         int64
+	MaxGoroutines        int64
+	MaxChannelCapacity   int64
+	MaxHostResultBytes   int64
+	DisableJIT           bool
+	DisableModuleLoading bool
+}
+
 // Option configures a VM instance.
 type Option func(*vmOptions)
 
@@ -250,6 +265,44 @@ func SecuritySandbox() Option {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
 		o.useJIT = false
+	}
+}
+
+// WithSecurity applies a grouped security policy. It is equivalent to applying
+// the corresponding fine-grained options, but gives embedders one place to
+// construct and audit production limits.
+func WithSecurity(policy SecurityPolicy) Option {
+	return func(o *vmOptions) {
+		if policy.Libs != 0 {
+			o.libs = policy.Libs
+		}
+		if policy.Capabilities != 0 || policy.DisableModuleLoading {
+			o.capabilities = policy.Capabilities
+		}
+		if policy.DisableModuleLoading {
+			o.capabilities &^= CapModuleLoading
+		}
+		if policy.MaxSteps > 0 {
+			o.maxSteps = policy.MaxSteps
+		}
+		if policy.MaxNativeCalls > 0 {
+			o.maxNativeCalls = policy.MaxNativeCalls
+		}
+		if policy.MaxCallDepth > 0 {
+			o.maxCallDepth = policy.MaxCallDepth
+		}
+		if policy.MaxGoroutines > 0 {
+			o.maxGoroutines = policy.MaxGoroutines
+		}
+		if policy.MaxChannelCapacity > 0 {
+			o.maxChannelCap = policy.MaxChannelCapacity
+		}
+		if policy.MaxHostResultBytes > 0 {
+			o.maxHostResult = policy.MaxHostResultBytes
+		}
+		if policy.DisableJIT {
+			o.useJIT = false
+		}
 	}
 }
 

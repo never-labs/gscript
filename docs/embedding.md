@@ -29,7 +29,7 @@ extensions:
 - Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`, `SecuritySandbox`,
-  `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
+  `WithSecurity`, `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
   `WithFilesystemWrite`, `WithFilesystemRoot`, `WithRequirePath`,
   `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
   `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithMaxHostResultBytes`,
@@ -458,6 +458,13 @@ prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
 `WithMaxHostResultBytes`.
+
+`WithSecurity(SecurityPolicy{...})` is the grouped form of the same controls.
+It is intended for production embedders that want one auditable policy object
+instead of a long option list. The current struct covers implemented controls:
+stdlib preset, host capability bits, module loading, JIT disablement, step
+budget, native-call budget, call-depth budget, script goroutine limit,
+channel-capacity limit, and host-result byte limit.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the

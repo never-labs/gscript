@@ -97,6 +97,12 @@ vm := gscript.New(
 )
 ```
 
+For applications that prefer one auditable configuration object, the public API
+also exposes `WithSecurity(SecurityPolicy)`. The first implementation groups
+the controls that exist today: stdlib preset, host capabilities, module
+loading, JIT policy, step budget, native-call budget, call-depth budget,
+script goroutine limit, channel-capacity limit, and host-result byte limit.
+
 `SecuritySandbox()` currently means:
 
 - `LibSafe` is selected as the stdlib preset.
@@ -601,9 +607,7 @@ type HostPolicy struct {
     DenyUnsafeHost      bool
 }
 
-func SecurityTrusted() SecurityPolicy
 func WithSecurity(policy SecurityPolicy) Option
-func WithContext(ctx context.Context) Option
 ```
 
 Execution should expose structured errors:

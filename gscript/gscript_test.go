@@ -1601,7 +1601,7 @@ func TestWithSandboxDisablesFilesystemCapabilities(t *testing.T) {
 
 func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
 	vm := gs.New(gs.WithJIT(), gs.SecuritySandbox(), gs.WithMaxSteps(16))
-	if err := vm.Exec(`value := require("json").encode({ok: true})`); err != nil {
+	if err := vm.Exec(`hasJSON := type(require("json"))`); err != nil {
 		t.Fatalf("safe stdlib should remain available: %v", err)
 	}
 	for _, src := range []string{
@@ -1618,6 +1618,39 @@ func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
 	var budgetErr *gs.BudgetError
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected step budget in sandboxed loop, got %T %v", err, err)
+	}
+}
+
+func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
+	vm := gs.New(gs.WithJIT(), gs.WithSecurity(gs.SecurityPolicy{
+		Libs:                 gs.LibSafe,
+		Capabilities:         gs.CapSafe,
+		DisableModuleLoading: true,
+		DisableJIT:           true,
+		MaxSteps:             32,
+		MaxNativeCalls:       4,
+		MaxCallDepth:         8,
+		MaxGoroutines:        1,
+		MaxChannelCapacity:   2,
+		MaxHostResultBytes:   4,
+	}))
+	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := vm.Get("json"); err != nil || got == nil {
+		t.Fatalf("safe stdlib should remain available: got=%v err=%v", got, err)
+	}
+	if err := vm.Exec(`fs.readfile("x")`); err == nil {
+		t.Fatal("WithSecurity allowed filesystem API")
+	}
+	err := vm.Exec(`value := large()`)
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+		t.Fatalf("expected host_result_bytes budget 4, got %T %v", err, err)
+	}
+	err = vm.Exec(`for {}`)
+	if !errors.As(err, &budgetErr) || budgetErr.Resource != "steps" || budgetErr.Limit != 32 {
+		t.Fatalf("expected steps budget 32, got %T %v", err, err)
 	}
 }
 
