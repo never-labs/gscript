@@ -306,6 +306,24 @@ func TestWithMaxChannelCapacityLimitsInterpreterMakeChan(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsInterpreterHostCallback(t *testing.T) {
+	vm := gs.New(gs.WithMaxHostResultBytes(4))
+	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
+		t.Fatal(err)
+	}
+	err := vm.Exec(`value := large()`)
+	if err == nil {
+		t.Fatal("expected host result budget error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+		t.Fatalf("budget = %s %d, want host_result_bytes 4", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
 func TestWithMaxStepsLimitsBytecodeExecution(t *testing.T) {
 	vm := gs.New(gs.WithVM(), gs.WithMaxSteps(8))
 	err := vm.Exec(`
@@ -438,6 +456,39 @@ func TestWithMaxChannelCapacityLimitsBytecodeMakeChan(t *testing.T) {
 	}
 	if budgetErr.Resource != "channel_capacity" || budgetErr.Limit != 2 {
 		t.Fatalf("budget = %s %d, want channel_capacity 2", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
+func TestWithMaxHostResultBytesLimitsBytecodeHostCallback(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithMaxHostResultBytes(4))
+	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
+		t.Fatal(err)
+	}
+	err := vm.Exec(`value := large()`)
+	if err == nil {
+		t.Fatal("expected host result budget error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+		t.Fatalf("budget = %s %d, want host_result_bytes 4", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
+func TestWithMaxHostResultBytesLimitsBytecodeFastStdlibResult(t *testing.T) {
+	vm := gs.New(gs.WithVM(), gs.WithMaxHostResultBytes(4))
+	err := vm.Exec(`value := base64.encode("1234")`)
+	if err == nil {
+		t.Fatal("expected host result budget error")
+	}
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected BudgetError, got %T %v", err, err)
+	}
+	if budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+		t.Fatalf("budget = %s %d, want host_result_bytes 4", budgetErr.Resource, budgetErr.Limit)
 	}
 }
 

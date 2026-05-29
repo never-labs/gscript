@@ -63,6 +63,10 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxChannelCapacity(o.maxChannelCap)
 		o.useJIT = false
 	}
+	if o.maxHostResult > 0 {
+		interp.SetMaxHostResultBytes(o.maxHostResult)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -174,6 +178,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxChannelCap > 0 {
 				bvm.SetMaxChannelCapacity(vm.opts.maxChannelCap)
 			}
+			if vm.opts.maxHostResult > 0 {
+				bvm.SetMaxHostResultBytes(vm.opts.maxHostResult)
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -192,6 +199,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			}
 			if vm.opts.maxChannelCap > 0 {
 				bvm.SetMaxChannelCapacity(vm.opts.maxChannelCap)
+			}
+			if vm.opts.maxHostResult > 0 {
+				bvm.SetMaxHostResultBytes(vm.opts.maxHostResult)
 			}
 		}
 		bvm.SetContext(activeRunContext(ctx))

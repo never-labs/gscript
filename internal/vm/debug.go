@@ -438,6 +438,10 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 		_ = vm.emitDebugHook("error", "native", gf.Name, runtime.StringValue(err.Error()))
 		return nil, err
 	}
+	if err := vm.checkHostResultBudget(results...); err != nil {
+		_ = vm.emitDebugHook("error", "native", gf.Name, runtime.StringValue(err.Error()))
+		return nil, err
+	}
 	if err := vm.emitDebugHook("return", "native", gf.Name, runtime.NilValue()); err != nil {
 		return nil, err
 	}

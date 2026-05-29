@@ -108,6 +108,7 @@ type VM struct {
 	maxGoroutines        int64 // <=0 means unlimited
 	activeGoroutines     *atomic.Int64
 	maxChannelCap        int64 // <=0 means unlimited
+	maxHostResult        int64 // <=0 means unlimited
 	ctx                  context.Context
 }
 
@@ -151,6 +152,12 @@ func (vm *VM) SetMaxGoroutines(max int64) {
 // channels. A non-positive value disables the limit.
 func (vm *VM) SetMaxChannelCapacity(max int64) {
 	vm.maxChannelCap = max
+}
+
+// SetMaxHostResultBytes sets the maximum byte size of strings returned from a
+// single native Go call. A non-positive value disables the limit.
+func (vm *VM) SetMaxHostResultBytes(max int64) {
+	vm.maxHostResult = max
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -237,6 +244,10 @@ func (vm *VM) checkChannelCapacityBudget(capacity int) error {
 		return nil
 	}
 	return fmt.Errorf("channel capacity limit exceeded (%d)", vm.maxChannelCap)
+}
+
+func (vm *VM) checkHostResultBudget(values ...runtime.Value) error {
+	return runtime.CheckHostResultBytes(vm.maxHostResult, values...)
 }
 
 // Regs returns the register file. Used by the JIT executor.
@@ -824,6 +835,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		maxGoroutines:      parent.maxGoroutines,
 		activeGoroutines:   parent.activeGoroutines,
 		maxChannelCap:      parent.maxChannelCap,
+		maxHostResult:      parent.maxHostResult,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -905,6 +917,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		maxGoroutines:      parent.maxGoroutines,
 		activeGoroutines:   parent.activeGoroutines,
 		maxChannelCap:      parent.maxChannelCap,
+		maxHostResult:      parent.maxHostResult,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()
@@ -3172,6 +3185,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					if err != nil {
 						return nil, err
 					}
+					if err := vm.checkHostResultBudget(r0, r1); err != nil {
+						return nil, err
+					}
 					for i := 0; i < c; i++ {
 						switch {
 						case i == 0 && n > 0:
@@ -3188,6 +3204,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 					}
 					r0, r1, n, err := gf.FastArg2Ret2(vm.regs[base+a+1], vm.regs[base+a+2])
 					if err != nil {
+						return nil, err
+					}
+					if err := vm.checkHostResultBudget(r0, r1); err != nil {
 						return nil, err
 					}
 					for i := 0; i < c; i++ {

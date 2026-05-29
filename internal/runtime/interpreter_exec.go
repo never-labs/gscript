@@ -283,6 +283,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				maxGoroutines:    interp.maxGoroutines,
 				activeGoroutines: interp.activeGoroutines,
 				maxChannelCap:    interp.maxChannelCap,
+				maxHostResult:    interp.maxHostResult,
 			}
 			childInterp.callFunction(fn, args)
 		}()
@@ -313,6 +314,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				maxGoroutines:    interp.maxGoroutines,
 				activeGoroutines: interp.activeGoroutines,
 				maxChannelCap:    interp.maxChannelCap,
+				maxHostResult:    interp.maxHostResult,
 			}
 			childInterp.callFunction(method, args)
 		}()

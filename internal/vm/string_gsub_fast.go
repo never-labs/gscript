@@ -42,7 +42,11 @@ func (vm *VM) ExecuteStdStringGSubCall(absSlot, nArgs, rawC int) (bool, error) {
 	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
 		return true, err
 	}
-	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{runtime.StringValue(out), runtime.IntValue(int64(count))})
+	outVal := runtime.StringValue(out)
+	if err := vm.checkHostResultBudget(outVal); err != nil {
+		return true, err
+	}
+	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{outVal, runtime.IntValue(int64(count))})
 	return true, nil
 }
 

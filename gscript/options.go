@@ -113,6 +113,7 @@ type vmOptions struct {
 	maxCallDepth   int64
 	maxGoroutines  int64
 	maxChannelCap  int64
+	maxHostResult  int64
 	printFunc      func(args ...interface{})
 	useVM          bool // use bytecode VM instead of tree-walker
 	useJIT         bool // enable JIT compilation (implies useVM)
@@ -307,6 +308,16 @@ func WithMaxGoroutines(max int64) Option {
 // code cannot bypass channel-creation checkpoints.
 func WithMaxChannelCapacity(max int64) Option {
 	return func(o *vmOptions) { o.maxChannelCap = max }
+}
+
+// WithMaxHostResultBytes limits string bytes returned from a single native Go
+// call, including standard-library functions and registered host callbacks. A
+// non-positive value disables the limit.
+//
+// When a host-result limit is set, JIT execution is disabled so native code
+// cannot bypass result materialization checks.
+func WithMaxHostResultBytes(max int64) Option {
+	return func(o *vmOptions) { o.maxHostResult = max }
 }
 
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.

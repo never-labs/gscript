@@ -32,8 +32,8 @@ extensions:
   `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
   `WithFilesystemWrite`, `WithFilesystemRoot`, `WithRequirePath`,
   `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
-  `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithPrint`, `WithVM`,
-  `WithJIT`, and `WithTracing`.
+  `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithMaxHostResultBytes`,
+  `WithPrint`, `WithVM`, `WithJIT`, and `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -249,6 +249,9 @@ Current sandbox gaps:
   statements, and `WithMaxChannelCapacity` limits `make(chan, n)` buffer
   sizes. Both disable JIT until compiled task/channel creation consumes the
   same policy.
+- `WithMaxHostResultBytes` limits string bytes returned from one native Go
+  call, including standard-library functions and registered host callbacks. It
+  checks direct strings and strings nested in returned tables.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven
@@ -384,9 +387,10 @@ boundaries. Timeouts should return a distinguishable error, for example
 `errors.Is(err, context.Canceled)` or `context.DeadlineExceeded`.
 
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
-`WithMaxGoroutines`, and `WithMaxChannelCapacity` are the first
-production-limits APIs. A full production limits object should still cover wall
-time, allocation/table sizes, module count, and host-call duration policy.
+`WithMaxGoroutines`, `WithMaxChannelCapacity`, and
+`WithMaxHostResultBytes` are the first production-limits APIs. A full
+production limits object should still cover wall time, allocation/table sizes,
+module count, and host-call duration policy.
 
 ### Errors and stack traces
 
@@ -452,7 +456,8 @@ safe built-in modules require-able.
 `CapSafe`. It does not change execution mode, so production examples should
 prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
-`WithMaxGoroutines`, and `WithMaxChannelCapacity`.
+`WithMaxGoroutines`, `WithMaxChannelCapacity`, and
+`WithMaxHostResultBytes`.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the

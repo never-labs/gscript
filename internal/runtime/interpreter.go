@@ -40,6 +40,7 @@ type Interpreter struct {
 	maxGoroutines     int64 // <=0 means unlimited
 	activeGoroutines  *atomic.Int64
 	maxChannelCap     int64 // <=0 means unlimited
+	maxHostResult     int64 // <=0 means unlimited
 	ctx               context.Context
 }
 
@@ -279,6 +280,12 @@ func (interp *Interpreter) SetMaxChannelCapacity(max int64) {
 	interp.maxChannelCap = max
 }
 
+// SetMaxHostResultBytes sets the maximum byte size of strings returned from a
+// single native Go call. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxHostResultBytes(max int64) {
+	interp.maxHostResult = max
+}
+
 // SetContext installs a host cancellation context checked at interpreter
 // statement/loop checkpoints. A nil context disables cancellation polling.
 func (interp *Interpreter) SetContext(ctx context.Context) {
@@ -358,4 +365,8 @@ func (interp *Interpreter) checkChannelCapacityBudget(capacity int) error {
 		return nil
 	}
 	return fmt.Errorf("channel capacity limit exceeded (%d)", interp.maxChannelCap)
+}
+
+func (interp *Interpreter) checkHostResultBudget(values []Value) error {
+	return CheckHostResultBytes(interp.maxHostResult, values...)
 }

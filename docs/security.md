@@ -161,6 +161,9 @@ Required controls:
 - `WithMaxChannelCapacity`: limits the buffer capacity accepted by
   `make(chan, n)` in the interpreter and bytecode VM. Setting this option
   disables JIT until compiled channel creation uses the same check.
+- `WithMaxHostResultBytes`: limits string bytes returned from one native Go
+  call, including stdlib functions and registered host callbacks. Setting this
+  option disables JIT until compiled native calls use the same result check.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
@@ -199,9 +202,10 @@ Required controls:
 - `MaxStringBytes`: maximum size of one string.
 - `MaxTableEntries`: maximum entries in one table.
 - `MaxArrayLength`: maximum sequence length for array-like tables.
-- `MaxHostResultBytes`: maximum bytes returned by `fs.readfile`, `io.read`,
-  `net.*`, `process.run`, JSON encode/decode, compression, and similar stdlib
-  functions.
+- `WithMaxHostResultBytes`: maximum string bytes returned by one native call,
+  including `fs.readfile`, `io.read`, `net.*`, `process.run`, JSON
+  encode/decode, compression, and registered host callbacks. This exists today
+  for direct string results and strings nested in returned tables.
 - `MaxRegexWorkBytes` or equivalent output limits for regexp split/find-all.
 
 Failure mode: return `ErrBudgetExceeded` with kind `memory`. Partially created

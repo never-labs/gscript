@@ -300,6 +300,10 @@ func (vm *VM) executeDirectGoFunctionFastCall(gf *runtime.GoFunction, absSlot, n
 		_ = vm.emitDebugHook("error", "native", gf.Name, runtime.StringValue(err.Error()))
 		return true, err
 	}
+	if err := vm.checkHostResultBudget(r0, r1); err != nil {
+		_ = vm.emitDebugHook("error", "native", gf.Name, runtime.StringValue(err.Error()))
+		return true, err
+	}
 	if err = vm.emitDebugHook("return", "native", gf.Name, runtime.NilValue()); err != nil {
 		return true, err
 	}
@@ -370,6 +374,9 @@ func (vm *VM) ExecuteStdStringFindCall(absSlot, nArgs, rawC int) (bool, error) {
 	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
 		return true, err
 	}
+	if err := vm.checkHostResultBudget(r0, r1); err != nil {
+		return true, err
+	}
 	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)
 	return true, nil
 }
@@ -390,6 +397,9 @@ func (vm *VM) ExecuteStdStringMatchCall(absSlot, nArgs, rawC int) (bool, error) 
 		return handled, err
 	}
 	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
+	if err := vm.checkHostResultBudget(r0, r1); err != nil {
 		return true, err
 	}
 	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)

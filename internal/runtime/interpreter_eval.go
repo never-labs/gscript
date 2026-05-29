@@ -829,6 +829,10 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 			_ = interp.emitDebugHook("error", "native", gf.Name, StringValue(err.Error()))
 			return nil, err
 		}
+		if err := interp.checkHostResultBudget(results); err != nil {
+			_ = interp.emitDebugHook("error", "native", gf.Name, StringValue(err.Error()))
+			return nil, err
+		}
 		if err := interp.emitDebugHook("return", "native", gf.Name, NilValue()); err != nil {
 			return nil, err
 		}
