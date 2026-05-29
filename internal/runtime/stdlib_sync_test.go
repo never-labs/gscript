@@ -2,9 +2,25 @@ package runtime
 
 import "testing"
 
-func TestSyncWaitGroup(t *testing.T) {
+func runSyncTestScript(t *testing.T, code string) *Interpreter {
+	t.Helper()
 	interp := New()
-	code := `
+	tokens, err := lexerNew(code)
+	if err != nil {
+		t.Fatalf("lexer: %v", err)
+	}
+	prog, err := parserNew(tokens)
+	if err != nil {
+		t.Fatalf("parser: %v", err)
+	}
+	if err := interp.Exec(prog); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	return interp
+}
+
+func TestSyncWaitGroup(t *testing.T) {
+	interp := runSyncTestScript(t, `
 wg := sync.waitgroup()
 ch := make(chan, 4)
 for i := 1; i <= 4; i++ {
@@ -19,19 +35,62 @@ total := 0
 for i := 1; i <= 4; i++ {
     total = total + <-ch
 }
-`
-	tokens, err := lexerNew(code)
-	if err != nil {
-		t.Fatalf("lexer: %v", err)
-	}
-	prog, err := parserNew(tokens)
-	if err != nil {
-		t.Fatalf("parser: %v", err)
-	}
-	if err := interp.Exec(prog); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`)
 	if got := interp.GetGlobal("total"); !got.IsInt() || got.Int() != 10 {
 		t.Fatalf("total = %v, want 10", got)
+	}
+}
+
+func TestSyncMutexAndOnce(t *testing.T) {
+	interp := runSyncTestScript(t, `
+mu := sync.mutex()
+wg := sync.waitgroup()
+state := {value: 0}
+for i := 1; i <= 4; i++ {
+    wg.add(1)
+    go func() {
+        for j := 1; j <= 100; j++ {
+            mu.lock()
+            state.value = state.value + 1
+            mu.unlock()
+        }
+        wg.done()
+    }()
+}
+wg.wait()
+
+once := sync.once()
+initCount := 0
+for i := 1; i <= 5; i++ {
+    once.do(func() {
+        initCount = initCount + 1
+    })
+}
+`)
+	state := interp.GetGlobal("state")
+	if !state.IsTable() {
+		t.Fatalf("state = %v, want table", state)
+	}
+	if got := state.Table().RawGetString("value"); !got.IsInt() || got.Int() != 400 {
+		t.Fatalf("state.value = %v, want 400", got)
+	}
+	if got := interp.GetGlobal("initCount"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("initCount = %v, want 1", got)
+	}
+}
+
+func TestSyncRWMutex(t *testing.T) {
+	interp := runSyncTestScript(t, `
+mu := sync.rwmutex()
+value := 0
+mu.lock()
+value = value + 10
+mu.unlock()
+mu.rlock()
+snapshot := value
+mu.runlock()
+`)
+	if got := interp.GetGlobal("snapshot"); !got.IsInt() || got.Int() != 10 {
+		t.Fatalf("snapshot = %v, want 10", got)
 	}
 }

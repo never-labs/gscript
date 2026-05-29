@@ -1191,6 +1191,12 @@ func (vm *VM) RegisterHTTPLib() {
 	vm.setPackageLoaded("http", httpLib)
 }
 
+func (vm *VM) RegisterSyncLib() {
+	syncLib := runtime.TableValue(runtime.BuildSyncLibWithCaller(vm.callValue))
+	vm.SetGlobal("sync", syncLib)
+	vm.setPackageLoaded("sync", syncLib)
+}
+
 func (vm *VM) RegisterScriptLib() {
 	t := runtime.NewTable()
 	set := func(name string, fn func([]runtime.Value) ([]runtime.Value, error)) {

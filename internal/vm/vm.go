@@ -674,6 +674,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterStringLib()
 	v.RegisterHTTPLib()
 	v.RegisterDebugLib()
+	v.RegisterSyncLib()
 	v.RegisterScriptLib()
 	v.RegisterLoaderLib()
 	v.registerChannelBuiltins()
@@ -746,6 +747,14 @@ func newIsolatedChildVM(parent *VM) *VM {
 		}
 		childGlobals[name] = ga[idx]
 	}
+	if pkgVal, ok := childGlobals["package"]; ok && pkgVal.IsTable() {
+		pkgCopy := clonePackageTableForChild(pkgVal.Table())
+		pkgCopyVal := runtime.TableValue(pkgCopy)
+		childGlobals["package"] = pkgCopyVal
+		if idx, ok := gi["package"]; ok && idx >= 0 && idx < len(ga) {
+			ga[idx] = pkgCopyVal
+		}
+	}
 
 	child := &VM{
 		regs:               runtime.MakeNilSlice(1024),
@@ -777,11 +786,33 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterStringLib()
 	child.RegisterHTTPLib()
 	child.RegisterDebugLib()
+	child.RegisterSyncLib()
 	child.RegisterScriptLib()
 	child.RegisterLoaderLib()
 	child.scriptDir = parent.scriptDir
 	runtime.RegisterVM(child)
 	return child
+}
+
+func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {
+	pkg := runtime.NewTable()
+	loaded := runtime.NewTable()
+	if parent != nil {
+		parentLoaded := parent.RawGetString("loaded")
+		if parentLoaded.IsTable() {
+			src := parentLoaded.Table()
+			for _, name := range runtime.StdlibModuleNames() {
+				if v := src.RawGetString(name); !v.IsNil() {
+					loaded.RawSetString(name, v)
+				}
+			}
+		}
+		if path := parent.RawGetString("path"); !path.IsNil() {
+			pkg.RawSetString("path", path)
+		}
+	}
+	pkg.RawSetString("loaded", runtime.TableValue(loaded))
+	return pkg
 }
 
 // registerChannelBuiltins adds channel-related builtins to globals.
