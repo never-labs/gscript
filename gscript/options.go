@@ -111,6 +111,7 @@ type vmOptions struct {
 	dynamicEval     bool
 	environmentVars []string
 	networkAccess   bool
+	debugAccess     bool
 	processExec     bool
 	processShell    bool
 	maxSteps        int64
@@ -146,6 +147,7 @@ type SecurityPolicy struct {
 	EnvironmentAllowlist    []string
 	DisableDynamicEval      bool
 	DisableNetworkAccess    bool
+	DisableDebugAccess      bool
 	DisableProcessExecution bool
 	DisableProcessShell     bool
 	DisableJIT              bool
@@ -295,6 +297,12 @@ func WithNetworkAccess(enabled bool) Option {
 	return func(o *vmOptions) { o.networkAccess = enabled }
 }
 
+// WithDebugAccess controls script-side debug APIs. Internal debug frame
+// accounting remains active for host diagnostics.
+func WithDebugAccess(enabled bool) Option {
+	return func(o *vmOptions) { o.debugAccess = enabled }
+}
+
 // WithSandbox selects the safe standard library set and disables host
 // filesystem-backed capabilities.
 func WithSandbox() Option {
@@ -303,6 +311,7 @@ func WithSandbox() Option {
 		o.capabilities = CapSafe
 		o.dynamicEval = false
 		o.networkAccess = false
+		o.debugAccess = false
 		o.processExec = false
 		o.processShell = false
 	}
@@ -318,6 +327,7 @@ func SecuritySandbox() Option {
 		o.capabilities = CapSafe
 		o.dynamicEval = false
 		o.networkAccess = false
+		o.debugAccess = false
 		o.processExec = false
 		o.processShell = false
 		o.useJIT = false
@@ -376,6 +386,9 @@ func WithSecurity(policy SecurityPolicy) Option {
 		}
 		if policy.DisableNetworkAccess {
 			o.networkAccess = false
+		}
+		if policy.DisableDebugAccess {
+			o.debugAccess = false
 		}
 		if policy.DisableProcessExecution {
 			o.processExec = false

@@ -114,6 +114,7 @@ type VM struct {
 	moduleDepth          int64
 	dynamicEval          bool
 	networkAccess        bool
+	debugAccess          bool
 	ctx                  context.Context
 }
 
@@ -187,6 +188,12 @@ func (vm *VM) SetDynamicEval(enabled bool) {
 // SetNetworkAccess controls host-backed network APIs in net and http.
 func (vm *VM) SetNetworkAccess(enabled bool) {
 	vm.networkAccess = enabled
+}
+
+// SetDebugAccess controls script-side debug APIs. Internal debug frame
+// accounting remains active for host diagnostics.
+func (vm *VM) SetDebugAccess(enabled bool) {
+	vm.debugAccess = enabled
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -829,6 +836,7 @@ func New(globals map[string]runtime.Value) *VM {
 		activeGoroutines:   &atomic.Int64{},
 		dynamicEval:        true,
 		networkAccess:      true,
+		debugAccess:        true,
 	}
 	v.initTypeNameValues()
 	v.RegisterCoroutineLib()
@@ -890,6 +898,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		moduleDepth:        parent.moduleDepth,
 		dynamicEval:        parent.dynamicEval,
 		networkAccess:      parent.networkAccess,
+		debugAccess:        parent.debugAccess,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -977,6 +986,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		moduleDepth:        parent.moduleDepth,
 		dynamicEval:        parent.dynamicEval,
 		networkAccess:      parent.networkAccess,
+		debugAccess:        parent.debugAccess,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()

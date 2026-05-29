@@ -32,6 +32,7 @@ type Interpreter struct {
 	networkAccess     bool             // net/http host network APIs are enabled
 	processExecution  bool             // process.run/exec/which are enabled
 	processShell      bool             // process.shell is enabled
+	debugAccess       bool             // script-side debug APIs are enabled
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -76,6 +77,7 @@ func New() *Interpreter {
 		networkAccess:     true,
 		processExecution:  true,
 		processShell:      true,
+		debugAccess:       true,
 		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()
@@ -190,6 +192,12 @@ func (interp *Interpreter) SetDynamicEval(enabled bool) {
 // SetNetworkAccess controls host-backed network APIs in net and http.
 func (interp *Interpreter) SetNetworkAccess(enabled bool) {
 	interp.networkAccess = enabled
+}
+
+// SetDebugAccess controls script-side debug APIs. Internal debug frame
+// accounting remains active for host diagnostics.
+func (interp *Interpreter) SetDebugAccess(enabled bool) {
+	interp.debugAccess = enabled
 }
 
 // SetProcessExecution controls process.run, process.exec, and process.which.

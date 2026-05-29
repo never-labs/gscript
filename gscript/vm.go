@@ -24,6 +24,7 @@ func New(opts ...Option) *VM {
 		capabilities:  CapAll,
 		dynamicEval:   true,
 		networkAccess: true,
+		debugAccess:   true,
 		processExec:   true,
 		processShell:  true,
 	}
@@ -40,6 +41,7 @@ func newVM(o vmOptions) *VM {
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
 	interp.SetDynamicEval(o.dynamicEval)
 	interp.SetNetworkAccess(o.networkAccess)
+	interp.SetDebugAccess(o.debugAccess)
 	interp.SetProcessExecution(o.processExec)
 	interp.SetProcessShell(o.processShell)
 	interp.SetFilesystemRoot(o.filesystemRoot)
@@ -216,6 +218,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			}
 			bvm.SetDynamicEval(vm.opts.dynamicEval)
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
+			bvm.SetDebugAccess(vm.opts.debugAccess)
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -246,6 +249,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			}
 			bvm.SetDynamicEval(vm.opts.dynamicEval)
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
+			bvm.SetDebugAccess(vm.opts.debugAccess)
 		}
 		bvm.SetContext(activeRunContext(ctx))
 		if _, err := bvm.Execute(proto); err != nil {

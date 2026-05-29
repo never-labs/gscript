@@ -225,7 +225,12 @@ func buildDebugLib(interp *Interpreter) *Table {
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{
 			Name: "debug." + name,
-			Fn:   fn,
+			Fn: func(args []Value) ([]Value, error) {
+				if interp != nil && !interp.debugAccess {
+					return nil, fmt.Errorf("debug access disabled")
+				}
+				return fn(args)
+			},
 		}))
 	}
 

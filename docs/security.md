@@ -84,8 +84,8 @@ modules must be considered capabilities, not ordinary libraries. The current
 `CapabilityFlags` layer is intentionally smaller than the future
 `SecurityPolicy`: it covers module loading, filesystem-backed script APIs,
 environment allowlists, network access, process execution gates, and the
-`process.shell` gate, but not executable allowlists, debug introspection,
-memory, or host callback effects yet.
+`process.shell` gate, but not executable allowlists, memory, or host callback
+effects yet.
 
 ## Default Security Configuration
 
@@ -107,6 +107,8 @@ module-byte limit, module-depth limit, filesystem read-byte limit, and
 filesystem write-byte limit, and dynamic-eval disablement.
 Environment reads can also be narrowed to a named allowlist.
 Network access can be disabled as a coarse gate.
+Script-visible debug APIs can be disabled while keeping host-internal debug
+frame accounting active.
 
 `SecuritySandbox()` currently means:
 

@@ -19,7 +19,12 @@ func (vm *VM) newDebugLib() *runtime.Table {
 	set := func(name string, fn func([]runtime.Value) ([]runtime.Value, error)) {
 		t.RawSetString(name, runtime.FunctionValue(&runtime.GoFunction{
 			Name: "debug." + name,
-			Fn:   fn,
+			Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+				if !vm.debugAccess {
+					return nil, fmt.Errorf("debug access disabled")
+				}
+				return fn(args)
+			},
 		}))
 	}
 
