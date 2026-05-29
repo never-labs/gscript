@@ -73,6 +73,8 @@ schema。
 - `gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-docs] <path-or-dir>`
   runs the formatter check, linter, test runner, and documentation reference
   check as a single CI gate.
+- `gscript diag dump ...` and `gscript diag bundle ...` are stable facades over
+  the existing production Tier 2 dump and diagnostics bundle scripts.
 
 There are also developer binaries:
 
@@ -95,7 +97,7 @@ There are also developer binaries:
 P0:
 
 - Continue introducing subcommands while preserving current invocation compatibility:
-  `gscript diag ...`.
+  `gscript inspect ...`.
 - Define common flags: `--json`, `--output PATH`, `--quiet`, `--verbose`,
   `--config PATH`, `--no-config`, `--color=auto|always|never`.
 - Define exit codes: `0` success, `1` runtime/test failure, `2` usage/config
@@ -119,6 +121,7 @@ gscript run --jit --diag=exit,tier2,runtime-path --json script.gs
 gscript inspect bytecode script.gs --proto sum
 gscript capabilities --json
 gscript check --json ./tests
+gscript diag bundle --output /tmp/gscript-diag --skip-benchmarks
 ```
 
 Suggested Go API:

@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/config/eval/fmt/lint/repl", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/eval/fmt/lint/repl", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -93,6 +93,9 @@ func TestHelperProcess(t *testing.T) {
 	switch os.Getenv("GSCRIPT_TEST_HELPER") {
 	case "bench":
 		_, _ = os.Stdout.WriteString("bench helper ok\n")
+		os.Exit(0)
+	case "diag":
+		_, _ = os.Stdout.WriteString("diag helper ok\n")
 		os.Exit(0)
 	case "docs":
 		_, _ = os.Stdout.WriteString("docs helper ok\n")
@@ -308,6 +311,68 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	}
 	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "strict_guard.py")) || gotArgs[1] != "--group" || gotArgs[2] != "suite" {
 		t.Fatalf("args = %#v, want strict_guard.py --group suite", gotArgs)
+	}
+}
+
+func TestDiagCommandDispatchesDumpScript(t *testing.T) {
+	oldDiagExecCommand := diagExecCommand
+	t.Cleanup(func() { diagExecCommand = oldDiagExecCommand })
+	var gotName string
+	var gotArgs []string
+	diagExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "diag")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runDiagCommand([]string{"dump", "suite/sieve"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDiagCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "bash" {
+		t.Fatalf("command = %q, want bash", gotName)
+	}
+	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "diag.sh")) || gotArgs[1] != "suite/sieve" {
+		t.Fatalf("args = %#v, want scripts/diag.sh suite/sieve", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "diag helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}
+
+func TestDiagCommandDispatchesBundleScript(t *testing.T) {
+	oldDiagExecCommand := diagExecCommand
+	t.Cleanup(func() { diagExecCommand = oldDiagExecCommand })
+	var gotArgs []string
+	diagExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "diag")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runDiagCommand([]string{"bundle", "--skip-benchmarks"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDiagCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "diagnostics_bundle.sh")) || gotArgs[1] != "--skip-benchmarks" {
+		t.Fatalf("args = %#v, want diagnostics_bundle.sh --skip-benchmarks", gotArgs)
+	}
+}
+
+func TestDiagCommandRejectsUnknownMode(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runDiagCommand([]string{"unknown"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runDiagCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "unknown diag mode") {
+		t.Fatalf("stderr = %q, want unknown mode", stderr.String())
 	}
 }
 
