@@ -91,11 +91,18 @@ func buildOSLibWithEnvironment(envRead, envWrite bool) *Table {
 	// os.exit([code])
 	set("exit", func(args []Value) ([]Value, error) {
 		code := 0
-		if len(args) >= 1 {
-			code = int(toInt(args[0]))
+		if len(args) >= 1 && !args[0].IsNil() {
+			if args[0].IsBool() {
+				if !args[0].Bool() {
+					code = 1
+				}
+			} else if args[0].IsNumber() {
+				code = int(toInt(args[0]))
+			} else {
+				return nil, fmt.Errorf("bad argument #1 to 'os.exit' (number or boolean expected)")
+			}
 		}
-		os.Exit(code)
-		return nil, nil // unreachable
+		return nil, &ProcessExitError{Code: code}
 	})
 
 	// os.getenv(name) -> string or nil

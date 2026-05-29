@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	gscript "github.com/gscript/gscript/gscript"
 	"github.com/gscript/gscript/internal/lexer"
 	"github.com/gscript/gscript/internal/parser"
 	"github.com/gscript/gscript/internal/runtime"
@@ -222,8 +223,8 @@ func main() {
 		interp.SetArgs("<eval>", flag.Args())
 		// Execute string
 		if err := runString(interp, *eval); err != nil {
-			if exit, ok := processExit(err); ok {
-				os.Exit(exit.Code)
+			if code, ok := processExitCode(err); ok {
+				os.Exit(code)
 			}
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
@@ -241,8 +242,8 @@ func main() {
 	// Execute file
 	filename := args[0]
 	if err := runScriptFile(interp, filename, args[1:], runOpts); err != nil {
-		if exit, ok := processExit(err); ok {
-			os.Exit(exit.Code)
+		if code, ok := processExitCode(err); ok {
+			os.Exit(code)
 		}
 		fmt.Fprintf(os.Stderr, "%s: %v\n", filename, err)
 		os.Exit(1)
@@ -742,6 +743,17 @@ func processExit(err error) (*runtime.ProcessExitError, bool) {
 	return nil, false
 }
 
+func processExitCode(err error) (int, bool) {
+	if exit, ok := processExit(err); ok {
+		return exit.Code, true
+	}
+	var gsExit *gscript.ExitError
+	if errors.As(err, &gsExit) {
+		return gsExit.Code, true
+	}
+	return 0, false
+}
+
 func runScriptFile(interp *runtime.Interpreter, filename string, args []string, opts cliRunOptions) error {
 	interp.SetArgs(filename, args)
 
@@ -860,7 +872,7 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 			runErr = runScriptFile(interp, filename, nil, opts)
 		}
 		if runErr != nil {
-			if exit, isExit := processExit(runErr); isExit && exit.Code == 0 {
+			if code, isExit := processExitCode(runErr); isExit && code == 0 {
 				fileResult.ExitCodeOK = true
 			} else {
 				fileResult.OK = false

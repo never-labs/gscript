@@ -34,8 +34,8 @@ func runRunCommand(args []string, outw, errw io.Writer) int {
 	filename := paths[0]
 	interp := runtime.New()
 	if err := runScriptFile(interp, filename, paths[1:], cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}); err != nil {
-		if exit, ok := processExit(err); ok {
-			return exit.Code
+		if code, ok := processExitCode(err); ok {
+			return code
 		}
 		fmt.Fprintf(errw, "%s: %v\n", filename, err)
 		return 1

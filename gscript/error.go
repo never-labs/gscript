@@ -120,6 +120,31 @@ func (e *HostCallbackPanicError) Error() string {
 	return fmt.Sprintf("host function %s panicked: %v", e.Name, e.Value)
 }
 
+// ExitError reports a script-requested process exit. Embedders can catch this
+// error and decide whether to terminate the host process, map it to an HTTP
+// status, or treat it as an ordinary script result.
+type ExitError struct {
+	Code int
+	Err  error
+}
+
+func (e *ExitError) Error() string {
+	if e == nil {
+		return "<nil>"
+	}
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return fmt.Sprintf("script exit %d", e.Code)
+}
+
+func (e *ExitError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 // BudgetError reports exhaustion of a resource budget configured on a VM.
 type BudgetError struct {
 	Resource string
@@ -178,6 +203,9 @@ func runtimeError(err error, file string) *Error {
 	if budgetErr := budgetErrorFrom(err); budgetErr != nil {
 		out.Err = budgetErr
 	}
+	if exitErr := exitErrorFrom(err); exitErr != nil {
+		out.Err = exitErr
+	}
 
 	return out
 }
@@ -199,4 +227,19 @@ func budgetErrorFrom(err error) *BudgetError {
 	}
 	limit, _ := strconv.ParseInt(matches[1], 10, 64)
 	return &BudgetError{Resource: "steps", Limit: limit, Err: err}
+}
+
+func exitErrorFrom(err error) *ExitError {
+	if err == nil {
+		return nil
+	}
+	var exitErr *ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr
+	}
+	var runtimeExit *runtime.ProcessExitError
+	if errors.As(err, &runtimeExit) {
+		return &ExitError{Code: runtimeExit.Code, Err: err}
+	}
+	return nil
 }

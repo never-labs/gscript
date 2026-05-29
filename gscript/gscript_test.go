@@ -419,6 +419,42 @@ func TestSetGet_nil(t *testing.T) {
 	}
 }
 
+func TestOSEexitReturnsCatchableExitError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		vm   *gs.VM
+	}{
+		{name: "interpreter", vm: gs.New()},
+		{name: "bytecode", vm: gs.New(gs.WithVM())},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.vm.Exec(`os.exit(7)`)
+			if err == nil {
+				t.Fatal("expected exit error")
+			}
+			var exitErr *gs.ExitError
+			if !errors.As(err, &exitErr) {
+				t.Fatalf("expected ExitError, got %T %v", err, err)
+			}
+			if exitErr.Code != 7 {
+				t.Fatalf("exit code = %d, want 7", exitErr.Code)
+			}
+		})
+	}
+}
+
+func TestOSEexitBooleanStatus(t *testing.T) {
+	vm := gs.New()
+	err := vm.Exec(`os.exit(false)`)
+	var exitErr *gs.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected ExitError, got %T %v", err, err)
+	}
+	if exitErr.Code != 1 {
+		t.Fatalf("exit code = %d, want 1", exitErr.Code)
+	}
+}
+
 func TestRegisterFunc(t *testing.T) {
 	vm := gs.New()
 	err := vm.RegisterFunc("square", func(x float64) float64 {

@@ -40,8 +40,8 @@ func runEvalCommand(args []string, outw, errw io.Writer) int {
 		err = runString(interp, rest[0])
 	}
 	if err != nil {
-		if exit, ok := processExit(err); ok {
-			return exit.Code
+		if code, ok := processExitCode(err); ok {
+			return code
 		}
 		fmt.Fprintf(errw, "error: %v\n", err)
 		return 1

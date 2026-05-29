@@ -325,8 +325,9 @@ Process policy:
 - Working directory must pass filesystem policy.
 - Enforce timeout, stdout/stderr byte limits, stdin byte limits, and process
   tree cleanup on cancellation.
-- `process.exit` should return a host-visible script exit error and must never
-  terminate the embedding process unless the CLI explicitly translates it.
+- `os.exit` and `process.exit` return host-visible script exit errors and do
+  not terminate the embedding process unless the CLI explicitly translates the
+  error to an OS exit code.
 
 OS/environment policy:
 

@@ -80,6 +80,10 @@ var hostErr *gs.HostCallbackError
 fmt.Println(errors.As(err, &gsErr), errors.As(err, &hostErr))
 ```
 
+`os.exit` and `process.exit` return a catchable `*gs.ExitError` through the
+public API instead of terminating the embedding process. The CLI maps that
+error back to an operating-system exit code.
+
 Go-backed modules are explicit host capabilities:
 
 ```go

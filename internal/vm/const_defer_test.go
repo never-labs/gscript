@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -28,6 +29,25 @@ func compileAndRunVMConstDefer(t *testing.T, src string, globals map[string]runt
 		t.Fatalf("runtime error: %v", err)
 	}
 	return globals
+}
+
+func compileAndRunVMConstDeferErr(t *testing.T, src string, globals map[string]runtime.Value) (map[string]runtime.Value, error) {
+	t.Helper()
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	proto, err := Compile(prog)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	v := New(globals)
+	_, err = v.Execute(proto)
+	return globals, err
 }
 
 func TestVMConstBindingRejectsAssignment(t *testing.T) {
@@ -155,6 +175,37 @@ func TestVMDeferRunsAtTopLevelScriptExit(t *testing.T) {
 	g := compileAndRunVMConstDefer(t, `
 		f := io.open(file, "r")
 		text := f:read("a")
+		f:close()
+	`, checkGlobals)
+	if got := g["text"].Str(); got != "top" {
+		t.Fatalf("text = %q, want top", got)
+	}
+}
+
+func TestVMOSExitRunsTopLevelDefers(t *testing.T) {
+	globals := runtime.NewInterpreterGlobals()
+	path := filepath.Join(t.TempDir(), "top-exit.txt")
+	globals["file"] = runtime.StringValue(path)
+
+	_, err := compileAndRunVMConstDeferErr(t, `
+		f := io.open(file, "w+")
+		defer f:close()
+		assert(f:write("top"))
+		os.exit(5)
+	`, globals)
+	var exitErr *runtime.ProcessExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("err = %T %v, want ProcessExitError", err, err)
+	}
+	if exitErr.Code != 5 {
+		t.Fatalf("exit code = %d, want 5", exitErr.Code)
+	}
+
+	checkGlobals := runtime.NewInterpreterGlobals()
+	checkGlobals["file"] = runtime.StringValue(path)
+	g := compileAndRunVMConstDefer(t, `
+		f := io.open(file, "r")
+		text := f:read("*a")
 		f:close()
 	`, checkGlobals)
 	if got := g["text"].Str(); got != "top" {
