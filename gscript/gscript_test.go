@@ -324,6 +324,21 @@ func TestWithMaxHostResultBytesLimitsInterpreterHostCallback(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsInterpreterProcessOutput(t *testing.T) {
+	for _, src := range []string{
+		`result := process.run("echo hello")`,
+		`result := process.exec("echo", "hello")`,
+		`result := process.shell("echo hello")`,
+	} {
+		vm := gs.New(gs.WithLibs(gs.LibString|gs.LibProcess), gs.WithMaxHostResultBytes(4))
+		err := vm.Exec(src)
+		var budgetErr *gs.BudgetError
+		if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+			t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+		}
+	}
+}
+
 func TestWithMaxModuleBytesLimitsInterpreterRequire(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "big.gs"), []byte(`return "12345"`), 0644); err != nil {
@@ -518,6 +533,21 @@ func TestWithMaxHostResultBytesLimitsBytecodeFastStdlibResult(t *testing.T) {
 	}
 	if budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
 		t.Fatalf("budget = %s %d, want host_result_bytes 4", budgetErr.Resource, budgetErr.Limit)
+	}
+}
+
+func TestWithMaxHostResultBytesLimitsBytecodeProcessOutput(t *testing.T) {
+	for _, src := range []string{
+		`result := process.run("echo hello")`,
+		`result := process.exec("echo", "hello")`,
+		`result := process.shell("echo hello")`,
+	} {
+		vm := gs.New(gs.WithVM(), gs.WithLibs(gs.LibString|gs.LibProcess), gs.WithMaxHostResultBytes(4))
+		err := vm.Exec(src)
+		var budgetErr *gs.BudgetError
+		if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+			t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+		}
 	}
 }
 

@@ -378,7 +378,8 @@ Process policy:
 - Environment default empty or allowlisted.
 - Working directory must pass filesystem policy.
 - Enforce timeout, stdout/stderr byte limits, stdin byte limits, and process
-  tree cleanup on cancellation.
+  tree cleanup on cancellation. `WithMaxHostResultBytes` currently bounds
+  captured `process.run`, `process.exec`, and `process.shell` output.
 - `os.exit` and `process.exit` return host-visible script exit errors and do
   not terminate the embedding process unless the CLI explicitly translates the
   error to an OS exit code.
