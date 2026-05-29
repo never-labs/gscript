@@ -60,6 +60,8 @@ schema。
 - `gscript capabilities [--json]` reports the current binary's platform,
   execution backends, stdlib modules, supported subcommands, and stable tooling
   output formats for CI/editor integration.
+- `gscript run [--vm] [--jit=true|false] <file.gs> [args...]` is the explicit
+  script execution subcommand; legacy `gscript <file.gs>` remains supported.
 - `gscript config [--json] [path]` walks upward from a file or directory,
   discovers `gscript.toml`, validates the supported project/tool keys, and
   reports the resolved project root for CI/editor integration.
@@ -87,8 +89,8 @@ There are also developer binaries:
 
 P0:
 
-- Introduce subcommands while preserving current invocation compatibility:
-  `gscript run [flags] FILE [-- args...]`, `gscript eval EXPR`,
+- Continue introducing subcommands while preserving current invocation compatibility:
+  `gscript eval EXPR`,
   `gscript repl`, `gscript diag ...`.
 - Define common flags: `--json`, `--output PATH`, `--quiet`, `--verbose`,
   `--config PATH`, `--no-config`, `--color=auto|always|never`.
