@@ -363,8 +363,10 @@ func (interp *Interpreter) registerBuiltins() {
 				return []Value{IntValue(int64(StringLen(a)))}, nil
 			case TypeTable:
 				return []Value{IntValue(int64(a.Table().Length()))}, nil
+			case TypeChannel:
+				return []Value{IntValue(int64(a.Channel().Len()))}, nil
 			default:
-				return nil, fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", a.TypeName())
+				return nil, fmt.Errorf("bad argument to 'rawlen' (table, string, or channel expected, got %s)", a.TypeName())
 			}
 		},
 		FastArg1: func(a Value) (Value, error) {
@@ -373,8 +375,10 @@ func (interp *Interpreter) registerBuiltins() {
 				return IntValue(int64(StringLen(a))), nil
 			case TypeTable:
 				return IntValue(int64(a.Table().Length())), nil
+			case TypeChannel:
+				return IntValue(int64(a.Channel().Len())), nil
 			default:
-				return NilValue(), fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", a.TypeName())
+				return NilValue(), fmt.Errorf("bad argument to 'rawlen' (table, string, or channel expected, got %s)", a.TypeName())
 			}
 		},
 		NativeKind: NativeKindStdRawLen,
@@ -393,8 +397,10 @@ func (interp *Interpreter) registerBuiltins() {
 				return []Value{IntValue(int64(StringLen(a)))}, nil
 			case TypeTable:
 				return []Value{IntValue(int64(a.Table().Length()))}, nil
+			case TypeChannel:
+				return []Value{IntValue(int64(a.Channel().Len()))}, nil
 			default:
-				return nil, fmt.Errorf("bad argument to 'len' (table or string expected, got %s)", a.TypeName())
+				return nil, fmt.Errorf("bad argument to 'len' (table, string, or channel expected, got %s)", a.TypeName())
 			}
 		},
 		FastArg1: func(a Value) (Value, error) {
@@ -403,9 +409,31 @@ func (interp *Interpreter) registerBuiltins() {
 				return IntValue(int64(StringLen(a))), nil
 			case TypeTable:
 				return IntValue(int64(a.Table().Length())), nil
+			case TypeChannel:
+				return IntValue(int64(a.Channel().Len())), nil
 			default:
-				return NilValue(), fmt.Errorf("bad argument to 'len' (table or string expected, got %s)", a.TypeName())
+				return NilValue(), fmt.Errorf("bad argument to 'len' (table, string, or channel expected, got %s)", a.TypeName())
 			}
+		},
+	}))
+
+	interp.globals.Define("cap", FunctionValue(&GoFunction{
+		Name: "cap",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) == 0 {
+				return nil, fmt.Errorf("bad argument to 'cap' (value expected)")
+			}
+			a := args[0]
+			if !a.IsChannel() {
+				return nil, fmt.Errorf("bad argument to 'cap' (channel expected, got %s)", a.TypeName())
+			}
+			return []Value{IntValue(int64(a.Channel().Cap()))}, nil
+		},
+		FastArg1: func(a Value) (Value, error) {
+			if !a.IsChannel() {
+				return NilValue(), fmt.Errorf("bad argument to 'cap' (channel expected, got %s)", a.TypeName())
+			}
+			return IntValue(int64(a.Channel().Cap())), nil
 		},
 	}))
 

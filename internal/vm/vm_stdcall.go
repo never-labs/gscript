@@ -460,8 +460,10 @@ func (vm *VM) ExecuteStdRawLenCall(absSlot, nArgs, rawC int) (bool, error) {
 		result = runtime.IntValue(int64(runtime.StringLen(arg)))
 	case runtime.TypeTable:
 		result = runtime.IntValue(int64(arg.Table().Length()))
+	case runtime.TypeChannel:
+		result = runtime.IntValue(int64(arg.Channel().Len()))
 	default:
-		return true, fmt.Errorf("bad argument to 'rawlen' (table or string expected, got %s)", arg.TypeName())
+		return true, fmt.Errorf("bad argument to 'rawlen' (table, string, or channel expected, got %s)", arg.TypeName())
 	}
 	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
 	vm.writeSingleCallResult(absSlot, rawC, result)

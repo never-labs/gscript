@@ -40,15 +40,55 @@ func ChannelCapacityFromValue(v Value, name string) (int, error) {
 }
 
 // Send sends a value on the channel. Blocks if the channel is full.
-func (c *Channel) Send(val Value) error {
+func (c *Channel) Send(val Value) (err error) {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return fmt.Errorf("send on closed channel")
 	}
 	c.mu.Unlock()
+	defer func() {
+		if recover() != nil {
+			// Closed concurrently after the optimistic closed check. The script
+			// visible behavior should be an ordinary send error, not a host panic.
+			err = fmt.Errorf("send on closed channel")
+		}
+	}()
 	c.ch <- val
 	return nil
+}
+
+func (c *Channel) TrySend(val Value) (ok bool, err error) {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return false, fmt.Errorf("send on closed channel")
+	}
+	c.mu.Unlock()
+	defer func() {
+		if recover() != nil {
+			ok = false
+			err = fmt.Errorf("send on closed channel")
+		}
+	}()
+	select {
+	case c.ch <- val:
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func (c *Channel) TryRecv() (Value, bool) {
+	select {
+	case val, ok := <-c.ch:
+		if !ok {
+			return NilValue(), false
+		}
+		return val, true
+	default:
+		return NilValue(), false
+	}
 }
 
 // Recv receives a value from the channel. Blocks if the channel is empty.

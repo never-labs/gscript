@@ -687,6 +687,9 @@ func (vm *VM) length(v runtime.Value) (runtime.Value, error) {
 		}
 		return runtime.IntValue(int64(v.Table().Len())), nil
 	}
+	if v.IsChannel() {
+		return runtime.IntValue(int64(v.Channel().Len())), nil
+	}
 	return runtime.NilValue(), fmt.Errorf("attempt to get length of a %s value", v.TypeName())
 }
 

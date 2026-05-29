@@ -2226,6 +2226,24 @@ result := type(ch)
 	expectGlobalString(t, g, "result", "channel")
 }
 
+func TestChannelLenAndCap(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 3)
+beforeLen := len(ch)
+beforeCap := cap(ch)
+ch <- 10
+ch <- 20
+afterLen := len(ch)
+afterCap := cap(ch)
+raw := rawlen(ch)
+`)
+	expectGlobalInt(t, g, "beforeLen", 0)
+	expectGlobalInt(t, g, "beforeCap", 3)
+	expectGlobalInt(t, g, "afterLen", 2)
+	expectGlobalInt(t, g, "afterCap", 3)
+	expectGlobalInt(t, g, "raw", 2)
+}
+
 func TestChannelSendRecvBuffered(t *testing.T) {
 	g := compileAndRun(t, `
 ch := make(chan, 1)
