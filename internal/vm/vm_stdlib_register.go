@@ -1192,7 +1192,7 @@ func (vm *VM) RegisterHTTPLib() {
 }
 
 func (vm *VM) RegisterSyncLib() {
-	syncLib := runtime.TableValue(runtime.BuildSyncLibWithCaller(vm.callValue))
+	syncLib := runtime.TableValue(runtime.BuildSyncLibWithTaskLauncher(vm.callValue, vm.launchSyncTask))
 	vm.SetGlobal("sync", syncLib)
 	vm.setPackageLoaded("sync", syncLib)
 }

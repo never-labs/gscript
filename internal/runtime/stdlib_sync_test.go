@@ -41,6 +41,29 @@ for i := 1; i <= 4; i++ {
 	}
 }
 
+func TestSyncTaskGroup(t *testing.T) {
+	interp := runSyncTestScript(t, `
+group := sync.group()
+for i := 1; i <= 4; i++ {
+    group.start(func(v) {
+        if v == 3 {
+            error("bad task")
+        }
+    }, i)
+}
+ok, err, count := group.wait()
+`)
+	if got := interp.GetGlobal("ok"); !got.IsBool() || got.Bool() {
+		t.Fatalf("ok = %v, want false", got)
+	}
+	if got := interp.GetGlobal("err"); !got.IsString() || got.Str() == "" {
+		t.Fatalf("err = %v, want non-empty string", got)
+	}
+	if got := interp.GetGlobal("count"); !got.IsInt() || got.Int() != 1 {
+		t.Fatalf("count = %v, want 1", got)
+	}
+}
+
 func TestSyncMutexAndOnce(t *testing.T) {
 	interp := runSyncTestScript(t, `
 mu := sync.mutex()

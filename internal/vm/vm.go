@@ -759,6 +759,15 @@ func newIsolatedChildVM(parent *VM) *VM {
 			ga[idx] = pkgCopyVal
 		}
 	}
+	for _, name := range []string{"table", "sort", "string", "testkit"} {
+		if val, ok := childGlobals[name]; ok && val.IsTable() {
+			copyVal := runtime.TableValue(cloneTableForChild(val.Table()))
+			childGlobals[name] = copyVal
+			if idx, ok := gi[name]; ok && idx >= 0 && idx < len(ga) {
+				ga[idx] = copyVal
+			}
+		}
+	}
 
 	child := &VM{
 		regs:               runtime.MakeNilSlice(1024),
@@ -816,6 +825,32 @@ func (vm *VM) attachIsolatedChildJIT(parent *VM) {
 	}
 }
 
+func (vm *VM) launchSyncTask(fn runtime.Value, args []runtime.Value, done func(error)) {
+	taskArgs := append([]runtime.Value(nil), args...)
+	go func() {
+		goVM := newIsolatedChildVM(vm)
+		defer goVM.Close()
+		var err error
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic: %v", r)
+			}
+			if done != nil {
+				done(err)
+			}
+		}()
+		if cl, ok := closureFromValue(fn); ok {
+			_, err = goVM.call(cl, taskArgs, 0, 0)
+			return
+		}
+		if gf := fn.GoFunction(); gf != nil {
+			_, err = gf.Fn(taskArgs)
+			return
+		}
+		err = fmt.Errorf("attempt to call a %s value", fn.TypeName())
+	}()
+}
+
 func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {
 	pkg := runtime.NewTable()
 	loaded := runtime.NewTable()
@@ -835,6 +870,17 @@ func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {
 	}
 	pkg.RawSetString("loaded", runtime.TableValue(loaded))
 	return pkg
+}
+
+func cloneTableForChild(parent *runtime.Table) *runtime.Table {
+	out := runtime.NewTable()
+	if parent == nil {
+		return out
+	}
+	for _, key := range parent.PairsKeysSnapshot() {
+		out.RawSet(key, parent.RawGet(key))
+	}
+	return out
 }
 
 // registerChannelBuiltins adds channel-related builtins to globals.

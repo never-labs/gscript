@@ -2352,6 +2352,37 @@ for i := 1; i <= workers; i++ {
 	expectGlobalInt(t, globals, "sum", 36)
 }
 
+func TestSyncGroupUsesIsolatedChildVMs(t *testing.T) {
+	before := runtime.GCRootScannerCount()
+	proto := compileProto(t, `
+group := sync.group()
+for i := 1; i <= 4; i++ {
+	group.start(func(v) {
+		if v == 3 {
+			error("group-fail")
+		}
+	}, i)
+}
+ok, err, count := group.wait()
+`)
+	globals := runtime.NewInterpreterGlobals()
+	v := New(globals)
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	v.Close()
+	if after := runtime.GCRootScannerCount(); after != before {
+		t.Fatalf("active VM root scanners = %d after sync.group workers exit, want %d", after, before)
+	}
+	if got := globals["ok"]; !got.IsBool() || got.Bool() {
+		t.Fatalf("ok = %v, want false", got)
+	}
+	if got := globals["err"]; !got.IsString() || !strings.Contains(got.Str(), "group-fail") {
+		t.Fatalf("err = %v, want group-fail string", got)
+	}
+	expectGlobalInt(t, globals, "count", 1)
+}
+
 func TestSelectDefaultWhenNoChannelReady(t *testing.T) {
 	g := compileAndRun(t, `
 ch := make(chan, 1)

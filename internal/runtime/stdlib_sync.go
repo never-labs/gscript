@@ -9,14 +9,26 @@ type scriptWaitGroup struct {
 	wg sync.WaitGroup
 }
 
+type scriptTaskGroup struct {
+	wg       sync.WaitGroup
+	mu       sync.Mutex
+	firstErr error
+	errCount int
+}
+
 type scriptOnce struct {
 	once sync.Once
 	err  error
 }
 
 type SyncFunctionCaller func(Value, []Value) ([]Value, error)
+type SyncTaskLauncher func(Value, []Value, func(error))
 
 func BuildSyncLibWithCaller(call SyncFunctionCaller) *Table {
+	return BuildSyncLibWithTaskLauncher(call, defaultSyncTaskLauncher(call))
+}
+
+func BuildSyncLibWithTaskLauncher(call SyncFunctionCaller, launch SyncTaskLauncher) *Table {
 	t := NewTable()
 	t.RawSetString("waitgroup", FunctionValue(&GoFunction{
 		Name: "sync.waitgroup",
@@ -42,7 +54,28 @@ func BuildSyncLibWithCaller(call SyncFunctionCaller) *Table {
 			return []Value{TableValue(newScriptOnceTable(call))}, nil
 		},
 	}))
+	t.RawSetString("group", FunctionValue(&GoFunction{
+		Name: "sync.group",
+		Fn: func(args []Value) ([]Value, error) {
+			return []Value{TableValue(newScriptTaskGroupTable(launch))}, nil
+		},
+	}))
 	return t
+}
+
+func defaultSyncTaskLauncher(call SyncFunctionCaller) SyncTaskLauncher {
+	return func(fn Value, args []Value, done func(error)) {
+		go func() {
+			var err error
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				done(err)
+			}()
+			_, err = call(fn, args)
+		}()
+	}
 }
 
 func newScriptWaitGroupTable() *Table {
@@ -95,6 +128,70 @@ func waitGroupAdd(state *scriptWaitGroup, delta int) (err error) {
 	}()
 	state.wg.Add(delta)
 	return nil
+}
+
+func newScriptTaskGroupTable(launch SyncTaskLauncher) *Table {
+	state := &scriptTaskGroup{}
+	if launch == nil {
+		launch = defaultSyncTaskLauncher(func(Value, []Value) ([]Value, error) {
+			return nil, fmt.Errorf("sync.group: no task launcher configured")
+		})
+	}
+	t := NewTable()
+	startFn := FunctionValue(&GoFunction{
+		Name: "sync.group.go",
+		Fn: func(args []Value) ([]Value, error) {
+			args = stripMethodSelf(args)
+			if len(args) < 1 || !args[0].IsFunction() {
+				return nil, fmt.Errorf("sync.group.start: function expected")
+			}
+			fn := args[0]
+			taskArgs := append([]Value(nil), args[1:]...)
+			state.wg.Add(1)
+			launch(fn, taskArgs, func(err error) {
+				state.record(err)
+				state.wg.Done()
+			})
+			return []Value{NilValue()}, nil
+		},
+	})
+	t.RawSetString("go", startFn)
+	t.RawSetString("start", startFn)
+	t.RawSetString("wait", FunctionValue(&GoFunction{
+		Name: "sync.group.wait",
+		Fn: func(args []Value) ([]Value, error) {
+			state.wg.Wait()
+			if err := state.error(); err != nil {
+				return []Value{BoolValue(false), StringValue(err.Error()), IntValue(int64(state.errorCount()))}, nil
+			}
+			return []Value{BoolValue(true), NilValue(), IntValue(0)}, nil
+		},
+	}))
+	return t
+}
+
+func (g *scriptTaskGroup) record(err error) {
+	if err == nil {
+		return
+	}
+	g.mu.Lock()
+	if g.firstErr == nil {
+		g.firstErr = err
+	}
+	g.errCount++
+	g.mu.Unlock()
+}
+
+func (g *scriptTaskGroup) error() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.firstErr
+}
+
+func (g *scriptTaskGroup) errorCount() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.errCount
 }
 
 func newScriptMutexTable() *Table {

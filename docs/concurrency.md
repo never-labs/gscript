@@ -28,6 +28,7 @@ Supported core forms:
 - `len(ch)` for queued buffered values
 - `cap(ch)` for channel capacity
 - `sync.waitgroup()` with `add`, `done`, and `wait`
+- `sync.group()` with `start(fn, ...args)` and `wait`
 - `sync.mutex()` with `lock`, `unlock`, and `trylock`
 - `sync.rwmutex()` with `lock`, `unlock`, `rlock`, `runlock`, `trylock`, and `tryrlock`
 - `sync.once()` with `do(fn)`
@@ -43,6 +44,8 @@ The implementation uses isolated child VMs for `go` calls. Globals are snapshott
 `select` without `default` blocks until a case is ready. `select` with `default` is non-blocking and covers polling, fan-in probes, timeout checks, and backpressure-aware sends without adding scheduler checks to ordinary code paths.
 
 `sync.waitgroup()` mirrors Go's coarse task-join pattern for scripts that need to wait for a fixed set of goroutines.
+
+`sync.group()` is the structured-concurrency form for joining background tasks and collecting failures. Use `group.start(fn, ...args)` to launch a task and `ok, err, count := group.wait()` to wait for completion. It returns `ok=true` when all tasks succeed; otherwise `ok=false`, `err` is the first error string, and `count` is the number of failed tasks. The group also exposes a `"go"` field for dynamic access, but the normal dot-call spelling is `start` because `go` is a statement keyword.
 
 `sync.mutex()`, `sync.rwmutex()`, and `sync.once()` are host-backed coarse synchronization primitives. They are intended for shared heap objects that are explicitly touched by goroutines, without adding locks to ordinary local computation.
 
