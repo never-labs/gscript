@@ -292,9 +292,12 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			if payloadReg == a || payloadReg == a+1 {
 				return false
 			}
-		case OP_SETGLOBAL, OP_SETGLOBALRO, OP_SETUPVAL, OP_CLOSE, OP_APPEND, OP_SEND, OP_DEFER, OP_CHECKCONST:
+		case OP_SETGLOBAL, OP_SETGLOBALRO, OP_SETUPVAL, OP_CLOSE, OP_APPEND, OP_SEND, OP_DEFER, OP_CHECKCONST, OP_TRYSEND:
 			if a == payloadReg || b == payloadReg {
 				return false
+			}
+			if op == OP_TRYSEND && cc == payloadReg {
+				return true
 			}
 		case OP_SELF:
 			if b == payloadReg || (cc < RKBit && cc == payloadReg) {
@@ -324,6 +327,13 @@ func (vm *VM) resumePayloadIsFieldOnlyUncached(proto *FuncProto, nextPC, resumeA
 			}
 			if b == payloadReg {
 				return false
+			}
+		case OP_TRYRECV:
+			if b == payloadReg {
+				return false
+			}
+			if a == payloadReg || cc == payloadReg {
+				return true
 			}
 		default:
 			if a == payloadReg {

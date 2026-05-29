@@ -354,7 +354,7 @@ func tier1OpMayExit(op vm.Opcode) bool {
 		vm.OP_GETUPVAL, vm.OP_SETUPVAL,
 		vm.OP_SELF, vm.OP_VARARG,
 		vm.OP_TFORCALL,
-		vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV,
+		vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV,
 		vm.OP_CALL:
 		return true
 	case vm.OP_ADD, vm.OP_SUB, vm.OP_MUL, vm.OP_MOD:

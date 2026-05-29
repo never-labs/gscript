@@ -725,6 +725,10 @@ func Disassemble(proto *FuncProto) string {
 			desc = fmt.Sprintf("SEND       R%d <- R%d", a, b)
 		case OP_RECV:
 			desc = fmt.Sprintf("RECV       R%d = <-R%d", a, b)
+		case OP_TRYSEND:
+			desc = fmt.Sprintf("TRYSEND    R%d <- R%d => R%d", a, b, cc)
+		case OP_TRYRECV:
+			desc = fmt.Sprintf("TRYRECV    R%d, R%d = <-R%d", a, cc, b)
 		case OP_SETTOP:
 			desc = fmt.Sprintf("SETTOP     R%d", a)
 		default:

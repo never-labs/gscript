@@ -3070,6 +3070,32 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				vm.regs[base+a] = runtime.NilValue()
 			}
 
+		case OP_TRYSEND:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			cc := DecodeC(inst)
+			chVal := vm.regs[base+a]
+			if !chVal.IsChannel() {
+				return nil, fmt.Errorf("send on non-channel value (got %s)", chVal.TypeName())
+			}
+			ok, err := chVal.Channel().TrySend(vm.regs[base+b])
+			if err != nil {
+				return nil, err
+			}
+			vm.regs[base+cc] = runtime.BoolValue(ok)
+
+		case OP_TRYRECV:
+			a := DecodeA(inst)
+			b := DecodeB(inst)
+			cc := DecodeC(inst)
+			chVal := vm.regs[base+b]
+			if !chVal.IsChannel() {
+				return nil, fmt.Errorf("receive from non-channel value (got %s)", chVal.TypeName())
+			}
+			val, ok := chVal.Channel().TryRecv()
+			vm.regs[base+a] = val
+			vm.regs[base+cc] = runtime.BoolValue(ok)
+
 		default:
 			return nil, fmt.Errorf("unhandled opcode %d (%s)", op, OpName(op))
 		}

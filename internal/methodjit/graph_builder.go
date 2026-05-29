@@ -1108,6 +1108,25 @@ func (b *graphBuilder) emitBlocks() {
 				instr := b.emit(block, OpNop, TypeAny, []*Value{ch}, 0, 0)
 				b.writeVariable(a, block, instr.Value())
 
+			case vm.OP_TRYSEND:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				cOp := vm.DecodeC(inst)
+				ch := b.readVariable(a, block)
+				val := b.readVariable(bOp, block)
+				instr := b.emit(block, OpNop, TypeBool, []*Value{ch, val}, 0, 0)
+				b.writeVariable(cOp, block, instr.Value())
+
+			case vm.OP_TRYRECV:
+				a := vm.DecodeA(inst)
+				bOp := vm.DecodeB(inst)
+				cOp := vm.DecodeC(inst)
+				ch := b.readVariable(bOp, block)
+				valInstr := b.emit(block, OpNop, TypeAny, []*Value{ch}, 0, 0)
+				okInstr := b.emit(block, OpNop, TypeBool, []*Value{ch}, 0, 0)
+				b.writeVariable(a, block, valInstr.Value())
+				b.writeVariable(cOp, block, okInstr.Value())
+
 			case vm.OP_YIELD:
 				a := vm.DecodeA(inst)
 				bOp := vm.DecodeB(inst)

@@ -2208,6 +2208,49 @@ result := state.value
 	expectGlobalInt(t, g, "result", 99)
 }
 
+func TestSelectDefaultWhenNoChannelReady(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 1)
+result := 0
+select {
+case v := <-ch:
+	result = v
+default:
+	result = 7
+}
+`)
+	expectGlobalInt(t, g, "result", 7)
+}
+
+func TestSelectReceiveReady(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 1)
+ch <- 42
+result := 0
+select {
+case v := <-ch:
+	result = v
+default:
+	result = -1
+}
+`)
+	expectGlobalInt(t, g, "result", 42)
+}
+
+func TestSelectSendReady(t *testing.T) {
+	g := compileAndRun(t, `
+ch := make(chan, 1)
+result := 0
+select {
+case ch <- 55:
+	result = <-ch
+default:
+	result = -1
+}
+`)
+	expectGlobalInt(t, g, "result", 55)
+}
+
 // ===== CHANNEL TESTS =====
 
 func TestChannelMakeAndType(t *testing.T) {

@@ -903,7 +903,9 @@ func tier2LoopCallCalleeIsLeafNativeCandidate(callee *vm.FuncProto) bool {
 			vm.OP_GO,
 			vm.OP_MAKECHAN,
 			vm.OP_SEND,
-			vm.OP_RECV:
+			vm.OP_RECV,
+			vm.OP_TRYSEND,
+			vm.OP_TRYRECV:
 			return false
 		}
 	}

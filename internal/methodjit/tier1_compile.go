@@ -320,6 +320,12 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 		case vm.OP_RECV:
 			emitBaselineOpExit(asm, inst, pc, vm.OP_RECV)
 			resumePCs = append(resumePCs, pc+1)
+		case vm.OP_TRYSEND:
+			emitBaselineOpExit(asm, inst, pc, vm.OP_TRYSEND)
+			resumePCs = append(resumePCs, pc+1)
+		case vm.OP_TRYRECV:
+			emitBaselineOpExit(asm, inst, pc, vm.OP_TRYRECV)
+			resumePCs = append(resumePCs, pc+1)
 
 		default:
 			// Unknown opcode: emit an exit for safety.

@@ -681,7 +681,7 @@ func baselineOpWritesSlot(op vm.Opcode) bool {
 	switch op {
 	case vm.OP_JMP, vm.OP_EQ, vm.OP_LT, vm.OP_LE, vm.OP_TEST, vm.OP_SETGLOBAL,
 		vm.OP_SETUPVAL, vm.OP_CLOSE, vm.OP_RETURN, vm.OP_TFORLOOP,
-		vm.OP_GO, vm.OP_SEND:
+		vm.OP_GO, vm.OP_SEND, vm.OP_TRYSEND:
 		return false
 	default:
 		return true

@@ -119,6 +119,9 @@ func (p *Parser) skipSemicolons() {
 // ============================================================
 
 func (p *Parser) parseStmt() (ast.Stmt, error) {
+	if p.isSelectStmt() {
+		return p.parseSelectStmt()
+	}
 	switch p.peek().Type {
 	case lexer.TOKEN_FUNC:
 		return p.parseFuncDeclOrExprStmt()
@@ -146,6 +149,12 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		}
 		return p.parseExpressionStmt()
 	}
+}
+
+func (p *Parser) isSelectStmt() bool {
+	return p.peek().Type == lexer.TOKEN_IDENT &&
+		p.peek().Value == "select" &&
+		p.peekAt(1).Type == lexer.TOKEN_LBRACE
 }
 
 func (p *Parser) isLabelStmt() bool {
@@ -603,6 +612,127 @@ func (p *Parser) parseSendStmt(pos ast.Pos, chExpr ast.Expr) (ast.Stmt, error) {
 		return nil, err
 	}
 	return &ast.SendStmt{P: pos, Channel: chExpr, Value: val}, nil
+}
+
+func (p *Parser) parseSelectStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume statement-position "select" identifier
+	pos := p.tokenPos(tok)
+	if _, err := p.expect(lexer.TOKEN_LBRACE); err != nil {
+		return nil, err
+	}
+
+	stmt := &ast.SelectStmt{P: pos}
+	for !p.check(lexer.TOKEN_RBRACE) && !p.isAtEnd() {
+		p.skipSemicolons()
+		if p.check(lexer.TOKEN_RBRACE) {
+			break
+		}
+		if p.peek().Type != lexer.TOKEN_IDENT {
+			return nil, p.errorf("expected case or default in select")
+		}
+		switch p.peek().Value {
+		case "case":
+			cls, err := p.parseSelectCase()
+			if err != nil {
+				return nil, err
+			}
+			stmt.Cases = append(stmt.Cases, cls)
+		case "default":
+			if stmt.Default != nil {
+				return nil, p.errorf("duplicate default in select")
+			}
+			defTok := p.advance()
+			body, err := p.parseSelectClauseBody(p.tokenPos(defTok))
+			if err != nil {
+				return nil, err
+			}
+			stmt.Default = body
+		default:
+			return nil, p.errorf("expected case or default in select")
+		}
+	}
+	if _, err := p.expect(lexer.TOKEN_RBRACE); err != nil {
+		return nil, err
+	}
+	if stmt.Default == nil {
+		return nil, p.errorf("select currently requires a default clause")
+	}
+	return stmt, nil
+}
+
+func (p *Parser) parseSelectCase() (ast.SelectCase, error) {
+	tok := p.advance() // consume "case"
+	pos := p.tokenPos(tok)
+	cls := ast.SelectCase{P: pos}
+
+	if p.check(lexer.TOKEN_ARROW) {
+		p.advance()
+		ch, err := p.parseExpr()
+		if err != nil {
+			return cls, err
+		}
+		cls.Channel = ch
+	} else {
+		first, err := p.parseExpr()
+		if err != nil {
+			return cls, err
+		}
+		if p.check(lexer.TOKEN_DECLARE) {
+			name, ok := first.(*ast.IdentExpr)
+			if !ok {
+				return cls, p.errorf("select receive declaration requires an identifier")
+			}
+			p.advance()
+			if _, err := p.expect(lexer.TOKEN_ARROW); err != nil {
+				return cls, err
+			}
+			ch, err := p.parseExpr()
+			if err != nil {
+				return cls, err
+			}
+			cls.RecvName = name.Name
+			cls.Channel = ch
+		} else if p.check(lexer.TOKEN_ARROW) {
+			p.advance()
+			val, err := p.parseExpr()
+			if err != nil {
+				return cls, err
+			}
+			cls.Channel = first
+			cls.SendValue = val
+		} else {
+			return cls, p.errorf("select case must be receive or send")
+		}
+	}
+
+	body, err := p.parseSelectClauseBody(pos)
+	if err != nil {
+		return cls, err
+	}
+	cls.Body = body
+	return cls, nil
+}
+
+func (p *Parser) parseSelectClauseBody(pos ast.Pos) (*ast.BlockStmt, error) {
+	if _, err := p.expect(lexer.TOKEN_COLON); err != nil {
+		return nil, err
+	}
+	body := &ast.BlockStmt{P: pos}
+	for !p.isAtEnd() {
+		p.skipSemicolons()
+		if p.check(lexer.TOKEN_RBRACE) {
+			break
+		}
+		if p.peek().Type == lexer.TOKEN_IDENT && (p.peek().Value == "case" || p.peek().Value == "default") {
+			break
+		}
+		stmt, err := p.parseStmt()
+		if err != nil {
+			return nil, err
+		}
+		body.Stmts = append(body.Stmts, stmt)
+	}
+	return body, nil
 }
 
 func (p *Parser) parseConstDeclStmt() (ast.Stmt, error) {
@@ -1094,6 +1224,9 @@ func (p *Parser) parsePostfix() (ast.Expr, error) {
 			}
 
 		case lexer.TOKEN_COLON:
+			if p.peekAt(1).Type != lexer.TOKEN_IDENT || p.peekAt(2).Type != lexer.TOKEN_LPAREN {
+				return expr, nil
+			}
 			// Method call: obj:method(args)
 			p.advance() // consume ':'
 			methodTok, err := p.expect(lexer.TOKEN_IDENT)

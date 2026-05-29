@@ -176,6 +176,8 @@ func (interp *Interpreter) execStmtRaw(stmt ast.Stmt, env *Environment) ([]Value
 		return interp.execDefer(s, env)
 	case *ast.SendStmt:
 		return interp.execSend(s, env)
+	case *ast.SelectStmt:
+		return interp.execSelect(s, env)
 	default:
 		return nil, false, false, false, fmt.Errorf("unknown statement type: %T", stmt)
 	}
@@ -316,6 +318,54 @@ func (interp *Interpreter) execSend(s *ast.SendStmt, env *Environment) ([]Value,
 		return nil, false, false, false, err
 	}
 	return nil, false, false, false, nil
+}
+
+func (interp *Interpreter) execSelect(s *ast.SelectStmt, env *Environment) ([]Value, bool, bool, bool, error) {
+	for _, cls := range s.Cases {
+		chVal, err := interp.evalExprSingle(cls.Channel, env)
+		if err != nil {
+			return nil, false, false, false, err
+		}
+		if !chVal.IsChannel() {
+			if cls.SendValue != nil {
+				return nil, false, false, false, fmt.Errorf("send on non-channel value")
+			}
+			return nil, false, false, false, fmt.Errorf("receive from non-channel value")
+		}
+
+		if cls.SendValue != nil {
+			val, err := interp.evalExprSingle(cls.SendValue, env)
+			if err != nil {
+				return nil, false, false, false, err
+			}
+			ok, err := chVal.Channel().TrySend(val)
+			if err != nil {
+				return nil, false, false, false, err
+			}
+			if !ok {
+				continue
+			}
+			return interp.execSelectBody(cls.Body, "", NilValue(), env)
+		}
+
+		val, ok := chVal.Channel().TryRecv()
+		if !ok {
+			continue
+		}
+		return interp.execSelectBody(cls.Body, cls.RecvName, val, env)
+	}
+	if s.Default != nil {
+		return interp.execSelectBody(s.Default, "", NilValue(), env)
+	}
+	return nil, false, false, false, nil
+}
+
+func (interp *Interpreter) execSelectBody(body *ast.BlockStmt, recvName string, recvVal Value, env *Environment) ([]Value, bool, bool, bool, error) {
+	child := NewEnvironment(env)
+	if recvName != "" {
+		child.Define(recvName, recvVal)
+	}
+	return interp.execBlock(body, child)
 }
 
 // ------------------------------------------------------------------

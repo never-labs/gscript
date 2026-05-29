@@ -86,6 +86,32 @@ func TestGoStyleNumberLiteral(t *testing.T) {
 	}
 }
 
+func TestSelectStmtPreservesSelectBuiltinExpression(t *testing.T) {
+	prog := mustParse(t, `
+x := select(1, 10, 20)
+ch := make(chan, 1)
+select {
+case v := <-ch:
+	x = v
+default:
+	x = 30
+}
+`)
+	if len(prog.Stmts) != 3 {
+		t.Fatalf("expected 3 statements, got %d", len(prog.Stmts))
+	}
+	if _, ok := prog.Stmts[0].(*ast.DeclareStmt); !ok {
+		t.Fatalf("first statement should remain a select() call expression declaration, got %T", prog.Stmts[0])
+	}
+	sel, ok := prog.Stmts[2].(*ast.SelectStmt)
+	if !ok {
+		t.Fatalf("third statement should be SelectStmt, got %T", prog.Stmts[2])
+	}
+	if len(sel.Cases) != 1 || sel.Cases[0].RecvName != "v" || sel.Default == nil {
+		t.Fatalf("unexpected select AST: %#v", sel)
+	}
+}
+
 func TestStringLiteral(t *testing.T) {
 	prog := mustParse(t, `s := "hello"`)
 	decl := prog.Stmts[0].(*ast.DeclareStmt)

@@ -132,6 +132,26 @@ func (s *SendStmt) nodeType() string { return "SendStmt" }
 func (s *SendStmt) GetPos() Pos      { return s.P }
 func (s *SendStmt) stmtNode()        {}
 
+// SelectStmt represents a Go-style non-blocking select statement.
+type SelectStmt struct {
+	P       Pos
+	Cases   []SelectCase
+	Default *BlockStmt
+}
+
+// SelectCase represents either a receive or send case inside select.
+type SelectCase struct {
+	P         Pos
+	RecvName  string // optional for: case name := <-ch:
+	Channel   Expr
+	SendValue Expr // nil means receive case; non-nil means send case
+	Body      *BlockStmt
+}
+
+func (s *SelectStmt) nodeType() string { return "SelectStmt" }
+func (s *SelectStmt) GetPos() Pos      { return s.P }
+func (s *SelectStmt) stmtNode()        {}
+
 // IfStmt represents if/elseif/else chains.
 type IfStmt struct {
 	P        Pos

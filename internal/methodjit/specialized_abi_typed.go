@@ -394,7 +394,7 @@ func analyzeTypedABIWithFactsAndGlobals(proto *vm.FuncProto, requireSelfCall boo
 		case vm.OP_LOADBOOL, vm.OP_GETUPVAL, vm.OP_NOT, vm.OP_CONCAT,
 			vm.OP_POW, vm.OP_CLOSURE,
 			vm.OP_TFORCALL, vm.OP_TFORLOOP, vm.OP_VARARG, vm.OP_SELF,
-			vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_APPEND, vm.OP_SETLIST:
+			vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_APPEND, vm.OP_SETLIST:
 			return typedSelfABIReject("unsupported opcode")
 		default:
 			return typedSelfABIReject("unknown opcode")
@@ -646,7 +646,7 @@ func specializedABIUsesSlotAtOrAbove(proto *vm.FuncProto, limit int) bool {
 				return true
 			}
 		case vm.OP_SETGLOBAL, vm.OP_SETUPVAL, vm.OP_TEST, vm.OP_SETLIST,
-			vm.OP_APPEND, vm.OP_SEND:
+			vm.OP_APPEND, vm.OP_SEND, vm.OP_TRYSEND:
 			if uses(a) {
 				return true
 			}

@@ -87,6 +87,8 @@ const (
 	OP_MAKECHAN // A B : R(A) = make(chan, B) — B=0 unbuffered
 	OP_SEND     // A B : R(A) <- R(B)
 	OP_RECV     // A B : R(A) = <-R(B)
+	OP_TRYSEND  // A B C : R(C) = try R(A) <- R(B)
+	OP_TRYRECV  // A B C : R(A), R(C) = try <-R(B)
 
 	OP_NEWOBJECTN  // A B C : R(A) = small string table, ctor=B, values starting at R(C)
 	OP_YIELD       // A B C : coroutine.yield(R(A+1)..R(A+B-1)); result convention matches CALL
@@ -239,6 +241,8 @@ var opNames = [...]string{
 	OP_MAKECHAN:    "MAKECHAN",
 	OP_SEND:        "SEND",
 	OP_RECV:        "RECV",
+	OP_TRYSEND:     "TRYSEND",
+	OP_TRYRECV:     "TRYRECV",
 	OP_SETLISTDYN:  "SETLISTDYN",
 	OP_CALLTABLE:   "CALLTABLE",
 	OP_SETTOP:      "SETTOP",

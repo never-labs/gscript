@@ -55,6 +55,8 @@ func (c *compiler) compileStmt(stmt ast.Stmt) error {
 		return c.compileDeferStmt(s)
 	case *ast.SendStmt:
 		return c.compileSendStmt(s)
+	case *ast.SelectStmt:
+		return c.compileSelectStmt(s)
 	default:
 		return fmt.Errorf("line %d: unsupported statement type %T", stmt.GetPos().Line, stmt)
 	}
@@ -836,6 +838,69 @@ func (c *compiler) compileMakeChanExpr(e *ast.MakeChanExpr, dest int) error {
 	} else {
 		c.emitABC(OP_MAKECHAN, dest, 0, 0, line) // C=0 means unbuffered
 	}
+	return nil
+}
+
+func (c *compiler) compileSelectStmt(s *ast.SelectStmt) error {
+	line := s.P.Line
+	base := c.nextReg
+	var endJumps []int
+
+	for _, cls := range s.Cases {
+		caseBase := c.nextReg
+		okReg := c.allocReg()
+		var recvReg int
+		if cls.SendValue == nil {
+			recvReg = c.allocReg()
+			chReg := c.allocReg()
+			if err := c.compileExprTo(cls.Channel, chReg); err != nil {
+				return err
+			}
+			c.emitABC(OP_TRYRECV, recvReg, chReg, okReg, cls.P.Line)
+		} else {
+			chReg := c.allocReg()
+			if err := c.compileExprTo(cls.Channel, chReg); err != nil {
+				return err
+			}
+			valReg := c.allocReg()
+			if err := c.compileExprTo(cls.SendValue, valReg); err != nil {
+				return err
+			}
+			c.emitABC(OP_TRYSEND, chReg, valReg, okReg, cls.P.Line)
+		}
+		c.nextReg = caseBase + 1
+		c.emitABC(OP_TEST, okReg, 0, 0, cls.P.Line)
+		skipJump := c.emitJump(cls.P.Line)
+
+		c.enterScope()
+		if cls.SendValue == nil && cls.RecvName != "" {
+			localReg := c.addLocal(cls.RecvName)
+			c.emitABC(OP_MOVE, localReg, recvReg, 0, cls.P.Line)
+		}
+		for _, st := range cls.Body.Stmts {
+			if err := c.compileStmt(st); err != nil {
+				return err
+			}
+		}
+		c.leaveScope()
+		endJumps = append(endJumps, c.emitJump(line))
+		c.patchJump(skipJump)
+		c.nextReg = base
+	}
+
+	if s.Default != nil {
+		c.enterScope()
+		for _, st := range s.Default.Stmts {
+			if err := c.compileStmt(st); err != nil {
+				return err
+			}
+		}
+		c.leaveScope()
+	}
+	for _, j := range endJumps {
+		c.patchJump(j)
+	}
+	c.nextReg = base
 	return nil
 }
 
