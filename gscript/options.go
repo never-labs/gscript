@@ -112,6 +112,7 @@ type vmOptions struct {
 	environmentVars []string
 	networkAccess   bool
 	debugAccess     bool
+	testkitAccess   bool
 	processExec     bool
 	processShell    bool
 	maxSteps        int64
@@ -148,6 +149,7 @@ type SecurityPolicy struct {
 	DisableDynamicEval      bool
 	DisableNetworkAccess    bool
 	DisableDebugAccess      bool
+	DisableTestkitAccess    bool
 	DisableProcessExecution bool
 	DisableProcessShell     bool
 	DisableJIT              bool
@@ -303,6 +305,11 @@ func WithDebugAccess(enabled bool) Option {
 	return func(o *vmOptions) { o.debugAccess = enabled }
 }
 
+// WithTestkitAccess controls script-side testkit diagnostics.
+func WithTestkitAccess(enabled bool) Option {
+	return func(o *vmOptions) { o.testkitAccess = enabled }
+}
+
 // WithSandbox selects the safe standard library set and disables host
 // filesystem-backed capabilities.
 func WithSandbox() Option {
@@ -312,6 +319,7 @@ func WithSandbox() Option {
 		o.dynamicEval = false
 		o.networkAccess = false
 		o.debugAccess = false
+		o.testkitAccess = false
 		o.processExec = false
 		o.processShell = false
 	}
@@ -328,6 +336,7 @@ func SecuritySandbox() Option {
 		o.dynamicEval = false
 		o.networkAccess = false
 		o.debugAccess = false
+		o.testkitAccess = false
 		o.processExec = false
 		o.processShell = false
 		o.useJIT = false
@@ -389,6 +398,9 @@ func WithSecurity(policy SecurityPolicy) Option {
 		}
 		if policy.DisableDebugAccess {
 			o.debugAccess = false
+		}
+		if policy.DisableTestkitAccess {
+			o.testkitAccess = false
 		}
 		if policy.DisableProcessExecution {
 			o.processExec = false

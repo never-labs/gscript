@@ -56,6 +56,9 @@ func (vm *VM) RegisterTestkitLib() {
 	lib.RawSetString("protect", runtime.FunctionValue(&runtime.GoFunction{
 		Name: "testkit.protect",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if !vm.testkitAccess {
+				return nil, fmt.Errorf("testkit access disabled")
+			}
 			if len(args) < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
 			}
@@ -82,6 +85,9 @@ func (vm *VM) RegisterTestkitLib() {
 	lib.RawSetString("functionInfo", runtime.FunctionValue(&runtime.GoFunction{
 		Name: "testkit.functionInfo",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if !vm.testkitAccess {
+				return nil, fmt.Errorf("testkit access disabled")
+			}
 			if len(args) < 1 || !args[0].IsFunction() {
 				return nil, fmt.Errorf("bad argument #1 to 'testkit.functionInfo' (function expected)")
 			}

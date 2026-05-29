@@ -12,7 +12,12 @@ func buildTestkitLib(interp *Interpreter) *Table {
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{
 			Name: "testkit." + name,
-			Fn:   fn,
+			Fn: func(args []Value) ([]Value, error) {
+				if interp != nil && !interp.testkitAccess {
+					return nil, fmt.Errorf("testkit access disabled")
+				}
+				return fn(args)
+			},
 		}))
 	}
 

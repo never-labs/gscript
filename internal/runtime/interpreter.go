@@ -33,6 +33,7 @@ type Interpreter struct {
 	processExecution  bool             // process.run/exec/which are enabled
 	processShell      bool             // process.shell is enabled
 	debugAccess       bool             // script-side debug APIs are enabled
+	testkitAccess     bool             // script-side testkit APIs are enabled
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -78,6 +79,7 @@ func New() *Interpreter {
 		processExecution:  true,
 		processShell:      true,
 		debugAccess:       true,
+		testkitAccess:     true,
 		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()
@@ -198,6 +200,11 @@ func (interp *Interpreter) SetNetworkAccess(enabled bool) {
 // accounting remains active for host diagnostics.
 func (interp *Interpreter) SetDebugAccess(enabled bool) {
 	interp.debugAccess = enabled
+}
+
+// SetTestkitAccess controls script-side testkit diagnostics.
+func (interp *Interpreter) SetTestkitAccess(enabled bool) {
+	interp.testkitAccess = enabled
 }
 
 // SetProcessExecution controls process.run, process.exec, and process.which.

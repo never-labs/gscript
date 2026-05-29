@@ -109,6 +109,7 @@ Environment reads can also be narrowed to a named allowlist.
 Network access can be disabled as a coarse gate.
 Script-visible debug APIs can be disabled while keeping host-internal debug
 frame accounting active.
+Script-visible test diagnostics can also be disabled independently.
 
 `SecuritySandbox()` currently means:
 

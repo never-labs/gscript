@@ -115,6 +115,7 @@ type VM struct {
 	dynamicEval          bool
 	networkAccess        bool
 	debugAccess          bool
+	testkitAccess        bool
 	ctx                  context.Context
 }
 
@@ -194,6 +195,11 @@ func (vm *VM) SetNetworkAccess(enabled bool) {
 // accounting remains active for host diagnostics.
 func (vm *VM) SetDebugAccess(enabled bool) {
 	vm.debugAccess = enabled
+}
+
+// SetTestkitAccess controls script-side testkit diagnostics.
+func (vm *VM) SetTestkitAccess(enabled bool) {
+	vm.testkitAccess = enabled
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -837,6 +843,7 @@ func New(globals map[string]runtime.Value) *VM {
 		dynamicEval:        true,
 		networkAccess:      true,
 		debugAccess:        true,
+		testkitAccess:      true,
 	}
 	v.initTypeNameValues()
 	v.RegisterCoroutineLib()
@@ -899,6 +906,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		dynamicEval:        parent.dynamicEval,
 		networkAccess:      parent.networkAccess,
 		debugAccess:        parent.debugAccess,
+		testkitAccess:      parent.testkitAccess,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -987,6 +995,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		dynamicEval:        parent.dynamicEval,
 		networkAccess:      parent.networkAccess,
 		debugAccess:        parent.debugAccess,
+		testkitAccess:      parent.testkitAccess,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()

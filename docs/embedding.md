@@ -274,6 +274,7 @@ Current sandbox gaps:
   `http`.
 - `WithDebugAccess(false)` disables script-visible `debug` APIs while keeping
   host-internal debug frame accounting active.
+- `WithTestkitAccess(false)` disables script-visible `testkit` diagnostics.
 - `WithProcessExecution(false)` disables `process.run`, `process.exec`, and
   `process.which`; `WithProcessShell(false)` disables `process.shell`.
 - Context-aware public entry points now poll cancellation at interpreter
@@ -416,9 +417,10 @@ boundaries. Timeouts should return a distinguishable error, for example
 `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
 `WithDynamicEval(false)`, plus `WithEnvironmentAllowlist`,
 `WithNetworkAccess(false)`, `WithDebugAccess(false)`,
-`WithProcessExecution(false)`, and `WithProcessShell(false)`, are the first
-production-limits APIs. A full production limits object should still cover wall
-time, allocation/table sizes, module count, and host-call duration policy.
+`WithTestkitAccess(false)`, `WithProcessExecution(false)`, and
+`WithProcessShell(false)`, are the first production-limits APIs. A full
+production limits object should still cover wall time, allocation/table sizes,
+module count, and host-call duration policy.
 
 ### Errors and stack traces
 
@@ -489,7 +491,8 @@ prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
 `WithDynamicEval(false)`, plus `WithEnvironmentAllowlist`,
 `WithNetworkAccess(false)`, `WithDebugAccess(false)`,
-`WithProcessExecution(false)`, and `WithProcessShell(false)`.
+`WithTestkitAccess(false)`, `WithProcessExecution(false)`, and
+`WithProcessShell(false)`.
 
 `WithSecurity(SecurityPolicy{...})` is the grouped form of the same controls.
 It is intended for production embedders that want one auditable policy object
@@ -498,8 +501,8 @@ stdlib preset, host capability bits, module loading, JIT disablement, step
 budget, native-call budget, call-depth budget, script goroutine limit,
 channel-capacity limit, host-result byte limit, module-byte limit,
 module-depth limit, filesystem read-byte limit, filesystem write-byte limit,
-dynamic-eval disablement, network disablement, debug disablement, and process
-gates.
+dynamic-eval disablement, network disablement, debug/testkit disablement, and
+process gates.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the

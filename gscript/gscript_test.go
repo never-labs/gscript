@@ -1775,6 +1775,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		DisableDynamicEval:      true,
 		DisableNetworkAccess:    true,
 		DisableDebugAccess:      true,
+		DisableTestkitAccess:    true,
 		DisableProcessExecution: true,
 		DisableProcessShell:     true,
 	}))
@@ -1959,6 +1960,36 @@ func TestWithDebugAccessFalseBlocksDebugAPIs(t *testing.T) {
 				err := vm.Exec(src)
 				if err == nil || !strings.Contains(err.Error(), "debug access disabled") {
 					t.Fatalf("%s err = %v, want debug access disabled", src, err)
+				}
+			}
+		})
+	}
+}
+
+func TestWithTestkitAccessFalseBlocksTestkitAPIs(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibTestkit),
+				gs.WithTestkitAccess(false),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			for _, src := range []string{
+				`stats := testkit.memory()`,
+				`info := testkit.value(42)`,
+				`kind := testkit.typeOf(42)`,
+				`result := testkit.protect(func() { return 1 })`,
+				`same := testkit.sameFunction(print, print)`,
+			} {
+				err := vm.Exec(src)
+				if err == nil || !strings.Contains(err.Error(), "testkit access disabled") {
+					t.Fatalf("%s err = %v, want testkit access disabled", src, err)
 				}
 			}
 		})
