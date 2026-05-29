@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/eval/fmt/lint/repl", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/eval/fmt/inspect/lint/repl", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -373,6 +373,47 @@ func TestDiagCommandRejectsUnknownMode(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "unknown diag mode") {
 		t.Fatalf("stderr = %q, want unknown mode", stderr.String())
+	}
+}
+
+func TestInspectBytecodeDumpsMainProto(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(path, []byte("x := 1\nprint(x)\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runInspectCommand([]string{"bytecode", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "=== <main>") || !strings.Contains(out, "LOAD") {
+		t.Fatalf("stdout = %q, want main bytecode dump", out)
+	}
+}
+
+func TestInspectBytecodeDumpsNamedProto(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fn.gs")
+	src := `func add(a, b) {
+    return a + b
+}
+print(add(1, 2))
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runInspectCommand([]string{"bytecode", "--proto", "add", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	if strings.Contains(out, "=== <main>") || !strings.Contains(out, "RETURN") {
+		t.Fatalf("stdout = %q, want named proto disassembly only", out)
 	}
 }
 
