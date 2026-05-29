@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/doc/eval/fmt/inspect/lint/repl", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/doc/eval/fmt/inspect/lint/mod/repl", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -468,6 +468,69 @@ func TestDocCheckDispatchesDocsScript(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "doc helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}
+
+func TestModInitGraphAndVerify(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`helper := require("pkg.helper")
+jsonMod := require("json")
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"init", "--name", "demo", "--dir", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod init code = %d, stderr = %q", code, stderr.String())
+	}
+	manifestPath := filepath.Join(dir, "gscript.mod.json")
+	if !strings.Contains(stdout.String(), manifestPath) {
+		t.Fatalf("stdout = %q, want manifest path", stdout.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"graph", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod graph code = %d, stderr = %q", code, stderr.String())
+	}
+	var graph modGraphReport
+	if err := json.Unmarshal(stdout.Bytes(), &graph); err != nil {
+		t.Fatalf("stdout is not JSON graph: %v; stdout = %q", err, stdout.String())
+	}
+	if len(graph.Files) != 1 || !containsString(graph.Files[0].Requires, "pkg.helper") || !containsString(graph.Files[0].Requires, "json") {
+		t.Fatalf("graph = %+v, want static requires", graph)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify code = %d, stderr = %q", code, stderr.String())
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if !verify.OK || verify.Manifest != manifestPath {
+		t.Fatalf("verify = %+v, want ok manifest", verify)
+	}
+}
+
+func TestModVerifyReportsMissingManifest(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"verify", "--json", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod verify code = %d, want 1", code)
+	}
+	var verify modVerifyReport
+	if err := json.Unmarshal(stdout.Bytes(), &verify); err != nil {
+		t.Fatalf("stdout is not JSON verify report: %v; stdout = %q", err, stdout.String())
+	}
+	if verify.OK || len(verify.Diagnostics) == 0 || verify.Diagnostics[0].Code != "GS9103" {
+		t.Fatalf("verify = %+v, want missing manifest diagnostic", verify)
 	}
 }
 

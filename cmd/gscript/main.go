@@ -90,6 +90,8 @@ func main() {
 			os.Exit(runInspectCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "lint":
 			os.Exit(runLintCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "mod":
+			os.Exit(runModCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "repl":
 			os.Exit(runREPLCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "run":
@@ -339,6 +341,7 @@ func buildCapabilities() cliCapabilities {
 			"fmt",
 			"inspect",
 			"lint",
+			"mod",
 			"repl",
 			"run",
 			"test",

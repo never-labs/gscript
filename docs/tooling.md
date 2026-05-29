@@ -81,6 +81,9 @@ schema。
 - `gscript doc generate [--output DIR]` emits generated CLI and stdlib
   reference Markdown from the current binary; `gscript doc check` runs the
   repository documentation reference checker.
+- `gscript mod init|graph|verify` provides a local package manifest and static
+  `require("...")` graph workflow without introducing networked package
+  fetching.
 
 There are also developer binaries:
 
@@ -313,11 +316,15 @@ Runtime module loading exists:
 - `ExecFile` and CLI file execution set script dir to the executed file's
   directory.
 - Standard library modules are documented under `docs/stdlib/`.
+- `gscript mod init` writes `gscript.mod.json`, `gscript mod graph` statically
+  scans string-literal `require("...")` calls, and `gscript mod verify` checks
+  the local manifest plus graph.
 
 ### Gaps
 
-- No module manifest, dependency lockfile, semantic versioning, package registry,
-  vendoring, checksum verification, or module graph command.
+- A local module manifest and graph command exist, but there is no dependency
+  lockfile, semantic version resolution, package registry, vendoring, or
+  checksum verification.
 - `require()` path rules are implicit and split between tree-walker and VM
   implementations.
 - No clear search path model beyond script dir / `WithRequirePath`.
@@ -327,6 +334,8 @@ Runtime module loading exists:
 
 P0:
 
+- Extend the local `gscript.mod.json` workflow into lockfiles and verified
+  vendoring.
 - Document and centralize module resolution rules so interpreter and VM share
   one resolver.
 - Add a project manifest, e.g. `gscript.toml`, with `name`, `version`,
