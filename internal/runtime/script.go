@@ -250,6 +250,9 @@ func buildScriptLib(interp *Interpreter) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'script.compile' (string expected)")
 		}
+		if !interp.dynamicEval {
+			return nil, fmt.Errorf("dynamic eval disabled")
+		}
 		var opt Value
 		if len(args) >= 2 {
 			opt = args[1]
@@ -264,6 +267,9 @@ func buildScriptLib(interp *Interpreter) *Table {
 	set("eval", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'script.eval' (string expected)")
+		}
+		if !interp.dynamicEval {
+			return nil, fmt.Errorf("dynamic eval disabled")
 		}
 		var opt Value
 		if len(args) >= 2 {

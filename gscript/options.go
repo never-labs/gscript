@@ -108,6 +108,7 @@ type vmOptions struct {
 	capabilities    CapabilityFlags
 	requirePath     string
 	filesystemRoot  string
+	dynamicEval     bool
 	maxSteps        int64
 	maxNativeCalls  int64
 	maxCallDepth    int64
@@ -138,6 +139,7 @@ type SecurityPolicy struct {
 	MaxModuleDepth          int64
 	MaxFilesystemReadBytes  int64
 	MaxFilesystemWriteBytes int64
+	DisableDynamicEval      bool
 	DisableJIT              bool
 	DisableModuleLoading    bool
 }
@@ -255,12 +257,20 @@ func WithFilesystemRoot(root string) Option {
 	}
 }
 
+// WithDynamicEval controls script-side string compilation APIs such as load(),
+// loadstring(), script.compile(), and script.eval(). It does not affect
+// host-side Compile/Exec calls.
+func WithDynamicEval(enabled bool) Option {
+	return func(o *vmOptions) { o.dynamicEval = enabled }
+}
+
 // WithSandbox selects the safe standard library set and disables host
 // filesystem-backed capabilities.
 func WithSandbox() Option {
 	return func(o *vmOptions) {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
+		o.dynamicEval = false
 	}
 }
 
@@ -272,6 +282,7 @@ func SecuritySandbox() Option {
 	return func(o *vmOptions) {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
+		o.dynamicEval = false
 		o.useJIT = false
 	}
 }
@@ -319,6 +330,9 @@ func WithSecurity(policy SecurityPolicy) Option {
 		}
 		if policy.MaxFilesystemWriteBytes > 0 {
 			o.maxFSWriteBytes = policy.MaxFilesystemWriteBytes
+		}
+		if policy.DisableDynamicEval {
+			o.dynamicEval = false
 		}
 		if policy.DisableJIT {
 			o.useJIT = false

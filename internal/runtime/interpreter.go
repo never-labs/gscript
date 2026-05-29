@@ -25,6 +25,7 @@ type Interpreter struct {
 	filesystemRead    bool             // fs read operations are enabled
 	filesystemWrite   bool             // fs write operations are enabled
 	filesystemRoot    string           // optional root for script-side filesystem access
+	dynamicEval       bool             // script-side string compile/eval is enabled
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -63,6 +64,7 @@ func New() *Interpreter {
 		filesystemEnabled: true,
 		filesystemRead:    true,
 		filesystemWrite:   true,
+		dynamicEval:       true,
 		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()
@@ -165,6 +167,13 @@ func (interp *Interpreter) ScriptDir() string {
 // RestrictStdlib.
 func (interp *Interpreter) SetModuleLoading(enabled bool) {
 	interp.moduleLoading = enabled
+}
+
+// SetDynamicEval controls script-side string compilation APIs such as load,
+// loadstring, script.compile, and script.eval. Host-side Compile/Exec calls are
+// unaffected.
+func (interp *Interpreter) SetDynamicEval(enabled bool) {
+	interp.dynamicEval = enabled
 }
 
 // SetFilesystemEnabled controls script-side filesystem APIs such as fs,

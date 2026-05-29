@@ -35,7 +35,7 @@ extensions:
   `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithMaxHostResultBytes`,
   `WithMaxModuleBytes`, `WithMaxModuleDepth`,
   `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, `WithPrint`,
-  `WithVM`, `WithJIT`, and `WithTracing`.
+  `WithDynamicEval`, `WithVM`, `WithJIT`, and `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -260,6 +260,9 @@ Current sandbox gaps:
 - `WithMaxFilesystemReadBytes` limits bytes read into memory by `fs.readfile`
   and `fs.copy`; `WithMaxFilesystemWriteBytes` limits `fs.writefile`,
   `fs.appendfile`, and `fs.copy` writes.
+- `WithDynamicEval(false)` disables script-side string compilation APIs such
+  as `load`, `loadstring`, `script.compile`, and `script.eval`. Host-side
+  `Compile`/`Exec` calls are unaffected.
 - Context-aware public entry points now poll cancellation at interpreter
   statement/loop checkpoints and bytecode instruction checkpoints. Native JIT
   loops and some blocking host operations still need broader policy-driven
@@ -397,8 +400,8 @@ boundaries. Timeouts should return a distinguishable error, for example
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
 `WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
-`WithMaxFilesystemReadBytes`, and `WithMaxFilesystemWriteBytes` are the first
-production-limits APIs. A full
+`WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
+`WithDynamicEval(false)` are the first production-limits APIs. A full
 production limits object should still cover wall time, allocation/table sizes,
 module count, and host-call duration policy.
 
@@ -468,7 +471,8 @@ prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxSteps`, `WithMaxNativeCalls`, `WithMaxCallDepth`,
 `WithMaxGoroutines`, `WithMaxChannelCapacity`, and
 `WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
-`WithMaxFilesystemReadBytes`, and `WithMaxFilesystemWriteBytes`.
+`WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
+`WithDynamicEval(false)`.
 
 `WithSecurity(SecurityPolicy{...})` is the grouped form of the same controls.
 It is intended for production embedders that want one auditable policy object
@@ -477,7 +481,7 @@ stdlib preset, host capability bits, module loading, JIT disablement, step
 budget, native-call budget, call-depth budget, script goroutine limit,
 channel-capacity limit, host-result byte limit, module-byte limit, and
 module-depth limit, filesystem read-byte limit, and filesystem write-byte
-limit.
+limit, and dynamic-eval disablement.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the

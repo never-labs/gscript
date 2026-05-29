@@ -22,6 +22,7 @@ func New(opts ...Option) *VM {
 	o := vmOptions{
 		libs:         LibAll,
 		capabilities: CapAll,
+		dynamicEval:  true,
 	}
 	for _, opt := range opts {
 		opt(&o)
@@ -34,6 +35,7 @@ func newVM(o vmOptions) *VM {
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
+	interp.SetDynamicEval(o.dynamicEval)
 	interp.SetFilesystemRoot(o.filesystemRoot)
 	interp.SetFilesystemCapabilities(
 		o.capabilities&CapFilesystemRead != 0,
@@ -203,6 +205,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxModuleDepth > 0 {
 				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
+			bvm.SetDynamicEval(vm.opts.dynamicEval)
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -231,6 +234,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxModuleDepth > 0 {
 				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
+			bvm.SetDynamicEval(vm.opts.dynamicEval)
 		}
 		bvm.SetContext(activeRunContext(ctx))
 		if _, err := bvm.Execute(proto); err != nil {

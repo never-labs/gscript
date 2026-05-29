@@ -757,6 +757,9 @@ func (interp *Interpreter) registerBuiltins() {
 			if len(args) < 1 || !args[0].IsString() {
 				return nil, fmt.Errorf("bad argument #1 to 'load' (string expected)")
 			}
+			if !interp.dynamicEval {
+				return []Value{NilValue(), StringValue("dynamic eval disabled")}, nil
+			}
 			var opt Value
 			if len(args) >= 2 {
 				opt = args[1]
@@ -795,6 +798,9 @@ func (interp *Interpreter) registerBuiltins() {
 		Fn: func(args []Value) ([]Value, error) {
 			if len(args) < 1 || !args[0].IsString() {
 				return nil, fmt.Errorf("bad argument #1 to 'loadstring' (string expected)")
+			}
+			if !interp.dynamicEval {
+				return nil, fmt.Errorf("dynamic eval disabled")
 			}
 			src := args[0].Str()
 			return interp.ExecString(src)

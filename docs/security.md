@@ -103,7 +103,7 @@ the controls that exist today: stdlib preset, host capabilities, module
 loading, JIT policy, step budget, native-call budget, call-depth budget,
 script goroutine limit, channel-capacity limit, host-result byte limit,
 module-byte limit, module-depth limit, filesystem read-byte limit, and
-filesystem write-byte limit.
+filesystem write-byte limit, and dynamic-eval disablement.
 
 `SecuritySandbox()` currently means:
 
@@ -181,6 +181,8 @@ Required controls:
   and `fs.copy`.
 - `WithMaxFilesystemWriteBytes`: limits bytes written by `fs.writefile`,
   `fs.appendfile`, and `fs.copy`.
+- `WithDynamicEval(false)`: disables script-side string compilation APIs such
+  as `load`, `loadstring`, `script.compile`, and `script.eval`.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
@@ -409,7 +411,9 @@ Required controls:
 - `AllowedModules`: exact or pattern-based logical module names.
 - `RequireRoots`: approved directories for `require` and `script.load`.
 - `AllowRelativeRequire`: default true only within approved roots.
-- `AllowDynamicEval`: controls string-based compile/eval.
+- `AllowDynamicEval`: controls string-based compile/eval. Current public API
+  exposes this as `WithDynamicEval(enabled)` and
+  `SecurityPolicy.DisableDynamicEval`.
 - `MaxModuleBytes`: source size limit per module.
 - `MaxModuleDepth`: nested require depth.
 

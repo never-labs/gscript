@@ -112,6 +112,7 @@ type VM struct {
 	maxModuleBytes       int64 // <=0 means unlimited
 	maxModuleDepth       int64 // <=0 means unlimited
 	moduleDepth          int64
+	dynamicEval          bool
 	ctx                  context.Context
 }
 
@@ -173,6 +174,13 @@ func (vm *VM) SetMaxModuleBytes(max int64) {
 // and pre-registered modules do not consume this budget.
 func (vm *VM) SetMaxModuleDepth(max int64) {
 	vm.maxModuleDepth = max
+}
+
+// SetDynamicEval controls script-side string compilation APIs such as load,
+// loadstring, script.compile, and script.eval. Host-side Compile/Exec calls are
+// unaffected.
+func (vm *VM) SetDynamicEval(enabled bool) {
+	vm.dynamicEval = enabled
 }
 
 // SetContext installs a host cancellation context checked at bytecode
@@ -813,6 +821,7 @@ func New(globals map[string]runtime.Value) *VM {
 		globalsMu:          &sync.RWMutex{},
 		noGlobalLock:       true, // single-threaded by default
 		activeGoroutines:   &atomic.Int64{},
+		dynamicEval:        true,
 	}
 	v.initTypeNameValues()
 	v.RegisterCoroutineLib()
@@ -872,6 +881,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		maxModuleBytes:     parent.maxModuleBytes,
 		maxModuleDepth:     parent.maxModuleDepth,
 		moduleDepth:        parent.moduleDepth,
+		dynamicEval:        parent.dynamicEval,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -957,6 +967,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 		maxModuleBytes:     parent.maxModuleBytes,
 		maxModuleDepth:     parent.maxModuleDepth,
 		moduleDepth:        parent.moduleDepth,
+		dynamicEval:        parent.dynamicEval,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()

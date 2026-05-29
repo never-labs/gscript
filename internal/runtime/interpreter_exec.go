@@ -288,6 +288,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				maxModuleDepth:   interp.maxModuleDepth,
 				maxFSReadBytes:   interp.maxFSReadBytes,
 				maxFSWriteBytes:  interp.maxFSWriteBytes,
+				dynamicEval:      interp.dynamicEval,
 			}
 			childInterp.callFunction(fn, args)
 		}()
@@ -323,6 +324,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				maxModuleDepth:   interp.maxModuleDepth,
 				maxFSReadBytes:   interp.maxFSReadBytes,
 				maxFSWriteBytes:  interp.maxFSWriteBytes,
+				dynamicEval:      interp.dynamicEval,
 			}
 			childInterp.callFunction(method, args)
 		}()

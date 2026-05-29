@@ -1226,6 +1226,9 @@ func (vm *VM) RegisterScriptLib() {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'script.compile' (string expected)")
 		}
+		if !vm.dynamicEval {
+			return nil, fmt.Errorf("dynamic eval disabled")
+		}
 		opt := runtime.NilValue()
 		if len(args) >= 2 {
 			opt = args[1]
@@ -1235,6 +1238,9 @@ func (vm *VM) RegisterScriptLib() {
 	set("eval", func(args []runtime.Value) ([]runtime.Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'script.eval' (string expected)")
+		}
+		if !vm.dynamicEval {
+			return nil, fmt.Errorf("dynamic eval disabled")
 		}
 		opt := runtime.NilValue()
 		if len(args) >= 2 {
@@ -1290,6 +1296,9 @@ func (vm *VM) RegisterLoaderLib() {
 	vm.SetGlobal("load", runtime.FunctionValue(&runtime.GoFunction{Name: "load", Fn: func(args []runtime.Value) ([]runtime.Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'load' (string expected)")
+		}
+		if !vm.dynamicEval {
+			return []runtime.Value{runtime.NilValue(), runtime.StringValue("dynamic eval disabled")}, nil
 		}
 		opt := runtime.NilValue()
 		if len(args) >= 2 {

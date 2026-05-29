@@ -1677,6 +1677,52 @@ func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
 	if !errors.As(err, &budgetErr) {
 		t.Fatalf("expected step budget in sandboxed loop, got %T %v", err, err)
 	}
+	if err := vm.Exec(`fn, loadErr := load("x := 1")`); err != nil {
+		t.Fatal(err)
+	}
+	loadErr, err := vm.Get("loadErr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg, ok := loadErr.(string); !ok || !strings.Contains(msg, "dynamic eval disabled") {
+		t.Fatalf("loadErr = %v, want dynamic eval disabled", loadErr)
+	}
+}
+
+func TestWithDynamicEvalFalseBlocksScriptStringCompilation(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithDynamicEval(false)}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`fn, loadErr := load("x := 1")`); err != nil {
+				t.Fatal(err)
+			}
+			fn, err := vm.Get("fn")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fn != nil {
+				t.Fatalf("fn = %v, want nil", fn)
+			}
+			loadErr, err := vm.Get("loadErr")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if msg, ok := loadErr.(string); !ok || !strings.Contains(msg, "dynamic eval disabled") {
+				t.Fatalf("loadErr = %v, want dynamic eval disabled", loadErr)
+			}
+			err = vm.Exec(`script.eval("x := 1")`)
+			if err == nil || !strings.Contains(err.Error(), "dynamic eval disabled") {
+				t.Fatalf("script.eval err = %v, want dynamic eval disabled", err)
+			}
+		})
+	}
 }
 
 func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
@@ -1695,6 +1741,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxModuleDepth:          1,
 		MaxFilesystemReadBytes:  128,
 		MaxFilesystemWriteBytes: 128,
+		DisableDynamicEval:      true,
 	}))
 	if err := vm.RegisterFunc("large", func() string { return "12345" }); err != nil {
 		t.Fatal(err)
