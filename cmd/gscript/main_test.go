@@ -51,8 +51,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
-		t.Fatalf("commands = %#v, want capabilities/config/fmt/lint", caps.Commands)
+	if !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "lint") {
+		t.Fatalf("commands = %#v, want capabilities/check/config/fmt/lint", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -173,6 +173,59 @@ func TestConfigCommandReportsParseErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "GS9002") || !strings.Contains(stderr.String(), "tool.test.format") {
 		t.Fatalf("stderr = %q, want config parse diagnostic", stderr.String())
+	}
+}
+
+func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".gs")+".out", []byte("ok\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCheckCommand([]string{"--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runCheckCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report checkReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Steps) != 3 {
+		t.Fatalf("report = %+v, want three passing steps", report)
+	}
+	for _, step := range report.Steps {
+		if !step.OK || step.Skipped || step.ExitCode != 0 {
+			t.Fatalf("step = %+v, want passing non-skipped step", step)
+		}
+	}
+}
+
+func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(path, []byte("func {\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCheckCommand([]string{"--json", "--no-test", dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runCheckCommand code = %d, want 1", code)
+	}
+	var report checkReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.OK || len(report.Steps) != 3 {
+		t.Fatalf("report = %+v, want failed report with three steps", report)
+	}
+	if !report.Steps[2].Skipped || !report.Steps[2].OK {
+		t.Fatalf("test step = %+v, want skipped ok", report.Steps[2])
 	}
 }
 

@@ -72,6 +72,8 @@ func main() {
 		switch os.Args[1] {
 		case "capabilities":
 			os.Exit(runCapabilitiesCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "check":
+			os.Exit(runCheckCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "config":
 			os.Exit(runConfigCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "fmt":
@@ -314,6 +316,7 @@ func buildCapabilities() cliCapabilities {
 		},
 		Commands: []string{
 			"capabilities",
+			"check",
 			"config",
 			"fmt",
 			"lint",

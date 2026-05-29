@@ -63,6 +63,8 @@ schema。
 - `gscript config [--json] [path]` walks upward from a file or directory,
   discovers `gscript.toml`, validates the supported project/tool keys, and
   reports the resolved project root for CI/editor integration.
+- `gscript check [--json] [--no-fmt] [--no-lint] [--no-test] <path-or-dir>`
+  runs the formatter check, linter, and test runner as a single CI gate.
 
 There are also developer binaries:
 
@@ -108,6 +110,7 @@ gscript run --vm script.gs
 gscript run --jit --diag=exit,tier2,runtime-path --json script.gs
 gscript inspect bytecode script.gs --proto sum
 gscript capabilities --json
+gscript check --json ./tests
 ```
 
 Suggested Go API:
