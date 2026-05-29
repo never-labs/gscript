@@ -249,7 +249,7 @@ Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentiona
 ### Control flow
 
 - `if`, `elseif`, `for expr`, `&&`, `||`, and `!` use truthiness: only `nil` and `false` are falsey.
-- `for {}` is an infinite loop until `break`, `return`, `goto`, error, coroutine yield, or host cancellation once cancellation is specified.
+- `for {}` is an infinite loop until `break`, `return`, `goto`, error, coroutine yield, or explicit host-backed cancellation logic observes a cancellation channel.
 - `for cond {}` tests `cond` before each iteration.
 - `for init; cond; post {}` executes `init` once, then `cond` before each iteration, then `post` after each normal iteration.
 - `for k := range expr {}` and `for k, v := range expr {}` use the GScript range protocol for tables/channels/iterables as implemented and tested; exact extension points must be written before new range sources become stable.
@@ -282,6 +282,10 @@ Unary `^` is bitwise not, while binary `^` is bitwise xor. This is an intentiona
 
 - `make(chan)` creates an unbuffered channel. `make(chan, n)` creates a buffered channel with non-negative capacity `n`.
 - `ch <- value` sends to a channel. `<-ch` receives from a channel.
+- `value, ok := <-ch` receives a value and a boolean. Closed-and-drained channels return `nil, false`.
+- `select { case ...: ... }` blocks until a case is ready when no `default` exists. With `default`, it performs a non-blocking probe.
+- Receive cases support `case value := <-ch:` and `case value, ok := <-ch:`. Send cases use `case ch <- value:`.
+- `time.after(seconds)` returns a channel that becomes ready after the delay. `context.withCancel()` and `context.withTimeout(seconds)` expose cancellation through `ctx.done`.
 - Blocking behavior follows Go-channel intuition, but scheduling and fairness are not deterministic user contracts.
 
 ## Stability Contract
@@ -457,21 +461,23 @@ Stable concurrency rules:
 - `channel` wraps Go channel semantics: buffered/unbuffered capacity, blocking send/receive, receive from closed returns `nil, false`, send-on-closed and close-of-closed are errors.
 - `make(chan, capacity)` capacity must be non-negative integer in host int range.
 - `len(ch)` and `cap(ch)` expose queued length and buffer capacity.
+- `select` is a stable statement form. It supports blocking cases, non-blocking `default`, send cases, receive cases, and receive comma-ok cases.
+- `time.after(seconds)` is the stable timeout-channel primitive. Negative durations are errors.
+- `context.background()`, `context.withCancel()`, and `context.withTimeout(seconds)` are the stable script-level cancellation surface. Cancellation is cooperative through `ctx.done`.
+- `sync.waitgroup()`, `sync.mutex()`, `sync.rwmutex()`, and `sync.once()` are host-backed coarse synchronization primitives.
 - Concurrent table mutation is not generally safe unless a table has been explicitly marked concurrent internally; script-level public contract should avoid data-race guarantees until specified.
 - Goroutine scheduling order is not deterministic and must not be part of official outputs except through synchronization with channels or explicit waits.
 
 Open specification items:
 
-- Public goroutine spawn syntax/API name and lifecycle contract if exposed beyond test helpers.
-- Cancellation, timeout and select semantics. Do not imply Go `select` until designed.
 - Panic/recover analogue: current language should use `pcall` / `xpcall`, not Go panic semantics.
 - Cross-coroutine `debug` visibility and hook event order.
 
 Executable route:
 
-1. Add a concurrency spec table for channel operations: make, send, receive, close, len, cap, range-over-closed, buffered drain, unbuffered rendezvous.
-2. Add determinism guidance: tests must synchronize through channels; no sleep-based order assertions.
-3. Keep JIT disabled across resume/yield/send/receive until side-effect replay and blocking-point deopt contracts are written.
+1. Keep tests synchronized through channels or explicit waits; do not assert sleep-based ordering.
+2. Keep JIT disabled across resume/yield/send/receive/select until side-effect replay and blocking-point deopt contracts are written.
+3. Extend host API cancellation integration gradually by routing blocking stdlib operations through explicit context/options rather than VM-wide preemption.
 
 ## Numbers, Strings, And Stdlib
 
