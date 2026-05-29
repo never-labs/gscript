@@ -236,6 +236,18 @@ func WithSandbox() Option {
 	}
 }
 
+// SecuritySandbox selects the production-oriented in-process sandbox baseline:
+// safe standard libraries, no host-backed capabilities, and no JIT by default.
+// Pair it with context deadlines and WithMaxSteps for concrete resource
+// budgets.
+func SecuritySandbox() Option {
+	return func(o *vmOptions) {
+		o.libs = LibSafe
+		o.capabilities = CapSafe
+		o.useJIT = false
+	}
+}
+
 // WithRequirePath sets the base directory for require() module loading.
 func WithRequirePath(path string) Option {
 	return func(o *vmOptions) { o.requirePath = path }

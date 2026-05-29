@@ -92,15 +92,18 @@ The current public safe entry point is:
 
 ```go
 vm := gscript.New(
-    gscript.WithSandbox(),
+    gscript.SecuritySandbox(),
+    gscript.WithMaxSteps(1_000_000),
 )
 ```
 
-`WithSandbox()` currently means:
+`SecuritySandbox()` currently means:
 
 - `LibSafe` is selected as the stdlib preset.
 - `CapSafe` is selected, which disables `CapModuleLoading` and
   both `CapFilesystemRead` and `CapFilesystemWrite`.
+- JIT is disabled by default so step budgets and context cancellation are not
+  bypassed by native code.
 - Filesystem-backed globals `fs`, `dofile`, and `loadfile` are absent.
 - `require("json")` and other enabled built-in stdlib modules still work,
   because stdlib module identity is controlled by `LibFlags`, not
@@ -111,10 +114,11 @@ vm := gscript.New(
 This is an in-process sandbox boundary, not a complete isolation boundary. It
 does not currently add memory budgets, wall-clock preemption, network/process
 policy, environment policy, debug redaction, or host-callback capability
-wrapping. For untrusted scripts, embedders should combine `WithSandbox()` with
-`WithMaxSteps`, explicit host bindings, and OS-level isolation where needed.
+wrapping. For untrusted scripts, embedders should combine `SecuritySandbox()`
+with `WithMaxSteps`, context deadlines, explicit host bindings, and OS-level
+isolation where needed.
 
-The future `SecuritySandbox()` policy should mean:
+The future full security policy should add:
 
 - CPU budget enabled.
 - Wall-clock timeout enabled.
@@ -577,7 +581,6 @@ type HostPolicy struct {
     DenyUnsafeHost      bool
 }
 
-func SecuritySandbox() SecurityPolicy
 func SecurityTrusted() SecurityPolicy
 func WithSecurity(policy SecurityPolicy) Option
 func WithContext(ctx context.Context) Option
@@ -662,8 +665,8 @@ func (vm *VM) RevokeCapability(name string)
 
 ## Rollout Plan
 
-1. Introduce `SecurityPolicy`, `SecuritySandbox`, structured security errors,
-   audit event types, and `WithSecurity` without changing existing defaults.
+1. Introduce full `SecurityPolicy`, structured security errors, audit event
+   types, and `WithSecurity` without changing existing defaults.
 2. Thread a shared security runtime through tree-walker, bytecode VM, child
    coroutine VMs, stdlib registration, and host wrappers.
 3. Enforce CPU, timeout, call-depth, meta-depth, coroutine, and module limits in

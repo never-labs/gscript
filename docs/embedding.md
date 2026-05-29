@@ -28,7 +28,7 @@ extensions:
   `BindStructWithConstructor`, and `BindMethod`.
 - Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
-- Options: `WithLibs`, `WithCapabilities`, `WithSandbox`,
+- Options: `WithLibs`, `WithCapabilities`, `WithSandbox`, `SecuritySandbox`,
   `WithModuleLoading`, `WithFilesystem`, `WithFilesystemRead`,
   `WithFilesystemWrite`, `WithFilesystemRoot`, `WithRequirePath`,
   `WithMaxSteps`, `WithPrint`, `WithVM`, `WithJIT`, and `WithTracing`.
@@ -427,13 +427,20 @@ The default production sandbox should deny filesystem, network, process,
 environment, debug introspection, dynamic script loading, and native host
 object access unless explicitly enabled.
 
-The current `WithSandbox()` boundary is narrower and should be documented as
-such in embedding examples: it is `WithLibs(LibSafe)` plus `CapSafe`. That
-removes filesystem-backed script APIs and disables file-module loading, while
-keeping safe built-in modules require-able. It does not wrap registered Go
-functions, does not make context cancellation preemptive inside long-running
-loops, and does not govern network/process effects if an embedder explicitly
-re-enables the corresponding libraries without a future policy layer.
+`SecuritySandbox()` is the production-oriented baseline option: it is
+`LibSafe` plus `CapSafe`, and it disables JIT by default so configured step
+budgets and context cancellation are not bypassed by native code. It removes
+filesystem-backed script APIs and disables file-module loading, while keeping
+safe built-in modules require-able.
+
+`WithSandbox()` remains the compatibility shorthand for `LibSafe` plus
+`CapSafe`. It does not change execution mode, so production examples should
+prefer `SecuritySandbox()` and then opt into explicit budgets such as
+`WithMaxSteps`.
+
+Neither sandbox option wraps registered Go functions or provides fine-grained
+network/process/debug policies if an embedder explicitly re-enables the
+corresponding libraries. Those remain policy-layer work.
 
 ### Module loader
 

@@ -1355,6 +1355,28 @@ func TestWithSandboxDisablesFilesystemCapabilities(t *testing.T) {
 	}
 }
 
+func TestSecuritySandboxDisablesHostCapabilitiesAndJIT(t *testing.T) {
+	vm := gs.New(gs.WithJIT(), gs.SecuritySandbox(), gs.WithMaxSteps(16))
+	if err := vm.Exec(`value := require("json").encode({ok: true})`); err != nil {
+		t.Fatalf("safe stdlib should remain available: %v", err)
+	}
+	for _, src := range []string{
+		`fs.readfile("x")`,
+		`os.getenv("PATH")`,
+		`process.pid()`,
+		`require("helper")`,
+	} {
+		if err := vm.Exec(src); err == nil {
+			t.Fatalf("SecuritySandbox allowed %s", src)
+		}
+	}
+	err := vm.Exec(`for {}`)
+	var budgetErr *gs.BudgetError
+	if !errors.As(err, &budgetErr) {
+		t.Fatalf("expected step budget in sandboxed loop, got %T %v", err, err)
+	}
+}
+
 func TestEnvironmentCapabilities(t *testing.T) {
 	t.Setenv("GSCRIPT_PUBLIC_ENV_CAP_TEST", "visible")
 
