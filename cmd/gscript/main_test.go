@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "version") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/ci/config/diag/doc/eval/fmt/help/inspect/lint/mod/repl/version", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {
+		t.Fatalf("commands = %#v, want core command set", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -102,6 +102,49 @@ func TestVersionCommandRejectsExtraArgs(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
 	if !strings.Contains(stderr.String(), "usage: gscript version") {
+		t.Fatalf("stderr = %q, want usage", stderr.String())
+	}
+}
+
+func TestEnvCommandJSON(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.toml"), []byte("[project]\nname = \"demo\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runEnvCommand([]string{"--json", "--path", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runEnvCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var report cliEnvReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON env report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || report.Version.GoVersion == "" || report.WorkingDir == "" {
+		t.Fatalf("report = %+v, want stable environment metadata", report)
+	}
+	if !report.Project.Found || report.Project.Name != "demo" || report.Project.Root != dir {
+		t.Fatalf("project = %+v, want discovered demo project at %s", report.Project, dir)
+	}
+	if !containsString(report.Capabilities.Commands, "env") {
+		t.Fatalf("commands = %#v, want env", report.Capabilities.Commands)
+	}
+}
+
+func TestEnvCommandRejectsExtraArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runEnvCommand([]string{"extra"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runEnvCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "usage: gscript env") {
 		t.Fatalf("stderr = %q, want usage", stderr.String())
 	}
 }

@@ -56,6 +56,7 @@ func cliHelpTopics() map[string]cliHelpTopic {
 		{Command: "diag", Usage: "usage: gscript diag [dump|bundle] [diagnostic-flags...]", Summary: "Run production diagnostic dump and bundle tools."},
 		{Command: "doc", Usage: "usage: gscript doc [generate|check] [flags]", Summary: "Generate reference docs or validate repository docs."},
 		{Command: "eval", Usage: "usage: gscript eval [--vm] [--jit=true|false] <source> [args...]", Summary: "Execute source passed on the command line."},
+		{Command: "env", Usage: "usage: gscript env [--json] [--path PATH]", Summary: "Report toolchain, project, cache, and platform environment."},
 		{Command: "fmt", Usage: "usage: gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]", Summary: "Normalize source formatting."},
 		{Command: "help", Usage: "usage: gscript help [command]", Summary: "Show command help."},
 		{Command: "inspect", Usage: "usage: gscript inspect bytecode [--proto NAME] <file.gs>", Summary: "Inspect compiled artifacts."},

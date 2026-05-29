@@ -60,6 +60,9 @@ schema。
 - `gscript capabilities [--json]` reports the current binary's platform,
   execution backends, stdlib modules, supported subcommands, and stable tooling
   output formats for CI/editor integration.
+- `gscript env [--json] [--path PATH]` reports version, platform,
+  capabilities, project config discovery, and user cache/config directories in
+  one environment snapshot for CI/editor integration.
 - `gscript run [--vm] [--jit=true|false] <file.gs> [args...]` is the explicit
   script execution subcommand; legacy `gscript <file.gs>` remains supported.
 - `gscript eval [--vm] [--jit=true|false] <source> [args...]` is the explicit
@@ -134,6 +137,7 @@ gscript eval 'print("hello")'
 gscript run --jit --diag=exit,tier2,runtime-path --json script.gs
 gscript inspect bytecode script.gs --proto sum
 gscript capabilities --json
+gscript env --json
 gscript check --json ./tests
 gscript diag bundle --output /tmp/gscript-diag --skip-benchmarks
 ```
@@ -826,6 +830,7 @@ gscript doc generate
 gscript doc check
 gscript ci smoke|pr|perf|release
 gscript capabilities
+gscript env
 gscript version
 gscript help
 ```

@@ -86,6 +86,8 @@ func main() {
 			os.Exit(runDocCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "eval":
 			os.Exit(runEvalCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "env":
+			os.Exit(runEnvCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "fmt":
 			os.Exit(runFmtCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "help":
