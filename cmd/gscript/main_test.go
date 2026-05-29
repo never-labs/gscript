@@ -94,6 +94,9 @@ func TestHelperProcess(t *testing.T) {
 	case "bench":
 		_, _ = os.Stdout.WriteString("bench helper ok\n")
 		os.Exit(0)
+	case "docs":
+		_, _ = os.Stdout.WriteString("docs helper ok\n")
+		os.Exit(0)
 	default:
 		os.Exit(2)
 	}
@@ -198,6 +201,13 @@ func TestConfigCommandReportsParseErrors(t *testing.T) {
 }
 
 func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {
+	oldCheckExecCommand := checkExecCommand
+	t.Cleanup(func() { checkExecCommand = oldCheckExecCommand })
+	checkExecCommand = func(name string, args ...string) *exec.Cmd {
+		helper, helperArgs := testHelperCommand(t, "docs")
+		return exec.Command(helper, helperArgs...)
+	}
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ok.gs")
 	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0644); err != nil {
@@ -216,8 +226,8 @@ func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Steps) != 3 {
-		t.Fatalf("report = %+v, want three passing steps", report)
+	if !report.OK || len(report.Steps) != 4 {
+		t.Fatalf("report = %+v, want four passing steps", report)
 	}
 	for _, step := range report.Steps {
 		if !step.OK || step.Skipped || step.ExitCode != 0 {
@@ -234,7 +244,7 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runCheckCommand([]string{"--json", "--no-test", dir}, &stdout, &stderr)
+	code := runCheckCommand([]string{"--json", "--no-test", "--no-docs", dir}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("runCheckCommand code = %d, want 1", code)
 	}
@@ -242,11 +252,14 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.OK || len(report.Steps) != 3 {
-		t.Fatalf("report = %+v, want failed report with three steps", report)
+	if report.OK || len(report.Steps) != 4 {
+		t.Fatalf("report = %+v, want failed report with four steps", report)
 	}
 	if !report.Steps[2].Skipped || !report.Steps[2].OK {
 		t.Fatalf("test step = %+v, want skipped ok", report.Steps[2])
+	}
+	if !report.Steps[3].Skipped || !report.Steps[3].OK {
+		t.Fatalf("docs step = %+v, want skipped ok", report.Steps[3])
 	}
 }
 

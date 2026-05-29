@@ -2,10 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 )
+
+var checkExecCommand = exec.Command
 
 type checkReport struct {
 	OK    bool              `json:"ok"`
@@ -26,12 +32,13 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	noFmt := fs.Bool("no-fmt", false, "skip formatter check")
 	noLint := fs.Bool("no-lint", false, "skip lint")
 	noTest := fs.Bool("no-test", false, "skip tests")
+	noDocs := fs.Bool("no-docs", false, "skip docs check")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	paths := fs.Args()
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: gscript check [--json] [--no-fmt] [--no-lint] [--no-test] <path-or-dir>")
+		fmt.Fprintln(errw, "usage: gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-docs] <path-or-dir>")
 		return 2
 	}
 
@@ -61,6 +68,13 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	runStep("test", *noTest, func() int {
 		return runTestCommand([]string{path}, cliRunOptions{UseVM: false}, io.Discard, errw)
 	})
+	runStep("docs", *noDocs, func() int {
+		docsOut := outw
+		if *jsonOut {
+			docsOut = errw
+		}
+		return runDocsCheck(docsOut, errw)
+	})
 
 	if *jsonOut {
 		enc := json.NewEncoder(outw)
@@ -84,4 +98,45 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func runDocsCheck(outw, errw io.Writer) int {
+	script, err := findScriptFromCWD(filepath.Join("scripts", "docs_check.sh"))
+	if err != nil {
+		fmt.Fprintf(errw, "gscript check: %v\n", err)
+		return 1
+	}
+	cmd := checkExecCommand("bash", script)
+	cmd.Stdout = outw
+	cmd.Stderr = errw
+	cmd.Dir = filepath.Dir(filepath.Dir(script))
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(errw, "gscript check: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func findScriptFromCWD(rel string) (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		candidate := filepath.Join(dir, rel)
+		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
+			return candidate, nil
+		} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+			return "", statErr
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("could not find %s from %s", rel, dir)
+		}
+		dir = parent
+	}
 }

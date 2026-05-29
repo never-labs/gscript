@@ -63,8 +63,9 @@ schema。
 - `gscript config [--json] [path]` walks upward from a file or directory,
   discovers `gscript.toml`, validates the supported project/tool keys, and
   reports the resolved project root for CI/editor integration.
-- `gscript check [--json] [--no-fmt] [--no-lint] [--no-test] <path-or-dir>`
-  runs the formatter check, linter, and test runner as a single CI gate.
+- `gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-docs] <path-or-dir>`
+  runs the formatter check, linter, test runner, and documentation reference
+  check as a single CI gate.
 
 There are also developer binaries:
 
