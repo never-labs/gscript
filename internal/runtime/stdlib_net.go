@@ -10,8 +10,12 @@ import (
 )
 
 // buildNetLib creates the "net" standard library table for HTTP client operations.
-func buildNetLib() *Table {
+func buildNetLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -25,6 +29,9 @@ func buildNetLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'net.get' (string expected)")
 		}
+		if interp != nil && !interp.networkAccess {
+			return nil, fmt.Errorf("network access disabled")
+		}
 		url := args[0].Str()
 		var opts Value
 		if len(args) >= 2 {
@@ -37,6 +44,9 @@ func buildNetLib() *Table {
 	set("post", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'net.post' (url and body expected)")
+		}
+		if interp != nil && !interp.networkAccess {
+			return nil, fmt.Errorf("network access disabled")
 		}
 		url := args[0].Str()
 		body := args[1].Str()
@@ -52,6 +62,9 @@ func buildNetLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'net.put' (url and body expected)")
 		}
+		if interp != nil && !interp.networkAccess {
+			return nil, fmt.Errorf("network access disabled")
+		}
 		url := args[0].Str()
 		body := args[1].Str()
 		var opts Value
@@ -66,6 +79,9 @@ func buildNetLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'net.delete' (string expected)")
 		}
+		if interp != nil && !interp.networkAccess {
+			return nil, fmt.Errorf("network access disabled")
+		}
 		url := args[0].Str()
 		var opts Value
 		if len(args) >= 2 {
@@ -78,6 +94,9 @@ func buildNetLib() *Table {
 	set("patch", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'net.patch' (url and body expected)")
+		}
+		if interp != nil && !interp.networkAccess {
+			return nil, fmt.Errorf("network access disabled")
 		}
 		url := args[0].Str()
 		body := args[1].Str()
@@ -92,6 +111,9 @@ func buildNetLib() *Table {
 	set("request", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'net.request' (table expected)")
+		}
+		if interp != nil && !interp.networkAccess {
+			return nil, fmt.Errorf("network access disabled")
 		}
 		optsTable := args[0].Table()
 

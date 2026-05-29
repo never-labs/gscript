@@ -110,6 +110,7 @@ type vmOptions struct {
 	filesystemRoot  string
 	dynamicEval     bool
 	environmentVars []string
+	networkAccess   bool
 	processExec     bool
 	processShell    bool
 	maxSteps        int64
@@ -144,6 +145,7 @@ type SecurityPolicy struct {
 	MaxFilesystemWriteBytes int64
 	EnvironmentAllowlist    []string
 	DisableDynamicEval      bool
+	DisableNetworkAccess    bool
 	DisableProcessExecution bool
 	DisableProcessShell     bool
 	DisableJIT              bool
@@ -288,6 +290,11 @@ func WithDynamicEval(enabled bool) Option {
 	return func(o *vmOptions) { o.dynamicEval = enabled }
 }
 
+// WithNetworkAccess controls host-backed network APIs in net and http.
+func WithNetworkAccess(enabled bool) Option {
+	return func(o *vmOptions) { o.networkAccess = enabled }
+}
+
 // WithSandbox selects the safe standard library set and disables host
 // filesystem-backed capabilities.
 func WithSandbox() Option {
@@ -295,6 +302,7 @@ func WithSandbox() Option {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
 		o.dynamicEval = false
+		o.networkAccess = false
 		o.processExec = false
 		o.processShell = false
 	}
@@ -309,6 +317,7 @@ func SecuritySandbox() Option {
 		o.libs = LibSafe
 		o.capabilities = CapSafe
 		o.dynamicEval = false
+		o.networkAccess = false
 		o.processExec = false
 		o.processShell = false
 		o.useJIT = false
@@ -364,6 +373,9 @@ func WithSecurity(policy SecurityPolicy) Option {
 		}
 		if policy.DisableDynamicEval {
 			o.dynamicEval = false
+		}
+		if policy.DisableNetworkAccess {
+			o.networkAccess = false
 		}
 		if policy.DisableProcessExecution {
 			o.processExec = false

@@ -20,11 +20,12 @@ type VM struct {
 // New creates a new GScript VM with the given options.
 func New(opts ...Option) *VM {
 	o := vmOptions{
-		libs:         LibAll,
-		capabilities: CapAll,
-		dynamicEval:  true,
-		processExec:  true,
-		processShell: true,
+		libs:          LibAll,
+		capabilities:  CapAll,
+		dynamicEval:   true,
+		networkAccess: true,
+		processExec:   true,
+		processShell:  true,
 	}
 	for _, opt := range opts {
 		opt(&o)
@@ -38,6 +39,7 @@ func newVM(o vmOptions) *VM {
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
 	interp.SetDynamicEval(o.dynamicEval)
+	interp.SetNetworkAccess(o.networkAccess)
 	interp.SetProcessExecution(o.processExec)
 	interp.SetProcessShell(o.processShell)
 	interp.SetFilesystemRoot(o.filesystemRoot)
@@ -213,6 +215,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
 			bvm.SetDynamicEval(vm.opts.dynamicEval)
+			bvm.SetNetworkAccess(vm.opts.networkAccess)
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -242,6 +245,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 				bvm.SetMaxModuleDepth(vm.opts.maxModuleDepth)
 			}
 			bvm.SetDynamicEval(vm.opts.dynamicEval)
+			bvm.SetNetworkAccess(vm.opts.networkAccess)
 		}
 		bvm.SetContext(activeRunContext(ctx))
 		if _, err := bvm.Execute(proto); err != nil {

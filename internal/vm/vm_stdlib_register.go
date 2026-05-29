@@ -1186,7 +1186,9 @@ func (vm *VM) RegisterStringLib() {
 }
 
 func (vm *VM) RegisterHTTPLib() {
-	httpLib := runtime.TableValue(runtime.BuildHTTPLibWithCaller(vm.callValue))
+	httpLib := runtime.TableValue(runtime.BuildHTTPLibWithCallerAndNetworkPolicy(vm.callValue, func() bool {
+		return vm.networkAccess
+	}))
 	vm.SetGlobal("http", httpLib)
 	vm.setPackageLoaded("http", httpLib)
 }

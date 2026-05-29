@@ -95,7 +95,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Time & networking ---
 	interp.globals.Define("time", TableValue(buildTimeLib()))
-	interp.globals.Define("net", TableValue(buildNetLib()))
+	interp.globals.Define("net", TableValue(buildNetLib(interp)))
 
 	// --- System ---
 	interp.globals.Define("process", TableValue(buildProcessLib(interp)))

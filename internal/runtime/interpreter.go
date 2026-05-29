@@ -29,6 +29,7 @@ type Interpreter struct {
 	environmentRead   bool             // script-side environment reads are enabled
 	environmentWrite  bool             // script-side environment writes are enabled
 	allowedEnv        map[string]bool  // nil means all environment variables are allowed
+	networkAccess     bool             // net/http host network APIs are enabled
 	processExecution  bool             // process.run/exec/which are enabled
 	processShell      bool             // process.shell is enabled
 	currentSourceName string           // source name for diagnostics while executing parsed source
@@ -72,6 +73,7 @@ func New() *Interpreter {
 		dynamicEval:       true,
 		environmentRead:   true,
 		environmentWrite:  true,
+		networkAccess:     true,
 		processExecution:  true,
 		processShell:      true,
 		activeGoroutines:  &atomic.Int64{},
@@ -183,6 +185,11 @@ func (interp *Interpreter) SetModuleLoading(enabled bool) {
 // unaffected.
 func (interp *Interpreter) SetDynamicEval(enabled bool) {
 	interp.dynamicEval = enabled
+}
+
+// SetNetworkAccess controls host-backed network APIs in net and http.
+func (interp *Interpreter) SetNetworkAccess(enabled bool) {
+	interp.networkAccess = enabled
 }
 
 // SetProcessExecution controls process.run, process.exec, and process.which.

@@ -83,9 +83,9 @@ The stdlib surface includes host-effect modules such as `io`, `fs`, `net`,
 modules must be considered capabilities, not ordinary libraries. The current
 `CapabilityFlags` layer is intentionally smaller than the future
 `SecurityPolicy`: it covers module loading, filesystem-backed script APIs,
-environment allowlists, process execution gates, and the `process.shell` gate,
-but not network, executable allowlists, debug introspection, memory, or host
-callback effects yet.
+environment allowlists, network access, process execution gates, and the
+`process.shell` gate, but not executable allowlists, debug introspection,
+memory, or host callback effects yet.
 
 ## Default Security Configuration
 
@@ -106,6 +106,7 @@ script goroutine limit, channel-capacity limit, host-result byte limit,
 module-byte limit, module-depth limit, filesystem read-byte limit, and
 filesystem write-byte limit, and dynamic-eval disablement.
 Environment reads can also be narrowed to a named allowlist.
+Network access can be disabled as a coarse gate.
 
 `SecuritySandbox()` currently means:
 
@@ -358,6 +359,9 @@ Current public root confinement:
 Network policy:
 
 - Default deny.
+- Host-backed `net` and `http` APIs should be disableable as a group. Current
+  public API exposes this as `WithNetworkAccess(enabled)` and
+  `SecurityPolicy.DisableNetworkAccess`.
 - Allow explicit schemes, hostnames, ports, CIDR ranges, and HTTP methods.
 - Deny link-local, loopback, private, metadata-service, and Unix socket targets
   unless explicitly allowed.

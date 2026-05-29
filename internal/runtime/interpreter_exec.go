@@ -292,6 +292,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				environmentRead:  interp.environmentRead,
 				environmentWrite: interp.environmentWrite,
 				allowedEnv:       interp.allowedEnv,
+				networkAccess:    interp.networkAccess,
 				processExecution: interp.processExecution,
 				processShell:     interp.processShell,
 			}
@@ -333,6 +334,7 @@ func (interp *Interpreter) execGo(s *ast.GoStmt, env *Environment) ([]Value, boo
 				environmentRead:  interp.environmentRead,
 				environmentWrite: interp.environmentWrite,
 				allowedEnv:       interp.allowedEnv,
+				networkAccess:    interp.networkAccess,
 				processExecution: interp.processExecution,
 				processShell:     interp.processShell,
 			}

@@ -14,10 +14,18 @@ import (
 type httpScriptCaller func(Value, []Value) ([]Value, error)
 
 func httpLib(interp *Interpreter) *Table {
-	return BuildHTTPLibWithCaller(interp.callFunction)
+	return buildHTTPLibWithPolicy(interp.callFunction, func() bool { return interp == nil || interp.networkAccess })
 }
 
 func BuildHTTPLibWithCaller(call httpScriptCaller) *Table {
+	return buildHTTPLibWithPolicy(call, nil)
+}
+
+func BuildHTTPLibWithCallerAndNetworkPolicy(call httpScriptCaller, networkAllowed func() bool) *Table {
+	return buildHTTPLibWithPolicy(call, networkAllowed)
+}
+
+func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool) *Table {
 	t := NewTable()
 	var handlerMu sync.Mutex
 
@@ -34,6 +42,9 @@ func BuildHTTPLibWithCaller(call httpScriptCaller) *Table {
 	set("listen", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("http.listen requires address and handler")
+		}
+		if networkAllowed != nil && !networkAllowed() {
+			return nil, fmt.Errorf("network access disabled")
 		}
 		addr := args[0].Str()
 		handler := args[1]
@@ -59,6 +70,9 @@ func BuildHTTPLibWithCaller(call httpScriptCaller) *Table {
 	set("get", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("http.get requires a URL")
+		}
+		if networkAllowed != nil && !networkAllowed() {
+			return nil, fmt.Errorf("network access disabled")
 		}
 		url := args[0].Str()
 		resp, err := http.Get(url)

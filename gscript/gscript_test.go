@@ -1773,6 +1773,7 @@ func TestWithSecurityAppliesSandboxAndBudgets(t *testing.T) {
 		MaxFilesystemWriteBytes: 128,
 		EnvironmentAllowlist:    []string{"GSCRIPT_PUBLIC_ENV_CAP_TEST"},
 		DisableDynamicEval:      true,
+		DisableNetworkAccess:    true,
 		DisableProcessExecution: true,
 		DisableProcessShell:     true,
 	}))
@@ -1898,6 +1899,35 @@ func TestWithProcessExecutionFalseBlocksRunExecAndWhich(t *testing.T) {
 				err := vm.Exec(src)
 				if err == nil || !strings.Contains(err.Error(), "process execution access disabled") {
 					t.Fatalf("%s err = %v, want process execution access disabled", src, err)
+				}
+			}
+		})
+	}
+}
+
+func TestWithNetworkAccessFalseBlocksNetAndHTTP(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibNet | gs.LibHTTP),
+				gs.WithNetworkAccess(false),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			for _, src := range []string{
+				`resp := net.get("http://127.0.0.1:1")`,
+				`resp := net.request({url: "http://127.0.0.1:1"})`,
+				`resp := http.get("http://127.0.0.1:1")`,
+				`server := http.listen("127.0.0.1:0", func(req, res) {}, {background: true})`,
+			} {
+				err := vm.Exec(src)
+				if err == nil || !strings.Contains(err.Error(), "network access disabled") {
+					t.Fatalf("%s err = %v, want network access disabled", src, err)
 				}
 			}
 		})

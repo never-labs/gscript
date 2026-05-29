@@ -35,8 +35,9 @@ extensions:
   `WithMaxGoroutines`, `WithMaxChannelCapacity`, `WithMaxHostResultBytes`,
   `WithMaxModuleBytes`, `WithMaxModuleDepth`,
   `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, `WithPrint`,
-  `WithDynamicEval`, `WithEnvironmentAllowlist`, `WithProcessExecution`,
-  `WithProcessShell`, `WithVM`, `WithJIT`, and `WithTracing`.
+  `WithDynamicEval`, `WithEnvironmentAllowlist`, `WithNetworkAccess`,
+  `WithProcessExecution`, `WithProcessShell`, `WithVM`, `WithJIT`, and
+  `WithTracing`.
 - Standard-library presets: `LibAll`, `LibSafe`, `LibApp`, and `LibGame`.
 - Concurrency helper: `Pool`, with the explicit contract that a `VM` is not goroutine-safe.
 - Advanced escape hatch: `Interpreter() *runtime.Interpreter`.
@@ -269,6 +270,8 @@ Current sandbox gaps:
   and writes to specific variable names. It filters `os.getenv`,
   `os.environ`, `os.expand`, and `process.env`, and rejects `os.setenv` /
   `os.unsetenv` for variables outside the allowlist.
+- `WithNetworkAccess(false)` disables host-backed network APIs in `net` and
+  `http`.
 - `WithProcessExecution(false)` disables `process.run`, `process.exec`, and
   `process.which`; `WithProcessShell(false)` disables `process.shell`.
 - Context-aware public entry points now poll cancellation at interpreter
@@ -279,8 +282,8 @@ Current sandbox gaps:
   confinement directory. It does not yet have separate read roots and write
   roots, byte limits, symlink policy, special-file policy, or per-operation
   audit events.
-- No public host policy for network, broader process control, debug
-  introspection, or host callbacks beyond coarse stdlib removal.
+- No public host policy for broader process control, debug introspection, or
+  host callbacks beyond coarse stdlib removal.
 - No public loader interface for resolving, validating, caching, or auditing
   modules.
 - No explicit isolation contract for host functions registered into a sandbox.
@@ -410,9 +413,10 @@ boundaries. Timeouts should return a distinguishable error, for example
 `WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
 `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
 `WithDynamicEval(false)`, plus `WithEnvironmentAllowlist`,
-`WithProcessExecution(false)`, and `WithProcessShell(false)`, are the first
-production-limits APIs. A full production limits object should still cover wall
-time, allocation/table sizes, module count, and host-call duration policy.
+`WithNetworkAccess(false)`, `WithProcessExecution(false)`, and
+`WithProcessShell(false)`, are the first production-limits APIs. A full
+production limits object should still cover wall time, allocation/table sizes,
+module count, and host-call duration policy.
 
 ### Errors and stack traces
 
@@ -482,20 +486,21 @@ prefer `SecuritySandbox()` and then opt into explicit budgets such as
 `WithMaxHostResultBytes`, `WithMaxModuleBytes`, `WithMaxModuleDepth`,
 `WithMaxFilesystemReadBytes`, `WithMaxFilesystemWriteBytes`, and
 `WithDynamicEval(false)`, plus `WithEnvironmentAllowlist`,
-`WithProcessExecution(false)`, and `WithProcessShell(false)`.
+`WithNetworkAccess(false)`, `WithProcessExecution(false)`, and
+`WithProcessShell(false)`.
 
 `WithSecurity(SecurityPolicy{...})` is the grouped form of the same controls.
 It is intended for production embedders that want one auditable policy object
 instead of a long option list. The current struct covers implemented controls:
 stdlib preset, host capability bits, module loading, JIT disablement, step
 budget, native-call budget, call-depth budget, script goroutine limit,
-channel-capacity limit, host-result byte limit, module-byte limit, and
-module-depth limit, filesystem read-byte limit, and filesystem write-byte
-limit, and dynamic-eval disablement.
+channel-capacity limit, host-result byte limit, module-byte limit,
+module-depth limit, filesystem read-byte limit, filesystem write-byte limit,
+dynamic-eval disablement, network disablement, and process gates.
 
 Neither sandbox option wraps registered Go functions or provides fine-grained
 network/process/debug policies if an embedder explicitly re-enables the
-corresponding libraries. Those remain policy-layer work.
+corresponding libraries. Fine-grained policy remains policy-layer work.
 
 ### Module loader
 
