@@ -112,6 +112,11 @@ the previous generation active when recompilation fails. It does not watch the
 filesystem and does not register files into `require`; embedders call `Reload`
 from their own watcher, admin endpoint, or deployment hook.
 
+Watchers should normally call `ReloadIfChanged` instead of `Reload`. It hashes
+the source bytes and returns the current generation without recompiling,
+publishing, or rerunning top-level code when the file has not changed. Use
+`Reload` only when the host intentionally wants to force a generation bump.
+
 `HotInstance` adds online reload semantics on top of `HotLoader`: it owns a
 persistent VM, runs the initial program once, and on reload skips top-level
 initializers for existing non-function globals while replacing function

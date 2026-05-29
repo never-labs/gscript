@@ -2,7 +2,11 @@ package gscript
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -24,6 +28,12 @@ type HotLoader struct {
 	opts    []CompileOption
 	vmOpts  []Option
 	modules map[string]*ModuleHandle
+}
+
+// ReloadResult describes whether a reload published or applied new source.
+type ReloadResult struct {
+	Changed    bool
+	Generation uint64
 }
 
 // HotLoaderOption configures a HotLoader.
@@ -70,7 +80,7 @@ func (loader *HotLoader) LoadContext(ctx context.Context, path string) (*ModuleH
 	loader.mu.Lock()
 	defer loader.mu.Unlock()
 
-	prog, err := loader.compileLocked(ctx, path)
+	prog, fingerprint, err := loader.compileLocked(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -80,12 +90,44 @@ func (loader *HotLoader) LoadContext(ctx context.Context, path string) (*ModuleH
 		handle = &ModuleHandle{path: path}
 		loader.modules[path] = handle
 	}
-	handle.install(prog)
+	handle.install(prog, fingerprint)
 	return handle, nil
 }
 
-func (loader *HotLoader) compileLocked(ctx context.Context, path string) (*Program, error) {
-	return CompileFileContext(ctx, path, loader.opts...)
+func (loader *HotLoader) compileLocked(ctx context.Context, path string) (*Program, string, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, "", err
+	}
+	src, fingerprint, scriptDir, err := readHotReloadSource(path)
+	if err != nil {
+		return nil, "", err
+	}
+	sourceName := path
+	cfg := compileOptions{sourceName: path}
+	for _, opt := range loader.opts {
+		opt(&cfg)
+	}
+	if cfg.sourceName != "" {
+		sourceName = cfg.sourceName
+	}
+	prog, err := compileSource(src, sourceName, scriptDir)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := checkContext(ctx); err != nil {
+		return nil, "", err
+	}
+	return prog, fingerprint, nil
+}
+
+func readHotReloadSource(path string) (string, string, string, error) {
+	src, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", "", newError(ErrRuntime, err, path)
+	}
+	sum := sha256.Sum256(src)
+	abs, _ := filepath.Abs(path)
+	return string(src), hex.EncodeToString(sum[:]), filepath.Dir(abs), nil
 }
 
 func (loader *HotLoader) handleLocked(path string) *ModuleHandle {
@@ -107,6 +149,51 @@ func (loader *HotLoader) Reload(path string) error {
 func (loader *HotLoader) ReloadContext(ctx context.Context, path string) error {
 	_, err := loader.LoadContext(ctx, path)
 	return err
+}
+
+// ReloadIfChanged recompiles and publishes path only when its source bytes
+// differ from the current handle generation. Unchanged files do not rerun
+// top-level code and do not advance the generation counter.
+func (loader *HotLoader) ReloadIfChanged(path string) (ReloadResult, error) {
+	return loader.ReloadIfChangedContext(context.Background(), path)
+}
+
+// ReloadIfChangedContext is the context-aware form of ReloadIfChanged.
+func (loader *HotLoader) ReloadIfChangedContext(ctx context.Context, path string) (ReloadResult, error) {
+	if path == "" {
+		return ReloadResult{}, fmt.Errorf("HotLoader.ReloadIfChanged: empty path")
+	}
+	loader.mu.Lock()
+	defer loader.mu.Unlock()
+
+	src, fingerprint, scriptDir, err := readHotReloadSource(path)
+	if err != nil {
+		return ReloadResult{}, err
+	}
+	handle := loader.handleLocked(path)
+	if snapshot := handle.current.Load(); snapshot != nil && snapshot.fingerprint == fingerprint {
+		return ReloadResult{Changed: false, Generation: snapshot.generation}, nil
+	}
+	if err := checkContext(ctx); err != nil {
+		return ReloadResult{}, err
+	}
+	sourceName := path
+	cfg := compileOptions{sourceName: path}
+	for _, opt := range loader.opts {
+		opt(&cfg)
+	}
+	if cfg.sourceName != "" {
+		sourceName = cfg.sourceName
+	}
+	prog, err := compileSource(src, sourceName, scriptDir)
+	if err != nil {
+		return ReloadResult{}, err
+	}
+	if err := checkContext(ctx); err != nil {
+		return ReloadResult{}, err
+	}
+	handle.install(prog, fingerprint)
+	return ReloadResult{Changed: true, Generation: handle.Generation()}, nil
 }
 
 // Handle returns a previously loaded module handle.
@@ -131,7 +218,7 @@ func (loader *HotLoader) LoadInstanceContext(ctx context.Context, path string) (
 	}
 
 	loader.mu.Lock()
-	prog, err := loader.compileLocked(ctx, path)
+	prog, fingerprint, err := loader.compileLocked(ctx, path)
 	if err != nil {
 		loader.mu.Unlock()
 		return nil, err
@@ -148,7 +235,7 @@ func (loader *HotLoader) LoadInstanceContext(ctx context.Context, path string) (
 	if err := inst.applyProgram(ctx, prog, false); err != nil {
 		return nil, err
 	}
-	handle.install(prog)
+	handle.install(prog, fingerprint)
 	inst.appliedSnapshot = handle.current.Load()
 	return inst, nil
 }
@@ -162,16 +249,17 @@ type ModuleHandle struct {
 }
 
 type moduleSnapshot struct {
-	generation uint64
-	program    *Program
+	generation  uint64
+	fingerprint string
+	program     *Program
 }
 
-func (handle *ModuleHandle) install(prog *Program) {
+func (handle *ModuleHandle) install(prog *Program, fingerprint string) {
 	var generation uint64 = 1
 	if current := handle.current.Load(); current != nil {
 		generation = current.generation + 1
 	}
-	handle.current.Store(&moduleSnapshot{generation: generation, program: prog})
+	handle.current.Store(&moduleSnapshot{generation: generation, fingerprint: fingerprint, program: prog})
 }
 
 // Path returns the source path associated with this handle.
@@ -290,7 +378,7 @@ func (inst *HotInstance) ReloadContext(ctx context.Context) error {
 	}
 
 	inst.loader.mu.Lock()
-	prog, err := inst.loader.compileLocked(ctx, inst.handle.path)
+	prog, fingerprint, err := inst.loader.compileLocked(ctx, inst.handle.path)
 	if err != nil {
 		inst.loader.mu.Unlock()
 		return err
@@ -303,9 +391,76 @@ func (inst *HotInstance) ReloadContext(ctx context.Context) error {
 	if err := inst.applyProgram(ctx, prog, true); err != nil {
 		return err
 	}
-	inst.handle.install(prog)
+	inst.handle.install(prog, fingerprint)
 	inst.appliedSnapshot = inst.handle.current.Load()
 	return nil
+}
+
+// ReloadIfChanged recompiles and applies the source file only when source
+// bytes differ from this instance's currently applied generation.
+func (inst *HotInstance) ReloadIfChanged() (ReloadResult, error) {
+	return inst.ReloadIfChangedContext(context.Background())
+}
+
+// ReloadIfChangedContext is the context-aware form of ReloadIfChanged.
+func (inst *HotInstance) ReloadIfChangedContext(ctx context.Context) (ReloadResult, error) {
+	if inst == nil || inst.loader == nil || inst.handle == nil {
+		return ReloadResult{}, fmt.Errorf("HotInstance.ReloadIfChanged: nil instance")
+	}
+
+	inst.mu.Lock()
+	var appliedFingerprint string
+	var appliedGeneration uint64
+	if inst.appliedSnapshot != nil {
+		appliedFingerprint = inst.appliedSnapshot.fingerprint
+		appliedGeneration = inst.appliedSnapshot.generation
+	}
+	inst.mu.Unlock()
+
+	inst.loader.mu.Lock()
+	src, fingerprint, scriptDir, err := readHotReloadSource(inst.handle.path)
+	if err != nil {
+		inst.loader.mu.Unlock()
+		return ReloadResult{}, err
+	}
+	if appliedFingerprint == fingerprint {
+		inst.loader.mu.Unlock()
+		return ReloadResult{Changed: false, Generation: appliedGeneration}, nil
+	}
+	if err := checkContext(ctx); err != nil {
+		inst.loader.mu.Unlock()
+		return ReloadResult{}, err
+	}
+	sourceName := inst.handle.path
+	cfg := compileOptions{sourceName: inst.handle.path}
+	for _, opt := range inst.loader.opts {
+		opt(&cfg)
+	}
+	if cfg.sourceName != "" {
+		sourceName = cfg.sourceName
+	}
+	prog, err := compileSource(src, sourceName, scriptDir)
+	if err != nil {
+		inst.loader.mu.Unlock()
+		return ReloadResult{}, err
+	}
+	if err := checkContext(ctx); err != nil {
+		inst.loader.mu.Unlock()
+		return ReloadResult{}, err
+	}
+	inst.loader.mu.Unlock()
+
+	inst.mu.Lock()
+	defer inst.mu.Unlock()
+	if inst.appliedSnapshot != nil && inst.appliedSnapshot.fingerprint == fingerprint {
+		return ReloadResult{Changed: false, Generation: inst.appliedSnapshot.generation}, nil
+	}
+	if err := inst.applyProgram(ctx, prog, true); err != nil {
+		return ReloadResult{}, err
+	}
+	inst.handle.install(prog, fingerprint)
+	inst.appliedSnapshot = inst.handle.current.Load()
+	return ReloadResult{Changed: true, Generation: inst.appliedSnapshot.generation}, nil
 }
 
 // Call calls a function on the persistent VM without rerunning top-level code.

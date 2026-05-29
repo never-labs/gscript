@@ -87,6 +87,42 @@ func TestHotLoaderReloadFailureKeepsPreviousProgram(t *testing.T) {
 	}
 }
 
+func TestHotLoaderReloadIfChangedSkipsSameSource(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "logic.gs")
+	if err := os.WriteFile(path, []byte(`func answer() { return 7 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	loader := gs.NewHotLoader()
+	handle, err := loader.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := loader.ReloadIfChanged(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Changed {
+		t.Fatal("ReloadIfChanged changed unchanged source")
+	}
+	if result.Generation != 1 || handle.Generation() != 1 {
+		t.Fatalf("generation result=%d handle=%d, want 1", result.Generation, handle.Generation())
+	}
+
+	if err := os.WriteFile(path, []byte(`func answer() { return 8 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	result, err = loader.ReloadIfChanged(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Changed || result.Generation != 2 || handle.Generation() != 2 {
+		t.Fatalf("ReloadIfChanged result=%+v handle generation=%d, want changed generation 2", result, handle.Generation())
+	}
+}
+
 func TestHotInstanceReloadPreservesScalarStateAndReplacesFunction(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "logic.gs")
@@ -121,6 +157,49 @@ func inc() {
 	}
 	assertCallResult(t, inst, "inc", int64(12))
 	assertCallResult(t, inst, "inc", int64(22))
+}
+
+func TestHotInstanceReloadIfChangedDoesNotReplayTopLevel(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "logic.gs")
+	writeScript(t, path, `
+loaded := 0
+loaded += 1
+func count_loaded() {
+	return loaded
+}
+`)
+
+	inst, err := gs.NewHotLoader().LoadInstance(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertCallResult(t, inst, "count_loaded", int64(1))
+
+	result, err := inst.ReloadIfChanged()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Changed {
+		t.Fatal("ReloadIfChanged changed unchanged source")
+	}
+	assertCallResult(t, inst, "count_loaded", int64(1))
+
+	writeScript(t, path, `
+loaded := 0
+loaded += 1
+func count_loaded() {
+	return loaded + 10
+}
+`)
+	result, err = inst.ReloadIfChanged()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Changed || result.Generation != 2 {
+		t.Fatalf("ReloadIfChanged result=%+v, want changed generation 2", result)
+	}
+	assertCallResult(t, inst, "count_loaded", int64(11))
 }
 
 func TestHotInstanceReloadPreservesTableIdentity(t *testing.T) {
