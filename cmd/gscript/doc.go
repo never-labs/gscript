@@ -129,6 +129,7 @@ func generateCLIReferenceMarkdown() []byte {
 		"repl":         "Start an interactive shell.",
 		"run":          "Run a script file.",
 		"test":         "Run GScript test files and stdout goldens.",
+		"version":      "Report binary version and build metadata.",
 	}
 	var b bytes.Buffer
 	fmt.Fprintln(&b, "# GScript CLI Reference")

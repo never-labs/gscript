@@ -86,6 +86,8 @@ schema。
   fetching.
 - `gscript ci smoke|pr|perf|release [--list] [--no-luajit]` provides canonical
   local CI profiles and can print the underlying commands before running them.
+- `gscript version [--json]` reports binary, platform, Go, and VCS build
+  metadata for release/debugging provenance.
 
 There are also developer binaries:
 
@@ -823,6 +825,7 @@ gscript doc generate
 gscript doc check
 gscript ci smoke|pr|perf|release
 gscript capabilities
+gscript version
 ```
 
 ## Non-Goals For The First Iteration

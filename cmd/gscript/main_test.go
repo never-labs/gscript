@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/ci/config/diag/doc/eval/fmt/inspect/lint/mod/repl", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "version") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/ci/config/diag/doc/eval/fmt/inspect/lint/mod/repl/version", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -73,6 +73,35 @@ func TestCapabilitiesRejectsExtraArgs(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
 	if !strings.Contains(stderr.String(), "usage: gscript capabilities") {
+		t.Fatalf("stderr = %q, want usage", stderr.String())
+	}
+}
+
+func TestVersionCommandJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runVersionCommand([]string{"--json"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runVersionCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var report cliVersionReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON version report: %v; stdout = %q", err, stdout.String())
+	}
+	if report.SchemaVersion != 1 || report.Version == "" || report.GoVersion == "" || report.GOOS != goruntime.GOOS || report.GOARCH != goruntime.GOARCH {
+		t.Fatalf("report = %+v, want stable version metadata", report)
+	}
+}
+
+func TestVersionCommandRejectsExtraArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := runVersionCommand([]string{"extra"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("runVersionCommand code = %d, want 2", code)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q, want empty", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "usage: gscript version") {
 		t.Fatalf("stderr = %q, want usage", stderr.String())
 	}
 }

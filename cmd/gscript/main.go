@@ -98,6 +98,8 @@ func main() {
 			os.Exit(runREPLCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "run":
 			os.Exit(runRunCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "version":
+			os.Exit(runVersionCommand(os.Args[2:], os.Stdout, os.Stderr))
 		}
 	}
 
@@ -348,6 +350,7 @@ func buildCapabilities() cliCapabilities {
 			"repl",
 			"run",
 			"test",
+			"version",
 		},
 		StdlibModules: modules,
 		Tooling: cliToolingCapability{
