@@ -101,6 +101,8 @@ type VM struct {
 	scriptDir            string
 	maxSteps             int64 // <=0 means unlimited
 	steps                int64
+	maxNativeCalls       int64 // <=0 means unlimited
+	nativeCalls          int64
 	ctx                  context.Context
 }
 
@@ -121,14 +123,22 @@ func (vm *VM) SetMaxSteps(max int64) {
 	vm.steps = 0
 }
 
+// SetMaxNativeCalls sets the maximum number of native Go calls made by one
+// Execute or host CallValue. A non-positive value disables the limit.
+func (vm *VM) SetMaxNativeCalls(max int64) {
+	vm.maxNativeCalls = max
+	vm.nativeCalls = 0
+}
+
 // SetContext installs a host cancellation context checked at bytecode
 // instruction checkpoints. A nil context disables cancellation polling.
 func (vm *VM) SetContext(ctx context.Context) {
 	vm.ctx = ctx
 }
 
-func (vm *VM) resetStepBudget() {
+func (vm *VM) resetExecutionBudgets() {
 	vm.steps = 0
+	vm.nativeCalls = 0
 }
 
 func (vm *VM) checkStepBudget() error {
@@ -145,6 +155,25 @@ func (vm *VM) checkStepBudget() error {
 			return fmt.Errorf("execution step limit exceeded (%d)", vm.maxSteps)
 		}
 	}
+	return nil
+}
+
+func (vm *VM) checkNativeCallBudget() error {
+	if vm.maxNativeCalls <= 0 {
+		return nil
+	}
+	vm.nativeCalls++
+	if vm.nativeCalls > vm.maxNativeCalls {
+		return fmt.Errorf("native call limit exceeded (%d)", vm.maxNativeCalls)
+	}
+	return nil
+}
+
+func (vm *VM) recordFastNativeCall(gf *runtime.GoFunction) error {
+	if err := vm.checkNativeCallBudget(); err != nil {
+		return err
+	}
+	runtime.RecordRuntimePathNativeCallFastFor(gf)
 	return nil
 }
 
@@ -725,6 +754,8 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		stringMeta:         parent.stringMeta,
 		currentCoroutine:   co,
 		coroutineStats:     parent.coroutineStats,
+		maxSteps:           parent.maxSteps,
+		maxNativeCalls:     parent.maxNativeCalls,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -800,6 +831,8 @@ func newIsolatedChildVM(parent *VM) *VM {
 		debugHook:          parent.debugHook,
 		debugOpts:          parent.debugOpts,
 		debugSink:          parent.debugSink,
+		maxSteps:           parent.maxSteps,
+		maxNativeCalls:     parent.maxNativeCalls,
 	}
 	child.initTypeNameValues()
 	child.RegisterCoroutineLib()
@@ -858,6 +891,10 @@ func (vm *VM) launchSyncTask(fn runtime.Value, args []runtime.Value, done func(e
 			return
 		}
 		if gf := fn.GoFunction(); gf != nil {
+			if budgetErr := goVM.checkNativeCallBudget(); budgetErr != nil {
+				err = budgetErr
+				return
+			}
 			_, err = gf.Fn(taskArgs)
 			return
 		}
@@ -902,12 +939,13 @@ func (vm *VM) Execute(proto *FuncProto) ([]runtime.Value, error) {
 	cl := &Closure{Proto: proto}
 	vm.frameCount = 0
 	vm.top = 0
-	vm.resetStepBudget()
+	vm.resetExecutionBudgets()
 	return vm.call(cl, nil, 0, 0)
 }
 
 // CallValue calls a function value with the given arguments (exported for gscript wrapper).
 func (vm *VM) CallValue(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
+	vm.resetExecutionBudgets()
 	return vm.callValue(fn, args)
 }
 
@@ -3055,7 +3093,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 				}
 			} else {
 				if gf := fnVal.GoFunction(); gf != nil && gf.FastArg1Ret2 != nil {
-					runtime.RecordRuntimePathNativeCallFastFor(gf)
+					if err := vm.recordFastNativeCall(gf); err != nil {
+						return nil, err
+					}
 					r0, r1, n, err := gf.FastArg1Ret2(vm.regs[base+a+1])
 					if err != nil {
 						return nil, err
@@ -3071,7 +3111,9 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						}
 					}
 				} else if gf := fnVal.GoFunction(); gf != nil && gf.FastArg2Ret2 != nil {
-					runtime.RecordRuntimePathNativeCallFastFor(gf)
+					if err := vm.recordFastNativeCall(gf); err != nil {
+						return nil, err
+					}
 					r0, r1, n, err := gf.FastArg2Ret2(vm.regs[base+a+1], vm.regs[base+a+2])
 					if err != nil {
 						return nil, err
@@ -3143,6 +3185,10 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 						_ = goVM.emitGoroutineError(err, fn)
 					}
 				} else if gf := fn.GoFunction(); gf != nil {
+					if err := goVM.checkNativeCallBudget(); err != nil {
+						_ = goVM.emitGoroutineError(err, fn)
+						return
+					}
 					if _, err := gf.Fn(goArgs); err != nil {
 						_ = goVM.emitGoroutineError(err, fn)
 					}

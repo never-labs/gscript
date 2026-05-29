@@ -301,6 +301,9 @@ func (vm *VM) callGoFunction(gf *runtime.GoFunction, args []runtime.Value) ([]ru
 	if gf == nil {
 		return nil, fmt.Errorf("attempt to call a nil native function")
 	}
+	if err := vm.checkNativeCallBudget(); err != nil {
+		return nil, err
+	}
 	var a0, a1, a2, a3, a4, a5, a6, a7 runtime.Value
 	if len(args) > 0 {
 		a0 = args[0]

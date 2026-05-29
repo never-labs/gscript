@@ -810,6 +810,9 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 	}
 
 	if gf := fn.GoFunction(); gf != nil {
+		if err := interp.checkNativeCallBudget(); err != nil {
+			return nil, err
+		}
 		interp.pushDebugFrame(gf.Name, "native")
 		defer interp.popDebugFrame()
 		if err := interp.emitDebugHook("call", "native", gf.Name, NilValue()); err != nil {
@@ -912,6 +915,7 @@ func (interp *Interpreter) callFunction(fn Value, args []Value) ([]Value, error)
 // CallFunction calls a GScript function value with the given args.
 // This is a public method for embedding use.
 func (interp *Interpreter) CallFunction(fn Value, args []Value) ([]Value, error) {
+	interp.resetExecutionBudgets()
 	return interp.callFunction(fn, args)
 }
 

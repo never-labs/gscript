@@ -109,6 +109,7 @@ type vmOptions struct {
 	requirePath    string
 	filesystemRoot string
 	maxSteps       int64
+	maxNativeCalls int64
 	printFunc      func(args ...interface{})
 	useVM          bool // use bytecode VM instead of tree-walker
 	useJIT         bool // enable JIT compilation (implies useVM)
@@ -265,6 +266,16 @@ func WithPrint(fn func(args ...interface{})) Option {
 // bypass the budget checkpoints.
 func WithMaxSteps(max int64) Option {
 	return func(o *vmOptions) { o.maxSteps = max }
+}
+
+// WithMaxNativeCalls limits calls from script into native Go functions,
+// including standard-library functions and registered host callbacks. A
+// non-positive value disables the limit.
+//
+// When a native-call limit is set, JIT execution is disabled so native code
+// cannot bypass host-call budget checkpoints.
+func WithMaxNativeCalls(max int64) Option {
+	return func(o *vmOptions) { o.maxNativeCalls = max }
 }
 
 // WithVM enables the bytecode VM instead of the default tree-walking interpreter.

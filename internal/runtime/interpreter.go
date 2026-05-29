@@ -33,6 +33,8 @@ type Interpreter struct {
 	gcRunning         bool             // host-facing collectgarbage running flag
 	maxSteps          int64            // <=0 means unlimited
 	steps             int64
+	maxNativeCalls    int64 // <=0 means unlimited
+	nativeCalls       int64
 	ctx               context.Context
 }
 
@@ -246,14 +248,22 @@ func (interp *Interpreter) SetMaxSteps(max int64) {
 	interp.steps = 0
 }
 
+// SetMaxNativeCalls sets the maximum number of native Go calls made by one
+// Exec/Run or host Call. A non-positive value disables the limit.
+func (interp *Interpreter) SetMaxNativeCalls(max int64) {
+	interp.maxNativeCalls = max
+	interp.nativeCalls = 0
+}
+
 // SetContext installs a host cancellation context checked at interpreter
 // statement/loop checkpoints. A nil context disables cancellation polling.
 func (interp *Interpreter) SetContext(ctx context.Context) {
 	interp.ctx = ctx
 }
 
-func (interp *Interpreter) resetStepBudget() {
+func (interp *Interpreter) resetExecutionBudgets() {
 	interp.steps = 0
+	interp.nativeCalls = 0
 }
 
 func (interp *Interpreter) checkStepBudget() error {
@@ -269,6 +279,17 @@ func (interp *Interpreter) checkStepBudget() error {
 		if interp.steps > interp.maxSteps {
 			return fmt.Errorf("execution step limit exceeded (%d)", interp.maxSteps)
 		}
+	}
+	return nil
+}
+
+func (interp *Interpreter) checkNativeCallBudget() error {
+	if interp.maxNativeCalls <= 0 {
+		return nil
+	}
+	interp.nativeCalls++
+	if interp.nativeCalls > interp.maxNativeCalls {
+		return fmt.Errorf("native call limit exceeded (%d)", interp.maxNativeCalls)
 	}
 	return nil
 }

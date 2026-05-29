@@ -16,7 +16,9 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunct
 	if err != nil {
 		return err
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(gf)
+	if err := vm.recordFastNativeCall(gf); err != nil {
+		return err
+	}
 	if countOnly {
 		vm.storeStdSelectOne(absSlot, rawC, runtime.IntValue(int64(start)))
 		return nil
@@ -37,7 +39,9 @@ func (vm *VM) executeStdSelectCall(absSlot, nArgs, rawC int, gf *runtime.GoFunct
 func (vm *VM) ExecuteStdSelectVarargCall(absSlot, rawC int, selector runtime.Value, varargs []runtime.Value, gf *runtime.GoFunction) error {
 	if rawC == 2 {
 		if selector.IsString() && selector.Str() == "#" {
-			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			if err := vm.recordFastNativeCall(gf); err != nil {
+				return err
+			}
 			vm.regs[absSlot] = runtime.IntValue(int64(len(varargs)))
 			return nil
 		}
@@ -50,7 +54,9 @@ func (vm *VM) ExecuteStdSelectVarargCall(absSlot, rawC int, selector runtime.Val
 			if idx < 1 {
 				return fmt.Errorf("bad argument #1 to 'select' (index out of range)")
 			}
-			runtime.RecordRuntimePathNativeCallFastFor(gf)
+			if err := vm.recordFastNativeCall(gf); err != nil {
+				return err
+			}
 			if idx > len(varargs) {
 				vm.regs[absSlot] = runtime.NilValue()
 			} else {
@@ -63,7 +69,9 @@ func (vm *VM) ExecuteStdSelectVarargCall(absSlot, rawC int, selector runtime.Val
 	if err != nil {
 		return err
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(gf)
+	if err := vm.recordFastNativeCall(gf); err != nil {
+		return err
+	}
 	if countOnly {
 		vm.storeStdSelectOne(absSlot, rawC, runtime.IntValue(int64(start)))
 		return nil
@@ -234,6 +242,9 @@ func (vm *VM) executeDirectGoFunctionFastCall(gf *runtime.GoFunction, absSlot, n
 	if !hasFastPath {
 		return false, nil
 	}
+	if err := vm.checkNativeCallBudget(); err != nil {
+		return true, err
+	}
 	var err error
 	if err = vm.emitDebugHook("call", "native", gf.Name, runtime.NilValue()); err != nil {
 		return true, err
@@ -303,7 +314,9 @@ func (vm *VM) ExecuteStdIPairsCall(absSlot, nArgs, rawC int) (bool, error) {
 	if nArgs == 0 || absSlot+1 >= len(vm.regs) || !vm.regs[absSlot+1].IsTable() {
 		return true, fmt.Errorf("bad argument #1 to 'ipairs' (table expected)")
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{
 		runtime.FunctionValue(vm.ipairsIteratorFn),
 		vm.regs[absSlot+1],
@@ -324,7 +337,9 @@ func (vm *VM) ExecuteStdPairsCall(absSlot, nArgs, rawC int) (bool, error) {
 	if mt := tbl.GetMetatable(); mt != nil && !mt.RawGetString("__pairs").IsNil() {
 		return false, nil
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.storeStdSelectResults(absSlot, rawC, []runtime.Value{
 		runtime.FunctionValue(vm.newPairsIteratorFunction(tbl)),
 		vm.regs[absSlot+1],
@@ -352,7 +367,9 @@ func (vm *VM) ExecuteStdStringFindCall(absSlot, nArgs, rawC int) (bool, error) {
 	if err != nil || !handled {
 		return handled, err
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)
 	return true, nil
 }
@@ -372,7 +389,9 @@ func (vm *VM) ExecuteStdStringMatchCall(absSlot, nArgs, rawC int) (bool, error) 
 	if err != nil || !handled {
 		return handled, err
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.storeFixedFastCallResult(absSlot, rawC, r0, r1, n)
 	return true, nil
 }
@@ -388,7 +407,9 @@ func (vm *VM) ExecuteStdRawGetCall(absSlot, nArgs, rawC int) (bool, error) {
 	if !table.IsTable() {
 		return true, fmt.Errorf("bad argument #1 to 'rawget' (table expected, got %s)", table.TypeName())
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.writeSingleCallResult(absSlot, rawC, table.Table().RawGet(vm.regs[absSlot+2]))
 	return true, nil
 }
@@ -410,7 +431,9 @@ func (vm *VM) ExecuteStdNextCall(absSlot, nArgs, rawC int) (bool, error) {
 	}
 	tbl := table.Table()
 	nk, nv, ok := tbl.Next(key)
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	if !ok {
 		if !key.IsNil() && tbl.RawGet(key).IsNil() {
 			return true, fmt.Errorf("invalid key to 'next'")
@@ -440,7 +463,9 @@ func (vm *VM) ExecuteStdRawSetCall(absSlot, nArgs, rawC int) (bool, error) {
 	if key.IsFloat() && math.IsNaN(key.Float()) {
 		return true, fmt.Errorf("table index is NaN")
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	table.Table().RawSet(key, vm.regs[absSlot+3])
 	vm.writeSingleCallResult(absSlot, rawC, table)
 	return true, nil
@@ -465,7 +490,9 @@ func (vm *VM) ExecuteStdRawLenCall(absSlot, nArgs, rawC int) (bool, error) {
 	default:
 		return true, fmt.Errorf("bad argument to 'rawlen' (table, string, or channel expected, got %s)", arg.TypeName())
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.writeSingleCallResult(absSlot, rawC, result)
 	return true, nil
 }
@@ -476,7 +503,9 @@ func (vm *VM) ExecuteStdTypeCall(absSlot, nArgs, rawC int) (bool, error) {
 	if nArgs != 1 || absSlot+1 >= len(vm.regs) {
 		return false, nil
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.writeSingleCallResult(absSlot, rawC, vm.typeNameValue(vm.regs[absSlot+1]))
 	return true, nil
 }
@@ -499,7 +528,9 @@ func (vm *VM) ExecuteStdGetMetatableCall(absSlot, nArgs, rawC int) (bool, error)
 			}
 		}
 	}
-	runtime.RecordRuntimePathNativeCallFastFor(vm.regs[absSlot].GoFunction())
+	if err := vm.recordFastNativeCall(vm.regs[absSlot].GoFunction()); err != nil {
+		return true, err
+	}
 	vm.writeSingleCallResult(absSlot, rawC, result)
 	return true, nil
 }

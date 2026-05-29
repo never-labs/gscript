@@ -148,7 +148,10 @@ Required controls:
 - `WithMaxSteps` / future `MaxInstructions`: checked at bytecode dispatch and
   tree-walker statement boundaries. This exists today for interpreter and
   bytecode VM execution.
-- `MaxNativeCalls`: limits calls from script into Go stdlib or host callbacks.
+- `WithMaxNativeCalls`: limits calls from script into Go stdlib or registered
+  host callbacks. This exists today for interpreter and bytecode VM execution,
+  including bytecode stdlib fast paths. Setting this option disables JIT until
+  compiled code debits the same counter.
 - `MaxJITTicks`: JIT code must periodically debit the same execution budget at
   loop backedges, call exits, and side exits.
 - `Deadline` or `Timeout`: wall-clock cancellation via `context.Context`;
@@ -163,10 +166,11 @@ location when available, and budget counters. Do not panic. Do not call
 
 Implementation notes:
 
-- The first implementation stores a per-VM step counter in the runtime
-  interpreter and bytecode VM, and the same checkpoints poll active public
-  execution contexts. A later shared `ExecutionBudget` should add structured
-  counters, deadline metadata, JIT polling, and host-call accounting.
+- The first implementation stores per-VM step and native-call counters in the
+  runtime interpreter and bytecode VM, and the same checkpoints poll active
+  public execution contexts. A later shared `ExecutionBudget` should add
+  structured counters, deadline metadata, JIT polling, and host-call duration
+  accounting.
 - Compile/JIT loop backedges should include budget polls. If a compiled path
   cannot poll correctly, it must side-exit to the interpreter before continuing.
 - Blocking stdlib operations must use the VM context so a timed-out script

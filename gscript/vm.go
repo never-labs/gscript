@@ -47,6 +47,10 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxSteps(o.maxSteps)
 		o.useJIT = false
 	}
+	if o.maxNativeCalls > 0 {
+		interp.SetMaxNativeCalls(o.maxNativeCalls)
+		o.useJIT = false
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -146,11 +150,19 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			if vm.opts.maxSteps > 0 {
 				bvm.SetMaxSteps(vm.opts.maxSteps)
 			}
+			if vm.opts.maxNativeCalls > 0 {
+				bvm.SetMaxNativeCalls(vm.opts.maxNativeCalls)
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
-		} else if vm.opts.maxSteps > 0 {
-			bvm.SetMaxSteps(vm.opts.maxSteps)
+		} else {
+			if vm.opts.maxSteps > 0 {
+				bvm.SetMaxSteps(vm.opts.maxSteps)
+			}
+			if vm.opts.maxNativeCalls > 0 {
+				bvm.SetMaxNativeCalls(vm.opts.maxNativeCalls)
+			}
 		}
 		bvm.SetContext(activeRunContext(ctx))
 		if _, err := bvm.Execute(proto); err != nil {

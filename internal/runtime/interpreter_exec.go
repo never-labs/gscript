@@ -23,7 +23,7 @@ func (interp *Interpreter) Exec(prog *ast.Program) error {
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return err
 	}
-	interp.resetStepBudget()
+	interp.resetExecutionBudgets()
 	interp.pushDeferFrame()
 	_, _, _, _, err := interp.execBlockInEnv(&ast.BlockStmt{P: prog.GetPos(), Stmts: prog.Stmts}, interp.globals)
 	if err != nil {
@@ -50,7 +50,7 @@ func (interp *Interpreter) ExecString(src string) ([]Value, error) {
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return nil, err
 	}
-	interp.resetStepBudget()
+	interp.resetExecutionBudgets()
 	// Execute and collect return values from the last return statement.
 	var lastRet []Value
 	interp.pushDeferFrame()
