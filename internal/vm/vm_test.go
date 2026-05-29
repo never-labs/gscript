@@ -2,6 +2,7 @@ package vm
 
 import (
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/gscript/gscript/internal/ast"
@@ -2191,6 +2192,121 @@ r2 := <-ch
 total := r1 + r2
 `)
 	expectGlobalInt(t, g, "total", 30)
+}
+
+func TestGoStmtBlockingSleepRunsConcurrently(t *testing.T) {
+	g := compileAndRun(t, `
+workers := 4
+delay := 0.03
+
+func sleeper(d, out) {
+	time.sleep(d)
+	out <- 1
+}
+
+func run_single(n, d) {
+	total := 0
+	for i := 1; i <= n; i++ {
+		time.sleep(d)
+		total = total + 1
+	}
+	return total
+}
+
+func run_parallel(n, d) {
+	out := make(chan, n)
+	for i := 1; i <= n; i++ {
+		go sleeper(d, out)
+	}
+	total := 0
+	for i := 1; i <= n; i++ {
+		total = total + <-out
+	}
+	return total
+}
+
+t0 := time.now()
+single := run_single(workers, delay)
+singleElapsed := time.since(t0)
+
+t1 := time.now()
+parallel := run_parallel(workers, delay)
+parallelElapsed := time.since(t1)
+
+speedup := singleElapsed / parallelElapsed
+`)
+	expectGlobalInt(t, g, "single", 4)
+	expectGlobalInt(t, g, "parallel", 4)
+	singleElapsed := g["singleElapsed"].Number()
+	parallelElapsed := g["parallelElapsed"].Number()
+	speedup := g["speedup"].Number()
+	if singleElapsed < 0.09 {
+		t.Fatalf("single sleep elapsed = %.6fs, want roughly serial blocking sleep", singleElapsed)
+	}
+	if parallelElapsed >= singleElapsed*0.75 {
+		t.Fatalf("parallel sleep elapsed = %.6fs, single = %.6fs, speedup = %.2fx; goroutines did not overlap enough", parallelElapsed, singleElapsed, speedup)
+	}
+}
+
+type isolatedChildJITProbe struct {
+	childCreated chan *isolatedChildJITProbe
+	bindCount    atomic.Int64
+	tryCount     atomic.Int64
+}
+
+func (j *isolatedChildJITProbe) TryCompile(proto *FuncProto) interface{} {
+	j.tryCount.Add(1)
+	return nil
+}
+
+func (j *isolatedChildJITProbe) Execute(compiled interface{}, regs []runtime.Value, base int, proto *FuncProto) ([]runtime.Value, error) {
+	return nil, nil
+}
+
+func (j *isolatedChildJITProbe) SetCallVM(v *VM) {
+	j.bindCount.Add(1)
+}
+
+func (j *isolatedChildJITProbe) NewIsolatedChildEngine(child *VM) MethodJITEngine {
+	childJIT := &isolatedChildJITProbe{}
+	if j.childCreated != nil {
+		j.childCreated <- childJIT
+	}
+	return childJIT
+}
+
+func TestGoStmtIsolatedChildReceivesOwnMethodJIT(t *testing.T) {
+	proto := compileProto(t, `
+ch := make(chan, 1)
+func worker() {
+	ch <- 7
+}
+go worker()
+result := <-ch
+`)
+	globals := runtime.NewInterpreterGlobals()
+	v := New(globals)
+	parentJIT := &isolatedChildJITProbe{childCreated: make(chan *isolatedChildJITProbe, 1)}
+	v.SetMethodJIT(parentJIT)
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	expectGlobalInt(t, globals, "result", 7)
+	var childJIT *isolatedChildJITProbe
+	select {
+	case childJIT = <-parentJIT.childCreated:
+	default:
+		t.Fatal("go child VM did not request an isolated MethodJIT engine")
+	}
+	if got := parentJIT.bindCount.Load(); got != 1 {
+		t.Fatalf("parent JIT bind count = %d, want 1; child must not rebind parent callVM", got)
+	}
+	if got := childJIT.bindCount.Load(); got != 1 {
+		t.Fatalf("child JIT bind count = %d, want 1", got)
+	}
+	if got := childJIT.tryCount.Load(); got == 0 {
+		t.Fatal("child JIT did not observe worker compilation attempts")
+	}
 }
 
 // Test go writes to shared table

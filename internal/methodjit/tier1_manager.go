@@ -189,6 +189,13 @@ func (e *BaselineJITEngine) NewCoroutineChildEngine(child *vm.VM) vm.MethodJITEn
 	return childEngine
 }
 
+// NewIsolatedChildEngine returns a VM-bound baseline engine for an OP_GO child
+// VM. It must not share the parent's callVM binding because goroutines execute
+// concurrently and exits have to resume against the child register/frame state.
+func (e *BaselineJITEngine) NewIsolatedChildEngine(child *vm.VM) vm.MethodJITEngine {
+	return e.NewCoroutineChildEngine(child)
+}
+
 // SetTierUpThreshold configures the CallCount threshold at which handleCall
 // falls to the slow path (callVM.CallValue) instead of executing the callee
 // directly. This allows the TieringManager to trigger Tier 2 compilation.

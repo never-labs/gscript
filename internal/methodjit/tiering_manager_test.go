@@ -35,6 +35,34 @@ func runWithTieringManager(t *testing.T, src string) (*vm.VM, *TieringManager) {
 	return v, tm
 }
 
+func TestTieringManager_GoroutineChildJITCompilesConcurrently(t *testing.T) {
+	v, _ := runWithTieringManager(t, `
+func spin(n) {
+    s := 0
+    for i := 1; i <= n; i++ {
+        s = s + (i % 97) * (i % 89)
+    }
+    return s
+}
+
+func worker(n, out) {
+    out <- spin(n)
+}
+
+ch := make(chan, 4)
+for w := 1; w <= 4; w++ {
+    go worker(120000, ch)
+}
+total := 0
+for w := 1; w <= 4; w++ {
+    total = total + <-ch
+}
+`)
+	if got := v.GetGlobal("total"); !got.IsInt() || got.Int() <= 0 {
+		t.Fatalf("total = %v, want positive int", got)
+	}
+}
+
 func TestTieringManager_TableFieldAccessPromotesAtCallBoundary(t *testing.T) {
 	old := os.Getenv("GSCRIPT_TIER2_NO_FILTER")
 	t.Cleanup(func() {

@@ -363,6 +363,22 @@ func (tm *TieringManager) NewCoroutineChildEngine(child *vm.VM) vm.MethodJITEngi
 	return tm.tier1.NewCoroutineChildEngine(child)
 }
 
+// NewIsolatedChildEngine returns an independent tiering manager for an OP_GO
+// child VM. Tiering state is deliberately not shared: compiled-code maps,
+// exit-resume buffers, and callVM bindings are mutable execution state and the
+// parent manager is not a cross-goroutine owner for those structures.
+func (tm *TieringManager) NewIsolatedChildEngine(child *vm.VM) vm.MethodJITEngine {
+	if tm == nil {
+		return nil
+	}
+	childTM := NewTieringManager()
+	childTM.SetTier2Threshold(tm.tier2Threshold)
+	if tm.perfStatsEnabled {
+		childTM.EnableTier2PerfStats()
+	}
+	return childTM
+}
+
 // getProfile returns a cached FuncProfile for the given proto, computing it
 // on first access.
 func (tm *TieringManager) getProfile(proto *vm.FuncProto) FuncProfile {

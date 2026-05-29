@@ -23,6 +23,7 @@ package methodjit
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/gscript/gscript/internal/jit"
 	"github.com/gscript/gscript/internal/vm"
@@ -244,12 +245,13 @@ func emitFloatArith(asm *jit.Assembler, valA, valB jit.Reg, op string) {
 	asm.FMOVtoGP(valA, jit.D0)
 }
 
-// baselineLabelID is a global counter for generating unique labels.
-var baselineLabelID int
+// baselineLabelID is a process-wide counter for generating unique labels.
+// Baseline compilation can happen in parallel in OP_GO child VMs, so this
+// counter must be atomic.
+var baselineLabelID atomic.Uint64
 
 func nextLabel(prefix string) string {
-	id := baselineLabelID
-	baselineLabelID++
+	id := baselineLabelID.Add(1)
 	return fmt.Sprintf("%s_%d", prefix, id)
 }
 

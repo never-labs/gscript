@@ -51,6 +51,10 @@ type methodJITEngineWithCoroutineChild interface {
 	NewCoroutineChildEngine(child *VM) MethodJITEngine
 }
 
+type methodJITEngineWithIsolatedChild interface {
+	NewIsolatedChildEngine(child *VM) MethodJITEngine
+}
+
 // VM is the bytecode virtual machine.
 type VM struct {
 	regs                 []runtime.Value          // register file (shared across frames via base offset)
@@ -791,7 +795,22 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterLoaderLib()
 	child.scriptDir = parent.scriptDir
 	runtime.RegisterVM(child)
+	child.attachIsolatedChildJIT(parent)
 	return child
+}
+
+func (vm *VM) attachIsolatedChildJIT(parent *VM) {
+	if vm == nil || parent == nil || parent.methodJIT == nil {
+		return
+	}
+	factory, ok := parent.methodJIT.(methodJITEngineWithIsolatedChild)
+	if !ok {
+		return
+	}
+	childEngine := factory.NewIsolatedChildEngine(vm)
+	if childEngine != nil {
+		vm.SetMethodJIT(childEngine)
+	}
 }
 
 func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {

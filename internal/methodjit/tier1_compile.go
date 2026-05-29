@@ -58,8 +58,6 @@ func CompileBaseline(proto *vm.FuncProto) (*BaselineFunc, error) {
 	asm := jit.NewAssembler()
 	code := proto.Code
 
-	// Reset the global label counter for this compilation.
-	baselineLabelID = 0
 	registerAccumulatorClosureFastPaths(proto)
 
 	// Track which PCs need resume stubs (for op-exit resume).
