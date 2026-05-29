@@ -481,13 +481,23 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *format != "text" && *format != "json" && *format != "sarif" {
-		fmt.Fprintf(errw, "gscript lint: unsupported --format %q (want text, json, or sarif)\n", *format)
-		return 2
-	}
 	paths := fs.Args()
 	if len(paths) == 0 {
 		fmt.Fprintln(errw, "usage: gscript lint [--format=text|json|sarif] <path-or-dir> [...]")
+		return 2
+	}
+	if !flagWasSet(fs, "format") {
+		config, diagnostics, err := loadOptionalCLIProjectConfig(paths[0])
+		if err != nil {
+			printCLIConfigDiagnostics(errw, paths[0], diagnostics)
+			return 2
+		}
+		if config != nil && config.Tool.Lint.Format != "" {
+			*format = config.Tool.Lint.Format
+		}
+	}
+	if *format != "text" && *format != "json" && *format != "sarif" {
+		fmt.Fprintf(errw, "gscript lint: unsupported --format %q (want text, json, or sarif)\n", *format)
 		return 2
 	}
 
@@ -733,13 +743,23 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	if *format != "text" && *format != "json" {
-		fmt.Fprintf(errw, "gscript test: unsupported --format %q (want text or json)\n", *format)
-		return 2
-	}
 	paths := fs.Args()
 	if len(paths) != 1 {
 		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] <path-or-dir>")
+		return 2
+	}
+	if !flagWasSet(fs, "format") {
+		config, diagnostics, err := loadOptionalCLIProjectConfig(paths[0])
+		if err != nil {
+			printCLIConfigDiagnostics(errw, paths[0], diagnostics)
+			return 2
+		}
+		if config != nil && config.Tool.Test.Format != "" {
+			*format = config.Tool.Test.Format
+		}
+	}
+	if *format != "text" && *format != "json" {
+		fmt.Fprintf(errw, "gscript test: unsupported --format %q (want text or json)\n", *format)
 		return 2
 	}
 	result := runTestsDetailed(paths[0], opts, errw, *format == "text")

@@ -164,6 +164,40 @@ func loadCLIProjectConfig(start string) (cliConfigReport, error) {
 	return report, nil
 }
 
+func loadOptionalCLIProjectConfig(start string) (*cliProjectConfig, []cliConfigDiagnostic, error) {
+	if _, err := os.Stat(start); err != nil {
+		return nil, nil, nil
+	}
+	report, err := loadCLIProjectConfig(start)
+	if err != nil {
+		if !report.Found && len(report.Diagnostics) == 1 && report.Diagnostics[0].Code == "GS9001" {
+			return nil, nil, nil
+		}
+		return report.Config, report.Diagnostics, err
+	}
+	return report.Config, report.Diagnostics, nil
+}
+
+func flagWasSet(fs *flag.FlagSet, name string) bool {
+	found := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
+func printCLIConfigDiagnostics(errw io.Writer, path string, diagnostics []cliConfigDiagnostic) {
+	for _, diag := range diagnostics {
+		if diag.Line > 0 && path != "" {
+			fmt.Fprintf(errw, "%s:%d: %s %s: %s\n", path, diag.Line, diag.Severity, diag.Code, diag.Message)
+		} else {
+			fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
+		}
+	}
+}
+
 func discoverCLIConfig(start string) (configPath, root string, err error) {
 	abs, err := filepath.Abs(start)
 	if err != nil {

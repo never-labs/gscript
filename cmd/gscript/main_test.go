@@ -306,6 +306,33 @@ func TestRunTestCommandJSONReportsResults(t *testing.T) {
 	}
 }
 
+func TestRunTestCommandUsesConfiguredFormat(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.toml"), []byte("[tool.test]\nformat = \"json\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "ok.gs")
+	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".gs")+".out", []byte("ok\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not configured JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if !result.OK || result.Total != 1 {
+		t.Fatalf("result = %+v, want one passing configured JSON test", result)
+	}
+}
+
 func TestRunTestCommandJSONReportsFailures(t *testing.T) {
 	dir := t.TempDir()
 	badPath := filepath.Join(dir, "bad.gs")
@@ -333,6 +360,33 @@ func TestRunTestCommandJSONReportsFailures(t *testing.T) {
 	}
 	if len(result.Files) != 1 || result.Files[0].Error != "" || result.Files[0].Expected != "expected\n" || result.Files[0].Actual != "actual\n" {
 		t.Fatalf("file result = %+v, want stdout mismatch payload", result.Files)
+	}
+}
+
+func TestLintCommandUsesConfiguredFormat(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.toml"), []byte("[tool.lint]\nformat = \"json\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(path, []byte("func {\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runLintCommand code = %d, want diagnostics failure", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty in configured JSON mode", stderr.String())
+	}
+	var diagnostics []lintDiagnostic
+	if err := json.Unmarshal(stdout.Bytes(), &diagnostics); err != nil {
+		t.Fatalf("stdout is not configured JSON diagnostics: %v; stdout = %q", err, stdout.String())
+	}
+	if len(diagnostics) != 1 || diagnostics[0].File != path || diagnostics[0].Code != "GS1001" {
+		t.Fatalf("diagnostics = %+v, want configured JSON parse diagnostic for %s", diagnostics, path)
 	}
 }
 
