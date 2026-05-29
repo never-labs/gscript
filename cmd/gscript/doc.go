@@ -112,26 +112,7 @@ func runDocCheckCommand(args []string, outw, errw io.Writer) int {
 }
 
 func generateCLIReferenceMarkdown() []byte {
-	caps := buildCapabilities()
-	descriptions := map[string]string{
-		"bench":        "Run benchmark harnesses.",
-		"capabilities": "Report binary capabilities.",
-		"check":        "Run formatter, linter, tests, and docs checks.",
-		"ci":           "Run canonical local CI profiles.",
-		"config":       "Discover and validate project config.",
-		"diag":         "Run diagnostic dump and bundle tools.",
-		"doc":          "Generate and validate documentation references.",
-		"eval":         "Execute source passed on the command line.",
-		"fmt":          "Format or check GScript source files.",
-		"help":         "Show command help.",
-		"inspect":      "Inspect compiled artifacts.",
-		"lint":         "Report source diagnostics.",
-		"mod":          "Manage local module metadata and require graphs.",
-		"repl":         "Start an interactive shell.",
-		"run":          "Run a script file.",
-		"test":         "Run GScript test files and stdout goldens.",
-		"version":      "Report binary version and build metadata.",
-	}
+	topics := cliHelpTopics()
 	var b bytes.Buffer
 	fmt.Fprintln(&b, "# GScript CLI Reference")
 	fmt.Fprintln(&b)
@@ -139,12 +120,8 @@ func generateCLIReferenceMarkdown() []byte {
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, "| Command | Summary |")
 	fmt.Fprintln(&b, "|---|---|")
-	for _, command := range caps.Commands {
-		summary := descriptions[command]
-		if summary == "" {
-			summary = "No summary available."
-		}
-		fmt.Fprintf(&b, "| `%s` | %s |\n", command, summary)
+	for _, command := range cliCommandNames() {
+		fmt.Fprintf(&b, "| `%s` | %s |\n", command, topics[command].Summary)
 	}
 	return b.Bytes()
 }

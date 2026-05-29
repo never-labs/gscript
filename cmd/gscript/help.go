@@ -73,3 +73,13 @@ func cliHelpTopics() map[string]cliHelpTopic {
 	}
 	return out
 }
+
+func cliCommandNames() []string {
+	topics := cliHelpTopics()
+	commands := make([]string, 0, len(topics))
+	for command := range topics {
+		commands = append(commands, command)
+	}
+	sort.Strings(commands)
+	return commands
+}

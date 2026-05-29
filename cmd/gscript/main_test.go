@@ -120,6 +120,36 @@ func TestHelpCommandListsCommands(t *testing.T) {
 	}
 }
 
+func TestCommandMetadataStaysInSync(t *testing.T) {
+	topics := cliHelpTopics()
+	commands := cliCommandNames()
+	if len(commands) == 0 {
+		t.Fatal("cliCommandNames is empty")
+	}
+	caps := buildCapabilities()
+	if len(caps.Commands) != len(commands) {
+		t.Fatalf("capability commands = %#v, want %#v", caps.Commands, commands)
+	}
+	for i, command := range commands {
+		if caps.Commands[i] != command {
+			t.Fatalf("capability commands = %#v, want %#v", caps.Commands, commands)
+		}
+		topic := topics[command]
+		if topic.Command != command || topic.Usage == "" || topic.Summary == "" {
+			t.Fatalf("topic for %q = %+v, want complete metadata", command, topic)
+		}
+	}
+	doc := string(generateCLIReferenceMarkdown())
+	if strings.Contains(doc, "No summary available") {
+		t.Fatalf("generated CLI reference has missing summary: %q", doc)
+	}
+	for _, command := range commands {
+		if !strings.Contains(doc, "`"+command+"`") {
+			t.Fatalf("generated CLI reference missing %q: %q", command, doc)
+		}
+	}
+}
+
 func TestHelpCommandShowsCommandUsage(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runHelpCommand([]string{"run"}, &stdout, &stderr)
