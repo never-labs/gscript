@@ -29,6 +29,7 @@ Supported core forms:
 - `sync.mutex()` with `lock`, `unlock`, and `trylock`
 - `sync.rwmutex()` with `lock`, `unlock`, `rlock`, `runlock`, `trylock`, and `tryrlock`
 - `sync.once()` with `do(fn)`
+- `time.after(seconds)` for timeout channels in `select`
 
 The implementation uses isolated child VMs for `go` calls. Globals are snapshotted for lock-light reads, while heap objects such as tables and channels are shared by pointer. This keeps ordinary single-threaded code on the existing fast path.
 
@@ -37,3 +38,5 @@ The implementation uses isolated child VMs for `go` calls. Globals are snapshott
 `sync.waitgroup()` mirrors Go's coarse task-join pattern for scripts that need to wait for a fixed set of goroutines.
 
 `sync.mutex()`, `sync.rwmutex()`, and `sync.once()` are host-backed coarse synchronization primitives. They are intended for shared heap objects that are explicitly touched by goroutines, without adding locks to ordinary local computation.
+
+`time.after(seconds)` returns a channel that receives the current time once after the delay, so timeout logic can stay in ordinary `select` syntax.

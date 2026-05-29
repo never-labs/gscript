@@ -176,6 +176,23 @@ func buildTimeLib() *Table {
 		return nil, nil
 	})
 
+	// time.after(seconds) -> channel
+	set("after", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'time.after'")
+		}
+		secs := toFloat(args[0])
+		if secs < 0 {
+			return nil, fmt.Errorf("bad argument #1 to 'time.after' (non-negative duration expected)")
+		}
+		ch := NewChannel(1)
+		go func() {
+			time.Sleep(time.Duration(secs * float64(time.Second)))
+			_ = ch.Send(TableValue(goTimeToTable(time.Now())))
+		}()
+		return []Value{ChannelValue(ch)}, nil
+	})
+
 	// time.since(t) -> float seconds elapsed
 	setFastArg1("since", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
