@@ -329,6 +329,12 @@ func GCRootLogSize() int64 {
 	return atomic.LoadInt64(&gcLog.cursor)
 }
 
+// GCRootScannerCount returns the number of active VM root scanners. It is a
+// diagnostic hook used by VM lifecycle tests and testkit memory snapshots.
+func GCRootScannerCount() int {
+	return int(atomic.LoadInt32(&activeVMCount))
+}
+
 // keepAliveIface registers a Go-heap pointer AND stores the full interface
 // for later type recovery via lookupIface. Used only for AnyFunction/AnyCoroutine.
 func keepAliveIface(p unsafe.Pointer, obj any) {

@@ -136,6 +136,7 @@ func (interp *Interpreter) testkitMemorySnapshot() *Table {
 	t.RawSetString("heapObjects", IntValue(int64(stats.HeapObjects)))
 	t.RawSetString("numGC", IntValue(int64(stats.NumGC)))
 	t.RawSetString("rootLog", IntValue(GCRootLogSize()))
+	t.RawSetString("rootScanners", IntValue(int64(GCRootScannerCount())))
 	t.RawSetString("running", BoolValue(interp.gcRunning))
 	t.RawSetString("mode", StringValue(interp.gcMode))
 	return t

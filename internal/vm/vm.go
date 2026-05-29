@@ -3072,6 +3072,7 @@ func (vm *VM) run() (retVals []runtime.Value, retErr error) {
 			}
 			go func(fn runtime.Value, goArgs []runtime.Value) {
 				goVM := newIsolatedChildVM(vm)
+				defer goVM.Close()
 				defer func() {
 					if r := recover(); r != nil {
 						_ = goVM.emitGoroutineError(fmt.Errorf("panic: %v", r), fn)

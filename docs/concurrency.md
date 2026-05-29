@@ -36,7 +36,7 @@ Supported core forms:
 - `time.sleep(ctx, seconds)` for cancellable sleep
 - `process.run(ctx, cmd, opts)` for cancellable subprocesses
 
-The implementation uses isolated child VMs for `go` calls. Globals are snapshotted for lock-light reads, while heap objects such as tables and channels are shared by pointer. This keeps ordinary single-threaded code on the existing fast path.
+The implementation uses isolated child VMs for `go` calls. Globals are snapshotted for lock-light reads, while heap objects such as tables and channels are shared by pointer. Child VMs are unregistered from the GC root scanner when the goroutine exits, so completed background work does not grow the active root set. This keeps ordinary single-threaded code on the existing fast path.
 
 `go` is fire-and-forget: a goroutine failure does not turn into a parent return value. For diagnostics, set `debug.setSink(fn)`. Runtime failures from child goroutines emit `type="error"` and `kind="goroutine"` events with `name`, `error`, and `stack` fields.
 

@@ -2324,6 +2324,34 @@ result := state.value
 	expectGlobalInt(t, g, "result", 99)
 }
 
+func TestGoStmtChildVMsUnregisterAfterExit(t *testing.T) {
+	before := runtime.GCRootScannerCount()
+	proto := compileProto(t, `
+workers := 8
+ch := make(chan, workers)
+for i := 1; i <= workers; i++ {
+	go func(v) {
+		ch <- v
+	}(i)
+}
+sum := 0
+for i := 1; i <= workers; i++ {
+	sum = sum + <-ch
+}
+`)
+	globals := runtime.NewInterpreterGlobals()
+	v := New(globals)
+	if _, err := v.Execute(proto); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	v.Close()
+	after := runtime.GCRootScannerCount()
+	if after != before {
+		t.Fatalf("active VM root scanners = %d after go workers exit, want %d", after, before)
+	}
+	expectGlobalInt(t, globals, "sum", 36)
+}
+
 func TestSelectDefaultWhenNoChannelReady(t *testing.T) {
 	g := compileAndRun(t, `
 ch := make(chan, 1)
