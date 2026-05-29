@@ -60,6 +60,9 @@ schema。
 - `gscript capabilities [--json]` reports the current binary's platform,
   execution backends, stdlib modules, supported subcommands, and stable tooling
   output formats for CI/editor integration.
+- `gscript config [--json] [path]` walks upward from a file or directory,
+  discovers `gscript.toml`, validates the supported project/tool keys, and
+  reports the resolved project root for CI/editor integration.
 
 There are also developer binaries:
 
@@ -69,8 +72,9 @@ There are also developer binaries:
 ### Gaps
 
 - Flat flags do not scale to formatter/linter/test/bench/doc/package workflows.
-- No `--help` hierarchy, machine-readable command inventory, shell completion,
-  config discovery, or stable exit-code contract.
+- No `--help` hierarchy, shell completion, or stable exit-code contract.
+- Project config discovery exists, but formatter/linter/test commands do not
+  yet consume the resolved config by default.
 - Diagnostics mostly write to stderr; JSON flags exist but are not unified under
   one schema envelope.
 - `cmd/dump` and `cmd/dump_bytecode` are useful but not discoverable as
@@ -87,6 +91,8 @@ P0:
   `--config PATH`, `--no-config`, `--color=auto|always|never`.
 - Define exit codes: `0` success, `1` runtime/test failure, `2` usage/config
   error, `3` parse/lint failure, `4` internal/tool failure, `124` timeout.
+- Reuse `gscript config --json` as the common discovery layer for editor, CI,
+  formatter, linter, test, and future package commands.
 
 P1:
 

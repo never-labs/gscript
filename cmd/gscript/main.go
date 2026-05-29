@@ -72,6 +72,8 @@ func main() {
 		switch os.Args[1] {
 		case "capabilities":
 			os.Exit(runCapabilitiesCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "config":
+			os.Exit(runConfigCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "fmt":
 			os.Exit(runFmtCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "lint":
@@ -246,6 +248,7 @@ type cliToolingCapability struct {
 	Formatter cliFormatterCapability `json:"formatter"`
 	Linter    cliLinterCapability    `json:"linter"`
 	Test      cliTestCapability      `json:"test"`
+	Config    cliConfigCapability    `json:"config"`
 }
 
 type cliFormatterCapability struct {
@@ -311,6 +314,7 @@ func buildCapabilities() cliCapabilities {
 		},
 		Commands: []string{
 			"capabilities",
+			"config",
 			"fmt",
 			"lint",
 			"run",
@@ -332,6 +336,16 @@ func buildCapabilities() cliCapabilities {
 			Test: cliTestCapability{
 				GoldenStdout: true,
 				Directory:    true,
+			},
+			Config: cliConfigCapability{
+				FileName: "gscript.toml",
+				Sections: []string{
+					"project",
+					"tool.fmt",
+					"tool.lint",
+					"tool.test",
+				},
+				Formats: []string{"text", "json"},
 			},
 		},
 	}
