@@ -80,6 +80,8 @@ func main() {
 			os.Exit(runConfigCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "diag":
 			os.Exit(runDiagCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "doc":
+			os.Exit(runDocCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "eval":
 			os.Exit(runEvalCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "fmt":
@@ -332,6 +334,7 @@ func buildCapabilities() cliCapabilities {
 			"check",
 			"config",
 			"diag",
+			"doc",
 			"eval",
 			"fmt",
 			"inspect",

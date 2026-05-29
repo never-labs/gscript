@@ -78,6 +78,9 @@ schema。
 - `gscript inspect bytecode [--proto NAME] <file.gs>` disassembles compiled
   bytecode through the supported CLI instead of requiring developer-only dump
   binaries.
+- `gscript doc generate [--output DIR]` emits generated CLI and stdlib
+  reference Markdown from the current binary; `gscript doc check` runs the
+  repository documentation reference checker.
 
 There are also developer binaries:
 
@@ -503,21 +506,22 @@ Docs are Markdown/HTML under `docs/`, including stdlib pages and performance
 writeups. `docs/_config.yml` and `docs/_layouts/default.html` indicate static
 site generation support. `scripts/docs_check.sh` is the current repository
 check for relative Markdown links and documented release-script entrypoints.
-There is no visible doc generator command.
+`gscript doc generate` emits a CLI reference and stdlib inventory from the
+current binary. `gscript doc check` wraps `scripts/docs_check.sh`.
 
 ### Gaps
 
-- Stdlib docs appear hand-maintained.
+- Generated stdlib inventory exists; detailed stdlib docs are still
+  hand-maintained.
 - No API/doc extraction from runtime builtin registration.
-- No docs freshness check for CLI flags, stdlib modules, or language features.
-- No generated command reference.
+- No docs freshness check for detailed CLI flags or language features.
 
 ### Recommendations
 
 P0:
 
-- Add `gscript doc generate` that emits CLI reference and stdlib inventory from
-  code metadata.
+- Extend `gscript doc generate` beyond CLI/std-lib inventory into detailed flag
+  docs and language references.
 - Keep `scripts/docs_check.sh` in the release gate until `gscript doc check`
   owns stale generated docs and broken internal links.
 

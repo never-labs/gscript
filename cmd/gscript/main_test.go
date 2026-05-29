@@ -52,8 +52,8 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
-		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/eval/fmt/inspect/lint/repl", caps.Commands)
+	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "repl") {
+		t.Fatalf("commands = %#v, want bench/capabilities/check/config/diag/doc/eval/fmt/inspect/lint/repl", caps.Commands)
 	}
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
@@ -96,6 +96,9 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(0)
 	case "diag":
 		_, _ = os.Stdout.WriteString("diag helper ok\n")
+		os.Exit(0)
+	case "doc":
+		_, _ = os.Stdout.WriteString("doc helper ok\n")
 		os.Exit(0)
 	case "docs":
 		_, _ = os.Stdout.WriteString("docs helper ok\n")
@@ -414,6 +417,57 @@ print(add(1, 2))
 	out := stdout.String()
 	if strings.Contains(out, "=== <main>") || !strings.Contains(out, "RETURN") {
 		t.Fatalf("stdout = %q, want named proto disassembly only", out)
+	}
+}
+
+func TestDocGenerateWritesReferenceFiles(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"generate", "--output", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	cliDoc, err := os.ReadFile(filepath.Join(dir, "cli.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdlibDoc, err := os.ReadFile(filepath.Join(dir, "stdlib.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(cliDoc, []byte("`run`")) || !bytes.Contains(cliDoc, []byte("`doc`")) {
+		t.Fatalf("cli.md = %q, want command reference", string(cliDoc))
+	}
+	if !bytes.Contains(stdlibDoc, []byte("`json`")) {
+		t.Fatalf("stdlib.md = %q, want stdlib inventory", string(stdlibDoc))
+	}
+}
+
+func TestDocCheckDispatchesDocsScript(t *testing.T) {
+	oldDocExecCommand := docExecCommand
+	t.Cleanup(func() { docExecCommand = oldDocExecCommand })
+	var gotName string
+	var gotArgs []string
+	docExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "doc")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "bash" {
+		t.Fatalf("command = %q, want bash", gotName)
+	}
+	if len(gotArgs) != 1 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "docs_check.sh")) {
+		t.Fatalf("args = %#v, want scripts/docs_check.sh", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "doc helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
 	}
 }
 
