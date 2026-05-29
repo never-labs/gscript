@@ -35,3 +35,35 @@ case <-time.after(0.05):
 		t.Fatalf("result = %v, want deadline exceeded", got)
 	}
 }
+
+func TestContextSleepCompletes(t *testing.T) {
+	interp := runSyncTestScript(t, `
+ctx := context.background()
+ok, err := time.sleep(ctx, 0.001)
+`)
+	if got := interp.GetGlobal("ok"); !got.IsBool() || !got.Bool() {
+		t.Fatalf("ok = %v, want true", got)
+	}
+	if got := interp.GetGlobal("err"); !got.IsNil() {
+		t.Fatalf("err = %v, want nil", got)
+	}
+}
+
+func TestContextSleepCancelled(t *testing.T) {
+	interp := runSyncTestScript(t, `
+ctx, cancel := context.withTimeout(0.001)
+_ = cancel
+t0 := time.now()
+ok, err := time.sleep(ctx, 0.05)
+elapsed := time.since(t0)
+`)
+	if got := interp.GetGlobal("ok"); !got.IsBool() || got.Bool() {
+		t.Fatalf("ok = %v, want false", got)
+	}
+	if got := interp.GetGlobal("err"); !got.IsString() || got.Str() != "deadline exceeded" {
+		t.Fatalf("err = %v, want deadline exceeded", got)
+	}
+	if got := interp.GetGlobal("elapsed"); !got.IsFloat() || got.Number() >= 0.04 {
+		t.Fatalf("elapsed = %v, want cancelled before full sleep", got)
+	}
+}

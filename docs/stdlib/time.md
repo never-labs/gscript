@@ -40,6 +40,14 @@ time.sleep(0.5)   // sleep 500ms
 time.sleep(2)     // sleep 2 seconds
 ```
 
+`time.sleep(ctx, seconds)` waits until either the duration elapses or `ctx.done` closes.
+It returns `true, nil` on completion and `false, err` on cancellation.
+
+```
+ctx, cancel := context.withTimeout(0.1)
+ok, err := time.sleep(ctx, 1.0)
+```
+
 ### time.since(t)
 
 Returns the number of seconds (float) elapsed since time table `t`.

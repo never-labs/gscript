@@ -75,7 +75,7 @@ JIT fast path policy:
 | `sync` | Bounded host | in-process goroutine coordination primitives: waitgroup, mutex, rwmutex, once | runtime error for invalid counter state, bad arguments, or invalid unlock | VM fallback |
 | `table` | Pure | in-process table mutation, iteration, raw/proxy helpers, callback helpers | runtime error; sentinel nil/empty for absent values | native identity for raw helpers/iterators; VM callback and VM fallback |
 | `testkit` | Test-only | runtime diagnostics for translated conformance tests | runtime error; diagnostic result tables | VM fallback |
-| `time` | Bounded host | wall clock, sleep, timeout channels, formatting/parsing, duration constants | runtime error for bad arguments; `nil, err` for parse failures | VM fallback |
+| `time` | Bounded host | wall clock, sleep, cancellable sleep, timeout channels, formatting/parsing, duration constants | runtime error for bad arguments; `nil, err` for parse failures and cancelled context sleep | VM fallback |
 | `url` | Pure | none; URL parse/escape/query helpers | runtime error for bad arguments; `nil, err` for malformed URLs | VM fallback |
 | `utf8` | Pure | none; UTF-8 validation/codepoint helpers | runtime error; sentinel nil/false for invalid positions/sequences where API defines it | native identity for selected codepoint/codes helpers; runtime specialization for math/bit/UTF-8 loops |
 | `uuid` | Bounded host | random UUID generation and UUID parsing | runtime error for bad arguments; `nil, err` for malformed UUID input | VM fallback |

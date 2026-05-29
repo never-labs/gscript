@@ -77,6 +77,42 @@ func timeSinceValue(v Value) (Value, error) {
 	return FloatValue(time.Since(goTime).Seconds()), nil
 }
 
+func contextDoneAndErr(v Value) (*Channel, Value, bool) {
+	if !v.IsTable() {
+		return nil, NilValue(), false
+	}
+	t := v.Table()
+	done := t.RawGetString("done")
+	if !done.IsChannel() {
+		return nil, NilValue(), false
+	}
+	return done.Channel(), t.RawGetString("err"), true
+}
+
+func contextCancelledValue(done *Channel, errFn Value) (Value, bool) {
+	select {
+	case _, ok := <-done.ch:
+		if !ok {
+			return contextErrValue(errFn), true
+		}
+		return StringValue("cancelled"), true
+	default:
+		return NilValue(), false
+	}
+}
+
+func contextErrValue(errFn Value) Value {
+	gf := errFn.GoFunction()
+	if gf == nil || gf.Fn == nil {
+		return StringValue("cancelled")
+	}
+	vals, err := gf.Fn(nil)
+	if err != nil || len(vals) == 0 || vals[0].IsNil() {
+		return StringValue("cancelled")
+	}
+	return vals[0]
+}
+
 // strftimeToGo converts strftime-style format specifiers to Go layout strings.
 func strftimeToGo(layout string) string {
 	// Check if it contains strftime-style % directives
@@ -167,11 +203,38 @@ func buildTimeLib() *Table {
 	})
 
 	// time.sleep(seconds) -> nil
+	// time.sleep(ctx, seconds) -> true, nil | false, err
 	set("sleep", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'time.sleep'")
 		}
+		if done, errFn, ok := contextDoneAndErr(args[0]); ok {
+			if len(args) < 2 {
+				return nil, fmt.Errorf("bad argument #2 to 'time.sleep'")
+			}
+			secs := toFloat(args[1])
+			if secs < 0 {
+				return nil, fmt.Errorf("bad argument #2 to 'time.sleep' (non-negative duration expected)")
+			}
+			if errVal, cancelled := contextCancelledValue(done, errFn); cancelled {
+				return []Value{BoolValue(false), errVal}, nil
+			}
+			timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				return []Value{BoolValue(true), NilValue()}, nil
+			case _, ok := <-done.ch:
+				if !ok {
+					return []Value{BoolValue(false), contextErrValue(errFn)}, nil
+				}
+				return []Value{BoolValue(false), StringValue("cancelled")}, nil
+			}
+		}
 		secs := toFloat(args[0])
+		if secs < 0 {
+			return nil, fmt.Errorf("bad argument #1 to 'time.sleep' (non-negative duration expected)")
+		}
 		time.Sleep(time.Duration(secs * float64(time.Second)))
 		return nil, nil
 	})
