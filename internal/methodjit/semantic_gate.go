@@ -40,6 +40,7 @@ func jitShouldStayInInterpreter(proto *vm.FuncProto) bool {
 		return false
 	}
 	return proto.Name == "<main>" ||
+		jitUnsupportedConcurrencyControl(proto) ||
 		jitUnsupportedVMOnlyControl(proto) ||
 		jitUnsupportedMultiReturn(proto) ||
 		jitUnsupportedClosureArithmetic(proto) ||
@@ -49,7 +50,8 @@ func jitShouldStayInInterpreter(proto *vm.FuncProto) bool {
 }
 
 func jitRequiresInterpreter(proto *vm.FuncProto) bool {
-	return jitUnsupportedVMOnlyControl(proto)
+	return jitUnsupportedVMOnlyControl(proto) ||
+		jitUnsupportedConcurrencyControl(proto)
 }
 
 func jitTier2CallableGate(proto *vm.FuncProto) GateResult {
@@ -98,6 +100,20 @@ func jitUnsupportedCallBoundary(proto *vm.FuncProto) bool {
 	for _, inst := range proto.Code {
 		switch vm.DecodeOp(inst) {
 		case vm.OP_CALL, vm.OP_CALLTABLE, vm.OP_SELF, vm.OP_TFORCALL, vm.OP_TFORLOOP, vm.OP_RESUME, vm.OP_YIELD:
+			return true
+		}
+	}
+	return false
+}
+
+func jitUnsupportedConcurrencyControl(proto *vm.FuncProto) bool {
+	if proto == nil {
+		return false
+	}
+	for _, inst := range proto.Code {
+		switch vm.DecodeOp(inst) {
+		case vm.OP_GO, vm.OP_MAKECHAN, vm.OP_SEND, vm.OP_RECV, vm.OP_RECVOK,
+			vm.OP_TRYSEND, vm.OP_TRYRECV, vm.OP_TRYRECVOK, vm.OP_SELECT:
 			return true
 		}
 	}

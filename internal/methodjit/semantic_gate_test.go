@@ -51,6 +51,22 @@ func TestJITSemanticGateRejectsCallBoundaries(t *testing.T) {
 	}
 }
 
+func TestJITSemanticGateRequiresInterpreterForConcurrencyOps(t *testing.T) {
+	top := compileTop(t, `
+func f(ch) {
+	go func() { ch <- 1 }()
+	return <-ch
+}
+`)
+	fn := findFirstProtoWithName(t, top, "f")
+	if !jitRequiresInterpreter(fn) {
+		t.Fatal("concurrency op function should stay interpreted to preserve blocking/scheduling semantics")
+	}
+	if !jitShouldStayInInterpreter(fn) {
+		t.Fatal("concurrency op function should be covered by semantic gate")
+	}
+}
+
 func TestJITSemanticGateRejectsDynamicOperators(t *testing.T) {
 	top := compileTop(t, `func f(a, b) { return a + b }`)
 	fn := findFirstProtoWithName(t, top, "f")
