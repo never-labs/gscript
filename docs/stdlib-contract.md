@@ -71,6 +71,7 @@ JIT fast path policy:
 | `soa` | Pure | none; in-process structure-of-arrays records over dense columns | runtime error for bad columns, mismatched lengths, or invalid row values | runtime specialization for recognized column kernels; VM fallback |
 | `sort` | Pure | in-process sort helpers with optional script callbacks | runtime error, including invalid comparator/order cases | runtime specialization for numeric sort cases; VM callback and VM fallback |
 | `string` | Pure | none; Lua-style byte string and pattern helpers plus Go-style helpers | runtime error | native identity for `format`, `sub`, `split`, `find`, `match`, `gsub`; VM fallback otherwise |
+| `sync` | Bounded host | in-process goroutine coordination primitives | runtime error for invalid counter state or bad arguments | VM fallback |
 | `table` | Pure | in-process table mutation, iteration, raw/proxy helpers, callback helpers | runtime error; sentinel nil/empty for absent values | native identity for raw helpers/iterators; VM callback and VM fallback |
 | `testkit` | Test-only | runtime diagnostics for translated conformance tests | runtime error; diagnostic result tables | VM fallback |
 | `time` | Bounded host | wall clock, sleep, formatting/parsing, duration constants | runtime error for bad arguments; `nil, err` for parse failures | VM fallback |

@@ -33,6 +33,7 @@ var stdlibModuleNames = []string{
 	"soa",
 	"sort",
 	"string",
+	"sync",
 	"table",
 	"testkit",
 	"time",
@@ -98,6 +99,7 @@ func (interp *Interpreter) registerStdlib() {
 	// --- System ---
 	interp.globals.Define("process", TableValue(buildProcessLib(interp)))
 	interp.globals.Define("script", TableValue(buildScriptLib(interp)))
+	interp.globals.Define("sync", TableValue(buildSyncLib()))
 	interp.globals.Define("debug", TableValue(buildDebugLib(interp)))
 	interp.globals.Define("testkit", TableValue(buildTestkitLib(interp)))
 
