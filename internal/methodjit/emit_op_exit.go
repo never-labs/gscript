@@ -19,7 +19,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 // emitOpExit emits ARM64 code that exits to Go for an unsupported operation.

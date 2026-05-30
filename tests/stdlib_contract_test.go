@@ -29,13 +29,13 @@ func readRuntimeStdlibModuleNames(t *testing.T, root string) []string {
 		t.Fatalf("read runtime stdlib registry: %v", err)
 	}
 
-	blockRE := regexp.MustCompile(`(?s)var\s+stdlibModuleNames\s*=\s*\[\]string\s*\{(.*?)\}`)
+	blockRE := regexp.MustCompile(`(?s)var\s+stdlibModules\s*=\s*\[\]StdlibModuleInfo\s*\{(.*?)\n\}`)
 	match := blockRE.FindStringSubmatch(string(data))
 	if match == nil {
-		t.Fatal("runtime stdlib registry stdlibModuleNames block not found")
+		t.Fatal("runtime stdlib registry stdlibModules block not found")
 	}
 
-	nameRE := regexp.MustCompile(`"([^"]+)"`)
+	nameRE := regexp.MustCompile(`Name:\s*"([^"]+)"`)
 	matches := nameRE.FindAllStringSubmatch(match[1], -1)
 	if len(matches) == 0 {
 		t.Fatal("runtime stdlib registry contains no module names")

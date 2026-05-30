@@ -3,8 +3,8 @@ package methodjit
 import (
 	"sort"
 
-	rt "github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	rt "github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func runtimeFieldPolyShapeCasesFromFeedback(fn *Function, instr *Instr) ([]FieldPolyShapeCase, Type) {

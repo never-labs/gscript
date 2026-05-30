@@ -8,7 +8,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func AnalyzeSpecializedABI(proto *vm.FuncProto) SpecializedABI {

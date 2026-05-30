@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 const (

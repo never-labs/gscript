@@ -4,7 +4,7 @@ package methodjit
 
 import (
 	"fmt"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 	"testing"
 )
 

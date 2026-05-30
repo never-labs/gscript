@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func runREPLCommand(args []string, outw, errw io.Writer) int {

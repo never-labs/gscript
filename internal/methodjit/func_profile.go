@@ -15,7 +15,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // FuncProfile captures the static characteristics of a function's bytecodes.

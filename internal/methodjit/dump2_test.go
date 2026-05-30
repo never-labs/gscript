@@ -3,9 +3,9 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/vm"
 	"testing"
 )
 

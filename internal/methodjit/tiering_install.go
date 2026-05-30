@@ -5,7 +5,7 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func (tm *TieringManager) installTier2(proto *vm.FuncProto, cf *CompiledFunction) {

@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/jit"
+import "github.com/Never-Labs/gscript/internal/jit"
 
 func emitCMPWConst(asm *jit.Assembler, reg, scratch jit.Reg, val int64) {
 	if val >= 0 && val <= 4095 {

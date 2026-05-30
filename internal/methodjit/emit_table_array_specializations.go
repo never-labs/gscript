@@ -5,7 +5,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 func (ec *emitContext) emitTableBoolArrayFill(instr *Instr) {

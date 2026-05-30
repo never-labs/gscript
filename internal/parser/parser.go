@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gscript/gscript/internal/ast"
-	"github.com/gscript/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/lexer"
 )
 
 // Parser implements a recursive descent parser for GScript.
@@ -25,7 +25,7 @@ func New(tokens []lexer.Token) *Parser {
 
 // Parse parses the token stream and returns the top-level Program AST node.
 func (p *Parser) Parse() (*ast.Program, error) {
-	prog := &ast.Program{}
+	prog := &ast.Program{FileDirectives: p.parseFileDirectives()}
 	for !p.isAtEnd() {
 		// skip optional semicolons between statements
 		p.skipSemicolons()
@@ -135,6 +135,9 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 	case lexer.TOKEN_FUNC:
 		return p.parseFuncDeclOrExprStmt()
 	case lexer.TOKEN_IDENT:
+		if p.peek().Value == "import" && p.peekAt(1).Type == lexer.TOKEN_STRING {
+			return p.parseImportDeclStmt()
+		}
 		if p.peek().Value == "tool" && p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LPAREN {
 			return p.parseToolDeclStmt()
 		}
@@ -231,6 +234,32 @@ func (p *Parser) parseFuncDeclStmt() (ast.Stmt, error) {
 	}, nil
 }
 
+func (p *Parser) parseImportDeclStmt() (ast.Stmt, error) {
+	importTok := p.advance()
+	pos := p.tokenPos(importTok)
+	pathTok, err := p.expect(lexer.TOKEN_STRING)
+	if err != nil {
+		return nil, err
+	}
+	if !p.checkIdent("as") {
+		return nil, p.errorf(`expected "as" in import declaration`)
+	}
+	p.advance()
+	aliasTok, err := p.expect(lexer.TOKEN_IDENT)
+	if err != nil {
+		return nil, err
+	}
+	return &ast.DeclareStmt{
+		P:     pos,
+		Names: []string{aliasTok.Value},
+		Values: []ast.Expr{&ast.CallExpr{
+			P:    pos,
+			Func: &ast.IdentExpr{P: pos, Name: "require"},
+			Args: []ast.Expr{&ast.StringLit{P: p.tokenPos(pathTok), Value: pathTok.Value}},
+		}},
+	}, nil
+}
+
 func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
 	tok := p.advance() // consume 'tool'
 	pos := p.tokenPos(tok)
@@ -262,11 +291,15 @@ func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]str
 	var paramDocEntries []ast.ToolParamDoc
 	for _, comment := range comments {
 		text := strings.TrimSpace(comment.Text)
-		if rest, ok := directiveRest(text, "gscript:requires"); ok {
+		name, rest, isDirective := parseGScriptDirective(text)
+		if isDirective && isFileDirectiveKind(name) {
+			continue
+		}
+		if isDirective && name == "requires" {
 			requires = append(requires, parseRequiresDirective(rest)...)
 			continue
 		}
-		if rest, ok := directiveRest(text, "gscript:param"); ok {
+		if isDirective && name == "param" {
 			if name, doc, ok := parseParamDirective(rest); ok {
 				paramDocs[name] = doc
 				paramDocEntries = append(paramDocEntries, ast.ToolParamDoc{Name: name, Doc: doc})
@@ -282,33 +315,71 @@ func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]str
 }
 
 func directiveRest(text, directive string) (string, bool) {
-	if !strings.HasPrefix(text, directive) {
+	name, rest, ok := parseGScriptDirective(text)
+	if !ok {
 		return "", false
 	}
-	if len(text) == len(directive) {
-		return "", true
+	want := strings.TrimPrefix(directive, "gscript:")
+	if name != want {
+		return "", false
 	}
-	switch text[len(directive)] {
-	case ':', ' ', '\t':
-		return strings.TrimSpace(text[len(directive):]), true
+	return rest, true
+}
+
+func parseGScriptDirective(text string) (string, string, bool) {
+	text = strings.TrimSpace(text)
+	if !strings.HasPrefix(text, "gscript:") {
+		return "", "", false
+	}
+	rest := text[len("gscript:"):]
+	if rest == "" {
+		return "", "", false
+	}
+	nameEnd := strings.IndexFunc(rest, func(r rune) bool {
+		return r == ':' || r == ' ' || r == '\t'
+	})
+	if nameEnd < 0 {
+		return rest, "", true
+	}
+	name := rest[:nameEnd]
+	if name == "" {
+		return "", "", false
+	}
+	return name, strings.TrimSpace(rest[nameEnd:]), true
+}
+
+func (p *Parser) parseFileDirectives() []ast.FileDirective {
+	tok := p.peek()
+	if tok.Type == lexer.TOKEN_EOF {
+		return nil
+	}
+	var directives []ast.FileDirective
+	for _, comment := range tok.LeadingComments {
+		name, rest, ok := parseGScriptDirective(comment.Text)
+		if !ok || !isFileDirectiveKind(name) {
+			continue
+		}
+		text := strings.TrimLeft(rest, ": \t")
+		directives = append(directives, ast.FileDirective{
+			P:    ast.Pos{Line: comment.Line, Column: comment.Column},
+			Kind: name,
+			Args: parseDirectiveArgs(text),
+			Text: text,
+		})
+	}
+	return directives
+}
+
+func isFileDirectiveKind(name string) bool {
+	switch name {
+	case "build", "test", "cap", "feature":
+		return true
 	default:
-		return "", false
+		return false
 	}
 }
 
-func contiguousLeadingComments(tok lexer.Token) []lexer.Comment {
-	comments := tok.LeadingComments
-	wantLine := tok.Line - 1
-	start := len(comments)
-	for start > 0 && comments[start-1].Line == wantLine {
-		start--
-		wantLine--
-	}
-	return comments[start:]
-}
-
-func parseRequiresDirective(rest string) []string {
-	rest = strings.TrimLeft(rest, ": \t")
+func parseDirectiveArgs(rest string) []string {
 	if rest == "" {
 		return nil
 	}
@@ -323,6 +394,21 @@ func parseRequiresDirective(rest string) []string {
 		}
 	}
 	return out
+}
+
+func contiguousLeadingComments(tok lexer.Token) []lexer.Comment {
+	comments := tok.LeadingComments
+	wantLine := tok.Line - 1
+	start := len(comments)
+	for start > 0 && comments[start-1].Line == wantLine {
+		start--
+		wantLine--
+	}
+	return comments[start:]
+}
+
+func parseRequiresDirective(rest string) []string {
+	return parseDirectiveArgs(strings.TrimLeft(rest, ": \t"))
 }
 
 func parseParamDirective(rest string) (string, string, bool) {

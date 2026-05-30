@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func TestAnalyzeSpecializedABI_RawIntEligible(t *testing.T) {

@@ -3,7 +3,7 @@ package jit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 // Value memory layout constants for NaN-boxed 8-byte values.
@@ -547,6 +547,6 @@ func EmitCheckIsString(asm *Assembler, valReg, scratch1, scratch2 Reg, notString
 	asm.CMPreg(scratch1, scratch2)
 	asm.BCond(CondNE, notStringLabel)
 	asm.UBFX(scratch1, valReg, uint8(NB_PtrSubShift), 4) // extract 4-bit sub-type
-	asm.CMPimm(scratch1, 1)                                // ptrSubString = 1
+	asm.CMPimm(scratch1, 1)                              // ptrSubString = 1
 	asm.BCond(CondNE, notStringLabel)
 }

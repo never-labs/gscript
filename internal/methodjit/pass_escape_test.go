@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // TestR158_Identify_Simple verifies the MVP predicate on

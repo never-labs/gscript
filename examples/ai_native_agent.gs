@@ -14,8 +14,8 @@ models {
 }
 
 // lookup searches local documentation.
-// gscript:requires docs.read
-// gscript:param query natural-language search query
+//gscript:requires docs.read
+//gscript:param query natural-language search query
 tool lookup(query) {
     return "doc:" .. query, nil
 }

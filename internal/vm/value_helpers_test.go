@@ -4,7 +4,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func TestClosureFromValueRecognizesVMClosureValue(t *testing.T) {

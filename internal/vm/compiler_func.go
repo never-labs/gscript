@@ -5,7 +5,7 @@ package vm
 // Pure code movement from compiler.go; declarations are verbatim.
 
 import (
-	"github.com/gscript/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/ast"
 )
 
 // ---- Function literal ----

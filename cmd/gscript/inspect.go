@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	bytecodevm "github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
+	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
 )
 
 func runInspectCommand(args []string, outw, errw io.Writer) int {

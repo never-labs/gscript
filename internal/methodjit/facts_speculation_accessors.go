@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/vm"
+import "github.com/Never-Labs/gscript/internal/vm"
 
 // ForEachSpecDependencyProto visits each recorded spec-dependency proto. The
 // visit callback may return false to stop iteration early. It is a read-only

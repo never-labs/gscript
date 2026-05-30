@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/vm"
+import "github.com/Never-Labs/gscript/internal/vm"
 
 type Tier2DeoptActionKind string
 

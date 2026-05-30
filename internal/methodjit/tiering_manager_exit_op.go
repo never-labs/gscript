@@ -13,8 +13,8 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // executeOpExit handles generic op-exits in the TieringManager's Tier 2 path.

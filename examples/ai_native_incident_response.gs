@@ -15,15 +15,15 @@ models {
     planner: "mock-planner"
 }
 
-// gscript:requires runbooks.read
-// gscript:param service production service name
-// gscript:param symptom current symptom or alert summary
+//gscript:requires runbooks.read
+//gscript:param service production service name
+//gscript:param symptom current symptom or alert summary
 tool search_runbook(service, symptom) {
     return "runbook:" .. service .. ":" .. symptom, nil
 }
 
-// gscript:requires metrics.read
-// gscript:param service production service name
+//gscript:requires metrics.read
+//gscript:param service production service name
 tool get_metrics(service) {
     return "metrics:" .. service .. ":latency=high,error_rate=2%", nil
 }

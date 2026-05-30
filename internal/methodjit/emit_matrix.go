@@ -17,8 +17,8 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func (ec *emitContext) emitMatrixInstr(instr *Instr) bool {

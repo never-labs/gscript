@@ -12,8 +12,8 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // TestTier1_Feedback_OpLE_Int runs a function whose hot loop is an

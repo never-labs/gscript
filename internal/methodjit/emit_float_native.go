@@ -9,7 +9,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 // emitTypedFloatBinOp emits ARM64 code for type-specialized float binary ops

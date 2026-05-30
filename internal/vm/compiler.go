@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gscript/gscript/internal/ast"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 // --------------------------------------------------------------------

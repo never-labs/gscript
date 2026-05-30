@@ -11,7 +11,7 @@ runtime behavior visible through `gscript/`, `internal/runtime`,
 The public import path is:
 
 ```go
-import gs "github.com/gscript/gscript/gscript"
+import gs "github.com/Never-Labs/gscript/gscript"
 ```
 
 The current API is useful for tests, demos, and controlled in-process

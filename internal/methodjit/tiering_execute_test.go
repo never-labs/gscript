@@ -5,7 +5,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func TestTier2NeedsNativeStackReserveSkipsLeafTypedPeer(t *testing.T) {

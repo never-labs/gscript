@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/gscript/gscript/internal/runtime"
+import "github.com/Never-Labs/gscript/internal/runtime"
 
 const (
 	tier2NewTableKindShift      = 32

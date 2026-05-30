@@ -29,9 +29,9 @@ type yieldResult struct {
 // Each coroutine runs in its own goroutine, suspended at yield points via
 // synchronous channel communication.
 type Coroutine struct {
-	status   CoroutineStatus
-	fn       Value // the function to run inside the coroutine
-	started  bool  // whether the goroutine has been launched
+	status  CoroutineStatus
+	fn      Value // the function to run inside the coroutine
+	started bool  // whether the goroutine has been launched
 
 	resumeCh chan []Value     // caller -> coroutine: resume/initial args
 	yieldCh  chan yieldResult // coroutine -> caller: yielded values or completion

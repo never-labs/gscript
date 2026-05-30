@@ -17,8 +17,8 @@ const (
 )
 
 var (
-	libSystem            uintptr
-	fnJitWriteProtect    func(enabled int32)
+	libSystem             uintptr
+	fnJitWriteProtect     func(enabled int32)
 	fnSysIcacheInvalidate func(start unsafe.Pointer, size uintptr)
 )
 

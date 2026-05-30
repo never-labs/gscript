@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func TestRegallocCarriesRawIntIntoSinglePredBlock(t *testing.T) {

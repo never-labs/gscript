@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
-	rt "github.com/gscript/gscript/internal/runtime"
+	rt "github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func TestCoroutineResumeBoundaryFromSlotsExtractsTargetAndArgs(t *testing.T) {

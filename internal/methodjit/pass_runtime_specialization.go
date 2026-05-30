@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/vm"
+import "github.com/Never-Labs/gscript/internal/vm"
 
 const callSiteRuntimeSpecializationMinStableObservations = 2
 

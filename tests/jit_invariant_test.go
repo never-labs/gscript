@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 // assertVMEqualsJIT runs the same source in bytecode-VM mode (no JIT) and in

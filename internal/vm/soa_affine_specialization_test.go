@@ -4,9 +4,9 @@ import (
 	"math"
 	"testing"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 const soaAffineUpdateSource = `

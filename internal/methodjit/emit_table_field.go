@@ -12,7 +12,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 func (ec *emitContext) hasFieldSvalsCache(tblValueID int, shapeID uint32) bool {

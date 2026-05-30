@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 func TestAINativeSyntaxExecutesThroughLLMStdlib(t *testing.T) {
@@ -27,8 +27,8 @@ func TestAINativeSyntaxExecutesThroughLLMStdlib(t *testing.T) {
 			vm := gs.New(opts...)
 			err := vm.Exec(`
 // Lookup docs.
-// gscript:requires docs.read, net.client
-// gscript:param query search query text
+//gscript:requires docs.read, net.client
+//gscript:param query search query text
 tool lookup(query) {
     return "found:" .. query, nil
 }
@@ -184,7 +184,7 @@ tool lookup(query) {
 		{
 			name: "tool invalid requires",
 			src: `
-// gscript:requires docs..read
+//gscript:requires docs..read
 tool lookup(query) {
     return query, nil
 }
@@ -194,8 +194,8 @@ tool lookup(query) {
 		{
 			name: "tool unknown param doc",
 			src: `
-// gscript:requires none
-// gscript:param missing not a parameter
+//gscript:requires none
+//gscript:param missing not a parameter
 tool lookup(query) {
     return query, nil
 }
@@ -205,9 +205,9 @@ tool lookup(query) {
 		{
 			name: "tool duplicate param doc",
 			src: `
-// gscript:requires none
-// gscript:param query first
-// gscript:param query second
+//gscript:requires none
+//gscript:param query first
+//gscript:param query second
 tool lookup(query) {
     return query, nil
 }
@@ -217,7 +217,7 @@ tool lookup(query) {
 		{
 			name: "agent duplicate tools",
 			src: `
-// gscript:requires none
+//gscript:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -263,7 +263,7 @@ func f() {
 		{
 			name: "agent capabilities missing tool requirement",
 			src: `
-// gscript:requires docs.read, net.client
+//gscript:requires docs.read, net.client
 tool lookup(query) {
     return query, nil
 }
@@ -279,7 +279,7 @@ agent answer(q) {
 		{
 			name: "agent defaults merged capabilities missing inherited tool requirement",
 			src: `
-// gscript:requires net.client
+//gscript:requires net.client
 tool lookup(query) {
     return query, nil
 }
@@ -298,7 +298,7 @@ agent answer(q) {
 		{
 			name: "turn caps missing tool requirement",
 			src: `
-// gscript:requires payments.refund
+//gscript:requires payments.refund
 tool refund(id) {
     return id, nil
 }
@@ -372,12 +372,12 @@ func TestAINativeSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
 			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
 			vm := gs.New(opts...)
 			err := vm.Exec(`
-// gscript:requires docs.read, net.client
+//gscript:requires docs.read, net.client
 tool lookup(query) {
     return query, nil
 }
 
-// gscript:requires none
+//gscript:requires none
 tool local_only(query) {
     return query, nil
 }
@@ -430,7 +430,7 @@ func TestAINativeSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T)
 			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
 			vm := gs.New(opts...)
 			err := vm.Exec(`
-// gscript:requires net.client
+//gscript:requires net.client
 tool lookup(query) {
     return query, nil
 }
@@ -493,7 +493,7 @@ func TestAINativeSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
 			vm := gs.New(opts...)
 			err := vm.Exec(`
 func make_agent(prefix) {
-    // gscript:requires none
+    //gscript:requires none
     tool local_lookup(query) {
         return prefix .. query, nil
     }
@@ -624,7 +624,7 @@ func TestAINativeStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 			}, tc.opts...)
 			vm := gs.New(opts...)
 			if err := vm.Exec(`
-// gscript:requires none
+//gscript:requires none
 tool lookup(query) {
     return "found:" .. query, nil
 }
@@ -695,7 +695,7 @@ models {
     alias: "resolved-model"
 }
 
-// gscript:requires none
+//gscript:requires none
 tool echo_tool(query) {
     return query, nil
 }
@@ -908,7 +908,7 @@ models {
 }
 
 // Echoes a query.
-// gscript:requires none
+//gscript:requires none
 tool echo_tool(query) {
     return query, nil
 }

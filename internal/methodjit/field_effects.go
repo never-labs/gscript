@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // FieldEffectSummary records conservative static field writes for fixed

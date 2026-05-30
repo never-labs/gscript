@@ -3,8 +3,8 @@ package vm
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/jit"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 type genericRecordArrayLoopSpecializationCache struct {

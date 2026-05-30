@@ -5,8 +5,8 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/jit"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 const maxInt48StringSplitNative = int64(1<<47 - 1)

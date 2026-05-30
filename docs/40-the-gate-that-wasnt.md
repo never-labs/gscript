@@ -140,7 +140,7 @@ The TDD cycle ran cleanly. The failing-test compile error showed up ("undefined:
 
 ```
 go test -run 'TestDeepRecursionRegression|TestDeepRecursionSimple|TestQuicksortSmall|TestIsTransientOpExit|TestDumpTier1_FibBody' ./internal/methodjit/
-ok  	github.com/gscript/gscript/internal/methodjit	0.845s
+ok  	github.com/Never-Labs/gscript/internal/methodjit	0.845s
 ```
 
 Fib body insn count: **635 — unchanged**. That was the single non-negotiable assertion: if the emitter had been touched, even incidentally, the fixture would have caught it. It wasn't, so it didn't.
@@ -182,7 +182,7 @@ fatal error: unknown caller pc
 goroutine 548 gp=0x1400019e540 m=5 mp=0x1400007d808 [running]:
 runtime.systemstack_switch()
 ...
-github.com/gscript/gscript/internal/methodjit.TestTier2RecursionDeeperFib
+github.com/Never-Labs/gscript/internal/methodjit.TestTier2RecursionDeeperFib
     internal/methodjit/tier2_recursion_hang_test.go:158 +0x118
 ```
 

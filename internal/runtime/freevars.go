@@ -1,6 +1,6 @@
 package runtime
 
-import "github.com/gscript/gscript/internal/ast"
+import "github.com/Never-Labs/gscript/internal/ast"
 
 // FreeVars returns the set of variable names that are referenced in the given
 // AST node but not defined within it. 'params' contains locally bound parameter

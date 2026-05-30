@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 // LLMProvider is the Go embedding hook behind the llm standard library.

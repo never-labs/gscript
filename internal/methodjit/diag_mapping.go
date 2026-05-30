@@ -3,7 +3,7 @@ package methodjit
 import (
 	"sort"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // InstrCodeRange records the native-code byte range emitted for one IR

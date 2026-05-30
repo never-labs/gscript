@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // TestR138_AckTier2Hang reproduces the bench hang for ack(3,4) x500

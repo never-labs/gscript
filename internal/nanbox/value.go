@@ -48,16 +48,16 @@ const (
 
 	// Pre-built special values.
 	valNil   uint64 = tagNil
-	valFalse uint64 = tagBool          // payload = 0
-	valTrue  uint64 = tagBool | 1      // payload = 1
+	valFalse uint64 = tagBool     // payload = 0
+	valTrue  uint64 = tagBool | 1 // payload = 1
 
 	// Canonical NaN (Go/IEEE 754 standard quiet NaN). Bit 50 is 0, so it
 	// does NOT collide with our tagged space (which requires bit 50 = 1).
 	canonicalNaN uint64 = 0x7FF8000000000000
 
 	// Int48 range limits.
-	maxInt48 int64 = (1 << 47) - 1  //  140_737_488_355_327
-	minInt48 int64 = -(1 << 47)     // -140_737_488_355_328
+	maxInt48 int64 = (1 << 47) - 1 //  140_737_488_355_327
+	minInt48 int64 = -(1 << 47)    // -140_737_488_355_328
 )
 
 // -------------------------------------------------------------------------

@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/gscript/gscript/gscript"
-	"github.com/gscript/gscript/internal/runtime"
+	gs "github.com/Never-Labs/gscript/gscript"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 type hostModuleService struct {
@@ -3080,6 +3080,102 @@ result := strings.upper("hello")
 	}
 	if val != "HELLO" {
 		t.Fatalf("result = %v, want HELLO", val)
+	}
+}
+
+func TestWithGoImportsRequireAllowlist(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithSandbox(),
+				gs.WithGoImports(map[string]any{
+					"strings": gs.Module{
+						"upper": strings.ToUpper,
+					},
+				}),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+strings := require("go:strings")
+same := package.loaded["go:strings"] == strings
+result := strings.upper("go-host")
+`); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := vm.Get("result"); err != nil || got != "GO-HOST" {
+				t.Fatalf("result = %v, %v; want GO-HOST, nil", got, err)
+			}
+			if got, err := vm.Get("same"); err != nil || got != true {
+				t.Fatalf("same = %v, %v; want true, nil", got, err)
+			}
+		})
+	}
+}
+
+func TestWithGoImportsImportSyntax(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithSandbox(),
+				gs.WithGoImports(map[string]any{
+					"go:strings": gs.Module{
+						"upper": strings.ToUpper,
+					},
+				}),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+import "go:strings" as strings
+same := package.loaded["go:strings"] == strings
+result := strings.upper("imported")
+`); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := vm.Get("result"); err != nil || got != "IMPORTED" {
+				t.Fatalf("result = %v, %v; want IMPORTED, nil", got, err)
+			}
+			if got, err := vm.Get("same"); err != nil || got != true {
+				t.Fatalf("same = %v, %v; want true, nil", got, err)
+			}
+		})
+	}
+}
+
+func TestWithGoImportsRejectsUnauthorizedGoImport(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := append([]gs.Option{
+				gs.WithGoImports(map[string]any{
+					"go:strings": gs.Module{"upper": strings.ToUpper},
+				}),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`require("go:os")`)
+			if err == nil {
+				t.Fatal("expected unauthorized go import to fail")
+			}
+			if !strings.Contains(err.Error(), `go import "go:os" is not allowed`) {
+				t.Fatalf("error = %v; want unauthorized go import error", err)
+			}
+		})
 	}
 }
 

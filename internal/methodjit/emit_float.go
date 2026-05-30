@@ -8,7 +8,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 // emitNumToFloat emits a numeric widening check/conversion. It accepts either

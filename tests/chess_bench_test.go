@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 // BenchmarkChessAI runs the chess_bench.gs Xiangqi AI benchmark script using the VM.

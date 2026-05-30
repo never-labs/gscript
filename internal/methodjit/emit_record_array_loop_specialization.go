@@ -5,8 +5,8 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/jit"
-	gruntime "github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/jit"
+	gruntime "github.com/Never-Labs/gscript/internal/runtime"
 )
 
 const (

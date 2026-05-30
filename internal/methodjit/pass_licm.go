@@ -38,7 +38,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 var licmPassAllowedDomains = allowedDomainsForModule(analysisFacts(AnalysisFactInt48Safe, AnalysisFactCallABIs, AnalysisFactFixedShapeTables, AnalysisFactSpecDependencyProtos), nil, nil)

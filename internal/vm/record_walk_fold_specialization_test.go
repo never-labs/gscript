@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func TestRecordWalkFoldSpecializationDerivesFieldsFromBytecode(t *testing.T) {

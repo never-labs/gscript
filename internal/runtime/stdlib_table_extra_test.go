@@ -3,8 +3,8 @@ package runtime
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
 )
 
 func TestTableKeys(t *testing.T) {

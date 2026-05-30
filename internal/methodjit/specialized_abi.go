@@ -5,7 +5,7 @@ package methodjit
 import (
 	"strings"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // SpecializedABIKind names the entry/return convention a function can use.

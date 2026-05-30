@@ -6,8 +6,8 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func observeTier2CallExitFeedback(proto *vm.FuncProto, cf *CompiledFunction, ctx *ExecContext, regs []runtime.Value, base int) {

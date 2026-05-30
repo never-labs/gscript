@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // TestWriteContract_ProductionPipeline drives the real Tier 2 pipeline over the

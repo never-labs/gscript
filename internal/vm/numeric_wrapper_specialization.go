@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/gscript/gscript/internal/runtime"
+import "github.com/Never-Labs/gscript/internal/runtime"
 
 func (vm *VM) tryExecuteNumericToIntegerWrapperCall(cl *Closure, absSlot, nArgs, rawC int) (bool, error) {
 	if cl == nil || cl.Proto == nil || nArgs != 1 || len(cl.Upvalues) != 0 {

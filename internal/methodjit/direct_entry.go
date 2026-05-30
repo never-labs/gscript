@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/vm"
+import "github.com/Never-Labs/gscript/internal/vm"
 
 func setFuncProtoDirectEntry(proto *vm.FuncProto, entry uintptr) bool {
 	if proto == nil || proto.DirectEntryPtr == entry {

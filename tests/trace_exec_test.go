@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 // runWithTimeout executes GScript source with JIT enabled and fails if it hangs.

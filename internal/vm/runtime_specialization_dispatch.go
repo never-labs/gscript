@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/gscript/gscript/internal/runtime"
+import "github.com/Never-Labs/gscript/internal/runtime"
 
 const maxCallSiteScalarScratch = 1 << 20
 

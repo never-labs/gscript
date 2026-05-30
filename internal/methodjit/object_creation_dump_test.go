@@ -19,7 +19,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func TestObjectCreationDump(t *testing.T) {

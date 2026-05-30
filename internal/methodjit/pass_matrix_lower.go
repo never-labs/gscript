@@ -31,7 +31,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/vm"
+import "github.com/Never-Labs/gscript/internal/vm"
 
 // MatrixLowerPass rewrites OpMatrixGetF / OpMatrixSetF into the split
 // form. Returns the modified function. Only walks existing

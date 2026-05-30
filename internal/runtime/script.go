@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gscript/gscript/internal/ast"
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
 )
 
 // ScriptOptions configures runtime source compilation and execution.

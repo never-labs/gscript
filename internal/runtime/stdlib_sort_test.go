@@ -37,11 +37,21 @@ func TestSortAsc(t *testing.T) {
 		d := arr[4]
 		e := arr[5]
 	`)
-	if interp.GetGlobal("a").Int() != 1 { t.Error("expected 1") }
-	if interp.GetGlobal("b").Int() != 2 { t.Error("expected 2") }
-	if interp.GetGlobal("c").Int() != 3 { t.Error("expected 3") }
-	if interp.GetGlobal("d").Int() != 4 { t.Error("expected 4") }
-	if interp.GetGlobal("e").Int() != 5 { t.Error("expected 5") }
+	if interp.GetGlobal("a").Int() != 1 {
+		t.Error("expected 1")
+	}
+	if interp.GetGlobal("b").Int() != 2 {
+		t.Error("expected 2")
+	}
+	if interp.GetGlobal("c").Int() != 3 {
+		t.Error("expected 3")
+	}
+	if interp.GetGlobal("d").Int() != 4 {
+		t.Error("expected 4")
+	}
+	if interp.GetGlobal("e").Int() != 5 {
+		t.Error("expected 5")
+	}
 }
 
 func TestSortAscStrings(t *testing.T) {
@@ -52,9 +62,15 @@ func TestSortAscStrings(t *testing.T) {
 		b := arr[2]
 		c := arr[3]
 	`)
-	if interp.GetGlobal("a").Str() != "apple" { t.Error("expected apple") }
-	if interp.GetGlobal("b").Str() != "banana" { t.Error("expected banana") }
-	if interp.GetGlobal("c").Str() != "cherry" { t.Error("expected cherry") }
+	if interp.GetGlobal("a").Str() != "apple" {
+		t.Error("expected apple")
+	}
+	if interp.GetGlobal("b").Str() != "banana" {
+		t.Error("expected banana")
+	}
+	if interp.GetGlobal("c").Str() != "cherry" {
+		t.Error("expected cherry")
+	}
 }
 
 func TestSortAscReturnsTable(t *testing.T) {
@@ -81,9 +97,15 @@ func TestSortDesc(t *testing.T) {
 		b := arr[2]
 		c := arr[5]
 	`)
-	if interp.GetGlobal("a").Int() != 5 { t.Error("expected 5") }
-	if interp.GetGlobal("b").Int() != 4 { t.Error("expected 4") }
-	if interp.GetGlobal("c").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("a").Int() != 5 {
+		t.Error("expected 5")
+	}
+	if interp.GetGlobal("b").Int() != 4 {
+		t.Error("expected 4")
+	}
+	if interp.GetGlobal("c").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 // ==================================================================
@@ -97,8 +119,12 @@ func TestSortBy(t *testing.T) {
 		first := arr[1]
 		last := arr[5]
 	`)
-	if interp.GetGlobal("first").Int() != 5 { t.Error("expected 5") }
-	if interp.GetGlobal("last").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("first").Int() != 5 {
+		t.Error("expected 5")
+	}
+	if interp.GetGlobal("last").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 // ==================================================================
@@ -113,7 +139,9 @@ func TestSortByKey(t *testing.T) {
 		last := arr[4]
 	`)
 	// Sorted by string length: fig(3), apple(5), banana(6), cherry(6)
-	if interp.GetGlobal("first").Str() != "fig" { t.Errorf("expected fig, got %s", interp.GetGlobal("first").Str()) }
+	if interp.GetGlobal("first").Str() != "fig" {
+		t.Errorf("expected fig, got %s", interp.GetGlobal("first").Str())
+	}
 }
 
 // ==================================================================
@@ -175,8 +203,12 @@ func TestSortReverse(t *testing.T) {
 		a := arr[1]
 		b := arr[5]
 	`)
-	if interp.GetGlobal("a").Int() != 5 { t.Error("expected 5") }
-	if interp.GetGlobal("b").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("a").Int() != 5 {
+		t.Error("expected 5")
+	}
+	if interp.GetGlobal("b").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 func TestSortReverseOdd(t *testing.T) {
@@ -187,9 +219,15 @@ func TestSortReverseOdd(t *testing.T) {
 		b := arr[2]
 		c := arr[3]
 	`)
-	if interp.GetGlobal("a").Int() != 3 { t.Error("expected 3") }
-	if interp.GetGlobal("b").Int() != 2 { t.Error("expected 2") }
-	if interp.GetGlobal("c").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("a").Int() != 3 {
+		t.Error("expected 3")
+	}
+	if interp.GetGlobal("b").Int() != 2 {
+		t.Error("expected 2")
+	}
+	if interp.GetGlobal("c").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 // ==================================================================
@@ -252,9 +290,15 @@ func TestSortUnique(t *testing.T) {
 		a := result[1]
 		d := result[4]
 	`)
-	if interp.GetGlobal("count").Int() != 4 { t.Errorf("expected 4 unique, got %d", interp.GetGlobal("count").Int()) }
-	if interp.GetGlobal("a").Int() != 1 { t.Error("expected 1") }
-	if interp.GetGlobal("d").Int() != 4 { t.Error("expected 4") }
+	if interp.GetGlobal("count").Int() != 4 {
+		t.Errorf("expected 4 unique, got %d", interp.GetGlobal("count").Int())
+	}
+	if interp.GetGlobal("a").Int() != 1 {
+		t.Error("expected 1")
+	}
+	if interp.GetGlobal("d").Int() != 4 {
+		t.Error("expected 4")
+	}
 }
 
 func TestSortUniqueEmpty(t *testing.T) {
@@ -263,7 +307,9 @@ func TestSortUniqueEmpty(t *testing.T) {
 		result := sort.unique(arr)
 		count := #result
 	`)
-	if interp.GetGlobal("count").Int() != 0 { t.Error("expected 0") }
+	if interp.GetGlobal("count").Int() != 0 {
+		t.Error("expected 0")
+	}
 }
 
 func TestSortUniqueNoDuplicates(t *testing.T) {
@@ -272,7 +318,9 @@ func TestSortUniqueNoDuplicates(t *testing.T) {
 		result := sort.unique(arr)
 		count := #result
 	`)
-	if interp.GetGlobal("count").Int() != 3 { t.Error("expected 3") }
+	if interp.GetGlobal("count").Int() != 3 {
+		t.Error("expected 3")
+	}
 }
 
 // ==================================================================
@@ -286,8 +334,12 @@ func TestSortPartition(t *testing.T) {
 		evenCount := #evens
 		oddCount := #odds
 	`)
-	if interp.GetGlobal("evenCount").Int() != 3 { t.Errorf("expected 3 evens, got %d", interp.GetGlobal("evenCount").Int()) }
-	if interp.GetGlobal("oddCount").Int() != 3 { t.Errorf("expected 3 odds, got %d", interp.GetGlobal("oddCount").Int()) }
+	if interp.GetGlobal("evenCount").Int() != 3 {
+		t.Errorf("expected 3 evens, got %d", interp.GetGlobal("evenCount").Int())
+	}
+	if interp.GetGlobal("oddCount").Int() != 3 {
+		t.Errorf("expected 3 odds, got %d", interp.GetGlobal("oddCount").Int())
+	}
 }
 
 // ==================================================================
@@ -300,7 +352,9 @@ func TestSortMin(t *testing.T) {
 		result := sort.min(arr)
 	`)
 	v := interp.GetGlobal("result")
-	if v.Int() != 1 { t.Errorf("expected 1, got %d", v.Int()) }
+	if v.Int() != 1 {
+		t.Errorf("expected 1, got %d", v.Int())
+	}
 }
 
 func TestSortMax(t *testing.T) {
@@ -309,7 +363,9 @@ func TestSortMax(t *testing.T) {
 		result := sort.max(arr)
 	`)
 	v := interp.GetGlobal("result")
-	if v.Int() != 5 { t.Errorf("expected 5, got %d", v.Int()) }
+	if v.Int() != 5 {
+		t.Errorf("expected 5, got %d", v.Int())
+	}
 }
 
 func TestSortMinByKey(t *testing.T) {
@@ -318,7 +374,9 @@ func TestSortMinByKey(t *testing.T) {
 		result := sort.min(arr, func(s) { return #s })
 	`)
 	v := interp.GetGlobal("result")
-	if v.Str() != "fig" { t.Errorf("expected fig, got %s", v.Str()) }
+	if v.Str() != "fig" {
+		t.Errorf("expected fig, got %s", v.Str())
+	}
 }
 
 func TestSortMaxByKey(t *testing.T) {
@@ -327,7 +385,9 @@ func TestSortMaxByKey(t *testing.T) {
 		result := sort.max(arr, func(s) { return #s })
 	`)
 	v := interp.GetGlobal("result")
-	if v.Str() != "banana" { t.Errorf("expected banana, got %s", v.Str()) }
+	if v.Str() != "banana" {
+		t.Errorf("expected banana, got %s", v.Str())
+	}
 }
 
 func TestSortMinEmpty(t *testing.T) {
@@ -336,7 +396,9 @@ func TestSortMinEmpty(t *testing.T) {
 		result := sort.min(arr)
 	`)
 	v := interp.GetGlobal("result")
-	if !v.IsNil() { t.Error("expected nil for empty") }
+	if !v.IsNil() {
+		t.Error("expected nil for empty")
+	}
 }
 
 func TestSortMaxEmpty(t *testing.T) {
@@ -345,5 +407,7 @@ func TestSortMaxEmpty(t *testing.T) {
 		result := sort.max(arr)
 	`)
 	v := interp.GetGlobal("result")
-	if !v.IsNil() { t.Error("expected nil for empty") }
+	if !v.IsNil() {
+		t.Error("expected nil for empty")
+	}
 }

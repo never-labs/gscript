@@ -3,7 +3,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func TestModularCallFloorReducePass_ReducesAdditiveModuloLeaf(t *testing.T) {

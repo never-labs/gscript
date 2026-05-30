@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func (ec *emitContext) traceNativeCallEmit(instr *Instr, pathKind string, callee *vm.FuncProto, desc *CallABIDescriptor) {

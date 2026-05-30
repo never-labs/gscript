@@ -34,8 +34,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // inlineMaxCalleeSize is the maximum bytecode count for a callee to be

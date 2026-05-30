@@ -22,7 +22,7 @@ import (
 
 	"golang.org/x/arch/arm64/arm64asm"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // WarmDumpSession records Tier 2 compile artifacts observed during a real run.

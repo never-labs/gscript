@@ -11,7 +11,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // TestTypeSpec_GetTableInt_CascadesToOpLeInt builds:

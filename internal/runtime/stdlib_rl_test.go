@@ -141,7 +141,7 @@ func TestRLColorAllConstants(t *testing.T) {
 	lib := rlLib(nil)
 
 	colors := []struct {
-		name string
+		name       string
 		r, g, b, a uint8
 	}{
 		{"LIGHTGRAY", 200, 200, 200, 255},

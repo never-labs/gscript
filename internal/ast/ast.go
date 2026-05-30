@@ -30,7 +30,8 @@ type Expr interface {
 
 // Program represents the top-level AST node containing all statements.
 type Program struct {
-	Stmts []Stmt
+	Stmts          []Stmt
+	FileDirectives []FileDirective
 }
 
 func (p *Program) nodeType() string { return "Program" }
@@ -39,6 +40,14 @@ func (p *Program) GetPos() Pos {
 		return p.Stmts[0].GetPos()
 	}
 	return Pos{Line: 1, Column: 1}
+}
+
+// FileDirective represents a file-level //gscript:<kind> directive.
+type FileDirective struct {
+	P    Pos
+	Kind string
+	Args []string
+	Text string
 }
 
 // ============================================================

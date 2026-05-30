@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func withExitResumeCheck(t *testing.T, fn func()) {

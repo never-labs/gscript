@@ -24,7 +24,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 // callExitResumeLabel returns the assembler label name for a call-exit

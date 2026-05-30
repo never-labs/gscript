@@ -4,17 +4,19 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
-	"github.com/gscript/gscript/internal/runtime"
-	bytecodevm "github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
 )
 
 // VM is a GScript virtual machine instance.
 // A VM is NOT goroutine-safe; use Pool for concurrent access.
 type VM struct {
-	interp *runtime.Interpreter
-	opts   vmOptions
-	bvm    *bytecodevm.VM // persisted bytecode VM for Call routing (nil if tree-walker mode)
+	interp          *runtime.Interpreter
+	opts            vmOptions
+	bvm             *bytecodevm.VM // persisted bytecode VM for Call routing (nil if tree-walker mode)
+	goImportAllowed map[string]bool
 }
 
 // New creates a new GScript VM with the given options.
@@ -108,6 +110,7 @@ func newVM(o vmOptions) *VM {
 	if o.llmTraceSink != nil {
 		interp.SetLLMTraceSink(llmTraceAdapter(o.llmTraceSink))
 	}
+	goImportAllowed := installGoImports(interp, o.goImports)
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -128,7 +131,7 @@ func newVM(o vmOptions) *VM {
 		interp.SetScriptDir(o.requirePath)
 	}
 
-	return &VM{interp: interp, opts: o}
+	return &VM{interp: interp, opts: o, goImportAllowed: goImportAllowed}
 }
 
 // Exec compiles and executes a GScript source string.
@@ -298,7 +301,7 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 }
 
 func (vm *VM) applyBytecodeCapabilities(bvm *bytecodevm.VM) {
-	if vm.opts.capabilities&CapModuleLoading == 0 || vm.opts.filesystemRoot != "" {
+	if vm.opts.capabilities&CapModuleLoading == 0 || vm.opts.filesystemRoot != "" || vm.opts.goImports != nil {
 		vm.copyInterpreterGlobalToBytecode(bvm, "require")
 	}
 	if vm.opts.capabilities&CapFilesystem == 0 {
@@ -314,6 +317,70 @@ func (vm *VM) applyBytecodeCapabilities(bvm *bytecodevm.VM) {
 			vm.copyInterpreterGlobalToBytecode(bvm, name)
 		}
 	}
+}
+
+func installGoImports(interp *runtime.Interpreter, imports map[string]any) map[string]bool {
+	allowed := make(map[string]bool, len(imports))
+	setupErrs := make(map[string]error)
+	for rawName, source := range imports {
+		name := normalizeGoImportName(rawName)
+		if name == "" {
+			continue
+		}
+		allowed[name] = true
+		members, err := ModuleFrom(source)
+		if err != nil {
+			setupErrs[name] = err
+			continue
+		}
+		module, err := moduleMembersValue(name, members)
+		if err != nil {
+			setupErrs[name] = err
+			continue
+		}
+		interp.SetModule(name, module)
+	}
+
+	baseRequire := interp.GetGlobal("require")
+	interp.SetGlobal("require", runtime.FunctionValue(&runtime.GoFunction{
+		Name: "require",
+		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
+			if len(args) < 1 || !args[0].IsString() {
+				return nil, fmt.Errorf("bad argument #1 to 'require' (string expected)")
+			}
+			name := args[0].Str()
+			if strings.HasPrefix(name, "go:") && !allowed[name] {
+				return nil, fmt.Errorf("go import %q is not allowed", name)
+			}
+			if err := setupErrs[name]; err != nil {
+				return nil, fmt.Errorf("go import %q: %v", name, err)
+			}
+			return interp.CallFunction(baseRequire, args)
+		},
+	}))
+	return allowed
+}
+
+func normalizeGoImportName(name string) string {
+	if name == "" {
+		return ""
+	}
+	if strings.HasPrefix(name, "go:") {
+		return name
+	}
+	return "go:" + name
+}
+
+func moduleMembersValue(name string, members Module) (runtime.Value, error) {
+	t := runtime.NewTable()
+	for k, v := range members {
+		gsVal, err := ToValue(v)
+		if err != nil {
+			return runtime.NilValue(), fmt.Errorf("%s.%s: %v", name, k, err)
+		}
+		t.RawSet(runtime.StringValue(k), gsVal)
+	}
+	return runtime.TableValue(t), nil
 }
 
 func (vm *VM) copyInterpreterGlobalToBytecode(bvm *bytecodevm.VM, name string) {
@@ -344,6 +411,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"encoding":  libs&LibEncoding != 0,
 		"fs":        libs&LibFS != 0,
 		"hash":      libs&LibHash != 0,
+		"history":   libs&LibLLM != 0,
 		"http":      libs&LibHTTP != 0,
 		"io":        libs&LibIO != 0,
 		"json":      libs&LibJSON != 0,
@@ -643,16 +711,14 @@ func (vm *VM) RegisterModule(name string, members Module) error {
 	if name == "" {
 		return fmt.Errorf("RegisterModule: empty module name")
 	}
-	t := runtime.NewTable()
-	for k, v := range members {
-		gsVal, err := ToValue(v)
-		if err != nil {
-			return fmt.Errorf("RegisterModule %s.%s: %v", name, k, err)
-		}
-		t.RawSet(runtime.StringValue(k), gsVal)
+	val, err := moduleMembersValue(name, members)
+	if err != nil {
+		return fmt.Errorf("RegisterModule %v", err)
 	}
-	val := runtime.TableValue(t)
 	vm.interp.SetModule(name, val)
+	if strings.HasPrefix(name, "go:") && vm.goImportAllowed != nil {
+		vm.goImportAllowed[name] = true
+	}
 	if vm.bvm != nil {
 		vm.bvm.SetGlobal(name, val)
 	}

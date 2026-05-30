@@ -7,7 +7,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // TestLoadElimination_BasicRedundant verifies that a second GetField on the

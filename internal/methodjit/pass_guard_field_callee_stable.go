@@ -5,7 +5,7 @@ import (
 	"sort"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 // StableFieldCalleeGuardPass replaces repeated in-loop field callee guards with

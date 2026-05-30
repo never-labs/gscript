@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 func TestHotLoaderReloadSwapsProgram(t *testing.T) {

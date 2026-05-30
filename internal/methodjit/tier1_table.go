@@ -14,8 +14,8 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // emitBaselineLen emits ARM64 for OP_LEN: R(A) = #R(B).

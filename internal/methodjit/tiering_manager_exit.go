@@ -13,8 +13,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // executeGlobalExit handles a global-exit in the TieringManager's Tier 2 path.

@@ -110,8 +110,8 @@ func TestShapeIDCacheHitAcrossTables(t *testing.T) {
 	for i := range bodies {
 		b := NewTable()
 		b.RawSetString("x", FloatValue(float64(i)))
-		b.RawSetString("y", FloatValue(float64(i) * 2))
-		b.RawSetString("mass", FloatValue(float64(i+1) * 100))
+		b.RawSetString("y", FloatValue(float64(i)*2))
+		b.RawSetString("mass", FloatValue(float64(i+1)*100))
 		bodies[i] = b
 	}
 

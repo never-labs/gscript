@@ -3,7 +3,7 @@ package vm
 import (
 	"unicode/utf8"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func (vm *VM) tryUTF8CodepointSumLoopRuntimeSpecialization(frame *CallFrame, base int, a int) (bool, error) {

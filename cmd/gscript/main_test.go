@@ -14,7 +14,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func TestTestFilesSingleFile(t *testing.T) {
@@ -58,6 +58,14 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
+	for _, want := range []string{"base", "host", "ai", "data", "vendor", "compat"} {
+		if !capabilitiesHaveStdlibLayer(caps.StdlibLayers, want) {
+			t.Fatalf("stdlib_layers = %#v, want layer %q", caps.StdlibLayers, want)
+		}
+	}
+	if !capabilitiesHaveStdlibModule(caps.StdlibLayers, "ai", "llm") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "host", "fs") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "data", "soa") {
+		t.Fatalf("stdlib_layers = %#v, want ai/llm, host/fs, and data/soa", caps.StdlibLayers)
+	}
 	for _, want := range []string{"agent", "tool", "turn", "messages_bare_expr", "direct_agent_tools", "toolof"} {
 		if !caps.AINative.Enabled || !containsString(caps.AINative.Syntax, want) {
 			t.Fatalf("ai_native syntax = %#v, want %q", caps.AINative.Syntax, want)
@@ -77,12 +85,35 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
 	}
-	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "GSCRIPT_TEST_SEED" {
-		t.Fatalf("test capabilities = %+v, want golden stdout, directory, list, and seed env", caps.Tooling.Test)
+	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "GSCRIPT_TEST_SEED" || !containsString(caps.Tooling.Test.GoldenModes, "update") {
+		t.Fatalf("test capabilities = %+v, want golden stdout modes, directory, list, and seed env", caps.Tooling.Test)
 	}
 	if caps.Tooling.Config.FileName != "gscript.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want gscript.toml/json", caps.Tooling.Config)
 	}
+}
+
+func capabilitiesHaveStdlibLayer(layers []cliStdlibLayer, name string) bool {
+	for _, layer := range layers {
+		if layer.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func capabilitiesHaveStdlibModule(layers []cliStdlibLayer, layerName, moduleName string) bool {
+	for _, layer := range layers {
+		if layer.Name != layerName {
+			continue
+		}
+		for _, module := range layer.Modules {
+			if module.Name == moduleName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func TestCapabilitiesRejectsExtraArgs(t *testing.T) {
@@ -966,11 +997,92 @@ func TestRunTestCommandJSONReportsResults(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
 	}
-	if !result.OK || result.Total != 1 || result.Passed != 1 || result.Failed != 0 {
+	if !result.OK || result.Total != 1 || result.Passed != 1 || result.Failed != 0 || result.GoldenMode != "auto" {
 		t.Fatalf("result = %+v, want one passing test", result)
 	}
 	if len(result.Files) != 1 || result.Files[0].File != okPath || !result.Files[0].OK {
 		t.Fatalf("files = %+v, want passing %s", result.Files, okPath)
+	}
+}
+
+func TestRunTestCommandGoldenRequireReportsMissingGolden(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "missing.gs")
+	golden := strings.TrimSuffix(path, ".gs") + ".out"
+	if err := os.WriteFile(path, []byte("print(\"ok\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", "--golden=require", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("runTestCommand code = %d, want 1", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if result.OK || result.GoldenMode != "require" || len(result.Files) != 1 || result.Files[0].Golden != golden || !strings.Contains(result.Files[0].Error, "missing golden") {
+		t.Fatalf("result = %+v, want missing golden failure for %s", result, golden)
+	}
+}
+
+func TestRunTestCommandGoldenIgnoreSkipsComparison(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.gs")
+	if err := os.WriteFile(path, []byte("print(\"actual\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".gs")+".out", []byte("expected\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", "--golden=ignore", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if !result.OK || result.GoldenMode != "ignore" || len(result.Files) != 1 || result.Files[0].Expected != "" || result.Files[0].Actual != "" {
+		t.Fatalf("result = %+v, want ignored golden mismatch", result)
+	}
+}
+
+func TestRunTestCommandGoldenUpdateWritesGolden(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ok.gs")
+	golden := strings.TrimSuffix(path, ".gs") + ".out"
+	if err := os.WriteFile(path, []byte("print(\"new\")\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(golden, []byte("old\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", "--golden=update", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	got, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new\n" {
+		t.Fatalf("golden = %q, want updated stdout", got)
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if !result.OK || result.GoldenMode != "update" || len(result.Files) != 1 || result.Files[0].Golden != golden {
+		t.Fatalf("result = %+v, want update golden result", result)
 	}
 }
 
@@ -1520,7 +1632,7 @@ print("ok")
 
 func TestFmtPreservesIntraLineFormattingBoundary(t *testing.T) {
 	src := `// lookup searches project docs.
-// gscript:requires docs.read
+//gscript:requires docs.read
 tool lookup(query) {
 return "found:"..query,nil
 }
@@ -1532,7 +1644,7 @@ cfg := {short:1, longer_key : 2}
 total:=1+  2
 `
 	want := `// lookup searches project docs.
-// gscript:requires docs.read
+//gscript:requires docs.read
 tool lookup(query) {
     return "found:"..query,nil
 }
@@ -1555,8 +1667,8 @@ total:=1+  2
 
 func aiNativeToolchainCoverageSource() []byte {
 	return []byte(`// lookup searches project docs.
-// gscript:requires docs.read
-// gscript:param query search query
+//gscript:requires docs.read
+//gscript:param query search query
 tool lookup(query) {
     return "found:" .. query, nil
 }

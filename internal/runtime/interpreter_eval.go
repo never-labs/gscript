@@ -11,7 +11,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/gscript/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/ast"
 )
 
 // ====================================================================

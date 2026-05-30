@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/gscript/gscript/internal/vm"
+import "github.com/Never-Labs/gscript/internal/vm"
 
 // TableArrayNestedLoadPass fuses the hot table-of-typed-arrays shape:
 //

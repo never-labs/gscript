@@ -6,7 +6,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 // emitReturn emits ARM64 code for OpReturn. Numeric pass returns leave a raw

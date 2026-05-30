@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
 )
 
 // runWithFSPath creates a temp dir and runs GScript source with fs and path libs registered.

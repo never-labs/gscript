@@ -3,7 +3,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // setAllTier2InstallFields populates every proto field that an installed Tier 2

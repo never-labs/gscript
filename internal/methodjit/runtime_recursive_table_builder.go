@@ -5,8 +5,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // Keep the native call-site builder bounded by a practical allocation limit.

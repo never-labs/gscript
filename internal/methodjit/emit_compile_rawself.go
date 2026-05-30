@@ -3,7 +3,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 func (ec *emitContext) emitSetRawSelfRegsEndFromMRegRegs() {

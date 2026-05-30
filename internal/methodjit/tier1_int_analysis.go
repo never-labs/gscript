@@ -9,8 +9,8 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // knownIntInfo is the result of the forward scan. perPC[pc] is the bitmap

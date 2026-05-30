@@ -9,8 +9,8 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/jit"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func emitBaselineSimpleClosureExprFastPath(asm *jit.Assembler, callerProto *vm.FuncProto, doneLabel string, callSlot int) {

@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func seedGuardedFixedShapeArgFacts(fn *Function, tableShapes *TableShapeFacts, facts map[int]FixedShapeTableFact, argFacts map[int]FixedShapeTableFact) {

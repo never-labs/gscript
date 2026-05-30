@@ -9,7 +9,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 func annotateFixedShapeArrayElementAccesses(fn *Function, numeric *NumericFacts, facts map[int]FixedShapeTableFact) {

@@ -23,11 +23,21 @@ func TestLogLevelConstants(t *testing.T) {
 		e := log.ERROR
 		f := log.FATAL
 	`)
-	if interp.GetGlobal("d").Int() != 0 { t.Error("DEBUG should be 0") }
-	if interp.GetGlobal("i").Int() != 1 { t.Error("INFO should be 1") }
-	if interp.GetGlobal("w").Int() != 2 { t.Error("WARN should be 2") }
-	if interp.GetGlobal("e").Int() != 3 { t.Error("ERROR should be 3") }
-	if interp.GetGlobal("f").Int() != 4 { t.Error("FATAL should be 4") }
+	if interp.GetGlobal("d").Int() != 0 {
+		t.Error("DEBUG should be 0")
+	}
+	if interp.GetGlobal("i").Int() != 1 {
+		t.Error("INFO should be 1")
+	}
+	if interp.GetGlobal("w").Int() != 2 {
+		t.Error("WARN should be 2")
+	}
+	if interp.GetGlobal("e").Int() != 3 {
+		t.Error("ERROR should be 3")
+	}
+	if interp.GetGlobal("f").Int() != 4 {
+		t.Error("FATAL should be 4")
+	}
 }
 
 // ==================================================================
@@ -41,7 +51,9 @@ func TestLogInfo(t *testing.T) {
 		count := #h
 		msg := h[1]
 	`)
-	if interp.GetGlobal("count").Int() != 1 { t.Error("expected 1 log entry") }
+	if interp.GetGlobal("count").Int() != 1 {
+		t.Error("expected 1 log entry")
+	}
 	msg := interp.GetGlobal("msg").Str()
 	if !strings.Contains(msg, "[INFO]") {
 		t.Errorf("expected [INFO] in message, got: %s", msg)

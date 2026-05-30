@@ -10,7 +10,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/jit"
+import "github.com/Never-Labs/gscript/internal/jit"
 
 // emitIntTagCheckBranch emits the full NaN-box integer tag-check-and-branch
 // sequence:

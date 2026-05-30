@@ -2,57 +2,87 @@ package runtime
 
 import "context"
 
-var stdlibModuleNames = []string{
-	"base64",
-	"array",
-	"binary",
-	"bit32",
-	"bits",
-	"bytes",
-	"chat",
-	"color",
-	"compress",
-	"container",
-	"context",
-	"crypto",
-	"csv",
-	"debug",
-	"encoding",
-	"fs",
-	"hash",
-	"http",
-	"io",
-	"json",
-	"llm",
-	"log",
-	"loop",
-	"math",
-	"matrix",
-	"msg",
-	"net",
-	"os",
-	"path",
-	"process",
-	"rand",
-	"regexp",
-	"rl",
-	"script",
-	"soa",
-	"sort",
-	"string",
-	"sync",
-	"table",
-	"testkit",
-	"time",
-	"url",
-	"utf8",
-	"uuid",
-	"vec",
+const (
+	StdlibLayerBase   = "base"
+	StdlibLayerHost   = "host"
+	StdlibLayerAI     = "ai"
+	StdlibLayerData   = "data"
+	StdlibLayerVendor = "vendor"
+	StdlibLayerCompat = "compat"
+)
+
+// StdlibModuleInfo describes the public standard-library surface in a form
+// suitable for CLI capability reports, test policy, and sandbox planning.
+type StdlibModuleInfo struct {
+	Name         string
+	Layer        string
+	Capabilities []string
+	SafeDefault  bool
+}
+
+var stdlibModules = []StdlibModuleInfo{
+	{Name: "array", Layer: StdlibLayerData, SafeDefault: true},
+	{Name: "base64", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "binary", Layer: StdlibLayerData, SafeDefault: true},
+	{Name: "bit32", Layer: StdlibLayerCompat, SafeDefault: true},
+	{Name: "bits", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "bytes", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "chat", Layer: StdlibLayerAI, Capabilities: []string{"llm.turn"}},
+	{Name: "color", Layer: StdlibLayerData, SafeDefault: true},
+	{Name: "compress", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "container", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "context", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "crypto", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "csv", Layer: StdlibLayerData, SafeDefault: true},
+	{Name: "debug", Layer: StdlibLayerHost, Capabilities: []string{"debug"}},
+	{Name: "encoding", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "fs", Layer: StdlibLayerHost, Capabilities: []string{"fs.read", "fs.write"}},
+	{Name: "hash", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "history", Layer: StdlibLayerAI},
+	{Name: "http", Layer: StdlibLayerHost, Capabilities: []string{"net.listen"}},
+	{Name: "io", Layer: StdlibLayerHost, Capabilities: []string{"io"}},
+	{Name: "json", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "llm", Layer: StdlibLayerAI, Capabilities: []string{"llm.turn"}},
+	{Name: "log", Layer: StdlibLayerHost, Capabilities: []string{"io.write"}},
+	{Name: "loop", Layer: StdlibLayerAI, Capabilities: []string{"llm.turn"}},
+	{Name: "math", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "matrix", Layer: StdlibLayerData, SafeDefault: true},
+	{Name: "msg", Layer: StdlibLayerAI},
+	{Name: "net", Layer: StdlibLayerHost, Capabilities: []string{"net.http"}},
+	{Name: "os", Layer: StdlibLayerHost, Capabilities: []string{"env.read", "env.write"}},
+	{Name: "path", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "process", Layer: StdlibLayerHost, Capabilities: []string{"process.exec", "process.shell"}},
+	{Name: "rand", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "regexp", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "rl", Layer: StdlibLayerVendor},
+	{Name: "script", Layer: StdlibLayerHost, Capabilities: []string{"script.eval", "module.load"}},
+	{Name: "soa", Layer: StdlibLayerData, SafeDefault: true},
+	{Name: "sort", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "string", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "sync", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "table", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "testkit", Layer: StdlibLayerHost, Capabilities: []string{"testkit"}},
+	{Name: "time", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "url", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "utf8", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "uuid", Layer: StdlibLayerBase, SafeDefault: true},
+	{Name: "vec", Layer: StdlibLayerData, SafeDefault: true},
+}
+
+func StdlibModules() []StdlibModuleInfo {
+	out := make([]StdlibModuleInfo, len(stdlibModules))
+	for i, module := range stdlibModules {
+		out[i] = module
+		out[i].Capabilities = append([]string(nil), module.Capabilities...)
+	}
+	return out
 }
 
 func StdlibModuleNames() []string {
-	out := make([]string, len(stdlibModuleNames))
-	copy(out, stdlibModuleNames)
+	out := make([]string, len(stdlibModules))
+	for i, module := range stdlibModules {
+		out[i] = module.Name
+	}
 	return out
 }
 
@@ -200,7 +230,8 @@ func (interp *Interpreter) registerStdlib() {
 func (interp *Interpreter) registerPackageLib() {
 	pkg := NewTable()
 	loaded := NewTable()
-	for _, name := range stdlibModuleNames {
+	for _, module := range stdlibModules {
+		name := module.Name
 		if v, ok := interp.globals.Get(name); ok && v.IsTable() {
 			interp.modules[name] = v
 			loaded.RawSetString(name, v)

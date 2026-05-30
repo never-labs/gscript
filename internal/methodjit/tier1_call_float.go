@@ -5,7 +5,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/jit"
+import "github.com/Never-Labs/gscript/internal/jit"
 
 func emitFloatValueOrMiss(asm *jit.Assembler, fpReg jit.FReg, gpReg, scratch jit.Reg, missLabel string) {
 	jit.EmitIsTaggedPinned(asm, gpReg, scratch, mRegTagInt)

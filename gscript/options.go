@@ -132,6 +132,7 @@ type vmOptions struct {
 	llmProviderFactory LLMProviderFactory
 	llmTraceSink       LLMTraceSink
 	llmRecordSink      LLMRecordSink
+	goImports          map[string]any
 	useVM              bool // use bytecode VM instead of tree-walker
 	useJIT             bool // enable JIT compilation (implies useVM)
 }
@@ -423,6 +424,23 @@ func WithSecurity(policy SecurityPolicy) Option {
 // WithRequirePath sets the base directory for require() module loading.
 func WithRequirePath(path string) Option {
 	return func(o *vmOptions) { o.requirePath = path }
+}
+
+// WithGoImports registers an explicit allowlist of Go-backed modules that
+// scripts may load with require("go:..."). The values are converted with the
+// same rules as ModuleFrom, so pass concrete modules or host values; this does
+// not dynamically load Go packages by import path.
+func WithGoImports(imports map[string]any) Option {
+	return func(o *vmOptions) {
+		if imports == nil {
+			o.goImports = nil
+			return
+		}
+		o.goImports = make(map[string]any, len(imports))
+		for name, source := range imports {
+			o.goImports[name] = source
+		}
+	}
 }
 
 // WithPrint overrides the print() function (useful to capture output in tests/games).

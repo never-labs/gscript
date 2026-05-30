@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // AnnotateCallABIsPass annotates stable raw-int callsite ABI facts after

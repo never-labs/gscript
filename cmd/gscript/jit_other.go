@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	bytecodevm "github.com/gscript/gscript/internal/vm"
+	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
 )
 
 func cliEnableJIT(_ *bytecodevm.VM, opts jitCLIOptions) (jitStatsReporter, error) {

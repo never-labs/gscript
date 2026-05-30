@@ -10,7 +10,7 @@ embedding contract.
 Public import path:
 
 ```go
-import "github.com/gscript/gscript/gscript"
+import "github.com/Never-Labs/gscript/gscript"
 ```
 
 Current public package surface:

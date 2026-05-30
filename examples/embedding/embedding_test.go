@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 type exampleLLMProvider struct{}

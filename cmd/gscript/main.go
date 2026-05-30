@@ -17,11 +17,11 @@ import (
 	"strconv"
 	"strings"
 
-	gscript "github.com/gscript/gscript/gscript"
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	"github.com/gscript/gscript/internal/runtime"
-	bytecodevm "github.com/gscript/gscript/internal/vm"
+	gscript "github.com/Never-Labs/gscript/gscript"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
 )
 
 // jitStatsReporter is implemented by the platform-specific JIT engine wrapper
@@ -257,6 +257,7 @@ type cliCapabilities struct {
 	Execution     cliExecutionCapability `json:"execution"`
 	Commands      []string               `json:"commands"`
 	StdlibModules []string               `json:"stdlib_modules"`
+	StdlibLayers  []cliStdlibLayer       `json:"stdlib_layers"`
 	AINative      cliAINativeCapability  `json:"ai_native"`
 	Tooling       cliToolingCapability   `json:"tooling"`
 }
@@ -271,6 +272,17 @@ type cliExecutionCapability struct {
 	BytecodeVM  bool `json:"bytecode_vm"`
 	JIT         bool `json:"jit"`
 	MethodJIT   bool `json:"method_jit"`
+}
+
+type cliStdlibLayer struct {
+	Name    string            `json:"name"`
+	Modules []cliStdlibModule `json:"modules"`
+}
+
+type cliStdlibModule struct {
+	Name         string   `json:"name"`
+	Capabilities []string `json:"capabilities,omitempty"`
+	SafeDefault  bool     `json:"safe_default,omitempty"`
 }
 
 type cliAINativeCapability struct {
@@ -303,10 +315,11 @@ type cliLinterCapability struct {
 }
 
 type cliTestCapability struct {
-	GoldenStdout bool   `json:"golden_stdout"`
-	Directory    bool   `json:"directory"`
-	List         bool   `json:"list"`
-	SeedEnv      string `json:"seed_env"`
+	GoldenStdout bool     `json:"golden_stdout"`
+	GoldenModes  []string `json:"golden_modes"`
+	Directory    bool     `json:"directory"`
+	List         bool     `json:"list"`
+	SeedEnv      string   `json:"seed_env"`
 }
 
 func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
@@ -355,6 +368,7 @@ func buildCapabilities() cliCapabilities {
 		},
 		Commands:      cliCommandNames(),
 		StdlibModules: modules,
+		StdlibLayers:  buildStdlibLayerCapabilities(),
 		AINative: cliAINativeCapability{
 			Enabled: true,
 			Syntax: []string{
@@ -422,6 +436,7 @@ func buildCapabilities() cliCapabilities {
 			},
 			Test: cliTestCapability{
 				GoldenStdout: true,
+				GoldenModes:  []string{"auto", "require", "ignore", "update"},
 				Directory:    true,
 				List:         true,
 				SeedEnv:      "GSCRIPT_TEST_SEED",
@@ -438,6 +453,34 @@ func buildCapabilities() cliCapabilities {
 			},
 		},
 	}
+}
+
+func buildStdlibLayerCapabilities() []cliStdlibLayer {
+	byLayer := map[string][]cliStdlibModule{}
+	for _, module := range runtime.StdlibModules() {
+		byLayer[module.Layer] = append(byLayer[module.Layer], cliStdlibModule{
+			Name:         module.Name,
+			Capabilities: append([]string(nil), module.Capabilities...),
+			SafeDefault:  module.SafeDefault,
+		})
+	}
+	order := []string{
+		runtime.StdlibLayerBase,
+		runtime.StdlibLayerHost,
+		runtime.StdlibLayerAI,
+		runtime.StdlibLayerData,
+		runtime.StdlibLayerVendor,
+		runtime.StdlibLayerCompat,
+	}
+	layers := make([]cliStdlibLayer, 0, len(order))
+	for _, name := range order {
+		modules := byLayer[name]
+		sort.Slice(modules, func(i, j int) bool {
+			return modules[i].Name < modules[j].Name
+		})
+		layers = append(layers, cliStdlibLayer{Name: name, Modules: modules})
+	}
+	return layers
 }
 
 func runFmtCommand(args []string, outw, errw io.Writer) int {
@@ -947,6 +990,7 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	format := fs.String("format", "text", "output format: text or json")
+	goldenMode := fs.String("golden", "auto", "golden stdout mode: auto, require, ignore, or update")
 	listOnly := fs.Bool("list", false, "list matching .gs test files without running them")
 	seed := fs.String("seed", "", "set GSCRIPT_TEST_SEED while running tests")
 	if err := fs.Parse(args); err != nil {
@@ -954,7 +998,7 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	}
 	paths := fs.Args()
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] [--list] [--seed SEED] <path-or-dir>")
+		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] <path-or-dir>")
 		return 2
 	}
 	if !flagWasSet(fs, "format") {
@@ -971,6 +1015,10 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		fmt.Fprintf(errw, "gscript test: unsupported --format %q (want text or json)\n", *format)
 		return 2
 	}
+	if !validTestGoldenMode(*goldenMode) {
+		fmt.Fprintf(errw, "gscript test: unsupported --golden %q (want auto, require, ignore, or update)\n", *goldenMode)
+		return 2
+	}
 	if *listOnly {
 		files, err := testFiles(paths[0])
 		if err != nil {
@@ -979,8 +1027,9 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		}
 		if *format == "json" {
 			if err := json.NewEncoder(outw).Encode(struct {
-				Files []string `json:"files"`
-			}{Files: files}); err != nil {
+				GoldenMode string   `json:"golden_mode"`
+				Files      []string `json:"files"`
+			}{GoldenMode: *goldenMode, Files: files}); err != nil {
 				fmt.Fprintf(errw, "gscript test: write json: %v\n", err)
 				return 1
 			}
@@ -991,7 +1040,7 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		}
 		return 0
 	}
-	result := runTestsDetailed(paths[0], opts, errw, *format == "text", *seed)
+	result := runTestsDetailed(paths[0], opts, errw, *format == "text", *seed, *goldenMode)
 	if *format == "json" {
 		if err := json.NewEncoder(outw).Encode(result); err != nil {
 			fmt.Fprintf(errw, "gscript test: write json: %v\n", err)
@@ -1004,13 +1053,23 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	return 0
 }
 
+func validTestGoldenMode(mode string) bool {
+	switch mode {
+	case "auto", "require", "ignore", "update":
+		return true
+	default:
+		return false
+	}
+}
+
 type testRunResult struct {
-	OK     bool             `json:"ok"`
-	Total  int              `json:"total"`
-	Passed int              `json:"passed"`
-	Failed int              `json:"failed"`
-	Seed   string           `json:"seed,omitempty"`
-	Files  []testFileResult `json:"files"`
+	OK         bool             `json:"ok"`
+	Total      int              `json:"total"`
+	Passed     int              `json:"passed"`
+	Failed     int              `json:"failed"`
+	Seed       string           `json:"seed,omitempty"`
+	GoldenMode string           `json:"golden_mode"`
+	Files      []testFileResult `json:"files"`
 }
 
 type testFileResult struct {
@@ -1024,28 +1083,30 @@ type testFileResult struct {
 }
 
 func runTests(path string, opts cliRunOptions, errw io.Writer) bool {
-	return runTestsDetailed(path, opts, errw, true, "").OK
+	return runTestsDetailed(path, opts, errw, true, "", "auto").OK
 }
 
-func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool, seed string) testRunResult {
+func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool, seed string, goldenMode string) testRunResult {
 	files, err := testFiles(path)
 	if err != nil {
 		if text {
 			fmt.Fprintf(errw, "%s: %v\n", path, err)
 		}
 		return testRunResult{
-			OK:     false,
-			Total:  1,
-			Failed: 1,
-			Files:  []testFileResult{{File: path, OK: false, Error: err.Error()}},
+			OK:         false,
+			Total:      1,
+			Failed:     1,
+			Files:      []testFileResult{{File: path, OK: false, Error: err.Error()}},
+			GoldenMode: goldenMode,
 		}
 	}
 
 	result := testRunResult{
-		OK:    true,
-		Total: len(files),
-		Seed:  seed,
-		Files: make([]testFileResult, 0, len(files)),
+		OK:         true,
+		Total:      len(files),
+		Seed:       seed,
+		GoldenMode: goldenMode,
+		Files:      make([]testFileResult, 0, len(files)),
 	}
 	if seed != "" {
 		oldSeed, hadSeed := os.LookupEnv("GSCRIPT_TEST_SEED")
@@ -1061,7 +1122,7 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 	for _, filename := range files {
 		fileResult := testFileResult{File: filename, OK: true}
 		golden, hasGolden, err := testGoldenOutputFile(filename)
-		if hasGolden {
+		if hasGolden || goldenMode == "require" || goldenMode == "update" {
 			fileResult.Golden = golden
 		}
 		if err != nil {
@@ -1073,10 +1134,21 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 			result.Files = append(result.Files, fileResult)
 			continue
 		}
+		if goldenMode == "require" && !hasGolden {
+			fileResult.OK = false
+			fileResult.Error = fmt.Sprintf("missing golden %s", golden)
+			if text {
+				fmt.Fprintf(errw, "%s: %s\n", filename, fileResult.Error)
+			}
+			result.Files = append(result.Files, fileResult)
+			continue
+		}
 
 		var runErr error
 		var stdout []byte
-		if hasGolden {
+		compareGolden := goldenMode == "auto" && hasGolden || goldenMode == "require"
+		updateGolden := goldenMode == "update"
+		if compareGolden || updateGolden {
 			stdout, runErr = runScriptFileCapturingStdout(filename, opts)
 		} else {
 			interp := runtime.New()
@@ -1095,7 +1167,18 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 				continue
 			}
 		}
-		if !hasGolden {
+		if updateGolden {
+			if err := os.WriteFile(golden, stdout, 0644); err != nil {
+				fileResult.OK = false
+				fileResult.Error = fmt.Sprintf("write golden %s: %v", golden, err)
+				if text {
+					fmt.Fprintf(errw, "%s: %s\n", filename, fileResult.Error)
+				}
+			}
+			result.Files = append(result.Files, fileResult)
+			continue
+		}
+		if !compareGolden {
 			result.Files = append(result.Files, fileResult)
 			continue
 		}

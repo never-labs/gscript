@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
 )
 
 // helper: parse and execute source code, return the interpreter.
@@ -847,7 +847,6 @@ func TestEqualityNil(t *testing.T) {
 		t.Errorf("expected true, got %v", v)
 	}
 }
-
 
 func TestInfiniteLoopBreak(t *testing.T) {
 	v := getGlobal(t, `

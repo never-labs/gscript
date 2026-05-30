@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/ast"
-	"github.com/gscript/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/lexer"
 )
 
 // helper: lex and parse the source, fail the test on error
@@ -286,7 +286,7 @@ models {
 }
 
 // Lookup docs.
-// gscript:requires none
+//gscript:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -335,7 +335,7 @@ func TestAINativeValidationReportsStaticToolListElementLine(t *testing.T) {
 		{
 			name: "unknown",
 			src: `
-// gscript:requires none
+//gscript:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -355,7 +355,7 @@ func f() {
 		{
 			name: "duplicate",
 			src: `
-// gscript:requires none
+//gscript:requires none
 tool lookup(query) {
     return query, nil
 }
@@ -395,9 +395,9 @@ func TestAINativeExampleParses(t *testing.T) {
 func TestAINativeToolCommentDirectivesParseAndDesugar(t *testing.T) {
 	prog := mustParse(t, `
 // Lookup docs.
-// gscript:requires docs.read, net.client
-// gscript:param query search query text
-// gscript:param limit: maximum result count
+//gscript:requires docs.read, net.client
+//gscript:param query search query text
+//gscript:param limit: maximum result count
 tool search_docs(query, limit) {
     return query, nil
 }
@@ -448,6 +448,86 @@ tool search_docs(query, limit) {
 	}
 	if got := stringFieldValue(paramDocs, "limit"); got != "maximum result count" {
 		t.Fatalf("param_docs.limit = %q", got)
+	}
+}
+
+func TestFileDirectivesParse(t *testing.T) {
+	prog := mustParse(t, `//gscript:build linux, darwin
+//gscript:test integration slow
+//gscript:cap docs.read,net.client
+//gscript:feature ai-native
+func main() {}
+`)
+	if len(prog.FileDirectives) != 4 {
+		t.Fatalf("file directives = %#v, want 4", prog.FileDirectives)
+	}
+	wantKinds := []string{"build", "test", "cap", "feature"}
+	for i, want := range wantKinds {
+		if got := prog.FileDirectives[i].Kind; got != want {
+			t.Fatalf("directive[%d].Kind = %q, want %q", i, got, want)
+		}
+	}
+	if got := prog.FileDirectives[0].Args; len(got) != 2 || got[0] != "linux" || got[1] != "darwin" {
+		t.Fatalf("build args = %#v", got)
+	}
+	if got := prog.FileDirectives[1].Args; len(got) != 2 || got[0] != "integration" || got[1] != "slow" {
+		t.Fatalf("test args = %#v", got)
+	}
+	if got := prog.FileDirectives[2].Args; len(got) != 2 || got[0] != "docs.read" || got[1] != "net.client" {
+		t.Fatalf("cap args = %#v", got)
+	}
+	if got := prog.FileDirectives[3].Text; got != "ai-native" {
+		t.Fatalf("feature text = %q", got)
+	}
+}
+
+func TestFileDirectiveBeforeToolDoesNotBecomeToolDoc(t *testing.T) {
+	prog := mustParse(t, `//gscript:build ai
+// Tool docs.
+//gscript:requires none
+tool lookup() {
+    return nil
+}
+`)
+	if len(prog.FileDirectives) != 1 || prog.FileDirectives[0].Kind != "build" {
+		t.Fatalf("file directives = %#v", prog.FileDirectives)
+	}
+	tool, ok := prog.Stmts[0].(*ast.ToolDeclStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want ToolDeclStmt", prog.Stmts[0])
+	}
+	if tool.DocComment != "Tool docs." {
+		t.Fatalf("tool doc = %q", tool.DocComment)
+	}
+	if len(tool.Requires) != 1 || tool.Requires[0] != "none" {
+		t.Fatalf("tool requires = %#v", tool.Requires)
+	}
+}
+
+func TestGoImportDesugarsToRequireDeclaration(t *testing.T) {
+	prog := mustParse(t, `import "go:net/http" as http
+`)
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("stmts = %#v, want one", prog.Stmts)
+	}
+	decl, ok := prog.Stmts[0].(*ast.DeclareStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want DeclareStmt", prog.Stmts[0])
+	}
+	if len(decl.Names) != 1 || decl.Names[0] != "http" {
+		t.Fatalf("names = %#v, want http", decl.Names)
+	}
+	call, ok := decl.Values[0].(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("value = %T, want CallExpr", decl.Values[0])
+	}
+	fn, ok := call.Func.(*ast.IdentExpr)
+	if !ok || fn.Name != "require" {
+		t.Fatalf("func = %#v, want require", call.Func)
+	}
+	arg, ok := call.Args[0].(*ast.StringLit)
+	if !ok || arg.Value != "go:net/http" {
+		t.Fatalf("arg = %#v, want go:net/http", call.Args[0])
 	}
 }
 

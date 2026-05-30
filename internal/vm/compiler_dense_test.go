@@ -3,7 +3,7 @@ package vm
 import (
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func TestCompilerDenseLiteralLowersToArrayConstructors(t *testing.T) {

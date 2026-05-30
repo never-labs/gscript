@@ -122,7 +122,8 @@ func (interp *Interpreter) ReplaceGlobals(globals map[string]Value) {
 
 // RestrictStdlib removes standard-library globals not present in allowed.
 func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
-	for _, name := range stdlibModuleNames {
+	for _, module := range stdlibModules {
+		name := module.Name
 		if allowed[name] {
 			continue
 		}
@@ -268,8 +269,8 @@ func (interp *Interpreter) refreshFSLib() {
 }
 
 func (interp *Interpreter) builtinModule(name string) (Value, bool) {
-	for _, moduleName := range stdlibModuleNames {
-		if name != moduleName {
+	for _, module := range stdlibModules {
+		if name != module.Name {
 			continue
 		}
 		v, ok := interp.globals.Get(name)

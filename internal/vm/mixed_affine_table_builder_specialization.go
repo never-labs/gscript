@@ -3,7 +3,7 @@ package vm
 import (
 	"strconv"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 type mixedAffineTableBuilderSpec struct {

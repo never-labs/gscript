@@ -35,10 +35,18 @@ func TestContainerSetNew(t *testing.T) {
 		has3 := container.setHas(s, 3)
 		has4 := container.setHas(s, 4)
 	`)
-	if !interp.GetGlobal("has1").Bool() { t.Error("expected has 1") }
-	if !interp.GetGlobal("has2").Bool() { t.Error("expected has 2") }
-	if !interp.GetGlobal("has3").Bool() { t.Error("expected has 3") }
-	if interp.GetGlobal("has4").Bool() { t.Error("should not have 4") }
+	if !interp.GetGlobal("has1").Bool() {
+		t.Error("expected has 1")
+	}
+	if !interp.GetGlobal("has2").Bool() {
+		t.Error("expected has 2")
+	}
+	if !interp.GetGlobal("has3").Bool() {
+		t.Error("expected has 3")
+	}
+	if interp.GetGlobal("has4").Bool() {
+		t.Error("should not have 4")
+	}
 }
 
 func TestContainerSetAdd(t *testing.T) {
@@ -47,7 +55,9 @@ func TestContainerSetAdd(t *testing.T) {
 		container.setAdd(s, "hello")
 		result := container.setHas(s, "hello")
 	`)
-	if !interp.GetGlobal("result").Bool() { t.Error("expected has hello") }
+	if !interp.GetGlobal("result").Bool() {
+		t.Error("expected has hello")
+	}
 }
 
 func TestContainerSetRemove(t *testing.T) {
@@ -57,8 +67,12 @@ func TestContainerSetRemove(t *testing.T) {
 		has2 := container.setHas(s, 2)
 		has1 := container.setHas(s, 1)
 	`)
-	if interp.GetGlobal("has2").Bool() { t.Error("2 should be removed") }
-	if !interp.GetGlobal("has1").Bool() { t.Error("1 should remain") }
+	if interp.GetGlobal("has2").Bool() {
+		t.Error("2 should be removed")
+	}
+	if !interp.GetGlobal("has1").Bool() {
+		t.Error("1 should remain")
+	}
 }
 
 func TestContainerSetSize(t *testing.T) {
@@ -66,7 +80,9 @@ func TestContainerSetSize(t *testing.T) {
 		s := container.setNew(1, 2, 3)
 		size := container.setSize(s)
 	`)
-	if interp.GetGlobal("size").Int() != 3 { t.Errorf("expected 3, got %d", interp.GetGlobal("size").Int()) }
+	if interp.GetGlobal("size").Int() != 3 {
+		t.Errorf("expected 3, got %d", interp.GetGlobal("size").Int())
+	}
 }
 
 func TestContainerSetUnion(t *testing.T) {
@@ -78,9 +94,15 @@ func TestContainerSetUnion(t *testing.T) {
 		has1 := container.setHas(u, 1)
 		has5 := container.setHas(u, 5)
 	`)
-	if interp.GetGlobal("size").Int() != 5 { t.Errorf("expected 5, got %d", interp.GetGlobal("size").Int()) }
-	if !interp.GetGlobal("has1").Bool() { t.Error("union should have 1") }
-	if !interp.GetGlobal("has5").Bool() { t.Error("union should have 5") }
+	if interp.GetGlobal("size").Int() != 5 {
+		t.Errorf("expected 5, got %d", interp.GetGlobal("size").Int())
+	}
+	if !interp.GetGlobal("has1").Bool() {
+		t.Error("union should have 1")
+	}
+	if !interp.GetGlobal("has5").Bool() {
+		t.Error("union should have 5")
+	}
 }
 
 func TestContainerSetIntersect(t *testing.T) {
@@ -93,10 +115,18 @@ func TestContainerSetIntersect(t *testing.T) {
 		has3 := container.setHas(i, 3)
 		has1 := container.setHas(i, 1)
 	`)
-	if interp.GetGlobal("size").Int() != 2 { t.Errorf("expected 2, got %d", interp.GetGlobal("size").Int()) }
-	if !interp.GetGlobal("has2").Bool() { t.Error("intersect should have 2") }
-	if !interp.GetGlobal("has3").Bool() { t.Error("intersect should have 3") }
-	if interp.GetGlobal("has1").Bool() { t.Error("intersect should not have 1") }
+	if interp.GetGlobal("size").Int() != 2 {
+		t.Errorf("expected 2, got %d", interp.GetGlobal("size").Int())
+	}
+	if !interp.GetGlobal("has2").Bool() {
+		t.Error("intersect should have 2")
+	}
+	if !interp.GetGlobal("has3").Bool() {
+		t.Error("intersect should have 3")
+	}
+	if interp.GetGlobal("has1").Bool() {
+		t.Error("intersect should not have 1")
+	}
 }
 
 func TestContainerSetDifference(t *testing.T) {
@@ -108,9 +138,15 @@ func TestContainerSetDifference(t *testing.T) {
 		has1 := container.setHas(d, 1)
 		has2 := container.setHas(d, 2)
 	`)
-	if interp.GetGlobal("size").Int() != 1 { t.Errorf("expected 1, got %d", interp.GetGlobal("size").Int()) }
-	if !interp.GetGlobal("has1").Bool() { t.Error("difference should have 1") }
-	if interp.GetGlobal("has2").Bool() { t.Error("difference should not have 2") }
+	if interp.GetGlobal("size").Int() != 1 {
+		t.Errorf("expected 1, got %d", interp.GetGlobal("size").Int())
+	}
+	if !interp.GetGlobal("has1").Bool() {
+		t.Error("difference should have 1")
+	}
+	if interp.GetGlobal("has2").Bool() {
+		t.Error("difference should not have 2")
+	}
 }
 
 func TestContainerSetToArray(t *testing.T) {
@@ -120,7 +156,9 @@ func TestContainerSetToArray(t *testing.T) {
 		count := #arr
 	`)
 	count := interp.GetGlobal("count")
-	if count.Int() != 3 { t.Errorf("expected 3 elements, got %d", count.Int()) }
+	if count.Int() != 3 {
+		t.Errorf("expected 3 elements, got %d", count.Int())
+	}
 }
 
 // ==================================================================
@@ -137,9 +175,15 @@ func TestContainerQueue(t *testing.T) {
 		second := container.queuePop(q)
 		size := container.queueSize(q)
 	`)
-	if interp.GetGlobal("first").Str() != "a" { t.Error("expected a") }
-	if interp.GetGlobal("second").Str() != "b" { t.Error("expected b") }
-	if interp.GetGlobal("size").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("first").Str() != "a" {
+		t.Error("expected a")
+	}
+	if interp.GetGlobal("second").Str() != "b" {
+		t.Error("expected b")
+	}
+	if interp.GetGlobal("size").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 func TestContainerQueueEmpty(t *testing.T) {
@@ -148,8 +192,12 @@ func TestContainerQueueEmpty(t *testing.T) {
 		empty := container.queueEmpty(q)
 		result := container.queuePop(q)
 	`)
-	if !interp.GetGlobal("empty").Bool() { t.Error("new queue should be empty") }
-	if !interp.GetGlobal("result").IsNil() { t.Error("pop from empty should return nil") }
+	if !interp.GetGlobal("empty").Bool() {
+		t.Error("new queue should be empty")
+	}
+	if !interp.GetGlobal("result").IsNil() {
+		t.Error("pop from empty should return nil")
+	}
 }
 
 func TestContainerQueuePeek(t *testing.T) {
@@ -159,8 +207,12 @@ func TestContainerQueuePeek(t *testing.T) {
 		peeked := container.queuePeek(q)
 		size := container.queueSize(q)
 	`)
-	if interp.GetGlobal("peeked").Int() != 42 { t.Error("expected 42") }
-	if interp.GetGlobal("size").Int() != 1 { t.Error("peek should not remove element") }
+	if interp.GetGlobal("peeked").Int() != 42 {
+		t.Error("expected 42")
+	}
+	if interp.GetGlobal("size").Int() != 1 {
+		t.Error("peek should not remove element")
+	}
 }
 
 func TestContainerQueueDeque(t *testing.T) {
@@ -173,9 +225,15 @@ func TestContainerQueueDeque(t *testing.T) {
 		last := container.queuePopBack(q)
 		mid := container.queuePop(q)
 	`)
-	if interp.GetGlobal("first").Str() != "a" { t.Error("expected a from front") }
-	if interp.GetGlobal("last").Str() != "c" { t.Error("expected c from back") }
-	if interp.GetGlobal("mid").Str() != "b" { t.Error("expected b remaining") }
+	if interp.GetGlobal("first").Str() != "a" {
+		t.Error("expected a from front")
+	}
+	if interp.GetGlobal("last").Str() != "c" {
+		t.Error("expected c from back")
+	}
+	if interp.GetGlobal("mid").Str() != "b" {
+		t.Error("expected b remaining")
+	}
 }
 
 func TestContainerQueueSize(t *testing.T) {
@@ -188,9 +246,15 @@ func TestContainerQueueSize(t *testing.T) {
 		container.queuePop(q)
 		s1 := container.queueSize(q)
 	`)
-	if interp.GetGlobal("s0").Int() != 0 { t.Error("expected 0") }
-	if interp.GetGlobal("s2").Int() != 2 { t.Error("expected 2") }
-	if interp.GetGlobal("s1").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("s0").Int() != 0 {
+		t.Error("expected 0")
+	}
+	if interp.GetGlobal("s2").Int() != 2 {
+		t.Error("expected 2")
+	}
+	if interp.GetGlobal("s1").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 // ==================================================================
@@ -207,9 +271,15 @@ func TestContainerHeapBasic(t *testing.T) {
 		second := h.pop()
 		third := h.pop()
 	`)
-	if interp.GetGlobal("first").Int() != 10 { t.Errorf("expected 10, got %d", interp.GetGlobal("first").Int()) }
-	if interp.GetGlobal("second").Int() != 20 { t.Errorf("expected 20, got %d", interp.GetGlobal("second").Int()) }
-	if interp.GetGlobal("third").Int() != 30 { t.Errorf("expected 30, got %d", interp.GetGlobal("third").Int()) }
+	if interp.GetGlobal("first").Int() != 10 {
+		t.Errorf("expected 10, got %d", interp.GetGlobal("first").Int())
+	}
+	if interp.GetGlobal("second").Int() != 20 {
+		t.Errorf("expected 20, got %d", interp.GetGlobal("second").Int())
+	}
+	if interp.GetGlobal("third").Int() != 30 {
+		t.Errorf("expected 30, got %d", interp.GetGlobal("third").Int())
+	}
 }
 
 func TestContainerHeapPeek(t *testing.T) {
@@ -221,8 +291,12 @@ func TestContainerHeapPeek(t *testing.T) {
 		peeked := h.peek()
 		size := h.size()
 	`)
-	if interp.GetGlobal("peeked").Int() != 3 { t.Errorf("expected 3, got %d", interp.GetGlobal("peeked").Int()) }
-	if interp.GetGlobal("size").Int() != 3 { t.Error("peek should not remove") }
+	if interp.GetGlobal("peeked").Int() != 3 {
+		t.Errorf("expected 3, got %d", interp.GetGlobal("peeked").Int())
+	}
+	if interp.GetGlobal("size").Int() != 3 {
+		t.Error("peek should not remove")
+	}
 }
 
 func TestContainerHeapEmpty(t *testing.T) {
@@ -233,9 +307,15 @@ func TestContainerHeapEmpty(t *testing.T) {
 		h.push(1)
 		notEmpty := h.empty()
 	`)
-	if !interp.GetGlobal("empty").Bool() { t.Error("new heap should be empty") }
-	if !interp.GetGlobal("result").IsNil() { t.Error("pop from empty should return nil") }
-	if interp.GetGlobal("notEmpty").Bool() { t.Error("should not be empty after push") }
+	if !interp.GetGlobal("empty").Bool() {
+		t.Error("new heap should be empty")
+	}
+	if !interp.GetGlobal("result").IsNil() {
+		t.Error("pop from empty should return nil")
+	}
+	if interp.GetGlobal("notEmpty").Bool() {
+		t.Error("should not be empty after push")
+	}
 }
 
 func TestContainerHeapStrings(t *testing.T) {
@@ -247,8 +327,12 @@ func TestContainerHeapStrings(t *testing.T) {
 		first := h.pop()
 		second := h.pop()
 	`)
-	if interp.GetGlobal("first").Str() != "apple" { t.Errorf("expected apple, got %s", interp.GetGlobal("first").Str()) }
-	if interp.GetGlobal("second").Str() != "banana" { t.Errorf("expected banana, got %s", interp.GetGlobal("second").Str()) }
+	if interp.GetGlobal("first").Str() != "apple" {
+		t.Errorf("expected apple, got %s", interp.GetGlobal("first").Str())
+	}
+	if interp.GetGlobal("second").Str() != "banana" {
+		t.Errorf("expected banana, got %s", interp.GetGlobal("second").Str())
+	}
 }
 
 // ==================================================================
@@ -265,9 +349,15 @@ func TestContainerStack(t *testing.T) {
 		second := container.stackPop(s)
 		size := container.stackSize(s)
 	`)
-	if interp.GetGlobal("first").Str() != "c" { t.Error("expected c (LIFO)") }
-	if interp.GetGlobal("second").Str() != "b" { t.Error("expected b") }
-	if interp.GetGlobal("size").Int() != 1 { t.Error("expected 1") }
+	if interp.GetGlobal("first").Str() != "c" {
+		t.Error("expected c (LIFO)")
+	}
+	if interp.GetGlobal("second").Str() != "b" {
+		t.Error("expected b")
+	}
+	if interp.GetGlobal("size").Int() != 1 {
+		t.Error("expected 1")
+	}
 }
 
 func TestContainerStackEmpty(t *testing.T) {
@@ -276,8 +366,12 @@ func TestContainerStackEmpty(t *testing.T) {
 		empty := container.stackEmpty(s)
 		result := container.stackPop(s)
 	`)
-	if !interp.GetGlobal("empty").Bool() { t.Error("new stack should be empty") }
-	if !interp.GetGlobal("result").IsNil() { t.Error("pop from empty should return nil") }
+	if !interp.GetGlobal("empty").Bool() {
+		t.Error("new stack should be empty")
+	}
+	if !interp.GetGlobal("result").IsNil() {
+		t.Error("pop from empty should return nil")
+	}
 }
 
 func TestContainerStackPeek(t *testing.T) {
@@ -287,6 +381,10 @@ func TestContainerStackPeek(t *testing.T) {
 		peeked := container.stackPeek(s)
 		size := container.stackSize(s)
 	`)
-	if interp.GetGlobal("peeked").Int() != 42 { t.Error("expected 42") }
-	if interp.GetGlobal("size").Int() != 1 { t.Error("peek should not remove") }
+	if interp.GetGlobal("peeked").Int() != 42 {
+		t.Error("expected 42")
+	}
+	if interp.GetGlobal("size").Int() != 1 {
+		t.Error("peek should not remove")
+	}
 }

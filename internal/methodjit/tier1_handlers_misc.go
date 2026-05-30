@@ -11,8 +11,8 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // handleConcat handles OP_CONCAT exit: R(A) = R(B)..R(B+1)..R(C)

@@ -3,7 +3,7 @@
 package methodjit
 
 import (
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func collectCallExitArgs(regs []runtime.Value, absSlot, nArgs int) []runtime.Value {

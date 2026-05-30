@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func recordPairwiseDriverLoopSource(t *testing.T, steps string) string {

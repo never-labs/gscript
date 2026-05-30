@@ -56,6 +56,7 @@ JIT fast path policy:
 | `encoding` | Pure | none; encoding conversion helpers | runtime error; `nil, err` for malformed input | VM fallback |
 | `fs` | Privileged host | filesystem read/write/remove/glob/cwd operations | runtime error for bad arguments; `nil, err` for OS failures | VM fallback |
 | `hash` | Pure | none; hash digests over strings/bytes | runtime error | VM fallback |
+| `history` | Pure | none; LLM/agent conversation history search and append helpers | runtime error for bad argument shape | VM fallback |
 | `http` | Privileged host | HTTP client/server, listener lifecycle, request/response I/O | runtime error for bad arguments; `nil, err` or result table for network/server failures | runtime specialization for stdlib host driver cases; VM fallback |
 | `io` | Privileged host | process stdio and file handles | runtime error for bad arguments; `nil, err` for file/stream failures; sentinel for EOF | VM fallback |
 | `json` | Pure | none; JSON codec over strings/tables | runtime error for bad arguments; `nil, err` for malformed JSON or unsupported values | runtime specialization for stdlib host driver cases; VM fallback |

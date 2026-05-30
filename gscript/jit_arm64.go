@@ -3,8 +3,8 @@
 package gscript
 
 import (
-	"github.com/gscript/gscript/internal/methodjit"
-	bytecodevm "github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/methodjit"
+	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
 )
 
 func enableJIT(bvm *bytecodevm.VM) {

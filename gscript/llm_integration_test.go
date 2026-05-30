@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 const defaultGLMAnthropicCompatibleBaseURL = "https://open.bigmodel.cn/api/anthropic"

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 // runGScript executes a GScript source string and captures its print output.
@@ -123,14 +123,14 @@ func TestTables(t *testing.T) {
 	out := runGScriptFile(t, filepath.Join(".", "05_tables.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
-		"5",      // #arr
-		"10",     // arr[1]
-		"30",     // arr[3]
-		"6",      // #arr after insert
-		"20",     // arr[1] after remove
-		"alice",  // person.name
-		"30",     // person["age"]
-		"5",      // matrix[2][2]
+		"5",     // #arr
+		"10",    // arr[1]
+		"30",    // arr[3]
+		"6",     // #arr after insert
+		"20",    // arr[1] after remove
+		"alice", // person.name
+		"30",    // person["age"]
+		"5",     // matrix[2][2]
 	}
 	if len(lines) != len(expected) {
 		t.Fatalf("expected %d lines, got %d:\n%s", len(expected), len(lines), out)
@@ -164,8 +164,8 @@ func TestMetatable(t *testing.T) {
 	expected := []string{
 		"Rex says woof",
 		"Whiskers says meow",
-		"4",  // v3.x
-		"6",  // v3.y
+		"4", // v3.x
+		"6", // v3.y
 	}
 	if len(lines) != len(expected) {
 		t.Fatalf("expected %d lines, got %d:\n%s", len(expected), len(lines), out)
@@ -197,15 +197,15 @@ func TestError(t *testing.T) {
 	out := runGScriptFile(t, filepath.Join(".", "09_error.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
-		"false",              // ok (pcall caught error)
+		"false",                // ok (pcall caught error)
 		"something went wrong", // err message
-		"true",               // ok2 (pcall success)
-		"42",                 // val
-		"false",              // ok3 (error object)
-		"404",                // e.code
-		"not found",          // e.msg
-		"false",              // ok4 (assert failed)
-		"math is broken",     // e2
+		"true",                 // ok2 (pcall success)
+		"42",                   // val
+		"false",                // ok3 (error object)
+		"404",                  // e.code
+		"not found",            // e.msg
+		"false",                // ok4 (assert failed)
+		"math is broken",       // e2
 	}
 	if len(lines) != len(expected) {
 		t.Fatalf("expected %d lines, got %d:\n%s", len(expected), len(lines), out)

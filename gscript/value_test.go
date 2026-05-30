@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 func TestPublicValueConstructorsAndAccessors(t *testing.T) {

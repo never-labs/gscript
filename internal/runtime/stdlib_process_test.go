@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
 )
 
 func execOnInterp(t *testing.T, interp *Interpreter, src string) {

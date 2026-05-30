@@ -1,8 +1,8 @@
 package benchmarks
 
 import (
+	gs "github.com/Never-Labs/gscript/gscript"
 	"testing"
-	gs "github.com/gscript/gscript/gscript"
 )
 
 func BenchmarkGScriptJITHeavyLoopWarm(b *testing.B) {

@@ -276,8 +276,8 @@ decorator/attribute syntax.
 
 ```gscript
 // search_docs searches indexed project documentation.
-// gscript:requires docs.read
-// gscript:param query natural-language search query
+//gscript:requires docs.read
+//gscript:param query natural-language search query
 tool search_docs(query) {
     return docs.search(query, {limit: 5}), nil
 }
@@ -749,7 +749,7 @@ enclosed `turn` / tool dispatch operations.
 Capabilities are strings:
 
 ```gscript
-// gscript:requires docs.read net.http
+//gscript:requires docs.read net.http
 ```
 
 Built-in capability namespaces:
@@ -787,7 +787,7 @@ agent support(q) {
 
 ```gscript
 // search_docs searches project documentation.
-// gscript:requires docs.read
+//gscript:requires docs.read
 tool search_docs(query) {
     return rag.search("project-docs", query, {limit: 5}), nil
 }
@@ -927,7 +927,7 @@ Tool:
 
 ```gscript
 // search_docs searches docs.
-// gscript:requires docs.read
+//gscript:requires docs.read
 tool search_docs(query) {
     return docs.search(query), nil
 }
@@ -1066,7 +1066,7 @@ agent answer(q) {
 
 ```gscript
 // search_docs searches project documentation.
-// gscript:requires docs.read
+//gscript:requires docs.read
 tool search_docs(query) {
     return docs.search(query, {limit: 5}), nil
 }

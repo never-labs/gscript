@@ -5,7 +5,7 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 func (ec *emitContext) emitStringConstLookup(instr *Instr) {

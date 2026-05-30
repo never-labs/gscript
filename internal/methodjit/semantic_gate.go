@@ -5,7 +5,7 @@ package methodjit
 import (
 	"os"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // jitUnsupportedMultiReturn reports whether proto uses return forms that the

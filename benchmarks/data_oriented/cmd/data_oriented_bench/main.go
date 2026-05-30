@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	dataoriented "github.com/gscript/gscript/benchmarks/data_oriented"
+	dataoriented "github.com/Never-Labs/gscript/benchmarks/data_oriented"
 )
 
 type report struct {

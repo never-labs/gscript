@@ -5,8 +5,8 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/jit"
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/runtime"
 )
 
 func (ec *emitContext) emitStringValueEqualsConstGuard(val jit.Reg, expected string, slowLabel string) {

@@ -3,7 +3,7 @@ package vm
 // GC root scanning, split verbatim from vm.go.
 
 import (
-	"github.com/gscript/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/runtime"
 	"unsafe"
 )
 

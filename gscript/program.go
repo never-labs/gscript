@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/gscript/gscript/internal/ast"
-	"github.com/gscript/gscript/internal/lexer"
-	"github.com/gscript/gscript/internal/parser"
-	bytecodevm "github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/Never-Labs/gscript/internal/parser"
+	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
 )
 
 // Program is a compiled GScript source unit.

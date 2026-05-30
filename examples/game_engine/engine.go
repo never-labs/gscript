@@ -5,7 +5,7 @@ import (
 	"math"
 	"os"
 
-	gs "github.com/gscript/gscript/gscript"
+	gs "github.com/Never-Labs/gscript/gscript"
 )
 
 // ---- Game Engine Types ----
@@ -15,8 +15,8 @@ type Vec2 struct {
 }
 
 func (v Vec2) Length() float64      { return math.Sqrt(v.X*v.X + v.Y*v.Y) }
-func (v Vec2) Add(o Vec2) Vec2     { return Vec2{v.X + o.X, v.Y + o.Y} }
-func (v Vec2) Sub(o Vec2) Vec2     { return Vec2{v.X - o.X, v.Y - o.Y} }
+func (v Vec2) Add(o Vec2) Vec2      { return Vec2{v.X + o.X, v.Y + o.Y} }
+func (v Vec2) Sub(o Vec2) Vec2      { return Vec2{v.X - o.X, v.Y - o.Y} }
 func (v Vec2) Scale(f float64) Vec2 { return Vec2{v.X * f, v.Y * f} }
 func (v Vec2) Normalize() Vec2 {
 	l := v.Length()
@@ -49,7 +49,7 @@ type Input struct {
 	keys map[string]bool
 }
 
-func NewInput() *Input { return &Input{keys: make(map[string]bool)} }
+func NewInput() *Input                    { return &Input{keys: make(map[string]bool)} }
 func (inp *Input) Press(key string)       { inp.keys[key] = true }
 func (inp *Input) Release(key string)     { inp.keys[key] = false }
 func (inp *Input) IsDown(key string) bool { return inp.keys[key] }

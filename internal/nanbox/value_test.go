@@ -129,7 +129,7 @@ func TestIntRoundtrip(t *testing.T) {
 		100, -100, 1000, -1000,
 		1 << 16, -(1 << 16),
 		1 << 31, -(1 << 31),
-		1<<47 - 1, // maxInt48
+		1<<47 - 1,  // maxInt48
 		-(1 << 47), // minInt48
 		12345678901234,
 		-12345678901234,
@@ -168,7 +168,7 @@ func TestIntOverflowPromotesToFloat(t *testing.T) {
 	// Values outside 48-bit range should be promoted to float64.
 	overflows := []int64{
 		1 << 47,        // maxInt48 + 1
-		-(1<<47) - 1,   // minInt48 - 1
+		-(1 << 47) - 1, // minInt48 - 1
 		1 << 62,
 		-(1 << 62),
 		math.MaxInt64,
@@ -463,8 +463,8 @@ func TestNoCollisions_AllTypes(t *testing.T) {
 	// Build a set of Values of all types and verify no two different
 	// types share the same bit pattern.
 	values := []struct {
-		v    Value
-		typ  string
+		v   Value
+		typ string
 	}{
 		{Nil, "nil"},
 		{True, "bool"},

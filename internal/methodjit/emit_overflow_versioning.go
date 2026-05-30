@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/gscript/gscript/internal/jit"
+import "github.com/Never-Labs/gscript/internal/jit"
 
 func (ec *emitContext) emitShiftAddOverflowVersion(spec *shiftAddOverflowVersion) {
 	if spec == nil {

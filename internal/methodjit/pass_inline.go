@@ -28,8 +28,8 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/gscript/gscript/internal/runtime"
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 // countOpHelper counts instructions of the given op (debug helper).

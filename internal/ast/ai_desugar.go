@@ -10,7 +10,22 @@ func DesugarAINative(prog *Program) *Program {
 	if prog == nil {
 		return nil
 	}
-	out := &Program{Stmts: desugarStmtList(prog.Stmts)}
+	out := &Program{
+		Stmts:          desugarStmtList(prog.Stmts),
+		FileDirectives: cloneFileDirectives(prog.FileDirectives),
+	}
+	return out
+}
+
+func cloneFileDirectives(directives []FileDirective) []FileDirective {
+	if len(directives) == 0 {
+		return nil
+	}
+	out := make([]FileDirective, len(directives))
+	for i, directive := range directives {
+		out[i] = directive
+		out[i].Args = append([]string(nil), directive.Args...)
+	}
 	return out
 }
 

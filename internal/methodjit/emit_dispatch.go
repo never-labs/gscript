@@ -9,7 +9,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/jit"
+	"github.com/Never-Labs/gscript/internal/jit"
 )
 
 // gprPhiMove represents a single GPR phi move for dependency-aware ordering.

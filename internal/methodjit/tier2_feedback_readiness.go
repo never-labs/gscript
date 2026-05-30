@@ -5,7 +5,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/gscript/gscript/internal/vm"
+	"github.com/Never-Labs/gscript/internal/vm"
 )
 
 const tier2FeedbackHardHotCallCount = 16
