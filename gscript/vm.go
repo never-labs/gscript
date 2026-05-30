@@ -101,6 +101,9 @@ func newVM(o vmOptions) *VM {
 	if o.llmProvider != nil {
 		interp.SetLLMProvider(llmProviderAdapter{provider: o.llmProvider})
 	}
+	if o.llmTraceSink != nil {
+		interp.SetLLMTraceSink(llmTraceAdapter(o.llmTraceSink))
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -227,6 +230,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetTestkitAccess(vm.opts.testkitAccess)
 			if vm.opts.llmProvider != nil {
 				bvm.SetLLMProvider(llmProviderAdapter{provider: vm.opts.llmProvider})
+			}
+			if vm.opts.llmTraceSink != nil {
+				bvm.SetLLMTraceSink(llmTraceAdapter(vm.opts.llmTraceSink))
 			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)

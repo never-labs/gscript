@@ -56,10 +56,27 @@ type LLMTurnResult struct {
 	Usage  LLMTurnUsage
 }
 
+type LLMTraceEvent struct {
+	Type         string
+	Model        string
+	Status       string
+	Tool         string
+	CallID       string
+	ErrorKind    string
+	Message      string
+	Step         int64
+	Attempt      int64
+	MessageCount int
+	ToolCount    int
+	Usage        LLMTurnUsage
+}
+
+type LLMTraceSink func(LLMTraceEvent)
+
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage
 // runtime substrate for the agent layer: future syntax can compile to these
 // functions without changing provider or tool-dispatch semantics.
-func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context) *Table {
+func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
 	t := NewTable()
 
 	hostLimit := func() int64 {
@@ -79,6 +96,12 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			return context.Background()
 		}
 		return ctx()
+	}
+	trace := func(event LLMTraceEvent) {
+		if len(traces) == 0 || traces[0] == nil {
+			return
+		}
+		traces[0](event)
 	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -161,16 +184,21 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		}
 		p := currentProvider()
 		if p == nil {
+			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
 		req, err := llmRequestFromTable(args[0].Table())
 		if err != nil {
+			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
+		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := p.Turn(currentContext(), req)
 		if err != nil {
+			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: "provider", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("provider", err.Error())}, nil
 		}
+		trace(LLMTraceEvent{Type: "turn_end", Model: req.Model, Status: llmResultStatus(res), MessageCount: len(req.Messages), ToolCount: len(req.Tools), Usage: res.Usage})
 		out := llmResultValue(res)
 		if err := CheckHostResultBytes(hostLimit(), out); err != nil {
 			return nil, err
@@ -197,9 +225,10 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		}
 		p := currentProvider()
 		if p == nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		result, err := llmReact(args[0].Table(), p, call, currentContext(), hostLimit())
+		result, err := llmReact(args[0].Table(), p, call, currentContext(), hostLimit(), trace)
 		if err != nil {
 			return nil, err
 		}
@@ -357,6 +386,16 @@ func llmResultValue(res LLMTurnResult) Value {
 	return TableValue(t)
 }
 
+func llmResultStatus(res LLMTurnResult) string {
+	if res.Status != "" {
+		return res.Status
+	}
+	if len(res.Calls) > 0 {
+		return "tool_calls"
+	}
+	return "final_answer"
+}
+
 func llmToolCallValue(call LLMToolCall) Value {
 	t := NewTable()
 	t.RawSetString("id", StringValue(call.ID))
@@ -403,9 +442,10 @@ func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) 
 	return []Value{results[0], NilValue()}, nil
 }
 
-func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64) ([]Value, error) {
+func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) ([]Value, error) {
 	messagesValue := opts.RawGetString("messages")
 	if !messagesValue.IsTable() {
+		llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: "llm.react requires messages"})
 		return []Value{NilValue(), llmErrorValue("validation", "llm.react requires messages")}, nil
 	}
 	toolsValue := opts.RawGetString("tools")
@@ -431,46 +471,63 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 			MaxTokens: toInt(opts.RawGetString("max_tokens")),
 			Stream:    opts.RawGetString("stream").Truthy(),
 		}
+		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: int64(step), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := provider.Turn(ctx, req)
 		if err != nil {
+			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: int64(step), ErrorKind: "provider", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("provider", err.Error())}, nil
 		}
+		llmTrace(trace, LLMTraceEvent{Type: "turn_end", Model: req.Model, Step: int64(step), Status: llmResultStatus(res), MessageCount: len(req.Messages), ToolCount: len(req.Tools), Usage: res.Usage})
 		turnValue := llmResultValue(res)
 		if err := CheckHostResultBytes(maxHostResult, turnValue); err != nil {
 			return nil, err
 		}
 		switch res.Status {
 		case "", "final_answer":
+			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
 			return []Value{llmReactResultValue("done", res.Text, "", turnValue, history), NilValue()}, nil
 		case "stop":
+			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "stopped", Message: res.Reason})
 			return []Value{llmReactResultValue("stopped", "", res.Reason, turnValue, history), NilValue()}, nil
 		case "tool_calls":
 			for i := range res.Calls {
 				callValue := llmToolCallValue(res.Calls[i])
 				history = append(history, llmAssistantCallMessage(callValue))
-				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, maxToolRetries)
+				llmTrace(trace, LLMTraceEvent{Type: "tool_call", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, maxToolRetries, trace, int64(step), res.Calls[i])
 				if !err.IsNil() {
+					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
 				}
 				if len(dispatchResult) >= 2 && !dispatchResult[1].IsNil() {
 					message := dispatchResult[1].Table().RawGetString("message").Str()
+					llmTrace(trace, LLMTraceEvent{Type: "tool_error", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(dispatchResult[1]), Message: message})
 					history = append(history, llmToolErrorMessage(res.Calls[i].ID, message))
 				} else {
 					value := NilValue()
 					if len(dispatchResult) > 0 {
 						value = dispatchResult[0]
 					}
+					llmTrace(trace, LLMTraceEvent{Type: "tool_result", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 					history = append(history, llmToolResultMessage(res.Calls[i].ID, value))
 				}
 			}
 		default:
+			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "stopped", Message: res.Status})
 			return []Value{llmReactResultValue("stopped", "", res.Status, turnValue, history), NilValue()}, nil
 		}
 	}
+	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(maxSteps), Status: "stopped", Message: "max_steps"})
 	return []Value{llmReactResultValue("stopped", "", "max_steps", NilValue(), history), NilValue()}, nil
 }
 
-func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetries int) ([]Value, Value) {
+func llmTrace(trace func(LLMTraceEvent), event LLMTraceEvent) {
+	if trace != nil {
+		trace(event)
+	}
+}
+
+func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetries int, trace func(LLMTraceEvent), step int64, callInfo LLMToolCall) ([]Value, Value) {
 	var lastErr Value
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		result, err := llmDispatch(call, callTable, tools)
@@ -487,6 +544,9 @@ func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetri
 		}
 		if !llmTransientToolError(kind) {
 			return nil, lastErr
+		}
+		if attempt < maxRetries {
+			llmTrace(trace, LLMTraceEvent{Type: "tool_retry", Step: step, Attempt: int64(attempt + 1), Tool: callInfo.Tool, CallID: callInfo.ID, ErrorKind: kind, Message: lastErr.Table().RawGetString("message").Str()})
 		}
 	}
 	return []Value{NilValue(), lastErr}, NilValue()

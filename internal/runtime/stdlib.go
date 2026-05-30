@@ -121,6 +121,10 @@ func (interp *Interpreter) registerStdlib() {
 			return context.Background()
 		}
 		return interp.ctx
+	}, func(event LLMTraceEvent) {
+		if interp.llmTraceSink != nil {
+			interp.llmTraceSink(event)
+		}
 	})))
 
 	// --- Utilities ---

@@ -117,6 +117,7 @@ type VM struct {
 	debugAccess          bool
 	testkitAccess        bool
 	llmProvider          runtime.LLMProvider
+	llmTraceSink         runtime.LLMTraceSink
 	ctx                  context.Context
 }
 
@@ -194,6 +195,10 @@ func (vm *VM) SetNetworkAccess(enabled bool) {
 
 func (vm *VM) SetLLMProvider(provider runtime.LLMProvider) {
 	vm.llmProvider = provider
+}
+
+func (vm *VM) SetLLMTraceSink(sink runtime.LLMTraceSink) {
+	vm.llmTraceSink = sink
 }
 
 // SetDebugAccess controls script-side debug APIs. Internal debug frame
@@ -914,6 +919,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		debugAccess:        parent.debugAccess,
 		testkitAccess:      parent.testkitAccess,
 		llmProvider:        parent.llmProvider,
+		llmTraceSink:       parent.llmTraceSink,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))

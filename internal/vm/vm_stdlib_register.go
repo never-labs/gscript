@@ -1202,6 +1202,10 @@ func (vm *VM) RegisterLLMLib() {
 			return context.Background()
 		}
 		return vm.ctx
+	}, func(event runtime.LLMTraceEvent) {
+		if vm.llmTraceSink != nil {
+			vm.llmTraceSink(event)
+		}
 	}))
 	vm.SetGlobal("llm", llmLib)
 	vm.setPackageLoaded("llm", llmLib)

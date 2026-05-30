@@ -129,6 +129,7 @@ type vmOptions struct {
 	maxFSWriteBytes int64
 	printFunc       func(args ...interface{})
 	llmProvider     LLMProvider
+	llmTraceSink    LLMTraceSink
 	useVM           bool // use bytecode VM instead of tree-walker
 	useJIT          bool // enable JIT compilation (implies useVM)
 }

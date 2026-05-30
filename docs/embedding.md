@@ -26,8 +26,8 @@ extensions:
 - Globals: `Set`, `Get`, `SetValue`, and `GetValue`.
 - Go binding: `RegisterFunc`, `RegisterTable`, `RegisterModule`, `BindStruct`,
   `BindStructWithConstructor`, and `BindMethod`.
-- Native LLM integration: `WithLLMProvider`, `WithLLMCommand`, and the `llm`
-  standard library module.
+- Native LLM integration: `WithLLMProvider`, `WithLLMCommand`,
+  `WithLLMTrace`, and the `llm` standard library module.
 - Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`, `SecuritySandbox`,
@@ -96,6 +96,20 @@ func (Provider) Turn(ctx context.Context, req gscript.LLMTurnRequest) (gscript.L
 }
 
 vm := gscript.New(gscript.WithLibs(gscript.LibString|gscript.LibLLM), gscript.WithLLMProvider(Provider{}))
+```
+
+Hosts can also attach a metadata-only trace sink. The runtime reports turn,
+tool-call, retry, and stop events with counts, status, usage, and tool names;
+prompt text and tool result values are intentionally omitted by default.
+
+```go
+vm := gscript.New(
+    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
+    gscript.WithLLMProvider(Provider{}),
+    gscript.WithLLMTrace(func(event gscript.LLMTraceEvent) {
+        log.Printf("llm event=%s status=%s tool=%s", event.Type, event.Status, event.Tool)
+    }),
+)
 ```
 
 Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:

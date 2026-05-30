@@ -35,6 +35,7 @@ type Interpreter struct {
 	debugAccess       bool             // script-side debug APIs are enabled
 	testkitAccess     bool             // script-side testkit APIs are enabled
 	llmProvider       LLMProvider      // optional host-provided model backend
+	llmTraceSink      LLMTraceSink     // optional host-side LLM trace sink
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -368,6 +369,12 @@ func (interp *Interpreter) SetMaxHostResultBytes(max int64) {
 // standard library. A nil provider leaves llm.turn unavailable.
 func (interp *Interpreter) SetLLMProvider(provider LLMProvider) {
 	interp.llmProvider = provider
+}
+
+// SetLLMTraceSink sets the optional host-side trace sink for llm.turn/react.
+// Trace events intentionally carry metadata only, not prompt text.
+func (interp *Interpreter) SetLLMTraceSink(sink LLMTraceSink) {
+	interp.llmTraceSink = sink
 }
 
 // SetMaxModuleBytes limits bytes read by script-side file loading APIs such as

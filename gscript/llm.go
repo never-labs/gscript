@@ -21,11 +21,19 @@ type LLMToolCall = runtime.LLMToolCall
 type LLMTurnRequest = runtime.LLMTurnRequest
 type LLMTurnResult = runtime.LLMTurnResult
 type LLMTurnUsage = runtime.LLMTurnUsage
+type LLMTraceEvent = runtime.LLMTraceEvent
+type LLMTraceSink func(LLMTraceEvent)
 
 // WithLLMProvider installs the provider used by llm.turn. A nil provider makes
 // llm.turn return a provider error.
 func WithLLMProvider(provider LLMProvider) Option {
 	return func(o *vmOptions) { o.llmProvider = provider }
+}
+
+// WithLLMTrace installs a host-side metadata trace sink for llm.turn/react.
+// Events intentionally omit prompt text and tool result values by default.
+func WithLLMTrace(sink LLMTraceSink) Option {
+	return func(o *vmOptions) { o.llmTraceSink = sink }
 }
 
 // WithLLMCommand installs a simple command-backed provider. It is intended for
@@ -69,6 +77,15 @@ type llmProviderAdapter struct {
 
 func (a llmProviderAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
 	return a.provider.Turn(ctx, req)
+}
+
+func llmTraceAdapter(sink LLMTraceSink) runtime.LLMTraceSink {
+	if sink == nil {
+		return nil
+	}
+	return func(event runtime.LLMTraceEvent) {
+		sink(event)
+	}
 }
 
 func containsModelFlag(args []string) bool {
