@@ -137,6 +137,8 @@ Replay is strict and sequential: each incoming request must match the next
 recorded request before the recorded result or provider error is returned.
 Go hosts can inspect replay failures with `errors.As` for
 `*gscript.LLMReplayMismatchError` and `*gscript.LLMReplayExhaustedError`.
+`NewLLMReplayProvider` also exposes `Remaining`, `Consumed`, `Reset`, and
+`Records` helpers for reusable evaluation fixtures.
 
 Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:
 

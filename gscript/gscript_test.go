@@ -1107,6 +1107,40 @@ func TestLLMReplayTypedErrors(t *testing.T) {
 	}
 }
 
+func TestLLMReplayProviderStateHelpers(t *testing.T) {
+	record := gs.LLMRecord{
+		Request: gs.LLMTurnRequest{
+			Model:    "mock-fast",
+			Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+		},
+		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+	}
+	replay := gs.NewLLMReplayProvider([]gs.LLMRecord{record})
+	if replay.Consumed() != 0 || replay.Remaining() != 1 {
+		t.Fatalf("initial consumed=%d remaining=%d", replay.Consumed(), replay.Remaining())
+	}
+	records := replay.Records()
+	records[0].Request.Messages[0].Text = "mutated"
+	if replay.Records()[0].Request.Messages[0].Text != "hello" {
+		t.Fatalf("Records returned mutable internal state")
+	}
+	res, err := replay.Turn(context.Background(), record.Request)
+	if err != nil || res.Text != "ok" {
+		t.Fatalf("Turn res=%#v err=%v", res, err)
+	}
+	if replay.Consumed() != 1 || replay.Remaining() != 0 {
+		t.Fatalf("after turn consumed=%d remaining=%d", replay.Consumed(), replay.Remaining())
+	}
+	replay.Reset()
+	if replay.Consumed() != 0 || replay.Remaining() != 1 {
+		t.Fatalf("after reset consumed=%d remaining=%d", replay.Consumed(), replay.Remaining())
+	}
+	res, err = replay.Turn(context.Background(), record.Request)
+	if err != nil || res.Text != "ok" {
+		t.Fatalf("Turn after reset res=%#v err=%v", res, err)
+	}
+}
+
 func TestLLMTurnRequestProviderOptions(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))

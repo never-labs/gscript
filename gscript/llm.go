@@ -204,6 +204,28 @@ func (p *LLMReplayProvider) Remaining() int {
 	return len(p.records) - p.next
 }
 
+func (p *LLMReplayProvider) Consumed() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.next
+}
+
+func (p *LLMReplayProvider) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.next = 0
+}
+
+func (p *LLMReplayProvider) Records() []LLMRecord {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]LLMRecord, len(p.records))
+	for i := range p.records {
+		out[i] = cloneLLMRecord(p.records[i])
+	}
+	return out
+}
+
 func containsModelFlag(args []string) bool {
 	for _, arg := range args {
 		if arg == "--model" || strings.HasPrefix(arg, "--model=") {
