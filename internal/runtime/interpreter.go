@@ -14,53 +14,54 @@ import (
 // interpreter_*.go files.
 // Interpreter is the tree-walking evaluator for GScript programs.
 type Interpreter struct {
-	globals           *Environment
-	output            []string         // captured print output (for testing)
-	currentCo         *Coroutine       // non-nil when running inside a coroutine
-	modules           map[string]Value // require() cache
-	stringMeta        *Table           // metatable for string values (__index → string lib)
-	scriptDir         string           // directory of the main script (for require path resolution)
-	moduleLoading     bool             // require() may load .gs files from the filesystem
-	filesystemEnabled bool             // script-side file APIs may access the filesystem
-	filesystemRead    bool             // fs read operations are enabled
-	filesystemWrite   bool             // fs write operations are enabled
-	filesystemRoot    string           // optional root for script-side filesystem access
-	dynamicEval       bool             // script-side string compile/eval is enabled
-	environmentRead   bool             // script-side environment reads are enabled
-	environmentWrite  bool             // script-side environment writes are enabled
-	allowedEnv        map[string]bool  // nil means all environment variables are allowed
-	networkAccess     bool             // net/http host network APIs are enabled
-	processExecution  bool             // process.run/exec/which are enabled
-	processShell      bool             // process.shell is enabled
-	debugAccess       bool             // script-side debug APIs are enabled
-	testkitAccess     bool             // script-side testkit APIs are enabled
-	llmProvider       LLMProvider      // optional host-provided model backend
-	llmTraceSink      LLMTraceSink     // optional host-side LLM trace sink
-	currentSourceName string           // source name for diagnostics while executing parsed source
-	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
-	callStack         []DebugFrame     // active runtime calls, oldest to newest
-	deferStack        [][]deferredCall // active function-scope deferred calls
-	debugHook         Value            // optional GScript diagnostic hook
-	debugOpts         DebugHookOptions // filters for debugHook
-	debugSink         Value            // optional explicit diagnostic sink
-	debugBusy         bool             // prevents debug hooks from recursively firing
-	gcMode            string           // host-facing collectgarbage mode label
-	gcRunning         bool             // host-facing collectgarbage running flag
-	maxSteps          int64            // <=0 means unlimited
-	steps             int64
-	maxNativeCalls    int64 // <=0 means unlimited
-	nativeCalls       int64
-	maxCallDepth      int64 // <=0 means unlimited
-	maxGoroutines     int64 // <=0 means unlimited
-	activeGoroutines  *atomic.Int64
-	maxChannelCap     int64 // <=0 means unlimited
-	maxHostResult     int64 // <=0 means unlimited
-	maxModuleBytes    int64 // <=0 means unlimited
-	maxModuleDepth    int64 // <=0 means unlimited
-	maxFSReadBytes    int64 // <=0 means unlimited
-	maxFSWriteBytes   int64 // <=0 means unlimited
-	moduleDepth       int64
-	ctx               context.Context
+	globals            *Environment
+	output             []string           // captured print output (for testing)
+	currentCo          *Coroutine         // non-nil when running inside a coroutine
+	modules            map[string]Value   // require() cache
+	stringMeta         *Table             // metatable for string values (__index → string lib)
+	scriptDir          string             // directory of the main script (for require path resolution)
+	moduleLoading      bool               // require() may load .gs files from the filesystem
+	filesystemEnabled  bool               // script-side file APIs may access the filesystem
+	filesystemRead     bool               // fs read operations are enabled
+	filesystemWrite    bool               // fs write operations are enabled
+	filesystemRoot     string             // optional root for script-side filesystem access
+	dynamicEval        bool               // script-side string compile/eval is enabled
+	environmentRead    bool               // script-side environment reads are enabled
+	environmentWrite   bool               // script-side environment writes are enabled
+	allowedEnv         map[string]bool    // nil means all environment variables are allowed
+	networkAccess      bool               // net/http host network APIs are enabled
+	processExecution   bool               // process.run/exec/which are enabled
+	processShell       bool               // process.shell is enabled
+	debugAccess        bool               // script-side debug APIs are enabled
+	testkitAccess      bool               // script-side testkit APIs are enabled
+	llmProvider        LLMProvider        // optional host-provided model backend
+	llmProviderFactory LLMProviderFactory // optional model-config provider constructor
+	llmTraceSink       LLMTraceSink       // optional host-side LLM trace sink
+	currentSourceName  string             // source name for diagnostics while executing parsed source
+	args               []string           // current script entrypoint args: [0]=script, [1:]=user args
+	callStack          []DebugFrame       // active runtime calls, oldest to newest
+	deferStack         [][]deferredCall   // active function-scope deferred calls
+	debugHook          Value              // optional GScript diagnostic hook
+	debugOpts          DebugHookOptions   // filters for debugHook
+	debugSink          Value              // optional explicit diagnostic sink
+	debugBusy          bool               // prevents debug hooks from recursively firing
+	gcMode             string             // host-facing collectgarbage mode label
+	gcRunning          bool               // host-facing collectgarbage running flag
+	maxSteps           int64              // <=0 means unlimited
+	steps              int64
+	maxNativeCalls     int64 // <=0 means unlimited
+	nativeCalls        int64
+	maxCallDepth       int64 // <=0 means unlimited
+	maxGoroutines      int64 // <=0 means unlimited
+	activeGoroutines   *atomic.Int64
+	maxChannelCap      int64 // <=0 means unlimited
+	maxHostResult      int64 // <=0 means unlimited
+	maxModuleBytes     int64 // <=0 means unlimited
+	maxModuleDepth     int64 // <=0 means unlimited
+	maxFSReadBytes     int64 // <=0 means unlimited
+	maxFSWriteBytes    int64 // <=0 means unlimited
+	moduleDepth        int64
+	ctx                context.Context
 }
 
 // New creates a new Interpreter with built-in globals.
@@ -369,6 +370,13 @@ func (interp *Interpreter) SetMaxHostResultBytes(max int64) {
 // standard library. A nil provider leaves llm.turn unavailable.
 func (interp *Interpreter) SetLLMProvider(provider LLMProvider) {
 	interp.llmProvider = provider
+}
+
+// SetLLMProviderFactory installs the constructor used by llm.register_models
+// entries that declare a protocol/base URL instead of relying on a host
+// provider. A nil factory keeps model configs as aliases only.
+func (interp *Interpreter) SetLLMProviderFactory(factory LLMProviderFactory) {
+	interp.llmProviderFactory = factory
 }
 
 // SetLLMTraceSink sets the optional host-side trace sink for llm.turn/react.

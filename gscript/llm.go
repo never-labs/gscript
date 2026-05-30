@@ -29,6 +29,8 @@ type LLMTurnUsage = runtime.LLMTurnUsage
 type LLMTraceEvent = runtime.LLMTraceEvent
 type LLMTraceSink func(LLMTraceEvent)
 type LLMRecordSink func(LLMRecord)
+type LLMProviderConfig = runtime.LLMProviderConfig
+type LLMProviderFactory func(LLMProviderConfig) (LLMProvider, error)
 
 type LLMRecord struct {
 	Request LLMTurnRequest
@@ -142,6 +144,13 @@ func WithLLMProvider(provider LLMProvider) Option {
 	return func(o *vmOptions) { o.llmProvider = provider }
 }
 
+// WithLLMProviderFactory installs a constructor for script-declared models {}
+// provider configs. Host-injected providers still take precedence for ordinary
+// llm.turn calls; this hook is used when no provider is otherwise configured.
+func WithLLMProviderFactory(factory LLMProviderFactory) Option {
+	return func(o *vmOptions) { o.llmProviderFactory = factory }
+}
+
 // WithLLMTrace installs a host-side metadata trace sink for llm.turn/react.
 // Events intentionally omit prompt text and tool result values by default.
 func WithLLMTrace(sink LLMTraceSink) Option {
@@ -225,6 +234,48 @@ func configuredLLMProvider(opts vmOptions) LLMProvider {
 		return opts.llmProvider
 	}
 	return recordingLLMProvider{provider: opts.llmProvider, sink: opts.llmRecordSink}
+}
+
+func configuredLLMProviderFactory(opts vmOptions) runtime.LLMProviderFactory {
+	var factory LLMProviderFactory
+	if opts.llmProviderFactory != nil {
+		factory = opts.llmProviderFactory
+	} else if opts.llmProvider == nil {
+		factory = defaultLLMProviderFactory
+	}
+	if factory == nil {
+		return nil
+	}
+	return func(cfg runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+		p, err := factory(cfg)
+		if err != nil || p == nil || opts.llmRecordSink == nil {
+			return p, err
+		}
+		return recordingLLMProvider{provider: p, sink: opts.llmRecordSink}, nil
+	}
+}
+
+func defaultLLMProviderFactory(cfg LLMProviderConfig) (LLMProvider, error) {
+	protocol := strings.ToLower(strings.ReplaceAll(cfg.Protocol, "_", "-"))
+	switch protocol {
+	case "openai", "openai-compatible", "openai-compat", "chat-completions":
+		return OpenAICompatibleLLMProvider{
+			Endpoint: openAIChatCompletionsEndpoint(cfg.BaseURL),
+			APIKey:   cfg.APIKey,
+			Model:    cfg.ProviderModel,
+		}, nil
+	case "anthropic", "anthropic-compatible", "anthropic-compat", "messages":
+		return AnthropicCompatibleLLMProvider{
+			Endpoint: cfg.BaseURL,
+			APIKey:   cfg.APIKey,
+			Model:    cfg.ProviderModel,
+		}, nil
+	default:
+		if cfg.Protocol == "" {
+			return nil, fmt.Errorf("llm provider protocol not configured for model %q", cfg.Name)
+		}
+		return nil, fmt.Errorf("unsupported llm provider protocol %q for model %q", cfg.Protocol, cfg.Name)
+	}
 }
 
 func (p recordingLLMProvider) Turn(ctx context.Context, req LLMTurnRequest) (LLMTurnResult, error) {

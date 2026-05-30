@@ -1,5 +1,7 @@
 package ast
 
+import "sort"
+
 // DesugarAINative rewrites AI-native syntax into the existing stdlib-shaped
 // AST. The parser keeps dedicated nodes so tooling can see source intent, while
 // interpreters and bytecode compilers can call this boundary once and execute
@@ -84,7 +86,7 @@ func desugarStmt(stmt Stmt) Stmt {
 			Values: []Expr{llmCall(s.P, "tool",
 				&StringLit{P: s.P, Value: s.Name},
 				&FuncLitExpr{P: s.P, Params: append([]FuncParam(nil), s.Params...), Body: desugarBlock(s.Body)},
-				toolOptionsTable(s.P, s.Params),
+				toolOptionsTable(s.P, s.Params, s.DocComment, s.Requires, s.ParamDocs),
 			)},
 		}
 	case *AgentDeclStmt:
@@ -98,7 +100,10 @@ func desugarStmt(stmt Stmt) Stmt {
 	case *ModelsDeclStmt:
 		return &CallStmt{P: s.P, Call: llmCall(s.P, "register_models", configTable(s.P, s.Config))}
 	case *BudgetStmt:
-		return desugarBlock(s.Body)
+		return &CallStmt{P: s.P, Call: llmCall(s.P, "with_budget",
+			configTable(s.P, s.Config),
+			&FuncLitExpr{P: s.P, Body: desugarBlock(s.Body)},
+		)}
 	default:
 		return stmt
 	}
@@ -233,7 +238,7 @@ func messagesTable(pos Pos, fields []ConfigField) Expr {
 	return &TableLitExpr{P: pos, Fields: out}
 }
 
-func toolOptionsTable(pos Pos, params []FuncParam) Expr {
+func toolOptionsTable(pos Pos, params []FuncParam, description string, requires []string, paramDocs map[string]string) Expr {
 	paramFields := make([]TableField, 0, len(params))
 	for _, p := range params {
 		if p.IsVarArg {
@@ -241,9 +246,41 @@ func toolOptionsTable(pos Pos, params []FuncParam) Expr {
 		}
 		paramFields = append(paramFields, TableField{Value: &StringLit{P: pos, Value: p.Name}})
 	}
-	return &TableLitExpr{P: pos, Fields: []TableField{
+	fields := []TableField{
 		{Key: &StringLit{P: pos, Value: "params"}, Value: &TableLitExpr{P: pos, Fields: paramFields}},
-	}}
+	}
+	if description != "" {
+		fields = append(fields, TableField{Key: &StringLit{P: pos, Value: "description"}, Value: &StringLit{P: pos, Value: description}})
+	}
+	if len(requires) > 0 {
+		requireFields := make([]TableField, 0, len(requires))
+		for _, capability := range requires {
+			requireFields = append(requireFields, TableField{Value: &StringLit{P: pos, Value: capability}})
+		}
+		fields = append(fields, TableField{Key: &StringLit{P: pos, Value: "requires"}, Value: &TableLitExpr{P: pos, Fields: requireFields}})
+	}
+	if len(paramDocs) > 0 {
+		paramDocFields := make([]TableField, 0, len(paramDocs))
+		seen := map[string]bool{}
+		for _, p := range params {
+			if doc, ok := paramDocs[p.Name]; ok {
+				paramDocFields = append(paramDocFields, TableField{Key: &StringLit{P: pos, Value: p.Name}, Value: &StringLit{P: pos, Value: doc}})
+				seen[p.Name] = true
+			}
+		}
+		var extra []string
+		for name := range paramDocs {
+			if !seen[name] {
+				extra = append(extra, name)
+			}
+		}
+		sort.Strings(extra)
+		for _, name := range extra {
+			paramDocFields = append(paramDocFields, TableField{Key: &StringLit{P: pos, Value: name}, Value: &StringLit{P: pos, Value: paramDocs[name]}})
+		}
+		fields = append(fields, TableField{Key: &StringLit{P: pos, Value: "param_docs"}, Value: &TableLitExpr{P: pos, Fields: paramDocFields}})
+	}
+	return &TableLitExpr{P: pos, Fields: fields}
 }
 
 func llmCall(pos Pos, name string, args ...Expr) *CallExpr {

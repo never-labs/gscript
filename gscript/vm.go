@@ -102,6 +102,9 @@ func newVM(o vmOptions) *VM {
 	if llmProvider != nil {
 		interp.SetLLMProvider(llmProviderAdapter{provider: llmProvider})
 	}
+	if llmProviderFactory := configuredLLMProviderFactory(o); llmProviderFactory != nil {
+		interp.SetLLMProviderFactory(llmProviderFactory)
+	}
 	if o.llmTraceSink != nil {
 		interp.SetLLMTraceSink(llmTraceAdapter(o.llmTraceSink))
 	}
@@ -232,6 +235,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			llmProvider := configuredLLMProvider(vm.opts)
 			if llmProvider != nil {
 				bvm.SetLLMProvider(llmProviderAdapter{provider: llmProvider})
+			}
+			if llmProviderFactory := configuredLLMProviderFactory(vm.opts); llmProviderFactory != nil {
+				bvm.SetLLMProviderFactory(llmProviderFactory)
 			}
 			if vm.opts.llmTraceSink != nil {
 				bvm.SetLLMTraceSink(llmTraceAdapter(vm.opts.llmTraceSink))

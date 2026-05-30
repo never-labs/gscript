@@ -191,14 +191,22 @@ func (t TokenType) String() string {
 
 // Token represents a single lexical token.
 type Token struct {
-	Type   TokenType
-	Value  string
-	Line   int
-	Column int
+	Type            TokenType
+	Value           string
+	Line            int
+	Column          int
+	LeadingComments []Comment
 }
 
 func (t Token) String() string {
 	return fmt.Sprintf("{%s %q %d:%d}", t.Type, t.Value, t.Line, t.Column)
+}
+
+// Comment represents a source comment captured as metadata for the next token.
+type Comment struct {
+	Text   string
+	Line   int
+	Column int
 }
 
 // keywords maps keyword strings to their token types.

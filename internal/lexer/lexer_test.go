@@ -330,6 +330,42 @@ func TestCommentOnly(t *testing.T) {
 	expectTokens(t, "// entire line is a comment", []Token{})
 }
 
+func TestLineCommentMetadata(t *testing.T) {
+	lex := New("// Lookup docs\n// gscript:requires docs.read\ntool lookup() {}")
+	tokens, err := lex.Tokenize()
+	if err != nil {
+		t.Fatalf("Tokenize error: %v", err)
+	}
+	if len(tokens) < 1 || tokens[0].Value != "tool" {
+		t.Fatalf("first token = %#v", tokens[0])
+	}
+	comments := tokens[0].LeadingComments
+	if len(comments) != 2 {
+		t.Fatalf("leading comments = %#v, want 2", comments)
+	}
+	if comments[0].Text != " Lookup docs" || comments[1].Text != " gscript:requires docs.read" {
+		t.Fatalf("leading comments = %#v", comments)
+	}
+}
+
+func TestTrailingLineCommentIsNotLeadingMetadata(t *testing.T) {
+	lex := New("x := 1 // not docs\ny := 2")
+	tokens, err := lex.Tokenize()
+	if err != nil {
+		t.Fatalf("Tokenize error: %v", err)
+	}
+	var yTok Token
+	for _, tok := range tokens {
+		if tok.Type == TOKEN_IDENT && tok.Value == "y" {
+			yTok = tok
+			break
+		}
+	}
+	if len(yTok.LeadingComments) != 0 {
+		t.Fatalf("y leading comments = %#v, want none", yTok.LeadingComments)
+	}
+}
+
 // ============================================================
 // Whitespace Handling
 // ============================================================

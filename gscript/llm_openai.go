@@ -153,6 +153,20 @@ func waitOpenAIRetry(ctx context.Context, backoff time.Duration) error {
 	}
 }
 
+func openAIChatCompletionsEndpoint(endpoint string) string {
+	if endpoint == "" {
+		return defaultOpenAICompatibleEndpoint
+	}
+	trimmed := strings.TrimRight(endpoint, "/")
+	if strings.HasSuffix(trimmed, "/v1/chat/completions") || strings.HasSuffix(trimmed, "/chat/completions") {
+		return trimmed
+	}
+	if strings.HasSuffix(trimmed, "/v1") {
+		return trimmed + "/chat/completions"
+	}
+	return trimmed + "/v1/chat/completions"
+}
+
 type openAIChatRequest struct {
 	Model          string            `json:"model"`
 	Messages       []openAIMessage   `json:"messages"`

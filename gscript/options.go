@@ -106,33 +106,34 @@ const (
 )
 
 type vmOptions struct {
-	libs            LibFlags
-	capabilities    CapabilityFlags
-	requirePath     string
-	filesystemRoot  string
-	dynamicEval     bool
-	environmentVars []string
-	networkAccess   bool
-	debugAccess     bool
-	testkitAccess   bool
-	processExec     bool
-	processShell    bool
-	maxSteps        int64
-	maxNativeCalls  int64
-	maxCallDepth    int64
-	maxGoroutines   int64
-	maxChannelCap   int64
-	maxHostResult   int64
-	maxModuleBytes  int64
-	maxModuleDepth  int64
-	maxFSReadBytes  int64
-	maxFSWriteBytes int64
-	printFunc       func(args ...interface{})
-	llmProvider     LLMProvider
-	llmTraceSink    LLMTraceSink
-	llmRecordSink   LLMRecordSink
-	useVM           bool // use bytecode VM instead of tree-walker
-	useJIT          bool // enable JIT compilation (implies useVM)
+	libs               LibFlags
+	capabilities       CapabilityFlags
+	requirePath        string
+	filesystemRoot     string
+	dynamicEval        bool
+	environmentVars    []string
+	networkAccess      bool
+	debugAccess        bool
+	testkitAccess      bool
+	processExec        bool
+	processShell       bool
+	maxSteps           int64
+	maxNativeCalls     int64
+	maxCallDepth       int64
+	maxGoroutines      int64
+	maxChannelCap      int64
+	maxHostResult      int64
+	maxModuleBytes     int64
+	maxModuleDepth     int64
+	maxFSReadBytes     int64
+	maxFSWriteBytes    int64
+	printFunc          func(args ...interface{})
+	llmProvider        LLMProvider
+	llmProviderFactory LLMProviderFactory
+	llmTraceSink       LLMTraceSink
+	llmRecordSink      LLMRecordSink
+	useVM              bool // use bytecode VM instead of tree-walker
+	useJIT             bool // enable JIT compilation (implies useVM)
 }
 
 // SecurityPolicy groups production sandbox controls behind one auditable

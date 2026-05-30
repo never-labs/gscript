@@ -273,10 +273,13 @@ func (s *FuncDeclStmt) stmtNode()        {}
 // ToolDeclStmt represents an AI tool declaration:
 // tool name(params) { body }
 type ToolDeclStmt struct {
-	P      Pos
-	Name   string
-	Params []FuncParam
-	Body   *BlockStmt
+	P          Pos
+	Name       string
+	Params     []FuncParam
+	Body       *BlockStmt
+	DocComment string
+	Requires   []string
+	ParamDocs  map[string]string
 }
 
 func (s *ToolDeclStmt) nodeType() string { return "ToolDeclStmt" }

@@ -23,15 +23,16 @@ Current implementation snapshot:
   not to a `llm.agent(..., flow_fn)` stdlib call.
 - `models { ... }` lowers to `llm.register_models({ ... })`. The stdlib stores
   aliases/configs and resolves `default`, aliases, and `provider_model` for
-  `llm.turn` / `llm.agent`. It does not yet instantiate provider clients from
-  `protocol`, `base_url`, or `api_key` inside the model table.
+  `llm.turn` / `llm.agent`. When no host provider is injected, entries with
+  `protocol`, `base_url`, `api_key`, and `provider_model` can construct the
+  built-in OpenAI-compatible or Anthropic-compatible provider at runtime.
 - Agent-local `budget: { ... }` tables are honored by the current `llm.agent`
-  / `llm.react` loop. Standalone `budget { ... } { ... }` blocks parse, but
-  currently lower to their body only; the ambient nested/intersection semantics
-  are not implemented yet.
-- Tool declarations currently lower with the tool name, function body, and
-  parameter list. Doc-comment extraction, `gscript:` directive extraction,
-  `description`, `requires`, and `param_docs` lowering are still pending.
+  / `llm.react` loop. Standalone `budget { ... } { ... }` blocks lower to
+  `llm.with_budget(config, func(){ ... })`; nested scopes intersect naturally,
+  so every active frame must allow the next turn/tool call.
+- Tool declarations lower with the tool name, function body, parameter list,
+  Go-style doc comments, and `gscript:` directives for `description`,
+  `requires`, and `param_docs`.
 
 ## 1. Core Shape
 
@@ -178,8 +179,10 @@ Current implementation note: this lowering is implemented as
 `llm.register_models({...})`; `llm.models({...})` is also available as a stdlib
 alias. Runtime resolution maps `default` and named aliases to the provider-side
 model string, preferring `provider_model` and then `model` inside config tables.
-The remaining provider fields are stored but not yet used to construct a
-provider automatically.
+If no host provider was installed with `WithLLMProvider`, config tables with a
+`protocol` are passed to the host provider factory. The default Go factory
+supports `"openai"` / `"openai_compatible"` and `"anthropic"` /
+`"anthropic_compatible"`.
 
 Rules:
 
@@ -1064,11 +1067,10 @@ Current status in this workspace:
 
 1. Done: parser accepts list literals (`[...]`) and AI-native list syntax lowers
    to array-table literals.
-2. Pending: parser does not yet preserve tool doc comments or extract
+2. Done: parser preserves immediately-adjacent tool doc comments and extracts
    `gscript:` directives for tool metadata.
-3. Partial: parser accepts `tool` declarations and lowers to `llm.tool`, but
-   only the parameter list is supplied in options. Description, requires, and
-   param-doc lowering are pending.
+3. Done: parser accepts `tool` declarations and lowers to `llm.tool` with
+   parameters, description, requires, and param-doc options.
 4. Partial: runtime has `llm.agent` for default execution through the existing
    `llm.react` loop, with module-level defaults and model alias resolution.
    There is no separate ambient agent frame abstraction yet.
@@ -1080,16 +1082,16 @@ Current status in this workspace:
    duplicates, and lowers to `llm.agent_defaults`.
 8. Partial: parser accepts module-scope `models` declarations, rejects literal
    `api_key` strings and alias cycles, and lowers to `llm.register_models`.
-   Runtime resolves default/alias/provider_model for existing providers, but
-   does not yet create providers from model-table protocol/base-url/api-key
-   fields.
+   Runtime resolves default/alias/provider_model and can ask a host factory to
+   construct OpenAI-compatible or Anthropic-compatible providers from
+   protocol/base-url/api-key fields when no host provider is already installed.
 9. Done: parser accepts `messages` constructors and lowers recognized roles to
    message constructor calls.
 10. Done: parser accepts `turn` blocks and lowers to `llm.turn`; the stdlib
     also supports the `user` shorthand by normalizing it into messages.
-11. Partial: parser accepts `budget` blocks, but current desugaring ignores the
-    budget config and emits only the body. Full ambient budget frames,
-    nesting/intersection, and charging of all active frames are not implemented.
+11. Done: parser accepts `budget` blocks and lowers them to ambient
+    `llm.with_budget` scopes. Nested/intersecting budgets charge every active
+    frame for turns, token usage, tool calls, and deadlines.
 12. Partial: current validation rejects duplicate `agent defaults`, non-module
     `agent defaults` / `models`, model alias cycles, and literal model
     `api_key` strings. The broader AI metadata/capability lint index is still

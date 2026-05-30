@@ -16,6 +16,20 @@ type LLMProvider interface {
 	Turn(context.Context, LLMTurnRequest) (LLMTurnResult, error)
 }
 
+// LLMProviderConfig is the runtime shape of one models {} provider entry.
+// The runtime records this data, but construction is delegated to the host
+// package to avoid coupling the interpreter to concrete HTTP providers.
+type LLMProviderConfig struct {
+	Name          string
+	Protocol      string
+	BaseURL       string
+	APIKey        string
+	ProviderModel string
+	Provider      string
+}
+
+type LLMProviderFactory func(LLMProviderConfig) (LLMProvider, error)
+
 type LLMMessage struct {
 	Role      string
 	Text      string
@@ -90,7 +104,7 @@ type LLMTraceSink func(LLMTraceEvent)
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage
 // runtime substrate for the agent layer: future syntax can compile to these
 // functions without changing provider or tool-dispatch semantics.
-func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
+func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFactory func() LLMProviderFactory, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
 	t := NewTable()
 
 	hostLimit := func() int64 {
@@ -104,6 +118,12 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			return nil
 		}
 		return provider()
+	}
+	currentProviderFactory := func() LLMProviderFactory {
+		if providerFactory == nil {
+			return nil
+		}
+		return providerFactory()
 	}
 	currentContext := func() context.Context {
 		if ctx == nil || ctx() == nil {
@@ -120,6 +140,33 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 	agentDefaults := NewTable()
 	modelAliases := NewTable()
 	var agentConfigMu sync.RWMutex
+	var budgetMu sync.Mutex
+	var ambientBudgets []*llmBudget
+
+	pushBudget := func(b *llmBudget) {
+		budgetMu.Lock()
+		ambientBudgets = append(ambientBudgets, b)
+		budgetMu.Unlock()
+	}
+	popBudget := func(b *llmBudget) {
+		budgetMu.Lock()
+		defer budgetMu.Unlock()
+		for i := len(ambientBudgets) - 1; i >= 0; i-- {
+			if ambientBudgets[i] == b {
+				copy(ambientBudgets[i:], ambientBudgets[i+1:])
+				ambientBudgets[len(ambientBudgets)-1] = nil
+				ambientBudgets = ambientBudgets[:len(ambientBudgets)-1]
+				return
+			}
+		}
+	}
+	currentBudgets := func() llmBudgetGroup {
+		budgetMu.Lock()
+		defer budgetMu.Unlock()
+		out := make(llmBudgetGroup, len(ambientBudgets))
+		copy(out, ambientBudgets)
+		return out
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) { setLLMFunction(t, "llm", name, fn) }
 
@@ -236,14 +283,20 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.turn' (table expected)")
 		}
-		p := currentProvider()
+		agentConfigMu.RLock()
+		opts := llmCloneTable(args[0].Table())
+		p, providerErr := llmResolveProviderForModel(opts, modelAliases, currentProvider(), currentProviderFactory())
+		if !providerErr.IsNil() {
+			agentConfigMu.RUnlock()
+			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: providerErr.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), providerErr}, nil
+		}
+		llmResolveModelAlias(opts, modelAliases)
 		if p == nil {
+			agentConfigMu.RUnlock()
 			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		agentConfigMu.RLock()
-		opts := llmCloneTable(args[0].Table())
-		llmResolveModelAlias(opts, modelAliases)
 		if opts.RawGetString("messages").IsNil() {
 			normalized, err := llmLoopOptions(opts, 1)
 			if err != nil {
@@ -259,6 +312,11 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
+		budgets := currentBudgets().with(llmBudgetFromOptions(opts))
+		if err := budgets.beforeTurn(); !err.IsNil() {
+			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), err}, nil
+		}
 		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := p.Turn(currentContext(), req)
 		if err != nil {
@@ -270,6 +328,7 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		if err := CheckHostResultBytes(hostLimit(), out); err != nil {
 			return nil, err
 		}
+		budgets.chargeTurn(res.Usage)
 		return []Value{out, NilValue()}, nil
 	})
 
@@ -295,11 +354,24 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		result, err := llmReact(args[0].Table(), p, call, currentContext(), hostLimit(), trace)
+		result, err := llmReact(args[0].Table(), p, call, currentContext(), hostLimit(), trace, currentBudgets())
 		if err != nil {
 			return nil, err
 		}
 		return result, nil
+	})
+
+	set("with_budget", func(args []Value) ([]Value, error) {
+		if len(args) < 2 || !args[0].IsTable() || !args[1].IsFunction() {
+			return nil, fmt.Errorf("bad argument to 'llm.with_budget' (budget table, function expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("llm.with_budget requires a function caller")
+		}
+		budget := llmBudgetFromConfig(args[0].Table())
+		pushBudget(budget)
+		defer popBudget(budget)
+		return call(args[1], nil)
 	})
 
 	set("agent_defaults", func(args []Value) ([]Value, error) {
@@ -328,21 +400,27 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		if call == nil {
 			return nil, fmt.Errorf("llm.run_agent requires a function caller")
 		}
-		p := currentProvider()
+		agentConfigMu.RLock()
+		merged := llmMergeTables(agentDefaults, src)
+		p, providerErr := llmResolveProviderForModel(merged, modelAliases, currentProvider(), currentProviderFactory())
+		if !providerErr.IsNil() {
+			agentConfigMu.RUnlock()
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: providerErr.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), providerErr}, nil
+		}
+		llmResolveModelAlias(merged, modelAliases)
 		if p == nil {
+			agentConfigMu.RUnlock()
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		agentConfigMu.RLock()
-		merged := llmMergeTables(agentDefaults, src)
-		llmResolveModelAlias(merged, modelAliases)
 		opts, err := llmLoopOptions(merged, 0)
 		agentConfigMu.RUnlock()
 		if err != nil {
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
-		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace)
+		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, currentBudgets())
 		if err != nil {
 			return nil, err
 		}
@@ -472,7 +550,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
-		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
+		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, nil, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
 			store:       args[0].Table().RawGetString("store"),
 			trace:       trace,
@@ -498,7 +576,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
-		return llmReact(opts, p, call, currentContext(), hostLimit(), trace)
+		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, nil)
 	})
 
 	set("plan_execute", func(args []Value) ([]Value, error) {
@@ -526,7 +604,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		if execModel := args[0].Table().RawGetString("exec_model"); !execModel.IsNil() {
 			opts.RawSetString("model", execModel)
 		}
-		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
+		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, nil, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
 			store:       args[0].Table().RawGetString("store"),
 			trace:       trace,
@@ -557,7 +635,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
-		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
+		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, nil, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
 			store:       args[0].Table().RawGetString("store"),
 			trace:       trace,
@@ -876,6 +954,92 @@ func llmResolveModelAlias(opts, aliases *Table) {
 	default:
 		opts.RawSetString("model", model)
 	}
+}
+
+func llmResolveProviderForModel(opts, aliases *Table, defaultProvider LLMProvider, factory LLMProviderFactory) (LLMProvider, Value) {
+	if defaultProvider != nil {
+		return defaultProvider, NilValue()
+	}
+	if factory == nil {
+		return nil, NilValue()
+	}
+	name, config := llmModelConfigTable(opts, aliases)
+	if config == nil {
+		return nil, NilValue()
+	}
+	cfg := LLMProviderConfig{
+		Name:          name,
+		Protocol:      llmTableString(config, "protocol"),
+		BaseURL:       llmTableString(config, "base_url"),
+		APIKey:        llmTableString(config, "api_key"),
+		ProviderModel: llmTableString(config, "provider_model"),
+		Provider:      llmTableString(config, "provider"),
+	}
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = llmTableString(config, "endpoint")
+	}
+	if cfg.ProviderModel == "" {
+		cfg.ProviderModel = llmTableString(config, "model")
+	}
+	if cfg.Protocol == "" {
+		return nil, NilValue()
+	}
+	p, err := factory(cfg)
+	if err != nil {
+		return nil, llmErrorValue("provider", err.Error())
+	}
+	if p == nil {
+		return nil, llmErrorValue("provider", "llm provider factory returned nil")
+	}
+	return p, NilValue()
+}
+
+func llmModelConfigTable(opts, aliases *Table) (string, *Table) {
+	if aliases == nil {
+		return "", nil
+	}
+	model := NilValue()
+	if opts != nil {
+		model = opts.RawGetString("model")
+	}
+	if model.IsNil() {
+		model = aliases.RawGetString("default")
+		if model.IsTable() {
+			return "default", model.Table()
+		}
+	}
+	if !model.IsString() || model.Str() == "" {
+		return "", nil
+	}
+	name := model.Str()
+	seen := map[string]bool{}
+	for name != "" {
+		if seen[name] {
+			return "", nil
+		}
+		seen[name] = true
+		alias := aliases.RawGetString(name)
+		switch {
+		case alias.IsTable():
+			return name, alias.Table()
+		case alias.IsString() && alias.Str() != "":
+			name = alias.Str()
+		default:
+			return "", nil
+		}
+	}
+	return "", nil
+}
+
+func llmTableString(tbl *Table, key string) string {
+	if tbl == nil {
+		return ""
+	}
+	v := tbl.RawGetString(key)
+	if !v.IsString() {
+		return ""
+	}
+	return v.Str()
 }
 
 func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) (LLMTurnResult, Value) {
@@ -1325,7 +1489,7 @@ type llmHITL struct {
 	snapshotsMu *sync.Mutex
 }
 
-func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent), hitls ...*llmHITL) ([]Value, error) {
+func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent), ambient llmBudgetGroup, hitls ...*llmHITL) ([]Value, error) {
 	var hitl *llmHITL
 	if len(hitls) > 0 {
 		hitl = hitls[0]
@@ -1354,14 +1518,14 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 	if maxHistoryTokens < 0 {
 		maxHistoryTokens = 0
 	}
-	budget := llmBudgetFromOptions(opts)
+	budgets := ambient.with(llmBudgetFromOptions(opts))
 	cancel := llmCancelFromOptions(opts, ctx)
 	for step := 0; step < maxSteps; step++ {
 		if err := cancel.check(); !err.IsNil() {
 			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
 			return []Value{NilValue(), err}, nil
 		}
-		if err := budget.beforeTurn(); !err.IsNil() {
+		if err := budgets.beforeTurn(); !err.IsNil() {
 			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
 			return []Value{NilValue(), err}, nil
 		}
@@ -1397,7 +1561,7 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		if err := CheckHostResultBytes(maxHostResult, turnValue); err != nil {
 			return nil, err
 		}
-		budget.chargeTurn(res.Usage)
+		budgets.chargeTurn(res.Usage)
 		switch res.Status {
 		case "", "final_answer":
 			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
@@ -1422,7 +1586,7 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
 				}
-				if err := budget.beforeToolCall(); !err.IsNil() {
+				if err := budgets.beforeToolCall(); !err.IsNil() {
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
 				}
@@ -1538,14 +1702,60 @@ type llmBudget struct {
 	started    time.Time
 }
 
-func llmBudgetFromOptions(opts *Table) *llmBudget {
-	b := &llmBudget{
+type llmBudgetGroup []*llmBudget
+
+func (g llmBudgetGroup) with(b *llmBudget) llmBudgetGroup {
+	if b == nil {
+		return g
+	}
+	out := make(llmBudgetGroup, 0, len(g)+1)
+	out = append(out, g...)
+	out = append(out, b)
+	return out
+}
+
+func (g llmBudgetGroup) beforeTurn() Value {
+	for _, b := range g {
+		if err := b.checkTurn(); !err.IsNil() {
+			return err
+		}
+	}
+	for _, b := range g {
+		b.startTurn()
+	}
+	return NilValue()
+}
+
+func (g llmBudgetGroup) chargeTurn(usage LLMTurnUsage) {
+	for _, b := range g {
+		b.chargeTurn(usage)
+	}
+}
+
+func (g llmBudgetGroup) beforeToolCall() Value {
+	for _, b := range g {
+		if err := b.checkToolCall(); !err.IsNil() {
+			return err
+		}
+	}
+	for _, b := range g {
+		b.startToolCall()
+	}
+	return NilValue()
+}
+
+func newLLMBudget() *llmBudget {
+	return &llmBudget{
 		maxTokens: -1,
 		maxTurns:  -1,
 		maxCalls:  -1,
 		maxMoney:  -1,
 		maxTime:   -1,
 	}
+}
+
+func llmBudgetFromOptions(opts *Table) *llmBudget {
+	b := newLLMBudget()
 	if v := opts.RawGetString("budget_tokens"); !v.IsNil() {
 		b.maxTokens = toInt(v)
 	}
@@ -1562,22 +1772,43 @@ func llmBudgetFromOptions(opts *Table) *llmBudget {
 		b.maxTime = llmBudgetDuration(v)
 	}
 	if t := opts.RawGetString("budget"); t.IsTable() {
-		bt := t.Table()
-		if v := bt.RawGetString("tokens"); !v.IsNil() {
-			b.maxTokens = toInt(v)
-		}
-		if v := bt.RawGetString("turns"); !v.IsNil() {
-			b.maxTurns = toInt(v)
-		}
-		if v := bt.RawGetString("calls"); !v.IsNil() {
-			b.maxCalls = toInt(v)
-		}
-		if v := bt.RawGetString("money"); !v.IsNil() {
-			b.maxMoney = toFloat(v)
-		}
-		if v := bt.RawGetString("time"); !v.IsNil() {
-			b.maxTime = llmBudgetDuration(v)
-		}
+		llmApplyBudgetConfig(b, t.Table())
+	}
+	llmNormalizeBudget(b)
+	return b
+}
+
+func llmBudgetFromConfig(config *Table) *llmBudget {
+	b := newLLMBudget()
+	llmApplyBudgetConfig(b, config)
+	llmNormalizeBudget(b)
+	return b
+}
+
+func llmApplyBudgetConfig(b *llmBudget, config *Table) {
+	if b == nil || config == nil {
+		return
+	}
+	if v := config.RawGetString("tokens"); !v.IsNil() {
+		b.maxTokens = toInt(v)
+	}
+	if v := config.RawGetString("turns"); !v.IsNil() {
+		b.maxTurns = toInt(v)
+	}
+	if v := config.RawGetString("calls"); !v.IsNil() {
+		b.maxCalls = toInt(v)
+	}
+	if v := config.RawGetString("money"); !v.IsNil() {
+		b.maxMoney = toFloat(v)
+	}
+	if v := config.RawGetString("time"); !v.IsNil() {
+		b.maxTime = llmBudgetDuration(v)
+	}
+}
+
+func llmNormalizeBudget(b *llmBudget) {
+	if b == nil {
+		return
 	}
 	if b.maxTokens < 0 {
 		b.maxTokens = -1
@@ -1597,10 +1828,20 @@ func llmBudgetFromOptions(opts *Table) *llmBudget {
 	if b.maxTime >= 0 {
 		b.started = time.Now()
 	}
-	return b
 }
 
 func (b *llmBudget) beforeTurn() Value {
+	if b == nil {
+		return NilValue()
+	}
+	if err := b.checkTurn(); !err.IsNil() {
+		return err
+	}
+	b.startTurn()
+	return NilValue()
+}
+
+func (b *llmBudget) checkTurn() Value {
 	if b == nil {
 		return NilValue()
 	}
@@ -1616,8 +1857,13 @@ func (b *llmBudget) beforeTurn() Value {
 	if b.maxMoney >= 0 && b.usedMoney >= b.maxMoney {
 		return llmBudgetError("money", 0, 0)
 	}
-	b.usedTurns++
 	return NilValue()
+}
+
+func (b *llmBudget) startTurn() {
+	if b != nil {
+		b.usedTurns++
+	}
 }
 
 func (b *llmBudget) chargeTurn(usage LLMTurnUsage) {
@@ -1632,14 +1878,30 @@ func (b *llmBudget) beforeToolCall() Value {
 	if b == nil {
 		return NilValue()
 	}
+	if err := b.checkToolCall(); !err.IsNil() {
+		return err
+	}
+	b.startToolCall()
+	return NilValue()
+}
+
+func (b *llmBudget) checkToolCall() Value {
+	if b == nil {
+		return NilValue()
+	}
 	if err := b.beforeWork(); !err.IsNil() {
 		return err
 	}
 	if b.maxCalls >= 0 && b.usedCalls >= b.maxCalls {
 		return llmBudgetError("calls", b.maxCalls, b.usedCalls)
 	}
-	b.usedCalls++
 	return NilValue()
+}
+
+func (b *llmBudget) startToolCall() {
+	if b != nil {
+		b.usedCalls++
+	}
 }
 
 func (b *llmBudget) beforeWork() Value {

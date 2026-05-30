@@ -278,6 +278,120 @@ manual := agent(q) {
 	}
 }
 
+func TestAINativeToolCommentDirectivesParseAndDesugar(t *testing.T) {
+	prog := mustParse(t, `
+// Lookup docs.
+// gscript:requires docs.read, net.client
+// gscript:param query search query text
+// gscript:param limit: maximum result count
+tool search_docs(query, limit) {
+    return query, nil
+}
+`)
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("statements = %d, want 1", len(prog.Stmts))
+	}
+	tool, ok := prog.Stmts[0].(*ast.ToolDeclStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want ToolDeclStmt", prog.Stmts[0])
+	}
+	if tool.DocComment != "Lookup docs." {
+		t.Fatalf("doc = %q", tool.DocComment)
+	}
+	if len(tool.Requires) != 2 || tool.Requires[0] != "docs.read" || tool.Requires[1] != "net.client" {
+		t.Fatalf("requires = %#v", tool.Requires)
+	}
+	if tool.ParamDocs["query"] != "search query text" || tool.ParamDocs["limit"] != "maximum result count" {
+		t.Fatalf("param docs = %#v", tool.ParamDocs)
+	}
+
+	desugared := ast.DesugarAINative(prog)
+	decl, ok := desugared.Stmts[0].(*ast.DeclareStmt)
+	if !ok || len(decl.Values) != 1 {
+		t.Fatalf("desugared stmt = %#v", desugared.Stmts[0])
+	}
+	call, ok := decl.Values[0].(*ast.CallExpr)
+	if !ok || len(call.Args) != 3 {
+		t.Fatalf("desugared value = %#v", decl.Values[0])
+	}
+	opts, ok := call.Args[2].(*ast.TableLitExpr)
+	if !ok {
+		t.Fatalf("tool options = %T", call.Args[2])
+	}
+	if got := stringFieldValue(opts, "description"); got != "Lookup docs." {
+		t.Fatalf("description option = %q", got)
+	}
+	requires := tableFieldValue(t, opts, "requires")
+	if got := arrayStringValue(t, requires, 1); got != "docs.read" {
+		t.Fatalf("requires[1] = %q", got)
+	}
+	if got := arrayStringValue(t, requires, 2); got != "net.client" {
+		t.Fatalf("requires[2] = %q", got)
+	}
+	paramDocs := tableFieldValue(t, opts, "param_docs")
+	if got := stringFieldValue(paramDocs, "query"); got != "search query text" {
+		t.Fatalf("param_docs.query = %q", got)
+	}
+	if got := stringFieldValue(paramDocs, "limit"); got != "maximum result count" {
+		t.Fatalf("param_docs.limit = %q", got)
+	}
+}
+
+func TestAINativeToolCommentBlankLineDoesNotAttach(t *testing.T) {
+	prog := mustParse(t, `
+// Stale docs.
+
+tool stale() {
+    return nil
+}
+`)
+	tool, ok := prog.Stmts[0].(*ast.ToolDeclStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want ToolDeclStmt", prog.Stmts[0])
+	}
+	if tool.DocComment != "" || len(tool.Requires) != 0 || len(tool.ParamDocs) != 0 {
+		t.Fatalf("unexpected metadata: doc=%q requires=%#v paramDocs=%#v", tool.DocComment, tool.Requires, tool.ParamDocs)
+	}
+}
+
+func tableFieldValue(t *testing.T, table *ast.TableLitExpr, key string) *ast.TableLitExpr {
+	t.Helper()
+	for _, field := range table.Fields {
+		if lit, ok := field.Key.(*ast.StringLit); ok && lit.Value == key {
+			value, ok := field.Value.(*ast.TableLitExpr)
+			if !ok {
+				t.Fatalf("%s = %T, want TableLitExpr", key, field.Value)
+			}
+			return value
+		}
+	}
+	t.Fatalf("missing table field %q in %#v", key, table.Fields)
+	return nil
+}
+
+func stringFieldValue(table *ast.TableLitExpr, key string) string {
+	for _, field := range table.Fields {
+		if lit, ok := field.Key.(*ast.StringLit); ok && lit.Value == key {
+			if value, ok := field.Value.(*ast.StringLit); ok {
+				return value.Value
+			}
+		}
+	}
+	return ""
+}
+
+func arrayStringValue(t *testing.T, table *ast.TableLitExpr, index int) string {
+	t.Helper()
+	if index < 1 || index > len(table.Fields) {
+		t.Fatalf("array index %d out of range for %#v", index, table.Fields)
+	}
+	value, ok := table.Fields[index-1].Value.(*ast.StringLit)
+	if !ok {
+		t.Fatalf("array[%d] = %T, want StringLit", index, table.Fields[index-1].Value)
+	}
+	return value.Value
+}
+
 func TestListAndMessagesExpressionsParse(t *testing.T) {
 	prog := mustParse(t, `
 tools := [search_docs, read_url]

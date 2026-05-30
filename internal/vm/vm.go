@@ -117,6 +117,7 @@ type VM struct {
 	debugAccess          bool
 	testkitAccess        bool
 	llmProvider          runtime.LLMProvider
+	llmProviderFactory   runtime.LLMProviderFactory
 	llmTraceSink         runtime.LLMTraceSink
 	ctx                  context.Context
 }
@@ -195,6 +196,10 @@ func (vm *VM) SetNetworkAccess(enabled bool) {
 
 func (vm *VM) SetLLMProvider(provider runtime.LLMProvider) {
 	vm.llmProvider = provider
+}
+
+func (vm *VM) SetLLMProviderFactory(factory runtime.LLMProviderFactory) {
+	vm.llmProviderFactory = factory
 }
 
 func (vm *VM) SetLLMTraceSink(sink runtime.LLMTraceSink) {
@@ -919,6 +924,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		debugAccess:        parent.debugAccess,
 		testkitAccess:      parent.testkitAccess,
 		llmProvider:        parent.llmProvider,
+		llmProviderFactory: parent.llmProviderFactory,
 		llmTraceSink:       parent.llmTraceSink,
 	}
 	child.initTypeNameValues()

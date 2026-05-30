@@ -1050,6 +1050,113 @@ text := result.text
 	}
 }
 
+func TestAINativeModelsProviderConfigOpenAICompatible(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			var got map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/chat/completions" {
+					t.Fatalf("path = %q", r.URL.Path)
+				}
+				if auth := r.Header.Get("Authorization"); auth != "Bearer test-key" {
+					t.Fatalf("Authorization = %q", auth)
+				}
+				if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+					t.Fatalf("Decode request: %v", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`)
+			}))
+			defer server.Close()
+
+			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(fmt.Sprintf(`
+models {
+    default: "chat"
+    chat: {
+        protocol: "openai_compatible"
+        base_url: %q
+        api_key: ("test" .. "-key")
+        provider_model: "provider-fast"
+    }
+}
+
+result, err := llm.turn({model: "chat", messages: {llm.user("hello")}})
+text := result.text
+`, server.URL))
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if got["model"] != "provider-fast" {
+				t.Fatalf("model = %#v", got["model"])
+			}
+			text, err := vm.Get("text")
+			if err != nil {
+				t.Fatalf("Get text: %v", err)
+			}
+			if text != "ok" {
+				t.Fatalf("text = %#v", text)
+			}
+		})
+	}
+}
+
+func TestAINativeModelsProviderConfigPreservesHostProvider(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "host"}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+models {
+    default: "chat"
+    chat: {
+        protocol: "unsupported-test-protocol"
+        base_url: "http://127.0.0.1:1"
+        api_key: ("test" .. "-key")
+        provider_model: "host-model"
+    }
+}
+
+result, err := llm.turn({model: "chat", messages: {llm.user("hello")}})
+text := result.text
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			if provider.requests[0].Model != "host-model" {
+				t.Fatalf("model = %q", provider.requests[0].Model)
+			}
+			text, err := vm.Get("text")
+			if err != nil {
+				t.Fatalf("Get text: %v", err)
+			}
+			if text != "host" {
+				t.Fatalf("text = %#v", text)
+			}
+		})
+	}
+}
+
 func TestLLMReactDispatchLoop(t *testing.T) {
 	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
 		{

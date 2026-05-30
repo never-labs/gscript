@@ -1195,6 +1195,8 @@ func (vm *VM) RegisterStringLib() {
 func (vm *VM) RegisterLLMLib() {
 	llmLib := runtime.TableValue(runtime.BuildLLMLib(vm.callValue, func() runtime.LLMProvider {
 		return vm.llmProvider
+	}, func() runtime.LLMProviderFactory {
+		return vm.llmProviderFactory
 	}, func() int64 {
 		return vm.maxHostResult
 	}, func() context.Context {

@@ -8,11 +8,13 @@ import (
 
 // Lexer tokenizes GScript source code.
 type Lexer struct {
-	source string
-	pos    int
-	line   int
-	col    int
-	tokens []Token
+	source          string
+	pos             int
+	line            int
+	col             int
+	tokens          []Token
+	pendingComments []Comment
+	lastTokenLine   int
 }
 
 // New creates a new Lexer for the given source string.
@@ -70,6 +72,30 @@ func (l *Lexer) skipWhitespace() {
 	}
 }
 
+func (l *Lexer) skipWhitespaceAndComments() error {
+	for {
+		l.skipWhitespace()
+
+		if l.peek() == '/' && l.peekAt(1) == '/' {
+			comment := l.readLineComment()
+			if comment.Line != l.lastTokenLine {
+				l.pendingComments = append(l.pendingComments, comment)
+			}
+			continue
+		}
+
+		if l.peek() == '/' && l.peekAt(1) == '*' {
+			l.pendingComments = nil
+			if err := l.skipBlockComment(); err != nil {
+				return err
+			}
+			continue
+		}
+
+		return nil
+	}
+}
+
 // NextToken returns the next token from the source.
 // After all tokens are consumed, it returns TOKEN_EOF.
 func (l *Lexer) NextToken() Token {
@@ -82,7 +108,9 @@ func (l *Lexer) NextToken() Token {
 
 // nextTokenInternal returns the next token or an error.
 func (l *Lexer) nextTokenInternal() (Token, error) {
-	l.skipWhitespace()
+	if err := l.skipWhitespaceAndComments(); err != nil {
+		return Token{}, err
+	}
 
 	if l.pos >= len(l.source) {
 		return Token{Type: TOKEN_EOF, Value: "", Line: l.line, Column: l.col}, nil
@@ -92,50 +120,71 @@ func (l *Lexer) nextTokenInternal() (Token, error) {
 	startLine := l.line
 	startCol := l.col
 
-	// Line comment
-	if ch == '/' && l.peekAt(1) == '/' {
-		l.skipLineComment()
-		return l.nextTokenInternal()
-	}
-
-	// Block comment
-	if ch == '/' && l.peekAt(1) == '*' {
-		if err := l.skipBlockComment(); err != nil {
-			return Token{}, err
-		}
-		return l.nextTokenInternal()
-	}
-
 	// String literal
 	if ch == '"' {
-		return l.readString()
+		tok, err := l.readString()
+		if err != nil {
+			return Token{}, err
+		}
+		return l.finishToken(tok), nil
 	}
 	if ch == '`' {
-		return l.readRawString()
+		tok, err := l.readRawString()
+		if err != nil {
+			return Token{}, err
+		}
+		return l.finishToken(tok), nil
 	}
 
 	// Number literal
 	if isDigit(ch) {
-		return l.readNumber()
+		tok, err := l.readNumber()
+		if err != nil {
+			return Token{}, err
+		}
+		return l.finishToken(tok), nil
 	}
 
 	// Identifier or keyword
 	if isLetter(ch) {
-		return l.readIdentifier()
+		tok, err := l.readIdentifier()
+		if err != nil {
+			return Token{}, err
+		}
+		return l.finishToken(tok), nil
 	}
 
 	// Operators and separators
-	return l.readOperator(startLine, startCol)
+	tok, err := l.readOperator(startLine, startCol)
+	if err != nil {
+		return Token{}, err
+	}
+	return l.finishToken(tok), nil
 }
 
-// skipLineComment skips from // to end of line.
-func (l *Lexer) skipLineComment() {
+func (l *Lexer) finishToken(tok Token) Token {
+	if tok.Type != TOKEN_EOF && len(l.pendingComments) > 0 {
+		tok.LeadingComments = append([]Comment(nil), l.pendingComments...)
+	}
+	l.pendingComments = nil
+	if tok.Type != TOKEN_EOF {
+		l.lastTokenLine = tok.Line
+	}
+	return tok
+}
+
+// readLineComment reads from // to end of line.
+func (l *Lexer) readLineComment() Comment {
+	startLine := l.line
+	startCol := l.col
 	// consume the //
 	l.advance()
 	l.advance()
+	start := l.pos
 	for l.pos < len(l.source) && l.peek() != '\n' {
 		l.advance()
 	}
+	return Comment{Text: l.source[start:l.pos], Line: startLine, Column: startCol}
 }
 
 // skipBlockComment skips from /* to */. Returns error if unterminated.

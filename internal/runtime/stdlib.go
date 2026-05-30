@@ -117,6 +117,8 @@ func (interp *Interpreter) registerStdlib() {
 	// --- AI model integration ---
 	interp.globals.Define("llm", TableValue(BuildLLMLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider
+	}, func() LLMProviderFactory {
+		return interp.llmProviderFactory
 	}, func() int64 {
 		return interp.maxHostResult
 	}, func() context.Context {

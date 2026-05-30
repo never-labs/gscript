@@ -234,6 +234,7 @@ func (p *Parser) parseFuncDeclStmt() (ast.Stmt, error) {
 func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
 	tok := p.advance() // consume 'tool'
 	pos := p.tokenPos(tok)
+	doc, requires, paramDocs := parseToolLeadingComments(tok)
 
 	nameTok, err := p.expect(lexer.TOKEN_IDENT)
 	if err != nil {
@@ -247,7 +248,99 @@ func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ast.ToolDeclStmt{P: pos, Name: nameTok.Value, Params: params, Body: body}, nil
+	return &ast.ToolDeclStmt{P: pos, Name: nameTok.Value, Params: params, Body: body, DocComment: doc, Requires: requires, ParamDocs: paramDocs}, nil
+}
+
+func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]string) {
+	comments := contiguousLeadingComments(tok)
+	if len(comments) == 0 {
+		return "", nil, nil
+	}
+	var docLines []string
+	var requires []string
+	paramDocs := map[string]string{}
+	for _, comment := range comments {
+		text := strings.TrimSpace(comment.Text)
+		if rest, ok := directiveRest(text, "gscript:requires"); ok {
+			requires = append(requires, parseRequiresDirective(rest)...)
+			continue
+		}
+		if rest, ok := directiveRest(text, "gscript:param"); ok {
+			if name, doc, ok := parseParamDirective(rest); ok {
+				paramDocs[name] = doc
+			}
+			continue
+		}
+		docLines = append(docLines, text)
+	}
+	if len(paramDocs) == 0 {
+		paramDocs = nil
+	}
+	return strings.TrimSpace(strings.Join(docLines, "\n")), requires, paramDocs
+}
+
+func directiveRest(text, directive string) (string, bool) {
+	if !strings.HasPrefix(text, directive) {
+		return "", false
+	}
+	if len(text) == len(directive) {
+		return "", true
+	}
+	switch text[len(directive)] {
+	case ':', ' ', '\t':
+		return strings.TrimSpace(text[len(directive):]), true
+	default:
+		return "", false
+	}
+}
+
+func contiguousLeadingComments(tok lexer.Token) []lexer.Comment {
+	comments := tok.LeadingComments
+	wantLine := tok.Line - 1
+	start := len(comments)
+	for start > 0 && comments[start-1].Line == wantLine {
+		start--
+		wantLine--
+	}
+	return comments[start:]
+}
+
+func parseRequiresDirective(rest string) []string {
+	rest = strings.TrimLeft(rest, ": \t")
+	if rest == "" {
+		return nil
+	}
+	fields := strings.FieldsFunc(rest, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\t'
+	})
+	out := make([]string, 0, len(fields))
+	for _, field := range fields {
+		field = strings.TrimSpace(field)
+		if field != "" {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
+func parseParamDirective(rest string) (string, string, bool) {
+	rest = strings.TrimLeft(rest, ": \t")
+	if rest == "" {
+		return "", "", false
+	}
+	nameEnd := strings.IndexFunc(rest, func(r rune) bool {
+		return r == ':' || r == '-' || r == ' ' || r == '\t'
+	})
+	if nameEnd < 0 {
+		return rest, "", true
+	}
+	name := strings.TrimSpace(rest[:nameEnd])
+	doc := strings.TrimSpace(rest[nameEnd:])
+	doc = strings.TrimLeft(doc, ":- \t")
+	if name == "" {
+		return "", "", false
+	}
+	return name, doc, true
 }
 
 func (p *Parser) parseAgentDeclOrExprStmt() (ast.Stmt, error) {

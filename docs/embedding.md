@@ -124,6 +124,26 @@ Anthropic-compatible gateways are supported through
 their own endpoint, API key, model, timeout, retry, and header policy explicitly;
 GScript does not encode vendor-specific local wrapper conventions.
 
+AI-native `models {}` declarations can also construct these built-in adapters
+when the VM has no host-injected provider:
+
+```gscript
+models {
+    default: "fast"
+    fast: {
+        protocol: "openai_compatible"
+        base_url: "https://api.openai.com/v1"
+        api_key: os.getenv("OPENAI_API_KEY")
+        provider_model: "gpt-4.1-mini"
+    }
+}
+```
+
+`WithLLMProvider` remains the highest-priority route, so test doubles and
+production host routers keep receiving turns even if the script declares
+provider fields. Hosts that need custom construction can install
+`WithLLMProviderFactory`.
+
 The real-provider integration smoke is gated and uses generic environment
 names:
 
