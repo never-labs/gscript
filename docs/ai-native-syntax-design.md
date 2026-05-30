@@ -1,11 +1,37 @@
 # GScript AI-Native Syntax Design
 
-Status: accepted syntax proposal. Parser/runtime work should implement this
-surface incrementally by lowering to the existing LLM standard library.
+Status: accepted syntax proposal with a partial implementation in the current
+workspace. Parser/runtime work is being implemented incrementally by lowering to
+the existing LLM standard library.
 
 GScript's AI layer is designed around one simple promise: a useful agent should
 be writable with almost no ceremony, while advanced users can still drop to a
 single-turn protocol primitive when they need exact control.
+
+Current implementation snapshot:
+
+- AI-native words are still lexed as ordinary identifiers. The parser recognizes
+  them contextually in the syntax positions described below.
+- Implemented parser/AST/desugar coverage includes list literals, `tool`
+  declarations, named and anonymous `agent` values, optional `flow`, `agent
+  defaults`, `models`, `messages`, `turn`, and the statement shape for
+  `budget`.
+- Lowering currently targets `llm.tool`, `llm.agent`, `llm.agent_defaults`,
+  `llm.register_models`, and `llm.turn`. Non-flow agents lower to
+  `llm.agent(name, config_fn)`. Flow agents currently lower to plain functions
+  with config fields bound as locals and explicit `turn` calls in the flow body,
+  not to a `llm.agent(..., flow_fn)` stdlib call.
+- `models { ... }` lowers to `llm.register_models({ ... })`. The stdlib stores
+  aliases/configs and resolves `default`, aliases, and `provider_model` for
+  `llm.turn` / `llm.agent`. It does not yet instantiate provider clients from
+  `protocol`, `base_url`, or `api_key` inside the model table.
+- Agent-local `budget: { ... }` tables are honored by the current `llm.agent`
+  / `llm.react` loop. Standalone `budget { ... } { ... }` blocks parse, but
+  currently lower to their body only; the ambient nested/intersection semantics
+  are not implemented yet.
+- Tool declarations currently lower with the tool name, function body, and
+  parameter list. Doc-comment extraction, `gscript:` directive extraction,
+  `description`, `requires`, and `param_docs` lowering are still pending.
 
 ## 1. Core Shape
 
@@ -57,6 +83,11 @@ react memory rag provider output user system tools defaults
 `react` remains a library strategy/helper, not a language keyword. The default
 `agent` execution strategy is ReAct-style multi-turn tool use, but users do not
 need to name it for the common case.
+
+Current implementation note: these words are not lexer keywords. They remain
+`TOKEN_IDENT` values and are recognized only by parser lookahead in statement or
+expression positions such as `agent ... {}`, `turn {}`, `messages {}`,
+`models {}`, and `budget {} {}`.
 
 ## 3. Lists
 
@@ -142,6 +173,13 @@ llm.register_models({
     },
 })
 ```
+
+Current implementation note: this lowering is implemented as
+`llm.register_models({...})`; `llm.models({...})` is also available as a stdlib
+alias. Runtime resolution maps `default` and named aliases to the provider-side
+model string, preferring `provider_model` and then `model` inside config tables.
+The remaining provider fields are stored but not yet used to construct a
+provider automatically.
 
 Rules:
 
@@ -237,6 +275,10 @@ Rules:
 - Tool bodies return `(value, err)`.
 - Tool declarations bind a value with the declared name.
 - Tools are normal closures and can capture surrounding state.
+
+Current implementation note: parser/desugar support for `tool` exists, but
+source doc comments and `gscript:` directives are not yet attached to the AST or
+lowered. The generated `llm.tool` options currently include `params` only.
 
 Lowering:
 
@@ -653,6 +695,14 @@ Rules:
 - Exhaustion is observed at the next `turn` or tool dispatch.
 - Money/cost accounting remains host/provider policy for now.
 
+Current implementation note: agent-local budget tables are enforced by the
+`llm.agent` / `llm.react` loop for turns, tool calls, tokens, money, and time
+when those limits are present in the options table. Standalone `budget` blocks
+parse, but their config is currently ignored during desugaring and no ambient
+budget frame is installed. They therefore do not yet provide nested
+intersection, active-frame charging, or automatic enforcement around enclosed
+`turn` / tool dispatch operations.
+
 ## 16. Capabilities
 
 Capabilities are strings:
@@ -822,6 +872,10 @@ answer := llm.agent("answer", func(q) {
 }, nil)
 ```
 
+Current implementation note: non-flow agents currently lower to
+`llm.agent("answer", func(q) { return {...} })`; the third `nil` flow argument
+shown in this canonical shape is not part of the current stdlib signature.
+
 Anonymous IIFE:
 
 ```gscript
@@ -862,6 +916,13 @@ support := llm.agent("support", func(q) {
     })
 })
 ```
+
+Current implementation note: the current flow-agent lowering is not this
+canonical `llm.agent` shape yet. It lowers to a plain function whose first
+statements bind config fields such as `tools`, `model`, and `system` as locals,
+then executes the desugared flow body. Flow bodies can call `turn { ... }`,
+which lowers to `llm.turn({...})`, but default agent execution is bypassed for
+flow agents.
 
 The compiler can avoid allocating closure objects when a cleaner internal
 representation is available, but record/replay, trace events, budgets, and
@@ -999,21 +1060,44 @@ agent manual(q) {
 
 ## 24. Implementation Milestones
 
-1. Parser accepts list literals (`[...]`) if not already supported in the target
-   branch.
-2. Parser preserves tool doc comments and extracts `gscript:` directives.
-3. Parser accepts `tool` declarations and lowers to existing `llm.tool`.
-4. Runtime adds `llm.agent` / ambient agent frame support for default execution.
-5. Parser accepts named and anonymous `agent` values.
-6. Parser accepts optional `flow` blocks.
-7. Parser accepts `agent defaults` declarations.
-8. Parser accepts `models` declarations with aliases and provider config.
-9. Parser accepts `messages` constructors.
-10. Parser accepts `turn` blocks and lowers to `llm.turn`.
-11. Parser accepts `budget` blocks and lowers to ambient budget frames.
-12. Linter emits AI metadata/capability diagnostics, including plaintext API
-    key rejection.
-13. Formatter preserves doc directives and formats AI blocks.
-14. Tests cover stdlib-vs-syntax equivalence, anonymous agents/IIFE, defaults,
-    real provider gated smoke, record/replay, output validation, and flow
-    behavior.
+Current status in this workspace:
+
+1. Done: parser accepts list literals (`[...]`) and AI-native list syntax lowers
+   to array-table literals.
+2. Pending: parser does not yet preserve tool doc comments or extract
+   `gscript:` directives for tool metadata.
+3. Partial: parser accepts `tool` declarations and lowers to `llm.tool`, but
+   only the parameter list is supplied in options. Description, requires, and
+   param-doc lowering are pending.
+4. Partial: runtime has `llm.agent` for default execution through the existing
+   `llm.react` loop, with module-level defaults and model alias resolution.
+   There is no separate ambient agent frame abstraction yet.
+5. Done: parser accepts named and anonymous `agent` values, including IIFE use.
+6. Partial: parser accepts optional `flow` blocks. Current lowering emits a
+   plain function with config locals instead of lowering flow agents through
+   `llm.agent`.
+7. Done: parser accepts module-scope `agent defaults` declarations, validates
+   duplicates, and lowers to `llm.agent_defaults`.
+8. Partial: parser accepts module-scope `models` declarations, rejects literal
+   `api_key` strings and alias cycles, and lowers to `llm.register_models`.
+   Runtime resolves default/alias/provider_model for existing providers, but
+   does not yet create providers from model-table protocol/base-url/api-key
+   fields.
+9. Done: parser accepts `messages` constructors and lowers recognized roles to
+   message constructor calls.
+10. Done: parser accepts `turn` blocks and lowers to `llm.turn`; the stdlib
+    also supports the `user` shorthand by normalizing it into messages.
+11. Partial: parser accepts `budget` blocks, but current desugaring ignores the
+    budget config and emits only the body. Full ambient budget frames,
+    nesting/intersection, and charging of all active frames are not implemented.
+12. Partial: current validation rejects duplicate `agent defaults`, non-module
+    `agent defaults` / `models`, model alias cycles, and literal model
+    `api_key` strings. The broader AI metadata/capability lint index is still
+    pending.
+13. Pending: formatter support for AI-native blocks and doc directives is not
+    described by the current implementation.
+14. Partial: tests cover parser acceptance, stdlib-vs-syntax execution for
+    interpreter and bytecode, anonymous agents/IIFE, defaults, model alias
+    resolution, direct turn sugar, validation errors, and flow behavior. Gated
+    real-provider smoke, full record/replay syntax coverage, output validation,
+    directive lowering, and ambient budget behavior remain pending.

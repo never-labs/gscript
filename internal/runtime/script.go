@@ -184,6 +184,9 @@ func (interp *Interpreter) execProgramWithOptions(prog *ast.Program, opts Script
 }
 
 func (interp *Interpreter) execProgram(prog *ast.Program, env *Environment) ([]Value, error) {
+	if err := ast.ValidateAINative(prog); err != nil {
+		return nil, err
+	}
 	prog = ast.DesugarAINative(prog)
 	var lastRet []Value
 	interp.pushDeferFrame()

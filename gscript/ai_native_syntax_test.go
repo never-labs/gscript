@@ -1,6 +1,7 @@
 package gscript_test
 
 import (
+	"strings"
 	"testing"
 
 	gs "github.com/gscript/gscript/gscript"
@@ -84,6 +85,71 @@ turn_text := direct.text
 			}
 			if gotTurn != "turn-ok" {
 				t.Fatalf("turn_text = %#v", gotTurn)
+			}
+		})
+	}
+}
+
+func TestAINativeSyntaxValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "duplicate defaults",
+			src: `
+agent defaults { model: "a" }
+agent defaults { model: "b" }
+`,
+			want: "duplicate agent defaults",
+		},
+		{
+			name: "nested defaults",
+			src: `
+func f() {
+    agent defaults { model: "a" }
+}
+`,
+			want: "module scope",
+		},
+		{
+			name: "literal api key",
+			src: `
+models {
+    default: "m"
+    m: {provider_model: "m", api_key: "secret"}
+}
+`,
+			want: "api_key",
+		},
+		{
+			name: "model alias cycle",
+			src: `
+models {
+    a: "b"
+    b: "a"
+}
+`,
+			want: "alias cycle",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, mode := range []struct {
+				name string
+				opts []gs.Option
+			}{
+				{name: "interpreter"},
+				{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+			} {
+				t.Run(mode.name, func(t *testing.T) {
+					opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+					vm := gs.New(opts...)
+					err := vm.Exec(tc.src)
+					if err == nil || !strings.Contains(err.Error(), tc.want) {
+						t.Fatalf("Exec error = %v, want substring %q", err, tc.want)
+					}
+				})
 			}
 		})
 	}
