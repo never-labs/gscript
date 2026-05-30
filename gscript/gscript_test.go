@@ -649,6 +649,36 @@ func TestWithMaxHostResultBytesLimitsBytesAndBinaryOutput(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsCryptoOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, src := range []string{
+				`value := crypto.randomBytes(5)`,
+				`value := crypto.randomHex(3)`,
+				`value := crypto.generateKey(16)`,
+				`key := "1234567890123456"; value := crypto.aesGcmEncrypt(key, "x")`,
+			} {
+				opts := append([]gs.Option{
+					gs.WithLibs(gs.LibString | gs.LibCrypto),
+					gs.WithMaxHostResultBytes(4),
+				}, tc.opts...)
+				vm := gs.New(opts...)
+				err := vm.Exec(src)
+				var budgetErr *gs.BudgetError
+				if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+					t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+				}
+			}
+		})
+	}
+}
+
 func TestWithMaxHostResultBytesLimitsCompressDecodeExpansion(t *testing.T) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)

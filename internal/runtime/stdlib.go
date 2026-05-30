@@ -142,7 +142,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("compress", TableValue(buildCompressLib(interp)))
 
 	// --- Cryptography ---
-	interp.globals.Define("crypto", TableValue(buildCryptoLib()))
+	interp.globals.Define("crypto", TableValue(buildCryptoLib(interp)))
 
 	// --- Container data structures ---
 	interp.globals.Define("container", TableValue(buildContainerLib(interp)))

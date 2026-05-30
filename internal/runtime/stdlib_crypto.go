@@ -12,8 +12,18 @@ import (
 // buildCryptoLib creates the "crypto" standard library table.
 // Provides AES encryption/decryption (GCM mode) and secure random generation.
 // Inspired by Odin's crypto package (aes, chacha20, etc.).
-func buildCryptoLib() *Table {
+func buildCryptoLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -31,6 +41,9 @@ func buildCryptoLib() *Table {
 		if n < 0 {
 			return nil, fmt.Errorf("bad argument #1 to 'crypto.randomBytes' (non-negative number expected)")
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), n); err != nil {
+			return nil, err
+		}
 		buf := make([]byte, n)
 		if _, err := io.ReadFull(rand.Reader, buf); err != nil {
 			return nil, fmt.Errorf("crypto.randomBytes: %v", err)
@@ -46,6 +59,9 @@ func buildCryptoLib() *Table {
 		n := int(toInt(args[0]))
 		if n < 0 {
 			return nil, fmt.Errorf("bad argument #1 to 'crypto.randomHex' (non-negative number expected)")
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), hex.EncodedLen(n)); err != nil {
+			return nil, err
 		}
 		buf := make([]byte, n)
 		if _, err := io.ReadFull(rand.Reader, buf); err != nil {
@@ -80,6 +96,9 @@ func buildCryptoLib() *Table {
 		if err != nil {
 			return nil, fmt.Errorf("crypto.aesGcmEncrypt: %v", err)
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), hex.EncodedLen(gcm.NonceSize()+len(plaintext)+gcm.Overhead())); err != nil {
+			return nil, err
+		}
 
 		nonce := make([]byte, gcm.NonceSize())
 		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
@@ -106,11 +125,6 @@ func buildCryptoLib() *Table {
 		key := []byte(args[0].Str())
 		ciphertextHex := args[1].Str()
 
-		ciphertext, err := hex.DecodeString(ciphertextHex)
-		if err != nil {
-			return []Value{NilValue(), StringValue("invalid hex ciphertext")}, nil
-		}
-
 		block, err := aes.NewCipher(key)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -119,6 +133,16 @@ func buildCryptoLib() *Table {
 		gcm, err := cipher.NewGCM(block)
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
+		}
+
+		if projected := hex.DecodedLen(len(ciphertextHex)) - gcm.NonceSize() - gcm.Overhead(); projected > 0 {
+			if err := CheckProjectedHostStringBytes(maxHostResult(), projected); err != nil {
+				return nil, err
+			}
+		}
+		ciphertext, err := hex.DecodeString(ciphertextHex)
+		if err != nil {
+			return []Value{NilValue(), StringValue("invalid hex ciphertext")}, nil
 		}
 
 		nonceSize := gcm.NonceSize()
@@ -144,6 +168,9 @@ func buildCryptoLib() *Table {
 		}
 		if size != 16 && size != 24 && size != 32 {
 			return nil, fmt.Errorf("crypto.generateKey: size must be 16, 24, or 32 (got %d)", size)
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), size); err != nil {
+			return nil, err
 		}
 		key := make([]byte, size)
 		if _, err := io.ReadFull(rand.Reader, key); err != nil {
