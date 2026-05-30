@@ -117,6 +117,9 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		}
 		traces[0](event)
 	}
+	agentDefaults := NewTable()
+	modelAliases := NewTable()
+	var agentConfigMu sync.RWMutex
 
 	set := func(name string, fn func([]Value) ([]Value, error)) { setLLMFunction(t, "llm", name, fn) }
 
@@ -280,6 +283,54 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
 		result, err := llmReact(args[0].Table(), p, call, currentContext(), hostLimit(), trace)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	})
+
+	set("agent_defaults", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.agent_defaults' (table expected)")
+		}
+		agentConfigMu.Lock()
+		agentDefaults = llmCloneTable(args[0].Table())
+		agentConfigMu.Unlock()
+		return []Value{BoolValue(true), NilValue()}, nil
+	})
+
+	set("models", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.models' (table expected)")
+		}
+		agentConfigMu.Lock()
+		modelAliases = llmCloneTable(args[0].Table())
+		agentConfigMu.Unlock()
+		return []Value{BoolValue(true), NilValue()}, nil
+	})
+
+	set("run_agent", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.run_agent' (table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("llm.run_agent requires a function caller")
+		}
+		p := currentProvider()
+		if p == nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
+			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
+		}
+		agentConfigMu.RLock()
+		merged := llmMergeTables(agentDefaults, args[0].Table())
+		llmResolveModelAlias(merged, modelAliases)
+		opts, err := llmLoopOptions(merged, 0)
+		agentConfigMu.RUnlock()
+		if err != nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
+			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+		}
+		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace)
 		if err != nil {
 			return nil, err
 		}
@@ -722,6 +773,65 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		opts.RawSetString("max_steps", IntValue(defaultMaxSteps))
 	}
 	return opts, nil
+}
+
+func llmCloneTable(src *Table) *Table {
+	out := NewTable()
+	llmCopyTable(out, src, true)
+	return out
+}
+
+func llmMergeTables(defaults, src *Table) *Table {
+	out := NewTable()
+	llmCopyTable(out, defaults, true)
+	llmCopyTable(out, src, true)
+	return out
+}
+
+func llmCopyTable(dst, src *Table, overwrite bool) {
+	if dst == nil || src == nil {
+		return
+	}
+	for _, key := range src.PairsKeysSnapshot() {
+		val := src.RawGet(key)
+		if val.IsNil() {
+			continue
+		}
+		if !overwrite && !dst.RawGet(key).IsNil() {
+			continue
+		}
+		dst.RawSet(key, val)
+	}
+}
+
+func llmResolveModelAlias(opts, aliases *Table) {
+	if opts == nil || aliases == nil {
+		return
+	}
+	model := opts.RawGetString("model")
+	if model.IsNil() {
+		model = aliases.RawGetString("default")
+	}
+	if !model.IsString() || model.Str() == "" {
+		return
+	}
+	alias := aliases.RawGetString(model.Str())
+	switch {
+	case alias.IsString() && alias.Str() != "":
+		opts.RawSetString("model", alias)
+	case alias.IsTable():
+		providerModel := alias.Table().RawGetString("provider_model")
+		if providerModel.IsNil() {
+			providerModel = alias.Table().RawGetString("model")
+		}
+		if providerModel.IsString() && providerModel.Str() != "" {
+			opts.RawSetString("model", providerModel)
+		} else {
+			opts.RawSetString("model", model)
+		}
+	default:
+		opts.RawSetString("model", model)
+	}
 }
 
 func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) (LLMTurnResult, Value) {

@@ -40,7 +40,9 @@ runtime handles the default multi-turn loop
 
 ## 2. Keywords
 
-New reserved words:
+AI-native words are contextual soft keywords. They are only special in their
+syntax positions, so existing library and table code such as `llm.turn(...)`
+and `{budget: ...}` keeps working.
 
 ```text
 agent tool turn flow budget models

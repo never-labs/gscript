@@ -76,6 +76,15 @@ func (p *Parser) check(t lexer.TokenType) bool {
 	return p.peek().Type == t
 }
 
+func (p *Parser) checkIdent(value string) bool {
+	return p.peek().Type == lexer.TOKEN_IDENT && p.peek().Value == value
+}
+
+func (p *Parser) checkIdentAt(offset int, value string) bool {
+	tok := p.peekAt(offset)
+	return tok.Type == lexer.TOKEN_IDENT && tok.Value == value
+}
+
 func (p *Parser) match(types ...lexer.TokenType) bool {
 	for _, t := range types {
 		if p.check(t) {
@@ -125,6 +134,26 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 	switch p.peek().Type {
 	case lexer.TOKEN_FUNC:
 		return p.parseFuncDeclOrExprStmt()
+	case lexer.TOKEN_IDENT:
+		if p.peek().Value == "tool" && p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LPAREN {
+			return p.parseToolDeclStmt()
+		}
+		if p.peek().Value == "agent" &&
+			((p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LBRACE) ||
+				(p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(2).Type == lexer.TOKEN_LPAREN) ||
+				(p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(1).Value == "defaults" && p.peekAt(2).Type == lexer.TOKEN_LBRACE)) {
+			return p.parseAgentDeclOrExprStmt()
+		}
+		if p.peek().Value == "models" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
+			return p.parseModelsDeclStmt()
+		}
+		if p.peek().Value == "budget" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
+			return p.parseBudgetStmt()
+		}
+		if p.isLabelStmt() {
+			return p.parseLabelStmt()
+		}
+		return p.parseExpressionStmt()
 	case lexer.TOKEN_IF:
 		return p.parseIfStmt()
 	case lexer.TOKEN_FOR:
@@ -202,6 +231,98 @@ func (p *Parser) parseFuncDeclStmt() (ast.Stmt, error) {
 	}, nil
 }
 
+func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'tool'
+	pos := p.tokenPos(tok)
+
+	nameTok, err := p.expect(lexer.TOKEN_IDENT)
+	if err != nil {
+		return nil, err
+	}
+	params, err := p.parseFuncParams()
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.ToolDeclStmt{P: pos, Name: nameTok.Value, Params: params, Body: body}, nil
+}
+
+func (p *Parser) parseAgentDeclOrExprStmt() (ast.Stmt, error) {
+	if p.peekAt(1).Type == lexer.TOKEN_IDENT && p.peekAt(1).Value == "defaults" && p.peekAt(2).Type == lexer.TOKEN_LBRACE {
+		return p.parseAgentDefaultsDeclStmt()
+	}
+	if p.peekAt(1).Type == lexer.TOKEN_IDENT && (p.peekAt(2).Type == lexer.TOKEN_LPAREN || p.peekAt(2).Type == lexer.TOKEN_LBRACE) {
+		return p.parseAgentDeclStmt()
+	}
+	return p.parseExpressionStmt()
+}
+
+func (p *Parser) parseAgentDefaultsDeclStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'agent'
+	pos := p.tokenPos(tok)
+	p.advance() // consume 'defaults'
+	config, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.AgentDefaultsDeclStmt{P: pos, Config: config}, nil
+}
+
+func (p *Parser) parseAgentDeclStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'agent'
+	pos := p.tokenPos(tok)
+
+	nameTok, err := p.expect(lexer.TOKEN_IDENT)
+	if err != nil {
+		return nil, err
+	}
+
+	var params []ast.FuncParam
+	if p.check(lexer.TOKEN_LPAREN) {
+		params, err = p.parseFuncParams()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	config, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	flow, err := p.parseOptionalFlowBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.AgentDeclStmt{P: pos, Name: nameTok.Value, Params: params, Config: config, Flow: flow}, nil
+}
+
+func (p *Parser) parseModelsDeclStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'models'
+	pos := p.tokenPos(tok)
+	config, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.ModelsDeclStmt{P: pos, Config: config}, nil
+}
+
+func (p *Parser) parseBudgetStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'budget'
+	pos := p.tokenPos(tok)
+	config, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.BudgetStmt{P: pos, Config: config, Body: body}, nil
+}
+
 func (p *Parser) parseFuncParams() ([]ast.FuncParam, error) {
 	if _, err := p.expect(lexer.TOKEN_LPAREN); err != nil {
 		return nil, err
@@ -271,6 +392,88 @@ func (p *Parser) parseBlock() (*ast.BlockStmt, error) {
 	}
 
 	return block, nil
+}
+
+func (p *Parser) parseConfigBlock() ([]ast.ConfigField, error) {
+	if _, err := p.expect(lexer.TOKEN_LBRACE); err != nil {
+		return nil, err
+	}
+
+	var fields []ast.ConfigField
+	for !p.check(lexer.TOKEN_RBRACE) && !p.isAtEnd() {
+		p.skipSemicolons()
+		if p.check(lexer.TOKEN_RBRACE) {
+			break
+		}
+		field, err := p.parseConfigField()
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, field)
+		if p.check(lexer.TOKEN_COMMA) || p.check(lexer.TOKEN_SEMICOLON) {
+			p.advance()
+		}
+	}
+	if _, err := p.expect(lexer.TOKEN_RBRACE); err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
+func (p *Parser) parseConfigField() (ast.ConfigField, error) {
+	if p.check(lexer.TOKEN_IDENT) && p.peekAt(1).Type == lexer.TOKEN_COLON {
+		keyTok := p.advance()
+		p.advance()
+		value, err := p.parseExpr()
+		if err != nil {
+			return ast.ConfigField{}, err
+		}
+		return ast.ConfigField{
+			P:     p.tokenPos(keyTok),
+			Key:   &ast.StringLit{P: p.tokenPos(keyTok), Value: keyTok.Value},
+			Value: value,
+		}, nil
+	}
+	if p.check(lexer.TOKEN_STRING) && p.peekAt(1).Type == lexer.TOKEN_COLON {
+		keyTok := p.advance()
+		p.advance()
+		value, err := p.parseExpr()
+		if err != nil {
+			return ast.ConfigField{}, err
+		}
+		return ast.ConfigField{
+			P:     p.tokenPos(keyTok),
+			Key:   &ast.StringLit{P: p.tokenPos(keyTok), Value: keyTok.Value},
+			Value: value,
+		}, nil
+	}
+	if p.check(lexer.TOKEN_LBRACKET) {
+		p.advance()
+		key, err := p.parseExpr()
+		if err != nil {
+			return ast.ConfigField{}, err
+		}
+		if _, err := p.expect(lexer.TOKEN_RBRACKET); err != nil {
+			return ast.ConfigField{}, err
+		}
+		if _, err := p.expect(lexer.TOKEN_COLON); err != nil {
+			return ast.ConfigField{}, err
+		}
+		value, err := p.parseExpr()
+		if err != nil {
+			return ast.ConfigField{}, err
+		}
+		return ast.ConfigField{P: key.GetPos(), Key: key, Value: value}, nil
+	}
+	return ast.ConfigField{}, p.errorf("expected config field")
+}
+
+func (p *Parser) parseOptionalFlowBlock() (*ast.BlockStmt, error) {
+	if !p.checkIdent("flow") {
+		return nil, nil
+	}
+	p.advance()
+	return p.parseBlock()
 }
 
 func (p *Parser) parseIfStmt() (ast.Stmt, error) {
@@ -1363,6 +1566,15 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 		return &ast.VarArgExpr{P: p.tokenPos(tok)}, nil
 
 	case lexer.TOKEN_IDENT:
+		if tok.Value == "messages" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
+			return p.parseMessagesExpr()
+		}
+		if tok.Value == "agent" && (p.peekAt(1).Type == lexer.TOKEN_LPAREN || p.peekAt(1).Type == lexer.TOKEN_LBRACE) {
+			return p.parseAgentLitExpr()
+		}
+		if tok.Value == "turn" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
+			return p.parseTurnExpr()
+		}
 		p.advance()
 		return &ast.IdentExpr{P: p.tokenPos(tok), Name: tok.Value}, nil
 
@@ -1387,7 +1599,7 @@ func (p *Parser) parsePrimary() (ast.Expr, error) {
 		if p.isTypedDenseLitStart() {
 			return p.parseDenseLitExpr()
 		}
-		return nil, p.errorf("unexpected token %s (%q)", tok.Type, tok.Value)
+		return p.parseListLitExpr()
 
 	default:
 		return nil, p.errorf("unexpected token %s (%q)", tok.Type, tok.Value)
@@ -1413,6 +1625,74 @@ func (p *Parser) parseFuncLitExpr() (ast.Expr, error) {
 		Params: params,
 		Body:   body,
 	}, nil
+}
+
+func (p *Parser) parseAgentLitExpr() (ast.Expr, error) {
+	tok := p.advance() // consume 'agent'
+	pos := p.tokenPos(tok)
+
+	var params []ast.FuncParam
+	var err error
+	if p.check(lexer.TOKEN_LPAREN) {
+		params, err = p.parseFuncParams()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	config, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	flow, err := p.parseOptionalFlowBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.AgentLitExpr{P: pos, Params: params, Config: config, Flow: flow}, nil
+}
+
+func (p *Parser) parseTurnExpr() (ast.Expr, error) {
+	tok := p.advance() // consume 'turn'
+	config, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.TurnExpr{P: p.tokenPos(tok), Config: config}, nil
+}
+
+func (p *Parser) parseMessagesExpr() (ast.Expr, error) {
+	tok := p.advance() // consume 'messages'
+	fields, err := p.parseConfigBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.MessagesExpr{P: p.tokenPos(tok), Fields: fields}, nil
+}
+
+func (p *Parser) parseListLitExpr() (ast.Expr, error) {
+	tok := p.advance() // consume '['
+	pos := p.tokenPos(tok)
+	list := &ast.ListLitExpr{P: pos}
+	if !p.check(lexer.TOKEN_RBRACKET) {
+		for {
+			value, err := p.parseExpr()
+			if err != nil {
+				return nil, err
+			}
+			list.Values = append(list.Values, value)
+			if !p.check(lexer.TOKEN_COMMA) && !p.check(lexer.TOKEN_SEMICOLON) {
+				break
+			}
+			p.advance()
+			if p.check(lexer.TOKEN_RBRACKET) {
+				break
+			}
+		}
+	}
+	if _, err := p.expect(lexer.TOKEN_RBRACKET); err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 func (p *Parser) parseTableLitExpr() (ast.Expr, error) {

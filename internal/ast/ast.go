@@ -270,6 +270,72 @@ func (s *FuncDeclStmt) nodeType() string { return "FuncDeclStmt" }
 func (s *FuncDeclStmt) GetPos() Pos      { return s.P }
 func (s *FuncDeclStmt) stmtNode()        {}
 
+// ToolDeclStmt represents an AI tool declaration:
+// tool name(params) { body }
+type ToolDeclStmt struct {
+	P      Pos
+	Name   string
+	Params []FuncParam
+	Body   *BlockStmt
+}
+
+func (s *ToolDeclStmt) nodeType() string { return "ToolDeclStmt" }
+func (s *ToolDeclStmt) GetPos() Pos      { return s.P }
+func (s *ToolDeclStmt) stmtNode()        {}
+
+// AgentDeclStmt represents a named AI agent declaration.
+type AgentDeclStmt struct {
+	P      Pos
+	Name   string
+	Params []FuncParam
+	Config []ConfigField
+	Flow   *BlockStmt
+}
+
+func (s *AgentDeclStmt) nodeType() string { return "AgentDeclStmt" }
+func (s *AgentDeclStmt) GetPos() Pos      { return s.P }
+func (s *AgentDeclStmt) stmtNode()        {}
+
+// AgentDefaultsDeclStmt represents module-level default agent configuration:
+// agent defaults { ... }
+type AgentDefaultsDeclStmt struct {
+	P      Pos
+	Config []ConfigField
+}
+
+func (s *AgentDefaultsDeclStmt) nodeType() string { return "AgentDefaultsDeclStmt" }
+func (s *AgentDefaultsDeclStmt) GetPos() Pos      { return s.P }
+func (s *AgentDefaultsDeclStmt) stmtNode()        {}
+
+// ModelsDeclStmt represents a models { ... } declaration.
+type ModelsDeclStmt struct {
+	P      Pos
+	Config []ConfigField
+}
+
+func (s *ModelsDeclStmt) nodeType() string { return "ModelsDeclStmt" }
+func (s *ModelsDeclStmt) GetPos() Pos      { return s.P }
+func (s *ModelsDeclStmt) stmtNode()        {}
+
+// BudgetStmt represents a budget { ... } { body } statement.
+type BudgetStmt struct {
+	P      Pos
+	Config []ConfigField
+	Body   *BlockStmt
+}
+
+func (s *BudgetStmt) nodeType() string { return "BudgetStmt" }
+func (s *BudgetStmt) GetPos() Pos      { return s.P }
+func (s *BudgetStmt) stmtNode()        {}
+
+// ConfigField represents a field inside agent, turn, budget, models, or
+// messages blocks.
+type ConfigField struct {
+	P     Pos
+	Key   Expr
+	Value Expr
+}
+
 // BlockStmt represents a block of statements enclosed in braces.
 type BlockStmt struct {
 	P     Pos
@@ -438,6 +504,49 @@ type FuncLitExpr struct {
 func (e *FuncLitExpr) nodeType() string { return "FuncLitExpr" }
 func (e *FuncLitExpr) GetPos() Pos      { return e.P }
 func (e *FuncLitExpr) exprNode()        {}
+
+// AgentLitExpr represents an anonymous AI agent value.
+type AgentLitExpr struct {
+	P      Pos
+	Params []FuncParam
+	Config []ConfigField
+	Flow   *BlockStmt
+}
+
+func (e *AgentLitExpr) nodeType() string { return "AgentLitExpr" }
+func (e *AgentLitExpr) GetPos() Pos      { return e.P }
+func (e *AgentLitExpr) exprNode()        {}
+
+// TurnExpr represents a turn { ... } expression.
+type TurnExpr struct {
+	P      Pos
+	Config []ConfigField
+}
+
+func (e *TurnExpr) nodeType() string { return "TurnExpr" }
+func (e *TurnExpr) GetPos() Pos      { return e.P }
+func (e *TurnExpr) exprNode()        {}
+
+// MessagesExpr represents a messages { ... } constructor. It is kept as a
+// distinct node so later lowering can preserve message role order.
+type MessagesExpr struct {
+	P      Pos
+	Fields []ConfigField
+}
+
+func (e *MessagesExpr) nodeType() string { return "MessagesExpr" }
+func (e *MessagesExpr) GetPos() Pos      { return e.P }
+func (e *MessagesExpr) exprNode()        {}
+
+// ListLitExpr represents a list literal: [a, b, c].
+type ListLitExpr struct {
+	P      Pos
+	Values []Expr
+}
+
+func (e *ListLitExpr) nodeType() string { return "ListLitExpr" }
+func (e *ListLitExpr) GetPos() Pos      { return e.P }
+func (e *ListLitExpr) exprNode()        {}
 
 // TableLitExpr represents a table literal: {k: v, k2: v2, expr, ...}
 type TableLitExpr struct {

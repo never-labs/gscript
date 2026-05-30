@@ -14,6 +14,7 @@ import (
 
 // Compile compiles a top-level program into a FuncProto.
 func Compile(prog *ast.Program) (*FuncProto, error) {
+	prog = ast.DesugarAINative(prog)
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return nil, err
 	}

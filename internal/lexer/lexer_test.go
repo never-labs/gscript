@@ -280,6 +280,17 @@ func TestKeywords(t *testing.T) {
 	})
 }
 
+func TestAINativeSoftKeywordsRemainIdentifiers(t *testing.T) {
+	expectTokens(t, "agent tool turn flow budget models", []Token{
+		{Type: TOKEN_IDENT, Value: "agent"},
+		{Type: TOKEN_IDENT, Value: "tool"},
+		{Type: TOKEN_IDENT, Value: "turn"},
+		{Type: TOKEN_IDENT, Value: "flow"},
+		{Type: TOKEN_IDENT, Value: "budget"},
+		{Type: TOKEN_IDENT, Value: "models"},
+	})
+}
+
 func TestKeywordVsIdentifier(t *testing.T) {
 	// "funcX" should be an identifier, not keyword + ident
 	expectTokens(t, "funcX returning iffoo", []Token{

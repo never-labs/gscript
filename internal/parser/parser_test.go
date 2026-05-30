@@ -199,6 +199,109 @@ func TestConstDeclareStmt(t *testing.T) {
 	}
 }
 
+func TestAINativeSyntaxParses(t *testing.T) {
+	prog := mustParse(t, `
+models {
+    default: "glm-fast"
+    "glm-fast": {
+        provider: "glm"
+        protocol: "anthropic"
+        provider_model: "glm-5.1"
+        base_url: "https://open.bigmodel.cn/api/anthropic"
+        api_key: env("GLM_API_KEY")
+    }
+}
+
+agent defaults {
+    model: "glm-fast"
+    tools: [search_docs]
+}
+
+tool search_docs(query) {
+    return docs.search(query), nil
+}
+
+agent answer(q) {
+    system: "Answer briefly."
+    user: q
+}
+
+one := agent { user: "What is GScript?" }()
+manual := agent(q) {
+    tools: [search_docs]
+    user: q
+} flow {
+    r, err := turn {
+        messages: messages { user: q }
+        tools: tools
+    }
+    return r, err
+}
+`)
+	if len(prog.Stmts) != 6 {
+		t.Fatalf("statements = %d, want 6", len(prog.Stmts))
+	}
+	models, ok := prog.Stmts[0].(*ast.ModelsDeclStmt)
+	if !ok || len(models.Config) != 2 {
+		t.Fatalf("models stmt = %#v", prog.Stmts[0])
+	}
+	defaults, ok := prog.Stmts[1].(*ast.AgentDefaultsDeclStmt)
+	if !ok || len(defaults.Config) != 2 {
+		t.Fatalf("agent defaults stmt = %#v", prog.Stmts[1])
+	}
+	tool, ok := prog.Stmts[2].(*ast.ToolDeclStmt)
+	if !ok || tool.Name != "search_docs" || len(tool.Params) != 1 {
+		t.Fatalf("tool stmt = %#v", prog.Stmts[2])
+	}
+	agentDecl, ok := prog.Stmts[3].(*ast.AgentDeclStmt)
+	if !ok || agentDecl.Name != "answer" || len(agentDecl.Params) != 1 || len(agentDecl.Config) != 2 || agentDecl.Flow != nil {
+		t.Fatalf("agent stmt = %#v", prog.Stmts[3])
+	}
+	oneDecl, ok := prog.Stmts[4].(*ast.DeclareStmt)
+	if !ok || len(oneDecl.Values) != 1 {
+		t.Fatalf("one decl = %#v", prog.Stmts[4])
+	}
+	oneCall, ok := oneDecl.Values[0].(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("one value = %T, want CallExpr", oneDecl.Values[0])
+	}
+	if _, ok := oneCall.Func.(*ast.AgentLitExpr); !ok {
+		t.Fatalf("one call func = %T, want AgentLitExpr", oneCall.Func)
+	}
+	manualDecl, ok := prog.Stmts[5].(*ast.DeclareStmt)
+	if !ok || len(manualDecl.Values) != 1 {
+		t.Fatalf("manual decl = %#v", prog.Stmts[5])
+	}
+	manualAgent, ok := manualDecl.Values[0].(*ast.AgentLitExpr)
+	if !ok || len(manualAgent.Params) != 1 || len(manualAgent.Config) != 2 || manualAgent.Flow == nil {
+		t.Fatalf("manual agent = %#v", manualDecl.Values[0])
+	}
+}
+
+func TestListAndMessagesExpressionsParse(t *testing.T) {
+	prog := mustParse(t, `
+tools := [search_docs, read_url]
+history := messages {
+    system: "You are concise."
+    user: question
+    assistant: "ok"
+}
+`)
+	if len(prog.Stmts) != 2 {
+		t.Fatalf("statements = %d, want 2", len(prog.Stmts))
+	}
+	toolsDecl := prog.Stmts[0].(*ast.DeclareStmt)
+	list, ok := toolsDecl.Values[0].(*ast.ListLitExpr)
+	if !ok || len(list.Values) != 2 {
+		t.Fatalf("tools value = %#v", toolsDecl.Values[0])
+	}
+	historyDecl := prog.Stmts[1].(*ast.DeclareStmt)
+	messages, ok := historyDecl.Values[0].(*ast.MessagesExpr)
+	if !ok || len(messages.Fields) != 3 {
+		t.Fatalf("history value = %#v", historyDecl.Values[0])
+	}
+}
+
 func TestAssignStmt(t *testing.T) {
 	prog := mustParse(t, `x = 10`)
 	assign, ok := prog.Stmts[0].(*ast.AssignStmt)
