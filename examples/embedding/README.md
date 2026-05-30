@@ -24,6 +24,9 @@ their documented output in sync.
   globals, and statement/instruction budgeting with `WithMaxSteps`.
 - `Example_structuredErrors` covers structured script and host callback errors
   with standard `errors.As` and `errors.Is` handling.
+- `Example_llmProvider` covers the native `llm` module with a Go-provided
+  model backend, message constructors, tool descriptors, and script-side tool
+  dispatch.
 
 Package-level examples in `../../gscript/example_test.go` exercise the same
 public surface from the `gscript` package documentation.

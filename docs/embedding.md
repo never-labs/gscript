@@ -26,6 +26,8 @@ extensions:
 - Globals: `Set`, `Get`, `SetValue`, and `GetValue`.
 - Go binding: `RegisterFunc`, `RegisterTable`, `RegisterModule`, `BindStruct`,
   `BindStructWithConstructor`, and `BindMethod`.
+- Native LLM integration: `WithLLMProvider`, `WithLLMCommand`, and the `llm`
+  standard library module.
 - Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`, `SecuritySandbox`,
@@ -76,6 +78,50 @@ if err != nil {
     panic(err)
 }
 fmt.Println(prog.SourceName(), result)
+```
+
+## Native LLM integration
+
+The first-stage agent runtime is a normal standard library module named `llm`.
+It intentionally avoids new syntax: future `turn` / `tool` / `agent` keywords
+can compile to the same runtime surface.
+
+Go hosts install a backend:
+
+```go
+type Provider struct{}
+
+func (Provider) Turn(ctx context.Context, req gscript.LLMTurnRequest) (gscript.LLMTurnResult, error) {
+    return gscript.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
+}
+
+vm := gscript.New(gscript.WithLibs(gscript.LibString|gscript.LibLLM), gscript.WithLLMProvider(Provider{}))
+```
+
+Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:
+
+```gscript
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {description: "lookup documentation", params: {"name"}})
+
+tools := {lookup}
+result, err := llm.turn({
+    messages: {llm.system("Use tools."), llm.user("find docs")},
+    tools: tools,
+})
+if err != nil { return nil, err }
+
+if result.status == "tool_calls" {
+    value, tool_err := llm.dispatch(result.calls[1], tools)
+}
+```
+
+For local command-backed experiments, `WithLLMCommand` can wrap an executable
+such as `glm_cc`:
+
+```go
+vm := gscript.New(gscript.WithLLMCommand("glm_cc", "--print", "--bare"))
 ```
 
 Structured errors use standard Go error APIs:

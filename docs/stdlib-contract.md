@@ -58,6 +58,7 @@ JIT fast path policy:
 | `http` | Privileged host | HTTP client/server, listener lifecycle, request/response I/O | runtime error for bad arguments; `nil, err` or result table for network/server failures | runtime specialization for stdlib host driver cases; VM fallback |
 | `io` | Privileged host | process stdio and file handles | runtime error for bad arguments; `nil, err` for file/stream failures; sentinel for EOF | VM fallback |
 | `json` | Pure | none; JSON codec over strings/tables | runtime error for bad arguments; `nil, err` for malformed JSON or unsupported values | runtime specialization for stdlib host driver cases; VM fallback |
+| `llm` | Bounded host | host-provided model backend through `WithLLMProvider` or command adapter | runtime error for bad argument shape; `(nil, err-table)` for provider/validation failures; result table for turns | VM callback and VM fallback |
 | `log` | Bounded host | in-process log sink and log level state | runtime error; sentinel empty data for no records | VM fallback |
 | `math` | Pure | none; numeric functions and constants | runtime error | intrinsic for `sqrt`/`floor`; native identity/FastArg paths for selected functions |
 | `matrix` | Pure | in-process dense matrix allocation and numeric kernels | runtime error | native matrix/table fast paths where recognized; VM fallback |

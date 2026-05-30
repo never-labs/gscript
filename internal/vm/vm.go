@@ -116,6 +116,7 @@ type VM struct {
 	networkAccess        bool
 	debugAccess          bool
 	testkitAccess        bool
+	llmProvider          runtime.LLMProvider
 	ctx                  context.Context
 }
 
@@ -189,6 +190,10 @@ func (vm *VM) SetDynamicEval(enabled bool) {
 // SetNetworkAccess controls host-backed network APIs in net and http.
 func (vm *VM) SetNetworkAccess(enabled bool) {
 	vm.networkAccess = enabled
+}
+
+func (vm *VM) SetLLMProvider(provider runtime.LLMProvider) {
+	vm.llmProvider = provider
 }
 
 // SetDebugAccess controls script-side debug APIs. Internal debug frame
@@ -858,6 +863,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterSortCallbackLib()
 	v.RegisterTableHigherOrderLib()
 	v.RegisterStringLib()
+	v.RegisterLLMLib()
 	v.RegisterHTTPLib()
 	v.RegisterDebugLib()
 	v.RegisterSyncLib()
@@ -907,6 +913,7 @@ func newChildVM(parent *VM, co *VMCoroutine) *VM {
 		networkAccess:      parent.networkAccess,
 		debugAccess:        parent.debugAccess,
 		testkitAccess:      parent.testkitAccess,
+		llmProvider:        parent.llmProvider,
 	}
 	child.initTypeNameValues()
 	child.setGlobalOverride("coroutine", runtime.TableValue(child.newCoroutineLib()))
@@ -1010,6 +1017,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterSortCallbackLib()
 	child.RegisterTableHigherOrderLib()
 	child.RegisterStringLib()
+	child.RegisterLLMLib()
 	child.RegisterHTTPLib()
 	child.RegisterDebugLib()
 	child.RegisterSyncLib()

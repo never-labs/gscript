@@ -1,6 +1,7 @@
 package embedding_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,22 @@ import (
 
 	gs "github.com/gscript/gscript/gscript"
 )
+
+type exampleLLMProvider struct{}
+
+func (exampleLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+	if len(req.Tools) > 0 {
+		return gs.LLMTurnResult{
+			Status: "tool_calls",
+			Calls: []gs.LLMToolCall{{
+				ID:   "call_1",
+				Tool: req.Tools[0].Name,
+				Args: map[string]any{"name": "gscript"},
+			}},
+		}, nil
+	}
+	return gs.LLMTurnResult{Status: "final_answer", Text: "hello"}, nil
+}
 
 func Example_compileRun() {
 	prog, err := gs.Compile(`
@@ -113,6 +130,32 @@ result := strings.upper("hello")
 
 	// Output:
 	// HELLO
+}
+
+func Example_llmProvider() {
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(exampleLLMProvider{}))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {description: "lookup documentation", params: {"name"}})
+
+tools := {lookup}
+result, err := llm.turn({
+    messages: {llm.system("Use tools."), llm.user("find docs")},
+    tools: tools,
+})
+answer, dispatch_err := llm.dispatch(result.calls[1], tools)
+`); err != nil {
+		panic(err)
+	}
+	answer, err := vm.Get("answer")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(answer)
+
+	// Output:
+	// docs:gscript
 }
 
 func Example_hotLoader() {

@@ -1,5 +1,7 @@
 package runtime
 
+import "context"
+
 var stdlibModuleNames = []string{
 	"base64",
 	"array",
@@ -20,6 +22,7 @@ var stdlibModuleNames = []string{
 	"http",
 	"io",
 	"json",
+	"llm",
 	"log",
 	"math",
 	"matrix",
@@ -107,6 +110,18 @@ func (interp *Interpreter) registerStdlib() {
 	// --- Data formats ---
 	interp.globals.Define("csv", TableValue(buildCSVLib(interp)))
 	interp.globals.Define("url", TableValue(buildURLLib(interp)))
+
+	// --- AI model integration ---
+	interp.globals.Define("llm", TableValue(BuildLLMLib(interp.callFunction, func() LLMProvider {
+		return interp.llmProvider
+	}, func() int64 {
+		return interp.maxHostResult
+	}, func() context.Context {
+		if interp.ctx == nil {
+			return context.Background()
+		}
+		return interp.ctx
+	})))
 
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))

@@ -98,6 +98,9 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxFilesystemWriteBytes(o.maxFSWriteBytes)
 		o.useJIT = false
 	}
+	if o.llmProvider != nil {
+		interp.SetLLMProvider(llmProviderAdapter{provider: o.llmProvider})
+	}
 
 	// Override print if requested
 	if o.printFunc != nil {
@@ -222,6 +225,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
 			bvm.SetDebugAccess(vm.opts.debugAccess)
 			bvm.SetTestkitAccess(vm.opts.testkitAccess)
+			if vm.opts.llmProvider != nil {
+				bvm.SetLLMProvider(llmProviderAdapter{provider: vm.opts.llmProvider})
+			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
 			}
@@ -325,6 +331,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"http":      libs&LibHTTP != 0,
 		"io":        libs&LibIO != 0,
 		"json":      libs&LibJSON != 0,
+		"llm":       libs&LibLLM != 0,
 		"log":       libs&LibLog != 0,
 		"math":      libs&LibMath != 0,
 		"matrix":    libs&LibMatrix != 0,

@@ -3,6 +3,7 @@ package vm
 // Standard-library registration and lib-builder helpers, split verbatim from vm.go.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gscript/gscript/internal/runtime"
@@ -1189,6 +1190,21 @@ func (vm *VM) RegisterStringLib() {
 	meta.RawSet(runtime.StringValue("__index"), runtime.TableValue(strLib))
 	vm.stringMeta = meta
 	vm.setPackageLoaded("string", runtime.TableValue(strLib))
+}
+
+func (vm *VM) RegisterLLMLib() {
+	llmLib := runtime.TableValue(runtime.BuildLLMLib(vm.callValue, func() runtime.LLMProvider {
+		return vm.llmProvider
+	}, func() int64 {
+		return vm.maxHostResult
+	}, func() context.Context {
+		if vm.ctx == nil {
+			return context.Background()
+		}
+		return vm.ctx
+	}))
+	vm.SetGlobal("llm", llmLib)
+	vm.setPackageLoaded("llm", llmLib)
 }
 
 func (vm *VM) RegisterHTTPLib() {

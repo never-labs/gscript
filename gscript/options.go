@@ -44,6 +44,7 @@ const (
 	LibLog                            // log.*
 	LibArray                          // array.* dense arrays
 	LibSoA                            // soa.* structure-of-arrays
+	LibLLM                            // llm.* native model/tool integration
 
 	LibRL = LibGL // compatibility alias for the registered rl.* module
 
@@ -55,7 +56,7 @@ const (
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
 		LibProcess | LibScript | LibDebug | LibTestkit | LibMatrix |
 		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
-		LibContainer | LibLog | LibArray | LibSoA
+		LibContainer | LibLog | LibArray | LibSoA | LibLLM
 
 	// LibSafe is a sandboxed subset with no I/O, network, or system access.
 	LibSafe = LibString | LibTable | LibMath | LibCoroutine |
@@ -71,7 +72,8 @@ const (
 		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
 		LibBytes | LibCSV | LibURL | LibUUID | LibProcess | LibScript |
 		LibDebug | LibMatrix | LibRand | LibSort | LibEncoding |
-		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA
+		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA |
+		LibLLM
 
 	// LibGame is a preset for game development (no I/O, includes GL/vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |
@@ -126,6 +128,7 @@ type vmOptions struct {
 	maxFSReadBytes  int64
 	maxFSWriteBytes int64
 	printFunc       func(args ...interface{})
+	llmProvider     LLMProvider
 	useVM           bool // use bytecode VM instead of tree-walker
 	useJIT          bool // enable JIT compilation (implies useVM)
 }

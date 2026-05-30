@@ -34,6 +34,7 @@ type Interpreter struct {
 	processShell      bool             // process.shell is enabled
 	debugAccess       bool             // script-side debug APIs are enabled
 	testkitAccess     bool             // script-side testkit APIs are enabled
+	llmProvider       LLMProvider      // optional host-provided model backend
 	currentSourceName string           // source name for diagnostics while executing parsed source
 	args              []string         // current script entrypoint args: [0]=script, [1:]=user args
 	callStack         []DebugFrame     // active runtime calls, oldest to newest
@@ -361,6 +362,12 @@ func (interp *Interpreter) SetMaxChannelCapacity(max int64) {
 // single native Go call. A non-positive value disables the limit.
 func (interp *Interpreter) SetMaxHostResultBytes(max int64) {
 	interp.maxHostResult = max
+}
+
+// SetLLMProvider sets the host-provided model backend used by the llm
+// standard library. A nil provider leaves llm.turn unavailable.
+func (interp *Interpreter) SetLLMProvider(provider LLMProvider) {
+	interp.llmProvider = provider
 }
 
 // SetMaxModuleBytes limits bytes read by script-side file loading APIs such as

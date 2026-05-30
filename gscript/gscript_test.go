@@ -25,6 +25,23 @@ type hostModuleService struct {
 	count  int64
 }
 
+type mockLLMProvider struct {
+	last gs.LLMTurnRequest
+	res  gs.LLMTurnResult
+	err  error
+}
+
+func (p *mockLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+	p.last = req
+	if p.err != nil {
+		return gs.LLMTurnResult{}, p.err
+	}
+	if p.res.Status != "" || p.res.Text != "" || len(p.res.Calls) > 0 {
+		return p.res, nil
+	}
+	return gs.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
+}
+
 func (s *hostModuleService) Label(id int64) string {
 	return fmt.Sprintf("%s-%03d", s.Prefix, id)
 }
@@ -32,6 +49,112 @@ func (s *hostModuleService) Label(id int64) string {
 func (s *hostModuleService) Bump() int64 {
 	s.count++
 	return s.count
+}
+
+func TestLLMTurnWithMockProvider(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{
+				Status: "tool_calls",
+				Calls: []gs.LLMToolCall{{
+					ID:   "call_1",
+					Tool: "lookup",
+					Args: map[string]any{"query": "gscript"},
+				}},
+				Usage: gs.LLMTurnUsage{InputTokens: 3, OutputTokens: 4},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+lookup := llm.tool("lookup", func(query) {
+    return query, nil
+}, {description: "lookup docs", params: {"query"}})
+tools := {lookup}
+value := nil
+dispatch_err := nil
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.system("Be concise."), llm.user("search gscript")},
+    tools: tools,
+    max_tokens: 64,
+})
+value, dispatch_err = llm.dispatch(result.calls[1], tools)
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if provider.last.Model != "mock-fast" {
+				t.Fatalf("model = %q", provider.last.Model)
+			}
+			if len(provider.last.Messages) != 2 || provider.last.Messages[0].Role != "system" || provider.last.Messages[1].Text != "search gscript" {
+				t.Fatalf("messages = %#v", provider.last.Messages)
+			}
+			if len(provider.last.Tools) != 1 || provider.last.Tools[0].Name != "lookup" || provider.last.Tools[0].Description != "lookup docs" {
+				t.Fatalf("tools = %#v", provider.last.Tools)
+			}
+			got, err := vm.Get("value")
+			if err != nil {
+				t.Fatalf("Get value: %v", err)
+			}
+			if got != "gscript" {
+				rawDispatchErr, _ := vm.Get("dispatch_err")
+				t.Fatalf("value = %#v dispatch_err=%#v", got, rawDispatchErr)
+			}
+			dispatchErr, err := vm.Get("dispatch_err")
+			if err != nil {
+				t.Fatalf("Get dispatch_err: %v", err)
+			}
+			if dispatchErr != nil {
+				t.Fatalf("dispatch_err = %#v", dispatchErr)
+			}
+		})
+	}
+}
+
+func TestLLMTurnWithoutProviderReturnsError(t *testing.T) {
+	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibLLM))
+	if err := vm.Exec(`
+result, err := llm.turn({messages: {llm.user("hi")}})
+kind := err.kind
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	got, err := vm.Get("kind")
+	if err != nil {
+		t.Fatalf("Get kind: %v", err)
+	}
+	if got != "provider" {
+		t.Fatalf("kind = %#v", got)
+	}
+}
+
+func TestLLMCommandProvider(t *testing.T) {
+	vm := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithLLMCommand("sh", "-c", `printf 'mock:%s' "$0"`),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({messages: {llm.user("hello")}})
+text := result.text
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	got, err := vm.Get("text")
+	if err != nil {
+		t.Fatalf("Get text: %v", err)
+	}
+	if got != "mock:User: hello" {
+		t.Fatalf("text = %#v", got)
+	}
 }
 
 // --- Basic VM tests ---
