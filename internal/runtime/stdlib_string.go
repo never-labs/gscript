@@ -157,7 +157,7 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 	// strings from the conventional string namespace. The canonical API is the
 	// binary library; these are compatibility entry points, not Lua format
 	// string clones.
-	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("string.pack", args) })
+	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("string.pack", args, 0) })
 	set("unpack", func(args []Value) ([]Value, error) { return binaryUnpackValues("string.unpack", args) })
 	set("packsize", func(args []Value) ([]Value, error) { return binarySizeValues("string.packsize", args) })
 

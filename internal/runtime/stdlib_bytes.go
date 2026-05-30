@@ -10,8 +10,18 @@ import (
 )
 
 // buildBytesLib creates the "bytes" standard library table.
-func buildBytesLib() *Table {
+func buildBytesLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -119,11 +129,17 @@ func buildBytesLib() *Table {
 
 		// buf.toString() -- get buffer content as string
 		setMethod("toString", func(args []Value) ([]Value, error) {
+			if err := CheckProjectedHostStringBytes(maxHostResult(), buf.Len()); err != nil {
+				return nil, err
+			}
 			return []Value{StringValue(buf.String())}, nil
 		})
 
 		// buf.toHex() -- get buffer content as hex string
 		setMethod("toHex", func(args []Value) ([]Value, error) {
+			if err := CheckProjectedHostStringBytes(maxHostResult(), hex.EncodedLen(buf.Len())); err != nil {
+				return nil, err
+			}
 			return []Value{StringValue(hex.EncodeToString(buf.Bytes()))}, nil
 		})
 
@@ -154,7 +170,7 @@ func buildBytesLib() *Table {
 				return nil, fmt.Errorf("bad argument to 'buffer.readString'")
 			}
 			from := int(toInt(args[0])) - 1 // convert to 0-based
-			to := int(toInt(args[1]))        // 1-based inclusive, so to becomes exclusive in Go
+			to := int(toInt(args[1]))       // 1-based inclusive, so to becomes exclusive in Go
 			data := buf.Bytes()
 			if from < 0 {
 				from = 0
@@ -164,6 +180,9 @@ func buildBytesLib() *Table {
 			}
 			if from >= to {
 				return []Value{StringValue("")}, nil
+			}
+			if err := CheckProjectedHostStringBytes(maxHostResult(), to-from); err != nil {
+				return nil, err
 			}
 			return []Value{StringValue(string(data[from:to]))}, nil
 		})
@@ -217,6 +236,9 @@ func buildBytesLib() *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'bytes.toHex' (string expected)")
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), hex.EncodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
+		}
 		return []Value{StringValue(hex.EncodeToString([]byte(args[0].Str())))}, nil
 	})
 
@@ -229,6 +251,9 @@ func buildBytesLib() *Table {
 		s2 := []byte(args[1].Str())
 		if len(s1) != len(s2) {
 			return nil, fmt.Errorf("bytes.xor: strings must have equal length (got %d and %d)", len(s1), len(s2))
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(s1)); err != nil {
+			return nil, err
 		}
 		result := make([]byte, len(s1))
 		for i := range s1 {
@@ -256,15 +281,26 @@ func buildBytesLib() *Table {
 		if n <= 0 {
 			return []Value{StringValue("")}, nil
 		}
+		if len(s) > 0 && n > int(^uint(0)>>1)/len(s) {
+			if maxHostResult() > 0 {
+				return nil, fmt.Errorf("host result byte limit exceeded (%d)", maxHostResult())
+			}
+			return nil, fmt.Errorf("bytes.repeat: result too large")
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(s)*n); err != nil {
+			return nil, err
+		}
 		return []Value{StringValue(strings.Repeat(s, n))}, nil
 	})
 
 	// bytes.concat(...) -- concatenate multiple strings/buffers
 	set("concat", func(args []Value) ([]Value, error) {
-		var buf bytes.Buffer
+		buf := newHostResultBuffer(maxHostResult())
 		for _, a := range args {
 			if a.IsString() {
-				buf.WriteString(a.Str())
+				if _, err := buf.Write([]byte(a.Str())); err != nil {
+					return nil, err
+				}
 			} else if a.IsTable() {
 				// Try to call toString on the table (buffer)
 				toStr := a.Table().RawGet(StringValue("toString"))
@@ -275,12 +311,16 @@ func buildBytesLib() *Table {
 							return nil, err
 						}
 						if len(results) > 0 {
-							buf.WriteString(results[0].String())
+							if _, err := buf.Write([]byte(results[0].String())); err != nil {
+								return nil, err
+							}
 						}
 					}
 				}
 			} else {
-				buf.WriteString(a.String())
+				if _, err := buf.Write([]byte(a.String())); err != nil {
+					return nil, err
+				}
 			}
 		}
 		return []Value{StringValue(buf.String())}, nil

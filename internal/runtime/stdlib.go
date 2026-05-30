@@ -110,8 +110,8 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
-	interp.globals.Define("binary", TableValue(buildBinaryLib()))
+	interp.globals.Define("bytes", TableValue(buildBytesLib(interp)))
+	interp.globals.Define("binary", TableValue(buildBinaryLib(interp)))
 
 	// --- Game math ---
 	interp.globals.Define("vec", TableValue(buildVecLib()))

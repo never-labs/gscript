@@ -617,6 +617,38 @@ func TestWithMaxHostResultBytesLimitsCSVEncoding(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsBytesAndBinaryOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, src := range []string{
+				`buf := bytes.fromString("12345"); value := buf.toString()`,
+				`buf := bytes.fromString("123"); value := buf.toHex()`,
+				`value := bytes.toHex("123")`,
+				`value := bytes.repeat("12", 3)`,
+				`value := bytes.concat("12", "345")`,
+				`value := binary.pack("bytes:5", "12345")`,
+			} {
+				opts := append([]gs.Option{
+					gs.WithLibs(gs.LibString | gs.LibBytes | gs.LibBinary),
+					gs.WithMaxHostResultBytes(4),
+				}, tc.opts...)
+				vm := gs.New(opts...)
+				err := vm.Exec(src)
+				var budgetErr *gs.BudgetError
+				if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+					t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+				}
+			}
+		})
+	}
+}
+
 func TestWithMaxHostResultBytesLimitsCompressDecodeExpansion(t *testing.T) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)

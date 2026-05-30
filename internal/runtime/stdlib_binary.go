@@ -1,9 +1,9 @@
 package runtime
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
@@ -20,8 +20,18 @@ type binaryFormat struct {
 }
 
 // buildBinaryLib creates the "binary" standard library table.
-func buildBinaryLib() *Table {
+func buildBinaryLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -38,7 +48,7 @@ func buildBinaryLib() *Table {
 	// i8/u8/i16/u16/i32/u32/i64/u64/f32/f64/string/str/bytes.
 	// string and bytes are length-prefixed with a u32 unless written as
 	// string:N or bytes:N, which encodes exactly N raw bytes.
-	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("binary.pack", args) })
+	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("binary.pack", args, maxHostResult()) })
 
 	// binary.unpack(format, data [, offset]) -> values..., nextOffset
 	// Offset is 1-based, matching GScript string positions.
@@ -50,7 +60,7 @@ func buildBinaryLib() *Table {
 	return t
 }
 
-func binaryPackValues(apiName string, args []Value) ([]Value, error) {
+func binaryPackValues(apiName string, args []Value, maxHostResult int64) ([]Value, error) {
 	if len(args) < 1 || !args[0].IsString() {
 		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
 	}
@@ -61,9 +71,9 @@ func binaryPackValues(apiName string, args []Value) ([]Value, error) {
 	if len(args)-1 != len(format.fields) {
 		return nil, fmt.Errorf("%s: got %d values for %d fields", apiName, len(args)-1, len(format.fields))
 	}
-	var buf bytes.Buffer
+	buf := newHostResultBuffer(maxHostResult)
 	for i, field := range format.fields {
-		if err := packBinaryField(&buf, format.order, field, args[i+1]); err != nil {
+		if err := packBinaryField(buf, format.order, field, args[i+1]); err != nil {
 			return nil, fmt.Errorf("%s", strings.Replace(err.Error(), "binary.pack", apiName, 1))
 		}
 	}
@@ -214,20 +224,22 @@ func binaryFieldSize(field binaryField) (int, bool) {
 	}
 }
 
-func packBinaryField(buf *bytes.Buffer, order binary.ByteOrder, field binaryField, value Value) error {
+func packBinaryField(buf io.Writer, order binary.ByteOrder, field binaryField, value Value) error {
 	switch field.kind {
 	case "i8", "int8":
 		n, err := requireSigned(value, -128, 127)
 		if err != nil {
 			return err
 		}
-		return buf.WriteByte(byte(int8(n)))
+		_, err = buf.Write([]byte{byte(int8(n))})
+		return err
 	case "u8", "uint8":
 		n, err := requireUnsigned(value, math.MaxUint8)
 		if err != nil {
 			return err
 		}
-		return buf.WriteByte(byte(n))
+		_, err = buf.Write([]byte{byte(n)})
+		return err
 	case "i16", "int16":
 		n, err := requireSigned(value, math.MinInt16, math.MaxInt16)
 		if err != nil {
