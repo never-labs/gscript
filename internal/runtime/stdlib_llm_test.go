@@ -13,10 +13,16 @@ import (
 type testLLMProvider struct {
 	requests []LLMTurnRequest
 	res      LLMTurnResult
+	results  []LLMTurnResult
 }
 
 func (p *testLLMProvider) Turn(_ context.Context, req LLMTurnRequest) (LLMTurnResult, error) {
 	p.requests = append(p.requests, req)
+	if len(p.results) > 0 {
+		res := p.results[0]
+		p.results = p.results[1:]
+		return res, nil
+	}
 	return p.res, nil
 }
 
@@ -158,5 +164,83 @@ err_message := err.message
 	}
 	if got := interp.GetGlobal("err_message"); !got.IsString() || !strings.Contains(got.Str(), `field "items[2].score" has type string, want number`) {
 		t.Fatalf("err_message = %v, want array element score type mismatch", got)
+	}
+}
+
+func TestLLMRunAgentOutputRepairRetrySucceeds(t *testing.T) {
+	provider := &testLLMProvider{results: []LLMTurnResult{
+		{Status: "final_answer", Text: `{"name":"Ada"}`},
+		{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`},
+	}}
+	interp := New()
+	interp.llmProvider = provider
+
+	if err := interp.Exec(parseLLMTestProgram(t, `
+result, err := llm.run_agent({
+    model: "mock-json"
+    messages: {llm.user("Extract the contact.")}
+    output: {
+        name: "Ada"
+        email: "ada@example.com"
+    }
+    output_retries: 1
+})
+email := result.value.email
+err_is_nil := err == nil
+`)); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	if got := interp.GetGlobal("err_is_nil"); !got.Truthy() {
+		t.Fatalf("err_is_nil = %v, want true", got)
+	}
+	if got := interp.GetGlobal("email"); !got.IsString() || got.Str() != "ada@example.com" {
+		t.Fatalf("email = %v, want ada@example.com", got)
+	}
+	if len(provider.requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(provider.requests))
+	}
+	if len(provider.requests[1].Messages) != 2 {
+		t.Fatalf("repair message count = %d, want 2", len(provider.requests[1].Messages))
+	}
+	repairPrompt := provider.requests[1].Messages[1].Text
+	if !strings.Contains(repairPrompt, `missing field "email"`) || !strings.Contains(repairPrompt, `{"name":"Ada"}`) {
+		t.Fatalf("repair prompt = %q, want validation error and previous response", repairPrompt)
+	}
+}
+
+func TestLLMRunAgentOutputRepairConsumesTurnBudget(t *testing.T) {
+	provider := &testLLMProvider{results: []LLMTurnResult{
+		{Status: "final_answer", Text: `{"name":"Ada"}`},
+		{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`},
+	}}
+	interp := New()
+	interp.llmProvider = provider
+
+	if err := interp.Exec(parseLLMTestProgram(t, `
+result, err := llm.run_agent({
+    model: "mock-json"
+    messages: {llm.user("Extract the contact.")}
+    output: {
+        name: "Ada"
+        email: "ada@example.com"
+    }
+    output_retries: 1
+    budget: {turns: 1}
+})
+err_kind := err.kind
+err_dimension := err.dimension
+`)); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != "budget" {
+		t.Fatalf("err_kind = %v, want budget", got)
+	}
+	if got := interp.GetGlobal("err_dimension"); !got.IsString() || got.Str() != "turns" {
+		t.Fatalf("err_dimension = %v, want turns", got)
+	}
+	if len(provider.requests) != 1 {
+		t.Fatalf("requests = %d, want 1 because repair is blocked by turn budget", len(provider.requests))
 	}
 }

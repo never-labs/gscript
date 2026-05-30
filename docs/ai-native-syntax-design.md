@@ -510,8 +510,14 @@ Rules:
   checks from example values for string, number, bool, object, and array fields.
   For arrays, the first hinted element is used as the shape for returned items.
 - On success, decoded structured data is placed in `result.value`.
-- On validation failure, runtime may perform bounded repair according to host
-  policy; if repair fails, return `err.kind == "validation"`.
+- By default, validation failure returns `err.kind == "validation"` without an
+  extra model call.
+- `output_repair: true` enables one repair turn. `output_retries: N` enables up
+  to `N` repair turns. The repair turn appends a prompt containing the
+  validation error, output shape example, and previous response, then asks the
+  model to return only matching JSON. Repair turns use the same provider path,
+  response format, trace events, cancellation, and LLM budget counters as normal
+  `llm.react` turns.
 
 Current implementation note: direct `turn { response_format: ... }` is lowered
 to `llm.turn` and forwarded to the provider request. Agent-level table
@@ -519,8 +525,8 @@ to `llm.turn` and forwarded to the provider request. Agent-level table
 {type: "json_object"}` when no explicit `response_format` is present, and a
 final JSON object/table response is decoded into `result.value`. Invalid JSON,
 missing hinted fields, and deep field type mismatches return
-`err.kind == "validation"`. Nested schema generation and repair remain pending
-runtime work.
+`err.kind == "validation"` unless `output_repair` or `output_retries` is set.
+Nested schema generation remains pending runtime work.
 
 ## 11. History And Call Options
 

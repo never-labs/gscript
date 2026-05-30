@@ -2,11 +2,62 @@ package gscript_test
 
 import (
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
 	gs "github.com/gscript/gscript/gscript"
 )
+
+func TestAINativeDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
+	cases := []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	}
+	if goruntime.GOOS == "darwin" && goruntime.GOARCH == "arm64" {
+		cases = append(cases, struct {
+			name string
+			opts []gs.Option
+		}{name: "jit", opts: []gs.Option{gs.WithJIT()}})
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "ok"}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+history := messages {
+    system: "Keep this system prompt."
+    user: "Keep this user prompt."
+}
+result, err := turn {
+    model: "mock-chat"
+    messages: history
+}
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			req := provider.requests[0]
+			if len(req.Messages) != 2 {
+				t.Fatalf("messages = %#v, want 2 messages", req.Messages)
+			}
+			if req.Messages[0].Role != "system" || strings.TrimSpace(req.Messages[0].Text) == "" {
+				t.Fatalf("system message = %#v", req.Messages[0])
+			}
+			if req.Messages[1].Role != "user" || strings.TrimSpace(req.Messages[1].Text) == "" {
+				t.Fatalf("user message = %#v", req.Messages[1])
+			}
+		})
+	}
+}
 
 func TestAINativeAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
 	for _, tc := range []struct {
@@ -246,6 +297,139 @@ history_len := out.history_len
 			historyLen, _ := vm.Get("history_len")
 			if firstStatus != "tool_calls" || finalText != "Agents need explicit history." || toolValue != "note:agents" || historyLen != int64(4) {
 				t.Fatalf("first_status=%#v final_text=%#v tool_value=%#v history_len=%#v", firstStatus, finalText, toolValue, historyLen)
+			}
+		})
+	}
+}
+
+func TestAINativeAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_delegate_1",
+						Tool: "delegate_research",
+						Args: map[string]any{"topic": "agent handoff"},
+					}},
+				},
+				{
+					Status: "final_answer",
+					Text:   `{"summary":"Agents can be delegated as tools","confidence":0.91}`,
+				},
+				{Status: "final_answer", Text: "Use delegated research: Agents can be delegated as tools."},
+			}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract_research(topic) {
+    model: "mock-extractor"
+    system: "Extract a structured research handoff."
+    user: "Research " .. topic
+    output: {
+        summary: "short finding"
+        confidence: 1
+    }
+}
+
+// gscript:requires none
+tool delegate_research(topic) {
+    result, err := extract_research(topic)
+    if err != nil {
+        return nil, err
+    }
+    return {
+        topic: topic
+        summary: result.value.summary
+        confidence: result.value.confidence
+    }, nil
+}
+
+agent supervisor(question) {
+    model: "mock-supervisor"
+    system: "Use delegated specialist agents as tools before answering."
+    user: question
+    tools: [delegate_research]
+}
+
+result, err := supervisor("Should this workflow delegate research?")
+final_text := result.text
+outer_history_len := #result.history
+tool_summary := result.history[4].value.summary
+tool_topic := result.history[4].value.topic
+tool_confidence := result.history[4].value.confidence
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 3 {
+				t.Fatalf("requests = %d, want 3", len(provider.requests))
+			}
+			first := provider.requests[0]
+			if first.Model != "mock-supervisor" || len(first.Tools) != 1 || first.Tools[0].Name != "delegate_research" {
+				t.Fatalf("first request = %#v", first)
+			}
+			if len(first.Messages) != 2 ||
+				first.Messages[0].Role != "system" || first.Messages[0].Text != "Use delegated specialist agents as tools before answering." ||
+				first.Messages[1].Role != "user" || first.Messages[1].Text != "Should this workflow delegate research?" {
+				t.Fatalf("first messages = %#v", first.Messages)
+			}
+
+			nested := provider.requests[1]
+			if nested.Model != "mock-extractor" || len(nested.Tools) != 0 {
+				t.Fatalf("nested request = %#v", nested)
+			}
+			if len(nested.Messages) != 2 ||
+				nested.Messages[0].Role != "system" || nested.Messages[0].Text != "Extract a structured research handoff." ||
+				nested.Messages[1].Role != "user" || nested.Messages[1].Text != "Research agent handoff" {
+				t.Fatalf("nested messages = %#v", nested.Messages)
+			}
+			format, ok := nested.ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_object" {
+				t.Fatalf("nested response_format = %#v", nested.ResponseFormat)
+			}
+
+			final := provider.requests[2]
+			if final.Model != "mock-supervisor" || len(final.Tools) != 1 || final.Tools[0].Name != "delegate_research" {
+				t.Fatalf("final request = %#v", final)
+			}
+			if len(final.Messages) != 4 ||
+				final.Messages[2].Role != "assistant" || final.Messages[2].ToolCall == nil ||
+				final.Messages[2].ToolCall.ID != "call_delegate_1" ||
+				final.Messages[3].Role != "tool" || final.Messages[3].ToolUseID != "call_delegate_1" {
+				t.Fatalf("final messages = %#v", final.Messages)
+			}
+			toolValue, ok := final.Messages[3].Value.(map[string]any)
+			if !ok {
+				t.Fatalf("tool result value = %#v", final.Messages[3].Value)
+			}
+			if toolValue["topic"] != "agent handoff" ||
+				toolValue["summary"] != "Agents can be delegated as tools" ||
+				toolValue["confidence"] != 0.91 {
+				t.Fatalf("tool result value = %#v", toolValue)
+			}
+
+			for name, want := range map[string]any{
+				"final_text":        "Use delegated research: Agents can be delegated as tools.",
+				"outer_history_len": int64(4),
+				"tool_summary":      "Agents can be delegated as tools",
+				"tool_topic":        "agent handoff",
+				"tool_confidence":   0.91,
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
 			}
 		})
 	}

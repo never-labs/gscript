@@ -942,6 +942,8 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"stop",
 		"metadata",
 		"output",
+		"output_repair",
+		"output_retries",
 		"budget",
 		"budget_tokens",
 		"budget_turns",
@@ -1638,14 +1640,25 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		budgets.chargeTurn(res.Usage)
 		switch res.Status {
 		case "", "final_answer":
-			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
 			result := llmReactResultValue("done", res.Text, "", turnValue, history)
 			if value, errValue := llmStructuredOutputValue(opts, res.Text); !errValue.IsNil() {
+				repairedValue, repairedTurn, repairedText, repairErr, repaired := llmRepairStructuredOutput(opts, provider, ctx, maxHostResult, trace, budgets, cancel, model, toolsValue, history, res.Text, errValue, int64(step))
+				if !repairErr.IsNil() {
+					llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(repairErr), Message: repairErr.Table().RawGetString("message").Str()})
+					return []Value{NilValue(), repairErr}, nil
+				}
+				if repaired {
+					result = llmReactResultValue("done", repairedText, "", repairedTurn, history)
+					result.Table().RawSetString("value", repairedValue)
+					llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
+					return []Value{result, NilValue()}, nil
+				}
 				llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(errValue), Message: errValue.Table().RawGetString("message").Str()})
 				return []Value{NilValue(), errValue}, nil
 			} else if !value.IsNil() {
 				result.Table().RawSetString("value", value)
 			}
+			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
 			return []Value{result, NilValue()}, nil
 		case "stop":
 			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "stopped", Message: res.Reason})
@@ -1767,6 +1780,124 @@ func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetri
 		}
 	}
 	return []Value{NilValue(), lastErr}, NilValue()
+}
+
+func llmRepairStructuredOutput(opts *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent), budgets llmBudgetGroup, cancel llmCancel, model string, toolsValue Value, history []Value, previousText string, validationErr Value, step int64) (Value, Value, string, Value, bool) {
+	maxRetries := llmOutputRepairRetries(opts)
+	if maxRetries <= 0 {
+		return NilValue(), NilValue(), "", NilValue(), false
+	}
+	lastErr := validationErr
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if err := cancel.check(); !err.IsNil() {
+			return NilValue(), NilValue(), "", err, true
+		}
+		if err := budgets.beforeTurn(); !err.IsNil() {
+			return NilValue(), NilValue(), "", err, true
+		}
+		repairHistory := llmStructuredOutputRepairHistory(opts, history, previousText, lastErr)
+		req := LLMTurnRequest{
+			Model:          model,
+			Messages:       llmMessagesFromValue(llmTableFromValues(repairHistory)),
+			Tools:          llmToolsFromValue(toolsValue),
+			ForceTool:      llmForceToolFromValue(opts.RawGetString("force_tool")),
+			MaxTokens:      toInt(opts.RawGetString("max_tokens")),
+			Temperature:    llmOptionalFloatFromValue(opts.RawGetString("temperature")),
+			TopP:           llmOptionalFloatFromValue(opts.RawGetString("top_p")),
+			ResponseFormat: llmAnyFromValue(opts.RawGetString("response_format")),
+			Stream:         opts.RawGetString("stream").Truthy(),
+			Stop:           llmStringSliceFromValue(opts.RawGetString("stop")),
+			Metadata:       llmStringMapFromValue(opts.RawGetString("metadata")),
+		}
+		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: step, Attempt: int64(attempt), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
+		res, err := provider.Turn(ctx, req)
+		if err != nil {
+			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: step, Attempt: int64(attempt), ErrorKind: "provider", Message: err.Error()})
+			return NilValue(), NilValue(), "", llmErrorValue("provider", err.Error()), true
+		}
+		if err := cancel.check(); !err.IsNil() {
+			return NilValue(), NilValue(), "", err, true
+		}
+		llmTrace(trace, LLMTraceEvent{Type: "turn_end", Model: req.Model, Step: step, Attempt: int64(attempt), Status: llmResultStatus(res), MessageCount: len(req.Messages), ToolCount: len(req.Tools), Usage: res.Usage})
+		turnValue := llmResultValue(res)
+		if err := CheckHostResultBytes(maxHostResult, turnValue); err != nil {
+			return NilValue(), NilValue(), "", llmErrorValue("internal", err.Error()), true
+		}
+		budgets.chargeTurn(res.Usage)
+		if llmResultStatus(res) != "final_answer" {
+			lastErr = llmErrorValue("validation", "structured output repair did not return a final answer")
+			previousText = res.Text
+			continue
+		}
+		value, errValue := llmStructuredOutputValue(opts, res.Text)
+		if errValue.IsNil() {
+			return value, turnValue, res.Text, NilValue(), true
+		}
+		lastErr = errValue
+		previousText = res.Text
+	}
+	return NilValue(), NilValue(), "", lastErr, true
+}
+
+func llmOutputRepairRetries(opts *Table) int {
+	if opts == nil {
+		return 0
+	}
+	retries := int(toInt(opts.RawGetString("output_retries")))
+	if retries < 0 {
+		retries = 0
+	}
+	if retries == 0 && opts.RawGetString("output_repair").Truthy() {
+		retries = 1
+	}
+	return retries
+}
+
+func llmStructuredOutputRepairHistory(opts *Table, history []Value, previousText string, validationErr Value) []Value {
+	repairHistory := make([]Value, 0, len(history)+1)
+	repairHistory = append(repairHistory, history...)
+	repairHistory = append(repairHistory, TableValue(llmMessageTable("user", llmStructuredOutputRepairPrompt(opts, previousText, validationErr))))
+	return repairHistory
+}
+
+func llmStructuredOutputRepairPrompt(opts *Table, previousText string, validationErr Value) string {
+	prompt := ""
+	if repair := opts.RawGetString("output_repair"); repair.IsString() {
+		prompt = strings.TrimSpace(repair.Str())
+	}
+	if prompt == "" {
+		prompt = "Return only a JSON object that matches the requested output shape."
+	}
+	message := ""
+	if validationErr.IsTable() {
+		message = validationErr.Table().RawGetString("message").Str()
+	}
+	shape := llmStructuredOutputShapeJSON(opts)
+	var b strings.Builder
+	b.WriteString(prompt)
+	if message != "" {
+		b.WriteString("\nValidation error: ")
+		b.WriteString(message)
+	}
+	if shape != "" {
+		b.WriteString("\nOutput shape example: ")
+		b.WriteString(shape)
+	}
+	b.WriteString("\nPrevious response:\n")
+	b.WriteString(previousText)
+	return b.String()
+}
+
+func llmStructuredOutputShapeJSON(opts *Table) string {
+	if opts == nil || !opts.RawGetString("output").IsTable() {
+		return ""
+	}
+	data := llmAnyFromValue(opts.RawGetString("output"))
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }
 
 type llmBudget struct {

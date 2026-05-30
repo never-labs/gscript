@@ -474,6 +474,25 @@ func (e *BaselineJITEngine) handleSetList(ctx *ExecContext, regs []runtime.Value
 	}
 	tbl := tblVal.Table()
 	offset := (c - 1) * 50
+	if b == 0 {
+		top := 0
+		if e != nil && e.callVM != nil {
+			top = e.callVM.Top()
+			regs = e.callVM.Regs()
+		}
+		valueStart := absA + 1
+		count := top - valueStart
+		if count < 0 {
+			count = 0
+		}
+		for i := 1; i <= count; i++ {
+			idx := valueStart + i - 1
+			if idx < len(regs) {
+				tbl.RawSetInt(int64(offset+i), regs[idx])
+			}
+		}
+		return nil
+	}
 	for i := 1; i <= b; i++ {
 		idx := absA + i
 		if idx < len(regs) {
