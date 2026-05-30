@@ -414,6 +414,29 @@ err_dimension := err.dimension
 	}
 }
 
+func TestLoopTimeBudget(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+result, err := loop.react({
+    user: "find docs",
+    budget: {time: 0},
+})
+err_kind := err.kind
+err_message := err.message
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	kind, _ := vm.Get("err_kind")
+	message, _ := vm.Get("err_message")
+	if kind != "deadline" || message != "deadline exceeded" {
+		t.Fatalf("err kind=%#v message=%#v", kind, message)
+	}
+	if len(provider.requests) != 0 {
+		t.Fatalf("provider requests = %d, want 0", len(provider.requests))
+	}
+}
+
 func TestLoopScriptContextCancellation(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))

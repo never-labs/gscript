@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // LLMProvider is the host boundary behind llm.turn. Implementations may call a
@@ -525,6 +526,7 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"budget_turns",
 		"budget_calls",
 		"budget_money",
+		"budget_time",
 		"ctx",
 		"context",
 		"cancel",
@@ -1007,11 +1009,13 @@ type llmBudget struct {
 	maxTurns  int64
 	maxCalls  int64
 	maxMoney  float64
+	maxTime   time.Duration
 
 	usedTokens int64
 	usedTurns  int64
 	usedCalls  int64
 	usedMoney  float64
+	started    time.Time
 }
 
 func llmBudgetFromOptions(opts *Table) *llmBudget {
@@ -1020,6 +1024,7 @@ func llmBudgetFromOptions(opts *Table) *llmBudget {
 		maxTurns:  -1,
 		maxCalls:  -1,
 		maxMoney:  -1,
+		maxTime:   -1,
 	}
 	if v := opts.RawGetString("budget_tokens"); !v.IsNil() {
 		b.maxTokens = toInt(v)
@@ -1032,6 +1037,9 @@ func llmBudgetFromOptions(opts *Table) *llmBudget {
 	}
 	if v := opts.RawGetString("budget_money"); !v.IsNil() {
 		b.maxMoney = toFloat(v)
+	}
+	if v := opts.RawGetString("budget_time"); !v.IsNil() {
+		b.maxTime = llmBudgetDuration(v)
 	}
 	if t := opts.RawGetString("budget"); t.IsTable() {
 		bt := t.Table()
@@ -1047,6 +1055,9 @@ func llmBudgetFromOptions(opts *Table) *llmBudget {
 		if v := bt.RawGetString("money"); !v.IsNil() {
 			b.maxMoney = toFloat(v)
 		}
+		if v := bt.RawGetString("time"); !v.IsNil() {
+			b.maxTime = llmBudgetDuration(v)
+		}
 	}
 	if b.maxTokens < 0 {
 		b.maxTokens = -1
@@ -1060,12 +1071,21 @@ func llmBudgetFromOptions(opts *Table) *llmBudget {
 	if b.maxMoney < 0 {
 		b.maxMoney = -1
 	}
+	if b.maxTime < 0 {
+		b.maxTime = -1
+	}
+	if b.maxTime >= 0 {
+		b.started = time.Now()
+	}
 	return b
 }
 
 func (b *llmBudget) beforeTurn() Value {
 	if b == nil {
 		return NilValue()
+	}
+	if err := b.beforeWork(); !err.IsNil() {
+		return err
 	}
 	if b.maxTurns >= 0 && b.usedTurns >= b.maxTurns {
 		return llmBudgetError("turns", b.maxTurns, b.usedTurns)
@@ -1092,11 +1112,29 @@ func (b *llmBudget) beforeToolCall() Value {
 	if b == nil {
 		return NilValue()
 	}
+	if err := b.beforeWork(); !err.IsNil() {
+		return err
+	}
 	if b.maxCalls >= 0 && b.usedCalls >= b.maxCalls {
 		return llmBudgetError("calls", b.maxCalls, b.usedCalls)
 	}
 	b.usedCalls++
 	return NilValue()
+}
+
+func (b *llmBudget) beforeWork() Value {
+	if b.maxTime >= 0 && !b.started.IsZero() && time.Since(b.started) >= b.maxTime {
+		return llmCancelError("deadline exceeded")
+	}
+	return NilValue()
+}
+
+func llmBudgetDuration(v Value) time.Duration {
+	secs := toFloat(v)
+	if secs < 0 {
+		return -1
+	}
+	return time.Duration(secs * float64(time.Second))
 }
 
 func llmBudgetError(dimension string, limit, used int64) Value {

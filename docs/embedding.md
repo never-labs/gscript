@@ -202,10 +202,11 @@ the full returned `result.history`.
 The `loop` module is a thin convenience layer over `llm.react`: `loop.react`
 accepts either explicit `messages` or `{system, user}` fields, and `loop.simple`
 performs a single-turn loop with the same result/error shape.
-Both `llm.react` and `loop.react` accept `budget: {tokens, turns, calls, money}`
-or the flat `budget_tokens` / `budget_turns` / `budget_calls` /
-`budget_money` fields. Exhaustion returns `(nil, {kind: "budget",
-dimension: ...})` before the next model turn or tool dispatch.
+Both `llm.react` and `loop.react` accept `budget: {tokens, turns, calls, money,
+time}` or the flat `budget_tokens` / `budget_turns` / `budget_calls` /
+`budget_money` / `budget_time` fields. Exhaustion returns
+`(nil, {kind: "budget", dimension: ...})` or `{kind: "deadline"}` before the
+next model turn or tool dispatch.
 They also accept a script context through `ctx`, `context`, or `cancel`.
 Cancellation is checked before each model turn and tool dispatch, returning
 `(nil, {kind: "cancelled" | "deadline", message: ...})`.
