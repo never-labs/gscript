@@ -343,6 +343,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"log":       libs&LibLog != 0,
 		"math":      libs&LibMath != 0,
 		"matrix":    libs&LibMatrix != 0,
+		"msg":       libs&LibLLM != 0,
 		"net":       libs&LibNet != 0,
 		"os":        libs&LibOS != 0,
 		"path":      libs&LibPath != 0,

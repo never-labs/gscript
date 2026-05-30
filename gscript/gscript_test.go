@@ -146,6 +146,58 @@ kind := err.kind
 	}
 }
 
+func TestLLMMessageHelpers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{
+				Status: "final_answer",
+				Text:   "ok",
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+call := {id: "call_1", tool: "lookup", args: {name: "gscript"}}
+messages := {
+    msg.system("system text"),
+    msg.user("user text"),
+    msg.assistant("assistant text"),
+    msg.assistant_call(call),
+    msg.tool_result("call_1", "docs"),
+    msg.tool_error("call_2", "missing"),
+}
+result, err := llm.turn({messages: messages})
+roles := messages[1].role .. "," .. messages[4].role .. "," .. messages[6].role
+tool_id := messages[5].tool_use_id
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.last.Messages) != 6 {
+				t.Fatalf("provider messages = %#v", provider.last.Messages)
+			}
+			if provider.last.Messages[3].ToolCall == nil || provider.last.Messages[3].ToolCall.Tool != "lookup" {
+				t.Fatalf("assistant call = %#v", provider.last.Messages[3])
+			}
+			if provider.last.Messages[4].Value != "docs" || provider.last.Messages[5].Error != "missing" {
+				t.Fatalf("tool messages = %#v", provider.last.Messages)
+			}
+			roles, _ := vm.Get("roles")
+			toolID, _ := vm.Get("tool_id")
+			if roles != "system,assistant,tool" || toolID != "call_1" {
+				t.Fatalf("roles=%#v tool_id=%#v", roles, toolID)
+			}
+		})
+	}
+}
+
 func TestLLMCommandProvider(t *testing.T) {
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),

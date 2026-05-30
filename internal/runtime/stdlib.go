@@ -26,6 +26,7 @@ var stdlibModuleNames = []string{
 	"log",
 	"math",
 	"matrix",
+	"msg",
 	"net",
 	"os",
 	"path",
@@ -126,6 +127,7 @@ func (interp *Interpreter) registerStdlib() {
 			interp.llmTraceSink(event)
 		}
 	})))
+	interp.globals.Define("msg", TableValue(BuildLLMMessageLib()))
 
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))

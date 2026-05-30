@@ -104,31 +104,21 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		traces[0](event)
 	}
 
-	set := func(name string, fn func([]Value) ([]Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: "llm." + name, Fn: fn}))
-	}
+	set := func(name string, fn func([]Value) ([]Value, error)) { setLLMFunction(t, "llm", name, fn) }
 
-	set("system", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'llm.system'")
-		}
-		return []Value{TableValue(llmMessageTable("system", args[0].Str()))}, nil
-	})
-	set("user", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'llm.user'")
-		}
-		return []Value{TableValue(llmMessageTable("user", args[0].Str()))}, nil
-	})
-	set("assistant", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'llm.assistant'")
-		}
-		return []Value{TableValue(llmMessageTable("assistant", args[0].Str()))}, nil
-	})
+	registerLLMMessageConstructors(t, "llm")
 	set("assistantCall", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.assistantCall' (table expected)")
+		}
+		msg := NewTable()
+		msg.RawSetString("role", StringValue("assistant"))
+		msg.RawSetString("tool_call", args[0])
+		return []Value{TableValue(msg)}, nil
+	})
+	set("assistant_call", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.assistant_call' (table expected)")
 		}
 		msg := NewTable()
 		msg.RawSetString("role", StringValue("assistant"))
@@ -145,9 +135,29 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		msg.RawSetString("value", args[1])
 		return []Value{TableValue(msg)}, nil
 	})
+	set("tool_result", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'llm.tool_result'")
+		}
+		msg := NewTable()
+		msg.RawSetString("role", StringValue("tool"))
+		msg.RawSetString("tool_use_id", args[0])
+		msg.RawSetString("value", args[1])
+		return []Value{TableValue(msg)}, nil
+	})
 	set("toolError", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'llm.toolError'")
+		}
+		msg := NewTable()
+		msg.RawSetString("role", StringValue("tool"))
+		msg.RawSetString("tool_use_id", args[0])
+		msg.RawSetString("error", StringValue(args[1].Str()))
+		return []Value{TableValue(msg)}, nil
+	})
+	set("tool_error", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'llm.tool_error'")
 		}
 		msg := NewTable()
 		msg.RawSetString("role", StringValue("tool"))
@@ -236,6 +246,69 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 	})
 
 	return t
+}
+
+// BuildLLMMessageLib creates the spec-facing "msg" helper table. It is kept
+// separate from provider access so future agent syntax can depend on message
+// construction without gaining model-call authority.
+func BuildLLMMessageLib() *Table {
+	t := NewTable()
+	registerLLMMessageConstructors(t, "msg")
+	setLLMFunction(t, "msg", "assistant_call", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'msg.assistant_call' (table expected)")
+		}
+		msg := NewTable()
+		msg.RawSetString("role", StringValue("assistant"))
+		msg.RawSetString("tool_call", args[0])
+		return []Value{TableValue(msg)}, nil
+	})
+	setLLMFunction(t, "msg", "tool_result", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'msg.tool_result'")
+		}
+		msg := NewTable()
+		msg.RawSetString("role", StringValue("tool"))
+		msg.RawSetString("tool_use_id", args[0])
+		msg.RawSetString("value", args[1])
+		return []Value{TableValue(msg)}, nil
+	})
+	setLLMFunction(t, "msg", "tool_error", func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'msg.tool_error'")
+		}
+		msg := NewTable()
+		msg.RawSetString("role", StringValue("tool"))
+		msg.RawSetString("tool_use_id", args[0])
+		msg.RawSetString("error", StringValue(args[1].Str()))
+		return []Value{TableValue(msg)}, nil
+	})
+	return t
+}
+
+func registerLLMMessageConstructors(t *Table, module string) {
+	setLLMFunction(t, module, "system", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to '%s.system'", module)
+		}
+		return []Value{TableValue(llmMessageTable("system", args[0].Str()))}, nil
+	})
+	setLLMFunction(t, module, "user", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to '%s.user'", module)
+		}
+		return []Value{TableValue(llmMessageTable("user", args[0].Str()))}, nil
+	})
+	setLLMFunction(t, module, "assistant", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to '%s.assistant'", module)
+		}
+		return []Value{TableValue(llmMessageTable("assistant", args[0].Str()))}, nil
+	})
+}
+
+func setLLMFunction(t *Table, module, name string, fn func([]Value) ([]Value, error)) {
+	t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: module + "." + name, Fn: fn}))
 }
 
 func llmMessageTable(role, text string) *Table {

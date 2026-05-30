@@ -144,7 +144,7 @@ lookup := llm.tool("lookup", func(name) {
 
 tools := {lookup}
 result, err := llm.turn({
-    messages: {llm.system("Use tools."), llm.user("find docs")},
+    messages: {msg.system("Use tools."), msg.user("find docs")},
     tools: tools,
 })
 if err != nil { return nil, err }
@@ -156,12 +156,12 @@ if result.status == "tool_calls" {
 
 For the common ReAct loop, `llm.react` is a small library helper. It repeatedly
 calls `llm.turn`, dispatches returned tool calls through the provided tool list,
-adds `llm.assistantCall` / `llm.toolResult` style messages to history, and
+adds `msg.assistant_call` / `msg.tool_result` style messages to history, and
 stops on a final answer:
 
 ```gscript
 result, err := llm.react({
-    messages: {llm.system("Use tools."), llm.user("find docs")},
+    messages: {msg.system("Use tools."), msg.user("find docs")},
     tools: {lookup},
     max_steps: 8,
     max_tool_retries: 1,

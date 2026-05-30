@@ -62,6 +62,7 @@ JIT fast path policy:
 | `log` | Bounded host | in-process log sink and log level state | runtime error; sentinel empty data for no records | VM fallback |
 | `math` | Pure | none; numeric functions and constants | runtime error | intrinsic for `sqrt`/`floor`; native identity/FastArg paths for selected functions |
 | `matrix` | Pure | in-process dense matrix allocation and numeric kernels | runtime error | native matrix/table fast paths where recognized; VM fallback |
+| `msg` | Pure | none; LLM/agent message constructor helpers only | runtime error for bad argument shape | VM fallback |
 | `net` | Privileged host | network client/server helpers | runtime error for bad arguments; `nil, err` or result table for network failures | runtime specialization for stdlib host driver cases; VM fallback |
 | `os` | Privileged host | environment, args, pid/host, file remove/rename, process exit | runtime error for bad arguments; `nil, err` or sentinel for host failures depending on Lua-compatible API | VM fallback |
 | `path` | Bounded host | host filepath rules and current platform separators | runtime error for bad arguments; `nil, err` for invalid rel/match cases | VM fallback |
