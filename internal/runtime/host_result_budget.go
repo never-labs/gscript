@@ -63,3 +63,13 @@ func ReadAllWithHostResultLimit(r io.Reader, max int64) ([]byte, error) {
 	}
 	return data, nil
 }
+
+func CheckProjectedHostStringBytes(max int64, size int) error {
+	if max <= 0 {
+		return nil
+	}
+	if int64(size) > max {
+		return fmt.Errorf("host result byte limit exceeded (%d)", max)
+	}
+	return nil
+}

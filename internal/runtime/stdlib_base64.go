@@ -6,8 +6,18 @@ import (
 )
 
 // buildBase64Lib creates the "base64" standard library table.
-func buildBase64Lib() *Table {
+func buildBase64Lib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -29,6 +39,9 @@ func buildBase64Lib() *Table {
 		if !arg.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'base64.encode' (string expected)")
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.StdEncoding.EncodedLen(StringLen(arg))); err != nil {
+			return NilValue(), err
+		}
 		return StringValue(base64.StdEncoding.EncodeToString([]byte(arg.Str()))), nil
 	}
 	setFastArg1("encode", func(args []Value) ([]Value, error) {
@@ -43,6 +56,9 @@ func buildBase64Lib() *Table {
 	base64Decode := func(arg Value) (Value, Value, int, error) {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.decode' (string expected)")
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.StdEncoding.DecodedLen(StringLen(arg))); err != nil {
+			return NilValue(), NilValue(), 0, err
 		}
 		decoded, err := base64.StdEncoding.DecodeString(arg.Str())
 		if err != nil {
@@ -69,6 +85,9 @@ func buildBase64Lib() *Table {
 		if !arg.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'base64.urlEncode' (string expected)")
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.RawURLEncoding.EncodedLen(StringLen(arg))); err != nil {
+			return NilValue(), err
+		}
 		return StringValue(base64.RawURLEncoding.EncodeToString([]byte(arg.Str()))), nil
 	}
 	setFastArg1("urlEncode", func(args []Value) ([]Value, error) {
@@ -83,6 +102,9 @@ func buildBase64Lib() *Table {
 	base64URLDecode := func(arg Value) (Value, Value, int, error) {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.urlDecode' (string expected)")
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.RawURLEncoding.DecodedLen(StringLen(arg))); err != nil {
+			return NilValue(), NilValue(), 0, err
 		}
 		decoded, err := base64.RawURLEncoding.DecodeString(arg.Str())
 		if err != nil {

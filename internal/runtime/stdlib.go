@@ -86,7 +86,7 @@ func (interp *Interpreter) registerStdlib() {
 	// --- Encoding / Crypto ---
 	interp.globals.Define("array", TableValue(buildArrayLib()))
 	interp.globals.Define("json", TableValue(buildJSONLib()))
-	interp.globals.Define("base64", TableValue(buildBase64Lib()))
+	interp.globals.Define("base64", TableValue(buildBase64Lib(interp)))
 	interp.globals.Define("hash", TableValue(buildHashLib()))
 
 	// --- File system & paths ---
@@ -136,7 +136,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("sort", TableValue(buildSortLib(interp)))
 
 	// --- Encoding utilities ---
-	interp.globals.Define("encoding", TableValue(buildEncodingLib()))
+	interp.globals.Define("encoding", TableValue(buildEncodingLib(interp)))
 
 	// --- Compression ---
 	interp.globals.Define("compress", TableValue(buildCompressLib(interp)))

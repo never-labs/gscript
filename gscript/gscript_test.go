@@ -559,6 +559,36 @@ func TestWithMaxHostResultBytesLimitsBytecodeFastStdlibResult(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesPreflightsEncodingStdlibResults(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, src := range []string{
+				`value := base64.encode("1234")`,
+				`value := base64.decode("MTIzNDU=")`,
+				`value := encoding.hexEncode("123")`,
+				`value := encoding.base32Encode("1234")`,
+			} {
+				opts := append([]gs.Option{
+					gs.WithLibs(gs.LibString | gs.LibBase64 | gs.LibEncoding),
+					gs.WithMaxHostResultBytes(4),
+				}, tc.opts...)
+				vm := gs.New(opts...)
+				err := vm.Exec(src)
+				var budgetErr *gs.BudgetError
+				if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+					t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+				}
+			}
+		})
+	}
+}
+
 func TestWithMaxHostResultBytesLimitsCompressDecodeExpansion(t *testing.T) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)

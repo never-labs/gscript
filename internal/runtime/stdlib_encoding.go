@@ -13,8 +13,18 @@ import (
 // buildEncodingLib creates the "encoding" standard library table.
 // Provides hex, base32, ini, and xml encoding/decoding utilities.
 // Inspired by Odin's encoding package family.
-func buildEncodingLib() *Table {
+func buildEncodingLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -32,6 +42,9 @@ func buildEncodingLib() *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.hexEncode' (string expected)")
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), hex.EncodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
+		}
 		encoded := hex.EncodeToString([]byte(args[0].Str()))
 		return []Value{StringValue(encoded)}, nil
 	})
@@ -40,6 +53,9 @@ func buildEncodingLib() *Table {
 	set("hexDecode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.hexDecode' (string expected)")
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), hex.DecodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
 		}
 		decoded, err := hex.DecodeString(args[0].Str())
 		if err != nil {
@@ -57,6 +73,9 @@ func buildEncodingLib() *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.base32Encode' (string expected)")
 		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base32.StdEncoding.EncodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
+		}
 		encoded := base32.StdEncoding.EncodeToString([]byte(args[0].Str()))
 		return []Value{StringValue(encoded)}, nil
 	})
@@ -65,6 +84,9 @@ func buildEncodingLib() *Table {
 	set("base32Decode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.base32Decode' (string expected)")
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base32.StdEncoding.DecodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
 		}
 		decoded, err := base32.StdEncoding.DecodeString(args[0].Str())
 		if err != nil {
@@ -78,7 +100,11 @@ func buildEncodingLib() *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.base32HexEncode' (string expected)")
 		}
-		encoded := base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(args[0].Str()))
+		enc := base32.HexEncoding.WithPadding(base32.NoPadding)
+		if err := CheckProjectedHostStringBytes(maxHostResult(), enc.EncodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
+		}
+		encoded := enc.EncodeToString([]byte(args[0].Str()))
 		return []Value{StringValue(encoded)}, nil
 	})
 
@@ -87,7 +113,11 @@ func buildEncodingLib() *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'encoding.base32HexDecode' (string expected)")
 		}
-		decoded, err := base32.HexEncoding.WithPadding(base32.NoPadding).DecodeString(args[0].Str())
+		enc := base32.HexEncoding.WithPadding(base32.NoPadding)
+		if err := CheckProjectedHostStringBytes(maxHostResult(), enc.DecodedLen(StringLen(args[0]))); err != nil {
+			return nil, err
+		}
+		decoded, err := enc.DecodeString(args[0].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}

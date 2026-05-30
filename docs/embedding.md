@@ -260,8 +260,8 @@ Current sandbox gaps:
 - `WithMaxHostResultBytes` limits string bytes returned from one native Go
   call, including standard-library functions and registered host callbacks. It
   checks direct strings and strings nested in returned tables. Process
-  stdout/stderr, `net`/`http` response bodies, and compressed decode output are
-  bounded while they are captured or expanded.
+  stdout/stderr, `net`/`http` response bodies, predictable encoding outputs,
+  and compressed decode output are bounded while they are captured or expanded.
 - `WithMaxModuleBytes` limits bytes read by script-side loading APIs such as
   `require`, `dofile`, `loadfile`, and `script.loadFile`.
 - `WithMaxModuleDepth` limits nested filesystem-backed `require` chains.
