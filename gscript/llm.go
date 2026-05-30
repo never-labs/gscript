@@ -36,6 +36,48 @@ type LLMRecord struct {
 	Error   string
 }
 
+// LLMTraceRecorder is a thread-safe trace sink for tests, diagnostics, and
+// host-side observability. Pass recorder.Record to WithLLMTrace.
+type LLMTraceRecorder struct {
+	mu     sync.Mutex
+	events []LLMTraceEvent
+}
+
+func NewLLMTraceRecorder(events ...LLMTraceEvent) *LLMTraceRecorder {
+	rec := &LLMTraceRecorder{}
+	rec.events = append(rec.events, events...)
+	return rec
+}
+
+func (r *LLMTraceRecorder) Record(event LLMTraceEvent) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, event)
+}
+
+func (r *LLMTraceRecorder) Events() []LLMTraceEvent {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]LLMTraceEvent, len(r.events))
+	copy(out, r.events)
+	return out
+}
+
+func (r *LLMTraceRecorder) Reset() {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = nil
+}
+
 // LLMRecorder is a thread-safe record sink for deterministic LLM replay
 // fixtures. Pass recorder.Record to WithLLMRecorder.
 type LLMRecorder struct {

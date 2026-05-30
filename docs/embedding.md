@@ -125,14 +125,19 @@ usage, token metadata, and tool names; prompt text and tool result values are
 intentionally omitted by default.
 
 ```go
+trace := gscript.NewLLMTraceRecorder()
 vm := gscript.New(
     gscript.WithLibs(gscript.LibString|gscript.LibLLM),
     gscript.WithLLMProvider(Provider{}),
     gscript.WithLLMTrace(func(event gscript.LLMTraceEvent) {
+        trace.Record(event)
         log.Printf("llm event=%s status=%s tool=%s", event.Type, event.Status, event.Tool)
     }),
 )
 ```
+
+For tests and diagnostics, `NewLLMTraceRecorder` provides a thread-safe sink
+with `Record`, `Events`, and `Reset` helpers.
 
 For deterministic tests and CI, hosts can record provider turns and replay them
 without reaching an external model:

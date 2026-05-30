@@ -1194,6 +1194,40 @@ react_result, react_err := llm.react({
 	}
 }
 
+func TestLLMTraceRecorderHelper(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+		Status: "final_answer",
+		Text:   "done",
+		Usage:  gs.LLMTurnUsage{InputTokens: 1, OutputTokens: 2},
+	}}
+	recorder := gs.NewLLMTraceRecorder(gs.LLMTraceEvent{Type: "seed"})
+	vm := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithLLMProvider(provider),
+		gs.WithLLMTrace(recorder.Record),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	events := recorder.Events()
+	if len(events) != 3 || events[0].Type != "seed" || events[1].Type != "turn_start" || events[2].Usage.OutputTokens != 2 {
+		t.Fatalf("events = %#v", events)
+	}
+	events[0].Type = "mutated"
+	if recorder.Events()[0].Type != "seed" {
+		t.Fatalf("Events returned mutable internal state")
+	}
+	recorder.Reset()
+	if got := recorder.Events(); len(got) != 0 {
+		t.Fatalf("after Reset events = %#v", got)
+	}
+}
+
 func TestLLMRecorderAndReplay(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{
 		Status: "final_answer",
