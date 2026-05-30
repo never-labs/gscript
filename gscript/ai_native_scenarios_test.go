@@ -1,6 +1,7 @@
 package gscript_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	gs "github.com/gscript/gscript/gscript"
@@ -244,6 +245,292 @@ history_len := out.history_len
 			historyLen, _ := vm.Get("history_len")
 			if firstStatus != "tool_calls" || finalText != "Agents need explicit history." || toolValue != "note:agents" || historyLen != int64(4) {
 				t.Fatalf("first_status=%#v final_text=%#v tool_value=%#v history_len=%#v", firstStatus, finalText, toolValue, historyLen)
+			}
+		})
+	}
+}
+
+func TestAINativeAgentTurnScenarioRecordReplay(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := `
+models {
+    default: "chat"
+    chat: {provider_model: "mock-chat"}
+}
+
+agent reviewer(topic) {
+    model: "chat"
+    system: "Review with two passes."
+} flow {
+    draft, draft_err := turn {
+        messages: messages {
+            system: system
+            user: "Draft " .. topic
+        }
+        max_tokens: 32
+    }
+    if draft_err != nil {
+        return nil, draft_err
+    }
+
+    final, final_err := turn {
+        messages: messages {
+            user: draft.text .. " / final"
+        }
+    }
+    return {draft: draft.text, final: final.text}, final_err
+}
+
+out, err := reviewer("recording")
+draft_text := out.draft
+final_text := out.final
+`
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "draft pass", Usage: gs.LLMTurnUsage{InputTokens: 2, OutputTokens: 3}},
+				{Status: "final_answer", Text: "final pass", Usage: gs.LLMTurnUsage{InputTokens: 4, OutputTokens: 5}},
+			}}
+			recorder := gs.NewLLMRecorder()
+			recordOpts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+				gs.WithLLMRecorder(recorder.Record),
+			}, tc.opts...)
+			recordVM := gs.New(recordOpts...)
+
+			if err := recordVM.Exec(source); err != nil {
+				t.Fatalf("record Exec: %v", err)
+			}
+			records := recorder.Records()
+			if len(records) != 2 {
+				t.Fatalf("records = %#v, want 2", records)
+			}
+			if records[0].Request.Model != "mock-chat" || records[0].Request.MaxTokens != 32 {
+				t.Fatalf("first recorded request = %#v", records[0].Request)
+			}
+			if len(records[0].Request.Messages) != 2 ||
+				records[0].Request.Messages[0].Role != "system" ||
+				records[0].Request.Messages[0].Text != "Review with two passes." ||
+				records[0].Request.Messages[1].Text != "Draft recording" {
+				t.Fatalf("first recorded messages = %#v", records[0].Request.Messages)
+			}
+			if records[1].Request.Model != "mock-chat" || len(records[1].Request.Messages) != 1 ||
+				records[1].Request.Messages[0].Text != "draft pass / final" {
+				t.Fatalf("second recorded request = %#v", records[1].Request)
+			}
+
+			replayOpts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMReplay(records),
+			}, tc.opts...)
+			replayVM := gs.New(replayOpts...)
+			if err := replayVM.Exec(source); err != nil {
+				t.Fatalf("replay Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"draft_text": "draft pass",
+				"final_text": "final pass",
+			} {
+				got, err := replayVM.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestAINativeAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "Checkout incidents are owned by payments on-call."},
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_metrics_1",
+						Tool: "get_metrics",
+						Args: map[string]any{"service": "checkout"},
+					}},
+				},
+				{Status: "final_answer", Text: "Checkout latency is elevated; page payments on-call."},
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_runbook_1",
+						Tool: "search_runbook",
+						Args: map[string]any{
+							"service": "checkout",
+							"symptom": "p95 latency spike",
+						},
+					}},
+				},
+				{Status: "final_answer", Text: "Incident brief: checkout latency spike, follow runbook."},
+			}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.ExecFile(filepath.Join("..", "examples", "ai_native_incident_response.gs")); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			if len(provider.requests) != 5 {
+				t.Fatalf("requests = %d, want 5", len(provider.requests))
+			}
+			faq := provider.requests[0]
+			if faq.Model != "mock-ops" || len(faq.Tools) != 0 {
+				t.Fatalf("faq request = %#v", faq)
+			}
+			if len(faq.Messages) != 2 || faq.Messages[0].Role != "system" || faq.Messages[1].Text != "Who owns checkout incidents?" {
+				t.Fatalf("faq messages = %#v", faq.Messages)
+			}
+
+			researchFirst := provider.requests[1]
+			if researchFirst.Model != "mock-ops" || len(researchFirst.Tools) != 2 {
+				t.Fatalf("research first request = %#v", researchFirst)
+			}
+			if researchFirst.Tools[0].Name != "search_runbook" || researchFirst.Tools[1].Name != "get_metrics" {
+				t.Fatalf("research tools = %#v", researchFirst.Tools)
+			}
+			researchFinal := provider.requests[2]
+			if len(researchFinal.Messages) != 4 ||
+				researchFinal.Messages[2].ToolCall == nil ||
+				researchFinal.Messages[2].ToolCall.Tool != "get_metrics" ||
+				researchFinal.Messages[3].Value != "metrics:checkout:latency=high,error_rate=2%" {
+				t.Fatalf("research final messages = %#v", researchFinal.Messages)
+			}
+
+			briefFirst := provider.requests[3]
+			if briefFirst.Model != "mock-planner" || len(briefFirst.Tools) != 2 {
+				t.Fatalf("brief first request = %#v", briefFirst)
+			}
+			briefFinal := provider.requests[4]
+			if briefFinal.Model != "mock-planner" || briefFinal.MaxTokens != 320 {
+				t.Fatalf("brief final request = %#v", briefFinal)
+			}
+			if len(briefFinal.Messages) != 4 ||
+				briefFinal.Messages[2].ToolCall == nil ||
+				briefFinal.Messages[2].ToolCall.ID != "call_runbook_1" ||
+				briefFinal.Messages[3].ToolUseID != "call_runbook_1" ||
+				briefFinal.Messages[3].Value != "runbook:checkout:p95 latency spike" {
+				t.Fatalf("brief final messages = %#v", briefFinal.Messages)
+			}
+
+			for name, want := range map[string]any{
+				"faq_text":          "Checkout incidents are owned by payments on-call.",
+				"research_text":     "Checkout latency is elevated; page payments on-call.",
+				"brief_text":        "Incident brief: checkout latency spike, follow runbook.",
+				"brief_evidence":    "runbook:checkout:p95 latency spike",
+				"brief_history_len": int64(4),
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestAINativeDirectTurnResponseFormatProviderRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+result, err := turn {
+    model: "mock-json"
+    messages: messages {
+        system: "Return only valid JSON."
+        user: "Extract the contact."
+    }
+    response_format: {
+        type: "json_schema"
+        json_schema: {
+            name: "contact"
+            schema: {
+                type: "object"
+                properties: {
+                    name: {type: "string"}
+                    email: {type: "string"}
+                }
+                required: ["name", "email"]
+                additionalProperties: false
+            }
+        }
+    }
+}
+text := result.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			req := provider.requests[0]
+			if req.Model != "mock-json" {
+				t.Fatalf("model = %q, want mock-json", req.Model)
+			}
+			if len(req.Messages) != 2 ||
+				req.Messages[0].Role != "system" || req.Messages[0].Text != "Return only valid JSON." ||
+				req.Messages[1].Role != "user" || req.Messages[1].Text != "Extract the contact." {
+				t.Fatalf("messages = %#v", req.Messages)
+			}
+			format, ok := req.ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_schema" {
+				t.Fatalf("response_format = %#v", req.ResponseFormat)
+			}
+			jsonSchema, ok := format["json_schema"].(map[string]any)
+			if !ok || jsonSchema["name"] != "contact" {
+				t.Fatalf("json_schema = %#v", format["json_schema"])
+			}
+			schema, ok := jsonSchema["schema"].(map[string]any)
+			if !ok || schema["type"] != "object" || schema["additionalProperties"] != false {
+				t.Fatalf("schema = %#v", jsonSchema["schema"])
+			}
+			properties, ok := schema["properties"].(map[string]any)
+			if !ok {
+				t.Fatalf("properties = %#v", schema["properties"])
+			}
+			name, ok := properties["name"].(map[string]any)
+			if !ok || name["type"] != "string" {
+				t.Fatalf("name property = %#v", properties["name"])
+			}
+			required, ok := schema["required"].([]any)
+			if !ok || len(required) != 2 || required[0] != "name" || required[1] != "email" {
+				t.Fatalf("required = %#v", schema["required"])
+			}
+			text, err := vm.Get("text")
+			if err != nil {
+				t.Fatalf("Get text: %v", err)
+			}
+			if text != `{"name":"Ada","email":"ada@example.com"}` {
+				t.Fatalf("text = %#v", text)
 			}
 		})
 	}

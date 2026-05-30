@@ -1,8 +1,9 @@
 # GScript AI-Native Syntax Design
 
 Status: accepted syntax proposal with a partial implementation in the current
-workspace. Parser/runtime work is being implemented incrementally by lowering to
-the existing LLM standard library.
+workspace. The implemented parser surface lowers to the existing LLM standard
+library; this document separates stable syntax decisions from current
+implementation status.
 
 GScript's AI layer is designed around one simple promise: a useful agent should
 be writable with almost no ceremony, while advanced users can still drop to a
@@ -14,8 +15,7 @@ Current implementation snapshot:
   them contextually in the syntax positions described below.
 - Implemented parser/AST/desugar coverage includes list literals, `tool`
   declarations, named and anonymous `agent` values, optional `flow`, `agent
-  defaults`, `models`, `messages`, `turn`, and the statement shape for
-  `budget`.
+  defaults`, `models`, `messages`, `turn`, and ambient `budget` blocks.
 - Lowering currently targets `llm.tool`, `llm.agent`, `llm.agent_defaults`,
   `llm.register_models`, and `llm.turn`. Non-flow agents lower to
   `llm.agent(name, config_fn)`. Flow agents lower to
@@ -33,6 +33,8 @@ Current implementation snapshot:
 - Tool declarations lower with the tool name, function body, parameter list,
   Go-style doc comments, and `gscript:` directives for `description`,
   `requires`, and `param_docs`.
+
+Current status is summarized in [Implementation Status](#24-implementation-status).
 
 ## 1. Core Shape
 
@@ -85,10 +87,8 @@ react memory rag provider output user system tools defaults
 `agent` execution strategy is ReAct-style multi-turn tool use, but users do not
 need to name it for the common case.
 
-Current implementation note: these words are not lexer keywords. They remain
-`TOKEN_IDENT` values and are recognized only by parser lookahead in statement or
-expression positions such as `agent ... {}`, `turn {}`, `messages {}`,
-`models {}`, and `budget {} {}`.
+Implementation uses ordinary identifier tokens plus parser lookahead, matching
+the soft-keyword contract above.
 
 ## 3. Lists
 
@@ -175,14 +175,13 @@ llm.register_models({
 })
 ```
 
-Current implementation note: this lowering is implemented as
-`llm.register_models({...})`; `llm.models({...})` is also available as a stdlib
-alias. Runtime resolution maps `default` and named aliases to the provider-side
-model string, preferring `provider_model` and then `model` inside config tables.
-If no host provider was installed with `WithLLMProvider`, config tables with a
-`protocol` are passed to the host provider factory. The default Go factory
-supports `"openai"` / `"openai_compatible"` and `"anthropic"` /
-`"anthropic_compatible"`.
+Implementation lowers this form to `llm.register_models({...})`; `llm.models`
+is also available as a stdlib alias. Runtime resolution maps `default` and
+named aliases to the provider-side model string, preferring `provider_model`
+and then `model` inside config tables. If no host provider was installed with
+`WithLLMProvider`, config tables with a `protocol` are passed to the host
+provider factory. The default Go factory supports `"openai"` /
+`"openai_compatible"` and `"anthropic"` / `"anthropic_compatible"`.
 
 Rules:
 
@@ -279,9 +278,8 @@ Rules:
 - Tool declarations bind a value with the declared name.
 - Tools are normal closures and can capture surrounding state.
 
-Current implementation note: parser/desugar support for `tool` exists, and
-only immediately-adjacent Go-style comments are attached. The generated
-`llm.tool` options include `params`, `description`, `requires`, and
+Implementation attaches only immediately-adjacent Go-style comments. The
+generated `llm.tool` options include `params`, `description`, `requires`, and
 `param_docs`. Validation rejects missing `gscript:requires`, malformed or
 duplicate capability entries, `none` mixed with other capabilities, unknown
 parameter docs, and duplicate parameter docs.
@@ -492,6 +490,11 @@ Rules:
 - On validation failure, runtime may perform bounded repair according to host
   policy; if repair fails, return `err.kind == "validation"`.
 
+Current implementation note: direct `turn { response_format: ... }` is lowered
+to `llm.turn` and forwarded to the provider request. Agent-level `output`
+translation, structured result decoding into `result.value`, and validation /
+repair behavior are still pending runtime work.
+
 ## 11. History And Call Options
 
 The default syntax stays simple:
@@ -701,12 +704,12 @@ Rules:
 - Exhaustion is observed at the next `turn` or tool dispatch.
 - Money/cost accounting remains host/provider policy for now.
 
-Current implementation note: agent-local budget tables are enforced by the
-`llm.agent` / `llm.react` loop for turns, tool calls, tokens, money, and time
-when those limits are present in the options table. Standalone `budget` blocks
-lower to ambient `llm.with_budget` scopes. Nested scopes intersect naturally,
-and active frames are charged for turns, tool calls, token usage, and deadlines
-around enclosed `turn` / tool dispatch operations.
+Implementation enforces agent-local budget tables in the `llm.agent` /
+`llm.react` loop for turns, tool calls, tokens, money, and time when those
+limits are present in the options table. Standalone `budget` blocks lower to
+ambient `llm.with_budget` scopes. Nested scopes intersect naturally, and active
+frames are charged for turns, tool calls, token usage, and deadlines around
+enclosed `turn` / tool dispatch operations.
 
 ## 16. Capabilities
 
@@ -895,12 +898,8 @@ answer := llm.agent("answer", func(q) {
         system: "Answer briefly.",
         user: q,
     }
-}, nil)
+})
 ```
-
-Current implementation note: non-flow agents currently lower to
-`llm.agent("answer", func(q) { return {...} })`; the third `nil` flow argument
-shown in this canonical shape is not part of the current stdlib signature.
 
 Anonymous IIFE:
 
@@ -913,7 +912,7 @@ as if:
 ```gscript
 r, err := llm.agent("", func() {
     return {user: "hello"}
-}, nil)()
+})()
 ```
 
 Flow agent:
@@ -943,12 +942,12 @@ support := llm.agent("support", func(q) {
 })
 ```
 
-Current implementation note: flow-agent lowering now uses this canonical
-`llm.agent` shape. The flow body still receives config fields such as `tools`,
-`model`, and `system` as local bindings for compatibility, and `llm.agent`
-also pushes the merged agent config as ambient context while the flow runs.
-This lets simple `turn {}` calls inherit the agent's model, tools, system,
-user, and budget unless the turn overrides them explicitly.
+Flow-agent lowering uses this canonical `llm.agent` shape. The flow body
+receives config fields such as `tools`, `model`, and `system` as local bindings
+for compatibility, and `llm.agent` also pushes the merged agent config as
+ambient context while the flow runs. This lets simple `turn {}` calls inherit
+the agent's model, tools, system, user, and budget unless the turn overrides
+them explicitly.
 
 The compiler can avoid allocating closure objects when a cleaner internal
 representation is available, but record/replay, trace events, budgets, and
@@ -976,7 +975,7 @@ answer := llm.agent("answer", func(q) {
         tools: [search_docs],
         user: q,
     }
-}, nil)
+})
 ```
 
 ## 22. Examples
@@ -1084,49 +1083,66 @@ agent manual(q) {
 10. `agent defaults { ... }` provides module-scope default agent configuration
     without nesting ordinary code.
 
-## 24. Implementation Milestones
+## 24. Implementation Status
 
 Current status in this workspace:
 
-1. Done: parser accepts list literals (`[...]`) and AI-native list syntax lowers
-   to array-table literals.
-2. Done: parser preserves immediately-adjacent tool doc comments and extracts
-   `gscript:` directives for tool metadata.
-3. Done: parser accepts `tool` declarations and lowers to `llm.tool` with
-   parameters, description, requires, and param-doc options.
-4. Partial: runtime has `llm.agent` for default execution through the existing
-   `llm.react` loop, with module-level defaults and model alias resolution.
-   There is no separate ambient agent frame abstraction yet.
-5. Done: parser accepts named and anonymous `agent` values, including IIFE use.
-6. Partial: parser accepts optional `flow` blocks. Current lowering emits a
-   plain function with config locals instead of lowering flow agents through
-   `llm.agent`.
-7. Done: parser accepts module-scope `agent defaults` declarations, validates
-   duplicates, and lowers to `llm.agent_defaults`.
-8. Partial: parser accepts module-scope `models` declarations, rejects literal
-   `api_key` strings and alias cycles, and lowers to `llm.register_models`.
-   Runtime resolves default/alias/provider_model and can ask a host factory to
-   construct OpenAI-compatible or Anthropic-compatible providers from
-   protocol/base-url/api-key fields when no host provider is already installed.
-9. Done: parser accepts `messages` constructors and lowers recognized roles to
-   message constructor calls.
-10. Done: parser accepts `turn` blocks and lowers to `llm.turn`; the stdlib
-    also supports the `user` shorthand by normalizing it into messages.
-11. Done: parser accepts `budget` blocks and lowers them to ambient
-    `llm.with_budget` scopes. Nested/intersecting budgets charge every active
-    frame for turns, token usage, tool calls, and deadlines.
-12. Partial: current validation rejects duplicate `agent defaults`, non-module
-    `agent defaults` / `models`, model alias cycles, literal model `api_key`
-    strings, missing/malformed/duplicate tool `gscript:requires`, unknown or
-    duplicate tool `gscript:param` docs, and duplicate statically named tools in
-    literal agent/defaults tool lists. The broader AI metadata/capability lint
-    index is still pending.
-13. Partial: `gscript fmt` and `gscript lint` accept AI-native source through
-    the parser-backed tooling path. The formatter currently normalizes
-    whitespace only; an AST pretty printer for AI-native blocks and doc
-    directives remains pending.
-14. Partial: tests cover parser acceptance, stdlib-vs-syntax execution for
-    interpreter and bytecode, anonymous agents/IIFE, defaults, model alias
-    resolution, direct turn sugar, validation errors, and flow behavior. Gated
-    real-provider smoke, full record/replay syntax coverage, output validation,
-    directive lowering, and ambient budget behavior remain pending.
+Done:
+
+- Parser accepts list literals (`[...]`) and AI-native list syntax lowers to
+  array-table literals.
+- Parser preserves immediately-adjacent tool doc comments and extracts
+  `gscript:` directives for tool metadata.
+- Parser accepts `tool` declarations and lowers to `llm.tool` with parameters,
+  description, requires, and param-doc options.
+- Parser accepts named and anonymous `agent` values, including IIFE use.
+  Non-flow agents lower to `llm.agent(name, config_fn)`.
+- Parser accepts optional `flow` blocks. Flow agents lower to
+  `llm.agent(name, config_fn, flow_fn)`.
+- Parser accepts module-scope `agent defaults` declarations, validates
+  duplicates, and lowers to `llm.agent_defaults`.
+- Parser accepts `messages` constructors and lowers recognized roles to message
+  constructor calls.
+- Parser accepts `turn` blocks and lowers to `llm.turn`; the stdlib also
+  supports the `user` shorthand by normalizing it into messages.
+- Parser accepts `budget` blocks and lowers them to ambient
+  `llm.with_budget` scopes. Nested/intersecting budgets charge every active
+  frame for turns, token usage, tool calls, and deadlines.
+- Runtime `llm.agent` owns merged agent defaults, model alias/default
+  resolution, agent-local budget, and ambient context for enclosed `turn {}`
+  calls.
+
+Partial:
+
+- `models` declarations are implemented for module-scope parsing, literal
+  `api_key` rejection, alias-cycle rejection, and lowering to
+  `llm.register_models`. Runtime resolves `default`, aliases, and
+  `provider_model`, and can construct OpenAI-compatible or
+  Anthropic-compatible providers from protocol/base-url/api-key fields when no
+  host provider is already installed. Broader provider policy and lint
+  integration remain host/tooling work.
+- Validation rejects duplicate `agent defaults`, non-module `agent defaults` /
+  `models`, model alias cycles, literal model `api_key` strings,
+  missing/malformed/duplicate tool `gscript:requires`, unknown or duplicate
+  tool `gscript:param` docs, and duplicate statically named tools in literal
+  agent/defaults tool lists.
+- `gscript fmt` and `gscript lint` accept AI-native source through the
+  parser-backed tooling path. The formatter currently normalizes whitespace
+  only; an AST pretty printer for AI-native blocks and doc directives remains
+  pending.
+- Tests cover parser acceptance, stdlib-vs-syntax execution for interpreter and
+  bytecode, anonymous agents/IIFE, defaults, model alias resolution, direct turn
+  sugar, direct turn `response_format` forwarding, validation errors, flow
+  behavior, directive lowering, ambient budget behavior, and AI-native
+  agent/turn record-replay through the existing LLM stdlib recorder/replay API.
+  Gated real-provider smoke and agent-level output validation coverage remain
+  incomplete.
+
+Pending:
+
+- Broader AI metadata/capability lint index described in
+  [Static Analysis](#19-static-analysis).
+- AST-level pretty printing/reindentation for AI-native syntax.
+- Production policy docs and checks for provider/model construction beyond the
+  current stdlib factory behavior.
+- Complete agent-level structured output validation coverage.

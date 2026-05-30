@@ -11,15 +11,21 @@ func ValidateAINative(prog *Program) error {
 	if prog == nil {
 		return nil
 	}
+	ctx := &aiValidationContext{}
 	seenDefaults := false
 	for _, stmt := range prog.Stmts {
+		if tool, ok := stmt.(*ToolDeclStmt); ok {
+			if err := ctx.declareTool(tool); err != nil {
+				return err
+			}
+		}
 		switch s := stmt.(type) {
 		case *AgentDefaultsDeclStmt:
 			if seenDefaults {
 				return fmt.Errorf("line %d: duplicate agent defaults declaration", s.P.Line)
 			}
 			seenDefaults = true
-			if err := validateAIToolsConfig(s.P, "agent defaults", s.Config); err != nil {
+			if err := ctx.validateAIToolsConfig(s.P, "agent defaults", s.Config); err != nil {
 				return err
 			}
 		case *ModelsDeclStmt:
@@ -27,43 +33,87 @@ func ValidateAINative(prog *Program) error {
 				return err
 			}
 		}
-		if err := validateAINativeStmt(stmt, true); err != nil {
+		if err := ctx.validateAINativeStmt(stmt, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateAINativeStmt(stmt Stmt, topLevel bool) error {
+type aiValidationContext struct {
+	tools AIToolRegistry
+}
+
+func (ctx *aiValidationContext) declareTool(tool *ToolDeclStmt) error {
+	if tool == nil {
+		return nil
+	}
+	if ctx.tools == nil {
+		ctx.tools = AIToolRegistry{}
+	}
+	if prev, ok := ctx.tools[tool.Name]; ok {
+		return fmt.Errorf("line %d: duplicate tool declaration %q, first declared at line %d", tool.P.Line, tool.Name, prev.Source.Line)
+	}
+	ctx.tools[tool.Name] = AIToolRegistryEntry{
+		Name:      tool.Name,
+		Requires:  append([]string(nil), tool.Requires...),
+		Doc:       tool.DocComment,
+		Params:    append([]FuncParam(nil), tool.Params...),
+		ParamDocs: cloneStringMap(tool.ParamDocs),
+		Source:    tool.P,
+	}
+	return nil
+}
+
+func (ctx *aiValidationContext) child() *aiValidationContext {
+	child := &aiValidationContext{tools: AIToolRegistry{}}
+	for name, entry := range ctx.tools {
+		child.tools[name] = entry
+	}
+	return child
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func (ctx *aiValidationContext) validateAINativeStmt(stmt Stmt, topLevel bool) error {
 	if stmt == nil {
 		return nil
 	}
 	switch s := stmt.(type) {
 	case *DeclareStmt:
-		return validateAINativeExprList(s.Values)
+		return ctx.validateAINativeExprList(s.Values)
 	case *AssignStmt:
-		if err := validateAINativeExprList(s.Targets); err != nil {
+		if err := ctx.validateAINativeExprList(s.Targets); err != nil {
 			return err
 		}
-		return validateAINativeExprList(s.Values)
+		return ctx.validateAINativeExprList(s.Values)
 	case *CompoundAssignStmt:
-		if err := validateAINativeExpr(s.Target); err != nil {
+		if err := ctx.validateAINativeExpr(s.Target); err != nil {
 			return err
 		}
-		return validateAINativeExpr(s.Value)
+		return ctx.validateAINativeExpr(s.Value)
 	case *IncDecStmt:
-		return validateAINativeExpr(s.Target)
+		return ctx.validateAINativeExpr(s.Target)
 	case *CallStmt:
-		return validateAINativeExpr(s.Call)
+		return ctx.validateAINativeExpr(s.Call)
 	case *GoStmt:
-		return validateAINativeExpr(s.Call)
+		return ctx.validateAINativeExpr(s.Call)
 	case *DeferStmt:
-		return validateAINativeExpr(s.Call)
+		return ctx.validateAINativeExpr(s.Call)
 	case *SendStmt:
-		if err := validateAINativeExpr(s.Channel); err != nil {
+		if err := ctx.validateAINativeExpr(s.Channel); err != nil {
 			return err
 		}
-		return validateAINativeExpr(s.Value)
+		return ctx.validateAINativeExpr(s.Value)
 	case *AgentDefaultsDeclStmt:
 		if !topLevel {
 			return fmt.Errorf("line %d: agent defaults must be declared at module scope", s.P.Line)
@@ -73,159 +123,159 @@ func validateAINativeStmt(stmt Stmt, topLevel bool) error {
 			return fmt.Errorf("line %d: models must be declared at module scope", s.P.Line)
 		}
 	case *BlockStmt:
-		return validateAINativeStmtList(s.Stmts, false)
+		return ctx.child().validateAINativeStmtList(s.Stmts, false)
 	case *FuncDeclStmt:
-		return validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
 	case *ToolDeclStmt:
 		if err := validateToolDecl(s); err != nil {
 			return err
 		}
-		return validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.validateAINativeStmtList(s.Body.Stmts, false)
 	case *AgentDeclStmt:
-		if err := validateAIToolsConfig(s.P, fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
+		if err := ctx.validateAIToolsConfig(s.P, fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
 			return err
 		}
 		if s.Flow != nil {
-			return validateAINativeStmtList(s.Flow.Stmts, false)
+			return ctx.child().validateAINativeStmtList(s.Flow.Stmts, false)
 		}
 	case *BudgetStmt:
-		return validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
 	case *IfStmt:
-		if err := validateAINativeExpr(s.Cond); err != nil {
+		if err := ctx.validateAINativeExpr(s.Cond); err != nil {
 			return err
 		}
-		if err := validateAINativeStmtList(s.Body.Stmts, false); err != nil {
+		if err := ctx.child().validateAINativeStmtList(s.Body.Stmts, false); err != nil {
 			return err
 		}
 		for _, ei := range s.ElseIfs {
-			if err := validateAINativeExpr(ei.Cond); err != nil {
+			if err := ctx.validateAINativeExpr(ei.Cond); err != nil {
 				return err
 			}
 		}
 		for _, ei := range s.ElseIfs {
-			if err := validateAINativeStmtList(ei.Body.Stmts, false); err != nil {
+			if err := ctx.child().validateAINativeStmtList(ei.Body.Stmts, false); err != nil {
 				return err
 			}
 		}
 		if s.ElseBody != nil {
-			return validateAINativeStmtList(s.ElseBody.Stmts, false)
+			return ctx.child().validateAINativeStmtList(s.ElseBody.Stmts, false)
 		}
 	case *ForStmt:
-		if err := validateAINativeExpr(s.Cond); err != nil {
+		if err := ctx.validateAINativeExpr(s.Cond); err != nil {
 			return err
 		}
-		return validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
 	case *ForNumStmt:
-		if err := validateAINativeStmt(s.Init, false); err != nil {
+		if err := ctx.validateAINativeStmt(s.Init, false); err != nil {
 			return err
 		}
-		if err := validateAINativeExpr(s.Cond); err != nil {
+		if err := ctx.validateAINativeExpr(s.Cond); err != nil {
 			return err
 		}
-		if err := validateAINativeStmt(s.Post, false); err != nil {
+		if err := ctx.validateAINativeStmt(s.Post, false); err != nil {
 			return err
 		}
-		return validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
 	case *ForRangeStmt:
-		if err := validateAINativeExpr(s.Iter); err != nil {
+		if err := ctx.validateAINativeExpr(s.Iter); err != nil {
 			return err
 		}
-		return validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
 	case *ReturnStmt:
-		return validateAINativeExprList(s.Values)
+		return ctx.validateAINativeExprList(s.Values)
 	case *SelectStmt:
 		for _, c := range s.Cases {
-			if err := validateAINativeStmtList(c.Body.Stmts, false); err != nil {
+			if err := ctx.child().validateAINativeStmtList(c.Body.Stmts, false); err != nil {
 				return err
 			}
 		}
 		if s.Default != nil {
-			return validateAINativeStmtList(s.Default.Stmts, false)
+			return ctx.child().validateAINativeStmtList(s.Default.Stmts, false)
 		}
 	}
 	return nil
 }
 
-func validateAINativeExprList(exprs []Expr) error {
+func (ctx *aiValidationContext) validateAINativeExprList(exprs []Expr) error {
 	for _, expr := range exprs {
-		if err := validateAINativeExpr(expr); err != nil {
+		if err := ctx.validateAINativeExpr(expr); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateAINativeExpr(expr Expr) error {
+func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 	if expr == nil {
 		return nil
 	}
 	switch e := expr.(type) {
 	case *BinaryExpr:
-		if err := validateAINativeExpr(e.Left); err != nil {
+		if err := ctx.validateAINativeExpr(e.Left); err != nil {
 			return err
 		}
-		return validateAINativeExpr(e.Right)
+		return ctx.validateAINativeExpr(e.Right)
 	case *UnaryExpr:
-		return validateAINativeExpr(e.Operand)
+		return ctx.validateAINativeExpr(e.Operand)
 	case *ParenExpr:
-		return validateAINativeExpr(e.Inner)
+		return ctx.validateAINativeExpr(e.Inner)
 	case *IndexExpr:
-		if err := validateAINativeExpr(e.Table); err != nil {
+		if err := ctx.validateAINativeExpr(e.Table); err != nil {
 			return err
 		}
-		return validateAINativeExpr(e.Index)
+		return ctx.validateAINativeExpr(e.Index)
 	case *FieldExpr:
-		return validateAINativeExpr(e.Table)
+		return ctx.validateAINativeExpr(e.Table)
 	case *CallExpr:
-		if err := validateAINativeExpr(e.Func); err != nil {
+		if err := ctx.validateAINativeExpr(e.Func); err != nil {
 			return err
 		}
-		return validateAINativeExprList(e.Args)
+		return ctx.validateAINativeExprList(e.Args)
 	case *MethodCallExpr:
-		if err := validateAINativeExpr(e.Object); err != nil {
+		if err := ctx.validateAINativeExpr(e.Object); err != nil {
 			return err
 		}
-		return validateAINativeExprList(e.Args)
+		return ctx.validateAINativeExprList(e.Args)
 	case *FuncLitExpr:
-		return validateAINativeStmtList(e.Body.Stmts, false)
+		return ctx.child().validateAINativeStmtList(e.Body.Stmts, false)
 	case *AgentLitExpr:
-		if err := validateAIToolsConfig(e.P, "agent expression", e.Config); err != nil {
+		if err := ctx.validateAIToolsConfig(e.P, "agent expression", e.Config); err != nil {
 			return err
 		}
 		if e.Flow != nil {
-			return validateAINativeStmtList(e.Flow.Stmts, false)
+			return ctx.child().validateAINativeStmtList(e.Flow.Stmts, false)
 		}
 	case *TurnExpr:
-		return validateAIToolsConfig(e.P, "turn", e.Config)
+		return ctx.validateAIToolsConfig(e.P, "turn", e.Config)
 	case *MessagesExpr:
-		return validateAIConfigExprs(e.Fields)
+		return ctx.validateAIConfigExprs(e.Fields)
 	case *ListLitExpr:
-		return validateAINativeExprList(e.Values)
+		return ctx.validateAINativeExprList(e.Values)
 	case *TableLitExpr:
 		for _, f := range e.Fields {
-			if err := validateAINativeExpr(f.Key); err != nil {
+			if err := ctx.validateAINativeExpr(f.Key); err != nil {
 				return err
 			}
-			if err := validateAINativeExpr(f.Value); err != nil {
+			if err := ctx.validateAINativeExpr(f.Value); err != nil {
 				return err
 			}
 		}
 	case *DenseLitExpr:
-		return validateAINativeExprList(e.Values)
+		return ctx.validateAINativeExprList(e.Values)
 	case *RecvExpr:
-		return validateAINativeExpr(e.Channel)
+		return ctx.validateAINativeExpr(e.Channel)
 	case *MakeChanExpr:
-		return validateAINativeExpr(e.Size)
+		return ctx.validateAINativeExpr(e.Size)
 	}
 	return nil
 }
 
-func validateAIConfigExprs(config []ConfigField) error {
+func (ctx *aiValidationContext) validateAIConfigExprs(config []ConfigField) error {
 	for _, f := range config {
-		if err := validateAINativeExpr(f.Key); err != nil {
+		if err := ctx.validateAINativeExpr(f.Key); err != nil {
 			return err
 		}
-		if err := validateAINativeExpr(f.Value); err != nil {
+		if err := ctx.validateAINativeExpr(f.Value); err != nil {
 			return err
 		}
 	}
@@ -307,7 +357,7 @@ func validateToolParamDocs(s *ToolDeclStmt) error {
 	return nil
 }
 
-func validateAIToolsConfig(pos Pos, owner string, config []ConfigField) error {
+func (ctx *aiValidationContext) validateAIToolsConfig(pos Pos, owner string, config []ConfigField) error {
 	for _, f := range config {
 		key, ok := stringConfigKey(f.Key)
 		if !ok || key != "tools" {
@@ -326,15 +376,23 @@ func validateAIToolsConfig(pos Pos, owner string, config []ConfigField) error {
 			if seen[ident.Name] {
 				return fmt.Errorf("line %d: %s tools list includes duplicate tool %q", pos.Line, owner, ident.Name)
 			}
+			if _, ok := ctx.tools[ident.Name]; !ok {
+				return fmt.Errorf("line %d: %s tools list references undeclared tool %q", pos.Line, owner, ident.Name)
+			}
 			seen[ident.Name] = true
 		}
 	}
 	return nil
 }
 
-func validateAINativeStmtList(stmts []Stmt, topLevel bool) error {
+func (ctx *aiValidationContext) validateAINativeStmtList(stmts []Stmt, topLevel bool) error {
 	for _, stmt := range stmts {
-		if err := validateAINativeStmt(stmt, topLevel); err != nil {
+		if tool, ok := stmt.(*ToolDeclStmt); ok {
+			if err := ctx.declareTool(tool); err != nil {
+				return err
+			}
+		}
+		if err := ctx.validateAINativeStmt(stmt, topLevel); err != nil {
 			return err
 		}
 	}

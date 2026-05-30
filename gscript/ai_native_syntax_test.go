@@ -199,6 +199,37 @@ agent answer(q) {
 `,
 			want: "duplicate tool",
 		},
+		{
+			name: "agent unknown static tool",
+			src: `
+agent answer(q) {
+    tools: [missing]
+    user: q
+}
+`,
+			want: "undeclared tool",
+		},
+		{
+			name: "defaults unknown static tool",
+			src: `
+agent defaults {
+    tools: [missing]
+}
+`,
+			want: "undeclared tool",
+		},
+		{
+			name: "turn unknown static tool",
+			src: `
+func f() {
+    _ = turn {
+        tools: [missing]
+        user: "hello"
+    }
+}
+`,
+			want: "undeclared tool",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, mode := range []struct {
@@ -216,6 +247,62 @@ agent answer(q) {
 						t.Fatalf("Exec error = %v, want substring %q", err, tc.want)
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestAINativeSyntaxValidationAllowsDynamicToolRefs(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+func f(tools) {
+    _ = turn {
+        tools: [tools[0]]
+        user: "hello"
+    }
+}
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+		})
+	}
+}
+
+func TestAINativeSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+func make_agent(prefix) {
+    // gscript:requires none
+    tool local_lookup(query) {
+        return prefix .. query, nil
+    }
+    return agent(q) {
+        tools: [local_lookup]
+        user: q
+    }
+}
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
 			}
 		})
 	}

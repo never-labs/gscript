@@ -292,6 +292,21 @@ type ToolParamDoc struct {
 	Doc  string
 }
 
+// AIToolRegistry indexes module-level AI tools by declaration name for
+// source-level validation and future lint passes.
+type AIToolRegistry map[string]AIToolRegistryEntry
+
+// AIToolRegistryEntry captures the source metadata attached to an AI tool
+// declaration.
+type AIToolRegistryEntry struct {
+	Name      string
+	Requires  []string
+	Doc       string
+	Params    []FuncParam
+	ParamDocs map[string]string
+	Source    Pos
+}
+
 // AgentDeclStmt represents a named AI agent declaration.
 type AgentDeclStmt struct {
 	P      Pos
