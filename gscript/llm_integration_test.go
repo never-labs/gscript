@@ -351,3 +351,137 @@ if stored_err != nil {
 		t.Fatalf("structured memory result mismatch: history=%#v project=%#v owner=%#v remembered=%#v source=%#v", historyLen, project, owner, remembered, source)
 	}
 }
+
+// TestAINativeSyntaxGLMDirectAgentToolsIntegration verifies a real GLM
+// agent-as-tool loop using a direct agent value in tools: [agent]. It is gated
+// the same way as the other GLM smokes and never invokes glm_cc.
+func TestAINativeSyntaxGLMDirectAgentToolsIntegration(t *testing.T) {
+	cfg := glmAnthropicCompatibleSmokeConfig(t)
+	t.Setenv("GSCRIPT_GLM_BASE_URL", cfg.Endpoint)
+	t.Setenv("GSCRIPT_GLM_API_KEY", cfg.APIKey)
+	t.Setenv("GSCRIPT_GLM_MODEL", cfg.Model)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibOS | gs.LibLLM))
+	if err := vm.ExecContext(ctx, `
+models {
+    default: "glm-smoke"
+    "glm-smoke": {
+        protocol: "anthropic_compatible"
+        base_url: os.getenv("GSCRIPT_GLM_BASE_URL")
+        api_key: os.getenv("GSCRIPT_GLM_API_KEY")
+        provider_model: os.getenv("GSCRIPT_GLM_MODEL")
+    }
+}
+
+glm_direct_error := nil
+glm_direct_text := ""
+glm_direct_history_len := 0
+glm_direct_system_role := ""
+glm_direct_user_role := ""
+glm_direct_assistant_role := ""
+glm_direct_tool_role := ""
+glm_direct_tool_name := ""
+glm_direct_tool_project := ""
+glm_direct_tool_owner := ""
+glm_direct_tool_source := ""
+
+agent extract_memory(note) {
+    model: "glm-smoke"
+    system: "Return only compact JSON. Extract the project codename and owner from the user note."
+    user: note
+    output: {
+        project: "ORCHID"
+        owner: "ADA"
+        remembered: true
+        source: "direct-agent-tool"
+    }
+    max_tokens: 96
+    temperature: 0
+}
+
+agent supervisor(question) {
+    model: "glm-smoke"
+    system: "You are testing tool use. You must call extract_memory exactly once before answering. After the tool result, answer in one short sentence that includes DIRECT_AGENT_TOOL_OK."
+    user: question
+    tools: [extract_memory]
+    max_steps: 4
+    max_tokens: 128
+    temperature: 0
+}
+
+result, err := supervisor("Use the extract_memory tool with this note: project codename is ORCHID and owner is ADA. Do not answer from memory; call the tool first.")
+if err != nil {
+    glm_direct_error = err.message
+} else {
+    glm_direct_text = result.text
+    glm_direct_history_len = #result.history
+    glm_direct_system_role = result.history[1].role
+    glm_direct_user_role = result.history[2].role
+    glm_direct_assistant_role = result.history[3].role
+    glm_direct_tool_role = result.history[4].role
+    glm_direct_tool_name = result.history[3].tool_call.tool
+    glm_direct_tool_project = result.history[4].value.project
+    glm_direct_tool_owner = result.history[4].value.owner
+    glm_direct_tool_source = result.history[4].value.source
+}
+`); err != nil {
+		t.Fatalf("ExecContext: %v", err)
+	}
+	if got, err := vm.Get("glm_direct_error"); err == nil && got != nil {
+		t.Fatalf("glm_direct_error = %#v", got)
+	}
+	text, err := vm.Get("glm_direct_text")
+	if err != nil {
+		t.Fatalf("Get glm_direct_text: %v", err)
+	}
+	historyLen, err := vm.Get("glm_direct_history_len")
+	if err != nil {
+		t.Fatalf("Get glm_direct_history_len: %v", err)
+	}
+	systemRole, err := vm.Get("glm_direct_system_role")
+	if err != nil {
+		t.Fatalf("Get glm_direct_system_role: %v", err)
+	}
+	userRole, err := vm.Get("glm_direct_user_role")
+	if err != nil {
+		t.Fatalf("Get glm_direct_user_role: %v", err)
+	}
+	assistantRole, err := vm.Get("glm_direct_assistant_role")
+	if err != nil {
+		t.Fatalf("Get glm_direct_assistant_role: %v", err)
+	}
+	toolRole, err := vm.Get("glm_direct_tool_role")
+	if err != nil {
+		t.Fatalf("Get glm_direct_tool_role: %v", err)
+	}
+	toolName, err := vm.Get("glm_direct_tool_name")
+	if err != nil {
+		t.Fatalf("Get glm_direct_tool_name: %v", err)
+	}
+	project, err := vm.Get("glm_direct_tool_project")
+	if err != nil {
+		t.Fatalf("Get glm_direct_tool_project: %v", err)
+	}
+	owner, err := vm.Get("glm_direct_tool_owner")
+	if err != nil {
+		t.Fatalf("Get glm_direct_tool_owner: %v", err)
+	}
+	source, err := vm.Get("glm_direct_tool_source")
+	if err != nil {
+		t.Fatalf("Get glm_direct_tool_source: %v", err)
+	}
+	fmt.Printf("endpoint=%s\n", cfg.Endpoint)
+	fmt.Printf("model=%s\n", cfg.Model)
+	fmt.Printf("direct_text=%q\n", text)
+	fmt.Printf("history_len=%#v roles=%#v/%#v/%#v/%#v tool=%#v project=%#v owner=%#v source=%#v\n",
+		historyLen, systemRole, userRole, assistantRole, toolRole, toolName, project, owner, source)
+	assertLLMSmokeText(t, fmt.Sprint(text), "direct_agent_tool_ok")
+	if historyLen != int64(4) ||
+		systemRole != "system" || userRole != "user" || assistantRole != "assistant" || toolRole != "tool" ||
+		toolName != "extract_memory" || project != "ORCHID" || owner != "ADA" || source != "direct-agent-tool" {
+		t.Fatalf("direct agent tool result mismatch: history=%#v roles=%#v/%#v/%#v/%#v tool=%#v project=%#v owner=%#v source=%#v",
+			historyLen, systemRole, userRole, assistantRole, toolRole, toolName, project, owner, source)
+	}
+}

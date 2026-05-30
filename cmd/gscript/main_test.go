@@ -58,11 +58,18 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	if !caps.AINative.Enabled || !containsString(caps.AINative.Syntax, "agent") || !containsString(caps.AINative.Syntax, "tool") || !containsString(caps.AINative.Syntax, "turn") {
-		t.Fatalf("ai_native capabilities = %+v, want enabled agent/tool/turn syntax", caps.AINative)
+	for _, want := range []string{"agent", "tool", "turn", "messages_bare_expr", "direct_agent_tools", "toolof"} {
+		if !caps.AINative.Enabled || !containsString(caps.AINative.Syntax, want) {
+			t.Fatalf("ai_native syntax = %#v, want %q", caps.AINative.Syntax, want)
+		}
 	}
 	if !containsString(caps.AINative.ToolMetadata, "gscript:requires") || !containsString(caps.AINative.StaticValidation, "static_tool_capabilities") || !containsString(caps.AINative.Tooling, "lint-sarif") {
 		t.Fatalf("ai_native capabilities = %+v, want metadata, static validation, and tooling entries", caps.AINative)
+	}
+	for _, want := range []string{"llm.toolof", "llm.agent_as_tool", "llm.validate_output", "msg.assistant_call", "msg.tool_result", "history.find", "history.find_all", "history.last", "history.append"} {
+		if !containsString(caps.AINative.RuntimePrimitives, want) {
+			t.Fatalf("ai_native runtime primitives = %#v, want %q", caps.AINative.RuntimePrimitives, want)
+		}
 	}
 	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {
 		t.Fatalf("commands = %#v, want core command set", caps.Commands)
@@ -1491,8 +1498,8 @@ total:=1+  2
 	}
 }
 
-func TestFmtAINativeSyntaxCoverage(t *testing.T) {
-	src := `// lookup searches project docs.
+func aiNativeToolchainCoverageSource() []byte {
+	return []byte(`// lookup searches project docs.
 // gscript:requires docs.read
 // gscript:param query search query
 tool lookup(query) {
@@ -1504,45 +1511,71 @@ models {
     fast: {provider_model: "mock-fast"}
 }
 
-agent defaults {
+agent extractor(topic) {
     model: "fast"
-    tools: [lookup]
-    budget: {turns: 2, calls: 4, tokens: 1000, time: 30s}
+    system: "Return JSON."
+    user: topic
+    output: {summary: "example"}
 }
 
-agent researcher(topic) {
-    system: "Use the tool."
+delegate := toolof(extractor, {
+    name: "delegate"
+    description: "Delegate extraction."
+})
+
+agent supervisor(topic) {
+    model: "fast"
+    tools: [extractor, delegate, lookup]
     user: topic
-    tools: [lookup]
 } flow {
-    history := messages {
+    call := {id: "call_1", tool: "lookup", args: {query: topic}}
+    msgs := messages {
         system: system
         user: topic
+        msg.assistant_call(call)
+        msg.tool_result("call_1", {summary: "docs"})
     }
-    result, err := turn {
-        messages: history
+    tool_msg, tool_idx := history.find(msgs, {role: "tool"})
+    assistant_msg, assistant_idx := history.last(msgs, {role: "assistant"})
+    all_users := history.find_all(msgs, {role: "user"})
+    history.append(msgs, msg.user("Summarize."))
+    ok, ok_msg := llm.validate_output({summary: "docs"}, {summary: "example"})
+    _ = tool_msg
+    _ = tool_idx
+    _ = assistant_msg
+    _ = assistant_idx
+    _ = all_users
+    _ = ok
+    _ = ok_msg
+    return turn {
+        messages: msgs
         tools: tools
         model: model
     }
-    return result, err
 }
 
-answer := agent(q) {
-    user: q
+answer, answer_err := supervisor("gscript")
+_ = answer
+_ = answer_err
+`)
 }
 
-budget { turns: 1 } {
-    direct, direct_err := turn {
-        messages: messages { user: "one-shot" }
-    }
-    _ = direct
-    _ = direct_err
-}
-`
-
-	formatted, err := formatSource("ai_native.gs", []byte(src))
+func TestFmtAINativeSyntaxCoverage(t *testing.T) {
+	formatted, err := formatSource("ai_native.gs", aiNativeToolchainCoverageSource())
 	if err != nil {
 		t.Fatalf("formatSource: %v", err)
+	}
+	for _, want := range []string{
+		"tools: [extractor, delegate, lookup]",
+		"msg.assistant_call(call)",
+		"msg.tool_result(\"call_1\", {summary: \"docs\"})",
+		"history.find(msgs, {role: \"tool\"})",
+		"history.find_all(msgs, {role: \"user\"})",
+		"llm.validate_output({summary: \"docs\"}, {summary: \"example\"})",
+	} {
+		if !strings.Contains(string(formatted), want) {
+			t.Fatalf("formatted AI-native source missing %q:\n%s", want, formatted)
+		}
 	}
 	if strings.Contains(string(formatted), "}  \n") {
 		t.Fatalf("formatted source still contains trailing spaces: %q", string(formatted))
@@ -1562,35 +1595,7 @@ budget { turns: 1 } {
 func TestLintAINativeSyntaxCoverage(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ai_native.gs")
-	src := []byte(`// lookup searches project docs.
-// gscript:requires docs.read
-tool lookup(query) {
-    return "found:" .. query, nil
-}
-
-models {
-    default: "fast"
-    fast: {provider_model: "mock-fast"}
-}
-
-agent defaults {
-    model: "fast"
-    tools: [lookup]
-}
-
-agent researcher(topic) {
-    user: topic
-    tools: [lookup]
-}
-
-direct, direct_err := turn {
-    messages: messages { user: "one-shot" }
-}
-
-budget { turns: 1 } {
-    result, err := researcher("gscript")
-}
-`)
+	src := aiNativeToolchainCoverageSource()
 	if err := os.WriteFile(path, src, 0644); err != nil {
 		t.Fatal(err)
 	}

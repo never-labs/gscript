@@ -29,6 +29,7 @@ GScript ships with a comprehensive standard library covering application develop
 | [script](#script) | `script` | Compile/evaluate/load script chunks |
 | [debug](#debug) | `debug` | Runtime diagnostics and source info |
 | [testkit](#testkit) | `testkit` | Script-level runtime test diagnostics |
+| [llm](llm.md) | `llm`, `msg`, `history`, `chat`, `loop` | AI-native agent runtime, tools, and history |
 | [http](#http) | `http` | HTTP server |
 | [gl](#gl) | `gl` | OpenGL 2D drawing |
 | [coroutine](#coroutine) | `coroutine` | Coroutine control (built-in) |
@@ -775,6 +776,29 @@ Core APIs:
 | `testkit.value(v)` / `testkit.typeOf(v)` | Inspect value type, truthiness, raw representation, and common shape fields. |
 | `testkit.protect(fn, ...)` | Run a function through a structured protected-call result table: `{ok, values, n}` or `{ok=false, error}`. |
 | `testkit.functionInfo(fn)` / `testkit.sameFunction(a, b)` | Inspect native/script function identity and compare raw function identity. |
+
+---
+
+## llm
+
+AI-native syntax lowers to the `llm`, `msg`, `history`, `chat`, and `loop`
+standard library tables. This includes agent turns, message blocks, tool
+definitions, direct agent tools, and `agent output` validation. See
+[llm.md](llm.md) for the full reference.
+
+Key helpers:
+
+| Function | Description |
+|---|---|
+| `history.find(h [, opts])` | First matching message plus 1-based index, or `nil, -1`. |
+| `history.find_all(h [, opts])` | Array of matching messages. |
+| `history.last(h [, opts])` | Last matching message plus 1-based index, or `nil, -1`. |
+| `history.append(h, message)` | Append a message to history in place. |
+| `toolof(agent, opts)` / `llm.toolof(agent, opts)` | Expose an agent as a normal tool. |
+| `llm.agent_as_tool(agent, opts)` | Alias for `llm.toolof`. |
+| `llm.validate_output(value, schema)` | Validate a table or JSON string against an `agent output` shape. |
+
+Direct agents in a `tools:` list are desugared to `toolof(agent)` at runtime.
 
 ---
 

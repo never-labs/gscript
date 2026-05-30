@@ -12,7 +12,7 @@ runner commands.
 | Official Lua translated semantics | `tests/official_lua_cases/*.lua` and `tests/official_lua_cases/*.gs` | `go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v` |
 | Official JIT parity | same official case pairs | `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v` |
 | Gated real provider LLM smoke | `gscript/llm_integration_test.go`, `docs/embedding.md` | `GSCRIPT_LLM_INTEGRATION=1 GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=... GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... GSCRIPT_ANTHROPIC_COMPAT_MODEL=... go test ./gscript -run 'Test(AnthropicCompatibleLLMIntegration|AINativeSyntaxAnthropicCompatibleLLMIntegration)' -count=1 -v` |
-| Gated GLM LLM smoke | `gscript/llm_integration_test.go`, `docs/embedding.md`, `examples/ai_native_glm_smoke.gs` | `GSCRIPT_LLM_INTEGRATION=1 GSCRIPT_GLM_API_KEY=... go test ./gscript -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration)' -count=1 -v`; demo: `GSCRIPT_GLM_API_KEY=... gscript -jit=false examples/ai_native_glm_smoke.gs` |
+| Gated GLM LLM smoke | `gscript/llm_integration_test.go`, `docs/embedding.md`, `examples/ai_native_glm_smoke.gs`, `examples/ai_native_glm_direct_agent_tools.gs` | `GSCRIPT_LLM_INTEGRATION=1 GSCRIPT_GLM_API_KEY=... go test ./gscript -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration|AINativeSyntaxGLMDirectAgentToolsIntegration)' -count=1 -v`; demo: `GSCRIPT_GLM_API_KEY=... gscript -jit=false examples/ai_native_glm_direct_agent_tools.gs` |
 
 Official translated cases are semantic parity tests. They compare Lua output to
 GScript output and are not used as performance timings.
@@ -23,9 +23,9 @@ provider endpoint/model/key variables are set. The GLM smoke mirrors the local
 `glm_cc` wrapper without shelling out to it: `GSCRIPT_GLM_API_KEY` may be
 replaced by `SENTINEL_GLM_API_KEY` or `GLM_API_KEY`; endpoint and model default
 to `https://open.bigmodel.cn/api/anthropic` and `glm-5.1`. The AI-native GLM
-case is a multi-turn memory smoke covering explicit history and structured
-`agent output`. Do not commit provider tokens; use local environment variables
-or CI secret storage.
+cases cover multi-turn memory, explicit history, structured `agent output`, and
+direct agent tools via `tools: [extract_memory]`. Do not commit provider tokens;
+use local environment variables or CI secret storage.
 
 ## Performance
 

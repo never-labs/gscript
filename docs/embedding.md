@@ -198,16 +198,18 @@ stores; never commit provider tokens or `.env` files with token values.
 
 For GLM, the repository smoke can reuse the same endpoint/key/model convention
 as a local `glm_cc` wrapper without invoking that command. The wrapper shape is
-Anthropic-compatible. The AI-native smoke is intentionally multi-turn: it asks
-GLM to store a memory, recalls that memory from explicit history, then extracts
-structured JSON through `agent output`.
+Anthropic-compatible. The AI-native smokes are intentionally multi-turn: one
+asks GLM to store a memory, recalls that memory from explicit history, then
+extracts structured JSON through `agent output`; the other runs a supervisor
+with a direct agent value in `tools: [extract_memory]` and checks the resulting
+system/user/assistant/tool history.
 
 ```sh
 GSCRIPT_LLM_INTEGRATION=1 \
 GSCRIPT_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
 GSCRIPT_GLM_API_KEY=... \
 GSCRIPT_GLM_MODEL=glm-5.1 \
-go test ./gscript -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration)' -count=1 -v
+go test ./gscript -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration|AINativeSyntaxGLMDirectAgentToolsIntegration)' -count=1 -v
 ```
 
 `GSCRIPT_GLM_BASE_URL` defaults to `https://open.bigmodel.cn/api/anthropic`,
@@ -215,15 +217,19 @@ and `GSCRIPT_GLM_MODEL` defaults to `glm-5.1`. If `GSCRIPT_GLM_API_KEY` is not
 set, the tests also accept the local wrapper's key variables,
 `SENTINEL_GLM_API_KEY` or `GLM_API_KEY`. Missing keys skip the tests safely.
 
-The same scenario is available as `examples/ai_native_glm_smoke.gs`. Until the
-bytecode VM LLM path is promoted to the default smoke target, run that example
-through the interpreter path:
+The same scenarios are available as `examples/ai_native_glm_smoke.gs` and
+`examples/ai_native_glm_direct_agent_tools.gs`. Until the bytecode VM LLM path
+is promoted to the default smoke target, run those examples through the
+interpreter path:
 
 ```sh
 GSCRIPT_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
 GSCRIPT_GLM_API_KEY=... \
 GSCRIPT_GLM_MODEL=glm-5.1 \
 gscript -jit=false examples/ai_native_glm_smoke.gs
+
+GSCRIPT_GLM_API_KEY=... \
+gscript -jit=false examples/ai_native_glm_direct_agent_tools.gs
 ```
 
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,

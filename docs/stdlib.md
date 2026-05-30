@@ -32,6 +32,7 @@
 | `string` | 保留 Lua `byte/char/find/format/gmatch/gsub/len/lower/match/pack/packsize/rep/sub/upper`，并补 split/trim/replaceAll/join/title/pad/isNumeric/hasPrefix/hasSuffix 等 Go helper。 | Lua pattern 与 Go regexp 两套语义易混；Unicode 与 byte index 边界需更清楚；format/pack 兼容面仍需 ledger 驱动。 | `string` 维持 Lua-facing 名称，Go 正则只进 `regexp`；文档化 byte-oriented API 与 `utf8` API；官方 Lua case 发现缺口时按 GScript 语义补兼容层。 |
 | `table` | 已有 sort/insert/remove/unpack/spread/move/concat、keys/values/contains/indexOf/copy/merge/count/unique/reverse/slice/zip/flatten/toArray，以及 map/filter/reduce/fromArray；部分 helper 通过 VM callback 和 proxy/metatable。 | raw helper 与 proxy-aware helper 边界需要文档化；大范围 unpack 已有限制但用户指南不足；higher-order callback error/coroutine 交互需继续压测。 | 把 API 分成 Lua-compatible、raw Go helper、callback helper 三组；新增稳定顺序选项时必须显式；继续覆盖 sparse/proxy/metamethod/JIT parity。 |
 | `debug` | 已有 traceback/stack/globals/info/value/goStack、事件式 setHook/getHook/emit/setSink；不复刻 Lua local/upvalue 槽位协议。 | 生产环境可能泄露 globals、source path、Go stack；hook/sink 需要并发和重入策略；缺少权限控制。 | `debug` 默认视作 privileged capability；嵌入场景允许禁用 goStack/globals/value；事件结构版本化；测试 hook ordering、filter、error propagation。 |
+| `llm` / AI-native | 已有 `llm.turn`、`llm.react`、`llm.tool`、`toolof`/`llm.toolof`/`llm.agent_as_tool`、`llm.validate_output`、`msg.*`、`history.find`/`find_all`/`last`/`append`，以及 direct agent tools。 | stdlib reference 与 AI-native 语法文档容易分裂；provider/sandbox/record-replay 能力仍需保持 host-first；direct agent tool 的默认 name/schema/params 需要在文档和测试中固定。 | 明确 `agent`、`turn`、`tool`、`messages`、`models` 和 direct agent tools 都脱糖到 stdlib 目标；以 `docs/stdlib/llm.md` 作为运行时 API 参考；默认继续通过 `LibLLM` 和 host provider 显式启用。 |
 
 ## Lua 兼容与 Go-style 取舍
 
@@ -40,6 +41,12 @@
 `json`、`csv`、`http`、`regexp`、`bytes`、`crypto`、`path`、`process`、未来 `context` 是 Go-host 能力层。这里优先采用 Go 标准库术语和结构化 option table，错误边界以可测试、可限权、可嵌入为准。不要为了 Lua 逐字兼容牺牲 Go 宿主可预测性。
 
 同名能力的分工应保持清楚：`os` 提供 Lua 风格薄包装，`process` 提供可捕获、可测试的进程控制；`path` 是 host filepath，`url` 是 URL；`string` 处理 Lua pattern/byte string，`regexp` 处理 RE2；`math.random` 是兼容入口，`rand` 是确定性和扩展随机工具。
+
+AI-native 语法属于 stdlib-first 的宿主能力层，而不是独立运行时分支。
+`agent` 声明、`turn` 块、`tool` 块、`messages {}`、`models {}` 和 direct
+agent tools 最终都落到 `llm`、`msg`、`history`、`chat`、`loop` 与全局
+`toolof` 这些普通表/函数。脚本作者可以使用语法糖；embedder、测试和
+record/replay 应以 [stdlib/llm.md](stdlib/llm.md) 中的 API 为稳定边界。
 
 ## `path` 模块
 
