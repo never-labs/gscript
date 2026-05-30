@@ -241,7 +241,20 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		req, err := llmRequestFromTable(args[0].Table())
+		agentConfigMu.RLock()
+		opts := llmCloneTable(args[0].Table())
+		llmResolveModelAlias(opts, modelAliases)
+		if opts.RawGetString("messages").IsNil() {
+			normalized, err := llmLoopOptions(opts, 1)
+			if err != nil {
+				agentConfigMu.RUnlock()
+				trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
+				return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+			}
+			opts = normalized
+		}
+		agentConfigMu.RUnlock()
+		req, err := llmRequestFromTable(opts)
 		if err != nil {
 			trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
@@ -299,20 +312,19 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		return []Value{BoolValue(true), NilValue()}, nil
 	})
 
-	set("models", func(args []Value) ([]Value, error) {
+	registerModels := func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'llm.models' (table expected)")
+			return nil, fmt.Errorf("bad argument #1 to 'llm.register_models' (table expected)")
 		}
 		agentConfigMu.Lock()
 		modelAliases = llmCloneTable(args[0].Table())
 		agentConfigMu.Unlock()
 		return []Value{BoolValue(true), NilValue()}, nil
-	})
+	}
+	set("models", registerModels)
+	set("register_models", registerModels)
 
-	set("run_agent", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'llm.run_agent' (table expected)")
-		}
+	runAgentConfig := func(src *Table) ([]Value, error) {
 		if call == nil {
 			return nil, fmt.Errorf("llm.run_agent requires a function caller")
 		}
@@ -322,7 +334,7 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
 		agentConfigMu.RLock()
-		merged := llmMergeTables(agentDefaults, args[0].Table())
+		merged := llmMergeTables(agentDefaults, src)
 		llmResolveModelAlias(merged, modelAliases)
 		opts, err := llmLoopOptions(merged, 0)
 		agentConfigMu.RUnlock()
@@ -335,6 +347,38 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 			return nil, err
 		}
 		return result, nil
+	}
+
+	set("run_agent", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.run_agent' (table expected)")
+		}
+		return runAgentConfig(args[0].Table())
+	})
+
+	set("agent", func(args []Value) ([]Value, error) {
+		if len(args) < 2 || !args[0].IsString() || !args[1].IsFunction() {
+			return nil, fmt.Errorf("bad argument to 'llm.agent' (name, config function expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("llm.agent requires a function caller")
+		}
+		name := args[0].Str()
+		configFn := args[1]
+		agentFn := &GoFunction{Name: "llm.agent." + name, Fn: func(callArgs []Value) ([]Value, error) {
+			configVals, err := call(configFn, callArgs)
+			if err != nil {
+				return nil, err
+			}
+			if len(configVals) >= 2 && !configVals[1].IsNil() {
+				return []Value{NilValue(), configVals[1]}, nil
+			}
+			if len(configVals) == 0 || !configVals[0].IsTable() {
+				return []Value{NilValue(), llmErrorValue("validation", "agent config function must return a table")}, nil
+			}
+			return runAgentConfig(configVals[0].Table())
+		}}
+		return []Value{FunctionValue(agentFn)}, nil
 	})
 
 	return t

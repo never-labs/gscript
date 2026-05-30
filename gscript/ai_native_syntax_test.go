@@ -88,3 +88,94 @@ turn_text := direct.text
 		})
 	}
 }
+
+func TestAINativeNamedAgentFlowAndDirectTurnSugar(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "flow-ok"},
+				{Status: "final_answer", Text: "turn-sugar-ok"},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+models {
+    default: "alias"
+    alias: "resolved-model"
+}
+
+tool echo_tool(query) {
+    return query, nil
+}
+
+agent support(q) {
+    model: "alias"
+    tools: [echo_tool]
+    system: "Use tools when useful."
+    user: q
+} flow {
+    r, err := turn {
+        model: model
+        messages: messages {
+            system: system
+            user: q
+        }
+        tools: tools
+    }
+    return r, err
+}
+
+flow_result, flow_err := support("hello")
+turn_result, turn_err := turn {
+    user: "direct user shorthand"
+}
+flow_text := flow_result.text
+turn_text := turn_result.text
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 2 {
+				t.Fatalf("requests = %d, want 2", len(provider.requests))
+			}
+			if provider.requests[0].Model != "resolved-model" {
+				t.Fatalf("flow model = %q, want resolved-model", provider.requests[0].Model)
+			}
+			if len(provider.requests[0].Messages) != 2 || provider.requests[0].Messages[0].Text != "Use tools when useful." || provider.requests[0].Messages[1].Text != "hello" {
+				t.Fatalf("flow messages = %#v", provider.requests[0].Messages)
+			}
+			if len(provider.requests[0].Tools) != 1 || provider.requests[0].Tools[0].Name != "echo_tool" {
+				t.Fatalf("flow tools = %#v", provider.requests[0].Tools)
+			}
+			if provider.requests[1].Model != "resolved-model" {
+				t.Fatalf("turn sugar model = %q, want default resolved-model", provider.requests[1].Model)
+			}
+			if len(provider.requests[1].Messages) != 1 || provider.requests[1].Messages[0].Role != "user" || provider.requests[1].Messages[0].Text != "direct user shorthand" {
+				t.Fatalf("turn sugar messages = %#v", provider.requests[1].Messages)
+			}
+			flowText, err := vm.Get("flow_text")
+			if err != nil {
+				t.Fatalf("Get flow_text: %v", err)
+			}
+			if flowText != "flow-ok" {
+				t.Fatalf("flow_text = %#v", flowText)
+			}
+			turnText, err := vm.Get("turn_text")
+			if err != nil {
+				t.Fatalf("Get turn_text: %v", err)
+			}
+			if turnText != "turn-sugar-ok" {
+				t.Fatalf("turn_text = %#v", turnText)
+			}
+		})
+	}
+}

@@ -91,12 +91,12 @@ func desugarStmt(stmt Stmt) Stmt {
 		return &DeclareStmt{
 			P:      s.P,
 			Names:  []string{s.Name},
-			Values: []Expr{desugarAgentFunction(s.P, s.Params, s.Config, s.Flow)},
+			Values: []Expr{desugarAgentValue(s.P, s.Name, s.Params, s.Config, s.Flow)},
 		}
 	case *AgentDefaultsDeclStmt:
 		return &CallStmt{P: s.P, Call: llmCall(s.P, "agent_defaults", configTable(s.P, s.Config))}
 	case *ModelsDeclStmt:
-		return &CallStmt{P: s.P, Call: llmCall(s.P, "models", configTable(s.P, s.Config))}
+		return &CallStmt{P: s.P, Call: llmCall(s.P, "register_models", configTable(s.P, s.Config))}
 	case *BudgetStmt:
 		return desugarBlock(s.Body)
 	default:
@@ -158,7 +158,7 @@ func desugarExpr(expr Expr) Expr {
 	case *TurnExpr:
 		return llmCall(e.P, "turn", configTable(e.P, e.Config))
 	case *AgentLitExpr:
-		return desugarAgentFunction(e.P, e.Params, e.Config, e.Flow)
+		return desugarAgentValue(e.P, "", e.Params, e.Config, e.Flow)
 	default:
 		return expr
 	}
@@ -182,14 +182,18 @@ func desugarTable(e *TableLitExpr) *TableLitExpr {
 	return &TableLitExpr{P: e.P, Fields: fields}
 }
 
-func desugarAgentFunction(pos Pos, params []FuncParam, config []ConfigField, flow *BlockStmt) Expr {
-	body := &BlockStmt{P: pos}
-	if flow != nil {
-		body.Stmts = append(body.Stmts, configLocalDecls(config)...)
-		body.Stmts = append(body.Stmts, desugarStmtList(flow.Stmts)...)
-	} else {
-		body.Stmts = []Stmt{&ReturnStmt{P: pos, Values: []Expr{llmCall(pos, "run_agent", configTable(pos, config))}}}
+func desugarAgentValue(pos Pos, name string, params []FuncParam, config []ConfigField, flow *BlockStmt) Expr {
+	if flow == nil {
+		return llmCall(pos, "agent",
+			&StringLit{P: pos, Value: name},
+			&FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: &BlockStmt{P: pos, Stmts: []Stmt{
+				&ReturnStmt{P: pos, Values: []Expr{configTable(pos, config)}},
+			}}},
+		)
 	}
+	body := &BlockStmt{P: pos}
+	body.Stmts = append(body.Stmts, configLocalDecls(config)...)
+	body.Stmts = append(body.Stmts, desugarStmtList(flow.Stmts)...)
 	return &FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: body}
 }
 
