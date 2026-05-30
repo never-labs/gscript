@@ -485,6 +485,11 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"max_steps",
 		"max_tool_retries",
 		"max_history_tokens",
+		"budget",
+		"budget_tokens",
+		"budget_turns",
+		"budget_calls",
+		"budget_money",
 	} {
 		if v := src.RawGetString(key); !v.IsNil() {
 			opts.RawSetString(key, v)
@@ -750,7 +755,12 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 	if maxHistoryTokens < 0 {
 		maxHistoryTokens = 0
 	}
+	budget := llmBudgetFromOptions(opts)
 	for step := 0; step < maxSteps; step++ {
+		if err := budget.beforeTurn(); !err.IsNil() {
+			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), err}, nil
+		}
 		requestHistory := history
 		if maxHistoryTokens > 0 {
 			requestHistory = chatWindow(llmTableFromValues(history).Table(), maxHistoryTokens)
@@ -773,6 +783,7 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		if err := CheckHostResultBytes(maxHostResult, turnValue); err != nil {
 			return nil, err
 		}
+		budget.chargeTurn(res.Usage)
 		switch res.Status {
 		case "", "final_answer":
 			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
@@ -785,6 +796,10 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 				callValue := llmToolCallValue(res.Calls[i])
 				history = append(history, llmAssistantCallMessage(callValue))
 				llmTrace(trace, LLMTraceEvent{Type: "tool_call", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+				if err := budget.beforeToolCall(); !err.IsNil() {
+					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
+					return []Value{NilValue(), err}, nil
+				}
 				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, maxToolRetries, trace, int64(step), res.Calls[i])
 				if !err.IsNil() {
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
@@ -841,6 +856,117 @@ func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetri
 		}
 	}
 	return []Value{NilValue(), lastErr}, NilValue()
+}
+
+type llmBudget struct {
+	maxTokens int64
+	maxTurns  int64
+	maxCalls  int64
+	maxMoney  float64
+
+	usedTokens int64
+	usedTurns  int64
+	usedCalls  int64
+	usedMoney  float64
+}
+
+func llmBudgetFromOptions(opts *Table) *llmBudget {
+	b := &llmBudget{
+		maxTokens: -1,
+		maxTurns:  -1,
+		maxCalls:  -1,
+		maxMoney:  -1,
+	}
+	if v := opts.RawGetString("budget_tokens"); !v.IsNil() {
+		b.maxTokens = toInt(v)
+	}
+	if v := opts.RawGetString("budget_turns"); !v.IsNil() {
+		b.maxTurns = toInt(v)
+	}
+	if v := opts.RawGetString("budget_calls"); !v.IsNil() {
+		b.maxCalls = toInt(v)
+	}
+	if v := opts.RawGetString("budget_money"); !v.IsNil() {
+		b.maxMoney = toFloat(v)
+	}
+	if t := opts.RawGetString("budget"); t.IsTable() {
+		bt := t.Table()
+		if v := bt.RawGetString("tokens"); !v.IsNil() {
+			b.maxTokens = toInt(v)
+		}
+		if v := bt.RawGetString("turns"); !v.IsNil() {
+			b.maxTurns = toInt(v)
+		}
+		if v := bt.RawGetString("calls"); !v.IsNil() {
+			b.maxCalls = toInt(v)
+		}
+		if v := bt.RawGetString("money"); !v.IsNil() {
+			b.maxMoney = toFloat(v)
+		}
+	}
+	if b.maxTokens < 0 {
+		b.maxTokens = -1
+	}
+	if b.maxTurns < 0 {
+		b.maxTurns = -1
+	}
+	if b.maxCalls < 0 {
+		b.maxCalls = -1
+	}
+	if b.maxMoney < 0 {
+		b.maxMoney = -1
+	}
+	return b
+}
+
+func (b *llmBudget) beforeTurn() Value {
+	if b == nil {
+		return NilValue()
+	}
+	if b.maxTurns >= 0 && b.usedTurns >= b.maxTurns {
+		return llmBudgetError("turns", b.maxTurns, b.usedTurns)
+	}
+	if b.maxTokens >= 0 && b.usedTokens >= b.maxTokens {
+		return llmBudgetError("tokens", b.maxTokens, b.usedTokens)
+	}
+	if b.maxMoney >= 0 && b.usedMoney >= b.maxMoney {
+		return llmBudgetError("money", 0, 0)
+	}
+	b.usedTurns++
+	return NilValue()
+}
+
+func (b *llmBudget) chargeTurn(usage LLMTurnUsage) {
+	if b == nil {
+		return
+	}
+	b.usedTokens += usage.InputTokens + usage.OutputTokens
+	b.usedMoney += usage.Cost
+}
+
+func (b *llmBudget) beforeToolCall() Value {
+	if b == nil {
+		return NilValue()
+	}
+	if b.maxCalls >= 0 && b.usedCalls >= b.maxCalls {
+		return llmBudgetError("calls", b.maxCalls, b.usedCalls)
+	}
+	b.usedCalls++
+	return NilValue()
+}
+
+func llmBudgetError(dimension string, limit, used int64) Value {
+	t := NewTable()
+	t.RawSetString("kind", StringValue("budget"))
+	t.RawSetString("dimension", StringValue(dimension))
+	t.RawSetString("message", StringValue("llm budget exceeded: "+dimension))
+	if limit > 0 {
+		t.RawSetString("limit", IntValue(limit))
+	}
+	if used > 0 {
+		t.RawSetString("used", IntValue(used))
+	}
+	return TableValue(t)
 }
 
 func llmErrorKind(v Value) string {
