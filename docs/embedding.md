@@ -175,6 +175,12 @@ return result.text, nil
 `validation`, `policy`, `user`, and `capability` are fed back as tool-error
 messages; unknown kinds are returned as fatal agent errors.
 
+The companion `chat` module provides pure history utilities for agent loops:
+`chat.merge(history, additions)`, `chat.window(history, max_tokens)`,
+`chat.token_count(value)`, and `chat.summarize(history, opts)`. Token counts are
+lightweight estimates, intended for local budgeting and tests rather than exact
+provider billing.
+
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:
 

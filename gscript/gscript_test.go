@@ -198,6 +198,52 @@ tool_id := messages[5].tool_use_id
 	}
 }
 
+func TestChatHelpers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			if err := vm.Exec(`
+history := {
+    msg.system("You are concise."),
+    msg.user("one two three four"),
+    msg.assistant("five six"),
+}
+more := {msg.user("seven eight")}
+merged := chat.merge(history, more)
+windowed := chat.window(merged, 4)
+tokens := chat.token_count(merged)
+summary := chat.summarize(merged, {max_chars: 32})
+merged_len := #merged
+window_len := #windowed
+summary_role := summary.role
+summary_text := summary.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			mergedLen, _ := vm.Get("merged_len")
+			windowLen, _ := vm.Get("window_len")
+			tokens, _ := vm.Get("tokens")
+			summaryRole, _ := vm.Get("summary_role")
+			summaryText, _ := vm.Get("summary_text")
+			if mergedLen != int64(4) || windowLen != int64(1) {
+				t.Fatalf("merged_len=%#v window_len=%#v", mergedLen, windowLen)
+			}
+			if tokens.(int64) <= 0 {
+				t.Fatalf("tokens = %#v", tokens)
+			}
+			if summaryRole != "system" || !strings.Contains(fmt.Sprint(summaryText), "...") {
+				t.Fatalf("summary_role=%#v summary_text=%#v", summaryRole, summaryText)
+			}
+		})
+	}
+}
+
 func TestLLMCommandProvider(t *testing.T) {
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),

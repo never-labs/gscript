@@ -45,6 +45,7 @@ JIT fast path policy:
 | `bit32` | Pure | none; 32-bit integer bit operations | runtime error | native identity for selected bit ops; VM fallback otherwise |
 | `bits` | Pure | none; Go `math/bits` style helpers | runtime error | VM fallback |
 | `bytes` | Pure | none; byte-string buffers and transforms | runtime error for bad argument shape; `nil, err` for malformed hex/bounds | VM fallback |
+| `chat` | Pure | none; agent chat-history helpers and lightweight token estimates | runtime error for bad argument shape | VM fallback |
 | `color` | Pure | none; color conversion and geometry helpers | runtime error | VM fallback |
 | `compress` | Pure | CPU/memory only through compression codecs | runtime error for bad argument shape; `nil, err` for malformed compressed data | VM fallback |
 | `container` | Pure | in-process set/queue/deque/stack/heap objects | runtime error; sentinel nil/false for empty pop/peek/lookup | VM callback and VM fallback |

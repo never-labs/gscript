@@ -1212,6 +1212,9 @@ func (vm *VM) RegisterLLMLib() {
 	msgLib := runtime.TableValue(runtime.BuildLLMMessageLib())
 	vm.SetGlobal("msg", msgLib)
 	vm.setPackageLoaded("msg", msgLib)
+	chatLib := runtime.TableValue(runtime.BuildChatLib())
+	vm.SetGlobal("chat", chatLib)
+	vm.setPackageLoaded("chat", chatLib)
 }
 
 func (vm *VM) RegisterHTTPLib() {

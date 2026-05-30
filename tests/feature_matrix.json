@@ -268,7 +268,7 @@
     },
     {
       "id": "llm_native_integration",
-      "name": "Native LLM turn/tool/msg integration",
+      "name": "Native LLM turn/tool/msg/chat integration",
       "category": "embedding-ai",
       "spec_sections": ["Modules, Loading, And Scope", "Numbers, Strings, And Stdlib", "Intentional Differences From Lua"],
       "parser": {"status": "not_applicable", "refs": []},

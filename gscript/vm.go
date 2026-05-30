@@ -327,6 +327,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"bit32":     libs&LibBit32 != 0,
 		"bits":      libs&LibBits != 0,
 		"bytes":     libs&LibBytes != 0,
+		"chat":      libs&LibLLM != 0,
 		"color":     libs&LibColor != 0,
 		"compress":  libs&LibCompress != 0,
 		"container": libs&LibContainer != 0,

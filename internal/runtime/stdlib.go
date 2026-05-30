@@ -9,6 +9,7 @@ var stdlibModuleNames = []string{
 	"bit32",
 	"bits",
 	"bytes",
+	"chat",
 	"color",
 	"compress",
 	"container",
@@ -128,6 +129,7 @@ func (interp *Interpreter) registerStdlib() {
 		}
 	})))
 	interp.globals.Define("msg", TableValue(BuildLLMMessageLib()))
+	interp.globals.Define("chat", TableValue(BuildChatLib()))
 
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
