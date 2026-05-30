@@ -195,12 +195,8 @@ add_release_smoke() {
         add_skip "Release Smoke" "missing benchmarks/suite/table_field_access.gs"
         return
     fi
-    if [ ! -d cmd/dump_bytecode ]; then
-        add_skip "Release Smoke" "missing cmd/dump_bytecode"
-        return
-    fi
     add_run "Release Smoke" \
-        "go run ./cmd/gscript tests/01_basic.gs && go run ./cmd/gscript -jit benchmarks/suite/table_field_access.gs && go run ./cmd/dump_bytecode tests/01_basic.gs"
+        "go run ./cmd/gscript tests/01_basic.gs && go run ./cmd/gscript -jit benchmarks/suite/table_field_access.gs && go run ./cmd/gscript inspect bytecode tests/01_basic.gs"
 }
 
 build_quick_plan() {
