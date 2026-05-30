@@ -1180,9 +1180,9 @@ func (vm *VM) SetStringMeta(meta *runtime.Table) {
 func (vm *VM) RegisterStringLib() {
 	var strLib *runtime.Table
 	if existing, ok := vm.globals["string"]; ok && existing.IsTable() {
-		strLib = runtime.RefreshStringLibWithCaller(existing.Table(), vm.callValue)
+		strLib = runtime.RefreshStringLibWithCaller(existing.Table(), vm.callValue, func() int64 { return vm.maxHostResult })
 	} else {
-		strLib = runtime.BuildStringLibWithCaller(vm.callValue)
+		strLib = runtime.BuildStringLibWithCaller(vm.callValue, func() int64 { return vm.maxHostResult })
 		vm.SetGlobal("string", runtime.TableValue(strLib))
 	}
 	meta := runtime.NewTable()

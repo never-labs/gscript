@@ -261,7 +261,7 @@ Current sandbox gaps:
   call, including standard-library functions and registered host callbacks. It
   checks direct strings and strings nested in returned tables. Process
   stdout/stderr, `net`/`http` response bodies, predictable encoding outputs,
-  CSV encoding, bytes/binary/crypto/url/utf8 output helpers, and compressed decode
+  CSV encoding, bytes/binary/crypto/url/utf8/string output helpers, and compressed decode
   output are bounded while they are captured or expanded.
 - `WithMaxModuleBytes` limits bytes read by script-side loading APIs such as
   `require`, `dofile`, `loadfile`, and `script.loadFile`.

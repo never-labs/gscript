@@ -92,8 +92,14 @@ type FunctionCaller func(Value, []Value) ([]Value, error)
 // BuildStringLibWithCaller creates the "string" standard library table using
 // caller for function-valued replacements. A nil caller still supports native
 // GoFunction callbacks.
-func BuildStringLibWithCaller(caller FunctionCaller) *Table {
+func BuildStringLibWithCaller(caller FunctionCaller, maxHostResults ...func() int64) *Table {
 	t := NewTable()
+	maxHostResult := func() int64 {
+		if len(maxHostResults) == 0 || maxHostResults[0] == nil {
+			return 0
+		}
+		return maxHostResults[0]()
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -157,7 +163,7 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 	// strings from the conventional string namespace. The canonical API is the
 	// binary library; these are compatibility entry points, not Lua format
 	// string clones.
-	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("string.pack", args, 0) })
+	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("string.pack", args, maxHostResult()) })
 	set("unpack", func(args []Value) ([]Value, error) { return binaryUnpackValues("string.unpack", args) })
 	set("packsize", func(args []Value) ([]Value, error) { return binarySizeValues("string.packsize", args) })
 
@@ -195,7 +201,13 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 			sep = args[2].Str()
 		}
 		if sep == "" {
+			if err := CheckProjectedRepeatedStringBytes(maxHostResult(), len(s), n, 0); err != nil {
+				return nil, err
+			}
 			return []Value{StringValue(strings.Repeat(s, n))}, nil
+		}
+		if err := CheckProjectedRepeatedStringBytes(maxHostResult(), len(s), n, len(sep)); err != nil {
+			return nil, err
 		}
 		parts := make([]string, n)
 		for i := range parts {
@@ -261,6 +273,9 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 
 	// string.char(i...) -> string
 	set("char", func(args []Value) ([]Value, error) {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(args)); err != nil {
+			return nil, err
+		}
 		buf := make([]byte, 0, len(args))
 		for _, a := range args {
 			n := int(toInt(a))
@@ -961,6 +976,16 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		for i := 0; i < length; i++ {
 			parts[i] = tbl.RawGet(IntValue(int64(i + 1))).String()
 		}
+		total := 0
+		for _, part := range parts {
+			total += len(part)
+		}
+		if length > 1 {
+			total += len(sep) * (length - 1)
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), total); err != nil {
+			return nil, err
+		}
 		return []Value{StringValue(strings.Join(parts, sep))}, nil
 	})
 
@@ -998,6 +1023,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		if pad == "" {
 			pad = " "
 		}
+		if n > len(s) {
+			if err := CheckProjectedHostStringBytes(maxHostResult(), n); err != nil {
+				return nil, err
+			}
+		}
 		for len(s) < n {
 			s = pad + s
 		}
@@ -1022,6 +1052,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		if pad == "" {
 			pad = " "
 		}
+		if n > len(s) {
+			if err := CheckProjectedHostStringBytes(maxHostResult(), n); err != nil {
+				return nil, err
+			}
+		}
 		for len(s) < n {
 			s = s + pad
 		}
@@ -1045,6 +1080,9 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 		if n <= 0 {
 			return []Value{StringValue("")}, nil
 		}
+		if err := CheckProjectedRepeatedStringBytes(maxHostResult(), len(s), n, 0); err != nil {
+			return nil, err
+		}
 		return []Value{StringValue(strings.Repeat(s, n))}, nil
 	})
 
@@ -1063,11 +1101,11 @@ func BuildStringLibWithCaller(caller FunctionCaller) *Table {
 
 // RefreshStringLibWithCaller updates an existing string library table in place,
 // preserving module identity for require/package.loaded users.
-func RefreshStringLibWithCaller(t *Table, caller FunctionCaller) *Table {
+func RefreshStringLibWithCaller(t *Table, caller FunctionCaller, maxHostResults ...func() int64) *Table {
 	if t == nil {
-		return BuildStringLibWithCaller(caller)
+		return BuildStringLibWithCaller(caller, maxHostResults...)
 	}
-	fresh := BuildStringLibWithCaller(caller)
+	fresh := BuildStringLibWithCaller(caller, maxHostResults...)
 	for key, val, ok := fresh.Next(NilValue()); ok; key, val, ok = fresh.Next(key) {
 		t.RawSet(key, val)
 	}

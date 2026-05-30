@@ -75,6 +75,31 @@ func CheckProjectedHostStringBytes(max int64, size int) error {
 	return nil
 }
 
+func CheckProjectedRepeatedStringBytes(max int64, valueLen, count, sepLen int) error {
+	if max <= 0 || count <= 0 {
+		return nil
+	}
+	n := int64(count)
+	base := int64(valueLen)
+	sep := int64(sepLen)
+	if base > 0 && n > max/base {
+		return fmt.Errorf("host result byte limit exceeded (%d)", max)
+	}
+	total := base * n
+	if sep > 0 && n > 1 {
+		gaps := n - 1
+		remaining := max - total
+		if remaining < 0 || gaps > remaining/sep {
+			return fmt.Errorf("host result byte limit exceeded (%d)", max)
+		}
+		total += gaps * sep
+	}
+	if total > max {
+		return fmt.Errorf("host result byte limit exceeded (%d)", max)
+	}
+	return nil
+}
+
 type hostResultBuffer struct {
 	buf bytes.Buffer
 	max int64

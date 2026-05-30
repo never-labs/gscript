@@ -54,7 +54,7 @@ func StdlibModuleNames() []string {
 // This is called from New() after registerBuiltins().
 func (interp *Interpreter) registerStdlib() {
 	// String library
-	strLib := BuildStringLibWithCaller(interp.callFunction)
+	strLib := BuildStringLibWithCaller(interp.callFunction, func() int64 { return interp.maxHostResult })
 	interp.globals.Define("string", TableValue(strLib))
 
 	// Set up string metatable so "hello":upper() works
