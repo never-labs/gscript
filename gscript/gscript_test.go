@@ -300,6 +300,52 @@ react_text := react.text
 	}
 }
 
+func TestLoopSnapshotResume(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+pending := {id: "call_1", tool: "lookup", args: {name: "old"}}
+token := loop.snapshot({msg.user("find docs")}, pending)
+approved, approved_err := loop.resume(token, {ok: true, args: {name: "gscript"}}, {lookup})
+approved_status := approved.status
+approved_history_len := #approved.history
+approved_value := approved.value
+
+denied_token := loop.snapshot({msg.user("refund")}, {id: "call_2", tool: "lookup", args: {name: "x"}})
+denied, denied_err := loop.resume(denied_token, {ok: false, reason: "needs approval"})
+denied_status := denied.status
+denied_history_len := #denied.history
+missing, missing_err := loop.resume(denied_token, {ok: true})
+missing_kind := missing_err.kind
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			approvedStatus, _ := vm.Get("approved_status")
+			approvedHistoryLen, _ := vm.Get("approved_history_len")
+			approvedValue, _ := vm.Get("approved_value")
+			deniedStatus, _ := vm.Get("denied_status")
+			deniedHistoryLen, _ := vm.Get("denied_history_len")
+			missingKind, _ := vm.Get("missing_kind")
+			if approvedStatus != "dispatched" || approvedHistoryLen != int64(3) || approvedValue != "docs:gscript" {
+				t.Fatalf("approved status=%#v history=%#v value=%#v", approvedStatus, approvedHistoryLen, approvedValue)
+			}
+			if deniedStatus != "denied" || deniedHistoryLen != int64(3) || missingKind != "validation" {
+				t.Fatalf("denied status=%#v history=%#v missing=%#v", deniedStatus, deniedHistoryLen, missingKind)
+			}
+		})
+	}
+}
+
 func TestLLMCommandProvider(t *testing.T) {
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),

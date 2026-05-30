@@ -187,6 +187,11 @@ the full returned `result.history`.
 The `loop` module is a thin convenience layer over `llm.react`: `loop.react`
 accepts either explicit `messages` or `{system, user}` fields, and `loop.simple`
 performs a single-turn loop with the same result/error shape.
+For human-in-the-loop workflows, `loop.snapshot(history, pending_call)` returns
+an opaque token, and `loop.resume(token, approval, tools?)` materializes an
+approved or denied tool call back into history. Passing a tool list to
+`loop.resume` dispatches approved calls immediately; omitting it returns an
+`approved` result for the host or script to handle.
 
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:

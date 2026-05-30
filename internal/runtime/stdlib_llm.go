@@ -2,7 +2,10 @@ package runtime
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"sync"
 )
 
 // LLMProvider is the host boundary behind llm.turn. Implementations may call a
@@ -288,6 +291,8 @@ func BuildLLMMessageLib() *Table {
 
 func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
 	t := NewTable()
+	snapshots := map[string]Value{}
+	var snapshotsMu sync.Mutex
 
 	hostLimit := func() int64 {
 		if maxHostResult == nil {
@@ -357,7 +362,103 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		return llmReact(opts, p, call, currentContext(), hostLimit(), trace)
 	})
 
+	set("snapshot", func(args []Value) ([]Value, error) {
+		if len(args) < 2 || !args[0].IsTable() || !args[1].IsTable() {
+			return nil, fmt.Errorf("bad argument to 'loop.snapshot' (history, pending_call expected)")
+		}
+		token, err := llmSnapshotToken()
+		if err != nil {
+			return nil, err
+		}
+		snapshot := NewTable()
+		snapshot.RawSetString("history", args[0])
+		snapshot.RawSetString("pending", args[1])
+		snapshotsMu.Lock()
+		snapshots[token] = TableValue(snapshot)
+		snapshotsMu.Unlock()
+		return []Value{StringValue(token)}, nil
+	})
+
+	set("resume", func(args []Value) ([]Value, error) {
+		if len(args) < 2 || !args[0].IsString() || !args[1].IsTable() {
+			return nil, fmt.Errorf("bad argument to 'loop.resume' (token, approval expected)")
+		}
+		snapshotsMu.Lock()
+		snapshot, ok := snapshots[args[0].Str()]
+		if !ok || !snapshot.IsTable() {
+			snapshotsMu.Unlock()
+			return []Value{NilValue(), llmErrorValue("validation", "snapshot not found")}, nil
+		}
+		delete(snapshots, args[0].Str())
+		snapshotsMu.Unlock()
+		var tools *Table
+		if len(args) >= 3 && args[2].IsTable() {
+			tools = args[2].Table()
+		}
+		return llmResumeSnapshot(snapshot.Table(), args[1].Table(), tools, call)
+	})
+
 	return t
+}
+
+func llmSnapshotToken() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", fmt.Errorf("loop.snapshot: failed to generate token: %v", err)
+	}
+	return hex.EncodeToString(b[:]), nil
+}
+
+func llmResumeSnapshot(snapshot, approval, tools *Table, call FunctionCaller) ([]Value, error) {
+	historyValue := snapshot.RawGetString("history")
+	pendingValue := snapshot.RawGetString("pending")
+	if !historyValue.IsTable() || !pendingValue.IsTable() {
+		return []Value{NilValue(), llmErrorValue("validation", "malformed snapshot")}, nil
+	}
+	history := llmMessageValuesFromTable(historyValue.Table())
+	pending := pendingValue
+	if replacementArgs := approval.RawGetString("args"); replacementArgs.IsTable() {
+		pending = llmToolCallValue(llmToolCallFromTable(pendingValue.Table()))
+		pending.Table().RawSetString("args", replacementArgs)
+	}
+	history = append(history, llmAssistantCallMessage(pending))
+
+	approved := approval.RawGetString("ok").Truthy()
+	reason := approval.RawGetString("reason").Str()
+	if !approved {
+		if reason == "" {
+			reason = "denied"
+		}
+		history = append(history, llmToolErrorMessage(pending.Table().RawGetString("id").Str(), reason))
+		return []Value{llmResumeResultValue("denied", pending, llmTableFromValues(history), NilValue()), NilValue()}, nil
+	}
+	if tools == nil || call == nil {
+		return []Value{llmResumeResultValue("approved", pending, llmTableFromValues(history), NilValue()), NilValue()}, nil
+	}
+	result, err := llmDispatch(call, pending.Table(), tools)
+	if err != nil {
+		return nil, err
+	}
+	if len(result) >= 2 && !result[1].IsNil() {
+		message := result[1].Table().RawGetString("message").Str()
+		history = append(history, llmToolErrorMessage(pending.Table().RawGetString("id").Str(), message))
+		return []Value{llmResumeResultValue("tool_error", pending, llmTableFromValues(history), result[1]), NilValue()}, nil
+	}
+	value := NilValue()
+	if len(result) > 0 {
+		value = result[0]
+	}
+	history = append(history, llmToolResultMessage(pending.Table().RawGetString("id").Str(), value))
+	return []Value{llmResumeResultValue("dispatched", pending, llmTableFromValues(history), value), NilValue()}, nil
+}
+
+func llmResumeResultValue(status string, pending, history, value Value) Value {
+	t := NewTable()
+	t.RawSetString("status", StringValue(status))
+	t.RawSetString("pending", pending)
+	t.RawSetString("history", history)
+	t.RawSetString("value", value)
+	return TableValue(t)
 }
 
 func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
