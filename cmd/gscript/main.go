@@ -303,8 +303,10 @@ type cliLinterCapability struct {
 }
 
 type cliTestCapability struct {
-	GoldenStdout bool `json:"golden_stdout"`
-	Directory    bool `json:"directory"`
+	GoldenStdout bool   `json:"golden_stdout"`
+	Directory    bool   `json:"directory"`
+	List         bool   `json:"list"`
+	SeedEnv      string `json:"seed_env"`
 }
 
 func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
@@ -421,6 +423,8 @@ func buildCapabilities() cliCapabilities {
 			Test: cliTestCapability{
 				GoldenStdout: true,
 				Directory:    true,
+				List:         true,
+				SeedEnv:      "GSCRIPT_TEST_SEED",
 			},
 			Config: cliConfigCapability{
 				FileName: "gscript.toml",
@@ -943,12 +947,14 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	format := fs.String("format", "text", "output format: text or json")
+	listOnly := fs.Bool("list", false, "list matching .gs test files without running them")
+	seed := fs.String("seed", "", "set GSCRIPT_TEST_SEED while running tests")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	paths := fs.Args()
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] <path-or-dir>")
+		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] [--list] [--seed SEED] <path-or-dir>")
 		return 2
 	}
 	if !flagWasSet(fs, "format") {
@@ -965,7 +971,27 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		fmt.Fprintf(errw, "gscript test: unsupported --format %q (want text or json)\n", *format)
 		return 2
 	}
-	result := runTestsDetailed(paths[0], opts, errw, *format == "text")
+	if *listOnly {
+		files, err := testFiles(paths[0])
+		if err != nil {
+			fmt.Fprintf(errw, "%s: %v\n", paths[0], err)
+			return 1
+		}
+		if *format == "json" {
+			if err := json.NewEncoder(outw).Encode(struct {
+				Files []string `json:"files"`
+			}{Files: files}); err != nil {
+				fmt.Fprintf(errw, "gscript test: write json: %v\n", err)
+				return 1
+			}
+			return 0
+		}
+		for _, file := range files {
+			fmt.Fprintln(outw, file)
+		}
+		return 0
+	}
+	result := runTestsDetailed(paths[0], opts, errw, *format == "text", *seed)
 	if *format == "json" {
 		if err := json.NewEncoder(outw).Encode(result); err != nil {
 			fmt.Fprintf(errw, "gscript test: write json: %v\n", err)
@@ -983,6 +1009,7 @@ type testRunResult struct {
 	Total  int              `json:"total"`
 	Passed int              `json:"passed"`
 	Failed int              `json:"failed"`
+	Seed   string           `json:"seed,omitempty"`
 	Files  []testFileResult `json:"files"`
 }
 
@@ -997,10 +1024,10 @@ type testFileResult struct {
 }
 
 func runTests(path string, opts cliRunOptions, errw io.Writer) bool {
-	return runTestsDetailed(path, opts, errw, true).OK
+	return runTestsDetailed(path, opts, errw, true, "").OK
 }
 
-func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool) testRunResult {
+func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool, seed string) testRunResult {
 	files, err := testFiles(path)
 	if err != nil {
 		if text {
@@ -1017,7 +1044,19 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 	result := testRunResult{
 		OK:    true,
 		Total: len(files),
+		Seed:  seed,
 		Files: make([]testFileResult, 0, len(files)),
+	}
+	if seed != "" {
+		oldSeed, hadSeed := os.LookupEnv("GSCRIPT_TEST_SEED")
+		_ = os.Setenv("GSCRIPT_TEST_SEED", seed)
+		defer func() {
+			if hadSeed {
+				_ = os.Setenv("GSCRIPT_TEST_SEED", oldSeed)
+			} else {
+				_ = os.Unsetenv("GSCRIPT_TEST_SEED")
+			}
+		}()
 	}
 	for _, filename := range files {
 		fileResult := testFileResult{File: filename, OK: true}

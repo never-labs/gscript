@@ -130,6 +130,13 @@ func (vm *VM) tableGetDepth(t runtime.Value, key runtime.Value, depth int) (runt
 		return runtime.NilValue(), nil
 	}
 
+	if t.IsSoA() {
+		if v, ok, err := t.SoA().GetIndex(key); ok || err != nil {
+			return v, err
+		}
+		return runtime.NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
+	}
+
 	if key.IsString() {
 		if v, ok := t.FixedRecordRawGetString(key.Str()); ok {
 			return v, nil
@@ -382,6 +389,12 @@ func (vm *VM) globalIsStdType(name string) bool {
 // tableSet performs table assignment with __newindex metamethod support.
 
 func (vm *VM) tableSet(t runtime.Value, key runtime.Value, val runtime.Value) error {
+	if t.IsSoA() {
+		if handled, err := t.SoA().SetIndex(key, val); handled || err != nil {
+			return err
+		}
+		return fmt.Errorf("attempt to index a %s value", t.TypeName())
+	}
 	if !t.IsTable() {
 		return fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}

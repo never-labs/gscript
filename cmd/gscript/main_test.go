@@ -77,6 +77,9 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if !containsString(caps.Tooling.Linter.Formats, "json") || !containsString(caps.Tooling.Linter.Formats, "sarif") || !containsString(caps.Tooling.Linter.Codes, "GS1001") {
 		t.Fatalf("linter capabilities = %+v, want json and GS1001", caps.Tooling.Linter)
 	}
+	if !caps.Tooling.Test.GoldenStdout || !caps.Tooling.Test.Directory || !caps.Tooling.Test.List || caps.Tooling.Test.SeedEnv != "GSCRIPT_TEST_SEED" {
+		t.Fatalf("test capabilities = %+v, want golden stdout, directory, list, and seed env", caps.Tooling.Test)
+	}
 	if caps.Tooling.Config.FileName != "gscript.toml" || !containsString(caps.Tooling.Config.Formats, "json") {
 		t.Fatalf("config capabilities = %+v, want gscript.toml/json", caps.Tooling.Config)
 	}
@@ -971,6 +974,58 @@ func TestRunTestCommandJSONReportsResults(t *testing.T) {
 	}
 }
 
+func TestRunTestCommandListsFiles(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.gs")
+	b := filepath.Join(dir, "b.gs")
+	if err := os.WriteFile(a, []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(b, []byte("x := 2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--list", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if got := stdout.String(); !strings.Contains(got, a) || !strings.Contains(got, b) {
+		t.Fatalf("stdout = %q, want listed files %q and %q", got, a, b)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunTestCommandSeedIsVisibleToScripts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "seed.gs")
+	if err := os.WriteFile(path, []byte(`print(os.getenv("GSCRIPT_TEST_SEED"))
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(path, ".gs")+".out", []byte("odin\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json", "--seed", "odin", dir}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if result.Seed != "odin" || !result.OK {
+		t.Fatalf("result = %+v, want seed and passing test", result)
+	}
+	if got := os.Getenv("GSCRIPT_TEST_SEED"); got == "odin" {
+		t.Fatal("GSCRIPT_TEST_SEED leaked after test run")
+	}
+}
+
 func TestRunTestCommandUsesConfiguredFormat(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "gscript.toml"), []byte("[tool.test]\nformat = \"json\"\n"), 0644); err != nil {
@@ -1611,6 +1666,45 @@ func TestLintAINativeSyntaxCoverage(t *testing.T) {
 	}
 	if len(diagnostics) != 0 {
 		t.Fatalf("diagnostics = %#v, want empty", diagnostics)
+	}
+}
+
+func TestSoADirectAccessRunsInInterpreterAndVM(t *testing.T) {
+	source := `
+points := soa.zip({
+    x: []f64{1, 2, 3},
+    y: []f64{10, 20, 30},
+    id: []i64{101, 102, 103},
+})
+xcol := points.x
+row := points[2]
+row.x = 42
+points[2] = row
+points.y = []f64{100, 200, 300}
+points.z = []i64{7, 8, 9}
+assert(xcol[2] == 42)
+assert(points.x[2] == 42)
+assert(points["x"][3] == 3)
+assert(points[2].x == 42)
+assert(points.y[3] == 300)
+assert(points.z[1] == 7)
+assert(points.missing == nil)
+`
+	for _, tc := range []struct {
+		name string
+		run  func(*runtime.Interpreter, string) error
+	}{
+		{name: "interpreter", run: runString},
+		{name: "bytecode", run: func(interp *runtime.Interpreter, src string) error {
+			return runStringVM(interp, src, false, false, jitCLIOptions{})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			interp := runtime.New()
+			if err := tc.run(interp, source); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+		})
 	}
 }
 

@@ -179,6 +179,10 @@ Current implementation status:
 
 - `soa.zip`, `soa.len`, `soa.columns`, `soa.column`, `soa.row`, and
   `soa.setRow` are available;
+- SoA values can be indexed directly for ergonomic code: `points.x` and
+  `points["x"]` return the live dense column, while `points[i]` returns a row
+  copy. Assigning `points.x = dense` replaces or adds a column, and assigning
+  `points[i] = row` writes a row back through the aligned columns.
 - `soa.withColumn` and `soa.dropColumn` return new SoA layouts while preserving
   dense-column references;
 - `soa.resize` and `soa.appendRow` mutate all columns together while preserving
@@ -233,6 +237,10 @@ Current API contract:
 | `soa.shape(s)` | Returns `{length, version, columns}` where each column reports `{name, dtype, length, version}` for diagnostics and guarded specialization. |
 | `soa.row(s, index)` | Returns a copied one-based row table. Mutating it does not write back. |
 | `soa.setRow(s, index, row)` | Writes every column from a table field of the same name and returns `true`. Missing or incompatible fields are errors. |
+| `s.name` / `s["name"]` | Returns the live dense column named `name`, or `nil` if missing. This is the language-level ergonomic spelling for `soa.column(s, name)`. |
+| `s[index]` | Returns a copied one-based row table. This matches `soa.row(s, index)` and is intended for boundary code, not hot loops. |
+| `s.name = dense` | Replaces or adds a column in place. The dense array length must match existing rows. |
+| `s[index] = row` | Writes an entire row table back through all columns. Missing or incompatible fields are errors. |
 | `soa.slice(s, first, last)` | Returns an independent SoA for one-based inclusive rows `first..last`. |
 | `soa.filter(s, mask)` | Returns an independent SoA containing rows whose bool dense mask entry is true. The mask length must match. |
 | `soa.compact(s, mask)` | Alias of `soa.filter`, using array-programming naming for mask compaction. |
@@ -274,7 +282,9 @@ Reserved array-programming API shape:
 Hot path guidance:
 
 - use `soa.column` or fused kernels when a loop touches only a subset of fields;
-- use `soa.row` and `soa.setRow` for boundary conversion, debugging, and tests;
+- use direct `s.column` access as the readable spelling for live hot columns;
+- use direct `s[i]`, `soa.row`, and `soa.setRow` for boundary conversion,
+  debugging, and tests;
 - batch independent column updates with `soa.affineMany` rather than repeated
   row materialization;
 - use `soa.scan` and `soa.scanInto` for prefix sums and offset generation;

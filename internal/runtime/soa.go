@@ -144,6 +144,90 @@ func (s *SoA) WithColumn(name string, col *DenseArray) (*SoA, error) {
 	return NewSoA(cols)
 }
 
+func (s *SoA) SetColumn(name string, col *DenseArray) error {
+	if s == nil {
+		return fmt.Errorf("soa is nil")
+	}
+	if name == "" {
+		return fmt.Errorf("soa column name must not be empty")
+	}
+	if col == nil {
+		return fmt.Errorf("soa column %q is nil", name)
+	}
+	if col.Len() != s.length {
+		return fmt.Errorf("soa column length mismatch")
+	}
+	old, ok := s.columns[name]
+	if !ok {
+		s.names = append(s.names, name)
+		sort.Strings(s.names)
+	}
+	if old != col {
+		s.shapeVersion++
+	}
+	s.columns[name] = col
+	return nil
+}
+
+func (s *SoA) GetIndex(key Value) (Value, bool, error) {
+	if s == nil {
+		return NilValue(), true, fmt.Errorf("soa is nil")
+	}
+	if key.IsString() {
+		if col, ok := s.Column(key.Str()); ok {
+			return DenseArrayValue(col), true, nil
+		}
+		return NilValue(), true, nil
+	}
+	if idx, ok, err := SoARowIndexFromValue(key, s.Len()); ok || err != nil {
+		if err != nil {
+			return NilValue(), true, err
+		}
+		row, err := s.Row(idx)
+		if err != nil {
+			return NilValue(), true, err
+		}
+		return TableValue(row), true, nil
+	}
+	return NilValue(), false, nil
+}
+
+func (s *SoA) SetIndex(key, val Value) (bool, error) {
+	if s == nil {
+		return true, fmt.Errorf("soa is nil")
+	}
+	if key.IsString() {
+		if !val.IsDenseArray() {
+			return true, fmt.Errorf("soa column assignment requires a dense array")
+		}
+		return true, s.SetColumn(key.Str(), val.DenseArray())
+	}
+	if idx, ok, err := SoARowIndexFromValue(key, s.Len()); ok || err != nil {
+		if err != nil {
+			return true, err
+		}
+		if !val.IsTable() {
+			return true, fmt.Errorf("soa row assignment requires a table")
+		}
+		return true, s.SetRow(idx, val.Table())
+	}
+	return false, nil
+}
+
+func SoARowIndexFromValue(v Value, length int) (int, bool, error) {
+	if !v.IsInt() {
+		return 0, false, nil
+	}
+	idx := int(v.Int())
+	if int64(idx) != v.Int() {
+		return 0, true, fmt.Errorf("soa row index out of range")
+	}
+	if idx < 1 || idx > length {
+		return 0, true, fmt.Errorf("soa row index out of range")
+	}
+	return idx - 1, true, nil
+}
+
 func (s *SoA) DropColumn(name string) (*SoA, error) {
 	if s == nil {
 		return nil, fmt.Errorf("soa is nil")

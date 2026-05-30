@@ -49,9 +49,11 @@ schema。
   `-tier2-perf-stats-json`、`-tier2-spec-state-json`、
   `-tier2-spec-worklist-json`、`-jit-op-audit`、`-jit-op-audit-json`、
   `-coroutine-stats`、`-runtime-path-stats`、`-runtime-path-stats-json`。
-- `gscript test [--format=text|json] <path-or-dir>` 递归运行 `.gs` 文件，可用
-  同名 `.out` 做 stdout golden 对比；JSON output reports per-file status for
-  CI integrations.
+- `gscript test [--format=text|json] [--list] [--seed SEED] <path-or-dir>`
+  递归运行 `.gs` 文件，可用同名 `.out` 做 stdout golden 对比；`--list`
+  reports the resolved test files without running them, `--seed` exposes
+  `GSCRIPT_TEST_SEED` to scripts for deterministic scenarios, and JSON output
+  reports per-file status for CI integrations.
 - `gscript fmt [--check] [--write] [--stdin-file-name FILE] <path-or-dir> [...]`
   解析并规范基础空白。
 - `gscript lint [--format=text|json|sarif] <path-or-dir> [...]` 解析文件/目录并报告
@@ -106,8 +108,9 @@ There are also developer binaries:
 
 - Flat flags do not scale to formatter/linter/test/bench/doc/package workflows.
 - No `--help` hierarchy, shell completion, or stable exit-code contract.
-- Project config discovery exists, but formatter/linter/test commands do not
-  yet consume the resolved config by default.
+- Project config discovery exists; formatter/linter/test commands consume
+  supported project config values, but the test runner is still a compact
+  golden-file harness rather than a full language-level `testing` package.
 - Diagnostics mostly write to stderr; JSON flags exist but are not unified under
   one schema envelope.
 - `cmd/dump` and `cmd/dump_bytecode` are useful but not discoverable as
@@ -406,16 +409,19 @@ Testing is Go-driven:
 
 `gscript test <path-or-dir>` runs `.gs` files directly. A single file path must
 end in `.gs`; a directory path is walked recursively and all `.gs` files are run
-in sorted order. By default the runner only checks whether each script succeeds.
-If a sibling `<name>.out` file exists next to `<name>.gs`, the runner captures
-stdout and compares it exactly to the golden file. Mismatches report the `.gs`
-file, the `.out` file, and an expected/got stdout summary.
+in sorted order. `--list` prints the resolved order without running scripts.
+`--seed SEED` sets `GSCRIPT_TEST_SEED` for the duration of the run and restores
+the caller's environment afterward. By default the runner only checks whether
+each script succeeds. If a sibling `<name>.out` file exists next to `<name>.gs`,
+the runner captures stdout and compares it exactly to the golden file.
+Mismatches report the `.gs` file, the `.out` file, and an expected/got stdout
+summary.
 
 ### Gaps
 
 - Test discovery is encoded in Go tests, not a language-level test manifest.
-- No standard assertion/test API, fixture layout, per-test timeout, JSON report,
-  JUnit report, coverage, or watch mode.
+- No standard assertion/test API, fixture layout, per-test timeout, JUnit
+  report, coverage, or watch mode.
 
 ### Recommendations
 
@@ -424,7 +430,9 @@ P0:
 - Add `gscript test` as a wrapper over language-level tests and existing Go
   semantic harnesses.
 - Define test file discovery: `*_test.gs`, `tests/**/*.gs`, and manifest opt-in.
-- Add JSON and JUnit output for CI.
+- Keep `--list` and `--seed` as stable primitives for CI sharding and
+  deterministic randomized tests.
+- Add JUnit output for CI.
 
 P1:
 

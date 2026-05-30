@@ -64,7 +64,7 @@ func cliHelpTopics() map[string]cliHelpTopic {
 		{Command: "mod", Usage: "usage: gscript mod [init|graph|verify] [flags]", Summary: "Manage local module metadata and require graphs."},
 		{Command: "repl", Usage: "usage: gscript repl", Summary: "Start the interactive shell."},
 		{Command: "run", Usage: "usage: gscript run [--vm] [--jit=true|false] <file.gs> [args...]", Summary: "Run a script file."},
-		{Command: "test", Usage: "usage: gscript test [--format=text|json] <path-or-dir>", Summary: "Run GScript test files and stdout goldens."},
+		{Command: "test", Usage: "usage: gscript test [--format=text|json] [--list] [--seed SEED] <path-or-dir>", Summary: "Run GScript test files and stdout goldens."},
 		{Command: "version", Usage: "usage: gscript version [--json]", Summary: "Report binary version and build metadata."},
 	}
 	out := make(map[string]cliHelpTopic, len(topics))

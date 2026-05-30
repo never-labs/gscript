@@ -24,6 +24,13 @@ points := soa.zip({
 check("len", soa.len(points) == 4)
 check("columns sorted", soa.columns(points)[1] == "id")
 check("shape", soa.shape(points).columns[1].dtype == "i64")
+check("direct column access", points.x[1] == 1 && points["velocity"][2] == 20)
+directRow := points[1]
+directRow.x = 11
+points[1] = directRow
+check("direct row writeback", points.x[1] == 11)
+points.x = []f64{1, 2, 3, 4}
+check("direct column assignment", points.x[1] == 1 && points.x[4] == 4)
 extended := soa.withColumn(points, "speed", []f64{1.5, 2.5, 3.5, 4.5})
 withoutY := soa.dropColumn(extended, "y")
 check("withColumn", soa.column(extended, "speed")[4] == 4.5)

@@ -853,6 +853,46 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 	}
 }
 
+func TestSoADirectColumnAndRowAccess(t *testing.T) {
+	interp := New()
+	if err := runSource(interp, `
+points := soa.zip({
+    x: []f64{1, 2, 3},
+    y: []f64{10, 20, 30},
+    id: []i64{101, 102, 103},
+})
+
+xcol := points.x
+sameX := points["x"]
+row2 := points[2]
+row2.x = 22
+beforeWriteback := points.x[2]
+points[2] = row2
+points.y = []f64{100, 200, 300}
+points.z = []i64{7, 8, 9}
+missing := points.missing
+updatedRow := points[2]
+`); err != nil {
+		t.Fatal(err)
+	}
+	assertDenseF64(t, interp.GetGlobal("xcol"), []float64{1, 22, 3})
+	assertDenseF64(t, interp.GetGlobal("sameX"), []float64{1, 22, 3})
+	if got := interp.GetGlobal("beforeWriteback"); !got.IsFloat() || got.Float() != 2 {
+		t.Fatalf("beforeWriteback = %v, want 2", got)
+	}
+	if got := interp.GetGlobal("row2").Table().RawGetString("x"); !got.IsNumber() || got.Number() != 22 {
+		t.Fatalf("row2.x = %v, want 22", got)
+	}
+	if got := interp.GetGlobal("updatedRow").Table().RawGetString("x"); !got.IsNumber() || got.Number() != 22 {
+		t.Fatalf("updatedRow.x = %v, want 22", got)
+	}
+	assertDenseF64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("points").SoA(), "y")), []float64{100, 200, 300})
+	assertDenseI64(t, DenseArrayValue(mustSoATestColumn(t, interp.GetGlobal("points").SoA(), "z")), []int64{7, 8, 9})
+	if got := interp.GetGlobal("missing"); !got.IsNil() {
+		t.Fatalf("missing = %v, want nil", got)
+	}
+}
+
 func BenchmarkDenseArrayFilterF64(b *testing.B) {
 	xs := make([]float64, 32768)
 	mask := make([]bool, len(xs))

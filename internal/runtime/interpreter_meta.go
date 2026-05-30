@@ -72,6 +72,12 @@ func (interp *Interpreter) tableGetDepth(t Value, key Value, depth int) (Value, 
 		}
 		return NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}
+	if t.IsSoA() {
+		if v, ok, err := t.SoA().GetIndex(key); ok || err != nil {
+			return v, err
+		}
+		return NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
+	}
 	if !t.IsTable() {
 		return NilValue(), fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}
@@ -120,6 +126,12 @@ func (interp *Interpreter) tableSet(t Value, key, val Value) error {
 func (interp *Interpreter) tableSetDepth(t Value, key, val Value, depth int) error {
 	if depth > maxMetaDepth {
 		return fmt.Errorf("'__newindex' chain too long; possible loop")
+	}
+	if t.IsSoA() {
+		if handled, err := t.SoA().SetIndex(key, val); handled || err != nil {
+			return err
+		}
+		return fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}
 	if !t.IsTable() {
 		return fmt.Errorf("attempt to index a %s value", t.TypeName())
