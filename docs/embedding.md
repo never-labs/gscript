@@ -117,6 +117,21 @@ if result.status == "tool_calls" {
 }
 ```
 
+For the common ReAct loop, `llm.react` is a small library helper. It repeatedly
+calls `llm.turn`, dispatches returned tool calls through the provided tool list,
+adds `llm.assistantCall` / `llm.toolResult` style messages to history, and
+stops on a final answer:
+
+```gscript
+result, err := llm.react({
+    messages: {llm.system("Use tools."), llm.user("find docs")},
+    tools: {lookup},
+    max_steps: 8,
+})
+if err != nil { return nil, err }
+return result.text, nil
+```
+
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:
 

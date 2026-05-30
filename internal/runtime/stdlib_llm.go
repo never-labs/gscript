@@ -188,6 +188,24 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		return llmDispatch(call, args[0].Table(), args[1].Table())
 	})
 
+	set("react", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.react' (table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("llm.react requires a function caller")
+		}
+		p := currentProvider()
+		if p == nil {
+			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
+		}
+		result, err := llmReact(args[0].Table(), p, call, currentContext(), hostLimit())
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	})
+
 	return t
 }
 
@@ -211,6 +229,28 @@ func llmRequestFromTable(t *Table) (LLMTurnRequest, error) {
 	req.Messages = llmMessagesFromValue(messages)
 	req.Tools = llmToolsFromValue(t.RawGetString("tools"))
 	return req, nil
+}
+
+func llmMessageValuesFromTable(t *Table) []Value {
+	if t == nil {
+		return nil
+	}
+	out := make([]Value, 0, t.Length())
+	for i := 1; i <= t.Length(); i++ {
+		v := t.RawGet(IntValue(int64(i)))
+		if v.IsTable() {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func llmTableFromValues(values []Value) Value {
+	t := NewSequentialArrayTable(len(values))
+	for i, v := range values {
+		t.array[i+1] = v
+	}
+	return TableValue(t)
 }
 
 func llmMessagesFromValue(v Value) []LLMMessage {
@@ -361,6 +401,102 @@ func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) 
 		return []Value{results[0], results[1]}, nil
 	}
 	return []Value{results[0], NilValue()}, nil
+}
+
+func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64) ([]Value, error) {
+	messagesValue := opts.RawGetString("messages")
+	if !messagesValue.IsTable() {
+		return []Value{NilValue(), llmErrorValue("validation", "llm.react requires messages")}, nil
+	}
+	toolsValue := opts.RawGetString("tools")
+	tools := toolsValue.Table()
+	if tools == nil {
+		tools = NewTable()
+	}
+	history := llmMessageValuesFromTable(messagesValue.Table())
+	maxSteps := int(toInt(opts.RawGetString("max_steps")))
+	if maxSteps <= 0 {
+		maxSteps = 8
+	}
+	model := opts.RawGetString("model").Str()
+	for step := 0; step < maxSteps; step++ {
+		req := LLMTurnRequest{
+			Model:     model,
+			Messages:  llmMessagesFromValue(llmTableFromValues(history)),
+			Tools:     llmToolsFromValue(toolsValue),
+			MaxTokens: toInt(opts.RawGetString("max_tokens")),
+			Stream:    opts.RawGetString("stream").Truthy(),
+		}
+		res, err := provider.Turn(ctx, req)
+		if err != nil {
+			return []Value{NilValue(), llmErrorValue("provider", err.Error())}, nil
+		}
+		turnValue := llmResultValue(res)
+		if err := CheckHostResultBytes(maxHostResult, turnValue); err != nil {
+			return nil, err
+		}
+		switch res.Status {
+		case "", "final_answer":
+			return []Value{llmReactResultValue("done", res.Text, "", turnValue, history), NilValue()}, nil
+		case "stop":
+			return []Value{llmReactResultValue("stopped", "", res.Reason, turnValue, history), NilValue()}, nil
+		case "tool_calls":
+			for i := range res.Calls {
+				callValue := llmToolCallValue(res.Calls[i])
+				history = append(history, llmAssistantCallMessage(callValue))
+				dispatchResult, err := llmDispatch(call, callValue.Table(), tools)
+				if err != nil {
+					return nil, err
+				}
+				if len(dispatchResult) >= 2 && !dispatchResult[1].IsNil() {
+					message := dispatchResult[1].Table().RawGetString("message").Str()
+					history = append(history, llmToolErrorMessage(res.Calls[i].ID, message))
+				} else {
+					value := NilValue()
+					if len(dispatchResult) > 0 {
+						value = dispatchResult[0]
+					}
+					history = append(history, llmToolResultMessage(res.Calls[i].ID, value))
+				}
+			}
+		default:
+			return []Value{llmReactResultValue("stopped", "", res.Status, turnValue, history), NilValue()}, nil
+		}
+	}
+	return []Value{llmReactResultValue("stopped", "", "max_steps", NilValue(), history), NilValue()}, nil
+}
+
+func llmReactResultValue(status, text, reason string, turn Value, history []Value) Value {
+	t := NewTable()
+	t.RawSetString("status", StringValue(status))
+	t.RawSetString("text", StringValue(text))
+	t.RawSetString("reason", StringValue(reason))
+	t.RawSetString("result", turn)
+	t.RawSetString("history", llmTableFromValues(history))
+	return TableValue(t)
+}
+
+func llmAssistantCallMessage(callValue Value) Value {
+	t := NewTable()
+	t.RawSetString("role", StringValue("assistant"))
+	t.RawSetString("tool_call", callValue)
+	return TableValue(t)
+}
+
+func llmToolResultMessage(id string, value Value) Value {
+	t := NewTable()
+	t.RawSetString("role", StringValue("tool"))
+	t.RawSetString("tool_use_id", StringValue(id))
+	t.RawSetString("value", value)
+	return TableValue(t)
+}
+
+func llmToolErrorMessage(id, message string) Value {
+	t := NewTable()
+	t.RawSetString("role", StringValue("tool"))
+	t.RawSetString("tool_use_id", StringValue(id))
+	t.RawSetString("error", StringValue(message))
+	return TableValue(t)
 }
 
 func llmFindTool(tools *Table, name string) *Table {

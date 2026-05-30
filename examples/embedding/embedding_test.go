@@ -14,6 +14,11 @@ import (
 type exampleLLMProvider struct{}
 
 func (exampleLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+	for _, msg := range req.Messages {
+		if msg.Role == "tool" && msg.Value != nil {
+			return gs.LLMTurnResult{Status: "final_answer", Text: fmt.Sprint(msg.Value)}, nil
+		}
+	}
 	if len(req.Tools) > 0 {
 		return gs.LLMTurnResult{
 			Status: "tool_calls",
@@ -140,11 +145,12 @@ lookup := llm.tool("lookup", func(name) {
 }, {description: "lookup documentation", params: {"name"}})
 
 tools := {lookup}
-result, err := llm.turn({
+	result, err := llm.react({
     messages: {llm.system("Use tools."), llm.user("find docs")},
     tools: tools,
+    max_steps: 2,
 })
-answer, dispatch_err := llm.dispatch(result.calls[1], tools)
+answer := result.text
 `); err != nil {
 		panic(err)
 	}

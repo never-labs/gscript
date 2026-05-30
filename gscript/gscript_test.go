@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -26,15 +27,23 @@ type hostModuleService struct {
 }
 
 type mockLLMProvider struct {
-	last gs.LLMTurnRequest
-	res  gs.LLMTurnResult
-	err  error
+	last     gs.LLMTurnRequest
+	requests []gs.LLMTurnRequest
+	res      gs.LLMTurnResult
+	results  []gs.LLMTurnResult
+	err      error
 }
 
 func (p *mockLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
 	p.last = req
+	p.requests = append(p.requests, req)
 	if p.err != nil {
 		return gs.LLMTurnResult{}, p.err
+	}
+	if len(p.results) > 0 {
+		res := p.results[0]
+		p.results = p.results[1:]
+		return res, nil
 	}
 	if p.res.Status != "" || p.res.Text != "" || len(p.res.Calls) > 0 {
 		return p.res, nil
@@ -154,6 +163,75 @@ text := result.text
 	}
 	if got != "mock:User: hello" {
 		t.Fatalf("text = %#v", got)
+	}
+}
+
+func TestLLMReactDispatchLoop(t *testing.T) {
+	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+		{
+			Status: "tool_calls",
+			Calls: []gs.LLMToolCall{{
+				ID:   "call_1",
+				Tool: "lookup",
+				Args: map[string]any{"name": "gscript"},
+			}},
+		},
+		{Status: "final_answer", Text: "done"},
+	}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+result, err := llm.react({
+    messages: {llm.user("find docs")},
+    tools: {lookup},
+    max_steps: 3,
+})
+status := result.status
+text := result.text
+history_len := #result.history
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(provider.requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(provider.requests))
+	}
+	if len(provider.requests[1].Messages) != 3 || provider.requests[1].Messages[1].ToolCall == nil || provider.requests[1].Messages[2].Value != "docs:gscript" {
+		t.Fatalf("second request messages = %#v", provider.requests[1].Messages)
+	}
+	status, _ := vm.Get("status")
+	text, _ := vm.Get("text")
+	historyLen, _ := vm.Get("history_len")
+	if status != "done" || text != "done" || historyLen != int64(3) {
+		t.Fatalf("status=%#v text=%#v history_len=%#v", status, text, historyLen)
+	}
+}
+
+func TestLLMCommandProviderGLMCCSmoke(t *testing.T) {
+	if os.Getenv("GSCRIPT_GLM_CC_SMOKE") == "" {
+		t.Skip("set GSCRIPT_GLM_CC_SMOKE=1 to run glm_cc-backed llm.turn smoke")
+	}
+	path, err := exec.LookPath("glm_cc")
+	if err != nil {
+		t.Skip("glm_cc not found")
+	}
+	vm := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithLLMCommand(path, "-p", "--bare"),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({messages: {llm.user("Reply with exactly: gscript-llm-ok")}})
+text := result.text
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	got, err := vm.Get("text")
+	if err != nil {
+		t.Fatalf("Get text: %v", err)
+	}
+	if strings.TrimSpace(fmt.Sprint(got)) != "gscript-llm-ok" {
+		t.Fatalf("glm_cc text = %#v", got)
 	}
 }
 
