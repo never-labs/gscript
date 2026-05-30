@@ -403,6 +403,71 @@ resume_value := resume.value
 	}
 }
 
+func TestLoopPlanExecute(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "1. lookup docs\n2. answer"},
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_1",
+						Tool: "lookup",
+						Args: map[string]any{"name": "gscript"},
+					}},
+				},
+				{Status: "final_answer", Text: "done"},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+result, err := loop.plan_execute({
+    user: "find docs",
+    tools: {lookup},
+    plan_model: "planner",
+    exec_model: "executor",
+    max_steps: 3,
+})
+status := result.status
+text := result.text
+plan := result.plan
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			status, _ := vm.Get("status")
+			text, _ := vm.Get("text")
+			plan, _ := vm.Get("plan")
+			if status != "done" || text != "done" || plan != "1. lookup docs\n2. answer" {
+				t.Fatalf("status=%#v text=%#v plan=%#v", status, text, plan)
+			}
+			if len(provider.requests) != 3 {
+				t.Fatalf("requests = %#v", provider.requests)
+			}
+			if provider.requests[0].Model != "planner" || provider.requests[1].Model != "executor" {
+				t.Fatalf("models = %#v / %#v", provider.requests[0].Model, provider.requests[1].Model)
+			}
+			if len(provider.requests[1].Messages) < 2 || !strings.Contains(provider.requests[1].Messages[0].Text, "lookup docs") {
+				t.Fatalf("execute messages = %#v", provider.requests[1].Messages)
+			}
+			if len(provider.requests[2].Messages) < 4 || provider.requests[2].Messages[3].Value != "docs:gscript" {
+				t.Fatalf("final messages = %#v", provider.requests[2].Messages)
+			}
+		})
+	}
+}
+
 func TestLoopBudgets(t *testing.T) {
 	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
 		{

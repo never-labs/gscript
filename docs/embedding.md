@@ -205,6 +205,9 @@ performs a single-turn loop with the same result/error shape.
 `loop.react` also accepts `approve_when: func(call) { ... }`; when it returns
 truthy for a tool call, the loop returns `{status: "pending", token, payload}`
 instead of dispatching, and the same token can be resumed with `loop.resume`.
+`loop.plan_execute` runs one planning turn, injects the plan as an execution
+system message, then reuses the same ReAct execution loop. It accepts
+`plan_model` and `exec_model` for split-model workflows.
 Both `llm.react` and `loop.react` accept `budget: {tokens, turns, calls, money,
 time}` or the flat `budget_tokens` / `budget_turns` / `budget_calls` /
 `budget_money` / `budget_time` fields. Exhaustion returns

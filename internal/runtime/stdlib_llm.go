@@ -399,6 +399,43 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		return llmReact(opts, p, call, currentContext(), hostLimit(), trace)
 	})
 
+	set("plan_execute", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'loop.plan_execute' (table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("loop.plan_execute requires a function caller")
+		}
+		p := currentProvider()
+		if p == nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
+			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
+		}
+		opts, err := llmLoopOptions(args[0].Table(), 0)
+		if err != nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
+			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+		}
+		planResult, planErr := llmPlanTurn(args[0].Table(), opts, p, currentContext(), hostLimit(), trace)
+		if !planErr.IsNil() {
+			return []Value{NilValue(), planErr}, nil
+		}
+		llmInjectPlan(opts, planResult.Text)
+		if execModel := args[0].Table().RawGetString("exec_model"); !execModel.IsNil() {
+			opts.RawSetString("model", execModel)
+		}
+		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
+			approveWhen: args[0].Table().RawGetString("approve_when"),
+			snapshots:   snapshots,
+			snapshotsMu: &snapshotsMu,
+		})
+		if err != nil || len(result) == 0 || !result[1].IsNil() || !result[0].IsTable() {
+			return result, err
+		}
+		result[0].Table().RawSetString("plan", StringValue(planResult.Text))
+		return result, nil
+	})
+
 	set("snapshot", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsTable() || !args[1].IsTable() {
 			return nil, fmt.Errorf("bad argument to 'loop.snapshot' (history, pending_call expected)")
@@ -543,6 +580,59 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		opts.RawSetString("max_steps", IntValue(defaultMaxSteps))
 	}
 	return opts, nil
+}
+
+func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) (LLMTurnResult, Value) {
+	model := src.RawGetString("plan_model").Str()
+	if model == "" {
+		model = opts.RawGetString("model").Str()
+	}
+	messages := llmPlanMessages(opts.RawGetString("messages"))
+	req := LLMTurnRequest{
+		Model:     model,
+		Messages:  llmMessagesFromValue(messages),
+		MaxTokens: toInt(src.RawGetString("plan_max_tokens")),
+		Stop:      llmStringSliceFromValue(src.RawGetString("plan_stop")),
+		Metadata:  llmStringMapFromValue(src.RawGetString("metadata")),
+	}
+	trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
+	res, err := provider.Turn(ctx, req)
+	if err != nil {
+		trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: "provider", Message: err.Error()})
+		return LLMTurnResult{}, llmErrorValue("provider", err.Error())
+	}
+	trace(LLMTraceEvent{Type: "turn_end", Model: req.Model, Status: llmResultStatus(res), MessageCount: len(req.Messages), Usage: res.Usage})
+	if err := CheckHostResultBytes(maxHostResult, llmResultValue(res)); err != nil {
+		return LLMTurnResult{}, llmErrorValue("internal", err.Error())
+	}
+	return res, NilValue()
+}
+
+func llmPlanMessages(messages Value) Value {
+	t := NewAppendArrayTable(2)
+	t.RawSet(IntValue(1), TableValue(llmMessageTable("system", "Create a concise execution plan. Do not call tools.")))
+	if messages.IsTable() {
+		for _, msg := range llmMessageValuesFromTable(messages.Table()) {
+			t.RawSet(IntValue(int64(t.Length()+1)), msg)
+		}
+	}
+	return TableValue(t)
+}
+
+func llmInjectPlan(opts *Table, plan string) {
+	if plan == "" {
+		return
+	}
+	messages := opts.RawGetString("messages")
+	if !messages.IsTable() {
+		return
+	}
+	merged := NewAppendArrayTable(messages.Table().Length() + 1)
+	merged.RawSet(IntValue(1), TableValue(llmMessageTable("system", "Execution plan:\n"+plan)))
+	for _, msg := range llmMessageValuesFromTable(messages.Table()) {
+		merged.RawSet(IntValue(int64(merged.Length()+1)), msg)
+	}
+	opts.RawSetString("messages", TableValue(merged))
 }
 
 func registerLLMMessageConstructors(t *Table, module string) {
