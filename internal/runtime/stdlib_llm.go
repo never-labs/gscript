@@ -2126,6 +2126,26 @@ func llmStructuredOutputValue(opts *Table, text string) (Value, Value) {
 }
 
 func llmValidateStructuredOutputShape(expected, actual *Table) string {
+	return llmValidateStructuredOutputValue(TableValue(expected), TableValue(actual), "")
+}
+
+func llmValidateStructuredOutputValue(expected Value, actual Value, path string) string {
+	expectedType := llmStructuredOutputExampleType(expected)
+	if expectedType != "" && !llmStructuredOutputTypeMatches(expectedType, actual) {
+		return fmt.Sprintf("structured output field %q has type %s, want %s", path, llmStructuredOutputActualType(actual), expectedType)
+	}
+	if !expected.IsTable() || !actual.IsTable() {
+		return ""
+	}
+	expectedTable := expected.Table()
+	actualTable := actual.Table()
+	if expectedTable.Length() > 0 {
+		return llmValidateStructuredOutputArray(expectedTable, actualTable, path)
+	}
+	return llmValidateStructuredOutputObject(expectedTable, actualTable, path)
+}
+
+func llmValidateStructuredOutputObject(expected, actual *Table, path string) string {
 	if expected == nil || actual == nil {
 		return ""
 	}
@@ -2137,13 +2157,50 @@ func llmValidateStructuredOutputShape(expected, actual *Table) string {
 		expectedValue := expected.RawGetString(name)
 		actualValue := actual.RawGetString(name)
 		if actualValue.IsNil() {
-			return fmt.Sprintf("structured output missing field %q", name)
+			return fmt.Sprintf("structured output missing field %q", llmStructuredOutputPath(path, name))
 		}
-		if expectedType := llmStructuredOutputExampleType(expectedValue); expectedType != "" && !llmStructuredOutputTypeMatches(expectedType, actualValue) {
-			return fmt.Sprintf("structured output field %q has type %s, want %s", name, llmStructuredOutputActualType(actualValue), expectedType)
+		if message := llmValidateStructuredOutputValue(expectedValue, actualValue, llmStructuredOutputPath(path, name)); message != "" {
+			return message
 		}
 	}
 	return ""
+}
+
+func llmValidateStructuredOutputArray(expected, actual *Table, path string) string {
+	if expected == nil || actual == nil {
+		return ""
+	}
+	if actual.Length() == 0 {
+		return fmt.Sprintf("structured output field %q must contain at least one item", path)
+	}
+	exemplar := expected.RawGet(IntValue(1))
+	if exemplar.IsNil() {
+		return ""
+	}
+	for i := 1; i <= actual.Length(); i++ {
+		item := actual.RawGet(IntValue(int64(i)))
+		if item.IsNil() {
+			return fmt.Sprintf("structured output missing field %q", llmStructuredOutputIndexPath(path, i))
+		}
+		if message := llmValidateStructuredOutputValue(exemplar, item, llmStructuredOutputIndexPath(path, i)); message != "" {
+			return message
+		}
+	}
+	return ""
+}
+
+func llmStructuredOutputPath(prefix, name string) string {
+	if prefix == "" {
+		return name
+	}
+	return prefix + "." + name
+}
+
+func llmStructuredOutputIndexPath(prefix string, index int) string {
+	if prefix == "" {
+		return fmt.Sprintf("[%d]", index)
+	}
+	return fmt.Sprintf("%s[%d]", prefix, index)
 }
 
 func llmStructuredOutputExampleType(v Value) string {

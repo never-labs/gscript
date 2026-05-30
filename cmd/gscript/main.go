@@ -218,6 +218,7 @@ func main() {
 	}
 
 	interp := runtime.New()
+	installCLILLMProviderFactory(interp)
 
 	if *eval != "" {
 		interp.SetArgs("<eval>", flag.Args())
@@ -822,6 +823,7 @@ func processExitCode(err error) (int, bool) {
 }
 
 func runScriptFile(interp *runtime.Interpreter, filename string, args []string, opts cliRunOptions) error {
+	installCLILLMProviderFactory(interp)
 	interp.SetArgs(filename, args)
 
 	// Set script directory for require.
@@ -832,6 +834,45 @@ func runScriptFile(interp *runtime.Interpreter, filename string, args []string, 
 		return runFileVM(interp, filename, opts.UseJIT, opts.ShowJITStats, opts.JIT)
 	}
 	return runFile(interp, filename)
+}
+
+func installCLILLMProviderFactory(interp *runtime.Interpreter) {
+	interp.SetLLMProviderFactory(cliDefaultLLMProviderFactory)
+}
+
+func cliDefaultLLMProviderFactory(cfg runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
+	protocol := strings.ToLower(strings.ReplaceAll(cfg.Protocol, "_", "-"))
+	switch protocol {
+	case "openai", "openai-compatible", "openai-compat", "chat-completions":
+		return gscript.OpenAICompatibleLLMProvider{
+			Endpoint: cliOpenAIChatCompletionsEndpoint(cfg.BaseURL),
+			APIKey:   cfg.APIKey,
+			Model:    cfg.ProviderModel,
+		}, nil
+	case "anthropic", "anthropic-compatible", "anthropic-compat", "messages":
+		return gscript.AnthropicCompatibleLLMProvider{
+			Endpoint: cfg.BaseURL,
+			APIKey:   cfg.APIKey,
+			Model:    cfg.ProviderModel,
+		}, nil
+	default:
+		if cfg.Protocol == "" {
+			return nil, fmt.Errorf("llm provider protocol not configured for model %q", cfg.Name)
+		}
+		return nil, fmt.Errorf("unsupported llm provider protocol %q for model %q", cfg.Protocol, cfg.Name)
+	}
+}
+
+func cliOpenAIChatCompletionsEndpoint(base string) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return "https://api.openai.com/v1/chat/completions"
+	}
+	trimmed := strings.TrimRight(base, "/")
+	if strings.HasSuffix(trimmed, "/chat/completions") {
+		return trimmed
+	}
+	return trimmed + "/chat/completions"
 }
 
 func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int {
@@ -1137,6 +1178,7 @@ func runStringVMWithSource(interp *runtime.Interpreter, src, sourceName string, 
 	globals := interp.ExportGlobals()
 	bvm := bytecodevm.New(globals)
 	bvm.SetScriptDir(interp.ScriptDir())
+	bvm.SetLLMProviderFactory(cliDefaultLLMProviderFactory)
 	if jitOpts.ShowCoroutineStats {
 		bvm.EnableCoroutineStats()
 	}

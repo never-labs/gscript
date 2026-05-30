@@ -25,10 +25,10 @@ func ValidateAINative(prog *Program) error {
 				return fmt.Errorf("line %d: duplicate agent defaults declaration", s.P.Line)
 			}
 			seenDefaults = true
-			if err := ctx.validateAIToolsConfig(s.P, "agent defaults", s.Config); err != nil {
+			if err := ctx.validateAIToolsConfig("agent defaults", s.Config); err != nil {
 				return err
 			}
-			defaults, err := ctx.staticAIConfig(s.P, "agent defaults", s.Config)
+			defaults, err := ctx.staticAIConfig("agent defaults", s.Config)
 			if err != nil {
 				return err
 			}
@@ -138,7 +138,7 @@ func (ctx *aiValidationContext) validateAINativeStmt(stmt Stmt, topLevel bool) e
 		}
 		return ctx.validateAINativeStmtList(s.Body.Stmts, false)
 	case *AgentDeclStmt:
-		if err := ctx.validateAIToolsConfig(s.P, fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
+		if err := ctx.validateAIToolsConfig(fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
 			return err
 		}
 		if err := ctx.validateAgentDefaultsMerge(s.P, fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
@@ -248,7 +248,7 @@ func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 	case *FuncLitExpr:
 		return ctx.child().validateAINativeStmtList(e.Body.Stmts, false)
 	case *AgentLitExpr:
-		if err := ctx.validateAIToolsConfig(e.P, "agent expression", e.Config); err != nil {
+		if err := ctx.validateAIToolsConfig("agent expression", e.Config); err != nil {
 			return err
 		}
 		if err := ctx.validateAgentDefaultsMerge(e.P, "agent expression", e.Config); err != nil {
@@ -258,7 +258,7 @@ func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 			return ctx.child().validateAINativeStmtList(e.Flow.Stmts, false)
 		}
 	case *TurnExpr:
-		return ctx.validateAIToolsConfig(e.P, "turn", e.Config)
+		return ctx.validateAIToolsConfig("turn", e.Config)
 	case *MessagesExpr:
 		return ctx.validateAIConfigExprs(e.Fields)
 	case *ListLitExpr:
@@ -369,8 +369,8 @@ func validateToolParamDocs(s *ToolDeclStmt) error {
 	return nil
 }
 
-func (ctx *aiValidationContext) validateAIToolsConfig(pos Pos, owner string, config []ConfigField) error {
-	info, err := ctx.staticAIConfig(pos, owner, config)
+func (ctx *aiValidationContext) validateAIToolsConfig(owner string, config []ConfigField) error {
+	info, err := ctx.staticAIConfig(owner, config)
 	if err != nil {
 		return err
 	}
@@ -387,8 +387,8 @@ type aiStaticAIConfig struct {
 	capsPos      Pos
 }
 
-func (ctx *aiValidationContext) staticAIConfig(pos Pos, owner string, config []ConfigField) (*aiStaticAIConfig, error) {
-	tools, toolsPresent, toolsStatic, err := ctx.staticToolsConfig(pos, owner, config)
+func (ctx *aiValidationContext) staticAIConfig(owner string, config []ConfigField) (*aiStaticAIConfig, error) {
+	tools, toolsPresent, toolsStatic, err := ctx.staticToolsConfig(owner, config)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +408,7 @@ func (ctx *aiValidationContext) validateAgentDefaultsMerge(pos Pos, owner string
 	if ctx.agentDefaults == nil {
 		return nil
 	}
-	agent, err := ctx.staticAIConfig(pos, owner, config)
+	agent, err := ctx.staticAIConfig(owner, config)
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func (ctx *aiValidationContext) validateStaticToolCaps(owner string, tools []str
 	return nil
 }
 
-func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config []ConfigField) ([]string, bool, bool, error) {
+func (ctx *aiValidationContext) staticToolsConfig(owner string, config []ConfigField) ([]string, bool, bool, error) {
 	for _, f := range config {
 		key, ok := stringConfigKey(f.Key)
 		if !ok || key != "tools" {
@@ -462,10 +462,10 @@ func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config 
 				continue
 			}
 			if seen[ident.Name] {
-				return nil, false, false, fmt.Errorf("line %d: %s tools list includes duplicate tool %q", pos.Line, owner, ident.Name)
+				return nil, false, false, fmt.Errorf("line %d: %s tools list includes duplicate tool %q", ident.P.Line, owner, ident.Name)
 			}
 			if _, ok := ctx.tools.Lookup(ident.Name); !ok {
-				return nil, false, false, fmt.Errorf("line %d: %s tools list references undeclared tool %q", pos.Line, owner, ident.Name)
+				return nil, false, false, fmt.Errorf("line %d: %s tools list references undeclared tool %q", ident.P.Line, owner, ident.Name)
 			}
 			seen[ident.Name] = true
 			names = append(names, ident.Name)

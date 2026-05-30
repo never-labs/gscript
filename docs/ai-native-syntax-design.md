@@ -506,9 +506,9 @@ Rules:
 
 - `output` guides the model toward the desired shape.
 - Table output hints request structured output validation. The runtime checks
-  that the final JSON object contains the hinted top-level fields and performs
-  shallow type checks from example values for string, number, bool, and table
-  fields.
+  that the final JSON object contains hinted fields and performs deep type
+  checks from example values for string, number, bool, object, and array fields.
+  For arrays, the first hinted element is used as the shape for returned items.
 - On success, decoded structured data is placed in `result.value`.
 - On validation failure, runtime may perform bounded repair according to host
   policy; if repair fails, return `err.kind == "validation"`.
@@ -518,9 +518,9 @@ to `llm.turn` and forwarded to the provider request. Agent-level table
 `output` now requests provider JSON mode with `response_format:
 {type: "json_object"}` when no explicit `response_format` is present, and a
 final JSON object/table response is decoded into `result.value`. Invalid JSON,
-missing hinted top-level fields, and shallow field type mismatches return
-`err.kind == "validation"`. Nested schema generation, deep validation, and
-repair remain pending runtime work.
+missing hinted fields, and deep field type mismatches return
+`err.kind == "validation"`. Nested schema generation and repair remain pending
+runtime work.
 
 ## 11. History And Call Options
 

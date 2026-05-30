@@ -1388,6 +1388,13 @@ budget { turns: 1 } {
 	if !strings.HasSuffix(string(formatted), "\n") {
 		t.Fatalf("formatted source does not end with newline: %q", string(formatted))
 	}
+	formattedAgain, err := formatSource("ai_native.gs", formatted)
+	if err != nil {
+		t.Fatalf("format formatted source: %v", err)
+	}
+	if !bytes.Equal(formattedAgain, formatted) {
+		t.Fatalf("AI-native formatting is not idempotent:\nonce:\n%s\ntwice:\n%s", formatted, formattedAgain)
+	}
 }
 
 func TestLintAINativeSyntaxCoverage(t *testing.T) {

@@ -279,6 +279,107 @@ manual := agent(q) {
 	}
 }
 
+func TestAINativeSyntaxPositions(t *testing.T) {
+	prog := mustParse(t, `
+models {
+    default: "fast"
+}
+
+// Lookup docs.
+// gscript:requires none
+tool lookup(query) {
+    return query, nil
+}
+
+agent answer(q) {
+    tools: [lookup]
+    user: q
+} flow {
+    r, err := turn {
+        messages: messages { user: q }
+        tools: tools
+    }
+    return r, err
+}
+`)
+	models := prog.Stmts[0].(*ast.ModelsDeclStmt)
+	if models.GetPos() != (ast.Pos{Line: 2, Column: 1}) || models.Config[0].P != (ast.Pos{Line: 3, Column: 5}) {
+		t.Fatalf("models positions = stmt %#v field %#v", models.GetPos(), models.Config[0].P)
+	}
+	tool := prog.Stmts[1].(*ast.ToolDeclStmt)
+	if tool.GetPos() != (ast.Pos{Line: 8, Column: 1}) {
+		t.Fatalf("tool pos = %#v", tool.GetPos())
+	}
+	agentDecl := prog.Stmts[2].(*ast.AgentDeclStmt)
+	if agentDecl.GetPos() != (ast.Pos{Line: 12, Column: 1}) || agentDecl.Config[0].P != (ast.Pos{Line: 13, Column: 5}) {
+		t.Fatalf("agent positions = stmt %#v field %#v", agentDecl.GetPos(), agentDecl.Config[0].P)
+	}
+	decl := agentDecl.Flow.Stmts[0].(*ast.DeclareStmt)
+	turnExpr := decl.Values[0].(*ast.TurnExpr)
+	if turnExpr.GetPos() != (ast.Pos{Line: 16, Column: 15}) || turnExpr.Config[0].P != (ast.Pos{Line: 17, Column: 9}) {
+		t.Fatalf("turn positions = expr %#v field %#v", turnExpr.GetPos(), turnExpr.Config[0].P)
+	}
+	messages := turnExpr.Config[0].Value.(*ast.MessagesExpr)
+	if messages.GetPos() != (ast.Pos{Line: 17, Column: 19}) || messages.Fields[0].P != (ast.Pos{Line: 17, Column: 30}) {
+		t.Fatalf("messages positions = expr %#v field %#v", messages.GetPos(), messages.Fields[0].P)
+	}
+}
+
+func TestAINativeValidationReportsStaticToolListElementLine(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			name: "unknown",
+			src: `
+// gscript:requires none
+tool lookup(query) {
+    return query, nil
+}
+
+func f() {
+    _ = turn {
+        tools: [
+            lookup,
+            missing,
+        ]
+        user: "hello"
+    }
+}
+`,
+			want: `line 11: turn tools list references undeclared tool "missing"`,
+		},
+		{
+			name: "duplicate",
+			src: `
+// gscript:requires none
+tool lookup(query) {
+    return query, nil
+}
+
+agent answer(q) {
+    tools: [
+        lookup,
+        lookup,
+    ]
+    user: q
+}
+`,
+			want: `line 10: agent answer tools list includes duplicate tool "lookup"`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prog := mustParse(t, tc.src)
+			err := ast.ValidateAINative(prog)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("ValidateAINative error = %v, want substring %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestAINativeExampleParses(t *testing.T) {
 	src, err := os.ReadFile("../../examples/ai_native_agent.gs")
 	if err != nil {
