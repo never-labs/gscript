@@ -40,14 +40,17 @@ type LLMToolCall struct {
 }
 
 type LLMTurnRequest struct {
-	Model     string
-	Messages  []LLMMessage
-	Tools     []LLMTool
-	ForceTool string
-	MaxTokens int64
-	Stream    bool
-	Stop      []string
-	Metadata  map[string]string
+	Model          string
+	Messages       []LLMMessage
+	Tools          []LLMTool
+	ForceTool      string
+	MaxTokens      int64
+	Temperature    *float64
+	TopP           *float64
+	ResponseFormat any
+	Stream         bool
+	Stop           []string
+	Metadata       map[string]string
 }
 
 type LLMTurnUsage struct {
@@ -691,6 +694,9 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"model",
 		"tools",
 		"max_tokens",
+		"temperature",
+		"top_p",
+		"response_format",
 		"stream",
 		"max_steps",
 		"max_tool_retries",
@@ -725,11 +731,14 @@ func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, ma
 	}
 	messages := llmPlanMessages(opts.RawGetString("messages"))
 	req := LLMTurnRequest{
-		Model:     model,
-		Messages:  llmMessagesFromValue(messages),
-		MaxTokens: toInt(src.RawGetString("plan_max_tokens")),
-		Stop:      llmStringSliceFromValue(src.RawGetString("plan_stop")),
-		Metadata:  llmStringMapFromValue(src.RawGetString("metadata")),
+		Model:          model,
+		Messages:       llmMessagesFromValue(messages),
+		MaxTokens:      toInt(src.RawGetString("plan_max_tokens")),
+		Temperature:    llmOptionalFloatFromValue(src.RawGetString("plan_temperature")),
+		TopP:           llmOptionalFloatFromValue(src.RawGetString("plan_top_p")),
+		ResponseFormat: llmAnyFromValue(src.RawGetString("plan_response_format")),
+		Stop:           llmStringSliceFromValue(src.RawGetString("plan_stop")),
+		Metadata:       llmStringMapFromValue(src.RawGetString("metadata")),
 	}
 	trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
 	res, err := provider.Turn(ctx, req)
@@ -794,11 +803,14 @@ func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Cont
 		messages.RawSet(IntValue(1), TableValue(llmMessageTable("system", prompt)))
 		messages.RawSet(IntValue(2), TableValue(llmMessageTable("user", text)))
 		req := LLMTurnRequest{
-			Model:     model,
-			Messages:  llmMessagesFromValue(TableValue(messages)),
-			MaxTokens: toInt(src.RawGetString("reflect_max_tokens")),
-			Stop:      llmStringSliceFromValue(src.RawGetString("reflect_stop")),
-			Metadata:  llmStringMapFromValue(src.RawGetString("metadata")),
+			Model:          model,
+			Messages:       llmMessagesFromValue(TableValue(messages)),
+			MaxTokens:      toInt(src.RawGetString("reflect_max_tokens")),
+			Temperature:    llmOptionalFloatFromValue(src.RawGetString("reflect_temperature")),
+			TopP:           llmOptionalFloatFromValue(src.RawGetString("reflect_top_p")),
+			ResponseFormat: llmAnyFromValue(src.RawGetString("reflect_response_format")),
+			Stop:           llmStringSliceFromValue(src.RawGetString("reflect_stop")),
+			Metadata:       llmStringMapFromValue(src.RawGetString("metadata")),
 		}
 		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
 		res, err := provider.Turn(ctx, req)
@@ -855,12 +867,15 @@ func llmMessageTable(role, text string) *Table {
 
 func llmRequestFromTable(t *Table) (LLMTurnRequest, error) {
 	req := LLMTurnRequest{
-		Model:     t.RawGetString("model").Str(),
-		ForceTool: llmForceToolFromValue(t.RawGetString("force_tool")),
-		MaxTokens: toInt(t.RawGetString("max_tokens")),
-		Stream:    t.RawGetString("stream").Truthy(),
-		Stop:      llmStringSliceFromValue(t.RawGetString("stop")),
-		Metadata:  llmStringMapFromValue(t.RawGetString("metadata")),
+		Model:          t.RawGetString("model").Str(),
+		ForceTool:      llmForceToolFromValue(t.RawGetString("force_tool")),
+		MaxTokens:      toInt(t.RawGetString("max_tokens")),
+		Temperature:    llmOptionalFloatFromValue(t.RawGetString("temperature")),
+		TopP:           llmOptionalFloatFromValue(t.RawGetString("top_p")),
+		ResponseFormat: llmAnyFromValue(t.RawGetString("response_format")),
+		Stream:         t.RawGetString("stream").Truthy(),
+		Stop:           llmStringSliceFromValue(t.RawGetString("stop")),
+		Metadata:       llmStringMapFromValue(t.RawGetString("metadata")),
 	}
 	messages := t.RawGetString("messages")
 	if !messages.IsTable() {
@@ -975,6 +990,14 @@ func llmStringMapFromValue(v Value) map[string]string {
 		return nil
 	}
 	return out
+}
+
+func llmOptionalFloatFromValue(v Value) *float64 {
+	if v.IsNil() {
+		return nil
+	}
+	f := toFloat(v)
+	return &f
 }
 
 func llmForceToolFromValue(v Value) string {
@@ -1193,14 +1216,17 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 			requestHistory = chatWindow(llmTableFromValues(history).Table(), maxHistoryTokens)
 		}
 		req := LLMTurnRequest{
-			Model:     model,
-			Messages:  llmMessagesFromValue(llmTableFromValues(requestHistory)),
-			Tools:     llmToolsFromValue(toolsValue),
-			ForceTool: llmForceToolFromValue(opts.RawGetString("force_tool")),
-			MaxTokens: toInt(opts.RawGetString("max_tokens")),
-			Stream:    opts.RawGetString("stream").Truthy(),
-			Stop:      llmStringSliceFromValue(opts.RawGetString("stop")),
-			Metadata:  llmStringMapFromValue(opts.RawGetString("metadata")),
+			Model:          model,
+			Messages:       llmMessagesFromValue(llmTableFromValues(requestHistory)),
+			Tools:          llmToolsFromValue(toolsValue),
+			ForceTool:      llmForceToolFromValue(opts.RawGetString("force_tool")),
+			MaxTokens:      toInt(opts.RawGetString("max_tokens")),
+			Temperature:    llmOptionalFloatFromValue(opts.RawGetString("temperature")),
+			TopP:           llmOptionalFloatFromValue(opts.RawGetString("top_p")),
+			ResponseFormat: llmAnyFromValue(opts.RawGetString("response_format")),
+			Stream:         opts.RawGetString("stream").Truthy(),
+			Stop:           llmStringSliceFromValue(opts.RawGetString("stop")),
+			Metadata:       llmStringMapFromValue(opts.RawGetString("metadata")),
 		}
 		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: int64(step), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := provider.Turn(ctx, req)

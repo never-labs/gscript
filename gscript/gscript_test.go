@@ -52,6 +52,10 @@ func (p *mockLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLM
 	return gs.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
 }
 
+func float64Ptr(v float64) *float64 {
+	return &v
+}
+
 func (s *hostModuleService) Label(id int64) string {
 	return fmt.Sprintf("%s-%03d", s.Prefix, id)
 }
@@ -831,16 +835,28 @@ func TestOpenAICompatibleLLMProvider(t *testing.T) {
 			Description: "lookup docs",
 			Params:      []string{"name"},
 		}},
-		ForceTool: "lookup",
-		MaxTokens: 32,
-		Stop:      []string{"END"},
-		Metadata:  map[string]string{"trace_id": "abc"},
+		ForceTool:   "lookup",
+		MaxTokens:   32,
+		Temperature: float64Ptr(0.25),
+		TopP:        float64Ptr(0.9),
+		ResponseFormat: map[string]any{
+			"type": "json_object",
+		},
+		Stop:     []string{"END"},
+		Metadata: map[string]string{"trace_id": "abc"},
 	})
 	if err != nil {
 		t.Fatalf("Turn: %v", err)
 	}
 	if got["model"] != "mock-fast" || got["max_tokens"] != float64(32) {
 		t.Fatalf("request scalar fields = %#v", got)
+	}
+	if got["temperature"] != 0.25 || got["top_p"] != 0.9 {
+		t.Fatalf("request sampling fields = %#v", got)
+	}
+	format := got["response_format"].(map[string]any)
+	if format["type"] != "json_object" {
+		t.Fatalf("response_format = %#v", got["response_format"])
 	}
 	messages := got["messages"].([]any)
 	if messages[0].(map[string]any)["role"] != "system" || messages[1].(map[string]any)["content"] != "find docs" {
@@ -1328,6 +1344,9 @@ result, err := llm.turn({
     messages: {llm.user("hello")},
     force_tool: "lookup",
     max_tokens: 16,
+    temperature: 0.25,
+    top_p: 0.9,
+    response_format: {type: "json_object"},
     stream: true,
     stop: {"END", "\n\n"},
     metadata: {trace_id: "abc", route: "test"},
@@ -1340,6 +1359,16 @@ result, err := llm.turn({
 	}
 	if provider.last.ForceTool != "lookup" {
 		t.Fatalf("force_tool = %#v", provider.last.ForceTool)
+	}
+	if provider.last.Temperature == nil || *provider.last.Temperature != 0.25 {
+		t.Fatalf("temperature = %#v", provider.last.Temperature)
+	}
+	if provider.last.TopP == nil || *provider.last.TopP != 0.9 {
+		t.Fatalf("top_p = %#v", provider.last.TopP)
+	}
+	format, _ := provider.last.ResponseFormat.(map[string]any)
+	if format["type"] != "json_object" {
+		t.Fatalf("response_format = %#v", provider.last.ResponseFormat)
 	}
 	if len(provider.last.Stop) != 2 || provider.last.Stop[0] != "END" || provider.last.Stop[1] != "\n\n" {
 		t.Fatalf("stop = %#v", provider.last.Stop)

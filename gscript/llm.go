@@ -303,6 +303,15 @@ func cloneLLMRequest(req LLMTurnRequest) LLMTurnRequest {
 		out.Tools[i].Requires = append([]string(nil), req.Tools[i].Requires...)
 		out.Tools[i].Schema = cloneLLMAny(req.Tools[i].Schema)
 	}
+	if req.Temperature != nil {
+		v := *req.Temperature
+		out.Temperature = &v
+	}
+	if req.TopP != nil {
+		v := *req.TopP
+		out.TopP = &v
+	}
+	out.ResponseFormat = cloneLLMAny(req.ResponseFormat)
 	out.Stop = append([]string(nil), req.Stop...)
 	if req.Metadata != nil {
 		out.Metadata = make(map[string]string, len(req.Metadata))
@@ -372,6 +381,7 @@ func normalizeLLMRequestJSON(req LLMTurnRequest) LLMTurnRequest {
 	for i := range out.Tools {
 		out.Tools[i].Schema = normalizeLLMAnyJSON(out.Tools[i].Schema)
 	}
+	out.ResponseFormat = normalizeLLMAnyJSON(out.ResponseFormat)
 	return out
 }
 
@@ -419,6 +429,9 @@ func llmRequestsEqual(a, b LLMTurnRequest) bool {
 	return a.Model == b.Model &&
 		a.ForceTool == b.ForceTool &&
 		a.MaxTokens == b.MaxTokens &&
+		reflect.DeepEqual(a.Temperature, b.Temperature) &&
+		reflect.DeepEqual(a.TopP, b.TopP) &&
+		reflect.DeepEqual(a.ResponseFormat, b.ResponseFormat) &&
 		a.Stream == b.Stream &&
 		reflect.DeepEqual(a.Stop, b.Stop) &&
 		reflect.DeepEqual(a.Metadata, b.Metadata) &&

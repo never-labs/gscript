@@ -208,9 +208,9 @@ return result.text, nil
 `internal` are transient and retried up to `max_tool_retries`;
 `validation`, `policy`, `user`, and `capability` are fed back as tool-error
 messages; unknown kinds are returned as fatal agent errors.
-Provider options such as `model`, `force_tool`, `max_tokens`, `stream`, `stop`, and
-`metadata` are forwarded consistently by `llm.turn`, `llm.react`, and
-`loop.react`.
+Provider options such as `model`, `force_tool`, `max_tokens`, `temperature`,
+`top_p`, `response_format`, `stream`, `stop`, and `metadata` are forwarded
+consistently by `llm.turn`, `llm.react`, and `loop.react`.
 Tool capability metadata remains plain data: `llm.tool_caps(tools)` returns the
 unique ordered `requires` list, and `llm.check_tools(tools, caps)` returns
 `(true, nil)` or `(nil, {kind: "capability", capability: ..., tool: ...})`.

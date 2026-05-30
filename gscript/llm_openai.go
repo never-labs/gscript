@@ -78,14 +78,17 @@ func (p OpenAICompatibleLLMProvider) Turn(ctx context.Context, req LLMTurnReques
 }
 
 type openAIChatRequest struct {
-	Model      string            `json:"model"`
-	Messages   []openAIMessage   `json:"messages"`
-	Tools      []openAITool      `json:"tools,omitempty"`
-	ToolChoice any               `json:"tool_choice,omitempty"`
-	MaxTokens  int64             `json:"max_tokens,omitempty"`
-	Stream     bool              `json:"stream,omitempty"`
-	Stop       []string          `json:"stop,omitempty"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
+	Model          string            `json:"model"`
+	Messages       []openAIMessage   `json:"messages"`
+	Tools          []openAITool      `json:"tools,omitempty"`
+	ToolChoice     any               `json:"tool_choice,omitempty"`
+	MaxTokens      int64             `json:"max_tokens,omitempty"`
+	Temperature    *float64          `json:"temperature,omitempty"`
+	TopP           *float64          `json:"top_p,omitempty"`
+	ResponseFormat any               `json:"response_format,omitempty"`
+	Stream         bool              `json:"stream,omitempty"`
+	Stop           []string          `json:"stop,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
 }
 
 type openAIMessage struct {
@@ -130,12 +133,15 @@ type openAIChatResponse struct {
 
 func openAIChatRequestFromTurn(req LLMTurnRequest, model string) openAIChatRequest {
 	out := openAIChatRequest{
-		Model:     model,
-		Messages:  make([]openAIMessage, 0, len(req.Messages)),
-		MaxTokens: req.MaxTokens,
-		Stream:    req.Stream,
-		Stop:      append([]string(nil), req.Stop...),
-		Metadata:  cloneStringMap(req.Metadata),
+		Model:          model,
+		Messages:       make([]openAIMessage, 0, len(req.Messages)),
+		MaxTokens:      req.MaxTokens,
+		Temperature:    cloneFloat64Ptr(req.Temperature),
+		TopP:           cloneFloat64Ptr(req.TopP),
+		ResponseFormat: cloneLLMAny(req.ResponseFormat),
+		Stream:         req.Stream,
+		Stop:           append([]string(nil), req.Stop...),
+		Metadata:       cloneStringMap(req.Metadata),
 	}
 	for _, msg := range req.Messages {
 		out.Messages = append(out.Messages, openAIMessageFromLLM(msg))
@@ -308,4 +314,12 @@ func cloneStringMap(src map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func cloneFloat64Ptr(src *float64) *float64 {
+	if src == nil {
+		return nil
+	}
+	out := *src
+	return &out
 }
