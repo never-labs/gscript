@@ -27,7 +27,8 @@ extensions:
 - Go binding: `RegisterFunc`, `RegisterTable`, `RegisterModule`, `BindStruct`,
   `BindStructWithConstructor`, and `BindMethod`.
 - Native LLM integration: `WithLLMProvider`, `WithLLMCommand`,
-  `WithLLMTrace`, and the `llm` standard library module.
+  `WithLLMTrace`, `WithLLMRecorder`, `WithLLMReplay`, and the `llm`
+  standard library module.
 - Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
 - Options: `WithLibs`, `WithCapabilities`, `WithSandbox`, `SecuritySandbox`,
@@ -111,6 +112,28 @@ vm := gscript.New(
     }),
 )
 ```
+
+For deterministic tests and CI, hosts can record provider turns and replay them
+without reaching an external model:
+
+```go
+var records []gscript.LLMRecord
+vm := gscript.New(
+    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
+    gscript.WithLLMProvider(Provider{}),
+    gscript.WithLLMRecorder(func(record gscript.LLMRecord) {
+        records = append(records, record)
+    }),
+)
+
+replay := gscript.New(
+    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
+    gscript.WithLLMReplay(records),
+)
+```
+
+Replay is strict and sequential: each incoming request must match the next
+recorded request before the recorded result or provider error is returned.
 
 Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:
 

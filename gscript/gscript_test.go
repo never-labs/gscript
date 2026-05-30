@@ -348,6 +348,79 @@ react_result, react_err := llm.react({
 	}
 }
 
+func TestLLMRecorderAndReplay(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+		Status: "final_answer",
+		Text:   "recorded",
+		Usage:  gs.LLMTurnUsage{InputTokens: 5, OutputTokens: 6},
+	}}
+	var records []gs.LLMRecord
+	vm := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithLLMProvider(provider),
+		gs.WithLLMRecorder(func(record gs.LLMRecord) {
+			records = append(records, record)
+		}),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.system("short"), llm.user("hello")},
+    max_tokens: 16,
+})
+text := result.text
+`); err != nil {
+		t.Fatalf("record Exec: %v", err)
+	}
+	if len(records) != 1 || records[0].Request.Model != "mock-fast" || records[0].Result.Text != "recorded" {
+		t.Fatalf("records = %#v", records)
+	}
+	replay := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithLLMReplay(records),
+	)
+	if err := replay.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.system("short"), llm.user("hello")},
+    max_tokens: 16,
+})
+text := result.text
+usage := result.usage.output_tokens
+`); err != nil {
+		t.Fatalf("replay Exec: %v", err)
+	}
+	text, _ := replay.Get("text")
+	usage, _ := replay.Get("usage")
+	if text != "recorded" || usage != int64(6) {
+		t.Fatalf("replay text=%#v usage=%#v", text, usage)
+	}
+}
+
+func TestLLMReplayRejectsMismatchedRequest(t *testing.T) {
+	records := []gs.LLMRecord{{
+		Request: gs.LLMTurnRequest{
+			Model:    "mock-fast",
+			Messages: []gs.LLMMessage{{Role: "user", Text: "expected"}},
+		},
+		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+	}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMReplay(records))
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("actual")},
+})
+kind := err.kind
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	kind, _ := vm.Get("kind")
+	if kind != "provider" {
+		t.Fatalf("kind = %#v", kind)
+	}
+}
+
 func TestLLMCommandProviderGLMCCSmoke(t *testing.T) {
 	if os.Getenv("GSCRIPT_GLM_CC_SMOKE") == "" {
 		t.Skip("set GSCRIPT_GLM_CC_SMOKE=1 to run glm_cc-backed llm.turn smoke")

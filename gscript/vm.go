@@ -98,8 +98,9 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxFilesystemWriteBytes(o.maxFSWriteBytes)
 		o.useJIT = false
 	}
-	if o.llmProvider != nil {
-		interp.SetLLMProvider(llmProviderAdapter{provider: o.llmProvider})
+	llmProvider := configuredLLMProvider(o)
+	if llmProvider != nil {
+		interp.SetLLMProvider(llmProviderAdapter{provider: llmProvider})
 	}
 	if o.llmTraceSink != nil {
 		interp.SetLLMTraceSink(llmTraceAdapter(o.llmTraceSink))
@@ -228,8 +229,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
 			bvm.SetDebugAccess(vm.opts.debugAccess)
 			bvm.SetTestkitAccess(vm.opts.testkitAccess)
-			if vm.opts.llmProvider != nil {
-				bvm.SetLLMProvider(llmProviderAdapter{provider: vm.opts.llmProvider})
+			llmProvider := configuredLLMProvider(vm.opts)
+			if llmProvider != nil {
+				bvm.SetLLMProvider(llmProviderAdapter{provider: llmProvider})
 			}
 			if vm.opts.llmTraceSink != nil {
 				bvm.SetLLMTraceSink(llmTraceAdapter(vm.opts.llmTraceSink))

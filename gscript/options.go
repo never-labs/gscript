@@ -130,6 +130,7 @@ type vmOptions struct {
 	printFunc       func(args ...interface{})
 	llmProvider     LLMProvider
 	llmTraceSink    LLMTraceSink
+	llmRecordSink   LLMRecordSink
 	useVM           bool // use bytecode VM instead of tree-walker
 	useJIT          bool // enable JIT compilation (implies useVM)
 }
