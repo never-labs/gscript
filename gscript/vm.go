@@ -342,6 +342,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"json":      libs&LibJSON != 0,
 		"llm":       libs&LibLLM != 0,
 		"log":       libs&LibLog != 0,
+		"loop":      libs&LibLLM != 0,
 		"math":      libs&LibMath != 0,
 		"matrix":    libs&LibMatrix != 0,
 		"msg":       libs&LibLLM != 0,

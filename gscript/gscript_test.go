@@ -244,6 +244,62 @@ summary_text := summary.text
 	}
 }
 
+func TestLoopHelpers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "simple"},
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_1",
+						Tool: "lookup",
+						Args: map[string]any{"name": "gscript"},
+					}},
+				},
+				{Status: "final_answer", Text: "react"},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+simple, simple_err := loop.simple({system: "short", user: "hello"})
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+react, react_err := loop.react({
+    user: "find docs",
+    tools: {lookup},
+    max_steps: 3,
+})
+simple_text := simple.text
+react_text := react.text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			simpleText, _ := vm.Get("simple_text")
+			reactText, _ := vm.Get("react_text")
+			if simpleText != "simple" || reactText != "react" {
+				t.Fatalf("simple=%#v react=%#v", simpleText, reactText)
+			}
+			if len(provider.requests) != 3 || len(provider.requests[0].Messages) != 2 || provider.requests[0].Messages[0].Role != "system" {
+				t.Fatalf("requests = %#v", provider.requests)
+			}
+			if len(provider.requests[2].Messages) != 3 || provider.requests[2].Messages[2].Value != "docs:gscript" {
+				t.Fatalf("react request = %#v", provider.requests[2])
+			}
+		})
+	}
+}
+
 func TestLLMCommandProvider(t *testing.T) {
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),

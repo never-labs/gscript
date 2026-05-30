@@ -1215,6 +1215,22 @@ func (vm *VM) RegisterLLMLib() {
 	chatLib := runtime.TableValue(runtime.BuildChatLib())
 	vm.SetGlobal("chat", chatLib)
 	vm.setPackageLoaded("chat", chatLib)
+	loopLib := runtime.TableValue(runtime.BuildLLMLoopLib(vm.callValue, func() runtime.LLMProvider {
+		return vm.llmProvider
+	}, func() int64 {
+		return vm.maxHostResult
+	}, func() context.Context {
+		if vm.ctx == nil {
+			return context.Background()
+		}
+		return vm.ctx
+	}, func(event runtime.LLMTraceEvent) {
+		if vm.llmTraceSink != nil {
+			vm.llmTraceSink(event)
+		}
+	}))
+	vm.SetGlobal("loop", loopLib)
+	vm.setPackageLoaded("loop", loopLib)
 }
 
 func (vm *VM) RegisterHTTPLib() {

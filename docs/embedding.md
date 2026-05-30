@@ -184,6 +184,10 @@ provider billing. `llm.react` uses the same estimate when `max_history_tokens`
 is set, trimming the request history before each provider turn while preserving
 the full returned `result.history`.
 
+The `loop` module is a thin convenience layer over `llm.react`: `loop.react`
+accepts either explicit `messages` or `{system, user}` fields, and `loop.simple`
+performs a single-turn loop with the same result/error shape.
+
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:
 

@@ -286,6 +286,115 @@ func BuildLLMMessageLib() *Table {
 	return t
 }
 
+func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
+	t := NewTable()
+
+	hostLimit := func() int64 {
+		if maxHostResult == nil {
+			return 0
+		}
+		return maxHostResult()
+	}
+	currentProvider := func() LLMProvider {
+		if provider == nil {
+			return nil
+		}
+		return provider()
+	}
+	currentContext := func() context.Context {
+		if ctx == nil || ctx() == nil {
+			return context.Background()
+		}
+		return ctx()
+	}
+	trace := func(event LLMTraceEvent) {
+		if len(traces) == 0 || traces[0] == nil {
+			return
+		}
+		traces[0](event)
+	}
+	set := func(name string, fn func([]Value) ([]Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: "loop." + name, Fn: fn}))
+	}
+
+	set("react", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'loop.react' (table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("loop.react requires a function caller")
+		}
+		p := currentProvider()
+		if p == nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
+			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
+		}
+		opts, err := llmLoopOptions(args[0].Table(), 0)
+		if err != nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
+			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+		}
+		return llmReact(opts, p, call, currentContext(), hostLimit(), trace)
+	})
+
+	set("simple", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'loop.simple' (table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("loop.simple requires a function caller")
+		}
+		p := currentProvider()
+		if p == nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
+			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
+		}
+		opts, err := llmLoopOptions(args[0].Table(), 1)
+		if err != nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
+			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+		}
+		return llmReact(opts, p, call, currentContext(), hostLimit(), trace)
+	})
+
+	return t
+}
+
+func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
+	opts := NewTable()
+	if messages := src.RawGetString("messages"); messages.IsTable() {
+		opts.RawSetString("messages", messages)
+	} else {
+		user := src.RawGetString("user")
+		if user.IsNil() {
+			return nil, fmt.Errorf("loop requires messages or user")
+		}
+		messages := NewAppendArrayTable(2)
+		if system := src.RawGetString("system"); !system.IsNil() {
+			messages.RawSet(IntValue(int64(messages.Length()+1)), TableValue(llmMessageTable("system", system.Str())))
+		}
+		messages.RawSet(IntValue(int64(messages.Length()+1)), TableValue(llmMessageTable("user", user.Str())))
+		opts.RawSetString("messages", TableValue(messages))
+	}
+	for _, key := range []string{
+		"model",
+		"tools",
+		"max_tokens",
+		"stream",
+		"max_steps",
+		"max_tool_retries",
+		"max_history_tokens",
+	} {
+		if v := src.RawGetString(key); !v.IsNil() {
+			opts.RawSetString(key, v)
+		}
+	}
+	if defaultMaxSteps > 0 && opts.RawGetString("max_steps").IsNil() {
+		opts.RawSetString("max_steps", IntValue(defaultMaxSteps))
+	}
+	return opts, nil
+}
+
 func registerLLMMessageConstructors(t *Table, module string) {
 	setLLMFunction(t, module, "system", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {

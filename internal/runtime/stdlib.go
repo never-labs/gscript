@@ -25,6 +25,7 @@ var stdlibModuleNames = []string{
 	"json",
 	"llm",
 	"log",
+	"loop",
 	"math",
 	"matrix",
 	"msg",
@@ -130,6 +131,20 @@ func (interp *Interpreter) registerStdlib() {
 	})))
 	interp.globals.Define("msg", TableValue(BuildLLMMessageLib()))
 	interp.globals.Define("chat", TableValue(BuildChatLib()))
+	interp.globals.Define("loop", TableValue(BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
+		return interp.llmProvider
+	}, func() int64 {
+		return interp.maxHostResult
+	}, func() context.Context {
+		if interp.ctx == nil {
+			return context.Background()
+		}
+		return interp.ctx
+	}, func(event LLMTraceEvent) {
+		if interp.llmTraceSink != nil {
+			interp.llmTraceSink(event)
+		}
+	})))
 
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
