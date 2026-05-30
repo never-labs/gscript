@@ -2,7 +2,10 @@ package gscript
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -177,6 +180,47 @@ func NewLLMReplayProvider(records []LLMRecord) *LLMReplayProvider {
 	return &LLMReplayProvider{records: out}
 }
 
+// MarshalLLMRecords serializes replay records as stable JSON for deterministic
+// tests and offline evaluation fixtures.
+func MarshalLLMRecords(records []LLMRecord) ([]byte, error) {
+	out := make([]LLMRecord, len(records))
+	for i := range records {
+		out[i] = cloneLLMRecord(records[i])
+	}
+	return json.MarshalIndent(out, "", "  ")
+}
+
+// UnmarshalLLMRecords parses replay fixture JSON. Integer-valued JSON numbers
+// are normalized back to int64 so strict replay matching remains compatible
+// with values produced by the GScript runtime.
+func UnmarshalLLMRecords(data []byte) ([]LLMRecord, error) {
+	var records []LLMRecord
+	if err := json.Unmarshal(data, &records); err != nil {
+		return nil, err
+	}
+	out := make([]LLMRecord, len(records))
+	for i := range records {
+		out[i] = normalizeLLMRecordJSON(records[i])
+	}
+	return out, nil
+}
+
+func SaveLLMRecords(path string, records []LLMRecord) error {
+	data, err := MarshalLLMRecords(records)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
+func LoadLLMRecords(path string) ([]LLMRecord, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return UnmarshalLLMRecords(data)
+}
+
 func (p *LLMReplayProvider) Turn(_ context.Context, req LLMTurnRequest) (LLMTurnResult, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -305,6 +349,69 @@ func cloneLLMAny(v any) any {
 		return out
 	default:
 		return v
+	}
+}
+
+func normalizeLLMRecordJSON(record LLMRecord) LLMRecord {
+	return LLMRecord{
+		Request: normalizeLLMRequestJSON(record.Request),
+		Result:  normalizeLLMResultJSON(record.Result),
+		Error:   record.Error,
+	}
+}
+
+func normalizeLLMRequestJSON(req LLMTurnRequest) LLMTurnRequest {
+	out := cloneLLMRequest(req)
+	for i := range out.Messages {
+		out.Messages[i].Value = normalizeLLMAnyJSON(out.Messages[i].Value)
+		if out.Messages[i].ToolCall != nil {
+			call := normalizeLLMToolCallJSON(*out.Messages[i].ToolCall)
+			out.Messages[i].ToolCall = &call
+		}
+	}
+	for i := range out.Tools {
+		out.Tools[i].Schema = normalizeLLMAnyJSON(out.Tools[i].Schema)
+	}
+	return out
+}
+
+func normalizeLLMResultJSON(res LLMTurnResult) LLMTurnResult {
+	out := cloneLLMResult(res)
+	for i := range out.Calls {
+		out.Calls[i] = normalizeLLMToolCallJSON(out.Calls[i])
+	}
+	return out
+}
+
+func normalizeLLMToolCallJSON(call LLMToolCall) LLMToolCall {
+	out := cloneLLMToolCall(call)
+	for k, v := range out.Args {
+		out.Args[k] = normalizeLLMAnyJSON(v)
+	}
+	return out
+}
+
+func normalizeLLMAnyJSON(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, v := range x {
+			out[k] = normalizeLLMAnyJSON(v)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, v := range x {
+			out[i] = normalizeLLMAnyJSON(v)
+		}
+		return out
+	case float64:
+		if math.Trunc(x) == x && x >= float64(math.MinInt64) && x <= float64(math.MaxInt64) {
+			return int64(x)
+		}
+		return x
+	default:
+		return x
 	}
 }
 

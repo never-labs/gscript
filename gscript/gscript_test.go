@@ -1141,6 +1141,79 @@ func TestLLMReplayProviderStateHelpers(t *testing.T) {
 	}
 }
 
+func TestLLMRecordJSONRoundTrip(t *testing.T) {
+	records := []gs.LLMRecord{{
+		Request: gs.LLMTurnRequest{
+			Model: "mock-fast",
+			Messages: []gs.LLMMessage{{
+				Role: "user",
+				Text: "hello",
+				Value: map[string]any{
+					"count": int64(3),
+					"tags":  []any{"a", int64(2)},
+				},
+			}},
+			Tools: []gs.LLMTool{{
+				Name:     "lookup",
+				Params:   []string{"name"},
+				Requires: []string{"docs.read"},
+				Schema: map[string]any{
+					"type":  "object",
+					"limit": int64(3),
+				},
+			}},
+			Metadata: map[string]string{"trace_id": "abc"},
+		},
+		Result: gs.LLMTurnResult{
+			Status: "tool_calls",
+			Calls: []gs.LLMToolCall{{
+				ID:   "call_1",
+				Tool: "lookup",
+				Args: map[string]any{"name": "gscript", "limit": int64(3)},
+			}},
+		},
+	}}
+	data, err := gs.MarshalLLMRecords(records)
+	if err != nil {
+		t.Fatalf("MarshalLLMRecords: %v", err)
+	}
+	decoded, err := gs.UnmarshalLLMRecords(data)
+	if err != nil {
+		t.Fatalf("UnmarshalLLMRecords: %v", err)
+	}
+	replay := gs.NewLLMReplayProvider(decoded)
+	res, err := replay.Turn(context.Background(), records[0].Request)
+	if err != nil {
+		t.Fatalf("Turn: %v", err)
+	}
+	if got := res.Calls[0].Args["limit"]; got != int64(3) {
+		t.Fatalf("limit = %#v (%T), want int64(3)", got, got)
+	}
+}
+
+func TestLLMRecordFileRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "records.json")
+	records := []gs.LLMRecord{{
+		Request: gs.LLMTurnRequest{
+			Model:    "mock-fast",
+			Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+		},
+		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+	}}
+	if err := gs.SaveLLMRecords(path, records); err != nil {
+		t.Fatalf("SaveLLMRecords: %v", err)
+	}
+	decoded, err := gs.LoadLLMRecords(path)
+	if err != nil {
+		t.Fatalf("LoadLLMRecords: %v", err)
+	}
+	replay := gs.NewLLMReplayProvider(decoded)
+	res, err := replay.Turn(context.Background(), records[0].Request)
+	if err != nil || res.Text != "ok" {
+		t.Fatalf("Turn res=%#v err=%v", res, err)
+	}
+}
+
 func TestLLMTurnRequestProviderOptions(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
