@@ -26,6 +26,25 @@ type OpenAICompatibleLLMProvider struct {
 	RetryBackoff time.Duration
 }
 
+// OpenAICompatibleLLMError reports a non-2xx response from an
+// OpenAI-compatible chat-completions endpoint.
+type OpenAICompatibleLLMError struct {
+	StatusCode int
+	Body       string
+	Retryable  bool
+}
+
+func (e *OpenAICompatibleLLMError) Error() string {
+	if e == nil {
+		return "openai-compatible llm error"
+	}
+	body := strings.TrimSpace(e.Body)
+	if body == "" {
+		return fmt.Sprintf("openai-compatible llm status %d", e.StatusCode)
+	}
+	return fmt.Sprintf("openai-compatible llm status %d: %s", e.StatusCode, body)
+}
+
 func WithOpenAICompatibleLLM(endpoint, apiKey, model string) Option {
 	return WithLLMProvider(OpenAICompatibleLLMProvider{
 		Endpoint: endpoint,
@@ -99,7 +118,12 @@ func (p OpenAICompatibleLLMProvider) turnOnce(ctx context.Context, endpoint stri
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return LLMTurnResult{}, openAIRetryableStatus(resp.StatusCode), fmt.Errorf("openai-compatible llm status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+		retryable := openAIRetryableStatus(resp.StatusCode)
+		return LLMTurnResult{}, retryable, &OpenAICompatibleLLMError{
+			StatusCode: resp.StatusCode,
+			Body:       strings.TrimSpace(string(data)),
+			Retryable:  retryable,
+		}
 	}
 	var out openAIChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {

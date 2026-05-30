@@ -908,6 +908,28 @@ func TestOpenAICompatibleLLMProviderRetriesTransientStatus(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleLLMProviderTypedStatusError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "bad request", http.StatusBadRequest)
+	}))
+	defer server.Close()
+	provider := gs.OpenAICompatibleLLMProvider{
+		Endpoint: server.URL,
+		Model:    "mock-fast",
+		Client:   server.Client(),
+	}
+	_, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+		Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+	})
+	var statusErr *gs.OpenAICompatibleLLMError
+	if !errors.As(err, &statusErr) {
+		t.Fatalf("err = %T %v, want OpenAICompatibleLLMError", err, err)
+	}
+	if statusErr.StatusCode != http.StatusBadRequest || statusErr.Retryable || !strings.Contains(statusErr.Body, "bad request") {
+		t.Fatalf("statusErr = %#v", statusErr)
+	}
+}
+
 func TestOpenAICompatibleLLMProviderTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(50 * time.Millisecond)
