@@ -192,7 +192,12 @@ func desugarAgentValue(pos Pos, name string, params []FuncParam, config []Config
 		&ReturnStmt{P: pos, Values: []Expr{configTable(pos, config)}},
 	}}}
 	if flow == nil {
-		return llmCall(pos, "agent", &StringLit{P: pos, Value: name}, configFn)
+		return llmCall(pos, "agent",
+			&StringLit{P: pos, Value: name},
+			configFn,
+			&NilLit{P: pos},
+			agentMetadataTable(pos, params, config),
+		)
 	}
 	body := &BlockStmt{P: pos}
 	body.Stmts = append(body.Stmts, configLocalDecls(config)...)
@@ -201,19 +206,69 @@ func desugarAgentValue(pos Pos, name string, params []FuncParam, config []Config
 		&StringLit{P: pos, Value: name},
 		configFn,
 		&FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: body},
+		agentMetadataTable(pos, params, config),
 	)
+}
+
+func agentMetadataTable(pos Pos, params []FuncParam, config []ConfigField) Expr {
+	paramFields := make([]TableField, 0, len(params))
+	for _, p := range params {
+		if p.IsVarArg {
+			continue
+		}
+		paramFields = append(paramFields, TableField{Value: &StringLit{P: pos, Value: p.Name}})
+	}
+	fields := []TableField{
+		{Key: &StringLit{P: pos, Value: "params"}, Value: &TableLitExpr{P: pos, Fields: paramFields}},
+	}
+	var systemDesc, explicitDesc string
+	for _, f := range config {
+		key, ok := stringConfigKey(f.Key)
+		if !ok {
+			continue
+		}
+		switch key {
+		case "output":
+			fields = append(fields, TableField{Key: &StringLit{P: pos, Value: "output"}, Value: desugarExpr(f.Value)})
+		case "system":
+			if lit, ok := f.Value.(*StringLit); ok {
+				systemDesc = lit.Value
+			}
+		case "description":
+			if lit, ok := f.Value.(*StringLit); ok {
+				explicitDesc = lit.Value
+			}
+		}
+	}
+	desc := explicitDesc
+	if desc == "" {
+		desc = systemDesc
+	}
+	if desc != "" {
+		fields = append(fields, TableField{Key: &StringLit{P: pos, Value: "description"}, Value: &StringLit{P: pos, Value: desc}})
+	}
+	return &TableLitExpr{P: pos, Fields: fields}
 }
 
 func configLocalDecls(config []ConfigField) []Stmt {
 	out := make([]Stmt, 0, len(config))
 	for _, f := range config {
 		key, ok := stringConfigKey(f.Key)
-		if !ok || !isIdentName(key) {
+		if !ok || !isAgentFlowImplicitConfigLocal(key) {
 			continue
 		}
 		out = append(out, &DeclareStmt{P: f.P, Names: []string{key}, Values: []Expr{desugarExpr(f.Value)}})
 	}
 	return out
+}
+
+func isAgentFlowImplicitConfigLocal(key string) bool {
+	switch key {
+	case "model", "system", "tools", "caps", "capabilities":
+		return true
+	default:
+		return false
+	}
 }
 
 func configTable(pos Pos, config []ConfigField) Expr {
@@ -224,20 +279,35 @@ func configTable(pos Pos, config []ConfigField) Expr {
 	return &TableLitExpr{P: pos, Fields: fields}
 }
 
-func messagesTable(pos Pos, fields []ConfigField) Expr {
+func messagesTable(pos Pos, fields []TableField) Expr {
 	out := make([]TableField, 0, len(fields))
 	for _, f := range fields {
-		key, ok := stringConfigKey(f.Key)
-		if ok && isMessageRole(key) {
-			out = append(out, TableField{Value: llmCall(f.P, key, desugarExpr(f.Value))})
+		if f.Key == nil {
+			out = append(out, TableField{Value: desugarExpr(f.Value)})
 			continue
 		}
-		out = append(out, TableField{Value: &TableLitExpr{P: f.P, Fields: []TableField{
-			{Key: &StringLit{P: f.P, Value: "role"}, Value: desugarExpr(f.Key)},
-			{Key: &StringLit{P: f.P, Value: "text"}, Value: desugarExpr(f.Value)},
+		key, ok := stringConfigKey(f.Key)
+		if ok && isMessageRole(key) {
+			out = append(out, TableField{Value: llmCall(messageFieldPos(f), key, desugarExpr(f.Value))})
+			continue
+		}
+		fieldPos := messageFieldPos(f)
+		out = append(out, TableField{Value: &TableLitExpr{P: fieldPos, Fields: []TableField{
+			{Key: &StringLit{P: fieldPos, Value: "role"}, Value: desugarExpr(f.Key)},
+			{Key: &StringLit{P: fieldPos, Value: "text"}, Value: desugarExpr(f.Value)},
 		}}})
 	}
 	return &TableLitExpr{P: pos, Fields: out}
+}
+
+func messageFieldPos(f TableField) Pos {
+	if f.Key != nil {
+		return f.Key.GetPos()
+	}
+	if f.Value != nil {
+		return f.Value.GetPos()
+	}
+	return Pos{}
 }
 
 func toolOptionsTable(pos Pos, params []FuncParam, description string, requires []string, paramDocs map[string]string) Expr {

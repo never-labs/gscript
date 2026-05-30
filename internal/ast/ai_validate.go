@@ -260,7 +260,7 @@ func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 	case *TurnExpr:
 		return ctx.validateAIToolsConfig("turn", e.Config)
 	case *MessagesExpr:
-		return ctx.validateAIConfigExprs(e.Fields)
+		return ctx.validateAIMessageFields(e.Fields)
 	case *ListLitExpr:
 		return ctx.validateAINativeExprList(e.Values)
 	case *TableLitExpr:
@@ -284,6 +284,18 @@ func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 
 func (ctx *aiValidationContext) validateAIConfigExprs(config []ConfigField) error {
 	for _, f := range config {
+		if err := ctx.validateAINativeExpr(f.Key); err != nil {
+			return err
+		}
+		if err := ctx.validateAINativeExpr(f.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ctx *aiValidationContext) validateAIMessageFields(fields []TableField) error {
+	for _, f := range fields {
 		if err := ctx.validateAINativeExpr(f.Key); err != nil {
 			return err
 		}

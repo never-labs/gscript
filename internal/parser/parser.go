@@ -1757,11 +1757,65 @@ func (p *Parser) parseTurnExpr() (ast.Expr, error) {
 
 func (p *Parser) parseMessagesExpr() (ast.Expr, error) {
 	tok := p.advance() // consume 'messages'
-	fields, err := p.parseConfigBlock()
+	fields, err := p.parseMessagesBlock()
 	if err != nil {
 		return nil, err
 	}
 	return &ast.MessagesExpr{P: p.tokenPos(tok), Fields: fields}, nil
+}
+
+func (p *Parser) parseMessagesBlock() ([]ast.TableField, error) {
+	if _, err := p.expect(lexer.TOKEN_LBRACE); err != nil {
+		return nil, err
+	}
+
+	var fields []ast.TableField
+	for !p.check(lexer.TOKEN_RBRACE) && !p.isAtEnd() {
+		p.skipSemicolons()
+		if p.check(lexer.TOKEN_RBRACE) {
+			break
+		}
+		field, err := p.parseMessageField()
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, field)
+		if p.check(lexer.TOKEN_COMMA) || p.check(lexer.TOKEN_SEMICOLON) {
+			p.advance()
+		}
+	}
+	if _, err := p.expect(lexer.TOKEN_RBRACE); err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
+func (p *Parser) parseMessageField() (ast.TableField, error) {
+	if p.check(lexer.TOKEN_IDENT) && p.peekAt(1).Type == lexer.TOKEN_COLON {
+		keyTok := p.advance()
+		p.advance()
+		value, err := p.parseExpr()
+		if err != nil {
+			return ast.TableField{}, err
+		}
+		return ast.TableField{
+			Key:   &ast.StringLit{P: p.tokenPos(keyTok), Value: keyTok.Value},
+			Value: value,
+		}, nil
+	}
+	if p.check(lexer.TOKEN_STRING) && p.peekAt(1).Type == lexer.TOKEN_COLON {
+		keyTok := p.advance()
+		p.advance()
+		value, err := p.parseExpr()
+		if err != nil {
+			return ast.TableField{}, err
+		}
+		return ast.TableField{
+			Key:   &ast.StringLit{P: p.tokenPos(keyTok), Value: keyTok.Value},
+			Value: value,
+		}, nil
+	}
+	return p.parseTableField()
 }
 
 func (p *Parser) parseListLitExpr() (ast.Expr, error) {

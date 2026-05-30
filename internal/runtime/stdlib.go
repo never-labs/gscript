@@ -115,7 +115,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("url", TableValue(buildURLLib(interp)))
 
 	// --- AI model integration ---
-	interp.globals.Define("llm", TableValue(BuildLLMLib(interp.callFunction, func() LLMProvider {
+	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider
 	}, func() LLMProviderFactory {
 		return interp.llmProviderFactory
@@ -130,7 +130,9 @@ func (interp *Interpreter) registerStdlib() {
 		if interp.llmTraceSink != nil {
 			interp.llmTraceSink(event)
 		}
-	})))
+	})
+	interp.globals.Define("llm", TableValue(llmLib))
+	interp.globals.Define("toolof", llmLib.RawGetString("toolof"))
 	interp.globals.Define("msg", TableValue(BuildLLMMessageLib()))
 	interp.globals.Define("chat", TableValue(BuildChatLib()))
 	interp.globals.Define("loop", TableValue(BuildLLMLoopLib(interp.callFunction, func() LLMProvider {

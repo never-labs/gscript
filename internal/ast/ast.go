@@ -379,8 +379,7 @@ func (s *BudgetStmt) nodeType() string { return "BudgetStmt" }
 func (s *BudgetStmt) GetPos() Pos      { return s.P }
 func (s *BudgetStmt) stmtNode()        {}
 
-// ConfigField represents a field inside agent, turn, budget, models, or
-// messages blocks.
+// ConfigField represents a field inside agent, turn, budget, or models blocks.
 type ConfigField struct {
 	P     Pos
 	Key   Expr
@@ -582,7 +581,7 @@ func (e *TurnExpr) exprNode()        {}
 // distinct node so later lowering can preserve message role order.
 type MessagesExpr struct {
 	P      Pos
-	Fields []ConfigField
+	Fields []TableField
 }
 
 func (e *MessagesExpr) nodeType() string { return "MessagesExpr" }

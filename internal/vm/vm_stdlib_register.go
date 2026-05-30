@@ -23,6 +23,9 @@ func (vm *VM) RestrictStdlib(allowed map[string]bool) {
 			vm.stringMeta = nil
 		}
 	}
+	if !allowed["llm"] {
+		vm.DeleteGlobal("toolof")
+	}
 }
 
 func (vm *VM) setPackageLoaded(name string, val runtime.Value) {
@@ -1210,6 +1213,9 @@ func (vm *VM) RegisterLLMLib() {
 		}
 	}))
 	vm.SetGlobal("llm", llmLib)
+	if llmTable := llmLib.Table(); llmTable != nil {
+		vm.SetGlobal("toolof", llmTable.RawGetString("toolof"))
+	}
 	vm.setPackageLoaded("llm", llmLib)
 	msgLib := runtime.TableValue(runtime.BuildLLMMessageLib())
 	vm.SetGlobal("msg", msgLib)

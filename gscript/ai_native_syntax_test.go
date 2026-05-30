@@ -763,6 +763,63 @@ turn_text := turn_result.text
 	}
 }
 
+func TestAINativeMessagesBlockAllowsMixedMessageItems(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "ok"}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+call := {id: "call_1", tool: "lookup", args: {query: "gscript"}}
+history := messages {
+    system: "System text."
+    user: "Find docs."
+    msg.assistant_call(call)
+    msg.tool_result("call_1", "docs")
+    user: "Summarize."
+}
+result, err := turn {
+    model: "mock-chat"
+    messages: history
+}
+history_len := #history
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			msgs := provider.requests[0].Messages
+			if len(msgs) != 5 {
+				t.Fatalf("messages = %#v, want 5", msgs)
+			}
+			if msgs[0].Role != "system" || msgs[1].Role != "user" ||
+				msgs[2].Role != "assistant" || msgs[2].ToolCall == nil || msgs[2].ToolCall.Tool != "lookup" ||
+				msgs[3].Role != "tool" || msgs[3].ToolUseID != "call_1" || msgs[3].Value != "docs" ||
+				msgs[4].Role != "user" || msgs[4].Text != "Summarize." {
+				t.Fatalf("messages order/content = %#v", msgs)
+			}
+			historyLen, err := vm.Get("history_len")
+			if err != nil {
+				t.Fatalf("Get history_len: %v", err)
+			}
+			if historyLen != int64(5) {
+				t.Fatalf("history_len = %#v, want 5", historyLen)
+			}
+		})
+	}
+}
+
 func TestAINativeFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -842,6 +899,102 @@ err_dimension := out.err_dimension
 			errDimension, _ := vm.Get("err_dimension")
 			if firstText != "one" || errKind != "budget" || errDimension != "tokens" {
 				t.Fatalf("first_text=%#v err_kind=%#v err_dimension=%#v", firstText, errKind, errDimension)
+			}
+		})
+	}
+}
+
+func TestAINativeAgentFlowImplicitConfigLocalsAreWhitelistedAndShadowable(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibLLM)}, tc.opts...)...)
+			err := vm.Exec(`
+agent probe(q) {
+    model: "cfg-model"
+    system: "cfg-system"
+    capabilities: ["cfg.cap"]
+    user: q
+    response_format: {type: "json_object"}
+} flow {
+    observed := model .. "|" .. system .. "|" .. capabilities[1]
+    model := "local-model"
+    system := "local-system"
+    capabilities := ["local.cap"]
+    return {
+        observed: observed,
+        shadowed: model .. "|" .. system .. "|" .. capabilities[1]
+    }, nil
+}
+
+out, err := probe("hello")
+observed := out.observed
+shadowed := out.shadowed
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			observed, _ := vm.Get("observed")
+			shadowed, _ := vm.Get("shadowed")
+			if observed != "cfg-model|cfg-system|cfg.cap" {
+				t.Fatalf("observed = %#v", observed)
+			}
+			if shadowed != "local-model|local-system|local.cap" {
+				t.Fatalf("shadowed = %#v", shadowed)
+			}
+		})
+	}
+}
+
+func TestAINativeAgentFlowDoesNotInjectArbitraryMetaFields(t *testing.T) {
+	for _, field := range []struct {
+		name   string
+		config string
+	}{
+		{name: "user", config: `user: q`},
+		{name: "output", config: `output: {schema: {type: "object"}}`},
+		{name: "response_format", config: `response_format: {type: "json_object"}`},
+		{name: "metadata", config: `metadata: {trace_id: "abc"}`},
+	} {
+		t.Run(field.name, func(t *testing.T) {
+			for _, tc := range []struct {
+				name string
+				opts []gs.Option
+			}{
+				{name: "interpreter"},
+				{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibLLM)}, tc.opts...)...)
+					err := vm.Exec(`
+` + field.name + ` := "outer-` + field.name + `"
+
+agent probe(q) {
+    model: "cfg-model"
+    ` + field.config + `
+} flow {
+    return ` + field.name + `, nil
+}
+
+out, err := probe("hello")
+got := out
+`)
+					if err != nil {
+						t.Fatalf("Exec: %v", err)
+					}
+					got, err := vm.Get("got")
+					if err != nil {
+						t.Fatalf("Get got: %v", err)
+					}
+					if want := "outer-" + field.name; got != want {
+						t.Fatalf("got = %#v, want %q", got, want)
+					}
+				})
 			}
 		})
 	}

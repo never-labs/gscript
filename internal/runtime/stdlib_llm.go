@@ -14,6 +14,15 @@ import (
 	"time"
 )
 
+type llmAgentMetadata struct {
+	Name        string
+	Params      []string
+	Output      Value
+	Description string
+}
+
+var llmAgentMetadataByFunction sync.Map // map[*GoFunction]llmAgentMetadata
+
 // LLMProvider is the host boundary behind llm.turn. Implementations may call a
 // remote API, a local model, or a test double; the runtime only sees this small
 // protocol shape.
@@ -246,6 +255,38 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 
 	set := func(name string, fn func([]Value) ([]Value, error)) { setLLMFunction(t, "llm", name, fn) }
 
+	newToolValue := func(name string, fn Value, opts Value) Value {
+		desc := ""
+		var params Value
+		var requires Value
+		var schema Value
+		if opts.IsTable() {
+			optTable := opts.Table()
+			desc = optTable.RawGetString("description").Str()
+			params = optTable.RawGetString("params")
+			requires = optTable.RawGetString("requires")
+			schema = optTable.RawGetString("schema")
+			if schema.IsNil() {
+				schema = optTable.RawGetString("output")
+			}
+		}
+		tool := NewTable()
+		tool.RawSetString("__llm_tool", BoolValue(true))
+		tool.RawSetString("name", StringValue(name))
+		tool.RawSetString("fn", fn)
+		tool.RawSetString("description", StringValue(desc))
+		if params.IsTable() {
+			tool.RawSetString("params", params)
+		}
+		if requires.IsTable() {
+			tool.RawSetString("requires", requires)
+		}
+		if !schema.IsNil() {
+			tool.RawSetString("schema", schema)
+		}
+		return TableValue(tool)
+	}
+
 	registerLLMMessageConstructors(t, "llm")
 	set("assistantCall", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
@@ -310,33 +351,62 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsFunction() {
 			return nil, fmt.Errorf("bad argument to 'llm.tool' (name, function expected)")
 		}
-		desc := ""
-		var params Value
-		var requires Value
-		var schema Value
-		if len(args) >= 3 && args[2].IsTable() {
-			opts := args[2].Table()
-			desc = opts.RawGetString("description").Str()
-			params = opts.RawGetString("params")
-			requires = opts.RawGetString("requires")
-			schema = opts.RawGetString("schema")
+		opts := NilValue()
+		if len(args) >= 3 {
+			opts = args[2]
 		}
-		tool := NewTable()
-		tool.RawSetString("__llm_tool", BoolValue(true))
-		tool.RawSetString("name", args[0])
-		tool.RawSetString("fn", args[1])
-		tool.RawSetString("description", StringValue(desc))
-		if params.IsTable() {
-			tool.RawSetString("params", params)
-		}
-		if requires.IsTable() {
-			tool.RawSetString("requires", requires)
-		}
-		if !schema.IsNil() {
-			tool.RawSetString("schema", schema)
-		}
-		return []Value{TableValue(tool)}, nil
+		return []Value{newToolValue(args[0].Str(), args[1], opts)}, nil
 	})
+
+	agentAsTool := func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsFunction() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.toolof' (agent function expected)")
+		}
+		if len(args) >= 2 && !args[1].IsNil() && !args[1].IsTable() {
+			return nil, fmt.Errorf("bad argument #2 to 'llm.toolof' (options table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("llm.toolof requires a function caller")
+		}
+		agent := args[0]
+		opts := NilValue()
+		if len(args) >= 2 {
+			opts = args[1]
+		}
+		meta, _ := llmAgentMetadataForValue(agent)
+		name := meta.Name
+		if opts.IsTable() && opts.Table().RawGetString("name").IsString() {
+			name = opts.Table().RawGetString("name").Str()
+		}
+		if name == "" {
+			name = "agent"
+		}
+		wrapper := FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
+			results, err := call(agent, callArgs)
+			if err != nil {
+				return nil, err
+			}
+			if len(results) >= 2 && !results[1].IsNil() {
+				return []Value{NilValue(), results[1]}, nil
+			}
+			if len(results) == 0 {
+				return []Value{NilValue(), NilValue()}, nil
+			}
+			return []Value{llmAgentToolResultValue(results[0]), NilValue()}, nil
+		}})
+		tool := newToolValue(name, wrapper, opts)
+		if tt := tool.Table(); tt != nil {
+			if !tt.RawGetString("params").IsTable() && len(meta.Params) > 0 {
+				tt.RawSetString("params", llmStringArrayValue(meta.Params))
+			}
+			if tt.RawGetString("schema").IsNil() && !meta.Output.IsNil() {
+				tt.RawSetString("schema", meta.Output)
+			}
+		}
+		return []Value{tool}, nil
+	}
+	set("toolof", agentAsTool)
+	set("agent_as_tool", agentAsTool)
 
 	set("tool_caps", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
@@ -531,6 +601,19 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		if len(args) >= 3 {
 			flowFn = args[2]
 		}
+		metadata := llmAgentMetadata{Name: name, Params: llmFunctionParamNames(configFn)}
+		if len(args) >= 4 && args[3].IsTable() {
+			metaTable := args[3].Table()
+			if params := metaTable.RawGetString("params"); params.IsTable() {
+				metadata.Params = llmStringSliceFromValue(params)
+			}
+			if output := metaTable.RawGetString("output"); !output.IsNil() {
+				metadata.Output = output
+			}
+			if desc := metaTable.RawGetString("description"); desc.IsString() {
+				metadata.Description = desc.Str()
+			}
+		}
 		agentFn := &GoFunction{Name: "llm.agent." + name, Fn: func(callArgs []Value) ([]Value, error) {
 			configVals, err := call(configFn, callArgs)
 			if err != nil {
@@ -556,6 +639,7 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 			defer popAgent(merged)
 			return call(flowFn, callArgs)
 		}}
+		llmAgentMetadataByFunction.Store(agentFn, metadata)
 		return []Value{FunctionValue(agentFn)}, nil
 	})
 
@@ -1536,6 +1620,57 @@ func llmToolCapsValue(tools *Table) Value {
 		}
 	}
 	return TableValue(caps)
+}
+
+func llmAgentMetadataForValue(v Value) (llmAgentMetadata, bool) {
+	if gf := v.GoFunction(); gf != nil {
+		if meta, ok := llmAgentMetadataByFunction.Load(gf); ok {
+			if typed, ok := meta.(llmAgentMetadata); ok {
+				return typed, true
+			}
+		}
+		if strings.HasPrefix(gf.Name, "llm.agent.") {
+			return llmAgentMetadata{Name: strings.TrimPrefix(gf.Name, "llm.agent.")}, true
+		}
+	}
+	return llmAgentMetadata{}, false
+}
+
+func llmFunctionParamNames(v Value) []string {
+	if cl := v.Closure(); cl != nil && cl.Proto != nil {
+		return append([]string(nil), cl.Proto.Params...)
+	}
+	return nil
+}
+
+func llmStringArrayValue(items []string) Value {
+	t := NewSequentialArrayTable(len(items))
+	for i, item := range items {
+		t.array[i+1] = StringValue(item)
+	}
+	return TableValue(t)
+}
+
+func llmAgentToolResultValue(v Value) Value {
+	if !v.IsTable() {
+		return v
+	}
+	t := v.Table()
+	if value := t.RawGetString("value"); !value.IsNil() {
+		return value
+	}
+	if text := t.RawGetString("text"); !text.IsNil() {
+		return text
+	}
+	if result := t.RawGetString("result"); result.IsTable() {
+		if value := result.Table().RawGetString("value"); !value.IsNil() {
+			return value
+		}
+		if text := result.Table().RawGetString("text"); !text.IsNil() {
+			return text
+		}
+	}
+	return v
 }
 
 func llmCheckToolCaps(tools, caps *Table) Value {

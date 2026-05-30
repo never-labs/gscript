@@ -249,16 +249,48 @@ MetaFields = { Ident ':' Expression [ ',' ] }
 
 ### 7.2 Body
 
-The body is a normal GScript code block. Inside, the following are in scope:
+The body is a normal GScript code block. In the implemented syntax this body is
+introduced by `flow { ... }` when the user wants a custom loop. Inside, the
+following names are injected as ordinary lexical locals at the top of the body:
 
 - the agent's `params`
-- each metadata field by name (`model`, `tools`, `system`)
+- `model`, `tools`, `system`, `caps`, and `capabilities` when those metadata
+  fields are present
 - ambient `turn { ... }()` which inherits the agent's `model` and `tools` as defaults
 - standard library: `msg.*`, `dispatch`, `resume`, `snapshot`, `loop.*`
 
-The body returns `(value, err)` like a function. There is no spec-enforced shape on `value`.
+Other metadata fields, such as `user`, `output`, `response_format`, and
+`metadata`, are not injected as implicit locals. This keeps the flow body close
+to lexical scoping: the injection is equivalent to local declarations before
+the user's first statement, and the user may shadow those names with later local
+declarations.
 
-### 7.3 Capability flow (load-time lint)
+The body returns `(value, err)` like a function. There is no spec-enforced shape
+on `value`. Agent `output:` validation is automatic only for the default agent
+loop; a custom `flow` returns exactly what it returns, so output validation must
+be performed explicitly by user code or helpers.
+
+### 7.3 `messages { ... }`
+
+`messages { ... }` is an ordered message constructor. Role fields are shorthand
+for message constructors, and bare expressions are inserted as-is, so initial
+prompts and dynamic tool history can use one sequence:
+
+```gscript
+history := messages {
+    system: system
+    user: question
+    msg.assistant_call(call)
+    msg.tool_result(call.id, value)
+    user: "Summarize the evidence."
+}
+```
+
+The role shorthands `system:`, `user:`, and `assistant:` lower to
+`msg.system`, `msg.user`, and `msg.assistant`. Bare expressions are expected to
+already be message-shaped tables.
+
+### 7.4 Capability flow (load-time lint)
 
 1. Compute `effective_caps`:
    - If `caps:` is given, use it.
@@ -267,7 +299,7 @@ The body returns `(value, err)` like a function. There is no spec-enforced shape
 3. The enclosing scope's caps (`gscript.WithCapabilities`) must include `effective_caps`.
 4. If body declares sub-agents in scope, their `effective_caps` are also checked transitively.
 
-### 7.4 Example
+### 7.5 Example
 
 ```gscript
 agent support(message) {
@@ -320,7 +352,24 @@ msg.tool_result(call_id, v)   → { role: "tool",      tool_use_id, value }
 msg.tool_error(call_id, m)    → { role: "tool",      tool_use_id, error }
 ```
 
-### 8.2 `dispatch(call)` — execute a tool call from LLM
+### 8.2 `toolof(agent, opts)` — expose an agent as a tool
+
+```
+toolof(agent_value, {
+    name: "delegate_research",
+    description: "Delegate research to a specialist agent.",
+    requires: ["none"],
+})
+```
+
+`toolof` is also available as `llm.toolof` and `llm.agent_as_tool`. It returns a
+normal tool table whose implementation invokes the original agent. If `params`
+is omitted, the agent's parameter names are used. If `schema` is omitted and the
+agent has an `output:` shape, that output shape becomes the tool schema. When
+the agent returns a structured result with `value`, the tool result is that
+`value`; otherwise it returns the result text or the raw result table.
+
+### 8.3 `dispatch(call)` — execute a tool call from LLM
 
 ```
 dispatch(call) → (value, err)
@@ -328,7 +377,7 @@ dispatch(call) → (value, err)
 
 Looks up `call.tool` in the ambient agent's `tools` list. Applies lightweight coercion to `call.args` based on the tool's parameter names. Invokes the tool. Returns whatever the tool returned. If lookup fails, returns `{ kind: "capability", message: "tool not in scope" }`.
 
-### 8.3 `snapshot(history, pending)` and `resume(token, approval)` — HITL primitives
+### 8.4 `snapshot(history, pending)` and `resume(token, approval)` — HITL primitives
 
 ```
 snapshot(history, pending_call) → token
@@ -341,7 +390,7 @@ resume(token, approval)         → (result, err)
 
 `approval` shape: `{ ok: bool, reason: string?, args: table? }`. If `args` is set on approval, the pending call's args are replaced before dispatch.
 
-### 8.4 `loop.*` — convenience loops (optional)
+### 8.5 `loop.*` — convenience loops (optional)
 
 ```
 loop.react({ user, example?, approve_when?, max_steps? })
@@ -354,7 +403,7 @@ Each is a regular function callable from inside an agent body. They use ambient 
 
 `loop.react` implements the standard pattern from §7.4. Users who want custom semantics write the loop directly.
 
-### 8.5 `chat.*` — memory strategies (optional)
+### 8.6 `chat.*` — memory strategies (optional)
 
 ```
 chat.token_count(history)               → number

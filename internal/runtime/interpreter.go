@@ -133,6 +133,9 @@ func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
 			interp.stringMeta = nil
 		}
 	}
+	if !allowed["llm"] {
+		interp.globals.Delete("toolof")
+	}
 }
 
 // NewInterpreterGlobals creates a fresh globals map with all builtins and stdlib registered.

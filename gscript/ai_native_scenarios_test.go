@@ -435,6 +435,124 @@ tool_confidence := result.history[4].value.confidence
 	}
 }
 
+func TestAINativeAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_delegate_toolof_1",
+						Tool: "delegate_research",
+						Args: map[string]any{"topic": "toolof"},
+					}},
+				},
+				{
+					Status: "final_answer",
+					Text:   `{"summary":"toolof invokes the original agent","confidence":0.82}`,
+				},
+				{Status: "final_answer", Text: "Delegation complete."},
+			}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract_research(topic) {
+    model: "mock-extractor"
+    system: "Return structured research."
+    user: "Research " .. topic
+    output: {
+        summary: "short finding"
+        confidence: 1
+    }
+}
+
+delegate_research := llm.toolof(extract_research, {
+    name: "delegate_research"
+    description: "Delegate research to a specialist agent."
+    requires: ["none"]
+})
+top_level_delegate := toolof(extract_research, {name: "top_level_delegate"})
+alias_delegate := llm.agent_as_tool(extract_research, {name: "alias_delegate"})
+runtime_tools := [delegate_research]
+
+agent supervisor(question) {
+    model: "mock-supervisor"
+    system: "Use the specialist."
+    user: question
+    tools: runtime_tools
+}
+
+result, err := supervisor("Check delegation.")
+final_text := result.text
+tool_summary := result.history[4].value.summary
+tool_confidence := result.history[4].value.confidence
+delegate_param := delegate_research.params[1]
+delegate_schema_summary := delegate_research.schema.summary
+delegate_schema_confidence := delegate_research.schema.confidence
+top_level_name := top_level_delegate.name
+alias_name := alias_delegate.name
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 3 {
+				t.Fatalf("requests = %d, want 3", len(provider.requests))
+			}
+			first := provider.requests[0]
+			if first.Model != "mock-supervisor" || len(first.Tools) != 1 {
+				t.Fatalf("first request = %#v", first)
+			}
+			tool := first.Tools[0]
+			if tool.Name != "delegate_research" ||
+				tool.Description != "Delegate research to a specialist agent." ||
+				len(tool.Params) != 1 || tool.Params[0] != "topic" ||
+				len(tool.Requires) != 1 || tool.Requires[0] != "none" {
+				t.Fatalf("tool metadata = %#v", tool)
+			}
+			schema, ok := tool.Schema.(map[string]any)
+			if !ok || schema["summary"] != "short finding" || schema["confidence"] != int64(1) {
+				t.Fatalf("tool schema = %#v", tool.Schema)
+			}
+			nested := provider.requests[1]
+			if nested.Model != "mock-extractor" || len(nested.Messages) != 2 || nested.Messages[1].Text != "Research toolof" {
+				t.Fatalf("nested request = %#v", nested)
+			}
+			final := provider.requests[2]
+			if final.Model != "mock-supervisor" || len(final.Messages) != 4 {
+				t.Fatalf("final request = %#v", final)
+			}
+			toolValue, ok := final.Messages[3].Value.(map[string]any)
+			if !ok || toolValue["summary"] != "toolof invokes the original agent" || toolValue["confidence"] != 0.82 {
+				t.Fatalf("tool result value = %#v", final.Messages[3].Value)
+			}
+			for name, want := range map[string]any{
+				"final_text":                 "Delegation complete.",
+				"tool_summary":               "toolof invokes the original agent",
+				"tool_confidence":            0.82,
+				"delegate_param":             "topic",
+				"delegate_schema_summary":    "short finding",
+				"delegate_schema_confidence": int64(1),
+				"top_level_name":             "top_level_delegate",
+				"alias_name":                 "alias_delegate",
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestAINativeAgentTurnScenarioRecordReplay(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -954,6 +1072,57 @@ err_message := err.message
 			}
 			if !strings.Contains(message.(string), `field "score" has type string, want number`) {
 				t.Fatalf("err_message = %#v, want score type mismatch", message)
+			}
+		})
+	}
+}
+
+func TestAINativeCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `not json`}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract(text) {
+    model: "mock-json"
+    user: text
+    output: {name: "Ada"}
+} flow {
+    result, err := turn {}
+    return result, err
+}
+
+result, err := extract("Ada")
+text := result.text
+err_is_nil := err == nil
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			format, ok := provider.requests[0].ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_object" {
+				t.Fatalf("response_format = %#v", provider.requests[0].ResponseFormat)
+			}
+			text, err := vm.Get("text")
+			if err != nil {
+				t.Fatalf("Get text: %v", err)
+			}
+			errIsNil, err := vm.Get("err_is_nil")
+			if err != nil {
+				t.Fatalf("Get err_is_nil: %v", err)
+			}
+			if text != "not json" || errIsNil != true {
+				t.Fatalf("text=%#v err_is_nil=%#v, want unvalidated flow result", text, errIsNil)
 			}
 		})
 	}

@@ -320,8 +320,9 @@ agent answer(q) {
 		t.Fatalf("turn positions = expr %#v field %#v", turnExpr.GetPos(), turnExpr.Config[0].P)
 	}
 	messages := turnExpr.Config[0].Value.(*ast.MessagesExpr)
-	if messages.GetPos() != (ast.Pos{Line: 17, Column: 19}) || messages.Fields[0].P != (ast.Pos{Line: 17, Column: 30}) {
-		t.Fatalf("messages positions = expr %#v field %#v", messages.GetPos(), messages.Fields[0].P)
+	firstMessagePos := messages.Fields[0].Key.GetPos()
+	if messages.GetPos() != (ast.Pos{Line: 17, Column: 19}) || firstMessagePos != (ast.Pos{Line: 17, Column: 30}) {
+		t.Fatalf("messages positions = expr %#v field %#v", messages.GetPos(), firstMessagePos)
 	}
 }
 
@@ -511,6 +512,7 @@ tools := [search_docs, read_url]
 history := messages {
     system: "You are concise."
     user: question
+    msg.assistant_call(call)
     assistant: "ok"
 }
 `)
@@ -524,8 +526,11 @@ history := messages {
 	}
 	historyDecl := prog.Stmts[1].(*ast.DeclareStmt)
 	messages, ok := historyDecl.Values[0].(*ast.MessagesExpr)
-	if !ok || len(messages.Fields) != 3 {
+	if !ok || len(messages.Fields) != 4 {
 		t.Fatalf("history value = %#v", historyDecl.Values[0])
+	}
+	if messages.Fields[2].Key != nil {
+		t.Fatalf("mixed message field key = %#v, want nil", messages.Fields[2].Key)
 	}
 }
 
