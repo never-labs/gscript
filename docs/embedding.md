@@ -187,6 +187,9 @@ messages; unknown kinds are returned as fatal agent errors.
 Provider options such as `model`, `force_tool`, `max_tokens`, `stream`, `stop`, and
 `metadata` are forwarded consistently by `llm.turn`, `llm.react`, and
 `loop.react`.
+Tool capability metadata remains plain data: `llm.tool_caps(tools)` returns the
+unique ordered `requires` list, and `llm.check_tools(tools, caps)` returns
+`(true, nil)` or `(nil, {kind: "capability", capability: ..., tool: ...})`.
 
 The companion `chat` module provides pure history utilities for agent loops:
 `chat.merge(history, additions)`, `chat.window(history, max_tokens)`,

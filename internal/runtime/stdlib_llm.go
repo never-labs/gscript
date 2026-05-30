@@ -206,6 +206,23 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		return []Value{TableValue(tool)}, nil
 	})
 
+	set("tool_caps", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'llm.tool_caps' (tools table expected)")
+		}
+		return []Value{llmToolCapsValue(args[0].Table())}, nil
+	})
+
+	set("check_tools", func(args []Value) ([]Value, error) {
+		if len(args) < 2 || !args[0].IsTable() || !args[1].IsTable() {
+			return nil, fmt.Errorf("bad argument to 'llm.check_tools' (tools, caps expected)")
+		}
+		if err := llmCheckToolCaps(args[0].Table(), args[1].Table()); !err.IsNil() {
+			return []Value{NilValue(), err}, nil
+		}
+		return []Value{BoolValue(true), NilValue()}, nil
+	})
+
 	set("turn", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.turn' (table expected)")
@@ -755,6 +772,63 @@ func llmErrorValue(kind, message string) Value {
 	t.RawSetString("kind", StringValue(kind))
 	t.RawSetString("message", StringValue(message))
 	return TableValue(t)
+}
+
+func llmToolCapsValue(tools *Table) Value {
+	caps := NewTable()
+	seen := map[string]bool{}
+	if tools == nil {
+		return TableValue(caps)
+	}
+	for i := 1; i <= tools.Length(); i++ {
+		tv := tools.RawGet(IntValue(int64(i)))
+		if !tv.IsTable() {
+			continue
+		}
+		for _, cap := range llmStringSliceFromValue(tv.Table().RawGetString("requires")) {
+			if cap == "" || seen[cap] {
+				continue
+			}
+			seen[cap] = true
+			caps.RawSet(IntValue(int64(caps.Length()+1)), StringValue(cap))
+		}
+	}
+	return TableValue(caps)
+}
+
+func llmCheckToolCaps(tools, caps *Table) Value {
+	allowed := map[string]bool{}
+	for _, cap := range llmStringSliceFromValue(TableValue(caps)) {
+		allowed[cap] = true
+	}
+	if allowed["all"] || allowed["cap.all"] || allowed["*"] {
+		return NilValue()
+	}
+	if allowed["none"] || allowed["cap.none"] {
+		allowed = map[string]bool{}
+	}
+	if tools == nil {
+		return NilValue()
+	}
+	for i := 1; i <= tools.Length(); i++ {
+		tv := tools.RawGet(IntValue(int64(i)))
+		if !tv.IsTable() {
+			continue
+		}
+		tool := tv.Table()
+		toolName := tool.RawGetString("name").Str()
+		for _, cap := range llmStringSliceFromValue(tool.RawGetString("requires")) {
+			if cap == "" || cap == "none" || cap == "cap.none" || allowed[cap] {
+				continue
+			}
+			err := llmErrorValue("capability", "missing capability: "+cap)
+			et := err.Table()
+			et.RawSetString("capability", StringValue(cap))
+			et.RawSetString("tool", StringValue(toolName))
+			return err
+		}
+	}
+	return NilValue()
 }
 
 func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) {
