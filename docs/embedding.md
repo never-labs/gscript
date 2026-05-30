@@ -175,6 +175,21 @@ GSCRIPT_ANTHROPIC_COMPAT_MODEL=... \
 go test ./gscript -run TestAnthropicCompatibleLLMIntegration -v
 ```
 
+The same gate also covers the AI-native `models {}` / `turn {}` path:
+
+```sh
+GSCRIPT_LLM_INTEGRATION=1 \
+GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=https://provider.example/api/anthropic \
+GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... \
+GSCRIPT_ANTHROPIC_COMPAT_MODEL=... \
+go test ./gscript -run TestAINativeSyntaxAnthropicCompatibleLLMIntegration -v
+```
+
+Both tests skip by default. They are not part of the default `go test` or
+`gscript ci` gates because they perform real network calls and require an
+external provider account. Keep keys in local environment variables or CI secret
+stores; never commit provider tokens or `.env` files with token values.
+
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
 tool-call, retry, HITL snapshot/resume, and stop events with counts, status,
 usage, token metadata, and tool names; prompt text and tool result values are

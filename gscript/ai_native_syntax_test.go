@@ -277,6 +277,25 @@ agent answer(q) {
 			want: "capabilities missing required capability \"net.client\"",
 		},
 		{
+			name: "agent defaults merged capabilities missing inherited tool requirement",
+			src: `
+// gscript:requires net.client
+tool lookup(query) {
+    return query, nil
+}
+
+agent defaults {
+    tools: [lookup]
+}
+
+agent answer(q) {
+    capabilities: []
+    user: q
+}
+`,
+			want: "capabilities missing required capability \"net.client\"",
+		},
+		{
 			name: "turn caps missing tool requirement",
 			src: `
 // gscript:requires payments.refund
@@ -358,6 +377,26 @@ tool lookup(query) {
     return query, nil
 }
 
+// gscript:requires none
+tool local_only(query) {
+    return query, nil
+}
+
+agent defaults {
+    tools: [lookup]
+}
+
+agent inherited(q) {
+    capabilities: ["docs.read", "net.client"]
+    user: q
+}
+
+agent override(q) {
+    tools: [local_only]
+    capabilities: []
+    user: q
+}
+
 agent answer(q) {
     tools: [lookup]
     capabilities: ["docs.read", "net.client"]
@@ -370,6 +409,42 @@ func f(caps) {
         caps: caps
         user: "hello"
     }
+}
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+		})
+	}
+}
+
+func TestAINativeSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+// gscript:requires net.client
+tool lookup(query) {
+    return query, nil
+}
+
+default_tools := [lookup]
+default_caps := []
+
+agent defaults {
+    tools: default_tools
+    capabilities: default_caps
+}
+
+agent answer(q) {
+    user: q
 }
 `)
 			if err != nil {

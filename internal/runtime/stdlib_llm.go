@@ -2119,7 +2119,77 @@ func llmStructuredOutputValue(opts *Table, text string) (Value, Value) {
 	if !value.IsTable() {
 		return NilValue(), llmErrorValue("validation", "structured output JSON must decode to a table")
 	}
+	if message := llmValidateStructuredOutputShape(opts.RawGetString("output").Table(), value.Table()); message != "" {
+		return NilValue(), llmErrorValue("validation", message)
+	}
 	return value, NilValue()
+}
+
+func llmValidateStructuredOutputShape(expected, actual *Table) string {
+	if expected == nil || actual == nil {
+		return ""
+	}
+	for _, key := range expected.PairsKeysSnapshot() {
+		if !key.IsString() {
+			continue
+		}
+		name := key.Str()
+		expectedValue := expected.RawGetString(name)
+		actualValue := actual.RawGetString(name)
+		if actualValue.IsNil() {
+			return fmt.Sprintf("structured output missing field %q", name)
+		}
+		if expectedType := llmStructuredOutputExampleType(expectedValue); expectedType != "" && !llmStructuredOutputTypeMatches(expectedType, actualValue) {
+			return fmt.Sprintf("structured output field %q has type %s, want %s", name, llmStructuredOutputActualType(actualValue), expectedType)
+		}
+	}
+	return ""
+}
+
+func llmStructuredOutputExampleType(v Value) string {
+	switch {
+	case v.IsString():
+		return "string"
+	case v.IsNumber():
+		return "number"
+	case v.IsBool():
+		return "bool"
+	case v.IsTable():
+		return "table"
+	default:
+		return ""
+	}
+}
+
+func llmStructuredOutputTypeMatches(expected string, v Value) bool {
+	switch expected {
+	case "string":
+		return v.IsString()
+	case "number":
+		return v.IsNumber()
+	case "bool":
+		return v.IsBool()
+	case "table":
+		return v.IsTable()
+	default:
+		return true
+	}
+}
+
+func llmStructuredOutputActualType(v Value) string {
+	if v.IsNumber() {
+		return "number"
+	}
+	if v.IsBool() {
+		return "bool"
+	}
+	if v.IsString() {
+		return "string"
+	}
+	if v.IsTable() {
+		return "table"
+	}
+	return v.TypeName()
 }
 
 func llmAssistantCallMessage(callValue Value) Value {

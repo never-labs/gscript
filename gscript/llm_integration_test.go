@@ -83,3 +83,56 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 		})
 	}
 }
+
+// TestAINativeSyntaxAnthropicCompatibleLLMIntegration verifies that AI-native
+// models/turn syntax can construct the same gated real-provider adapter. It is
+// intentionally skipped unless all real-provider environment variables are set.
+func TestAINativeSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
+	if os.Getenv("GSCRIPT_LLM_INTEGRATION") == "" {
+		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run AI-native real provider smoke")
+	}
+	endpoint := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_BASE_URL")
+	apiKey := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_API_KEY")
+	model := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+	if endpoint == "" || apiKey == "" || model == "" {
+		t.Skip("set GSCRIPT_ANTHROPIC_COMPAT_BASE_URL, GSCRIPT_ANTHROPIC_COMPAT_API_KEY, and GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	vm := gs.New(gs.WithLibs(gs.LibString | gs.LibOS | gs.LibLLM))
+	if err := vm.ExecContext(ctx, `
+models {
+    default: "smoke"
+    smoke: {
+        protocol: "anthropic_compatible"
+        base_url: os.getenv("GSCRIPT_ANTHROPIC_COMPAT_BASE_URL")
+        api_key: os.getenv("GSCRIPT_ANTHROPIC_COMPAT_API_KEY")
+        provider_model: os.getenv("GSCRIPT_ANTHROPIC_COMPAT_MODEL")
+    }
+}
+
+result, err := turn {
+    messages: messages {
+        system: "You are a concise test assistant. Return plain text only."
+        user: "Reply with exactly: gscript ai native provider ok"
+    }
+    max_tokens: 32
+    temperature: 0
+}
+smoke_text := result.text
+`); err != nil {
+		t.Fatalf("ExecContext: %v", err)
+	}
+	got, err := vm.Get("smoke_text")
+	if err != nil {
+		t.Fatalf("Get smoke_text: %v", err)
+	}
+	text, ok := got.(string)
+	if !ok || text == "" {
+		t.Fatalf("smoke_text = %#v, want non-empty string", got)
+	}
+	fmt.Printf("endpoint=%s\n", endpoint)
+	fmt.Printf("model=%s\n", model)
+	fmt.Printf("text=%q\n", text)
+}

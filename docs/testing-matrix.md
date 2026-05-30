@@ -11,9 +11,15 @@ runner commands.
 | Hand-written language smoke tests | `tests/01_basic.gs` through `tests/12_advanced.gs` | Covered by `go test ./tests -count=1` |
 | Official Lua translated semantics | `tests/official_lua_cases/*.lua` and `tests/official_lua_cases/*.gs` | `go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v` |
 | Official JIT parity | same official case pairs | `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v` |
+| Gated real provider LLM smoke | `gscript/llm_integration_test.go`, `docs/embedding.md` | `GSCRIPT_LLM_INTEGRATION=1 GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=... GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... GSCRIPT_ANTHROPIC_COMPAT_MODEL=... go test ./gscript -run 'Test(AnthropicCompatibleLLMIntegration|AINativeSyntaxAnthropicCompatibleLLMIntegration)' -count=1 -v` |
 
 Official translated cases are semantic parity tests. They compare Lua output to
 GScript output and are not used as performance timings.
+
+The real provider LLM smoke tests are opt-in only. They skip under the default
+`go test` and `gscript ci` gates unless `GSCRIPT_LLM_INTEGRATION` and all
+provider endpoint/model/key variables are set. Do not commit provider tokens;
+use local environment variables or CI secret storage.
 
 ## Performance
 

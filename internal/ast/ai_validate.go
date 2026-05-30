@@ -28,6 +28,11 @@ func ValidateAINative(prog *Program) error {
 			if err := ctx.validateAIToolsConfig(s.P, "agent defaults", s.Config); err != nil {
 				return err
 			}
+			defaults, err := ctx.staticAIConfig(s.P, "agent defaults", s.Config)
+			if err != nil {
+				return err
+			}
+			ctx.agentDefaults = defaults
 		case *ModelsDeclStmt:
 			if err := validateModelsDecl(s); err != nil {
 				return err
@@ -41,7 +46,8 @@ func ValidateAINative(prog *Program) error {
 }
 
 type aiValidationContext struct {
-	tools AIToolRegistry
+	tools         AIToolRegistry
+	agentDefaults *aiStaticAIConfig
 }
 
 func (ctx *aiValidationContext) declareTool(tool *ToolDeclStmt) error {
@@ -66,7 +72,7 @@ func (ctx *aiValidationContext) declareTool(tool *ToolDeclStmt) error {
 }
 
 func (ctx *aiValidationContext) child() *aiValidationContext {
-	child := &aiValidationContext{tools: AIToolRegistry{}}
+	child := &aiValidationContext{tools: AIToolRegistry{}, agentDefaults: ctx.agentDefaults}
 	for name, entry := range ctx.tools {
 		child.tools[name] = entry
 	}
@@ -133,6 +139,9 @@ func (ctx *aiValidationContext) validateAINativeStmt(stmt Stmt, topLevel bool) e
 		return ctx.validateAINativeStmtList(s.Body.Stmts, false)
 	case *AgentDeclStmt:
 		if err := ctx.validateAIToolsConfig(s.P, fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
+			return err
+		}
+		if err := ctx.validateAgentDefaultsMerge(s.P, fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
 			return err
 		}
 		if s.Flow != nil {
@@ -240,6 +249,9 @@ func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 		return ctx.child().validateAINativeStmtList(e.Body.Stmts, false)
 	case *AgentLitExpr:
 		if err := ctx.validateAIToolsConfig(e.P, "agent expression", e.Config); err != nil {
+			return err
+		}
+		if err := ctx.validateAgentDefaultsMerge(e.P, "agent expression", e.Config); err != nil {
 			return err
 		}
 		if e.Flow != nil {
@@ -358,23 +370,79 @@ func validateToolParamDocs(s *ToolDeclStmt) error {
 }
 
 func (ctx *aiValidationContext) validateAIToolsConfig(pos Pos, owner string, config []ConfigField) error {
-	tools, toolsStatic, err := ctx.staticToolsConfig(pos, owner, config)
+	info, err := ctx.staticAIConfig(pos, owner, config)
 	if err != nil {
 		return err
 	}
-	caps, capsStatic, capsPos := staticCapsConfig(config)
-	if toolsStatic && capsStatic {
-		for _, req := range ctx.tools.RequiredCapabilitiesForTools(tools) {
-			if capAllows(caps, req) {
-				continue
-			}
-			return fmt.Errorf("line %d: %s capabilities missing required capability %q", capsPos.Line, owner, req)
+	return ctx.validateStaticToolCaps(owner, info.tools, info.toolsPresent && info.toolsStatic, info.caps, info.capsPresent && info.capsStatic, info.capsPos)
+}
+
+type aiStaticAIConfig struct {
+	tools        []string
+	toolsPresent bool
+	toolsStatic  bool
+	caps         []string
+	capsPresent  bool
+	capsStatic   bool
+	capsPos      Pos
+}
+
+func (ctx *aiValidationContext) staticAIConfig(pos Pos, owner string, config []ConfigField) (*aiStaticAIConfig, error) {
+	tools, toolsPresent, toolsStatic, err := ctx.staticToolsConfig(pos, owner, config)
+	if err != nil {
+		return nil, err
+	}
+	caps, capsPresent, capsStatic, capsPos := staticCapsConfig(config)
+	return &aiStaticAIConfig{
+		tools:        tools,
+		toolsPresent: toolsPresent,
+		toolsStatic:  toolsStatic,
+		caps:         caps,
+		capsPresent:  capsPresent,
+		capsStatic:   capsStatic,
+		capsPos:      capsPos,
+	}, nil
+}
+
+func (ctx *aiValidationContext) validateAgentDefaultsMerge(pos Pos, owner string, config []ConfigField) error {
+	if ctx.agentDefaults == nil {
+		return nil
+	}
+	agent, err := ctx.staticAIConfig(pos, owner, config)
+	if err != nil {
+		return err
+	}
+	defaults := ctx.agentDefaults
+	if (defaults.toolsPresent && !defaults.toolsStatic) || (defaults.capsPresent && !defaults.capsStatic) ||
+		(agent.toolsPresent && !agent.toolsStatic) || (agent.capsPresent && !agent.capsStatic) {
+		return nil
+	}
+
+	tools, toolsStatic := defaults.tools, defaults.toolsPresent && defaults.toolsStatic
+	if agent.toolsPresent {
+		tools, toolsStatic = agent.tools, agent.toolsStatic
+	}
+	caps, capsStatic, capsPos := defaults.caps, defaults.capsPresent && defaults.capsStatic, defaults.capsPos
+	if agent.capsPresent {
+		caps, capsStatic, capsPos = agent.caps, agent.capsStatic, agent.capsPos
+	}
+	return ctx.validateStaticToolCaps(owner, tools, toolsStatic, caps, capsStatic, capsPos)
+}
+
+func (ctx *aiValidationContext) validateStaticToolCaps(owner string, tools []string, toolsStatic bool, caps []string, capsStatic bool, capsPos Pos) error {
+	if !toolsStatic || !capsStatic {
+		return nil
+	}
+	for _, req := range ctx.tools.RequiredCapabilitiesForTools(tools) {
+		if capAllows(caps, req) {
+			continue
 		}
+		return fmt.Errorf("line %d: %s capabilities missing required capability %q", capsPos.Line, owner, req)
 	}
 	return nil
 }
 
-func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config []ConfigField) ([]string, bool, error) {
+func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config []ConfigField) ([]string, bool, bool, error) {
 	for _, f := range config {
 		key, ok := stringConfigKey(f.Key)
 		if !ok || key != "tools" {
@@ -382,7 +450,7 @@ func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config 
 		}
 		list, ok := f.Value.(*ListLitExpr)
 		if !ok {
-			return nil, false, nil
+			return nil, true, false, nil
 		}
 		seen := map[string]bool{}
 		names := make([]string, 0, len(list.Values))
@@ -394,20 +462,20 @@ func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config 
 				continue
 			}
 			if seen[ident.Name] {
-				return nil, false, fmt.Errorf("line %d: %s tools list includes duplicate tool %q", pos.Line, owner, ident.Name)
+				return nil, false, false, fmt.Errorf("line %d: %s tools list includes duplicate tool %q", pos.Line, owner, ident.Name)
 			}
 			if _, ok := ctx.tools.Lookup(ident.Name); !ok {
-				return nil, false, fmt.Errorf("line %d: %s tools list references undeclared tool %q", pos.Line, owner, ident.Name)
+				return nil, false, false, fmt.Errorf("line %d: %s tools list references undeclared tool %q", pos.Line, owner, ident.Name)
 			}
 			seen[ident.Name] = true
 			names = append(names, ident.Name)
 		}
-		return names, allStatic, nil
+		return names, true, allStatic, nil
 	}
-	return nil, false, nil
+	return nil, false, false, nil
 }
 
-func staticCapsConfig(config []ConfigField) ([]string, bool, Pos) {
+func staticCapsConfig(config []ConfigField) ([]string, bool, bool, Pos) {
 	for _, f := range config {
 		key, ok := stringConfigKey(f.Key)
 		if !ok || (key != "capabilities" && key != "caps") {
@@ -415,11 +483,11 @@ func staticCapsConfig(config []ConfigField) ([]string, bool, Pos) {
 		}
 		caps, ok := staticStringList(f.Value)
 		if !ok {
-			return nil, false, f.P
+			return nil, true, false, f.P
 		}
-		return caps, true, f.P
+		return caps, true, true, f.P
 	}
-	return nil, false, Pos{}
+	return nil, false, false, Pos{}
 }
 
 func staticStringList(expr Expr) ([]string, bool) {
