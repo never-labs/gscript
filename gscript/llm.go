@@ -204,6 +204,8 @@ func cloneLLMRequest(req LLMTurnRequest) LLMTurnRequest {
 	out.Tools = append([]LLMTool(nil), req.Tools...)
 	for i := range out.Tools {
 		out.Tools[i].Params = append([]string(nil), req.Tools[i].Params...)
+		out.Tools[i].Requires = append([]string(nil), req.Tools[i].Requires...)
+		out.Tools[i].Schema = cloneLLMAny(req.Tools[i].Schema)
 	}
 	out.Stop = append([]string(nil), req.Stop...)
 	if req.Metadata != nil {

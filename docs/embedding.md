@@ -140,7 +140,12 @@ Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:
 ```gscript
 lookup := llm.tool("lookup", func(name) {
     return "docs:" .. name, nil
-}, {description: "lookup documentation", params: {"name"}})
+}, {
+    description: "lookup documentation",
+    params: {"name"},
+    requires: {"docs.read"},
+    schema: {type: "object", required: {"name"}},
+})
 
 tools := {lookup}
 result, err := llm.turn({

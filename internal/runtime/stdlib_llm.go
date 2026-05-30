@@ -28,6 +28,8 @@ type LLMTool struct {
 	Name        string
 	Description string
 	Params      []string
+	Requires    []string
+	Schema      any
 }
 
 type LLMToolCall struct {
@@ -177,10 +179,14 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		}
 		desc := ""
 		var params Value
+		var requires Value
+		var schema Value
 		if len(args) >= 3 && args[2].IsTable() {
 			opts := args[2].Table()
 			desc = opts.RawGetString("description").Str()
 			params = opts.RawGetString("params")
+			requires = opts.RawGetString("requires")
+			schema = opts.RawGetString("schema")
 		}
 		tool := NewTable()
 		tool.RawSetString("__llm_tool", BoolValue(true))
@@ -189,6 +195,12 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, maxHostResult
 		tool.RawSetString("description", StringValue(desc))
 		if params.IsTable() {
 			tool.RawSetString("params", params)
+		}
+		if requires.IsTable() {
+			tool.RawSetString("requires", requires)
+		}
+		if !schema.IsNil() {
+			tool.RawSetString("schema", schema)
 		}
 		return []Value{TableValue(tool)}, nil
 	})
@@ -626,6 +638,8 @@ func llmToolsFromValue(v Value) []LLMTool {
 			Name:        tt.RawGetString("name").Str(),
 			Description: tt.RawGetString("description").Str(),
 			Params:      llmStringSliceFromValue(tt.RawGetString("params")),
+			Requires:    llmStringSliceFromValue(tt.RawGetString("requires")),
+			Schema:      llmAnyFromValue(tt.RawGetString("schema")),
 		})
 	}
 	return out
