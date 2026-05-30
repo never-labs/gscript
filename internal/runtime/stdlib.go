@@ -123,7 +123,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Text processing ---
 	interp.globals.Define("regexp", TableValue(buildRegexpLib()))
-	interp.globals.Define("utf8", TableValue(buildUTF8Lib()))
+	interp.globals.Define("utf8", TableValue(buildUTF8Lib(interp)))
 
 	// --- Low-level ---
 	interp.globals.Define("bit32", TableValue(buildBit32Lib()))

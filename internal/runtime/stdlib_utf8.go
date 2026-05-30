@@ -2,14 +2,19 @@ package runtime
 
 import (
 	"fmt"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
 // buildUTF8Lib creates the "utf8" standard library table.
-func buildUTF8Lib() *Table {
+func buildUTF8Lib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	maxHostResult := func() int64 {
+		if len(interps) == 0 || interps[0] == nil {
+			return 0
+		}
+		return interps[0].maxHostResult
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -61,14 +66,16 @@ func buildUTF8Lib() *Table {
 
 	// utf8.char(...) → string
 	set("char", func(args []Value) ([]Value, error) {
-		var buf strings.Builder
+		buf := newHostResultBuffer(maxHostResult())
 		for _, arg := range args {
 			n := toInt(arg)
 			if n < 0 || n > utf8.MaxRune || !utf8.ValidRune(rune(n)) {
 				return nil, fmt.Errorf("bad argument to 'utf8.char' (value out of range)")
 			}
 			cp := rune(n)
-			buf.WriteRune(cp)
+			if _, err := buf.Write([]byte(string(cp))); err != nil {
+				return nil, err
+			}
 		}
 		return []Value{StringValue(buf.String())}, nil
 	})
@@ -188,7 +195,11 @@ func buildUTF8Lib() *Table {
 		if len(args) >= 2 {
 			replacement = args[1].Str()
 		}
-		return []Value{StringValue(utf8Sanitize(args[0].Str(), replacement))}, nil
+		out, err := utf8Sanitize(args[0].Str(), replacement, maxHostResult())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(out)}, nil
 	})
 
 	// utf8.reverse(s) → string (reverse by codepoint)
@@ -200,7 +211,11 @@ func buildUTF8Lib() *Table {
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
 			runes[i], runes[j] = runes[j], runes[i]
 		}
-		return []Value{StringValue(string(runes))}, nil
+		out := string(runes)
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(out)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(out)}, nil
 	})
 
 	// utf8.sub(s, i [, j]) → string (substring by codepoint indices, 1-based)
@@ -234,7 +249,11 @@ func buildUTF8Lib() *Table {
 			return []Value{StringValue("")}, nil
 		}
 
-		return []Value{StringValue(string(runes[i-1 : j]))}, nil
+		out := string(runes[i-1 : j])
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(out)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(out)}, nil
 	})
 
 	// utf8.upper(s) → string
@@ -246,7 +265,11 @@ func buildUTF8Lib() *Table {
 		for i, r := range runes {
 			runes[i] = unicode.ToUpper(r)
 		}
-		return []Value{StringValue(string(runes))}, nil
+		out := string(runes)
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(out)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(out)}, nil
 	})
 
 	// utf8.lower(s) → string
@@ -258,7 +281,11 @@ func buildUTF8Lib() *Table {
 		for i, r := range runes {
 			runes[i] = unicode.ToLower(r)
 		}
-		return []Value{StringValue(string(runes))}, nil
+		out := string(runes)
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(out)); err != nil {
+			return nil, err
+		}
+		return []Value{StringValue(out)}, nil
 	})
 
 	// utf8.charclass(cp) → string ("L", "N", "P", "S", "O")
@@ -412,17 +439,21 @@ func utf8ValidationReport(s string) *Table {
 	return tbl
 }
 
-func utf8Sanitize(s, replacement string) string {
-	var out strings.Builder
+func utf8Sanitize(s, replacement string, maxHostResult int64) (string, error) {
+	out := newHostResultBuffer(maxHostResult)
 	for pos := 0; pos < len(s); {
 		r, size := utf8.DecodeRuneInString(s[pos:])
 		if r == utf8.RuneError && size == 1 {
-			out.WriteString(replacement)
+			if _, err := out.Write([]byte(replacement)); err != nil {
+				return "", err
+			}
 			pos++
 			continue
 		}
-		out.WriteString(s[pos : pos+size])
+		if _, err := out.Write([]byte(s[pos : pos+size])); err != nil {
+			return "", err
+		}
 		pos += size
 	}
-	return out.String()
+	return out.String(), nil
 }

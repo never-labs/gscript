@@ -7,7 +7,7 @@ func (interp *Interpreter) registerStdlibExtra() {
 	interp.globals.Define("regexp", TableValue(buildRegexpLib()))
 
 	// UTF-8 library
-	interp.globals.Define("utf8", TableValue(buildUTF8Lib()))
+	interp.globals.Define("utf8", TableValue(buildUTF8Lib(interp)))
 
 	// Bit32 library
 	interp.globals.Define("bit32", TableValue(buildBit32Lib()))
