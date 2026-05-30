@@ -40,11 +40,27 @@ SMOKE_BENCHES=(
     "suite/table_array_access"
 )
 
+FEATURE_SMOKE_BENCHES=(
+    "extended/producer_consumer_pipeline"
+    "official/calls_vararg_coroutine_hot"
+    "official/stdlib_host_hot"
+    "data_oriented/soa_affine_many_hot"
+    "data_oriented/soa_masked_aggregate_hot"
+)
+
 STRICT_CORE_BENCHES=(
     "suite/sieve"
     "suite/string_bench"
     "suite/table_array_access"
     "extended/json_table_walk"
+)
+
+STRICT_FEATURE_BENCHES=(
+    "extended/producer_consumer_pipeline"
+    "official/calls_vararg_coroutine_hot"
+    "official/stdlib_host_hot"
+    "data_oriented/soa_affine_many_hot"
+    "data_oriented/soa_masked_aggregate_hot"
 )
 
 usage() {
@@ -53,6 +69,7 @@ Usage: bash scripts/performance_gate.sh [options]
 
 Options:
   --smoke                 Run a short two-benchmark gate.
+  --feature-smoke         Run hot-path smoke coverage for newer language features.
   --full                  Run all benchmark groups through timing_compare.py.
   --bench ID              Add one benchmark selector, e.g. suite/spectral_norm.
   --runs N                Measured timing samples after calibration. Default: 5.
@@ -79,6 +96,12 @@ while [ "$#" -gt 0 ]; do
             RUNS=1
             WARMUP=0
             TIMEOUT=60
+            ;;
+        --feature-smoke)
+            PROFILE="feature_smoke"
+            RUNS=2
+            WARMUP=1
+            TIMEOUT=90
             ;;
         --full)
             PROFILE="full"
@@ -407,6 +430,11 @@ elif [ "$PROFILE" = "smoke" ]; then
     for bench in "${SMOKE_BENCHES[@]}"; do
         TIMING_CMD+=(--bench "$bench")
     done
+elif [ "$PROFILE" = "feature_smoke" ]; then
+    TIMING_CMD+=(--all-groups)
+    for bench in "${FEATURE_SMOKE_BENCHES[@]}"; do
+        TIMING_CMD+=(--bench "$bench")
+    done
 else
     TIMING_CMD+=(--all-groups)
     if [ "${#BENCHES[@]}" -eq 0 ]; then
@@ -447,6 +475,10 @@ if [ "$STRICT" -eq 1 ]; then
         STRICT_CMD+=(--group suite --group extended --group official)
         if [ "$PROFILE" = "smoke" ]; then
             for bench in "${SMOKE_BENCHES[@]}"; do
+                STRICT_CMD+=(--bench "$bench")
+            done
+        elif [ "$PROFILE" = "feature_smoke" ]; then
+            for bench in "${STRICT_FEATURE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")
             done
         elif [ "${#BENCHES[@]}" -eq 0 ]; then

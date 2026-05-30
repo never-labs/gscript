@@ -58,6 +58,12 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
+	if !caps.AINative.Enabled || !containsString(caps.AINative.Syntax, "agent") || !containsString(caps.AINative.Syntax, "tool") || !containsString(caps.AINative.Syntax, "turn") {
+		t.Fatalf("ai_native capabilities = %+v, want enabled agent/tool/turn syntax", caps.AINative)
+	}
+	if !containsString(caps.AINative.ToolMetadata, "gscript:requires") || !containsString(caps.AINative.StaticValidation, "static_tool_capabilities") || !containsString(caps.AINative.Tooling, "lint-sarif") {
+		t.Fatalf("ai_native capabilities = %+v, want metadata, static validation, and tooling entries", caps.AINative)
+	}
 	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {
 		t.Fatalf("commands = %#v, want core command set", caps.Commands)
 	}

@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -103,6 +105,40 @@ type LLMTraceEvent struct {
 }
 
 type LLMTraceSink func(LLMTraceEvent)
+
+const (
+	LLMProviderErrorNetwork   = "network"
+	LLMProviderErrorAuth      = "auth"
+	LLMProviderErrorRateLimit = "rate_limit"
+	LLMProviderErrorRequest   = "request"
+	LLMProviderErrorProvider  = "provider"
+)
+
+type llmProviderErrorKind interface {
+	LLMProviderErrorKind() string
+}
+
+// ClassifyLLMProviderError maps provider failures into a stable diagnostic
+// category without inspecting prompts, messages, or token values.
+func ClassifyLLMProviderError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var typed llmProviderErrorKind
+	if errors.As(err, &typed) {
+		if kind := typed.LLMProviderErrorKind(); kind != "" {
+			return kind
+		}
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return LLMProviderErrorNetwork
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return LLMProviderErrorNetwork
+	}
+	return LLMProviderErrorProvider
+}
 
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage
 // runtime substrate for the agent layer: future syntax can compile to these
@@ -365,8 +401,8 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := p.Turn(currentContext(), req)
 		if err != nil {
-			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: "provider", Message: err.Error()})
-			return []Value{NilValue(), llmErrorValue("provider", err.Error())}, nil
+			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
+			return []Value{NilValue(), llmProviderErrorValue(err)}, nil
 		}
 		trace(LLMTraceEvent{Type: "turn_end", Model: req.Model, Status: llmResultStatus(res), MessageCount: len(req.Messages), ToolCount: len(req.Tools), Usage: res.Usage})
 		out := llmResultValue(res)
@@ -1062,7 +1098,7 @@ func llmResolveProviderForModel(opts, aliases *Table, defaultProvider LLMProvide
 	}
 	p, err := factory(cfg)
 	if err != nil {
-		return nil, llmErrorValue("provider", err.Error())
+		return nil, llmProviderErrorValue(err)
 	}
 	if p == nil {
 		return nil, llmErrorValue("provider", "llm provider factory returned nil")
@@ -1137,8 +1173,8 @@ func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, ma
 	trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
 	res, err := provider.Turn(ctx, req)
 	if err != nil {
-		trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: "provider", Message: err.Error()})
-		return LLMTurnResult{}, llmErrorValue("provider", err.Error())
+		trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
+		return LLMTurnResult{}, llmProviderErrorValue(err)
 	}
 	trace(LLMTraceEvent{Type: "turn_end", Model: req.Model, Status: llmResultStatus(res), MessageCount: len(req.Messages), Usage: res.Usage})
 	if err := CheckHostResultBytes(maxHostResult, llmResultValue(res)); err != nil {
@@ -1209,8 +1245,8 @@ func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Cont
 		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
 		res, err := provider.Turn(ctx, req)
 		if err != nil {
-			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: "provider", Message: err.Error()})
-			return llmErrorValue("provider", err.Error())
+			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
+			return llmProviderErrorValue(err)
 		}
 		trace(LLMTraceEvent{Type: "turn_end", Model: req.Model, Status: llmResultStatus(res), MessageCount: len(req.Messages), Usage: res.Usage})
 		turn := llmResultValue(res)
@@ -1473,6 +1509,13 @@ func llmErrorValue(kind, message string) Value {
 	return TableValue(t)
 }
 
+func llmProviderErrorValue(err error) Value {
+	if err == nil {
+		return llmErrorValue(LLMProviderErrorProvider, "")
+	}
+	return llmErrorValue(ClassifyLLMProviderError(err), err.Error())
+}
+
 func llmToolCapsValue(tools *Table) Value {
 	caps := NewTable()
 	seen := map[string]bool{}
@@ -1625,8 +1668,8 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: int64(step), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := provider.Turn(ctx, req)
 		if err != nil {
-			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: int64(step), ErrorKind: "provider", Message: err.Error()})
-			return []Value{NilValue(), llmErrorValue("provider", err.Error())}, nil
+			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: int64(step), ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
+			return []Value{NilValue(), llmProviderErrorValue(err)}, nil
 		}
 		if err := cancel.check(); !err.IsNil() {
 			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
@@ -1812,8 +1855,8 @@ func llmRepairStructuredOutput(opts *Table, provider LLMProvider, ctx context.Co
 		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: step, Attempt: int64(attempt), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := provider.Turn(ctx, req)
 		if err != nil {
-			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: step, Attempt: int64(attempt), ErrorKind: "provider", Message: err.Error()})
-			return NilValue(), NilValue(), "", llmErrorValue("provider", err.Error()), true
+			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: step, Attempt: int64(attempt), ErrorKind: ClassifyLLMProviderError(err), Message: err.Error()})
+			return NilValue(), NilValue(), "", llmProviderErrorValue(err), true
 		}
 		if err := cancel.check(); !err.IsNil() {
 			return NilValue(), NilValue(), "", err, true

@@ -59,7 +59,11 @@ schema。
   integrations.
 - `gscript capabilities [--json]` reports the current binary's platform,
   execution backends, stdlib modules, supported subcommands, and stable tooling
-  output formats for CI/editor integration.
+  output formats for CI/editor integration. JSON output also includes an
+  `ai_native` section so editors, CI jobs, and agent harnesses can discover
+  supported AI-native syntax, metadata directives, static validation passes,
+  runtime lowering targets, and formatter/linter integration without scraping
+  help text.
 - `gscript env [--json] [--path PATH]` reports version, platform,
   capabilities, project config discovery, and user cache/config directories in
   one environment snapshot for CI/editor integration.

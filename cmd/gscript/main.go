@@ -257,6 +257,7 @@ type cliCapabilities struct {
 	Execution     cliExecutionCapability `json:"execution"`
 	Commands      []string               `json:"commands"`
 	StdlibModules []string               `json:"stdlib_modules"`
+	AINative      cliAINativeCapability  `json:"ai_native"`
 	Tooling       cliToolingCapability   `json:"tooling"`
 }
 
@@ -270,6 +271,15 @@ type cliExecutionCapability struct {
 	BytecodeVM  bool `json:"bytecode_vm"`
 	JIT         bool `json:"jit"`
 	MethodJIT   bool `json:"method_jit"`
+}
+
+type cliAINativeCapability struct {
+	Enabled           bool     `json:"enabled"`
+	Syntax            []string `json:"syntax"`
+	ToolMetadata      []string `json:"tool_metadata"`
+	StaticValidation  []string `json:"static_validation"`
+	RuntimePrimitives []string `json:"runtime_primitives"`
+	Tooling           []string `json:"tooling"`
 }
 
 type cliToolingCapability struct {
@@ -320,6 +330,7 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 	}
 	fmt.Fprintf(outw, "platform: %s/%s\n", caps.Platform.GOOS, caps.Platform.GOARCH)
 	fmt.Fprintf(outw, "jit: %t\n", caps.Execution.JIT)
+	fmt.Fprintf(outw, "ai-native: %t (%s)\n", caps.AINative.Enabled, strings.Join(caps.AINative.Syntax, ", "))
 	fmt.Fprintf(outw, "commands: %s\n", strings.Join(caps.Commands, ", "))
 	fmt.Fprintf(outw, "stdlib modules: %d\n", len(caps.StdlibModules))
 	return 0
@@ -342,6 +353,45 @@ func buildCapabilities() cliCapabilities {
 		},
 		Commands:      cliCommandNames(),
 		StdlibModules: modules,
+		AINative: cliAINativeCapability{
+			Enabled: true,
+			Syntax: []string{
+				"models",
+				"tool",
+				"agent defaults",
+				"agent",
+				"turn",
+				"messages",
+				"budget",
+				"toolof",
+			},
+			ToolMetadata: []string{
+				"doc_comment",
+				"gscript:requires",
+				"gscript:param",
+			},
+			StaticValidation: []string{
+				"duplicate_agent_defaults",
+				"tool_requires",
+				"tool_param_docs",
+				"static_tool_capabilities",
+				"agent_defaults_merge",
+			},
+			RuntimePrimitives: []string{
+				"llm.models",
+				"llm.tool",
+				"llm.agent",
+				"llm.turn",
+				"llm.messages",
+				"llm.budget",
+				"llm.toolof",
+			},
+			Tooling: []string{
+				"fmt-parse-backed",
+				"lint-json",
+				"lint-sarif",
+			},
+		},
 		Tooling: cliToolingCapability{
 			Formatter: cliFormatterCapability{
 				Stdin:     true,

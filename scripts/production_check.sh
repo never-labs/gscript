@@ -20,7 +20,8 @@ Runs the release-gate commands from docs/production-readiness-checklist.md.
 
 Options:
   --quick   Run short correctness gates only: core packages, feature matrix,
-            integration, and stdlib contract. Skips long performance passes.
+            integration, release matrix metadata, and stdlib contract. Skips
+            long performance passes.
   --full    Run the available Required Commands subset. This is the default.
   --list    Print the commands that would run without executing them.
   --out-dir DIR
@@ -207,6 +208,8 @@ build_quick_plan() {
         "go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
     add_go_test "Feature Matrix and Integration" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
+    add_go_test "Release Matrix Metadata" \
+        "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
     add_go_test "Stdlib Contract" \
         "go test ./tests -run TestStdlibContract -count=1"
     add_documentation_references
@@ -219,6 +222,8 @@ build_full_plan() {
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Official Lua Compatibility Surface" \
         "go test ./tests -run Official -count=1"
+    add_go_test "Release Matrix Metadata" \
+        "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
     add_documentation_references
     add_performance_gate
     add_release_smoke

@@ -139,6 +139,13 @@ func (e *AnthropicCompatibleLLMError) Error() string {
 	return fmt.Sprintf("anthropic-compatible llm status %d: %s", e.StatusCode, body)
 }
 
+func (e *AnthropicCompatibleLLMError) LLMProviderErrorKind() string {
+	if e == nil {
+		return LLMProviderErrorProvider
+	}
+	return llmHTTPStatusErrorKind(e.StatusCode, e.Retryable)
+}
+
 type anthropicRequest struct {
 	Model         string             `json:"model"`
 	System        string             `json:"system,omitempty"`

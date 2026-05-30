@@ -118,11 +118,17 @@ HTTP clients, headers, local gateways, test servers, request timeouts, and
 bounded retries on transient network failures or `408` / `409` / `429` / `5xx`
 HTTP responses. Non-2xx HTTP responses return `*gscript.OpenAICompatibleLLMError`
 with `StatusCode`, trimmed `Body`, and `Retryable` fields for host policy.
+`gscript.ClassifyLLMProviderError(err)` maps built-in provider status errors,
+context cancellation/deadlines, and network errors into stable diagnostic
+categories: `network`, `auth`, `rate_limit`, `request`, or `provider`. The
+classifier never inspects prompt text, messages, or token values.
 
 Anthropic-compatible gateways are supported through
 `AnthropicCompatibleLLMProvider` and `WithAnthropicCompatibleLLM`. Hosts pass
 their own endpoint, API key, model, timeout, retry, and header policy explicitly;
 GScript does not encode vendor-specific local wrapper conventions.
+`*gscript.AnthropicCompatibleLLMError` exposes the same status fields and
+provider error classification behavior as the OpenAI-compatible adapter.
 
 AI-native `models {}` declarations can also construct these built-in adapters
 when the VM has no host-injected provider:

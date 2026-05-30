@@ -45,6 +45,13 @@ func (e *OpenAICompatibleLLMError) Error() string {
 	return fmt.Sprintf("openai-compatible llm status %d: %s", e.StatusCode, body)
 }
 
+func (e *OpenAICompatibleLLMError) LLMProviderErrorKind() string {
+	if e == nil {
+		return LLMProviderErrorProvider
+	}
+	return llmHTTPStatusErrorKind(e.StatusCode, e.Retryable)
+}
+
 func WithOpenAICompatibleLLM(endpoint, apiKey, model string) Option {
 	return WithLLMProvider(OpenAICompatibleLLMProvider{
 		Endpoint: endpoint,
@@ -137,6 +144,22 @@ func openAIRetryableStatus(status int) bool {
 		status == http.StatusConflict ||
 		status == http.StatusTooManyRequests ||
 		status >= 500
+}
+
+func llmHTTPStatusErrorKind(status int, retryable bool) string {
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return LLMProviderErrorAuth
+	case http.StatusTooManyRequests:
+		return LLMProviderErrorRateLimit
+	}
+	if retryable {
+		return LLMProviderErrorNetwork
+	}
+	if status >= 400 && status < 500 {
+		return LLMProviderErrorRequest
+	}
+	return LLMProviderErrorProvider
 }
 
 func waitOpenAIRetry(ctx context.Context, backoff time.Duration) error {

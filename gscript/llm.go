@@ -38,6 +38,20 @@ type LLMRecord struct {
 	Error   string
 }
 
+const (
+	LLMProviderErrorNetwork   = runtime.LLMProviderErrorNetwork
+	LLMProviderErrorAuth      = runtime.LLMProviderErrorAuth
+	LLMProviderErrorRateLimit = runtime.LLMProviderErrorRateLimit
+	LLMProviderErrorRequest   = runtime.LLMProviderErrorRequest
+	LLMProviderErrorProvider  = runtime.LLMProviderErrorProvider
+)
+
+// ClassifyLLMProviderError returns a stable diagnostic category for provider
+// errors without inspecting prompts, messages, or tokens.
+func ClassifyLLMProviderError(err error) string {
+	return runtime.ClassifyLLMProviderError(err)
+}
+
 // LLMTraceRecorder is a thread-safe trace sink for tests, diagnostics, and
 // host-side observability. Pass recorder.Record to WithLLMTrace.
 type LLMTraceRecorder struct {

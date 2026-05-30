@@ -59,11 +59,12 @@ captures git revision/status, Go environment summary, quick Go test logs, and
 quick benchmark/strict-guard summaries when those local tools are available.
 
 Use `scripts/production_check.sh --quick` for a short preflight that runs the
-core Go package tests, feature/integration checks, the standard-library
-contract check, and the documentation reference gate when `scripts/docs_check.sh`
-is present, without the long benchmark passes. The default `--full` mode runs
-the correctness gates, the documentation reference gate when available, the
-release smoke, and the repeatable performance gate through
+core Go package tests, feature/integration checks, release matrix metadata
+gate, the standard-library contract check, and the documentation reference gate
+when `scripts/docs_check.sh` is present, without the long benchmark passes. The
+default `--full` mode runs the correctness gates, release matrix metadata gate,
+the documentation reference gate when available, the release smoke, and the
+repeatable performance gate through
 `scripts/performance_gate.sh --full`. Use
 `scripts/production_check.sh --list` to print the available command subset for
 the current checkout. Add `--out-dir DIR` to write the resolved plan and command
@@ -79,9 +80,22 @@ The integrated documentation reference gate is:
 scripts/docs_check.sh
 ```
 
-It checks README and `docs/**/*.md` relative `.md` links, and verifies fenced
-code blocks that mention `production_check`, `performance_gate`,
-`diagnostics_bundle`, or `release_artifacts` point at executable scripts.
+It checks README and `docs/**/*.md` relative `.md` links, verifies fenced code
+blocks that mention `production_check`, `performance_gate`,
+`diagnostics_bundle`, or `release_artifacts` point at executable scripts, and
+keeps the AI-native language gate plus machine-checkable release evidence
+sections present.
+
+The short hot-path feature performance guard is:
+
+```bash
+bash scripts/performance_gate.sh --feature-smoke
+```
+
+It focuses on newer language features, including AI-native official hot cases,
+concurrency, stdlib host dispatch, and data-oriented SOA paths. Use it before
+and after language-facing runtime changes when a full benchmark sweep would slow
+down iteration.
 
 The release artifact smoke is:
 
@@ -111,6 +125,30 @@ preflight including documentation link/script-reference drift when the checker
 is available, and the release matrix metadata gate. A version tag is not
 releasable until the full local checklist below has also been run and archived
 with the release evidence.
+
+### AI-Native Language Gates
+
+AI-facing language work is release-blocking when it changes syntax, semantics,
+tool-visible diagnostics, or host capability boundaries. The release candidate
+must keep the human spec and machine ledgers aligned:
+
+```bash
+go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
+bash scripts/docs_check.sh
+```
+
+Expected result:
+
+- every stable `docs/language-spec.md` section is referenced by
+  `tests/feature_matrix.json` and has a semantic or official-case gate;
+- `tests/official_lua_cases/MANIFEST.md`,
+  `tests/official_lua_cases/KNOWN_FAILURES.md`, and
+  `tests/official_lua_cases/MISSING_CAPABILITIES.md` classify translated
+  oracle coverage and intentional gaps;
+- `docs/stdlib-contract.md` modules remain linked from official coverage or a
+  documented capability entry;
+- this checklist and `docs/release.md` keep the machine-checkable commands that
+  `scripts/docs_check.sh` requires.
 
 ### Correctness
 

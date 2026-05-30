@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -14,16 +15,30 @@ type testLLMProvider struct {
 	requests []LLMTurnRequest
 	res      LLMTurnResult
 	results  []LLMTurnResult
+	err      error
 }
 
 func (p *testLLMProvider) Turn(_ context.Context, req LLMTurnRequest) (LLMTurnResult, error) {
 	p.requests = append(p.requests, req)
+	if p.err != nil {
+		return LLMTurnResult{}, p.err
+	}
 	if len(p.results) > 0 {
 		res := p.results[0]
 		p.results = p.results[1:]
 		return res, nil
 	}
 	return p.res, nil
+}
+
+type testLLMProviderKindError string
+
+func (e testLLMProviderKindError) Error() string {
+	return "typed provider failure: " + string(e)
+}
+
+func (e testLLMProviderKindError) LLMProviderErrorKind() string {
+	return string(e)
 }
 
 func parseLLMTestProgram(t *testing.T, src string) *ast.Program {
@@ -71,6 +86,63 @@ err_message := err.message
 	format, ok := provider.requests[0].ResponseFormat.(map[string]any)
 	if !ok || format["type"] != "json_object" {
 		t.Fatalf("response_format = %#v, want json_object", provider.requests[0].ResponseFormat)
+	}
+}
+
+func TestLLMTurnProviderErrorKindReachesScript(t *testing.T) {
+	provider := &testLLMProvider{err: testLLMProviderKindError(LLMProviderErrorRateLimit)}
+	interp := New()
+	interp.llmProvider = provider
+
+	if err := interp.Exec(parseLLMTestProgram(t, `
+result, err := llm.turn({
+    model: "mock"
+    messages: {llm.user("hello")}
+})
+err_kind := err.kind
+err_message := err.message
+`)); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != LLMProviderErrorRateLimit {
+		t.Fatalf("err_kind = %v, want %s", got, LLMProviderErrorRateLimit)
+	}
+	if got := interp.GetGlobal("err_message"); !got.IsString() || !strings.Contains(got.Str(), "typed provider failure") {
+		t.Fatalf("err_message = %v, want typed provider failure", got)
+	}
+}
+
+func TestLLMReactProviderErrorKindReachesScript(t *testing.T) {
+	provider := &testLLMProvider{err: context.DeadlineExceeded}
+	interp := New()
+	interp.llmProvider = provider
+
+	if err := interp.Exec(parseLLMTestProgram(t, `
+result, err := llm.react({
+    model: "mock"
+    messages: {llm.user("hello")}
+    max_steps: 1
+})
+err_kind := err.kind
+`)); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != LLMProviderErrorNetwork {
+		t.Fatalf("err_kind = %v, want %s", got, LLMProviderErrorNetwork)
+	}
+}
+
+func TestClassifyLLMProviderErrorRuntime(t *testing.T) {
+	if got := ClassifyLLMProviderError(testLLMProviderKindError(LLMProviderErrorAuth)); got != LLMProviderErrorAuth {
+		t.Fatalf("typed provider classification = %q, want %q", got, LLMProviderErrorAuth)
+	}
+	if got := ClassifyLLMProviderError(context.Canceled); got != LLMProviderErrorNetwork {
+		t.Fatalf("context classification = %q, want %q", got, LLMProviderErrorNetwork)
+	}
+	if got := ClassifyLLMProviderError(errors.New("plain")); got != LLMProviderErrorProvider {
+		t.Fatalf("plain classification = %q, want %q", got, LLMProviderErrorProvider)
 	}
 }
 

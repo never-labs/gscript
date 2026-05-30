@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1005,6 +1006,30 @@ func TestOpenAICompatibleLLMProviderTypedStatusError(t *testing.T) {
 	}
 	if statusErr.StatusCode != http.StatusBadRequest || statusErr.Retryable || !strings.Contains(statusErr.Body, "bad request") {
 		t.Fatalf("statusErr = %#v", statusErr)
+	}
+}
+
+func TestClassifyLLMProviderError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "nil", err: nil, want: ""},
+		{name: "openai auth", err: &gs.OpenAICompatibleLLMError{StatusCode: http.StatusUnauthorized}, want: gs.LLMProviderErrorAuth},
+		{name: "anthropic rate limit", err: &gs.AnthropicCompatibleLLMError{StatusCode: http.StatusTooManyRequests, Retryable: true}, want: gs.LLMProviderErrorRateLimit},
+		{name: "retryable status", err: &gs.OpenAICompatibleLLMError{StatusCode: http.StatusBadGateway, Retryable: true}, want: gs.LLMProviderErrorNetwork},
+		{name: "request status", err: &gs.AnthropicCompatibleLLMError{StatusCode: http.StatusUnprocessableEntity}, want: gs.LLMProviderErrorRequest},
+		{name: "context", err: context.DeadlineExceeded, want: gs.LLMProviderErrorNetwork},
+		{name: "net", err: &net.DNSError{Err: "no such host", Name: "provider.test"}, want: gs.LLMProviderErrorNetwork},
+		{name: "generic", err: errors.New("provider rejected request"), want: gs.LLMProviderErrorProvider},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := gs.ClassifyLLMProviderError(tc.err); got != tc.want {
+				t.Fatalf("ClassifyLLMProviderError(%T) = %q, want %q", tc.err, got, tc.want)
+			}
+		})
 	}
 }
 

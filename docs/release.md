@@ -200,6 +200,39 @@ The release notes should summarize:
 Do not publish a benchmark headline unless the corresponding report includes
 the command, timing source, repeat count, and checksum status.
 
+## Machine-Checkable Release Evidence
+
+Every release candidate must include evidence that can be re-run from the tag.
+Keep this section in sync with `docs/production-readiness-checklist.md` and
+`scripts/docs_check.sh`; the docs checker treats these commands and ledgers as
+release-readiness contract.
+
+Required machine gates:
+
+```bash
+bash scripts/production_check.sh --quick
+go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
+bash scripts/docs_check.sh
+bash scripts/performance_gate.sh --feature-smoke
+```
+
+The release evidence archive should also name the exact revisions of these
+machine-readable ledgers:
+
+| Evidence | Required file |
+|---|---|
+| Language feature matrix | `tests/feature_matrix.json` |
+| Language spec contract | `docs/language-spec.md` |
+| Official translated cases | `tests/official_lua_cases/MANIFEST.md` |
+| Known official-case skips | `tests/official_lua_cases/KNOWN_FAILURES.md` |
+| Intentional capability gaps | `tests/official_lua_cases/MISSING_CAPABILITIES.md` |
+| Standard library contract | `docs/stdlib-contract.md` |
+
+The release is blocked if a language-facing change updates only prose or only
+tests. Syntax, semantic, stdlib, diagnostics, and host-capability changes need a
+spec reference, matrix row or documented non-goal, and a release gate that can
+fail in CI.
+
 ## Release Checklist
 
 1. Start from a clean release branch and confirm no unrelated local changes.

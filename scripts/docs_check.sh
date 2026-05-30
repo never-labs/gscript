@@ -13,6 +13,7 @@ Usage: scripts/docs_check.sh [--help]
 Checks README/docs Markdown for:
   - relative .md links whose target file exists;
   - fenced code blocks that mention release scripts whose files exist and are executable.
+  - release-readiness docs keep machine-checkable language and AI-native gates.
 
 The release-script check covers:
   scripts/production_check.sh
@@ -64,6 +65,7 @@ script_names = {
 errors = []
 checked_links = 0
 checked_script_mentions = 0
+checked_release_gate_docs = 0
 
 
 def strip_link_destination(raw: str) -> str:
@@ -153,10 +155,51 @@ def check_script_mentions(path: Path) -> None:
         errors.append(f"{path.relative_to(root)}:{fence_start}: unclosed fenced code block")
 
 
+def require_snippets(path: Path, snippets: list[str]) -> None:
+    global checked_release_gate_docs
+    text = path.read_text(encoding="utf-8")
+    checked_release_gate_docs += 1
+    for snippet in snippets:
+        if snippet not in text:
+            errors.append(
+                f"{path.relative_to(root)}: missing release-readiness snippet: {snippet}"
+            )
+
+
+def check_release_gate_docs() -> None:
+    release_matrix_cmd = "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+    require_snippets(
+        root / "docs" / "production-readiness-checklist.md",
+        [
+            "### AI-Native Language Gates",
+            release_matrix_cmd,
+            "bash scripts/performance_gate.sh --feature-smoke",
+            "tests/feature_matrix.json",
+            "docs/language-spec.md",
+            "tests/official_lua_cases/MISSING_CAPABILITIES.md",
+            "docs/stdlib-contract.md",
+        ],
+    )
+    require_snippets(
+        root / "docs" / "release.md",
+        [
+            "## Machine-Checkable Release Evidence",
+            "bash scripts/production_check.sh --quick",
+            release_matrix_cmd,
+            "scripts/docs_check.sh",
+            "bash scripts/performance_gate.sh --feature-smoke",
+            "tests/official_lua_cases/MANIFEST.md",
+            "tests/official_lua_cases/KNOWN_FAILURES.md",
+        ],
+    )
+
+
 for doc_file in doc_files:
     if doc_file.is_file():
         check_markdown_links(doc_file)
         check_script_mentions(doc_file)
+
+check_release_gate_docs()
 
 if errors:
     print("docs_check.sh found problems:", file=sys.stderr)
@@ -167,6 +210,7 @@ if errors:
 print(
     f"docs_check.sh: checked {len(doc_files)} Markdown files, "
     f"{checked_links} relative .md links, "
-    f"{checked_script_mentions} release-script code-block mentions."
+    f"{checked_script_mentions} release-script code-block mentions, "
+    f"{checked_release_gate_docs} release-gate docs."
 )
 PY
