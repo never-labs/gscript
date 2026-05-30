@@ -234,7 +234,7 @@ func (p *Parser) parseFuncDeclStmt() (ast.Stmt, error) {
 func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
 	tok := p.advance() // consume 'tool'
 	pos := p.tokenPos(tok)
-	doc, requires, paramDocs := parseToolLeadingComments(tok)
+	doc, requires, paramDocs, paramDocEntries := parseToolLeadingComments(tok)
 
 	nameTok, err := p.expect(lexer.TOKEN_IDENT)
 	if err != nil {
@@ -248,17 +248,18 @@ func (p *Parser) parseToolDeclStmt() (ast.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ast.ToolDeclStmt{P: pos, Name: nameTok.Value, Params: params, Body: body, DocComment: doc, Requires: requires, ParamDocs: paramDocs}, nil
+	return &ast.ToolDeclStmt{P: pos, Name: nameTok.Value, Params: params, Body: body, DocComment: doc, Requires: requires, ParamDocs: paramDocs, ParamDocEntries: paramDocEntries}, nil
 }
 
-func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]string) {
+func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]string, []ast.ToolParamDoc) {
 	comments := contiguousLeadingComments(tok)
 	if len(comments) == 0 {
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 	var docLines []string
 	var requires []string
 	paramDocs := map[string]string{}
+	var paramDocEntries []ast.ToolParamDoc
 	for _, comment := range comments {
 		text := strings.TrimSpace(comment.Text)
 		if rest, ok := directiveRest(text, "gscript:requires"); ok {
@@ -268,6 +269,7 @@ func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]str
 		if rest, ok := directiveRest(text, "gscript:param"); ok {
 			if name, doc, ok := parseParamDirective(rest); ok {
 				paramDocs[name] = doc
+				paramDocEntries = append(paramDocEntries, ast.ToolParamDoc{Name: name, Doc: doc})
 			}
 			continue
 		}
@@ -276,7 +278,7 @@ func parseToolLeadingComments(tok lexer.Token) (string, []string, map[string]str
 	if len(paramDocs) == 0 {
 		paramDocs = nil
 	}
-	return strings.TrimSpace(strings.Join(docLines, "\n")), requires, paramDocs
+	return strings.TrimSpace(strings.Join(docLines, "\n")), requires, paramDocs, paramDocEntries
 }
 
 func directiveRest(text, directive string) (string, bool) {

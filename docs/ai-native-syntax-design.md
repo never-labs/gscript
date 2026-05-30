@@ -18,9 +18,9 @@ Current implementation snapshot:
   `budget`.
 - Lowering currently targets `llm.tool`, `llm.agent`, `llm.agent_defaults`,
   `llm.register_models`, and `llm.turn`. Non-flow agents lower to
-  `llm.agent(name, config_fn)`. Flow agents currently lower to plain functions
-  with config fields bound as locals and explicit `turn` calls in the flow body,
-  not to a `llm.agent(..., flow_fn)` stdlib call.
+  `llm.agent(name, config_fn)`. Flow agents lower to
+  `llm.agent(name, config_fn, flow_fn)`, so model aliases/defaults, budget, and
+  ambient `turn {}` inheritance are owned by the same stdlib path.
 - `models { ... }` lowers to `llm.register_models({ ... })`. The stdlib stores
   aliases/configs and resolves `default`, aliases, and `provider_model` for
   `llm.turn` / `llm.agent`. When no host provider is injected, entries with
@@ -279,9 +279,12 @@ Rules:
 - Tool declarations bind a value with the declared name.
 - Tools are normal closures and can capture surrounding state.
 
-Current implementation note: parser/desugar support for `tool` exists, but
-source doc comments and `gscript:` directives are not yet attached to the AST or
-lowered. The generated `llm.tool` options currently include `params` only.
+Current implementation note: parser/desugar support for `tool` exists, and
+only immediately-adjacent Go-style comments are attached. The generated
+`llm.tool` options include `params`, `description`, `requires`, and
+`param_docs`. Validation rejects missing `gscript:requires`, malformed or
+duplicate capability entries, `none` mixed with other capabilities, unknown
+parameter docs, and duplicate parameter docs.
 
 Lowering:
 
@@ -701,10 +704,9 @@ Rules:
 Current implementation note: agent-local budget tables are enforced by the
 `llm.agent` / `llm.react` loop for turns, tool calls, tokens, money, and time
 when those limits are present in the options table. Standalone `budget` blocks
-parse, but their config is currently ignored during desugaring and no ambient
-budget frame is installed. They therefore do not yet provide nested
-intersection, active-frame charging, or automatic enforcement around enclosed
-`turn` / tool dispatch operations.
+lower to ambient `llm.with_budget` scopes. Nested scopes intersect naturally,
+and active frames are charged for turns, tool calls, token usage, and deadlines
+around enclosed `turn` / tool dispatch operations.
 
 ## 16. Capabilities
 
@@ -805,6 +807,11 @@ turns:
 Checks:
 
 - `tool` missing `gscript:requires`.
+- Malformed or duplicate `gscript:requires` entries, including `none` mixed
+  with other capabilities.
+- Unknown or duplicate `gscript:param` docs.
+- Duplicate statically named entries in literal `agent.tools` / `turn.tools`
+  lists.
 - `agent.tools` references unknown/non-tool values when statically known.
 - Host capability policy does not include tool requirements.
 - `turn` has no messages.
@@ -827,6 +834,22 @@ lex/parse
 
 This keeps formatter/linter aware of source syntax while preserving the existing
 runtime as the first lowering target.
+
+## Tooling Status
+
+The current CLI tooling understands AI-native syntax through the same
+parser-backed path used by normal `.gs` files:
+
+- `gscript fmt` accepts `tool`, `agent`, `turn`, `messages`, `models`, and
+  `budget` syntax before rewriting bytes. It is still a narrow whitespace
+  normalizer: CRLF/CR becomes LF, trailing spaces/tabs are trimmed, trailing
+  blank lines are collapsed, and a final newline is ensured. It does not yet
+  pretty-print or re-indent AST nodes.
+- `gscript lint` reports lexer/parser failures, including AI-native syntax
+  errors, as `GS1001` diagnostics in text, JSON, or SARIF output. The broader
+  AI metadata/capability lint index is still pending.
+- `examples/ai_native_agent.gs` is a parser/tooling example that covers the
+  AI-native surface without requiring runtime changes.
 
 ## 21. Canonical Desugaring
 
@@ -920,12 +943,12 @@ support := llm.agent("support", func(q) {
 })
 ```
 
-Current implementation note: the current flow-agent lowering is not this
-canonical `llm.agent` shape yet. It lowers to a plain function whose first
-statements bind config fields such as `tools`, `model`, and `system` as locals,
-then executes the desugared flow body. Flow bodies can call `turn { ... }`,
-which lowers to `llm.turn({...})`, but default agent execution is bypassed for
-flow agents.
+Current implementation note: flow-agent lowering now uses this canonical
+`llm.agent` shape. The flow body still receives config fields such as `tools`,
+`model`, and `system` as local bindings for compatibility, and `llm.agent`
+also pushes the merged agent config as ambient context while the flow runs.
+This lets simple `turn {}` calls inherit the agent's model, tools, system,
+user, and budget unless the turn overrides them explicitly.
 
 The compiler can avoid allocating closure objects when a cleaner internal
 representation is available, but record/replay, trace events, budgets, and
@@ -1093,11 +1116,15 @@ Current status in this workspace:
     `llm.with_budget` scopes. Nested/intersecting budgets charge every active
     frame for turns, token usage, tool calls, and deadlines.
 12. Partial: current validation rejects duplicate `agent defaults`, non-module
-    `agent defaults` / `models`, model alias cycles, and literal model
-    `api_key` strings. The broader AI metadata/capability lint index is still
-    pending.
-13. Pending: formatter support for AI-native blocks and doc directives is not
-    described by the current implementation.
+    `agent defaults` / `models`, model alias cycles, literal model `api_key`
+    strings, missing/malformed/duplicate tool `gscript:requires`, unknown or
+    duplicate tool `gscript:param` docs, and duplicate statically named tools in
+    literal agent/defaults tool lists. The broader AI metadata/capability lint
+    index is still pending.
+13. Partial: `gscript fmt` and `gscript lint` accept AI-native source through
+    the parser-backed tooling path. The formatter currently normalizes
+    whitespace only; an AST pretty printer for AI-native blocks and doc
+    directives remains pending.
 14. Partial: tests cover parser acceptance, stdlib-vs-syntax execution for
     interpreter and bytecode, anonymous agents/IIFE, defaults, model alias
     resolution, direct turn sugar, validation errors, and flow behavior. Gated

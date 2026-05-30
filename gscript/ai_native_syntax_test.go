@@ -142,6 +142,63 @@ models {
 `,
 			want: "alias cycle",
 		},
+		{
+			name: "tool missing requires",
+			src: `
+tool lookup(query) {
+    return query, nil
+}
+`,
+			want: "missing gscript:requires",
+		},
+		{
+			name: "tool invalid requires",
+			src: `
+// gscript:requires docs..read
+tool lookup(query) {
+    return query, nil
+}
+`,
+			want: "invalid gscript:requires",
+		},
+		{
+			name: "tool unknown param doc",
+			src: `
+// gscript:requires none
+// gscript:param missing not a parameter
+tool lookup(query) {
+    return query, nil
+}
+`,
+			want: "unknown parameter",
+		},
+		{
+			name: "tool duplicate param doc",
+			src: `
+// gscript:requires none
+// gscript:param query first
+// gscript:param query second
+tool lookup(query) {
+    return query, nil
+}
+`,
+			want: "duplicate gscript:param",
+		},
+		{
+			name: "agent duplicate tools",
+			src: `
+// gscript:requires none
+tool lookup(query) {
+    return query, nil
+}
+
+agent answer(q) {
+    tools: [lookup, lookup]
+    user: q
+}
+`,
+			want: "duplicate tool",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, mode := range []struct {
@@ -278,6 +335,7 @@ func TestAINativeStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 			}, tc.opts...)
 			vm := gs.New(opts...)
 			if err := vm.Exec(`
+// gscript:requires none
 tool lookup(query) {
     return "found:" .. query, nil
 }
@@ -348,6 +406,7 @@ models {
     alias: "resolved-model"
 }
 
+// gscript:requires none
 tool echo_tool(query) {
     return query, nil
 }
@@ -410,6 +469,90 @@ turn_text := turn_result.text
 			}
 			if turnText != "turn-sugar-ok" {
 				t.Fatalf("turn_text = %#v", turnText)
+			}
+		})
+	}
+}
+
+func TestAINativeFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "one", Usage: gs.LLMTurnUsage{InputTokens: 2, OutputTokens: 3}},
+				{Status: "final_answer", Text: "two"},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+models {
+    default: "default-alias"
+    "default-alias": "resolved-default"
+    flow_alias: "resolved-flow"
+}
+
+// Echoes a query.
+// gscript:requires none
+tool echo_tool(query) {
+    return query, nil
+}
+
+agent defaults {
+    model: "default-alias"
+    system: "Default system."
+}
+
+agent flow_support(q) {
+    model: "flow_alias"
+    tools: [echo_tool]
+    user: q
+    budget: { tokens: 5 }
+} flow {
+    first, first_err := turn {}
+    second, second_err := turn { user: "second " .. q }
+    return {
+        first_text: first.text
+        err_kind: second_err.kind
+        err_dimension: second_err.dimension
+    }, nil
+}
+
+out, err := flow_support("hello")
+first_text := out.first_text
+err_kind := out.err_kind
+err_dimension := out.err_dimension
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			req := provider.requests[0]
+			if req.Model != "resolved-flow" {
+				t.Fatalf("flow model = %q, want resolved-flow", req.Model)
+			}
+			if len(req.Messages) != 2 ||
+				req.Messages[0].Role != "system" || req.Messages[0].Text != "Default system." ||
+				req.Messages[1].Role != "user" || req.Messages[1].Text != "hello" {
+				t.Fatalf("flow messages = %#v", req.Messages)
+			}
+			if len(req.Tools) != 1 || req.Tools[0].Name != "echo_tool" {
+				t.Fatalf("flow tools = %#v", req.Tools)
+			}
+			firstText, _ := vm.Get("first_text")
+			errKind, _ := vm.Get("err_kind")
+			errDimension, _ := vm.Get("err_dimension")
+			if firstText != "one" || errKind != "budget" || errDimension != "tokens" {
+				t.Fatalf("first_text=%#v err_kind=%#v err_dimension=%#v", firstText, errKind, errDimension)
 			}
 		})
 	}

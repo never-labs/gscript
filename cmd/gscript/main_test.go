@@ -1156,6 +1156,117 @@ func TestFmtStdinCheckAcceptsFormattedSource(t *testing.T) {
 	}
 }
 
+func TestFmtAINativeSyntaxCoverage(t *testing.T) {
+	src := `// lookup searches project docs.
+// gscript:requires docs.read
+// gscript:param query search query
+tool lookup(query) {
+    return "found:" .. query, nil
+}
+
+models {
+    default: "fast"
+    fast: {provider_model: "mock-fast"}
+}
+
+agent defaults {
+    model: "fast"
+    tools: [lookup]
+    budget: {turns: 2, calls: 4, tokens: 1000, time: 30s}
+}
+
+agent researcher(topic) {
+    system: "Use the tool."
+    user: topic
+    tools: [lookup]
+} flow {
+    history := messages {
+        system: system
+        user: topic
+    }
+    result, err := turn {
+        messages: history
+        tools: tools
+        model: model
+    }
+    return result, err
+}
+
+answer := agent(q) {
+    user: q
+}
+
+budget { turns: 1 } {
+    direct, direct_err := turn {
+        messages: messages { user: "one-shot" }
+    }
+    _ = direct
+    _ = direct_err
+}
+`
+
+	formatted, err := formatSource("ai_native.gs", []byte(src))
+	if err != nil {
+		t.Fatalf("formatSource: %v", err)
+	}
+	if strings.Contains(string(formatted), "}  \n") {
+		t.Fatalf("formatted source still contains trailing spaces: %q", string(formatted))
+	}
+	if !strings.HasSuffix(string(formatted), "\n") {
+		t.Fatalf("formatted source does not end with newline: %q", string(formatted))
+	}
+}
+
+func TestLintAINativeSyntaxCoverage(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ai_native.gs")
+	src := []byte(`// lookup searches project docs.
+// gscript:requires docs.read
+tool lookup(query) {
+    return "found:" .. query, nil
+}
+
+models {
+    default: "fast"
+    fast: {provider_model: "mock-fast"}
+}
+
+agent defaults {
+    model: "fast"
+    tools: [lookup]
+}
+
+agent researcher(topic) {
+    user: topic
+    tools: [lookup]
+}
+
+direct, direct_err := turn {
+    messages: messages { user: "one-shot" }
+}
+
+budget { turns: 1 } {
+    result, err := researcher("gscript")
+}
+`)
+	if err := os.WriteFile(path, src, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runLintCommand([]string{"--format=json", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runLintCommand code = %d, stderr = %q, stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var diagnostics []lintDiagnostic
+	if err := json.Unmarshal(stdout.Bytes(), &diagnostics); err != nil {
+		t.Fatalf("stdout is not JSON diagnostics: %v; stdout = %q", err, stdout.String())
+	}
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v, want empty", diagnostics)
+	}
+}
+
 func TestFmtStdinRejectsPathArguments(t *testing.T) {
 	oldStdin := cliStdin
 	cliStdin = strings.NewReader("x := 1\n")

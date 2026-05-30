@@ -88,6 +88,7 @@ func TestAINativeAgentScenarioReactToolAutoDispatch(t *testing.T) {
 			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
+// gscript:requires none
 tool lookup(topic) {
     return "doc:" .. topic, nil
 }
@@ -161,6 +162,7 @@ func TestAINativeAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
+// gscript:requires none
 tool lookup(topic) {
     return "note:" .. topic, nil
 }

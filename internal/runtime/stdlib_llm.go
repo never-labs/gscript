@@ -140,6 +140,8 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 	agentDefaults := NewTable()
 	modelAliases := NewTable()
 	var agentConfigMu sync.RWMutex
+	var agentContextMu sync.Mutex
+	var ambientAgents []*Table
 	var budgetMu sync.Mutex
 	var ambientBudgets []*llmBudget
 
@@ -165,6 +167,41 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		defer budgetMu.Unlock()
 		out := make(llmBudgetGroup, len(ambientBudgets))
 		copy(out, ambientBudgets)
+		return out
+	}
+	pushAgent := func(config *Table) {
+		if config == nil {
+			return
+		}
+		agentContextMu.Lock()
+		ambientAgents = append(ambientAgents, config)
+		agentContextMu.Unlock()
+	}
+	popAgent := func(config *Table) {
+		if config == nil {
+			return
+		}
+		agentContextMu.Lock()
+		defer agentContextMu.Unlock()
+		for i := len(ambientAgents) - 1; i >= 0; i-- {
+			if ambientAgents[i] == config {
+				copy(ambientAgents[i:], ambientAgents[i+1:])
+				ambientAgents[len(ambientAgents)-1] = nil
+				ambientAgents = ambientAgents[:len(ambientAgents)-1]
+				return
+			}
+		}
+	}
+	currentAgentConfig := func() *Table {
+		agentContextMu.Lock()
+		defer agentContextMu.Unlock()
+		if len(ambientAgents) == 0 {
+			return nil
+		}
+		out := NewTable()
+		for _, config := range ambientAgents {
+			llmCopyTable(out, config, true)
+		}
 		return out
 	}
 
@@ -284,7 +321,12 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 			return nil, fmt.Errorf("bad argument #1 to 'llm.turn' (table expected)")
 		}
 		agentConfigMu.RLock()
-		opts := llmCloneTable(args[0].Table())
+		var opts *Table
+		if ambient := currentAgentConfig(); ambient != nil {
+			opts = llmMergeTables(ambient, args[0].Table())
+		} else {
+			opts = llmCloneTable(args[0].Table())
+		}
 		p, providerErr := llmResolveProviderForModel(opts, modelAliases, currentProvider(), currentProviderFactory())
 		if !providerErr.IsNil() {
 			agentConfigMu.RUnlock()
@@ -438,11 +480,18 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsFunction() {
 			return nil, fmt.Errorf("bad argument to 'llm.agent' (name, config function expected)")
 		}
+		if len(args) >= 3 && !args[2].IsNil() && !args[2].IsFunction() {
+			return nil, fmt.Errorf("bad argument #3 to 'llm.agent' (flow function expected)")
+		}
 		if call == nil {
 			return nil, fmt.Errorf("llm.agent requires a function caller")
 		}
 		name := args[0].Str()
 		configFn := args[1]
+		flowFn := NilValue()
+		if len(args) >= 3 {
+			flowFn = args[2]
+		}
 		agentFn := &GoFunction{Name: "llm.agent." + name, Fn: func(callArgs []Value) ([]Value, error) {
 			configVals, err := call(configFn, callArgs)
 			if err != nil {
@@ -454,7 +503,19 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 			if len(configVals) == 0 || !configVals[0].IsTable() {
 				return []Value{NilValue(), llmErrorValue("validation", "agent config function must return a table")}, nil
 			}
-			return runAgentConfig(configVals[0].Table())
+			if !flowFn.IsFunction() {
+				return runAgentConfig(configVals[0].Table())
+			}
+			agentConfigMu.RLock()
+			merged := llmMergeTables(agentDefaults, configVals[0].Table())
+			llmResolveModelAlias(merged, modelAliases)
+			agentConfigMu.RUnlock()
+			budget := llmBudgetFromOptions(merged)
+			pushAgent(merged)
+			pushBudget(budget)
+			defer popBudget(budget)
+			defer popAgent(merged)
+			return call(flowFn, callArgs)
 		}}
 		return []Value{FunctionValue(agentFn)}, nil
 	})

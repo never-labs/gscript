@@ -188,18 +188,20 @@ func desugarTable(e *TableLitExpr) *TableLitExpr {
 }
 
 func desugarAgentValue(pos Pos, name string, params []FuncParam, config []ConfigField, flow *BlockStmt) Expr {
+	configFn := &FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: &BlockStmt{P: pos, Stmts: []Stmt{
+		&ReturnStmt{P: pos, Values: []Expr{configTable(pos, config)}},
+	}}}
 	if flow == nil {
-		return llmCall(pos, "agent",
-			&StringLit{P: pos, Value: name},
-			&FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: &BlockStmt{P: pos, Stmts: []Stmt{
-				&ReturnStmt{P: pos, Values: []Expr{configTable(pos, config)}},
-			}}},
-		)
+		return llmCall(pos, "agent", &StringLit{P: pos, Value: name}, configFn)
 	}
 	body := &BlockStmt{P: pos}
 	body.Stmts = append(body.Stmts, configLocalDecls(config)...)
 	body.Stmts = append(body.Stmts, desugarStmtList(flow.Stmts)...)
-	return &FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: body}
+	return llmCall(pos, "agent",
+		&StringLit{P: pos, Value: name},
+		configFn,
+		&FuncLitExpr{P: pos, Params: append([]FuncParam(nil), params...), Body: body},
+	)
 }
 
 func configLocalDecls(config []ConfigField) []Stmt {

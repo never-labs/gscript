@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -275,6 +276,17 @@ manual := agent(q) {
 	manualAgent, ok := manualDecl.Values[0].(*ast.AgentLitExpr)
 	if !ok || len(manualAgent.Params) != 1 || len(manualAgent.Config) != 2 || manualAgent.Flow == nil {
 		t.Fatalf("manual agent = %#v", manualDecl.Values[0])
+	}
+}
+
+func TestAINativeExampleParses(t *testing.T) {
+	src, err := os.ReadFile("../../examples/ai_native_agent.gs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog := mustParse(t, string(src))
+	if len(prog.Stmts) == 0 {
+		t.Fatal("example parsed with no statements")
 	}
 }
 
