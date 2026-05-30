@@ -820,6 +820,68 @@ history_len := #history
 	}
 }
 
+func TestAINativeHistoryHelpersAndValidateOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			if err := vm.Exec(`
+call := {id: "call_1", tool: "lookup", args: {query: "gscript"}}
+h := messages {
+    user: "Find docs."
+    msg.assistant_call(call)
+    msg.tool_result("call_1", {summary: "docs"})
+}
+tool_msg, tool_idx := history.find(h, {role: "tool"})
+assistant_msg, assistant_idx := history.last(h, {role: "assistant"})
+all_users := history.find_all(h, {role: "user"})
+history.append(h, msg.user("Summarize."))
+ok, ok_msg := llm.validate_output({summary: "docs"}, {summary: "example"})
+bad, bad_msg := llm.validate_output({summary: 1}, {summary: "example"})
+json_ok, _ := llm.validate_output("{\"summary\":\"docs\"}", {summary: "example"})
+history_len := #h
+tool_summary := tool_msg.value.summary
+assistant_tool := assistant_msg.tool_call.tool
+user_count := #all_users
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			for name, want := range map[string]any{
+				"tool_idx":       int64(3),
+				"assistant_idx":  int64(2),
+				"history_len":    int64(4),
+				"tool_summary":   "docs",
+				"assistant_tool": "lookup",
+				"user_count":     int64(1),
+				"ok":             true,
+				"ok_msg":         "",
+				"bad":            false,
+				"json_ok":        true,
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+			badMsg, err := vm.Get("bad_msg")
+			if err != nil {
+				t.Fatalf("Get bad_msg: %v", err)
+			}
+			if msg, ok := badMsg.(string); !ok || !strings.Contains(msg, `field "summary" has type number, want string`) {
+				t.Fatalf("bad_msg = %#v", badMsg)
+			}
+		})
+	}
+}
+
 func TestAINativeFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -957,7 +1019,6 @@ func TestAINativeAgentFlowDoesNotInjectArbitraryMetaFields(t *testing.T) {
 		config string
 	}{
 		{name: "user", config: `user: q`},
-		{name: "output", config: `output: {schema: {type: "object"}}`},
 		{name: "response_format", config: `response_format: {type: "json_object"}`},
 		{name: "metadata", config: `metadata: {trace_id: "abc"}`},
 	} {

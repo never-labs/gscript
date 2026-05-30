@@ -264,7 +264,7 @@ func configLocalDecls(config []ConfigField) []Stmt {
 
 func isAgentFlowImplicitConfigLocal(key string) bool {
 	switch key {
-	case "model", "system", "tools", "caps", "capabilities":
+	case "model", "system", "tools", "caps", "capabilities", "output":
 		return true
 	default:
 		return false

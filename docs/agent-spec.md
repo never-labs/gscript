@@ -259,10 +259,10 @@ following names are injected as ordinary lexical locals at the top of the body:
 - ambient `turn { ... }()` which inherits the agent's `model` and `tools` as defaults
 - standard library: `msg.*`, `dispatch`, `resume`, `snapshot`, `loop.*`
 
-Other metadata fields, such as `user`, `output`, `response_format`, and
-`metadata`, are not injected as implicit locals. This keeps the flow body close
-to lexical scoping: the injection is equivalent to local declarations before
-the user's first statement, and the user may shadow those names with later local
+Other metadata fields, such as `user`, `response_format`, and `metadata`, are
+not injected as implicit locals. This keeps the flow body close to lexical
+scoping: the injection is equivalent to local declarations before the user's
+first statement, and the user may shadow those names with later local
 declarations.
 
 The body returns `(value, err)` like a function. There is no spec-enforced shape
@@ -368,6 +368,20 @@ is omitted, the agent's parameter names are used. If `schema` is omitted and the
 agent has an `output:` shape, that output shape becomes the tool schema. When
 the agent returns a structured result with `value`, the tool result is that
 `value`; otherwise it returns the result text or the raw result table.
+
+For the common static case, an agent value may also appear directly in an
+agent's `tools:` list:
+
+```gscript
+agent supervisor(q) {
+    tools: [delegate_research]
+    user: q
+}
+```
+
+This is equivalent to applying `toolof(delegate_research)` at runtime. The
+explicit `toolof` form remains useful when the caller wants to override name,
+description, capabilities, or schema.
 
 ### 8.3 `dispatch(call)` — execute a tool call from LLM
 

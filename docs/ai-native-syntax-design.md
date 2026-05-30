@@ -824,8 +824,19 @@ summary_tool := toolof(summarize, {
 })
 ```
 
-Implicit agent-to-tool conversion is not part of the language. Explicit
-conversion keeps name, description, and capability choices visible.
+An agent value can also be placed directly in an agent `tools:` list for the
+common static case:
+
+```gscript
+agent supervisor(q) {
+    tools: [summarize]
+    user: q
+}
+```
+
+The runtime treats this as `toolof(summarize)`. Explicit conversion remains the
+recommended form when name, description, capability, or schema choices need to
+be visible at the call site.
 
 ## 19. Static Analysis
 

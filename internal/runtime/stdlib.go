@@ -134,6 +134,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("llm", TableValue(llmLib))
 	interp.globals.Define("toolof", llmLib.RawGetString("toolof"))
 	interp.globals.Define("msg", TableValue(BuildLLMMessageLib()))
+	interp.globals.Define("history", TableValue(BuildLLMHistoryLib()))
 	interp.globals.Define("chat", TableValue(BuildChatLib()))
 	interp.globals.Define("loop", TableValue(BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider

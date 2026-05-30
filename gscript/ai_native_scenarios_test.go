@@ -553,6 +553,94 @@ alias_name := alias_delegate.name
 	}
 }
 
+func TestAINativeAgentScenarioDirectAgentInToolsList(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{
+					Status: "tool_calls",
+					Calls: []gs.LLMToolCall{{
+						ID:   "call_direct_agent_1",
+						Tool: "extract_research",
+						Args: map[string]any{"topic": "direct tools"},
+					}},
+				},
+				{
+					Status: "final_answer",
+					Text:   `{"summary":"direct agent tools work","confidence":0.77}`,
+				},
+				{Status: "final_answer", Text: "Direct delegation complete."},
+			}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract_research(topic) {
+    model: "mock-extractor"
+    system: "Return structured research."
+    user: "Research " .. topic
+    output: {
+        summary: "short finding"
+        confidence: 1
+    }
+}
+
+agent supervisor(question) {
+    model: "mock-supervisor"
+    system: "Use the specialist."
+    user: question
+    tools: [extract_research]
+}
+
+result, err := supervisor("Check direct delegation.")
+final_text := result.text
+tool_summary := result.history[4].value.summary
+tool_confidence := result.history[4].value.confidence
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 3 {
+				t.Fatalf("requests = %d, want 3", len(provider.requests))
+			}
+			first := provider.requests[0]
+			if first.Model != "mock-supervisor" || len(first.Tools) != 1 {
+				t.Fatalf("first request = %#v", first)
+			}
+			tool := first.Tools[0]
+			if tool.Name != "extract_research" || len(tool.Params) != 1 || tool.Params[0] != "topic" {
+				t.Fatalf("direct agent tool metadata = %#v", tool)
+			}
+			schema, ok := tool.Schema.(map[string]any)
+			if !ok || schema["summary"] != "short finding" || schema["confidence"] != int64(1) {
+				t.Fatalf("direct agent tool schema = %#v", tool.Schema)
+			}
+			nested := provider.requests[1]
+			if nested.Model != "mock-extractor" || len(nested.Messages) != 2 || nested.Messages[1].Text != "Research direct tools" {
+				t.Fatalf("nested request = %#v", nested)
+			}
+			for name, want := range map[string]any{
+				"final_text":      "Direct delegation complete.",
+				"tool_summary":    "direct agent tools work",
+				"tool_confidence": 0.77,
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 func TestAINativeAgentTurnScenarioRecordReplay(t *testing.T) {
 	for _, tc := range []struct {
 		name string

@@ -19,6 +19,11 @@ func ValidateAINative(prog *Program) error {
 				return err
 			}
 		}
+		if agent, ok := stmt.(*AgentDeclStmt); ok {
+			if err := ctx.declareAgent(agent); err != nil {
+				return err
+			}
+		}
 		switch s := stmt.(type) {
 		case *AgentDefaultsDeclStmt:
 			if seenDefaults {
@@ -47,6 +52,7 @@ func ValidateAINative(prog *Program) error {
 
 type aiValidationContext struct {
 	tools         AIToolRegistry
+	agents        map[string]Pos
 	agentDefaults *aiStaticAIConfig
 }
 
@@ -71,10 +77,27 @@ func (ctx *aiValidationContext) declareTool(tool *ToolDeclStmt) error {
 	return nil
 }
 
+func (ctx *aiValidationContext) declareAgent(agent *AgentDeclStmt) error {
+	if agent == nil || agent.Name == "" {
+		return nil
+	}
+	if ctx.agents == nil {
+		ctx.agents = map[string]Pos{}
+	}
+	if prev, ok := ctx.agents[agent.Name]; ok {
+		return fmt.Errorf("line %d: duplicate agent declaration %q, first declared at line %d", agent.P.Line, agent.Name, prev.Line)
+	}
+	ctx.agents[agent.Name] = agent.P
+	return nil
+}
+
 func (ctx *aiValidationContext) child() *aiValidationContext {
-	child := &aiValidationContext{tools: AIToolRegistry{}, agentDefaults: ctx.agentDefaults}
+	child := &aiValidationContext{tools: AIToolRegistry{}, agents: map[string]Pos{}, agentDefaults: ctx.agentDefaults}
 	for name, entry := range ctx.tools {
 		child.tools[name] = entry
+	}
+	for name, pos := range ctx.agents {
+		child.agents[name] = pos
 	}
 	return child
 }
@@ -477,7 +500,9 @@ func (ctx *aiValidationContext) staticToolsConfig(owner string, config []ConfigF
 				return nil, false, false, fmt.Errorf("line %d: %s tools list includes duplicate tool %q", ident.P.Line, owner, ident.Name)
 			}
 			if _, ok := ctx.tools.Lookup(ident.Name); !ok {
-				return nil, false, false, fmt.Errorf("line %d: %s tools list references undeclared tool %q", ident.P.Line, owner, ident.Name)
+				if _, agentOK := ctx.agents[ident.Name]; !agentOK {
+					return nil, false, false, fmt.Errorf("line %d: %s tools list references undeclared tool or agent %q", ident.P.Line, owner, ident.Name)
+				}
 			}
 			seen[ident.Name] = true
 			names = append(names, ident.Name)

@@ -436,6 +436,9 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		} else {
 			opts = llmCloneTable(args[0].Table())
 		}
+		if tv := opts.RawGetString("tools"); llmToolsListHasAgents(tv) {
+			opts.RawSetString("tools", llmNormalizeToolsValue(call, tv))
+		}
 		p, providerErr := llmResolveProviderForModel(opts, modelAliases, currentProvider(), currentProviderFactory())
 		if !providerErr.IsNil() {
 			agentConfigMu.RUnlock()
@@ -456,6 +459,12 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 				return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 			}
 			opts = normalized
+		} else if opts.RawGetString("response_format").IsNil() && opts.RawGetString("output").IsTable() {
+			// When an ambient agent (typically a flow agent) declares output:
+			// forward a json_object response_format to the provider so the
+			// model knows the requested shape. Auto-validation is left to the
+			// flow body via llm.validate_output.
+			opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
 		}
 		agentConfigMu.RUnlock()
 		req, err := llmRequestFromTable(opts)
@@ -525,6 +534,36 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		return call(args[1], nil)
 	})
 
+	validateOutput := func(args []Value) ([]Value, error) {
+		if len(args) < 2 {
+			return nil, fmt.Errorf("bad argument to 'llm.validate_output' (value, schema expected)")
+		}
+		value := args[0]
+		schema := args[1]
+		// Accept either a decoded table value or a JSON string for the value.
+		if value.IsString() {
+			dec := json.NewDecoder(strings.NewReader(value.Str()))
+			dec.UseNumber()
+			var raw any
+			if err := dec.Decode(&raw); err != nil {
+				return []Value{BoolValue(false), StringValue("value is not valid JSON: " + err.Error())}, nil
+			}
+			value = jsonGoToGScript(raw)
+		}
+		if !schema.IsTable() {
+			return []Value{BoolValue(false), StringValue("schema must be a table example")}, nil
+		}
+		if !value.IsTable() {
+			return []Value{BoolValue(false), StringValue("value must decode to a table")}, nil
+		}
+		if msg := llmValidateStructuredOutputShape(schema.Table(), value.Table()); msg != "" {
+			return []Value{BoolValue(false), StringValue(msg)}, nil
+		}
+		return []Value{BoolValue(true), StringValue("")}, nil
+	}
+	set("validate_output", validateOutput)
+	set("validateOutput", validateOutput)
+
 	set("agent_defaults", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.agent_defaults' (table expected)")
@@ -567,6 +606,11 @@ func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFacto
 		}
 		opts, err := llmLoopOptions(merged, 0)
 		agentConfigMu.RUnlock()
+		if err == nil {
+			if tv := opts.RawGetString("tools"); llmToolsListHasAgents(tv) {
+				opts.RawSetString("tools", llmNormalizeToolsValue(call, tv))
+			}
+		}
 		if err != nil {
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
@@ -681,6 +725,151 @@ func BuildLLMMessageLib() *Table {
 		msg.RawSetString("error", StringValue(args[1].Str()))
 		return []Value{TableValue(msg)}, nil
 	})
+	return t
+}
+
+// BuildLLMHistoryLib creates the "history" stdlib table with helpers for
+// searching and mutating conversation history values produced by agents and
+// llm.react. The block-form `messages { }` constructor remains the preferred
+// way to assemble *initial* history; these helpers cover the dynamic case where
+// the user reads/appends to a history list at runtime.
+func BuildLLMHistoryLib() *Table {
+	t := NewTable()
+	set := func(name string, fn func([]Value) ([]Value, error)) {
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: "history." + name, Fn: fn}))
+	}
+
+	matches := func(msg *Table, opts *Table) bool {
+		if msg == nil {
+			return false
+		}
+		for _, key := range opts.PairsKeysSnapshot() {
+			if !key.IsString() {
+				continue
+			}
+			k := key.Str()
+			want := opts.RawGet(key)
+			switch k {
+			case "role":
+				if msg.RawGetString("role").Str() != want.Str() {
+					return false
+				}
+			case "tool":
+				name := ""
+				if call := msg.RawGetString("tool_call"); call.IsTable() {
+					name = call.Table().RawGetString("tool").Str()
+				}
+				if name == "" && msg.RawGetString("role").Str() == "tool" {
+					// tool result messages don't carry the tool name directly;
+					// match via tool_use_id prefix or skip.
+					return false
+				}
+				if name != want.Str() {
+					return false
+				}
+			case "tool_use_id", "id":
+				if msg.RawGetString("tool_use_id").Str() != want.Str() {
+					return false
+				}
+			case "has_error":
+				if want.Truthy() != (msg.RawGetString("error").Str() != "") {
+					return false
+				}
+			default:
+				if msg.RawGetString(k).Str() != want.Str() {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+	iter := func(historyVal, optsVal Value, yield func(idx int, msg Value) bool) {
+		if !historyVal.IsTable() {
+			return
+		}
+		ht := historyVal.Table()
+		var opts *Table
+		if optsVal.IsTable() {
+			opts = optsVal.Table()
+		} else {
+			opts = NewTable()
+		}
+		for i := 1; i <= ht.Length(); i++ {
+			m := ht.RawGet(IntValue(int64(i)))
+			if !m.IsTable() {
+				continue
+			}
+			if !matches(m.Table(), opts) {
+				continue
+			}
+			if !yield(i, m) {
+				return
+			}
+		}
+	}
+
+	set("find", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'history.find' (history expected)")
+		}
+		optsVal := NilValue()
+		if len(args) >= 2 {
+			optsVal = args[1]
+		}
+		var foundMsg Value = NilValue()
+		foundIdx := int64(-1)
+		iter(args[0], optsVal, func(idx int, msg Value) bool {
+			foundMsg = msg
+			foundIdx = int64(idx)
+			return false
+		})
+		return []Value{foundMsg, IntValue(foundIdx)}, nil
+	})
+
+	set("find_all", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'history.find_all' (history expected)")
+		}
+		optsVal := NilValue()
+		if len(args) >= 2 {
+			optsVal = args[1]
+		}
+		out := NewTable()
+		iter(args[0], optsVal, func(idx int, msg Value) bool {
+			out.RawSet(IntValue(int64(out.Length()+1)), msg)
+			return true
+		})
+		return []Value{TableValue(out)}, nil
+	})
+
+	set("last", func(args []Value) ([]Value, error) {
+		if len(args) < 1 {
+			return nil, fmt.Errorf("bad argument #1 to 'history.last' (history expected)")
+		}
+		optsVal := NilValue()
+		if len(args) >= 2 {
+			optsVal = args[1]
+		}
+		var foundMsg Value = NilValue()
+		foundIdx := int64(-1)
+		iter(args[0], optsVal, func(idx int, msg Value) bool {
+			foundMsg = msg
+			foundIdx = int64(idx)
+			return true
+		})
+		return []Value{foundMsg, IntValue(foundIdx)}, nil
+	})
+
+	set("append", func(args []Value) ([]Value, error) {
+		if len(args) < 2 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument to 'history.append' (history, message expected)")
+		}
+		h := args[0].Table()
+		h.RawSet(IntValue(int64(h.Length()+1)), args[1])
+		return []Value{args[0]}, nil
+	})
+
 	return t
 }
 
@@ -1673,6 +1862,120 @@ func llmAgentToolResultValue(v Value) Value {
 	return v
 }
 
+// llmIsAgentValue returns true if v is an agent function value produced by
+// llm.agent (it carries an llm.agent.* GoFunction name and has registered
+// metadata).
+func llmIsAgentValue(v Value) bool {
+	if !v.IsFunction() {
+		return false
+	}
+	gf := v.GoFunction()
+	if gf == nil {
+		return false
+	}
+	if _, ok := llmAgentMetadataByFunction.Load(gf); ok {
+		return true
+	}
+	return strings.HasPrefix(gf.Name, "llm.agent.")
+}
+
+// llmAgentFunctionToToolTable builds a tool table from an agent function value
+// so it can be passed directly inside a `tools: [...]` list. The wrapper calls
+// the agent through `call`, unwraps result.value, and propagates pending/stopped
+// statuses as tool-level signals.
+func llmAgentFunctionToToolTable(call FunctionCaller, agent Value) *Table {
+	meta, _ := llmAgentMetadataForValue(agent)
+	name := meta.Name
+	if name == "" {
+		if gf := agent.GoFunction(); gf != nil {
+			name = strings.TrimPrefix(gf.Name, "llm.agent.")
+		}
+	}
+	if name == "" {
+		name = "agent"
+	}
+	wrapper := FunctionValue(&GoFunction{Name: "llm.agent_as_tool." + name, Fn: func(callArgs []Value) ([]Value, error) {
+		if call == nil {
+			return []Value{NilValue(), llmErrorValue("internal", "agent-as-tool requires a function caller")}, nil
+		}
+		results, err := call(agent, callArgs)
+		if err != nil {
+			return nil, err
+		}
+		if len(results) >= 2 && !results[1].IsNil() {
+			return []Value{NilValue(), results[1]}, nil
+		}
+		if len(results) == 0 {
+			return []Value{NilValue(), NilValue()}, nil
+		}
+		result := results[0]
+		if result.IsTable() {
+			status := result.Table().RawGetString("status").Str()
+			switch status {
+			case "pending":
+				pendErr := llmErrorValue("pending", "delegated agent paused for approval")
+				pendErr.Table().RawSetString("pending", result)
+				return []Value{NilValue(), pendErr}, nil
+			case "stopped":
+				reason := result.Table().RawGetString("reason").Str()
+				if reason == "" {
+					reason = "delegated agent stopped"
+				}
+				return []Value{NilValue(), llmErrorValue("tool", reason)}, nil
+			}
+		}
+		return []Value{llmAgentToolResultValue(result), NilValue()}, nil
+	}})
+	tool := NewTable()
+	tool.RawSetString("__llm_tool", BoolValue(true))
+	tool.RawSetString("name", StringValue(name))
+	tool.RawSetString("fn", wrapper)
+	tool.RawSetString("description", StringValue(meta.Description))
+	if len(meta.Params) > 0 {
+		tool.RawSetString("params", llmStringArrayValue(meta.Params))
+	}
+	if !meta.Output.IsNil() {
+		tool.RawSetString("schema", meta.Output)
+	}
+	return tool
+}
+
+// llmToolsListHasAgents reports whether any entry in the tools list is an
+// agent function value (rather than an already-constructed tool table).
+func llmToolsListHasAgents(v Value) bool {
+	if !v.IsTable() {
+		return false
+	}
+	t := v.Table()
+	for i := 1; i <= t.Length(); i++ {
+		if llmIsAgentValue(t.RawGet(IntValue(int64(i)))) {
+			return true
+		}
+	}
+	return false
+}
+
+// llmNormalizeToolsValue scans a tools list value and, for any entry that is an
+// agent function value, returns a new list with that entry replaced by a
+// synthesized tool table. The original list is not mutated. If no agent values
+// are present, the input value is returned unchanged.
+func llmNormalizeToolsValue(call FunctionCaller, v Value) Value {
+	if !llmToolsListHasAgents(v) {
+		return v
+	}
+	t := v.Table()
+	n := t.Length()
+	out := NewSequentialArrayTable(n)
+	for i := 1; i <= n; i++ {
+		entry := t.RawGet(IntValue(int64(i)))
+		if llmIsAgentValue(entry) {
+			entry = TableValue(llmAgentFunctionToToolTable(call, entry))
+		}
+		out.array[i] = entry
+	}
+	return TableValue(out)
+}
+
 func llmCheckToolCaps(tools, caps *Table) Value {
 	allowed := map[string]bool{}
 	for _, cap := range llmStringSliceFromValue(TableValue(caps)) {
@@ -1864,10 +2167,34 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 				}
 				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, maxToolRetries, trace, int64(step), res.Calls[i])
 				if !err.IsNil() {
+					if llmErrorKind(err) == "pending" {
+						pendingPayload := err.Table().RawGetString("pending")
+						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "pending", Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+						if pendingPayload.IsTable() {
+							pendingPayload.Table().RawSetString("history", llmTableFromValues(history))
+							return []Value{pendingPayload, NilValue()}, nil
+						}
+						pending := NewTable()
+						pending.RawSetString("status", StringValue("pending"))
+						pending.RawSetString("history", llmTableFromValues(history))
+						return []Value{TableValue(pending), NilValue()}, nil
+					}
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
 				}
 				if len(dispatchResult) >= 2 && !dispatchResult[1].IsNil() {
+					if llmErrorKind(dispatchResult[1]) == "pending" {
+						pendingPayload := dispatchResult[1].Table().RawGetString("pending")
+						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "pending", Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+						if pendingPayload.IsTable() {
+							pendingPayload.Table().RawSetString("history", llmTableFromValues(history))
+							return []Value{pendingPayload, NilValue()}, nil
+						}
+						pending := NewTable()
+						pending.RawSetString("status", StringValue("pending"))
+						pending.RawSetString("history", llmTableFromValues(history))
+						return []Value{TableValue(pending), NilValue()}, nil
+					}
 					message := dispatchResult[1].Table().RawGetString("message").Str()
 					llmTrace(trace, LLMTraceEvent{Type: "tool_error", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(dispatchResult[1]), Message: message})
 					history = append(history, llmToolErrorMessage(res.Calls[i].ID, message))

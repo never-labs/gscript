@@ -350,7 +350,7 @@ func f() {
     }
 }
 `,
-			want: `line 11: turn tools list references undeclared tool "missing"`,
+			want: `line 11: turn tools list references undeclared tool or agent "missing"`,
 		},
 		{
 			name: "duplicate",

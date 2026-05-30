@@ -1,8 +1,12 @@
 // AI-native agent-as-tool demo.
 //
-// This shows a supervisor agent dispatching a normal tool whose implementation
-// calls a specialist agent. The specialist returns structured output, and the
-// tool returns that table into the supervisor's ReAct history as a tool result.
+// This shows a supervisor agent delegating to a specialist agent that is
+// listed *directly* in the supervisor's tools: [...] list. The runtime
+// auto-wraps the agent value as a tool whose params/schema are derived from
+// the agent's declared parameters and output: shape; the agent's structured
+// result.value is fed back to the supervisor as the tool result.
+//
+// For the explicit `tool wrapper` form, see TestAINativeAgentScenarioAgentAsToolStructuredHandoff.
 
 models {
     default: "supervisor"
@@ -20,29 +24,18 @@ agent extract_research(topic) {
     }
 }
 
-// gscript:requires none
-// gscript:param topic research topic delegated by the supervisor
-tool delegate_research(topic) {
-    result, err := extract_research(topic)
-    if err != nil {
-        return nil, err
-    }
-    return {
-        topic: topic
-        summary: result.value.summary
-        confidence: result.value.confidence
-    }, nil
-}
-
 agent supervisor(question) {
     model: "supervisor"
     system: "Use delegated specialist agents as tools before answering."
     user: question
-    tools: [delegate_research]
+    tools: [extract_research]
 }
 
 result, err := supervisor("Should this workflow delegate research?")
 
 final_text := result.text
 outer_history_len := #result.history
-delegated_summary := result.history[4].value.summary
+
+// Use history.find to locate the tool result without depending on index order.
+tool_msg, _ := history.find(result.history, {role: "tool"})
+delegated_summary := tool_msg.value.summary
