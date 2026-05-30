@@ -69,34 +69,96 @@ for stable provider schemas, tracing, and tests.
 
 ## 4. Models
 
-Scripts use logical model names. Provider construction, API keys, HTTP clients,
-timeouts, retry policy, pricing, and audit policy remain host responsibilities.
+Scripts can declare named models directly in GScript. This keeps the language
+self-contained: users do not need a separate TOML/JSON configuration format to
+use their LLM subscriptions.
 
 ```gscript
 models {
     default: "fast"
-    strong:  "reasoning"
-    cheap:   "small"
+
+    "fast": {
+        provider: "glm"
+        protocol: "anthropic"
+        provider_model: "glm-5.1"
+        base_url: "https://open.bigmodel.cn/api/anthropic"
+        api_key: env("GLM_API_KEY")
+        timeout: 45s
+        retries: 2
+    }
+
+    "strong": {
+        provider: "openai"
+        protocol: "openai"
+        provider_model: "gpt-5"
+        base_url: "https://api.openai.com/v1"
+        api_key: env("OPENAI_API_KEY")
+    }
 }
 ```
 
-This declares aliases only. It does not create a provider or read secrets.
+`model: "fast"` in an agent refers to the user-defined model name. The provider
+service's actual model identifier lives in `provider_model`.
+
+`models` entries can be aliases or provider configs:
+
+```gscript
+models {
+    default: "glm-fast"
+    coding:  "openai-strong"
+
+    "glm-fast": {
+        provider: "glm"
+        protocol: "anthropic"
+        provider_model: "glm-5.1"
+        base_url: "https://open.bigmodel.cn/api/anthropic"
+        api_key: env("GLM_API_KEY")
+    }
+
+    "openai-strong": {
+        provider: "openai"
+        protocol: "openai"
+        provider_model: "gpt-5"
+        base_url: "https://api.openai.com/v1"
+        api_key: env("OPENAI_API_KEY")
+    }
+}
+```
 
 Lowering target:
 
 ```gscript
-llm.register_model_alias({
-    default: "fast",
-    strong: "reasoning",
-    cheap: "small",
+llm.register_models({
+    default: "glm-fast",
+    coding: "openai-strong",
+    "glm-fast": {
+        provider: "glm",
+        protocol: "anthropic",
+        provider_model: "glm-5.1",
+        base_url: "https://open.bigmodel.cn/api/anthropic",
+        api_key: env("GLM_API_KEY"),
+    },
 })
 ```
 
+Rules:
+
+- `provider` is a human-readable provider label for trace/audit.
+- `protocol` selects the wire format, such as `"openai"` or `"anthropic"`.
+- `provider_model` is the provider-side model ID.
+- `base_url` is the protocol endpoint/base URL.
+- `api_key` must come from `env("NAME")`, a host secret reference, or another
+  explicit secret source. Literal API keys in source are a lint error.
+- `default` is the model used when neither agent nor defaults specify `model`.
+- Aliases can point to another named model. Alias cycles are load errors.
+- Go embedding APIs may still inject or override named models for production
+  hosts.
+
 Non-goals:
 
-- Script syntax that reads API keys.
-- Script syntax that constructs OpenAI/Anthropic/GLM clients.
-- Provider-specific keywords.
+- Provider-specific keywords such as `openai` or `anthropic`.
+- Storing plaintext API keys in source.
+- Requiring a separate config file format for core LLM setup.
 
 ## 5. Agent Defaults
 
@@ -927,7 +989,8 @@ agent manual(q) {
 5. `output` is an output example/shape hint, not an input example.
 6. `flow` is the advanced escape hatch for custom multi-turn logic.
 7. `turn` is the single-call low-level primitive.
-8. Provider binding stays in Go host code.
+8. Model/provider binding can be declared in GScript `models {}` or injected by
+   Go host code; plaintext API keys in source are forbidden.
 9. Budget does not include money in the first language surface.
 10. `agent defaults { ... }` provides module-scope default agent configuration
     without nesting ordinary code.
@@ -942,11 +1005,13 @@ agent manual(q) {
 5. Parser accepts named and anonymous `agent` values.
 6. Parser accepts optional `flow` blocks.
 7. Parser accepts `agent defaults` declarations.
-8. Parser accepts `messages` constructors.
-9. Parser accepts `turn` blocks and lowers to `llm.turn`.
-10. Parser accepts `budget` blocks and lowers to ambient budget frames.
-11. Linter emits AI metadata/capability diagnostics.
-12. Formatter preserves doc directives and formats AI blocks.
-13. Tests cover stdlib-vs-syntax equivalence, anonymous agents/IIFE, defaults,
+8. Parser accepts `models` declarations with aliases and provider config.
+9. Parser accepts `messages` constructors.
+10. Parser accepts `turn` blocks and lowers to `llm.turn`.
+11. Parser accepts `budget` blocks and lowers to ambient budget frames.
+12. Linter emits AI metadata/capability diagnostics, including plaintext API
+    key rejection.
+13. Formatter preserves doc directives and formats AI blocks.
+14. Tests cover stdlib-vs-syntax equivalence, anonymous agents/IIFE, defaults,
     real provider gated smoke, record/replay, output validation, and flow
     behavior.
