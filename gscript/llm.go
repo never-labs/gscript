@@ -205,6 +205,13 @@ func cloneLLMRequest(req LLMTurnRequest) LLMTurnRequest {
 	for i := range out.Tools {
 		out.Tools[i].Params = append([]string(nil), req.Tools[i].Params...)
 	}
+	out.Stop = append([]string(nil), req.Stop...)
+	if req.Metadata != nil {
+		out.Metadata = make(map[string]string, len(req.Metadata))
+		for k, v := range req.Metadata {
+			out.Metadata[k] = v
+		}
+	}
 	return out
 }
 
@@ -251,6 +258,8 @@ func llmRequestsEqual(a, b LLMTurnRequest) bool {
 	return a.Model == b.Model &&
 		a.MaxTokens == b.MaxTokens &&
 		a.Stream == b.Stream &&
+		reflect.DeepEqual(a.Stop, b.Stop) &&
+		reflect.DeepEqual(a.Metadata, b.Metadata) &&
 		reflect.DeepEqual(a.Messages, b.Messages) &&
 		reflect.DeepEqual(a.Tools, b.Tools)
 }

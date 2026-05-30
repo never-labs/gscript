@@ -42,6 +42,8 @@ type LLMTurnRequest struct {
 	Tools     []LLMTool
 	MaxTokens int64
 	Stream    bool
+	Stop      []string
+	Metadata  map[string]string
 }
 
 type LLMTurnUsage struct {
@@ -485,6 +487,8 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"max_steps",
 		"max_tool_retries",
 		"max_history_tokens",
+		"stop",
+		"metadata",
 		"budget",
 		"budget_tokens",
 		"budget_turns",
@@ -541,6 +545,8 @@ func llmRequestFromTable(t *Table) (LLMTurnRequest, error) {
 		Model:     t.RawGetString("model").Str(),
 		MaxTokens: toInt(t.RawGetString("max_tokens")),
 		Stream:    t.RawGetString("stream").Truthy(),
+		Stop:      llmStringSliceFromValue(t.RawGetString("stop")),
+		Metadata:  llmStringMapFromValue(t.RawGetString("metadata")),
 	}
 	messages := t.RawGetString("messages")
 	if !messages.IsTable() {
@@ -633,6 +639,24 @@ func llmStringSliceFromValue(v Value) []string {
 	out := make([]string, 0, t.Length())
 	for i := 1; i <= t.Length(); i++ {
 		out = append(out, t.RawGet(IntValue(int64(i))).Str())
+	}
+	return out
+}
+
+func llmStringMapFromValue(v Value) map[string]string {
+	if !v.IsTable() {
+		return nil
+	}
+	t := v.Table()
+	out := make(map[string]string)
+	for _, key := range t.PairsKeysSnapshot() {
+		if !key.IsString() {
+			continue
+		}
+		out[key.Str()] = t.RawGet(key).Str()
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }
@@ -779,6 +803,8 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 			Tools:     llmToolsFromValue(toolsValue),
 			MaxTokens: toInt(opts.RawGetString("max_tokens")),
 			Stream:    opts.RawGetString("stream").Truthy(),
+			Stop:      llmStringSliceFromValue(opts.RawGetString("stop")),
+			Metadata:  llmStringMapFromValue(opts.RawGetString("metadata")),
 		}
 		llmTrace(trace, LLMTraceEvent{Type: "turn_start", Model: req.Model, Step: int64(step), MessageCount: len(req.Messages), ToolCount: len(req.Tools)})
 		res, err := provider.Turn(ctx, req)

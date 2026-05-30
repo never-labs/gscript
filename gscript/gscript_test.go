@@ -754,6 +754,62 @@ kind := err.kind
 	}
 }
 
+func TestLLMTurnRequestProviderOptions(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+    max_tokens: 16,
+    stream: true,
+    stop: {"END", "\n\n"},
+    metadata: {trace_id: "abc", route: "test"},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if provider.last.Model != "mock-fast" || provider.last.MaxTokens != 16 || !provider.last.Stream {
+		t.Fatalf("request = %#v", provider.last)
+	}
+	if len(provider.last.Stop) != 2 || provider.last.Stop[0] != "END" || provider.last.Stop[1] != "\n\n" {
+		t.Fatalf("stop = %#v", provider.last.Stop)
+	}
+	if provider.last.Metadata["trace_id"] != "abc" || provider.last.Metadata["route"] != "test" {
+		t.Fatalf("metadata = %#v", provider.last.Metadata)
+	}
+}
+
+func TestLoopRequestProviderOptions(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+result, err := loop.react({
+    user: "hello",
+    model: "mock-fast",
+    max_tokens: 32,
+    stream: true,
+    stop: {"DONE"},
+    metadata: {trace_id: "loop-1"},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(provider.requests) != 1 {
+		t.Fatalf("requests = %d", len(provider.requests))
+	}
+	req := provider.requests[0]
+	if req.Model != "mock-fast" || req.MaxTokens != 32 || !req.Stream {
+		t.Fatalf("request = %#v", req)
+	}
+	if len(req.Stop) != 1 || req.Stop[0] != "DONE" {
+		t.Fatalf("stop = %#v", req.Stop)
+	}
+	if req.Metadata["trace_id"] != "loop-1" {
+		t.Fatalf("metadata = %#v", req.Metadata)
+	}
+}
+
 func TestLLMCommandProviderGLMCCSmoke(t *testing.T) {
 	if os.Getenv("GSCRIPT_GLM_CC_SMOKE") == "" {
 		t.Skip("set GSCRIPT_GLM_CC_SMOKE=1 to run glm_cc-backed llm.turn smoke")

@@ -146,6 +146,9 @@ tools := {lookup}
 result, err := llm.turn({
     messages: {msg.system("Use tools."), msg.user("find docs")},
     tools: tools,
+    max_tokens: 1024,
+    stop: {"</answer>"},
+    metadata: {trace_id: "request-123"},
 })
 if err != nil { return nil, err }
 
@@ -175,6 +178,9 @@ return result.text, nil
 `internal` are transient and retried up to `max_tool_retries`;
 `validation`, `policy`, `user`, and `capability` are fed back as tool-error
 messages; unknown kinds are returned as fatal agent errors.
+Provider options such as `model`, `max_tokens`, `stream`, `stop`, and
+`metadata` are forwarded consistently by `llm.turn`, `llm.react`, and
+`loop.react`.
 
 The companion `chat` module provides pure history utilities for agent loops:
 `chat.merge(history, additions)`, `chat.window(history, max_tokens)`,
