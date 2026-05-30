@@ -164,8 +164,8 @@ func WithLLMReplay(records []LLMRecord) Option {
 }
 
 // WithLLMCommand installs a simple command-backed provider. It is intended for
-// local tooling and tests, including wrappers such as glm_cc. The prompt is
-// rendered from the request messages and passed as the final command argument.
+// local tooling and tests. The prompt is rendered from the request messages and
+// passed as the final command argument.
 func WithLLMCommand(command string, args ...string) Option {
 	return WithLLMProvider(CommandLLMProvider{Command: command, Args: args})
 }

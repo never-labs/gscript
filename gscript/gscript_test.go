@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1733,33 +1732,6 @@ result, err := loop.react({
 	}
 	if req.Metadata["trace_id"] != "loop-1" {
 		t.Fatalf("metadata = %#v", req.Metadata)
-	}
-}
-
-func TestLLMCommandProviderGLMCCSmoke(t *testing.T) {
-	if os.Getenv("GSCRIPT_GLM_CC_SMOKE") == "" {
-		t.Skip("set GSCRIPT_GLM_CC_SMOKE=1 to run glm_cc-backed llm.turn smoke")
-	}
-	path, err := exec.LookPath("glm_cc")
-	if err != nil {
-		t.Skip("glm_cc not found")
-	}
-	vm := gs.New(
-		gs.WithLibs(gs.LibString|gs.LibLLM),
-		gs.WithLLMCommand(path, "-p", "--bare"),
-	)
-	if err := vm.Exec(`
-result, err := llm.turn({messages: {llm.user("Reply with exactly: gscript-llm-ok")}})
-text := result.text
-`); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
-	got, err := vm.Get("text")
-	if err != nil {
-		t.Fatalf("Get text: %v", err)
-	}
-	if strings.TrimSpace(fmt.Sprint(got)) != "gscript-llm-ok" {
-		t.Fatalf("glm_cc text = %#v", got)
 	}
 }
 

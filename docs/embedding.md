@@ -124,6 +124,17 @@ Anthropic-compatible gateways are supported through
 their own endpoint, API key, model, timeout, retry, and header policy explicitly;
 GScript does not encode vendor-specific local wrapper conventions.
 
+The real-provider integration smoke is gated and uses generic environment
+names:
+
+```sh
+GSCRIPT_LLM_INTEGRATION=1 \
+GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=https://provider.example/api/anthropic \
+GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... \
+GSCRIPT_ANTHROPIC_COMPAT_MODEL=... \
+go test ./gscript -run TestAnthropicCompatibleLLMIntegration -v
+```
+
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
 tool-call, retry, HITL snapshot/resume, and stop events with counts, status,
 usage, token metadata, and tool names; prompt text and tool result values are
@@ -265,10 +276,10 @@ Both functions also accept an optional store table with `save(token, snapshot)`,
 outside the current VM process.
 
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
-such as `glm_cc`:
+that reads the prompt from the final argument:
 
 ```go
-vm := gscript.New(gscript.WithLLMCommand("glm_cc", "--print", "--bare"))
+vm := gscript.New(gscript.WithLLMCommand("my-llm-command", "--plain"))
 ```
 
 Structured errors use standard Go error APIs:
