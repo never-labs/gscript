@@ -490,6 +490,9 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"budget_turns",
 		"budget_calls",
 		"budget_money",
+		"ctx",
+		"context",
+		"cancel",
 	} {
 		if v := src.RawGetString(key); !v.IsNil() {
 			opts.RawSetString(key, v)
@@ -756,7 +759,12 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		maxHistoryTokens = 0
 	}
 	budget := llmBudgetFromOptions(opts)
+	cancel := llmCancelFromOptions(opts, ctx)
 	for step := 0; step < maxSteps; step++ {
+		if err := cancel.check(); !err.IsNil() {
+			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), err}, nil
+		}
 		if err := budget.beforeTurn(); !err.IsNil() {
 			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
 			return []Value{NilValue(), err}, nil
@@ -778,6 +786,10 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 			llmTrace(trace, LLMTraceEvent{Type: "turn_error", Model: req.Model, Step: int64(step), ErrorKind: "provider", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("provider", err.Error())}, nil
 		}
+		if err := cancel.check(); !err.IsNil() {
+			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
+			return []Value{NilValue(), err}, nil
+		}
 		llmTrace(trace, LLMTraceEvent{Type: "turn_end", Model: req.Model, Step: int64(step), Status: llmResultStatus(res), MessageCount: len(req.Messages), ToolCount: len(req.Tools), Usage: res.Usage})
 		turnValue := llmResultValue(res)
 		if err := CheckHostResultBytes(maxHostResult, turnValue); err != nil {
@@ -796,6 +808,10 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 				callValue := llmToolCallValue(res.Calls[i])
 				history = append(history, llmAssistantCallMessage(callValue))
 				llmTrace(trace, LLMTraceEvent{Type: "tool_call", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+				if err := cancel.check(); !err.IsNil() {
+					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
+					return []Value{NilValue(), err}, nil
+				}
 				if err := budget.beforeToolCall(); !err.IsNil() {
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
@@ -966,6 +982,55 @@ func llmBudgetError(dimension string, limit, used int64) Value {
 	if used > 0 {
 		t.RawSetString("used", IntValue(used))
 	}
+	return TableValue(t)
+}
+
+type llmCancel struct {
+	host context.Context
+	done *Channel
+	err  Value
+}
+
+func llmCancelFromOptions(opts *Table, host context.Context) llmCancel {
+	c := llmCancel{host: host}
+	for _, key := range []string{"ctx", "context", "cancel"} {
+		if done, errFn, ok := contextDoneAndErr(opts.RawGetString(key)); ok {
+			c.done = done
+			c.err = errFn
+			break
+		}
+	}
+	return c
+}
+
+func (c llmCancel) check() Value {
+	if c.host != nil {
+		if err := c.host.Err(); err != nil {
+			return llmCancelError(err.Error())
+		}
+	}
+	if c.done != nil {
+		if reason, cancelled := contextCancelledValue(c.done, c.err); cancelled {
+			if reason.IsNil() {
+				reason = StringValue("cancelled")
+			}
+			return llmCancelError(reason.String())
+		}
+	}
+	return NilValue()
+}
+
+func llmCancelError(reason string) Value {
+	if reason == "" {
+		reason = "cancelled"
+	}
+	kind := "cancelled"
+	if reason == "deadline exceeded" || reason == "context deadline exceeded" {
+		kind = "deadline"
+	}
+	t := NewTable()
+	t.RawSetString("kind", StringValue(kind))
+	t.RawSetString("message", StringValue(reason))
 	return TableValue(t)
 }
 

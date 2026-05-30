@@ -331,6 +331,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"color":     libs&LibColor != 0,
 		"compress":  libs&LibCompress != 0,
 		"container": libs&LibContainer != 0,
+		"context":   true,
 		"crypto":    libs&LibCrypto != 0,
 		"csv":       libs&LibCSV != 0,
 		"debug":     libs&LibDebug != 0,
