@@ -468,6 +468,56 @@ plan := result.plan
 	}
 }
 
+func TestLoopReflect(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+				{Status: "final_answer", Text: "draft"},
+				{Status: "final_answer", Text: "refined"},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+result, err := loop.reflect({
+    user: "answer",
+    model: "writer",
+    reflect_model: "critic",
+    max_iters: 1,
+})
+status := result.status
+text := result.text
+reflection_text := result.reflection[1].text
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			status, _ := vm.Get("status")
+			text, _ := vm.Get("text")
+			reflectionText, _ := vm.Get("reflection_text")
+			if status != "done" || text != "refined" || reflectionText != "refined" {
+				t.Fatalf("status=%#v text=%#v reflection=%#v", status, text, reflectionText)
+			}
+			if len(provider.requests) != 2 {
+				t.Fatalf("requests = %#v", provider.requests)
+			}
+			if provider.requests[0].Model != "writer" || provider.requests[1].Model != "critic" {
+				t.Fatalf("models = %#v / %#v", provider.requests[0].Model, provider.requests[1].Model)
+			}
+			if len(provider.requests[1].Messages) != 2 || provider.requests[1].Messages[1].Text != "draft" {
+				t.Fatalf("reflection messages = %#v", provider.requests[1].Messages)
+			}
+		})
+	}
+}
+
 func TestLoopBudgets(t *testing.T) {
 	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
 		{

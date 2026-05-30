@@ -208,6 +208,9 @@ instead of dispatching, and the same token can be resumed with `loop.resume`.
 `loop.plan_execute` runs one planning turn, injects the plan as an execution
 system message, then reuses the same ReAct execution loop. It accepts
 `plan_model` and `exec_model` for split-model workflows.
+`loop.reflect` runs the normal ReAct loop first, then performs one or more
+reflection turns over a completed answer; it stores the reflection turns on
+`result.reflection` and updates `result.text` with the latest improved answer.
 Both `llm.react` and `loop.react` accept `budget: {tokens, turns, calls, money,
 time}` or the flat `budget_tokens` / `budget_turns` / `budget_calls` /
 `budget_money` / `budget_time` fields. Exhaustion returns

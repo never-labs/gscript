@@ -436,6 +436,37 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		return result, nil
 	})
 
+	set("reflect", func(args []Value) ([]Value, error) {
+		if len(args) < 1 || !args[0].IsTable() {
+			return nil, fmt.Errorf("bad argument #1 to 'loop.reflect' (table expected)")
+		}
+		if call == nil {
+			return nil, fmt.Errorf("loop.reflect requires a function caller")
+		}
+		p := currentProvider()
+		if p == nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
+			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
+		}
+		opts, err := llmLoopOptions(args[0].Table(), 0)
+		if err != nil {
+			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
+			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
+		}
+		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
+			approveWhen: args[0].Table().RawGetString("approve_when"),
+			snapshots:   snapshots,
+			snapshotsMu: &snapshotsMu,
+		})
+		if err != nil || len(result) == 0 || !result[1].IsNil() || !result[0].IsTable() {
+			return result, err
+		}
+		if reflectErr := llmReflectResult(args[0].Table(), result[0].Table(), p, currentContext(), hostLimit(), trace); !reflectErr.IsNil() {
+			return []Value{NilValue(), reflectErr}, nil
+		}
+		return result, nil
+	})
+
 	set("snapshot", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsTable() || !args[1].IsTable() {
 			return nil, fmt.Errorf("bad argument to 'loop.snapshot' (history, pending_call expected)")
@@ -633,6 +664,56 @@ func llmInjectPlan(opts *Table, plan string) {
 		merged.RawSet(IntValue(int64(merged.Length()+1)), msg)
 	}
 	opts.RawSetString("messages", TableValue(merged))
+}
+
+func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) Value {
+	if result.RawGetString("status").Str() != "done" {
+		return NilValue()
+	}
+	maxIters := toInt(src.RawGetString("max_iters"))
+	if maxIters <= 0 {
+		maxIters = 1
+	}
+	model := src.RawGetString("reflect_model").Str()
+	if model == "" {
+		model = src.RawGetString("model").Str()
+	}
+	reflections := NewAppendArrayTable(int(maxIters))
+	text := result.RawGetString("text").Str()
+	for i := int64(0); i < maxIters; i++ {
+		messages := NewAppendArrayTable(2)
+		prompt := src.RawGetString("reflect_prompt").Str()
+		if prompt == "" {
+			prompt = "Review the answer. If it can be improved, return the improved final answer only."
+		}
+		messages.RawSet(IntValue(1), TableValue(llmMessageTable("system", prompt)))
+		messages.RawSet(IntValue(2), TableValue(llmMessageTable("user", text)))
+		req := LLMTurnRequest{
+			Model:     model,
+			Messages:  llmMessagesFromValue(TableValue(messages)),
+			MaxTokens: toInt(src.RawGetString("reflect_max_tokens")),
+			Stop:      llmStringSliceFromValue(src.RawGetString("reflect_stop")),
+			Metadata:  llmStringMapFromValue(src.RawGetString("metadata")),
+		}
+		trace(LLMTraceEvent{Type: "turn_start", Model: req.Model, MessageCount: len(req.Messages)})
+		res, err := provider.Turn(ctx, req)
+		if err != nil {
+			trace(LLMTraceEvent{Type: "turn_error", Model: req.Model, ErrorKind: "provider", Message: err.Error()})
+			return llmErrorValue("provider", err.Error())
+		}
+		trace(LLMTraceEvent{Type: "turn_end", Model: req.Model, Status: llmResultStatus(res), MessageCount: len(req.Messages), Usage: res.Usage})
+		turn := llmResultValue(res)
+		if err := CheckHostResultBytes(maxHostResult, turn); err != nil {
+			return llmErrorValue("internal", err.Error())
+		}
+		reflections.RawSet(IntValue(int64(reflections.Length()+1)), turn)
+		if res.Text != "" {
+			text = res.Text
+			result.RawSetString("text", StringValue(text))
+		}
+	}
+	result.RawSetString("reflection", TableValue(reflections))
+	return NilValue()
 }
 
 func registerLLMMessageConstructors(t *Table, module string) {
