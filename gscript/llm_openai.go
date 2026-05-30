@@ -364,6 +364,11 @@ func normalizeOpenAIJSON(v any) any {
 			return f
 		}
 		return x.String()
+	case float64:
+		if x == float64(int64(x)) {
+			return int64(x)
+		}
+		return x
 	case map[string]any:
 		out := make(map[string]any, len(x))
 		for k, v := range x {

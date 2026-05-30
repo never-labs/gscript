@@ -879,6 +879,85 @@ func TestOpenAICompatibleLLMProvider(t *testing.T) {
 	}
 }
 
+func TestAnthropicCompatibleLLMProvider(t *testing.T) {
+	var got map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s", r.Method)
+		}
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		if key := r.Header.Get("x-api-key"); key != "test-key" {
+			t.Fatalf("x-api-key = %q", key)
+		}
+		if version := r.Header.Get("anthropic-version"); version == "" {
+			t.Fatal("missing anthropic-version")
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("Decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+  "type": "message",
+  "role": "assistant",
+  "stop_reason": "tool_use",
+  "content": [{
+    "type": "tool_use",
+    "id": "toolu_1",
+    "name": "lookup",
+    "input": {"name": "gscript", "limit": 3}
+  }],
+  "usage": {"input_tokens": 9, "output_tokens": 6}
+}`)
+	}))
+	defer server.Close()
+	provider := gs.AnthropicCompatibleLLMProvider{
+		Endpoint: server.URL,
+		APIKey:   "test-key",
+		Model:    "fallback-model",
+		Client:   server.Client(),
+	}
+	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+		Model: "claude-test",
+		Messages: []gs.LLMMessage{
+			{Role: "system", Text: "short"},
+			{Role: "user", Text: "find docs"},
+		},
+		Tools: []gs.LLMTool{{
+			Name:        "lookup",
+			Description: "lookup docs",
+			Params:      []string{"name"},
+		}},
+		ForceTool: "lookup",
+		MaxTokens: 32,
+	})
+	if err != nil {
+		t.Fatalf("Turn: %v", err)
+	}
+	if got["model"] != "claude-test" || got["system"] != "short" || got["max_tokens"] != float64(32) {
+		t.Fatalf("request scalar fields = %#v", got)
+	}
+	messages := got["messages"].([]any)
+	if messages[0].(map[string]any)["role"] != "user" || messages[0].(map[string]any)["content"] != "find docs" {
+		t.Fatalf("messages = %#v", messages)
+	}
+	tools := got["tools"].([]any)
+	if tools[0].(map[string]any)["name"] != "lookup" {
+		t.Fatalf("tools = %#v", tools)
+	}
+	choice := got["tool_choice"].(map[string]any)
+	if choice["type"] != "tool" || choice["name"] != "lookup" {
+		t.Fatalf("tool_choice = %#v", got["tool_choice"])
+	}
+	if res.Status != "tool_calls" || res.Usage.InputTokens != 9 || res.Usage.OutputTokens != 6 {
+		t.Fatalf("result = %#v", res)
+	}
+	if len(res.Calls) != 1 || res.Calls[0].Tool != "lookup" || res.Calls[0].Args["limit"] != int64(3) {
+		t.Fatalf("calls = %#v", res.Calls)
+	}
+}
+
 func TestOpenAICompatibleLLMProviderRetriesTransientStatus(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

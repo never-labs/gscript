@@ -119,6 +119,11 @@ bounded retries on transient network failures or `408` / `409` / `429` / `5xx`
 HTTP responses. Non-2xx HTTP responses return `*gscript.OpenAICompatibleLLMError`
 with `StatusCode`, trimmed `Body`, and `Retryable` fields for host policy.
 
+Anthropic-compatible gateways are supported through
+`AnthropicCompatibleLLMProvider` and `WithAnthropicCompatibleLLM`. Hosts pass
+their own endpoint, API key, model, timeout, retry, and header policy explicitly;
+GScript does not encode vendor-specific local wrapper conventions.
+
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
 tool-call, retry, HITL snapshot/resume, and stop events with counts, status,
 usage, token metadata, and tool names; prompt text and tool result values are
