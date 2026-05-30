@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"sync"
 	"time"
 )
@@ -938,6 +941,7 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"force_tool",
 		"stop",
 		"metadata",
+		"output",
 		"budget",
 		"budget_tokens",
 		"budget_turns",
@@ -955,7 +959,16 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 	if defaultMaxSteps > 0 && opts.RawGetString("max_steps").IsNil() {
 		opts.RawSetString("max_steps", IntValue(defaultMaxSteps))
 	}
+	if opts.RawGetString("response_format").IsNil() && opts.RawGetString("output").IsTable() {
+		opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
+	}
 	return opts, nil
+}
+
+func llmJSONResponseFormatTable() *Table {
+	format := NewTable()
+	format.RawSetString("type", StringValue("json_object"))
+	return format
 }
 
 func llmCloneTable(src *Table) *Table {
@@ -1626,7 +1639,14 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		switch res.Status {
 		case "", "final_answer":
 			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
-			return []Value{llmReactResultValue("done", res.Text, "", turnValue, history), NilValue()}, nil
+			result := llmReactResultValue("done", res.Text, "", turnValue, history)
+			if value, errValue := llmStructuredOutputValue(opts, res.Text); !errValue.IsNil() {
+				llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(errValue), Message: errValue.Table().RawGetString("message").Str()})
+				return []Value{NilValue(), errValue}, nil
+			} else if !value.IsNil() {
+				result.Table().RawSetString("value", value)
+			}
+			return []Value{result, NilValue()}, nil
 		case "stop":
 			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "stopped", Message: res.Reason})
 			return []Value{llmReactResultValue("stopped", "", res.Reason, turnValue, history), NilValue()}, nil
@@ -2076,6 +2096,30 @@ func llmReactResultValue(status, text, reason string, turn Value, history []Valu
 	t.RawSetString("result", turn)
 	t.RawSetString("history", llmTableFromValues(history))
 	return TableValue(t)
+}
+
+func llmStructuredOutputValue(opts *Table, text string) (Value, Value) {
+	if opts == nil || !opts.RawGetString("output").IsTable() {
+		return NilValue(), NilValue()
+	}
+	dec := json.NewDecoder(strings.NewReader(text))
+	dec.UseNumber()
+	var data any
+	if err := dec.Decode(&data); err != nil {
+		return NilValue(), llmErrorValue("validation", "structured output is not valid JSON: "+err.Error())
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return NilValue(), llmErrorValue("validation", "structured output contains trailing JSON")
+		}
+		return NilValue(), llmErrorValue("validation", "structured output is not valid JSON: "+err.Error())
+	}
+	value := jsonGoToGScript(data)
+	if !value.IsTable() {
+		return NilValue(), llmErrorValue("validation", "structured output JSON must decode to a table")
+	}
+	return value, NilValue()
 }
 
 func llmAssistantCallMessage(callValue Value) Value {

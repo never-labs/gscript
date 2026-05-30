@@ -491,9 +491,12 @@ Rules:
   policy; if repair fails, return `err.kind == "validation"`.
 
 Current implementation note: direct `turn { response_format: ... }` is lowered
-to `llm.turn` and forwarded to the provider request. Agent-level `output`
-translation, structured result decoding into `result.value`, and validation /
-repair behavior are still pending runtime work.
+to `llm.turn` and forwarded to the provider request. Agent-level table
+`output` now requests provider JSON mode with `response_format:
+{type: "json_object"}` when no explicit `response_format` is present, and a
+final JSON object/table response is decoded into `result.value`. Invalid JSON
+returns `err.kind == "validation"`. Schema generation, field-level validation,
+and repair remain pending runtime work.
 
 ## 11. History And Call Options
 
@@ -846,8 +849,9 @@ parser-backed path used by normal `.gs` files:
 - `gscript fmt` accepts `tool`, `agent`, `turn`, `messages`, `models`, and
   `budget` syntax before rewriting bytes. It is still a narrow whitespace
   normalizer: CRLF/CR becomes LF, trailing spaces/tabs are trimmed, trailing
-  blank lines are collapsed, and a final newline is ensured. It does not yet
-  pretty-print or re-indent AST nodes.
+  blank lines are collapsed, brace-driven line indentation is normalized, and a
+  final newline is ensured. It does not yet pretty-print expressions or rebuild
+  source from AST nodes.
 - `gscript lint` reports lexer/parser failures, including AI-native syntax
   errors, as `GS1001` diagnostics in text, JSON, or SARIF output. The broader
   AI metadata/capability lint index is still pending.
@@ -1127,22 +1131,22 @@ Partial:
   tool `gscript:param` docs, and duplicate statically named tools in literal
   agent/defaults tool lists.
 - `gscript fmt` and `gscript lint` accept AI-native source through the
-  parser-backed tooling path. The formatter currently normalizes whitespace
-  only; an AST pretty printer for AI-native blocks and doc directives remains
-  pending.
+  parser-backed tooling path. The formatter currently normalizes whitespace and
+  brace-driven indentation; a full AST pretty printer for AI-native blocks and
+  doc directives remains pending.
 - Tests cover parser acceptance, stdlib-vs-syntax execution for interpreter and
   bytecode, anonymous agents/IIFE, defaults, model alias resolution, direct turn
-  sugar, direct turn `response_format` forwarding, validation errors, flow
+  sugar, direct turn `response_format` forwarding, agent-level table `output`
+  JSON-mode requests and `result.value` decoding, validation errors, flow
   behavior, directive lowering, ambient budget behavior, and AI-native
   agent/turn record-replay through the existing LLM stdlib recorder/replay API.
-  Gated real-provider smoke and agent-level output validation coverage remain
-  incomplete.
+  Gated real-provider smoke coverage remains incomplete.
 
 Pending:
 
 - Broader AI metadata/capability lint index described in
   [Static Analysis](#19-static-analysis).
-- AST-level pretty printing/reindentation for AI-native syntax.
+- AST-level pretty printing for AI-native syntax.
 - Production policy docs and checks for provider/model construction beyond the
   current stdlib factory behavior.
 - Complete agent-level structured output validation coverage.

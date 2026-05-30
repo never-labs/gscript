@@ -694,6 +694,11 @@ func formatSource(filename string, src []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	tokens, err := lexer.New(string(src)).Tokenize()
+	if err != nil {
+		return nil, fmt.Errorf("lexer error: %w", err)
+	}
+
 	normalized := bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n"))
 	normalized = bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
 	lines := bytes.Split(normalized, []byte("\n"))
@@ -706,7 +711,64 @@ func formatSource(filename string, src []byte) ([]byte, error) {
 	if len(lines) == 0 {
 		return []byte("\n"), nil
 	}
-	return append(bytes.Join(lines, []byte("\n")), '\n'), nil
+	indentFormatted := formatLineIndentation(lines, tokens)
+	return append(bytes.Join(indentFormatted, []byte("\n")), '\n'), nil
+}
+
+func formatLineIndentation(lines [][]byte, tokens []lexer.Token) [][]byte {
+	lineStats := map[int]formatLineStats{}
+	for _, tok := range tokens {
+		if tok.Type == lexer.TOKEN_EOF {
+			continue
+		}
+		stats := lineStats[tok.Line]
+		if !stats.HasToken {
+			stats.HasToken = true
+			stats.StartsWithClosingBrace = tok.Type == lexer.TOKEN_RBRACE
+		}
+		switch tok.Type {
+		case lexer.TOKEN_LBRACE:
+			stats.OpenBraces++
+		case lexer.TOKEN_RBRACE:
+			stats.CloseBraces++
+		}
+		lineStats[tok.Line] = stats
+	}
+
+	out := make([][]byte, len(lines))
+	indent := 0
+	for i, line := range lines {
+		lineNo := i + 1
+		stats := lineStats[lineNo]
+		lineIndent := indent
+		if stats.StartsWithClosingBrace && lineIndent > 0 {
+			lineIndent--
+		}
+
+		trimmed := bytes.TrimLeft(line, " \t")
+		if len(line) == 0 {
+			out[i] = nil
+		} else {
+			if !stats.HasToken && !bytes.HasPrefix(trimmed, []byte("//")) {
+				out[i] = line
+			} else {
+				out[i] = append(bytes.Repeat([]byte(" "), lineIndent*4), trimmed...)
+			}
+		}
+
+		indent += stats.OpenBraces - stats.CloseBraces
+		if indent < 0 {
+			indent = 0
+		}
+	}
+	return out
+}
+
+type formatLineStats struct {
+	HasToken               bool
+	StartsWithClosingBrace bool
+	OpenBraces             int
+	CloseBraces            int
 }
 
 func parseGScriptFile(filename string) error {

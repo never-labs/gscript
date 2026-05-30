@@ -536,6 +536,148 @@ text := result.text
 	}
 }
 
+func TestAINativeAgentOutputStructuredValue(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract_contact(text) {
+    model: "mock-json"
+    system: "Extract contact information."
+    user: text
+    output: {
+        name: "Ada Lovelace"
+        email: "ada@example.com"
+    }
+}
+
+result, err := extract_contact("Ada <ada@example.com>")
+name := result.value.name
+email := result.value.email
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			format, ok := provider.requests[0].ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_object" {
+				t.Fatalf("response_format = %#v", provider.requests[0].ResponseFormat)
+			}
+			name, err := vm.Get("name")
+			if err != nil {
+				t.Fatalf("Get name: %v", err)
+			}
+			if name != "Ada" {
+				t.Fatalf("name = %#v, want Ada", name)
+			}
+			email, err := vm.Get("email")
+			if err != nil {
+				t.Fatalf("Get email: %v", err)
+			}
+			if email != "ada@example.com" {
+				t.Fatalf("email = %#v, want ada@example.com", email)
+			}
+		})
+	}
+}
+
+func TestAINativeAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"ok":true}`}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract(text) {
+    model: "mock-json"
+    user: text
+    output: {ok: true}
+    response_format: {type: "json_schema", name: "explicit"}
+}
+
+result, err := extract("ok")
+ok := result.value.ok
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			format, ok := provider.requests[0].ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_schema" || format["name"] != "explicit" {
+				t.Fatalf("response_format = %#v", provider.requests[0].ResponseFormat)
+			}
+			value, err := vm.Get("ok")
+			if err != nil {
+				t.Fatalf("Get ok: %v", err)
+			}
+			if value != true {
+				t.Fatalf("ok = %#v, want true", value)
+			}
+		})
+	}
+}
+
+func TestAINativeAgentOutputValidationError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `not json`}}
+			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.Exec(`
+agent extract_contact(text) {
+    model: "mock-json"
+    user: text
+    output: {name: "Ada"}
+}
+
+result, err := extract_contact("Ada")
+err_kind := err.kind
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+
+			if len(provider.requests) != 1 {
+				t.Fatalf("requests = %d, want 1", len(provider.requests))
+			}
+			format, ok := provider.requests[0].ResponseFormat.(map[string]any)
+			if !ok || format["type"] != "json_object" {
+				t.Fatalf("response_format = %#v", provider.requests[0].ResponseFormat)
+			}
+			kind, err := vm.Get("err_kind")
+			if err != nil {
+				t.Fatalf("Get err_kind: %v", err)
+			}
+			if kind != "validation" {
+				t.Fatalf("err_kind = %#v, want validation", kind)
+			}
+		})
+	}
+}
+
 func aiNativeScenarioOptions(provider gs.LLMProvider, opts ...gs.Option) []gs.Option {
 	base := []gs.Option{
 		gs.WithLibs(gs.LibString | gs.LibLLM),

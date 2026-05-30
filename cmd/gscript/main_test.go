@@ -1156,6 +1156,144 @@ func TestFmtStdinCheckAcceptsFormattedSource(t *testing.T) {
 	}
 }
 
+func TestFmtStdinAINativeIndentation(t *testing.T) {
+	src := `tool lookup(query) {
+return "found:" .. query, nil
+}
+models {
+default: "fast"
+fast: {provider_model: "mock-fast"}
+}
+agent defaults {
+model: "fast"
+tools: [lookup]
+budget: {turns: 2, calls: 4, tokens: 1000, time: 30s}
+}
+agent researcher(topic) {
+system: "Use the tool."
+user: topic
+tools: [lookup]
+} flow {
+history := messages {
+system: system
+user: topic
+}
+result, err := turn {
+messages: history
+tools: tools
+model: model
+}
+return result, err
+}
+answer := agent(q) {
+user: q
+}
+budget { turns: 1 } {
+direct, direct_err := turn {
+messages: messages { user: "one-shot" }
+}
+_ = direct
+_ = direct_err
+}
+`
+	want := `tool lookup(query) {
+    return "found:" .. query, nil
+}
+models {
+    default: "fast"
+    fast: {provider_model: "mock-fast"}
+}
+agent defaults {
+    model: "fast"
+    tools: [lookup]
+    budget: {turns: 2, calls: 4, tokens: 1000, time: 30s}
+}
+agent researcher(topic) {
+    system: "Use the tool."
+    user: topic
+    tools: [lookup]
+} flow {
+    history := messages {
+        system: system
+        user: topic
+    }
+    result, err := turn {
+        messages: history
+        tools: tools
+        model: model
+    }
+    return result, err
+}
+answer := agent(q) {
+    user: q
+}
+budget { turns: 1 } {
+    direct, direct_err := turn {
+        messages: messages { user: "one-shot" }
+    }
+    _ = direct
+    _ = direct_err
+}
+`
+
+	oldStdin := cliStdin
+	cliStdin = strings.NewReader(src)
+	defer func() { cliStdin = oldStdin }()
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--stdin-file-name", "ai_native.gs"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runFmtCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestFmtStdinPreservesCommentOnlyLines(t *testing.T) {
+	src := `agent sample() {
+// keep this note
+
+user: "hello"
+} flow {
+if true {
+// nested
+print("ok")
+}
+}
+`
+	want := `agent sample() {
+    // keep this note
+
+    user: "hello"
+} flow {
+    if true {
+        // nested
+        print("ok")
+    }
+}
+`
+
+	oldStdin := cliStdin
+	cliStdin = strings.NewReader(src)
+	defer func() { cliStdin = oldStdin }()
+
+	var stdout, stderr bytes.Buffer
+	code := runFmtCommand([]string{"--stdin-file-name", "comments.gs"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runFmtCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if got := stdout.String(); got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
 func TestFmtAINativeSyntaxCoverage(t *testing.T) {
 	src := `// lookup searches project docs.
 // gscript:requires docs.read
