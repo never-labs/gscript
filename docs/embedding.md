@@ -165,6 +165,7 @@ result, err := llm.react({
     tools: {lookup},
     max_steps: 8,
     max_tool_retries: 1,
+    max_history_tokens: 4000,
 })
 if err != nil { return nil, err }
 return result.text, nil
@@ -179,7 +180,9 @@ The companion `chat` module provides pure history utilities for agent loops:
 `chat.merge(history, additions)`, `chat.window(history, max_tokens)`,
 `chat.token_count(value)`, and `chat.summarize(history, opts)`. Token counts are
 lightweight estimates, intended for local budgeting and tests rather than exact
-provider billing.
+provider billing. `llm.react` uses the same estimate when `max_history_tokens`
+is set, trimming the request history before each provider turn while preserving
+the full returned `result.history`.
 
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:

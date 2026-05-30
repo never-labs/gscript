@@ -536,10 +536,18 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 	if maxToolRetries < 0 {
 		maxToolRetries = 0
 	}
+	maxHistoryTokens := toInt(opts.RawGetString("max_history_tokens"))
+	if maxHistoryTokens < 0 {
+		maxHistoryTokens = 0
+	}
 	for step := 0; step < maxSteps; step++ {
+		requestHistory := history
+		if maxHistoryTokens > 0 {
+			requestHistory = chatWindow(llmTableFromValues(history).Table(), maxHistoryTokens)
+		}
 		req := LLMTurnRequest{
 			Model:     model,
-			Messages:  llmMessagesFromValue(llmTableFromValues(history)),
+			Messages:  llmMessagesFromValue(llmTableFromValues(requestHistory)),
 			Tools:     llmToolsFromValue(toolsValue),
 			MaxTokens: toInt(opts.RawGetString("max_tokens")),
 			Stream:    opts.RawGetString("stream").Truthy(),

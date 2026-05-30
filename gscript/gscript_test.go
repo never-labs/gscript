@@ -306,6 +306,46 @@ history_len := #result.history
 	}
 }
 
+func TestLLMReactCanWindowHistory(t *testing.T) {
+	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+		{
+			Status: "tool_calls",
+			Calls: []gs.LLMToolCall{{
+				ID:   "call_1",
+				Tool: "lookup",
+				Args: map[string]any{"name": "gscript"},
+			}},
+		},
+		{Status: "final_answer", Text: "done"},
+	}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+result, err := llm.react({
+    messages: {msg.system("drop this long system prompt"), msg.user("drop this long user prompt")},
+    tools: {lookup},
+    max_steps: 3,
+    max_history_tokens: 10,
+})
+status := result.status
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(provider.requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(provider.requests))
+	}
+	second := provider.requests[1].Messages
+	if len(second) != 2 || second[0].Role != "assistant" || second[0].ToolCall == nil || second[1].Role != "tool" || second[1].Value != "docs:gscript" {
+		t.Fatalf("second request messages = %#v", second)
+	}
+	status, _ := vm.Get("status")
+	if status != "done" {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
 func TestLLMReactRetriesTransientToolErrors(t *testing.T) {
 	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
 		{
