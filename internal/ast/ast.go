@@ -307,6 +307,33 @@ type AIToolRegistryEntry struct {
 	Source    Pos
 }
 
+// Lookup returns a registered AI tool entry by declaration name.
+func (r AIToolRegistry) Lookup(name string) (AIToolRegistryEntry, bool) {
+	entry, ok := r[name]
+	return entry, ok
+}
+
+// RequiredCapabilitiesForTools returns the unique non-none capabilities
+// required by statically named tools, preserving first-seen order.
+func (r AIToolRegistry) RequiredCapabilitiesForTools(names []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, name := range names {
+		entry, ok := r.Lookup(name)
+		if !ok {
+			continue
+		}
+		for _, req := range entry.Requires {
+			if req == "" || req == "none" || req == "cap.none" || seen[req] {
+				continue
+			}
+			seen[req] = true
+			out = append(out, req)
+		}
+	}
+	return out
+}
+
 // AgentDeclStmt represents a named AI agent declaration.
 type AgentDeclStmt struct {
 	P      Pos

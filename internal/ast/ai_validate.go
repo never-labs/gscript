@@ -358,6 +358,23 @@ func validateToolParamDocs(s *ToolDeclStmt) error {
 }
 
 func (ctx *aiValidationContext) validateAIToolsConfig(pos Pos, owner string, config []ConfigField) error {
+	tools, toolsStatic, err := ctx.staticToolsConfig(pos, owner, config)
+	if err != nil {
+		return err
+	}
+	caps, capsStatic, capsPos := staticCapsConfig(config)
+	if toolsStatic && capsStatic {
+		for _, req := range ctx.tools.RequiredCapabilitiesForTools(tools) {
+			if capAllows(caps, req) {
+				continue
+			}
+			return fmt.Errorf("line %d: %s capabilities missing required capability %q", capsPos.Line, owner, req)
+		}
+	}
+	return nil
+}
+
+func (ctx *aiValidationContext) staticToolsConfig(pos Pos, owner string, config []ConfigField) ([]string, bool, error) {
 	for _, f := range config {
 		key, ok := stringConfigKey(f.Key)
 		if !ok || key != "tools" {
@@ -365,24 +382,83 @@ func (ctx *aiValidationContext) validateAIToolsConfig(pos Pos, owner string, con
 		}
 		list, ok := f.Value.(*ListLitExpr)
 		if !ok {
-			continue
+			return nil, false, nil
 		}
 		seen := map[string]bool{}
+		names := make([]string, 0, len(list.Values))
+		allStatic := true
 		for _, v := range list.Values {
 			ident, ok := v.(*IdentExpr)
 			if !ok {
+				allStatic = false
 				continue
 			}
 			if seen[ident.Name] {
-				return fmt.Errorf("line %d: %s tools list includes duplicate tool %q", pos.Line, owner, ident.Name)
+				return nil, false, fmt.Errorf("line %d: %s tools list includes duplicate tool %q", pos.Line, owner, ident.Name)
 			}
-			if _, ok := ctx.tools[ident.Name]; !ok {
-				return fmt.Errorf("line %d: %s tools list references undeclared tool %q", pos.Line, owner, ident.Name)
+			if _, ok := ctx.tools.Lookup(ident.Name); !ok {
+				return nil, false, fmt.Errorf("line %d: %s tools list references undeclared tool %q", pos.Line, owner, ident.Name)
 			}
 			seen[ident.Name] = true
+			names = append(names, ident.Name)
+		}
+		return names, allStatic, nil
+	}
+	return nil, false, nil
+}
+
+func staticCapsConfig(config []ConfigField) ([]string, bool, Pos) {
+	for _, f := range config {
+		key, ok := stringConfigKey(f.Key)
+		if !ok || (key != "capabilities" && key != "caps") {
+			continue
+		}
+		caps, ok := staticStringList(f.Value)
+		if !ok {
+			return nil, false, f.P
+		}
+		return caps, true, f.P
+	}
+	return nil, false, Pos{}
+}
+
+func staticStringList(expr Expr) ([]string, bool) {
+	switch e := expr.(type) {
+	case *ListLitExpr:
+		return staticStringExprs(e.Values)
+	case *TableLitExpr:
+		values := make([]Expr, 0, len(e.Fields))
+		for _, f := range e.Fields {
+			if f.Key != nil {
+				return nil, false
+			}
+			values = append(values, f.Value)
+		}
+		return staticStringExprs(values)
+	default:
+		return nil, false
+	}
+}
+
+func staticStringExprs(exprs []Expr) ([]string, bool) {
+	out := make([]string, 0, len(exprs))
+	for _, expr := range exprs {
+		lit, ok := expr.(*StringLit)
+		if !ok {
+			return nil, false
+		}
+		out = append(out, lit.Value)
+	}
+	return out, true
+}
+
+func capAllows(caps []string, req string) bool {
+	for _, cap := range caps {
+		if cap == req || cap == "all" || cap == "cap.all" || cap == "*" {
+			return true
 		}
 	}
-	return nil
+	return false
 }
 
 func (ctx *aiValidationContext) validateAINativeStmtList(stmts []Stmt, topLevel bool) error {
@@ -433,15 +509,29 @@ func validateModelsDecl(s *ModelsDeclStmt) error {
 }
 
 func validateModelConfigTable(tbl *TableLitExpr) error {
+	hasProtocol := false
+	hasProviderModel := false
 	for _, f := range tbl.Fields {
 		key, ok := stringConfigKey(f.Key)
 		if !ok {
 			continue
 		}
-		if key == "api_key" {
+		switch key {
+		case "api_key":
 			if _, ok := f.Value.(*StringLit); ok {
 				return fmt.Errorf("model api_key must not be a string literal")
 			}
+		case "protocol":
+			hasProtocol = true
+			protocol, ok := f.Value.(*StringLit)
+			if !ok {
+				return fmt.Errorf("model protocol must be a string literal")
+			}
+			if !isAllowedModelProtocol(protocol.Value) {
+				return fmt.Errorf("unsupported model protocol %q", protocol.Value)
+			}
+		case "provider_model", "model":
+			hasProviderModel = true
 		}
 		if nested, ok := f.Value.(*TableLitExpr); ok {
 			if err := validateModelConfigTable(nested); err != nil {
@@ -449,5 +539,18 @@ func validateModelConfigTable(tbl *TableLitExpr) error {
 			}
 		}
 	}
+	if hasProtocol && !hasProviderModel {
+		return fmt.Errorf("model provider config with protocol must include provider_model or model")
+	}
 	return nil
+}
+
+func isAllowedModelProtocol(protocol string) bool {
+	switch strings.ToLower(strings.ReplaceAll(protocol, "_", "-")) {
+	case "openai", "openai-compatible", "openai-compat", "chat-completions",
+		"anthropic", "anthropic-compatible", "anthropic-compat", "messages":
+		return true
+	default:
+		return false
+	}
 }

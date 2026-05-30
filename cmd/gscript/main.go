@@ -711,6 +711,11 @@ func formatSource(filename string, src []byte) ([]byte, error) {
 	if len(lines) == 0 {
 		return []byte("\n"), nil
 	}
+	// The formatter is deliberately parse-backed, not AST-printed: parsing is
+	// a safety gate, then token positions drive only newline/trailing-space
+	// normalization and brace indentation. Intra-line expression spacing,
+	// table/config field alignment, and comment attachment stay untouched until
+	// an AST printer can round-trip comments and original source boundaries.
 	indentFormatted := formatLineIndentation(lines, tokens)
 	return append(bytes.Join(indentFormatted, []byte("\n")), '\n'), nil
 }

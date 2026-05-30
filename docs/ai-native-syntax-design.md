@@ -183,14 +183,34 @@ and then `model` inside config tables. If no host provider was installed with
 provider factory. The default Go factory supports `"openai"` /
 `"openai_compatible"` and `"anthropic"` / `"anthropic_compatible"`.
 
-Rules:
+Production policy:
+
+- Host-installed providers are the production default. `WithLLMProvider` takes
+  precedence over script-declared provider fields, and host routers may still
+  resolve script model aliases to provider-side model names.
+- Script-declared provider configs are allowed when the host intentionally
+  leaves `WithLLMProvider` unset or installs `WithLLMProviderFactory` to
+  construct approved providers from `models {}`. This is useful for examples,
+  tests, local tools, and deployments where provider selection is part of the
+  script contract.
+- The default factory only accepts the built-in wire protocols:
+  `"openai"`, `"openai_compatible"`, `"openai_compat"`,
+  `"chat_completions"`, `"anthropic"`, `"anthropic_compatible"`,
+  `"anthropic_compat"`, and `"messages"`. Underscores and hyphens are treated
+  equivalently by the Go factory.
+- A provider config with `protocol` must include either `provider_model` or
+  `model`. Alias-only entries and host-only configs without `protocol` remain
+  valid and do not trigger provider construction.
+- `api_key` must come from `env("NAME")`, a host secret reference, or another
+  explicit expression that the deployment treats as a secret source. Literal
+  API keys in source are rejected before lowering.
+
+Field rules:
 
 - `provider` is a human-readable provider label for trace/audit.
 - `protocol` selects the wire format, such as `"openai"` or `"anthropic"`.
 - `provider_model` is the provider-side model ID.
 - `base_url` is the protocol endpoint/base URL.
-- `api_key` must come from `env("NAME")`, a host secret reference, or another
-  explicit secret source. Literal API keys in source are a lint error.
 - `default` is the model used when neither agent nor defaults specify `model`.
 - Aliases can point to another named model. Alias cycles are load errors.
 - Go embedding APIs may still inject or override named models for production
@@ -810,6 +830,14 @@ turns:
   model, tools, output, stream, source span
 ```
 
+The current lint index records declared tools and exposes their source
+metadata, including `requires`, for follow-on checks. When an `agent`,
+`agent defaults`, or `turn` has a statically named literal `tools` list, the
+validator aggregates the referenced tool requirements. If the same config also
+has a static `capabilities` or `caps` string list/table, validation checks that
+the declared capabilities cover those requirements. Dynamic tool expressions
+and dynamic capability expressions are intentionally left to runtime checks.
+
 Checks:
 
 - `tool` missing `gscript:requires`.
@@ -819,6 +847,8 @@ Checks:
 - Duplicate statically named entries in literal `agent.tools` / `turn.tools`
   lists.
 - `agent.tools` references unknown/non-tool values when statically known.
+- Statically declared `agent` / `turn` `capabilities` or `caps` do not cover
+  the aggregated requirements of statically named tools.
 - Host capability policy does not include tool requirements.
 - `turn` has no messages.
 - `output` table is malformed.

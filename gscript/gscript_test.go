@@ -1127,7 +1127,7 @@ func TestAINativeModelsProviderConfigPreservesHostProvider(t *testing.T) {
 models {
     default: "chat"
     chat: {
-        protocol: "unsupported-test-protocol"
+        protocol: "openai_compatible"
         base_url: "http://127.0.0.1:1"
         api_key: ("test" .. "-key")
         provider_model: "host-model"

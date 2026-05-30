@@ -1294,6 +1294,41 @@ print("ok")
 	}
 }
 
+func TestFmtPreservesIntraLineFormattingBoundary(t *testing.T) {
+	src := `// lookup searches project docs.
+// gscript:requires docs.read
+tool lookup(query) {
+return "found:"..query,nil
+}
+models {
+short: "x"
+longer_key : {provider_model:"mock-fast"}
+}
+cfg := {short:1, longer_key : 2}
+total:=1+  2
+`
+	want := `// lookup searches project docs.
+// gscript:requires docs.read
+tool lookup(query) {
+    return "found:"..query,nil
+}
+models {
+    short: "x"
+    longer_key : {provider_model:"mock-fast"}
+}
+cfg := {short:1, longer_key : 2}
+total:=1+  2
+`
+
+	formatted, err := formatSource("boundary.gs", []byte(src))
+	if err != nil {
+		t.Fatalf("formatSource: %v", err)
+	}
+	if got := string(formatted); got != want {
+		t.Fatalf("formatted = %q, want %q", got, want)
+	}
+}
+
 func TestFmtAINativeSyntaxCoverage(t *testing.T) {
 	src := `// lookup searches project docs.
 // gscript:requires docs.read

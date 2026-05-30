@@ -144,6 +144,26 @@ production host routers keep receiving turns even if the script declares
 provider fields. Hosts that need custom construction can install
 `WithLLMProviderFactory`.
 
+Production policy is intentionally host-first:
+
+- Prefer `WithLLMProvider` for production routing, auth, logging, retries, and
+  network policy. Script `models {}` aliases still resolve the model name
+  before the host provider receives a turn.
+- Use script-declared provider configs only when the host explicitly allows
+  that deployment shape by leaving `WithLLMProvider` unset or by installing a
+  vetted `WithLLMProviderFactory`.
+- Provider configs that set `protocol` must use a string literal from the
+  built-in allowlist: `openai`, `openai_compatible`, `openai_compat`,
+  `chat_completions`, `anthropic`, `anthropic_compatible`,
+  `anthropic_compat`, or `messages`. Hyphenated spellings are accepted by the
+  Go factory as equivalent aliases.
+- Provider configs with `protocol` must include `provider_model` or `model`.
+  Alias-only declarations and host-only configs without `protocol` remain
+  valid.
+- Do not put plaintext keys in source. `api_key` must come from an environment
+  lookup or another explicit secret expression; string-literal API keys are
+  rejected during AI-native syntax validation.
+
 The real-provider integration smoke is gated and uses generic environment
 names:
 

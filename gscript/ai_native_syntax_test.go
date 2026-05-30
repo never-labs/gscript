@@ -133,6 +133,36 @@ models {
 			want: "api_key",
 		},
 		{
+			name: "provider protocol must be string",
+			src: `
+models {
+    default: "m"
+    m: {protocol: ("openai" .. "_compatible"), provider_model: "m"}
+}
+`,
+			want: "protocol must be a string literal",
+		},
+		{
+			name: "provider protocol whitelist",
+			src: `
+models {
+    default: "m"
+    m: {protocol: "unsupported-test-protocol", provider_model: "m"}
+}
+`,
+			want: "unsupported model protocol",
+		},
+		{
+			name: "provider config requires model",
+			src: `
+models {
+    default: "m"
+    m: {protocol: "openai_compatible", base_url: "http://127.0.0.1:1"}
+}
+`,
+			want: "provider_model or model",
+		},
+		{
 			name: "model alias cycle",
 			src: `
 models {
@@ -230,6 +260,40 @@ func f() {
 `,
 			want: "undeclared tool",
 		},
+		{
+			name: "agent capabilities missing tool requirement",
+			src: `
+// gscript:requires docs.read, net.client
+tool lookup(query) {
+    return query, nil
+}
+
+agent answer(q) {
+    tools: [lookup]
+    capabilities: ["docs.read"]
+    user: q
+}
+`,
+			want: "capabilities missing required capability \"net.client\"",
+		},
+		{
+			name: "turn caps missing tool requirement",
+			src: `
+// gscript:requires payments.refund
+tool refund(id) {
+    return id, nil
+}
+
+func f() {
+    _ = turn {
+        tools: [refund]
+        caps: []
+        user: "refund"
+    }
+}
+`,
+			want: "capabilities missing required capability \"payments.refund\"",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, mode := range []struct {
@@ -247,6 +311,69 @@ func f() {
 						t.Fatalf("Exec error = %v, want substring %q", err, tc.want)
 					}
 				})
+			}
+		})
+	}
+}
+
+func TestAINativeSyntaxValidationAllowsAliasOnlyModels(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+models {
+    default: "fast"
+    fast: "host-fast"
+    host: {provider_model: "host-only"}
+}
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+		})
+	}
+}
+
+func TestAINativeSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
+	for _, mode := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			opts := append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, mode.opts...)
+			vm := gs.New(opts...)
+			err := vm.Exec(`
+// gscript:requires docs.read, net.client
+tool lookup(query) {
+    return query, nil
+}
+
+agent answer(q) {
+    tools: [lookup]
+    capabilities: ["docs.read", "net.client"]
+    user: q
+}
+
+func f(caps) {
+    _ = turn {
+        tools: [lookup]
+        caps: caps
+        user: "hello"
+    }
+}
+`)
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
 			}
 		})
 	}
