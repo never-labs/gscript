@@ -99,6 +99,23 @@ func (Provider) Turn(ctx context.Context, req gscript.LLMTurnRequest) (gscript.L
 vm := gscript.New(gscript.WithLibs(gscript.LibString|gscript.LibLLM), gscript.WithLLMProvider(Provider{}))
 ```
 
+For OpenAI-compatible chat-completions gateways, hosts can use the built-in
+HTTP adapter:
+
+```go
+vm := gscript.New(
+    gscript.WithLibs(gscript.LibString|gscript.LibLLM),
+    gscript.WithOpenAICompatibleLLM(
+        "https://api.openai.com/v1/chat/completions",
+        os.Getenv("OPENAI_API_KEY"),
+        "gpt-4.1-mini",
+    ),
+)
+```
+
+`OpenAICompatibleLLMProvider` exposes the same adapter as a struct for custom
+HTTP clients, headers, local gateways, and test servers.
+
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
 tool-call, retry, HITL snapshot/resume, and stop events with counts, status,
 usage, token metadata, and tool names; prompt text and tool result values are

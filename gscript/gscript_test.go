@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -777,6 +778,110 @@ text := result.text
 	}
 	if got != "mock:User: hello" {
 		t.Fatalf("text = %#v", got)
+	}
+}
+
+func TestOpenAICompatibleLLMProvider(t *testing.T) {
+	var got map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("method = %s", r.Method)
+		}
+		if auth := r.Header.Get("Authorization"); auth != "Bearer test-key" {
+			t.Fatalf("Authorization = %q", auth)
+		}
+		if header := r.Header.Get("X-Test"); header != "ok" {
+			t.Fatalf("X-Test = %q", header)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("Decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{
+  "choices": [{
+    "finish_reason": "tool_calls",
+    "message": {
+      "role": "assistant",
+      "tool_calls": [{
+        "id": "call_1",
+        "type": "function",
+        "function": {"name": "lookup", "arguments": "{\"name\":\"gscript\",\"limit\":3}"}
+      }]
+    }
+  }],
+  "usage": {"prompt_tokens": 7, "completion_tokens": 5}
+}`)
+	}))
+	defer server.Close()
+	provider := gs.OpenAICompatibleLLMProvider{
+		Endpoint: server.URL,
+		APIKey:   "test-key",
+		Model:    "fallback-model",
+		Client:   server.Client(),
+		Headers:  map[string]string{"X-Test": "ok"},
+	}
+	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+		Model: "mock-fast",
+		Messages: []gs.LLMMessage{
+			{Role: "system", Text: "short"},
+			{Role: "user", Text: "find docs"},
+		},
+		Tools: []gs.LLMTool{{
+			Name:        "lookup",
+			Description: "lookup docs",
+			Params:      []string{"name"},
+		}},
+		ForceTool: "lookup",
+		MaxTokens: 32,
+		Stop:      []string{"END"},
+		Metadata:  map[string]string{"trace_id": "abc"},
+	})
+	if err != nil {
+		t.Fatalf("Turn: %v", err)
+	}
+	if got["model"] != "mock-fast" || got["max_tokens"] != float64(32) {
+		t.Fatalf("request scalar fields = %#v", got)
+	}
+	messages := got["messages"].([]any)
+	if messages[0].(map[string]any)["role"] != "system" || messages[1].(map[string]any)["content"] != "find docs" {
+		t.Fatalf("messages = %#v", messages)
+	}
+	tools := got["tools"].([]any)
+	fn := tools[0].(map[string]any)["function"].(map[string]any)
+	if fn["name"] != "lookup" || fn["description"] != "lookup docs" {
+		t.Fatalf("tools = %#v", tools)
+	}
+	choice := got["tool_choice"].(map[string]any)
+	if choice["type"] != "function" || choice["function"].(map[string]any)["name"] != "lookup" {
+		t.Fatalf("tool_choice = %#v", got["tool_choice"])
+	}
+	if res.Status != "tool_calls" || res.Usage.InputTokens != 7 || res.Usage.OutputTokens != 5 {
+		t.Fatalf("result = %#v", res)
+	}
+	if len(res.Calls) != 1 || res.Calls[0].Tool != "lookup" || res.Calls[0].Args["limit"] != int64(3) {
+		t.Fatalf("calls = %#v", res.Calls)
+	}
+}
+
+func TestWithOpenAICompatibleLLM(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`)
+	}))
+	defer server.Close()
+	vm := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithOpenAICompatibleLLM(server.URL, "", "mock-fast"),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({messages: {llm.user("hello")}})
+text := result.text
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	text, _ := vm.Get("text")
+	if text != "ok" {
+		t.Fatalf("text = %#v", text)
 	}
 }
 
