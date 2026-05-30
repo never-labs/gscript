@@ -3,70 +3,598 @@
 Status: accepted syntax proposal. Parser/runtime work should implement this
 surface incrementally by lowering to the existing LLM standard library.
 
-This document defines the language-level AI surface for GScript. The goal is to
-make AI workflows feel native while preserving the existing runtime investment:
-new syntax lowers to the current `llm.*` / `loop.*` standard library wherever
-possible.
+GScript's AI layer is designed around one simple promise: a useful agent should
+be writable with almost no ceremony, while advanced users can still drop to a
+single-turn protocol primitive when they need exact control.
 
-## 1. Design Goals
+## 1. Core Shape
 
-GScript should be usable in two roles:
+The primary user-facing form is `agent`.
 
-- A Go-embedded scripting language with a small, explicit host boundary.
-- A standalone AI-native language where agents, tools, budgets, model routing,
-  and replayable LLM calls are first-class source concepts.
+```gscript
+agent ask(q) {
+    user: q
+}
 
-The AI syntax must:
+r, err := ask("What is GScript?")
+print(r.text)
+```
 
-- Keep GScript dynamically typed. No static type annotations are introduced.
-- Preserve normal function/table/closure semantics.
-- Make all LLM network I/O pass through one primitive: `turn`.
-- Make tool capabilities visible to tooling before execution.
-- Keep secrets, HTTP clients, and provider policy in the Go host by default.
-- Lower to existing stdlib APIs so the first implementation is incremental.
+Default behavior:
 
-## 2. Reserved Words And Attributes
+- `model`: host default
+- `system`: empty
+- `tools`: empty list
+- `max_steps`: `1` without tools, host/default loop limit with tools
+- `budget`: host default
+- `output`: plain text
+- execution: automatic multi-turn agent loop
+
+The simple rule is:
+
+```text
+agent config says what to run
+user field is the current user input
+runtime handles the default multi-turn loop
+```
+
+## 2. Keywords
 
 New reserved words:
 
 ```text
-tool agent turn react budget models
+agent tool turn flow budget models
 ```
 
-`models` declares logical model aliases only. It does not construct providers or
-read secrets.
-
-New attribute syntax:
-
-```gscript
-@requires("net.http", "fs.read")
-@desc("Search project docs.")
-@params({query: "search query"})
-```
-
-Attributes attach to the immediately following `tool` or `agent` declaration.
-They are semantic, unlike comments. Comments remain documentation only.
-
-Rationale: previous `//gs:` directives were easy to implement but too fragile
-for a production language. Attributes are explicit syntax, format-friendly, and
-easy for lint/IDE tools to inspect.
-
-Additional AI-layer literals:
+Not keywords:
 
 ```text
-500ms  60s  2m  1h
+react memory rag provider output user system tools defaults
 ```
 
-Duration literals are available only in AI metadata/budget positions.
-They lower to the existing duration handling used by runtime budget options.
-Money literals such as `$0.25` are not part of the language; use `money: 0.25`.
+`react` remains a library strategy/helper, not a language keyword. The default
+`agent` execution strategy is ReAct-style multi-turn tool use, but users do not
+need to name it for the common case.
 
-## 3. Capability Model
+## 3. Lists
 
-Capabilities are strings, not bitwise syntax in user code:
+AI syntax uses ordinary list literals for ordered data:
 
 ```gscript
-@requires("fs.read", "net.http")
+tools: [search_docs, read_url]
+```
+
+Lists lower to the existing array-table representation. Tool order is preserved
+for stable provider schemas, tracing, and tests.
+
+## 4. Models
+
+Scripts use logical model names. Provider construction, API keys, HTTP clients,
+timeouts, retry policy, pricing, and audit policy remain host responsibilities.
+
+```gscript
+models {
+    default: "fast"
+    strong:  "reasoning"
+    cheap:   "small"
+}
+```
+
+This declares aliases only. It does not create a provider or read secrets.
+
+Lowering target:
+
+```gscript
+llm.register_model_alias({
+    default: "fast",
+    strong: "reasoning",
+    cheap: "small",
+})
+```
+
+Non-goals:
+
+- Script syntax that reads API keys.
+- Script syntax that constructs OpenAI/Anthropic/GLM clients.
+- Provider-specific keywords.
+
+## 5. Agent Defaults
+
+Repeated agent configuration should be factored once without wrapping normal
+code in a nested block. `agent defaults { ... }` is a module-scope declaration
+that supplies defaults for every agent in that module.
+
+```gscript
+agent defaults {
+    model: "strong"
+    system: "Answer clearly and cite sources."
+    tools: [search_docs]
+    budget: {turns: 6, calls: 12, tokens: 8000, time: 60s}
+}
+
+agent answer_docs(q) {
+    user: q
+}
+
+agent summarize(text) {
+    system: "Summarize clearly."
+    user: text
+}
+```
+
+Rules:
+
+- Explicit fields on an agent override defaults.
+- Missing fields are inherited from `agent defaults`, then host defaults.
+- `tools` defaults are inherited as a whole. An agent that sets `tools` replaces
+  the default list.
+- `budget` defaults are nested/intersected with agent-local budget.
+- `system` defaults are replaced by explicit `system`. To extend a default
+  system prompt, write `system: system + "\nExtra instruction."`.
+- Defaults apply to named agents, anonymous agents, and agent IIFEs in the same
+  module.
+- There is at most one `agent defaults` declaration per module. Duplicate
+  declarations are a load/lint error.
+- `agent defaults` does not create providers or call models. Its fields are
+  merged into each agent's config and evaluated under the same rules as that
+  agent config.
+
+Grammar:
+
+```ebnf
+AgentDefaultsDecl = "agent" "defaults" AgentConfig ;
+```
+
+## 6. Tool Declarations
+
+Tools use Go-style documentation plus `gscript:` directives. There is no
+decorator/attribute syntax.
+
+```gscript
+// search_docs searches indexed project documentation.
+// gscript:requires docs.read
+// gscript:param query natural-language search query
+tool search_docs(query) {
+    return docs.search(query, {limit: 5}), nil
+}
+```
+
+Grammar:
+
+```ebnf
+ToolDecl = DocComment "tool" Ident "(" [ParamList] ")" Block ;
+```
+
+Rules:
+
+- `gscript:requires` is required. Use `gscript:requires none` for pure tools.
+- `gscript:param <name> <description>` is optional.
+- The doc comment summary becomes the LLM-facing tool description.
+- Tool bodies return `(value, err)`.
+- Tool declarations bind a value with the declared name.
+- Tools are normal closures and can capture surrounding state.
+
+Lowering:
+
+```gscript
+search_docs := llm.tool("search_docs", func(query) {
+    return docs.search(query, {limit: 5}), nil
+}, {
+    description: "search_docs searches indexed project documentation.",
+    params: ["query"],
+    param_docs: {
+        query: "natural-language search query",
+    },
+    requires: ["docs.read"],
+})
+```
+
+## 7. Agent Values
+
+Agents are first-class callable values, like functions.
+
+Named agent:
+
+```gscript
+agent answer(q) {
+    system: "Answer briefly."
+    user: q
+}
+```
+
+Anonymous agent assigned to a variable:
+
+```gscript
+answer := agent(q) {
+    system: "Answer briefly."
+    user: q
+}
+```
+
+Anonymous no-arg agent, immediately invoked:
+
+```gscript
+r, err := agent {
+    user: "What is GScript?"
+}()
+```
+
+Higher-order agent construction:
+
+```gscript
+func make_agent(style) {
+    return agent(q) {
+        system: "Answer in this style: " .. style
+        user: q
+    }
+}
+
+brief := make_agent("brief")
+r, err := brief("Explain GScript")
+```
+
+Grammar:
+
+```ebnf
+AgentDecl = "agent" Ident [ParamList] AgentConfig [FlowBlock] ;
+AgentExpr = "agent" [ParamList] AgentConfig [FlowBlock] ;
+AgentConfig = "{" FieldBindings "}" ;
+FlowBlock = "flow" Block ;
+FieldBindings = { Ident ":" Expr [ "," | ";" ] } ;
+```
+
+`ParamList` follows function parameter syntax. `agent { ... }` is a no-argument
+anonymous agent.
+
+## 8. Agent Config Fields
+
+Common fields:
+
+```text
+model        optional logical model name
+system       optional system prompt string
+user         current user input; string/table/list accepted
+tools        ordered list of tool values
+output       output example / shape hint
+max_steps    max automatic loop steps
+budget       local budget table
+temperature  optional number
+top_p        optional number
+stream       optional stream callback
+metadata     optional trace/provider metadata table
+memory       optional stdlib memory strategy
+approve_when optional HITL predicate for tool calls
+```
+
+Defaults:
+
+```text
+model      = host default
+system     = ""
+user       = nil unless provided by config/body evaluation
+tools      = []
+max_steps  = 1 when tools is empty, host/default tool-loop limit otherwise
+budget     = host/default budget
+output     = plain text
+memory     = none
+stream     = off
+```
+
+The only required field for a no-arg agent expression is usually `user`.
+
+```gscript
+agent { user: "Summarize this file: " .. text }()
+```
+
+For named agents, `user` usually references a parameter:
+
+```gscript
+agent summarize(text) {
+    system: "Summarize clearly."
+    user: text
+}
+```
+
+## 9. Default Agent Execution
+
+Calling an agent returns `(result, err)`.
+
+```gscript
+r, err := answer("What is GScript?")
+```
+
+Result shape:
+
+```text
+result.status   "done" | "pending" | "stopped"
+result.text     final text answer
+result.value    structured output when output/json is used
+result.history  full updated conversation history
+result.usage    token/cost/latency metadata when provider reports it
+result.steps    number of model turns
+```
+
+Error shape:
+
+```text
+err.kind      "provider" | "network" | "timeout" | "cancelled" |
+              "budget" | "validation" | "capability" |
+              "tool" | "internal" | "stopped"
+err.message   human-readable message
+err.retryable optional bool
+err.status    optional provider status code
+err.tool      optional tool name
+err.cause     optional nested error/table
+```
+
+Default loop semantics:
+
+1. Build initial messages from `system`, optional existing history from runtime
+   call options, and `user`.
+2. Perform one `turn`.
+3. If the model returns final text, return `result.status == "done"`.
+4. If the model requests tools, dispatch them, append tool results to history,
+   and continue until final text, pending approval, `max_steps`, budget, cancel,
+   or provider/tool error.
+5. If `approve_when(call)` returns true, return `result.status == "pending"`
+   with a resumable token.
+
+The default strategy should be good enough for common tool-using agents.
+
+## 10. Output Examples
+
+`output` is an output example or shape hint, not an input/few-shot example.
+
+Text-shape hint:
+
+```gscript
+agent classify(text) {
+    system: "Classify sentiment."
+    user: text
+    output: "positive"
+}
+```
+
+Structured output hint:
+
+```gscript
+agent extract_contact(text) {
+    system: "Extract contact information."
+    user: text
+    output: {
+        name: "Ada Lovelace"
+        email: "ada@example.com"
+        company: "Analytical Engines"
+    }
+}
+
+r, err := extract_contact(email_body)
+print(r.value.email)
+```
+
+Rules:
+
+- `output` guides the model toward the desired shape.
+- Table output hints request structured output validation.
+- On success, decoded structured data is placed in `result.value`.
+- On validation failure, runtime may perform bounded repair according to host
+  policy; if repair fails, return `err.kind == "validation"`.
+
+## 11. History And Call Options
+
+The default syntax stays simple:
+
+```gscript
+r, err := chat("How do I embed it?")
+```
+
+History is optional and should be supplied by host/runtime call options rather
+than forcing every call to use an envelope table. The exact call-option syntax is
+an implementation detail for the parser/API phase, but the semantic model is:
+
+```text
+input is this call's user input
+history is previous conversation state
+runtime builds: system + history + input
+result.history is the updated history to save
+```
+
+If the language later gains named call options, the intended surface is:
+
+```gscript
+r, err := chat("How do I embed it?", history: session.history)
+session.history = r.history
+```
+
+Until then, Go embedding APIs can pass history through host call options and the
+stdlib may accept explicit option tables.
+
+## 12. Custom Multi-Turn Logic With `flow`
+
+Most agents should not need custom loop logic. When they do, an optional `flow`
+block takes over execution.
+
+```gscript
+agent support(message) {
+    system: "Support agent."
+    tools: [refund, lookup_order]
+    user: message
+    max_steps: 8
+} flow {
+    history := messages {
+        system: system
+        user: message
+    }
+
+    for i := 0; i < max_steps; i++ {
+        r, err := turn {
+            messages: history
+            tools: tools
+        }
+        if err != nil { return nil, err }
+
+        if r.status == "final_answer" {
+            return {status: "done", text: r.text, history: history}, nil
+        }
+
+        for _, c := range r.calls {
+            if c.tool == "refund" && c.args.amount > 100 {
+                return snapshot(history, c), nil
+            }
+
+            v, e := dispatch(c)
+            history = append(history, assistant_call(c))
+            if e != nil {
+                history = append(history, tool_error(c.id, e.message))
+            } else {
+                history = append(history, tool_result(c.id, v))
+            }
+        }
+    }
+
+    return nil, {kind: "stopped", message: "max steps"}
+}
+```
+
+Rules:
+
+- If no `flow` block is present, the default automatic multi-turn loop runs.
+- If `flow` is present, it is responsible for calling `turn`, dispatching tools,
+  and returning `(result, err)`.
+- Agent config fields are available in `flow` as local variables.
+- `flow` does not change provider binding or capability policy.
+
+## 13. Turn
+
+`turn` is the low-level primitive for one model call. It is for advanced users
+and for `flow` blocks.
+
+```gscript
+r, err := turn {
+    model: "strong"
+    messages: messages {
+        system: "Be concise."
+        user: question
+    }
+    tools: [search_docs]
+}
+```
+
+Semantics:
+
+- Calls the selected provider once.
+- Does not dispatch tools.
+- Does not loop.
+- Does not manage memory or history beyond the provided messages.
+- Returns `(result, err)`.
+
+Turn result shape:
+
+```text
+result.status = "final_answer" | "tool_calls" | "stop"
+result.text
+result.calls
+result.reason
+result.usage
+```
+
+Fields:
+
+```text
+model          optional logical model name
+messages       required ordered message list
+tools          optional ordered tool list
+force_tool     optional tool value | "any" | "none"
+max            optional {tokens, time}
+temperature    optional number
+top_p          optional number
+stop           optional list of strings
+metadata       optional table of strings
+stream         optional bool or callback
+output         optional output hint, same meaning as agent output
+```
+
+Lowering target:
+
+```gscript
+r, err := llm.turn({...})
+```
+
+## 14. Messages
+
+`messages` is a lightweight constructor for ordered message lists.
+
+```gscript
+history := messages {
+    system: "You are concise."
+    user: "Hello"
+    assistant: "Hi"
+    user: "Summarize this."
+}
+```
+
+It lowers to:
+
+```gscript
+[
+    {role: "system", text: "You are concise."},
+    {role: "user", text: "Hello"},
+    {role: "assistant", text: "Hi"},
+    {role: "user", text: "Summarize this."},
+]
+```
+
+Advanced entries may still be raw tables:
+
+```gscript
+history = append(history, [
+    {role: "assistant", tool_call: c},
+    {role: "tool", tool_use_id: c.id, value: v},
+])
+```
+
+`messages` exists to avoid forcing normal users to write `{role, text}` tables
+for common prompts. It is a data constructor, not a provider call.
+
+## 15. Budget
+
+Budget is optional and does not include money in the first language surface.
+
+```gscript
+budget {
+    turns: 8
+    calls: 16
+    tokens: 16000
+    time: 60s
+} {
+    return research(question)
+}
+```
+
+Agent-local budget:
+
+```gscript
+agent research(q) {
+    tools: [search_docs]
+    user: q
+    budget: {turns: 8, calls: 16, tokens: 16000, time: 60s}
+}
+```
+
+Rules:
+
+- Budget blocks are statements.
+- Budgets are ambient and nest by intersection.
+- Counters charge all active frames.
+- Exhaustion is observed at the next `turn` or tool dispatch.
+- Money/cost accounting remains host/provider policy for now.
+
+## 16. Capabilities
+
+Capabilities are strings:
+
+```gscript
+// gscript:requires docs.read net.http
 ```
 
 Built-in capability namespaces:
@@ -86,468 +614,25 @@ all           none
 
 Rules:
 
-- `none` means no host-sensitive capability.
-- `all` is legal only with an explicit linter warning suppression.
-- Unknown capability names are warnings by default and can be errors under
-  strict mode, allowing host applications to define private capabilities.
-- Tool capabilities are checked at load/lint time when all referenced tools are
-  statically visible.
-- Runtime checks remain authoritative. Static checks are a developer feedback
-  layer, not a security boundary.
+- Static checks are developer feedback.
+- Runtime capability checks remain authoritative.
+- Unknown capabilities are warnings by default and may be errors in strict mode.
+- `all` requires explicit lint suppression.
 
-## 4. Provider And Model Binding
+## 17. Memory And Retrieval
 
-Scripts use logical model names:
+Memory and retrieval are stdlib namespaces, not syntax.
 
 ```gscript
-agent summarize(text) {
-    model: "fast"
-} {
-    return react { messages: {user(text)} }
-}
-```
-
-The Go host binds `"fast"` to a provider, endpoint, key, timeout, retry policy,
-cost model, and audit policy.
-
-Script-level aliases are allowed, but they do not create providers:
-
-```gscript
-models {
-    default: "fast"
-    strong:  "reasoning"
-    cheap:   "small"
-}
-```
-
-Lowering target:
-
-```gscript
-llm.register_model_alias({
-    default: "fast",
-    strong: "reasoning",
-    cheap: "small",
-})
-```
-
-Non-goals:
-
-- Script syntax that directly reads API keys.
-- Script syntax that constructs HTTP provider clients.
-- Provider-specific keywords such as `openai` or `anthropic`.
-
-Reasoning: secrets and transport policy belong to the embedding host. This also
-keeps GLM/OpenAI/Anthropic/local gateways from leaking into the language syntax.
-
-## 5. Tool Declaration
-
-Syntax:
-
-```gscript
-@requires("docs.read")
-@desc("Search indexed documentation.")
-@params({
-    query: "natural-language search query",
-    limit: "maximum result count",
-})
-tool search_docs(query, limit) {
-    return docs.search(query, limit), nil
-}
-```
-
-Grammar:
-
-```ebnf
-ToolDecl = AttrList "tool" Ident "(" [ParamList] ")" Block ;
-AttrList = { Attribute } ;
-Attribute = "@" Ident "(" [ExprList] ")" ;
-```
-
-Rules:
-
-- `@requires(...)` is required. Use `@requires("none")` for pure tools.
-- `@desc(...)` is optional. If absent, formatter/linter may derive a summary
-  from the leading doc comment.
-- `@params({...})` is optional. Parameter names still come from the declaration.
-- Tool bodies return `(value, err)`.
-- Tool declarations bind a value with the same name in the surrounding scope.
-- Tools can close over state exactly like normal functions.
-
-Lowering:
-
-```gscript
-search_docs := llm.tool("search_docs", func(query, limit) {
-    return docs.search(query, limit), nil
-}, {
-    description: "Search indexed documentation.",
-    params: {"query", "limit"},
-    param_docs: {
-        query: "natural-language search query",
-        limit: "maximum result count",
-    },
-    requires: {"docs.read"},
-})
-```
-
-## 6. Turn Block
-
-`turn` is the only language primitive that may cause an LLM provider call.
-
-Syntax:
-
-```gscript
-result, err := turn {
-    model: "fast"
-    messages: {system("Be concise."), user(question)}
-    tools: {search_docs}
-    max: {tokens: 256}
-}
-```
-
-Named turn templates:
-
-```gscript
-turn classify(text) {
-    model: "cheap"
-    messages: {
-        system("Classify as positive, negative, or neutral."),
-        user(text),
-    }
-    max: {tokens: 16}
-}
-
-result, err := classify("GScript is useful")
-```
-
-Grammar:
-
-```ebnf
-TurnExpr = "turn" "{" FieldBindings "}" ;
-TurnDecl = "turn" Ident "(" [ParamList] ")" "{" FieldBindings "}" ;
-FieldBindings = { Ident ":" Expr [ "," | ";" ] } ;
-```
-
-Fields:
-
-```text
-model          optional string; defaults from nearest agent, then host default
-messages       required table/list of messages
-tools          optional table/list; defaults from nearest agent
-force_tool     optional tool value | "any" | "none"
-max            optional table: {tokens, time}
-temperature    optional number
-top_p          optional number
-stop           optional list of strings
-metadata       optional table of strings
-stream         optional bool or stream sink
-json           optional schema/table, see structured output
-```
-
-Return shape:
-
-```text
-(result, err)
-
-result.status = "final_answer" | "tool_calls" | "stop"
-result.text
-result.calls
-result.reason
-result.usage = {input_tokens, output_tokens, cost, latency}
-
-err.kind = "budget" | "deadline" | "cancelled" | "provider" | "network"
-```
-
-Lowering:
-
-```gscript
-result, err := llm.turn({
-    model: "fast",
-    messages: {llm.system("Be concise."), llm.user(question)},
-    tools: {search_docs},
-    max_tokens: 256,
-})
-```
-
-If `model` or `tools` are absent, lowering leaves them absent and the runtime
-fills them from the ambient agent frame.
-
-## 7. Structured Output
-
-Structured output is part of `turn`, not a separate keyword.
-
-```gscript
-result, err := turn {
-    messages: {user("Extract name and age from: Ada, 37")}
-    json: {
-        name: "string",
-        age:  "number",
-    }
-}
-
-person := result.value
-```
-
-Rules:
-
-- `json:` requests valid JSON and validates the response.
-- On success, `result.value` contains the decoded table.
-- On model formatting failure, the runtime may perform bounded repair retries
-  according to host policy.
-- If repair fails, return `err.kind == "validation"`.
-- Schema syntax is intentionally lightweight. It maps to provider-native JSON
-  schema when supported and to prompt+validator fallback otherwise.
-
-Supported schema atoms:
-
-```text
-"string" "number" "int" "bool" "any"
-{"array": <schema>}
-{"object": {field: schema, ...}}
-{"enum": {"a", "b", "c"}}
-```
-
-## 8. Streaming
-
-Streaming is expressed through `stream:` on `turn`.
-
-```gscript
-result, err := turn {
-    messages: {user("Write a short haiku.")}
-    stream: func(event) {
-        if event.type == "text" {
-            print(event.text)
-        }
-    }
-}
-```
-
-Stream event shape:
-
-```text
-{type: "start"}
-{type: "text", text}
-{type: "tool_call_delta", id, tool, args_delta}
-{type: "usage", usage}
-{type: "end", status}
-{type: "error", err}
-```
-
-Rules:
-
-- Streaming is optional. Providers without streaming may buffer and emit one
-  text event.
-- The final return value is still `(result, err)`.
-- Record/replay stores enough event data to replay stream callbacks
-  deterministically when enabled.
-
-## 9. Agent Declaration
-
-Agents are callable values with metadata and a body.
-
-```gscript
-agent research(question) {
-    model: "strong"
-    tools: {search_docs, read_url}
-    system: "You are a careful research assistant."
-    budget: {turns: 8, tokens: 16000, time: 60s}
-} {
-    return react {
-        messages: {user(question)}
-    }
-}
-```
-
-Grammar:
-
-```ebnf
-AgentDecl = AttrList "agent" Ident "(" [ParamList] ")" AgentMeta Block ;
-AgentExpr = AttrList "agent" "(" [ParamList] ")" AgentMeta Block ;
-AgentMeta = "{" FieldBindings "}" ;
-```
-
-Metadata fields:
-
-```text
-model       optional logical model name
-tools       optional table/list of tool values
-system      optional string
-budget      optional table, same fields as budget block
-memory      optional memory strategy
-caps        optional list of capabilities; default is union(tools.requires)
-policy      optional table, host/lint interpreted
-```
-
-Rules:
-
-- Calling an agent pushes an ambient agent frame.
-- `turn` and `react` inside the body inherit model/tools/system/budget from the
-  nearest agent frame.
-- Agent body returns ordinary `(value, err)`.
-- `system`, `model`, `tools`, and `memory` are also visible as local variables
-  in the body.
-- Agents can be passed around as normal values.
-
-Lowering outline:
-
-```gscript
-research := llm.agent("research", {
-    model: "strong",
-    tools: {search_docs, read_url},
-    system: "You are a careful research assistant.",
-    budget: {turns: 8, tokens: 16000, time: 60s},
-}, func(question) {
-    return loop.react({
-        messages: {llm.user(question)},
-    })
-})
-```
-
-The exact lowering can be compiler-internal; `llm.agent` need not be a public
-API if a direct ambient-frame bytecode operation is cleaner later.
-
-## 10. React Block
-
-`react` is syntax sugar for the common ReAct loop. It is not an LLM-call
-primitive; it eventually calls `turn`.
-
-```gscript
-answer, err := react {
-    messages: {user(question)}
-    max_steps: 6
-    approve_when: func(call) {
-        return call.tool == "refund" && call.args.amount > 100
-    }
-}
-```
-
-Fields are the existing `llm.react` / `loop.react` options:
-
-```text
-messages tools model max_steps max_history_tokens max_tool_retries
-force_tool budget metadata approve_when store
-```
-
-Lowering:
-
-```gscript
-answer, err := llm.react({...})
-```
-
-Rationale: a first-class `react` block is more ergonomic than requiring every
-user to write the manual turn/dispatch loop, while preserving `turn` as the only
-provider boundary.
-
-Grammar:
-
-```ebnf
-ReactExpr = "react" "{" FieldBindings "}" ;
-```
-
-## 11. Budget Block
-
-Syntax:
-
-```gscript
-budget {
-    turns: 8
-    tokens: 20000
-    time: 60s
-    money: 0.25
-} {
-    return research(question)
-}
-```
-
-Rules:
-
-- Budget blocks are statements.
-- Budgets are ambient and nest by intersection.
-- Counters charge all active frames.
-- Exhaustion is observed at the next `turn` or tool dispatch.
-
-Lowering:
-
-```gscript
-llm.with_budget({turns: 8, tokens: 20000, time: 60s, money: 0.25}, func() {
-    return research(question)
-})
-```
-
-Money literal `$0.25` is not part of the language. Numeric money fields keep the
-lexer simpler and avoid a provider-specific currency assumption.
-
-Grammar:
-
-```ebnf
-BudgetStmt = "budget" "{" FieldBindings "}" Block ;
-```
-
-## 12. Agent As Tool
-
-Agents can be exposed as tools explicitly:
-
-```gscript
-@requires("none")
-agent summarize(text) {
-    model: "fast"
-    system: "Summarize in three bullets."
-} {
-    return react { messages: {user(text)} }
-}
-
-summary_tool := toolof(summarize, {
-    name: "summarize",
-    description: "Summarize text.",
-})
-```
-
-`toolof` is a stdlib helper, not a keyword.
-
-Reasoning: implicit agent-as-tool conversion is convenient but too magical. An
-explicit helper makes capability and naming choices visible.
-
-## 13. Memory
-
-Memory is configured as agent metadata or passed to `react`.
-
-```gscript
-agent support(message) {
-    model: "fast"
+agent support(q) {
     memory: memory.window({tokens: 4000})
-} {
-    return react { messages: {user(message)} }
+    user: q
 }
 ```
 
-Required memory strategy interface:
-
-```text
-load(session)              -> history, err
-save(session, history)     -> nil, err
-compact(history, budget)   -> history, err
-```
-
-Built-in memory helpers are stdlib:
-
-```text
-memory.none()
-memory.window({tokens})
-memory.summary({model, tokens})
-memory.store(store, opts)
-```
-
-Non-goal for syntax:
-
-- Dedicated `memory {}` block.
-- Hidden persistent state unless an agent explicitly receives a session/store
-  through metadata or call options.
-
-## 14. Retrieval
-
-RAG is stdlib, not syntax.
-
 ```gscript
-@requires("docs.read")
+// search_docs searches project documentation.
+// gscript:requires docs.read
 tool search_docs(query) {
     return rag.search("project-docs", query, {limit: 5}), nil
 }
@@ -556,371 +641,312 @@ tool search_docs(query) {
 Required stdlib areas:
 
 ```text
+memory.none()
+memory.window({tokens})
+memory.summary({model, tokens})
+memory.store(store, opts)
+
 embed.provider(...)
 vector.index(...)
 rag.search(index, query, opts)
 rag.cite(results)
 ```
 
-Reasoning: retrieval backends differ too much to deserve syntax. The AI-native
-part is that tools and agents make retrieval capability-visible and easy to
-compose.
+## 18. Agent As Tool
 
-## 15. Error Model
+Agents can be exposed as tools explicitly:
 
-Errors remain plain tables.
-
-Common shape:
-
-```text
-{
-    kind:    "provider" | "network" | "validation" | "policy" |
-             "budget" | "deadline" | "cancelled" | "capability" |
-             "user" | "internal" | "stopped",
-    message: string,
-    status:  optional number,
-    cause:   optional value,
+```gscript
+agent summarize(text) {
+    system: "Summarize in three bullets."
+    user: text
 }
+
+summary_tool := toolof(summarize, {
+    name: "summarize",
+    description: "Summarize text.",
+    requires: ["none"],
+})
 ```
 
-Tool error handling categories:
+Implicit agent-to-tool conversion is not part of the language. Explicit
+conversion keeps name, description, and capability choices visible.
 
-```text
-transient:   network provider internal
-recoverable: validation policy user capability
-fatal:       everything else
-```
-
-The categories are defaults for `react`. Manual loops can choose different
-policy.
-
-## 16. Message Constructors
-
-AI syntax imports short message constructors into agent bodies:
-
-```gscript
-system("...")
-user("...")
-assistant("...")
-tool_result(id, value)
-tool_error(id, message)
-assistant_call(call)
-```
-
-Outside agent bodies, the canonical stdlib names remain available:
-
-```gscript
-llm.system(...)
-llm.user(...)
-```
-
-Lowering inside agent body rewrites short names to `llm.*` only if no local
-binding shadows them.
-
-## 17. Static Analysis
+## 19. Static Analysis
 
 The compiler/linter should build an AI metadata index:
 
 ```text
 tools:
-  name, params, desc, requires, source span
+  name, params, doc, requires, source span
 agents:
-  name, model, tools, caps, budget, source span
+  name, params, model, tools, output, budget, source span
 turns:
-  model, tools, json schema, stream, source span
+  model, tools, output, stream, source span
 ```
 
 Checks:
 
-- `tool` missing `@requires`.
-- `agent.tools` references unknown/non-tool value when statically known.
-- `agent.caps` does not include tool requirements.
-- host capability policy does not include agent/tool requirements.
-- `turn` has neither explicit model nor ambient/default model.
-- `turn` has neither explicit messages nor messages inherited by a helper.
-- `json:` schema is malformed.
-- `stream:` callback is not callable when statically known.
-- duplicate model aliases.
+- `tool` missing `gscript:requires`.
+- `agent.tools` references unknown/non-tool values when statically known.
+- Host capability policy does not include tool requirements.
+- `turn` has no messages.
+- `output` table is malformed.
+- `stream` callback is not callable when statically known.
+- Duplicate model aliases.
 
 Static analysis never replaces runtime checks.
 
-## 18. Desugaring Order
-
-Source pipeline:
+## 20. Desugaring Order
 
 ```text
 lex/parse
-  -> attach attributes
+  -> attach doc directives
   -> build AI metadata index
   -> AI lint/capability checks
   -> desugar AI syntax to core AST/std-lib calls
   -> normal compile/interpreter/VM/JIT pipeline
 ```
 
-This order keeps formatter/linter aware of source syntax while keeping runtime
-execution mostly on existing mechanisms.
+This keeps formatter/linter aware of source syntax while preserving the existing
+runtime as the first lowering target.
 
-## 18.1 Canonical Desugaring Shapes
+## 21. Canonical Desugaring
 
-Implementations may use direct AST nodes internally, but the observable behavior
+Implementations may use direct AST nodes internally, but observable behavior
 must match these shapes.
 
 Tool:
 
 ```gscript
-@requires("docs.read")
-@desc("Search docs.")
+// search_docs searches docs.
+// gscript:requires docs.read
 tool search_docs(query) {
     return docs.search(query), nil
 }
 ```
 
-lowers as if written:
+as if:
 
 ```gscript
 search_docs := llm.tool("search_docs", func(query) {
     return docs.search(query), nil
 }, {
-    description: "Search docs.",
-    params: {"query"},
-    requires: {"docs.read"},
+    description: "search_docs searches docs.",
+    params: ["query"],
+    requires: ["docs.read"],
 })
 ```
 
-Agent:
+Simple agent:
 
 ```gscript
-agent answer(question) {
-    model: "strong"
-    tools: {search_docs}
-    system: "Be precise."
-} {
-    return react { messages: {user(question)} }
+agent answer(q) {
+    system: "Answer briefly."
+    user: q
 }
 ```
 
-lowers as if written:
+as if:
 
 ```gscript
-answer := llm.agent("answer", {
-    model: "strong",
-    tools: {search_docs},
-    system: "Be precise.",
-}, func(question) {
-    return llm.react({
-        messages: {llm.user(question)},
+answer := llm.agent("answer", func(q) {
+    return {
+        system: "Answer briefly.",
+        user: q,
+    }
+}, nil)
+```
+
+Anonymous IIFE:
+
+```gscript
+r, err := agent { user: "hello" }()
+```
+
+as if:
+
+```gscript
+r, err := llm.agent("", func() {
+    return {user: "hello"}
+}, nil)()
+```
+
+Flow agent:
+
+```gscript
+agent support(q) {
+    tools: [refund]
+    user: q
+} flow {
+    return turn { messages: messages { user: q }, tools: tools }
+}
+```
+
+as if:
+
+```gscript
+support := llm.agent("support", func(q) {
+    return {
+        tools: [refund],
+        user: q,
+    }
+}, func(q) {
+    return llm.turn({
+        messages: messages { user: q },
+        tools: tools,
     })
 })
 ```
 
-Turn:
+The compiler can avoid allocating closure objects when a cleaner internal
+representation is available, but record/replay, trace events, budgets, and
+errors must remain equivalent.
+
+Agent defaults:
 
 ```gscript
-r, err := turn {
-    messages: {user(question)}
-    max: {tokens: 256}
+agent defaults {
+    model: "strong"
+    tools: [search_docs]
+}
+
+agent answer(q) {
+    user: q
 }
 ```
 
-lowers as if written:
+as if each agent in the module captured merged config:
 
 ```gscript
-r, err := llm.turn({
-    messages: {llm.user(question)},
-    max_tokens: 256,
-})
-```
-
-Budget:
-
-```gscript
-budget { turns: 4 } {
-    return answer(question)
-}
-```
-
-lowers as if written:
-
-```gscript
-return llm.with_budget({turns: 4}, func() {
-    return answer(question)
-})
-```
-
-The compiler can avoid allocating closure objects for these forms when it has a
-cleaner internal representation, but errors, trace events, record/replay, and
-ambient defaults must remain equivalent to the stdlib form.
-
-## 19. Compatibility With Existing Stdlib API
-
-The current stdlib remains public:
-
-```gscript
-llm.tool(...)
-llm.turn(...)
-llm.react(...)
-loop.react(...)
-```
-
-The new syntax is preferred for authored source, but stdlib calls remain useful
-for dynamic construction and embedding tests.
-
-The following equivalences must hold:
-
-```gscript
-tool t(x) { return x, nil }
-```
-
-is equivalent to a generated `llm.tool`.
-
-```gscript
-turn { messages: {user("hi")} }
-```
-
-is equivalent to `llm.turn({...})` after ambient defaults are applied.
-
-```gscript
-react { messages: {user("hi")} }
-```
-
-is equivalent to `llm.react({...})` after ambient defaults are applied.
-
-## 20. Examples
-
-### 20.1 Single Turn
-
-```gscript
-agent classify(text) {
-    model: "cheap"
-    system: "Return one of: positive, negative, neutral."
-} {
-    r, err := turn {
-        messages: {system(system), user(text)}
-        max: {tokens: 8}
+answer := llm.agent("answer", func(q) {
+    return {
+        model: "strong",
+        tools: [search_docs],
+        user: q,
     }
-    if err != nil { return nil, err }
-    return r.text, nil
+}, nil)
+```
+
+## 22. Examples
+
+### 22.1 One-Off Question
+
+```gscript
+r, err := agent {
+    user: "What is GScript?"
+}()
+print(r.text)
+```
+
+### 22.2 Named Assistant
+
+```gscript
+agent answer(q) {
+    system: "Answer in one short paragraph."
+    user: q
 }
 ```
 
-### 20.2 Tool-Using Agent
+### 22.3 Tool-Using Agent
 
 ```gscript
-@requires("docs.read")
-@desc("Search project documentation.")
+// search_docs searches project documentation.
+// gscript:requires docs.read
 tool search_docs(query) {
     return docs.search(query, {limit: 5}), nil
 }
 
-agent answer(question) {
-    model: "strong"
-    tools: {search_docs}
-    system: "Answer using tools when needed. Cite the source title."
-    budget: {turns: 6, tokens: 8000}
-} {
-    return react {
-        messages: {system(system), user(question)}
-        max_tool_retries: 1
-    }
+agent answer_docs(q) {
+    system: "Use docs when useful. Cite sources."
+    tools: [search_docs]
+    user: q
+    max_steps: 6
 }
 ```
 
-### 20.3 Structured Extraction
+### 22.4 Structured Extraction
 
 ```gscript
 agent extract_contact(text) {
-    model: "fast"
-} {
+    system: "Extract contact information."
+    user: text
+    output: {
+        name: "Ada Lovelace"
+        email: "ada@example.com"
+    }
+}
+```
+
+### 22.5 Module Defaults
+
+```gscript
+agent defaults {
+    model: "strong"
+    system: "Use docs when useful. Cite sources."
+    tools: [search_docs]
+    max_steps: 6
+}
+
+agent answer_docs(q) {
+    user: q
+}
+
+agent explain_code(code) {
+    system: system + "\nFocus on correctness risks."
+    user: code
+}
+```
+
+### 22.6 Custom Flow
+
+```gscript
+agent manual(q) {
+    tools: [search_docs]
+    user: q
+} flow {
+    history := messages { user: q }
     r, err := turn {
-        messages: {user(text)}
-        json: {
-            name: "string",
-            email: "string",
-            tags: {"array": "string"},
-        }
+        messages: history
+        tools: tools
     }
     if err != nil { return nil, err }
-    return r.value, nil
+    return r, nil
 }
 ```
 
-### 20.4 Streaming
+## 23. Accepted Decisions
 
-```gscript
-agent draft(topic) {
-    model: "fast"
-} {
-    return turn {
-        messages: {user("Draft a paragraph about " .. topic)}
-        stream: func(e) {
-            if e.type == "text" { print(e.text) }
-        }
-    }
-}
-```
+1. `agent` is the main user-facing AI construct and defaults to automatic
+   multi-turn execution.
+2. `agent` is a first-class callable value: named, anonymous, assignable,
+   passable, returnable, and IIFE-callable.
+3. `react` is not a keyword. It remains a stdlib/default strategy concept.
+4. Tool metadata uses Go-style doc comments plus `gscript:` directives, not
+   decorators.
+5. `output` is an output example/shape hint, not an input example.
+6. `flow` is the advanced escape hatch for custom multi-turn logic.
+7. `turn` is the single-call low-level primitive.
+8. Provider binding stays in Go host code.
+9. Budget does not include money in the first language surface.
+10. `agent defaults { ... }` provides module-scope default agent configuration
+    without nesting ordinary code.
 
-### 20.5 Manual Turn Loop With HITL
+## 24. Implementation Milestones
 
-```gscript
-@requires("payment.refund")
-tool refund(order_id, amount) {
-    return payments.refund(order_id, amount), nil
-}
-
-agent support(message) {
-    model: "strong"
-    tools: {refund}
-    system: "Help the customer. Ask for approval before large refunds."
-} {
-    history := {system(system), user(message)}
-    for i := 0; i < 8; i++ {
-        r, err := turn { messages: history }
-        if err != nil { return nil, err }
-        if r.status == "final_answer" { return r.text, nil }
-        if r.status == "stop" {
-            return nil, {kind: "stopped", message: r.reason}
-        }
-        for _, c := range r.calls {
-            history = append(history, assistant_call(c))
-            if c.tool == "refund" && c.args.amount > 100 {
-                return {status: "pending", token: snapshot(history, c)}, nil
-            }
-            v, e := dispatch(c)
-            if e != nil {
-                history = append(history, tool_error(c.id, e.message))
-            } else {
-                history = append(history, tool_result(c.id, v))
-            }
-        }
-    }
-    return nil, {kind: "stopped", message: "max turns"}
-}
-```
-
-## 21. Accepted Decisions
-
-These decisions are fixed for the first implementation:
-
-1. `react` is a keyword/block and lowers to `llm.react`.
-2. Short message constructors are available as sugar only inside agent bodies.
-3. `models` is syntax for logical aliases only; provider binding stays in Go
-   host code.
-4. `budget {}` is a statement, not an expression.
-5. Money literals such as `$0.25` are not supported; use numeric money fields.
-6. `memory` and `rag` remain standard library namespaces, not keywords.
-
-## 22. Implementation Milestones After Design Approval
-
-1. Parser accepts attributes and stores them on AST nodes.
-2. Parser accepts `tool` declarations and lowers to existing `llm.tool`.
-3. Runtime adds ambient agent frame support used by `turn`, `dispatch`, and
-   `react`.
-4. Parser accepts `agent` declarations and lowers to ambient-frame execution.
-5. Parser accepts `turn` block expressions/declarations and lowers to
-   `llm.turn`.
-6. Parser accepts `react` block expressions and lowers to `llm.react`.
-7. Parser accepts `budget` blocks and lowers to ambient budget frames.
-8. Linter emits AI metadata/capability diagnostics.
-9. Formatter preserves attributes and formats AI blocks.
-10. Integration tests cover stdlib-vs-syntax equivalence, real provider gated
-    smoke, record/replay, streaming, structured output, and capability failures.
+1. Parser accepts list literals (`[...]`) if not already supported in the target
+   branch.
+2. Parser preserves tool doc comments and extracts `gscript:` directives.
+3. Parser accepts `tool` declarations and lowers to existing `llm.tool`.
+4. Runtime adds `llm.agent` / ambient agent frame support for default execution.
+5. Parser accepts named and anonymous `agent` values.
+6. Parser accepts optional `flow` blocks.
+7. Parser accepts `agent defaults` declarations.
+8. Parser accepts `messages` constructors.
+9. Parser accepts `turn` blocks and lowers to `llm.turn`.
+10. Parser accepts `budget` blocks and lowers to ambient budget frames.
+11. Linter emits AI metadata/capability diagnostics.
+12. Formatter preserves doc directives and formats AI blocks.
+13. Tests cover stdlib-vs-syntax equivalence, anonymous agents/IIFE, defaults,
+    real provider gated smoke, record/replay, output validation, and flow
+    behavior.
