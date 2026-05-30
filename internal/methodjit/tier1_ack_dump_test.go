@@ -33,7 +33,7 @@ import (
 const ackTotalInsnBaseline = 936
 
 func TestDumpTier1_AckermannBody(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
 	if err != nil {
 		t.Fatalf("read ackermann.gs: %v", err)
 	}

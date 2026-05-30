@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Collect a reusable benchmark diagnostics bundle.
 
-The script is intentionally benchmark-agnostic. It discovers suite, extended,
-variant, and official-hot benchmarks with the same selector rules as
-timing_compare.py, then stores per-benchmark artifacts for tiering, exits,
-runtime paths, speculation, and optional CPU/warm JIT mapping.
+The script is intentionally benchmark-agnostic. It discovers domain benchmarks
+with the same selector rules as timing_compare.py, then stores per-benchmark
+artifacts for tiering, exits, runtime paths, speculation, and optional CPU/warm
+JIT mapping.
 """
 
 from __future__ import annotations
@@ -597,7 +597,7 @@ def positive_int(value: str) -> int:
 def groups_for_args(args: argparse.Namespace) -> list[str]:
     if args.all_groups:
         return list(timing.GROUPS)
-    groups = list(args.group or ["suite"])
+    groups = list(args.group or timing.GROUPS)
     for selector in args.bench or []:
         if "/" not in selector:
             continue

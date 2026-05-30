@@ -197,7 +197,7 @@ fi
 if [ "$RUN_BENCHMARKS" -eq 1 ]; then
     if have_cmd python3 && [ -f benchmarks/timing_compare.py ]; then
         if ! run_logged "Benchmark Quick Summary" "$OUT_DIR/benchmark_quick.log" \
-            "python3 benchmarks/timing_compare.py --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --bench=suite/sieve --json '$OUT_DIR/benchmark_quick.json' --markdown '$OUT_DIR/benchmark_quick.md'" \
+            "python3 benchmarks/timing_compare.py --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --bench=control/sieve --json '$OUT_DIR/benchmark_quick.json' --markdown '$OUT_DIR/benchmark_quick.md'" \
             "$OUT_DIR/benchmark_quick.status"; then
             failures=$((failures + 1))
         fi
@@ -212,7 +212,7 @@ if [ "$RUN_BENCHMARKS" -eq 1 ]; then
 
     if have_cmd python3 && [ -f benchmarks/strict_guard.py ]; then
         if ! run_logged "Strict Guard Summary" "$OUT_DIR/strict_guard.log" \
-            "python3 benchmarks/strict_guard.py --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --mode=vm --mode=default --mode=no_filter --bench=suite/sieve --json '$OUT_DIR/strict_guard.json' --markdown '$OUT_DIR/strict_guard.md'" \
+            "python3 benchmarks/strict_guard.py --runs=1 --warmup=0 --timeout=30 --min-sample-seconds=0.001 --max-repeat=1 --no-luajit --mode=vm --mode=default --mode=no_filter --bench=control/sieve --json '$OUT_DIR/strict_guard.json' --markdown '$OUT_DIR/strict_guard.md'" \
             "$OUT_DIR/strict_guard.status"; then
             failures=$((failures + 1))
         fi

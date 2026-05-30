@@ -56,7 +56,7 @@ func TestFeatureMatrixSchema(t *testing.T) {
 			t.Fatalf("missing field_notes entry for %q", field)
 		}
 	}
-	for _, field := range []string{"parser", "bytecode", "interpreter", "tier1", "tier2", "semantic_gate", "official_case", "perf_hot_case"} {
+	for _, field := range []string{"parser", "bytecode", "interpreter", "tier1", "tier2", "semantic_gate", "conformance_case", "perf_hot_case"} {
 		if !required[field] {
 			t.Fatalf("required_fields missing %q", field)
 		}

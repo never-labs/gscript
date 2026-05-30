@@ -11,7 +11,7 @@ import (
 
 func recordPairwiseDriverLoopSource(t *testing.T, steps string) string {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "nbody.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "nbody.gs"))
 	if err != nil {
 		t.Fatalf("read nbody benchmark: %v", err)
 	}

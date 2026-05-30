@@ -137,7 +137,7 @@ func caller(f, n) {
 func TestTier1CallICNoFilterClosureBenchDoesNotCrash(t *testing.T) {
 	t.Setenv("GSCRIPT_TIER2_NO_FILTER", "1")
 
-	src, err := os.ReadFile("../../benchmarks/suite/closure_bench.gs")
+	src, err := os.ReadFile("../../benchmarks/calls/closure_bench.gs")
 	if err != nil {
 		t.Fatalf("read closure_bench.gs: %v", err)
 	}

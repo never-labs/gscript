@@ -41,7 +41,7 @@ import (
 // below 3 (one per CALL site in ackermann), the optimization was reverted
 // or the STR was merged back into the shared join.
 func TestSelfCall_ConstantsStrMoved(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
 	if err != nil {
 		t.Fatalf("read ackermann.gs: %v", err)
 	}

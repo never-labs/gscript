@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Benchmark comparison and regression guard for GScript.
 
-Runs suite benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
+Runs domain benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
 modes. Each benchmark/mode is isolated so a timeout or crash records a row but
 does not abort the full run.
 """
@@ -26,29 +26,30 @@ from typing import Iterable
 
 
 DEFAULT_BENCHMARKS = [
-    "fib",
-    "fib_recursive",
-    "sieve",
-    "mandelbrot",
-    "ackermann",
-    "matmul",
-    "spectral_norm",
-    "nbody",
-    "fannkuch",
-    "sort",
-    "sum_primes",
-    "mutual_recursion",
-    "method_dispatch",
-    "closure_bench",
-    "string_bench",
-    "binary_trees",
-    "table_field_access",
-    "table_array_access",
-    "coroutine_bench",
-    "fibonacci_iterative",
-    "math_intensive",
-    "object_creation",
+    "recursion/fib",
+    "recursion/fib_recursive",
+    "control/sieve",
+    "numeric/mandelbrot",
+    "recursion/ackermann",
+    "numeric/matmul",
+    "numeric/spectral_norm",
+    "numeric/nbody",
+    "numeric/fannkuch",
+    "table/sort",
+    "numeric/sum_primes",
+    "recursion/mutual_recursion",
+    "calls/method_dispatch",
+    "calls/closure_bench",
+    "string/string_bench",
+    "recursion/binary_trees",
+    "table/table_field_access",
+    "table/table_array_access",
+    "calls/coroutine_bench",
+    "recursion/fibonacci_iterative",
+    "numeric/math_intensive",
+    "calls/object_creation",
 ]
+BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
 
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
@@ -206,6 +207,21 @@ def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None)
     return sample
 
 
+def resolve_benchmark(root: Path, bench: str) -> tuple[str, Path, Path | None]:
+    if "/" in bench:
+        group, name = bench.split("/", 1)
+        groups = [group]
+    else:
+        name = bench
+        groups = list(BENCHMARK_GROUPS)
+    for group in groups:
+        gs = root / "benchmarks" / group / f"{name}.gs"
+        if gs.exists():
+            lua = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
+            return f"{group}/{name}", gs, lua if lua.exists() else None
+    return bench, root / "benchmarks" / "__missing__" / f"{name}.gs", None
+
+
 def run_mode(
     mode: str,
     bench: str,
@@ -216,27 +232,26 @@ def run_mode(
     timeout: int,
 ) -> ModeResult:
     samples: list[RunSample] = []
-    suite_file = root / "benchmarks" / "suite" / f"{bench}.gs"
-    lua_file = root / "benchmarks" / "lua" / f"{bench}.lua"
+    _bench_id, script_file, lua_file = resolve_benchmark(root, bench)
 
     if mode == "luajit":
         if luajit_bin is None:
             return ModeResult(status="skipped")
-        if not lua_file.exists():
+        if lua_file is None or not lua_file.exists():
             return ModeResult(status="missing")
         cmd = [luajit_bin, str(lua_file)]
         env = None
     else:
-        if not suite_file.exists():
+        if not script_file.exists():
             return ModeResult(status="missing")
         env = os.environ.copy()
         if mode == "vm":
-            cmd = [str(gscript_bin), "-vm", str(suite_file)]
+            cmd = [str(gscript_bin), "-vm", str(script_file)]
         elif mode == "default":
-            cmd = [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(suite_file)]
+            cmd = [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script_file)]
         elif mode == "no_filter":
             env["GSCRIPT_TIER2_NO_FILTER"] = "1"
-            cmd = [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(suite_file)]
+            cmd = [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script_file)]
         else:
             raise ValueError(f"unknown mode: {mode}")
 
@@ -474,13 +489,14 @@ def main(argv: list[str] | None = None) -> int:
         build_gscript(root, gscript_bin)
         results: list[BenchmarkResult] = []
         for bench in benchmarks:
-            row = BenchmarkResult(benchmark=bench)
+            bench_id, _script_file, _lua_file = resolve_benchmark(root, bench)
+            row = BenchmarkResult(benchmark=bench_id)
             row.vm = run_mode("vm", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
             row.default = run_mode("default", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
             row.no_filter = run_mode("no_filter", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
             row.luajit = run_mode("luajit", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
 
-            base = baseline.get(bench)
+            base = baseline.get(bench_id) or baseline.get(bench)
             row.baseline_seconds = base
             if base is not None and row.default and row.default.seconds is not None and base > 0:
                 row.regression_pct = ((row.default.seconds / base) - 1.0) * 100.0

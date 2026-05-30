@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
-DEFAULT_SUITE = [
+DEFAULT_ORDER = [
     "fib",
     "fib_recursive",
     "sieve",
@@ -52,44 +52,153 @@ DEFAULT_SUITE = [
     "object_creation",
 ]
 
-GROUPS = ["suite", "extended", "variants", "official", "data_oriented"]
+GROUPS = ["numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control"]
+LEGACY_GROUP_ALIASES = {
+    "suite": ["numeric", "recursion", "table", "calls", "string", "control"],
+    "extended": ["app", "table", "string", "concurrency"],
+    "variants": ["recursion", "calls", "numeric", "table"],
+    "official": ["calls", "control", "table", "string", "app"],
+    "data_oriented": ["data"],
+}
+LEGACY_BENCH_ALIASES = {
+    "recursion/ackermann": "recursion/ackermann",
+    "recursion/binary_trees": "recursion/binary_trees",
+    "calls/closure_bench": "calls/closure_bench",
+    "calls/coroutine_bench": "calls/coroutine_bench",
+    "numeric/fannkuch": "numeric/fannkuch",
+    "recursion/fib": "recursion/fib",
+    "recursion/fib_recursive": "recursion/fib_recursive",
+    "recursion/fibonacci_iterative": "recursion/fibonacci_iterative",
+    "numeric/mandelbrot": "numeric/mandelbrot",
+    "numeric/math_intensive": "numeric/math_intensive",
+    "numeric/matmul": "numeric/matmul",
+    "numeric/matmul_dense": "numeric/matmul_dense",
+    "numeric/matmul_dense_split2": "numeric/matmul_dense_split2",
+    "numeric/matmul_dense_tb": "numeric/matmul_dense_tb",
+    "numeric/matmul_dense_unroll2": "numeric/matmul_dense_unroll2",
+    "calls/method_dispatch": "calls/method_dispatch",
+    "recursion/mutual_recursion": "recursion/mutual_recursion",
+    "numeric/nbody": "numeric/nbody",
+    "numeric/nbody_dense": "numeric/nbody_dense",
+    "calls/object_creation": "calls/object_creation",
+    "control/sieve": "control/sieve",
+    "table/sort": "table/sort",
+    "numeric/spectral_norm": "numeric/spectral_norm",
+    "numeric/spectral_norm_dense": "numeric/spectral_norm_dense",
+    "string/string_bench": "string/string_bench",
+    "numeric/sum_primes": "numeric/sum_primes",
+    "table/table_array_access": "table/table_array_access",
+    "table/table_field_access": "table/table_field_access",
+    "app/actors_dispatch_mutation": "app/actors_dispatch_mutation",
+    "table/groupby_nested_agg": "table/groupby_nested_agg",
+    "table/json_table_walk": "table/json_table_walk",
+    "string/log_tokenize_format": "string/log_tokenize_format",
+    "app/mixed_inventory_sim": "app/mixed_inventory_sim",
+    "concurrency/producer_consumer_pipeline": "concurrency/producer_consumer_pipeline",
+    "recursion/ack_nested_shifted": "recursion/ack_nested_shifted",
+    "calls/closure_accumulator": "calls/closure_accumulator",
+    "numeric/matmul_row": "numeric/matmul_row",
+    "table/sort_mixed_numeric": "table/sort_mixed_numeric",
+    "calls/call_len_pairs_metamethod": "calls/call_len_pairs_metamethod",
+    "calls/calls_vararg_coroutine": "calls/calls_vararg_coroutine",
+    "control/defer_protected": "control/defer_protected",
+    "table/events_metamethod": "table/events_metamethod",
+    "string/math_bit_utf8": "string/math_bit_utf8",
+    "table/nextvar_table": "table/nextvar_table",
+    "string/regexp_random": "string/regexp_random",
+    "app/stdlib_host": "app/stdlib_host",
+    "string/strings_patterns": "string/strings_patterns",
+    "table/table_sort_proxy": "table/table_sort_proxy",
+}
+LEGACY_BENCH_ALIASES.update({
+    "suite/ackermann": "recursion/ackermann",
+    "suite/binary_trees": "recursion/binary_trees",
+    "suite/closure_bench": "calls/closure_bench",
+    "suite/coroutine_bench": "calls/coroutine_bench",
+    "suite/fannkuch": "numeric/fannkuch",
+    "suite/fib": "recursion/fib",
+    "suite/fib_recursive": "recursion/fib_recursive",
+    "suite/fibonacci_iterative": "recursion/fibonacci_iterative",
+    "suite/mandelbrot": "numeric/mandelbrot",
+    "suite/math_intensive": "numeric/math_intensive",
+    "suite/matmul": "numeric/matmul",
+    "suite/matmul_dense": "numeric/matmul_dense",
+    "suite/matmul_dense_split2": "numeric/matmul_dense_split2",
+    "suite/matmul_dense_tb": "numeric/matmul_dense_tb",
+    "suite/matmul_dense_unroll2": "numeric/matmul_dense_unroll2",
+    "suite/method_dispatch": "calls/method_dispatch",
+    "suite/mutual_recursion": "recursion/mutual_recursion",
+    "suite/nbody": "numeric/nbody",
+    "suite/nbody_dense": "numeric/nbody_dense",
+    "suite/object_creation": "calls/object_creation",
+    "suite/sieve": "control/sieve",
+    "suite/sort": "table/sort",
+    "suite/spectral_norm": "numeric/spectral_norm",
+    "suite/spectral_norm_dense": "numeric/spectral_norm_dense",
+    "suite/string_bench": "string/string_bench",
+    "suite/sum_primes": "numeric/sum_primes",
+    "suite/table_array_access": "table/table_array_access",
+    "suite/table_field_access": "table/table_field_access",
+    "extended/actors_dispatch_mutation": "app/actors_dispatch_mutation",
+    "extended/groupby_nested_agg": "table/groupby_nested_agg",
+    "extended/json_table_walk": "table/json_table_walk",
+    "extended/log_tokenize_format": "string/log_tokenize_format",
+    "extended/mixed_inventory_sim": "app/mixed_inventory_sim",
+    "extended/producer_consumer_pipeline": "concurrency/producer_consumer_pipeline",
+    "variants/ack_nested_shifted": "recursion/ack_nested_shifted",
+    "variants/closure_accumulator_variant": "calls/closure_accumulator",
+    "variants/matmul_row_variant": "numeric/matmul_row",
+    "variants/sort_mixed_numeric": "table/sort_mixed_numeric",
+    "official/call_len_pairs_metamethod_hot": "calls/call_len_pairs_metamethod",
+    "official/calls_vararg_coroutine_hot": "calls/calls_vararg_coroutine",
+    "official/defer_protected_hot": "control/defer_protected",
+    "official/events_metamethod_hot": "table/events_metamethod",
+    "official/math_bit_utf8_hot": "string/math_bit_utf8",
+    "official/nextvar_table_hot": "table/nextvar_table",
+    "official/regexp_random_hot": "string/regexp_random",
+    "official/stdlib_host_hot": "app/stdlib_host",
+    "official/strings_patterns_hot": "string/strings_patterns",
+    "official/table_sort_proxy_hot": "table/table_sort_proxy",
+    "data_oriented/soa_affine_many_hot": "data/soa_affine_many",
+    "data_oriented/soa_masked_aggregate_hot": "data/soa_masked_aggregate",
+})
 MODES = ["default", "vm", "no_filter"]
 TIME_SOURCES = ["auto", "script", "wall"]
 
 HOT_SCALE_PROFILE = [
-    "suite/mutual_recursion:REPS=1000000",
-    "suite/matmul_dense_unroll2:N=600",
-    "suite/method_dispatch:N=50000000",
-    "suite/spectral_norm:N=2000",
-    "suite/table_array_access:REPS=4000",
-    "suite/coroutine_bench:N1=1000000",
-    "suite/coroutine_bench:N2=500000",
-    "suite/coroutine_bench:N3=1000000",
-    "extended/actors_dispatch_mutation:N=15000",
-    "extended/actors_dispatch_mutation:TICKS=3000",
-    "extended/log_tokenize_format:PASSES=24",
-    "variants/closure_accumulator_variant:INT_REPS=8000000",
-    "variants/closure_accumulator_variant:FLOAT_REPS=8000000",
-    "official/call_len_pairs_metamethod_hot:GROUPS=1920",
-    "official/call_len_pairs_metamethod_hot:REPS=1920",
-    "official/calls_vararg_coroutine_hot:N_CALLS=880000",
-    "official/calls_vararg_coroutine_hot:N_CORO=360000",
-    "official/defer_protected_hot:PROTECTED_N=720000",
-    "official/defer_protected_hot:COROUTINE_N=180000",
-    "official/events_metamethod_hot:N=2400000",
-    "official/math_bit_utf8_hot:N=720000",
-    "official/nextvar_table_hot:SIZE=5200",
-    "official/nextvar_table_hot:REPS=180",
-    "official/nextvar_table_hot:ALLOC_N=1400",
-    "official/nextvar_table_hot:ALLOC_REPS=360",
-    "official/regexp_random_hot:N=144000",
-    "official/stdlib_host_hot:N=28000",
-    "official/table_sort_proxy_hot:N=840",
-    "official/table_sort_proxy_hot:PASSES=3000",
-    "data_oriented/soa_affine_many_hot:STEPS=600",
-    "data_oriented/soa_masked_aggregate_hot:REPS=2400",
-    "data_oriented/soa_filter_gather_hot:FILTER_REPS=360",
-    "data_oriented/soa_filter_gather_hot:GATHER_REPS=360",
+    "recursion/mutual_recursion:REPS=1000000",
+    "numeric/matmul_dense_unroll2:N=600",
+    "calls/method_dispatch:N=50000000",
+    "numeric/spectral_norm:N=2000",
+    "table/table_array_access:REPS=4000",
+    "calls/coroutine_bench:N1=1000000",
+    "calls/coroutine_bench:N2=500000",
+    "calls/coroutine_bench:N3=1000000",
+    "app/actors_dispatch_mutation:N=15000",
+    "app/actors_dispatch_mutation:TICKS=3000",
+    "string/log_tokenize_format:PASSES=24",
+    "calls/closure_accumulator:INT_REPS=8000000",
+    "calls/closure_accumulator:FLOAT_REPS=8000000",
+    "calls/call_len_pairs_metamethod:GROUPS=1920",
+    "calls/call_len_pairs_metamethod:REPS=1920",
+    "calls/calls_vararg_coroutine:N_CALLS=880000",
+    "calls/calls_vararg_coroutine:N_CORO=360000",
+    "control/defer_protected:PROTECTED_N=720000",
+    "control/defer_protected:COROUTINE_N=180000",
+    "table/events_metamethod:N=2400000",
+    "string/math_bit_utf8:N=720000",
+    "table/nextvar_table:SIZE=5200",
+    "table/nextvar_table:REPS=180",
+    "table/nextvar_table:ALLOC_N=1400",
+    "table/nextvar_table:ALLOC_REPS=360",
+    "string/regexp_random:N=144000",
+    "app/stdlib_host:N=28000",
+    "table/table_sort_proxy:N=840",
+    "table/table_sort_proxy:PASSES=3000",
+    "data/soa_affine_many:STEPS=600",
+    "data/soa_masked_aggregate:REPS=2400",
+    "data/soa_filter_gather:FILTER_REPS=360",
+    "data/soa_filter_gather:GATHER_REPS=360",
 ]
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
@@ -576,69 +685,41 @@ def subject_diagnostic(
     return diagnostic
 
 
+def canonical_group(group: str) -> list[str]:
+    return LEGACY_GROUP_ALIASES.get(group, [group])
+
+
+def canonical_selector(selector: str) -> str:
+    return LEGACY_BENCH_ALIASES.get(selector, selector)
+
+
+def canonical_groups(groups: list[str]) -> list[str]:
+    out: list[str] = []
+    for group in groups:
+        for canonical in canonical_group(group):
+            if canonical not in GROUPS:
+                raise SystemExit(f"unknown benchmark group: {group}")
+            if canonical not in out:
+                out.append(canonical)
+    return out
+
+
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
     specs: list[BenchmarkSpec] = []
-    if "suite" in groups:
-        suite_dir = root / "benchmarks" / "suite"
-        names = [name for name in DEFAULT_SUITE if (suite_dir / f"{name}.gs").exists()]
-        extras = sorted(path.stem for path in suite_dir.glob("*.gs") if path.stem not in set(names))
-        specs.extend(
-            BenchmarkSpec("suite", name, f"benchmarks/suite/{name}.gs", f"benchmarks/lua/{name}.lua")
-            for name in [*names, *extras]
-        )
-    if "extended" in groups:
-        manifest = root / "benchmarks" / "extended" / "manifest.json"
-        if manifest.exists():
-            data = json.loads(manifest.read_text())
-            for row in data.get("benchmarks", []):
-                specs.append(
-                    BenchmarkSpec(
-                        "extended",
-                        row["name"],
-                        row["gscript"],
-                        row.get("luajit") or None,
-                    )
-                )
-        else:
-            specs.extend(
+    for group in canonical_groups(groups):
+        bench_dir = root / "benchmarks" / group
+        ordered = [name for name in DEFAULT_ORDER if (bench_dir / f"{name}.gs").exists()]
+        extras = sorted(path.stem for path in bench_dir.glob("*.gs") if path.stem not in set(ordered))
+        for name in [*ordered, *extras]:
+            luajit = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
+            specs.append(
                 BenchmarkSpec(
-                    "extended",
-                    path.stem,
-                    f"benchmarks/extended/{path.name}",
-                    f"benchmarks/lua_extended/{path.stem}.lua",
+                    group,
+                    name,
+                    f"benchmarks/{group}/{name}.gs",
+                    f"benchmarks/lua_ref/{group}/{name}.lua" if luajit.exists() else None,
                 )
-                for path in sorted((root / "benchmarks" / "extended").glob("*.gs"))
             )
-    if "variants" in groups:
-        specs.extend(
-            BenchmarkSpec(
-                "variants",
-                path.stem,
-                f"benchmarks/variants/{path.name}",
-                f"benchmarks/lua_variants/{path.stem}.lua",
-            )
-            for path in sorted((root / "benchmarks" / "variants").glob("*.gs"))
-        )
-    if "official" in groups:
-        specs.extend(
-            BenchmarkSpec(
-                "official",
-                path.stem,
-                f"benchmarks/official_hot/{path.name}",
-                f"benchmarks/lua_official_hot/{path.stem}.lua",
-            )
-            for path in sorted((root / "benchmarks" / "official_hot").glob("*.gs"))
-        )
-    if "data_oriented" in groups:
-        specs.extend(
-            BenchmarkSpec(
-                "data_oriented",
-                path.stem,
-                f"benchmarks/data_oriented_hot/{path.name}",
-                f"benchmarks/lua_data_oriented_hot/{path.stem}.lua",
-            )
-            for path in sorted((root / "benchmarks" / "data_oriented_hot").glob("*.gs"))
-        )
     return specs
 
 
@@ -646,10 +727,11 @@ def select_specs(specs: list[BenchmarkSpec], selectors: list[str] | None) -> lis
     if not selectors:
         return specs
     out: list[BenchmarkSpec] = []
-    for selector in selectors:
+    for raw_selector in selectors:
+        selector = canonical_selector(raw_selector)
         matches = [spec for spec in specs if selector in {spec.name, spec.benchmark_id}]
         if not matches:
-            raise SystemExit(f"unknown benchmark selector: {selector}")
+            raise SystemExit(f"unknown benchmark selector: {raw_selector}")
         if len(matches) > 1 and "/" not in selector:
             ids = ", ".join(spec.benchmark_id for spec in matches)
             raise SystemExit(f"ambiguous benchmark selector {selector!r}; use one of: {ids}")
@@ -673,6 +755,7 @@ def parse_scale_overrides(values: list[str] | None) -> list[ScaleOverride]:
             selector, name = left.split(":", 1)
             if not selector:
                 raise argparse.ArgumentTypeError("--scale selector must not be empty")
+            selector = canonical_selector(selector)
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
             raise argparse.ArgumentTypeError(f"invalid scale variable name: {name!r}")
         overrides.append(ScaleOverride(selector, name, raw_value))
@@ -1186,7 +1269,7 @@ def positive_int(value: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
-    parser.add_argument("--group", action="append", choices=GROUPS, help="benchmark group; repeatable")
+    parser.add_argument("--group", action="append", choices=[*GROUPS, *LEGACY_GROUP_ALIASES.keys()], help="benchmark group; repeatable")
     parser.add_argument("--all-groups", action="store_true", help="run all benchmark groups")
     parser.add_argument("--mode", action="append", choices=MODES, help="GScript mode; repeatable")
     parser.add_argument("--runs", type=positive_int, default=5, help="measured samples after calibration")
@@ -1224,7 +1307,7 @@ def main() -> int:
     parser.add_argument(
         "--scale",
         action="append",
-        help="temporary parameter override: VAR=VALUE or BENCH:VAR=VALUE, e.g. suite/ackermann:REPS=5000",
+        help="temporary parameter override: VAR=VALUE or BENCH:VAR=VALUE, e.g. recursion/ackermann:REPS=5000",
     )
     parser.add_argument(
         "--param",
@@ -1249,7 +1332,7 @@ def main() -> int:
         parser.error("--timer-resolution must be >= 0")
 
     root = Path(__file__).resolve().parents[1]
-    groups = GROUPS if args.all_groups else (args.group or ["suite"])
+    groups = GROUPS if args.all_groups else (args.group or GROUPS)
     modes = args.mode or ["default"]
     specs = select_specs(discover_specs(root, groups), args.bench)
     try:

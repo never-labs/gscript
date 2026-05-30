@@ -17,7 +17,16 @@ import (
 )
 
 func readBenchFile(name string) ([]byte, error) {
-	p := filepath.Join("..", "..", "benchmarks", "suite", name)
+	domain := "numeric"
+	switch name {
+	case "sort.gs":
+		domain = "table"
+	case "sieve.gs":
+		domain = "control"
+	case "closure_bench.gs":
+		domain = "calls"
+	}
+	p := filepath.Join("..", "..", "benchmarks", domain, name)
 	return os.ReadFile(p)
 }
 

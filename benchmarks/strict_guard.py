@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Strict benchmark harness for statistically meaningful GScript comparisons.
 
-Runs suite benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
+Runs domain benchmarks in VM, default JIT, no-filter JIT, and optional LuaJIT
 modes. Unlike regression_guard.py, this harness keeps timing quality explicit:
 zero/too-small script times are either calibrated with repeated invocations or
 reported as low_resolution instead of being treated as wins.
@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-DEFAULT_BENCHMARKS = [
+DEFAULT_ORDER = [
     "fib",
     "fib_recursive",
     "sieve",
@@ -53,18 +53,127 @@ DEFAULT_BENCHMARKS = [
 ]
 
 DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
-DEFAULT_GROUPS = ["suite", "extended", "variants"]
-ALL_GROUPS = ["suite", "extended", "variants", "official", "data_oriented"]
+DEFAULT_GROUPS = ["numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control"]
+ALL_GROUPS = DEFAULT_GROUPS
+LEGACY_GROUP_ALIASES = {
+    "suite": ["numeric", "recursion", "table", "calls", "string", "control"],
+    "extended": ["app", "table", "string", "concurrency"],
+    "variants": ["recursion", "calls", "numeric", "table"],
+    "official": ["calls", "control", "table", "string", "app"],
+    "data_oriented": ["data"],
+}
+LEGACY_BENCH_ALIASES = {
+    "recursion/ackermann": "recursion/ackermann",
+    "recursion/binary_trees": "recursion/binary_trees",
+    "calls/closure_bench": "calls/closure_bench",
+    "calls/coroutine_bench": "calls/coroutine_bench",
+    "numeric/fannkuch": "numeric/fannkuch",
+    "recursion/fib": "recursion/fib",
+    "recursion/fib_recursive": "recursion/fib_recursive",
+    "recursion/fibonacci_iterative": "recursion/fibonacci_iterative",
+    "numeric/mandelbrot": "numeric/mandelbrot",
+    "numeric/math_intensive": "numeric/math_intensive",
+    "numeric/matmul": "numeric/matmul",
+    "numeric/matmul_dense": "numeric/matmul_dense",
+    "numeric/matmul_dense_split2": "numeric/matmul_dense_split2",
+    "numeric/matmul_dense_tb": "numeric/matmul_dense_tb",
+    "numeric/matmul_dense_unroll2": "numeric/matmul_dense_unroll2",
+    "calls/method_dispatch": "calls/method_dispatch",
+    "recursion/mutual_recursion": "recursion/mutual_recursion",
+    "numeric/nbody": "numeric/nbody",
+    "numeric/nbody_dense": "numeric/nbody_dense",
+    "calls/object_creation": "calls/object_creation",
+    "control/sieve": "control/sieve",
+    "table/sort": "table/sort",
+    "numeric/spectral_norm": "numeric/spectral_norm",
+    "numeric/spectral_norm_dense": "numeric/spectral_norm_dense",
+    "string/string_bench": "string/string_bench",
+    "numeric/sum_primes": "numeric/sum_primes",
+    "table/table_array_access": "table/table_array_access",
+    "table/table_field_access": "table/table_field_access",
+    "app/actors_dispatch_mutation": "app/actors_dispatch_mutation",
+    "table/groupby_nested_agg": "table/groupby_nested_agg",
+    "table/json_table_walk": "table/json_table_walk",
+    "string/log_tokenize_format": "string/log_tokenize_format",
+    "app/mixed_inventory_sim": "app/mixed_inventory_sim",
+    "concurrency/producer_consumer_pipeline": "concurrency/producer_consumer_pipeline",
+    "recursion/ack_nested_shifted": "recursion/ack_nested_shifted",
+    "calls/closure_accumulator": "calls/closure_accumulator",
+    "numeric/matmul_row": "numeric/matmul_row",
+    "table/sort_mixed_numeric": "table/sort_mixed_numeric",
+    "calls/call_len_pairs_metamethod": "calls/call_len_pairs_metamethod",
+    "calls/calls_vararg_coroutine": "calls/calls_vararg_coroutine",
+    "control/defer_protected": "control/defer_protected",
+    "table/events_metamethod": "table/events_metamethod",
+    "string/math_bit_utf8": "string/math_bit_utf8",
+    "table/nextvar_table": "table/nextvar_table",
+    "string/regexp_random": "string/regexp_random",
+    "app/stdlib_host": "app/stdlib_host",
+    "string/strings_patterns": "string/strings_patterns",
+    "table/table_sort_proxy": "table/table_sort_proxy",
+}
+LEGACY_BENCH_ALIASES.update({
+    "suite/ackermann": "recursion/ackermann",
+    "suite/binary_trees": "recursion/binary_trees",
+    "suite/closure_bench": "calls/closure_bench",
+    "suite/coroutine_bench": "calls/coroutine_bench",
+    "suite/fannkuch": "numeric/fannkuch",
+    "suite/fib": "recursion/fib",
+    "suite/fib_recursive": "recursion/fib_recursive",
+    "suite/fibonacci_iterative": "recursion/fibonacci_iterative",
+    "suite/mandelbrot": "numeric/mandelbrot",
+    "suite/math_intensive": "numeric/math_intensive",
+    "suite/matmul": "numeric/matmul",
+    "suite/matmul_dense": "numeric/matmul_dense",
+    "suite/matmul_dense_split2": "numeric/matmul_dense_split2",
+    "suite/matmul_dense_tb": "numeric/matmul_dense_tb",
+    "suite/matmul_dense_unroll2": "numeric/matmul_dense_unroll2",
+    "suite/method_dispatch": "calls/method_dispatch",
+    "suite/mutual_recursion": "recursion/mutual_recursion",
+    "suite/nbody": "numeric/nbody",
+    "suite/nbody_dense": "numeric/nbody_dense",
+    "suite/object_creation": "calls/object_creation",
+    "suite/sieve": "control/sieve",
+    "suite/sort": "table/sort",
+    "suite/spectral_norm": "numeric/spectral_norm",
+    "suite/spectral_norm_dense": "numeric/spectral_norm_dense",
+    "suite/string_bench": "string/string_bench",
+    "suite/sum_primes": "numeric/sum_primes",
+    "suite/table_array_access": "table/table_array_access",
+    "suite/table_field_access": "table/table_field_access",
+    "extended/actors_dispatch_mutation": "app/actors_dispatch_mutation",
+    "extended/groupby_nested_agg": "table/groupby_nested_agg",
+    "extended/json_table_walk": "table/json_table_walk",
+    "extended/log_tokenize_format": "string/log_tokenize_format",
+    "extended/mixed_inventory_sim": "app/mixed_inventory_sim",
+    "extended/producer_consumer_pipeline": "concurrency/producer_consumer_pipeline",
+    "variants/ack_nested_shifted": "recursion/ack_nested_shifted",
+    "variants/closure_accumulator_variant": "calls/closure_accumulator",
+    "variants/matmul_row_variant": "numeric/matmul_row",
+    "variants/sort_mixed_numeric": "table/sort_mixed_numeric",
+    "official/call_len_pairs_metamethod_hot": "calls/call_len_pairs_metamethod",
+    "official/calls_vararg_coroutine_hot": "calls/calls_vararg_coroutine",
+    "official/defer_protected_hot": "control/defer_protected",
+    "official/events_metamethod_hot": "table/events_metamethod",
+    "official/math_bit_utf8_hot": "string/math_bit_utf8",
+    "official/nextvar_table_hot": "table/nextvar_table",
+    "official/regexp_random_hot": "string/regexp_random",
+    "official/stdlib_host_hot": "app/stdlib_host",
+    "official/strings_patterns_hot": "string/strings_patterns",
+    "official/table_sort_proxy_hot": "table/table_sort_proxy",
+    "data_oriented/soa_affine_many_hot": "data/soa_affine_many",
+    "data_oriented/soa_masked_aggregate_hot": "data/soa_masked_aggregate",
+})
 
 LOGICAL_TIME_BENCHMARKS = {
-    "official/defer_protected_hot",
+    "control/defer_protected",
 }
 
 VARIANT_BASES = {
     "ack_nested_shifted": "ackermann",
     "sort_mixed_numeric": "sort",
-    "matmul_row_variant": "matmul",
-    "closure_accumulator_variant": "closure_bench",
+    "matmul_row": "matmul",
+    "closure_accumulator": "closure_bench",
 }
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
@@ -572,9 +681,9 @@ def parse_repeat_overrides(values: list[str] | None) -> dict[tuple[str | None, s
         if "/" in key:
             head, tail = key.split("/", 1)
             if head in DEFAULT_MODES:
-                overrides[(head, tail)] = count
+                overrides[(head, canonical_selector(tail))] = count
             else:
-                overrides[(None, key)] = count
+                overrides[(None, canonical_selector(key))] = count
         else:
             overrides[(None, key)] = count
     return overrides
@@ -622,85 +731,40 @@ def ratio(numer: float | None, denom: float | None) -> float | None:
     return numer / denom
 
 
-def suite_specs(root: Path) -> list[BenchmarkSpec]:
-    suite_dir = root / "benchmarks" / "suite"
-    ordered = [name for name in DEFAULT_BENCHMARKS if (suite_dir / f"{name}.gs").exists()]
-    extras = sorted(path.stem for path in suite_dir.glob("*.gs") if path.stem not in set(ordered))
-    return [
-        BenchmarkSpec("suite", name, suite_dir / f"{name}.gs", root / "benchmarks" / "lua" / f"{name}.lua")
-        for name in [*ordered, *extras]
-    ]
+def canonical_group(group: str) -> list[str]:
+    return LEGACY_GROUP_ALIASES.get(group, [group])
 
 
-def extended_specs(root: Path) -> list[BenchmarkSpec]:
-    manifest = root / "benchmarks" / "extended" / "manifest.json"
-    if manifest.exists():
-        data = json.loads(manifest.read_text())
-        specs = []
-        for row in data.get("benchmarks", []):
-            specs.append(
-                BenchmarkSpec(
-                    "extended",
-                    row["name"],
-                    root / row["gscript"],
-                    root / row["luajit"] if row.get("luajit") else None,
-                )
-            )
-        return specs
-    return [
-        BenchmarkSpec("extended", path.stem, path, root / "benchmarks" / "lua_extended" / f"{path.stem}.lua")
-        for path in sorted((root / "benchmarks" / "extended").glob("*.gs"))
-    ]
+def canonical_selector(selector: str) -> str:
+    return LEGACY_BENCH_ALIASES.get(selector, selector)
 
 
-def variant_specs(root: Path) -> list[BenchmarkSpec]:
-    return [
-        BenchmarkSpec(
-            "variants",
-            path.stem,
-            path,
-            root / "benchmarks" / "lua_variants" / f"{path.stem}.lua",
-            VARIANT_BASES.get(path.stem),
-        )
-        for path in sorted((root / "benchmarks" / "variants").glob("*.gs"))
-    ]
+def canonical_groups(groups: list[str]) -> list[str]:
+    out: list[str] = []
+    for group in groups:
+        for canonical in canonical_group(group):
+            if canonical not in ALL_GROUPS:
+                raise SystemExit(f"unknown benchmark group: {group}")
+            if canonical not in out:
+                out.append(canonical)
+    return out
 
 
-def official_specs(root: Path) -> list[BenchmarkSpec]:
-    return [
-        BenchmarkSpec(
-            "official",
-            path.stem,
-            path,
-            root / "benchmarks" / "lua_official_hot" / f"{path.stem}.lua",
-        )
-        for path in sorted((root / "benchmarks" / "official_hot").glob("*.gs"))
-    ]
-
-
-def data_oriented_specs(root: Path) -> list[BenchmarkSpec]:
-    return [
-        BenchmarkSpec(
-            "data_oriented",
-            path.stem,
-            path,
-            root / "benchmarks" / "lua_data_oriented_hot" / f"{path.stem}.lua",
-        )
-        for path in sorted((root / "benchmarks" / "data_oriented_hot").glob("*.gs"))
-    ]
+def domain_specs(root: Path, group: str) -> list[BenchmarkSpec]:
+    bench_dir = root / "benchmarks" / group
+    ordered = [name for name in DEFAULT_ORDER if (bench_dir / f"{name}.gs").exists()]
+    extras = sorted(path.stem for path in bench_dir.glob("*.gs") if path.stem not in set(ordered))
+    specs: list[BenchmarkSpec] = []
+    for name in [*ordered, *extras]:
+        luajit = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
+        specs.append(BenchmarkSpec(group, name, bench_dir / f"{name}.gs", luajit if luajit.exists() else None, VARIANT_BASES.get(name)))
+    return specs
 
 
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
-    by_group = {
-        "suite": suite_specs,
-        "extended": extended_specs,
-        "variants": variant_specs,
-        "official": official_specs,
-        "data_oriented": data_oriented_specs,
-    }
     specs: list[BenchmarkSpec] = []
-    for group in groups:
-        specs.extend(by_group[group](root))
+    for group in canonical_groups(groups):
+        specs.extend(domain_specs(root, group))
     return specs
 
 
@@ -708,10 +772,11 @@ def select_specs(specs: list[BenchmarkSpec], selectors: list[str] | None) -> lis
     if not selectors:
         return specs
     selected: list[BenchmarkSpec] = []
-    for selector in selectors:
+    for raw_selector in selectors:
+        selector = canonical_selector(raw_selector)
         matches = [spec for spec in specs if selector in {spec.benchmark_id, spec.name}]
         if not matches:
-            raise SystemExit(f"unknown benchmark selector: {selector}")
+            raise SystemExit(f"unknown benchmark selector: {raw_selector}")
         if len(matches) > 1 and "/" not in selector:
             ids = ", ".join(spec.benchmark_id for spec in matches)
             raise SystemExit(f"ambiguous benchmark selector {selector!r}; use one of: {ids}")
@@ -739,7 +804,7 @@ def suspicious_kernel_wins(
     rows = list(results)
     lines: list[str] = []
     for row in rows:
-        if row.group != "suite":
+        if row.base:
             continue
         vm = comparable_seconds(row.modes.get("vm"))
         default = comparable_seconds(row.modes.get("default"))
@@ -751,7 +816,7 @@ def suspicious_kernel_wins(
         if vm_speedup < args.suspicious_vm_speedup or lj_ratio > args.suspicious_luajit_ratio:
             continue
 
-        matching_variants = [r for r in rows if r.group == "variants" and r.base == row.benchmark]
+        matching_variants = [r for r in rows if r.base == row.benchmark]
         if not matching_variants:
             lines.append(
                 f"- `{row.benchmark}`: Default is {fmt_ratio(vm_speedup)} faster than VM and "
@@ -765,12 +830,12 @@ def suspicious_kernel_wins(
             v_ratio = ratio(v_default, v_luajit)
             if v_ratio is None:
                 lines.append(
-                    f"- `{row.benchmark}`: suite win lacks a comparable `{variant.benchmark}` "
+                    f"- `{row.benchmark}`: baseline win lacks a comparable `{variant.benchmark}` "
                     "LuaJIT variant result."
                 )
             elif v_ratio >= args.variant_confirm_ratio:
                 lines.append(
-                    f"- `{row.benchmark}`: suite beats LuaJIT by {fmt_ratio(1.0 / lj_ratio)}, "
+                    f"- `{row.benchmark}`: baseline beats LuaJIT by {fmt_ratio(1.0 / lj_ratio)}, "
                     f"but `{variant.benchmark}` is {fmt_ratio(v_ratio)} of LuaJIT "
                     "(variant does not confirm the win)."
                 )
@@ -825,7 +890,7 @@ def markdown_summary(results: Iterable[BenchmarkResult], modes: list[str], args:
     if suspicious:
         lines.extend(suspicious)
     else:
-        lines.append("_No suite-only win crossed the suspicion thresholds._")
+        lines.append("_No baseline-only win crossed the suspicion thresholds._")
 
     lines.extend(
         [
@@ -935,8 +1000,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--group",
         action="append",
-        choices=ALL_GROUPS,
-        help="benchmark group to run; repeatable; default is suite+extended+variants",
+        choices=[*ALL_GROUPS, *LEGACY_GROUP_ALIASES.keys()],
+        help="benchmark group to run; repeatable; default is all domain groups",
     )
     parser.add_argument("--mode", action="append", choices=DEFAULT_MODES, help="mode to run; repeatable")
     parser.add_argument("--warmup", type=int, default=1, help="warmup samples after calibration")

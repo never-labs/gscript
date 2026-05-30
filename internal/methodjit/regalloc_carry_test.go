@@ -9,7 +9,7 @@
 // The test uses two routes:
 //   1. A handwritten minimal IR (header with float phi → body with MulFloat)
 //      to pin down the core invariant deterministically.
-//   2. The real mandelbrot proto from ../../benchmarks/suite/mandelbrot.gs,
+//   2. The real mandelbrot proto from ../../benchmarks/numeric/mandelbrot.gs,
 //      where the inner-loop body currently collides with the loop-carried
 //      float phi (v64/v65 in current numbering).
 
@@ -163,7 +163,7 @@ func TestRegallocCarriesLoopHeaderPhis_Synthetic(t *testing.T) {
 // then asserts that no SSA value defined in a non-header loop-body block is
 // assigned to the same FPR as one of the innermost loop-header's float phis.
 func TestRegallocCarriesLoopHeaderPhis_Mandelbrot(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/mandelbrot.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/numeric/mandelbrot.gs")
 	if err != nil {
 		t.Fatalf("read mandelbrot.gs: %v", err)
 	}

@@ -38,14 +38,14 @@ def main(diag_root):
         with open(latest_path) as f:
             latest = json.load(f)
 
-    # Layout v2: diag/<suite>/<bench>/stats.json (suite ∈ {suite, extended, variants}).
+    # Layout v2: diag/<domain>/<bench>/stats.json.
     # Layout v1 (legacy): diag/<bench>/stats.json — still tolerated.
-    benches = []  # list of (label, suite, name, stats_path)
+    benches = []  # list of (label, domain, name, stats_path)
     for top in sorted(diag_root.iterdir()):
         if not top.is_dir():
             continue
         if (top / "stats.json").exists():
-            benches.append((top.name, "suite", top.name, top))
+            benches.append((top.name, "legacy", top.name, top))
             continue
         for sub in sorted(top.iterdir()):
             if sub.is_dir() and (sub / "stats.json").exists():
@@ -58,11 +58,11 @@ def main(diag_root):
     lines.append("")
     lines.append("## Insn counts (hottest proto per benchmark)")
     lines.append("")
-    lines.append("| Benchmark | Suite | Hottest proto | Insns | Bytes | Load | Store | FP | Branch |")
+    lines.append("| Benchmark | Domain | Hottest proto | Insns | Bytes | Load | Store | FP | Branch |")
     lines.append("|-----------|-------|---------------|------:|------:|-----:|------:|---:|-------:|")
 
     per_bench_hottest = {}
-    for label, suite, name, bench_dir in benches:
+    for label, domain, name, bench_dir in benches:
         with open(bench_dir / "stats.json") as f:
             data = json.load(f)
         protos = [p for p in data.get("protos", []) if not p.get("skip_reason")]
@@ -73,7 +73,7 @@ def main(diag_root):
         per_bench_hottest[label] = hot
         lines.append("| {b} | {s} | {n} | {i} | {bytes} | {l} | {st} | {f} | {br} |".format(
             b=name,
-            s=suite,
+            s=domain,
             n=hot.get("name", "?"),
             i=hot.get("insn_count", 0),
             bytes=hot.get("code_bytes", 0),

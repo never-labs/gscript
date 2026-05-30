@@ -160,16 +160,16 @@ recursive kernels. A stricter runs=5 guard over the newer extended suite makes
 the next map sharper still:
 
 ```text
-extended/mixed_inventory_sim:
+app/mixed_inventory_sim:
   best GScript 0.152s vs LuaJIT 0.022s
 
-extended/actors_dispatch_mutation:
+app/actors_dispatch_mutation:
   best GScript 0.039s vs LuaJIT 0.011s
 
-extended/producer_consumer_pipeline:
+concurrency/producer_consumer_pipeline:
   best GScript 0.127s vs LuaJIT 0.043s
 
-extended/json_table_walk:
+table/json_table_walk:
   best GScript 0.031s vs LuaJIT 0.017s
 ```
 

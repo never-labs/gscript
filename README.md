@@ -14,7 +14,7 @@ go run ./cmd/gscript run path/to/script.gs
 
 ```bash
 go run ./cmd/gscript check --json tests/01_basic.gs
-go run ./cmd/gscript bench compare --bench suite/mandelbrot --runs 3 --warmup 1
+go run ./cmd/gscript bench compare --bench numeric/mandelbrot --runs 3 --warmup 1
 go run ./cmd/gscript diag bundle --output /tmp/gscript-diag --skip-benchmarks
 go run ./cmd/gscript ci smoke --list
 ```

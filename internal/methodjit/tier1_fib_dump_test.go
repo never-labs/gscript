@@ -22,7 +22,7 @@ import (
 const fibTotalInsnBaseline = 639
 
 func TestDumpTier1_FibBody(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/fib.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/fib.gs")
 	if err != nil {
 		t.Fatalf("read fib.gs: %v", err)
 	}

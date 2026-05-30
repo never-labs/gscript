@@ -4,7 +4,7 @@
 This script orchestrates the existing tools instead of replacing them:
 
 1. timing_compare.py decides whether a gap is real and records timing source.
-2. profile_exits.py explains Tier 2 exit/deopt pressure for suite benchmarks.
+2. profile_exits.py explains Tier 2 exit/deopt pressure for selected benchmarks.
 3. scripts/diag.sh and pprof can be enabled when codegen/runtime detail is needed.
 4. -jit-dump-warm plus jit_addr_map.py can map sampled JIT PCs back to IR.
 
@@ -91,30 +91,38 @@ def run_split(cmd: list[str], cwd: Path, timeout: int | None = None) -> subproce
     )
 
 
-def bench_id_to_suite_name(bench: str) -> str | None:
-    if "/" not in bench:
-        return bench
-    group, name = bench.split("/", 1)
-    if group != "suite":
+BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
+
+
+def bench_id_to_path(root: Path, bench: str) -> tuple[str, str, Path] | None:
+    path = bench_script_path(root, bench)
+    if path is None:
         return None
-    return name
+    group = path.parent.name
+    return group, path.stem, path
 
 
 def bench_script_path(root: Path, bench: str) -> Path | None:
     if "/" in bench:
         group, name = bench.split("/", 1)
-        groups = [group]
+        legacy = {
+            "suite": ("numeric", "recursion", "table", "calls", "string", "control"),
+            "extended": ("app", "table", "string", "concurrency"),
+            "variants": ("recursion", "calls", "numeric", "table"),
+            "official": ("calls", "control", "table", "string", "app"),
+            "data_oriented": ("data",),
+        }
+        if group == "variants":
+            name = {"closure_accumulator_variant": "closure_accumulator", "matmul_row_variant": "matmul_row"}.get(name, name)
+        if group in {"official", "data_oriented"}:
+            name = name.removesuffix("_hot")
+        groups = list(legacy.get(group, (group,)))
     else:
         name = bench
-        groups = ["suite", "extended", "variants"]
-    candidates = {
-        "suite": root / "benchmarks" / "suite" / f"{name}.gs",
-        "extended": root / "benchmarks" / "extended" / f"{name}.gs",
-        "variants": root / "benchmarks" / "variants" / f"{name}.gs",
-    }
+        groups = list(BENCHMARK_GROUPS)
     for group in groups:
-        path = candidates.get(group)
-        if path is not None and path.exists():
+        path = root / "benchmarks" / group / f"{name}.gs"
+        if path.exists():
             return path
     return None
 
@@ -124,7 +132,7 @@ def bench_group(root: Path, bench: str) -> str | None:
     if path is None:
         return None
     parent = path.parent.name
-    if parent in {"suite", "extended", "variants"}:
+    if parent in BENCHMARK_GROUPS:
         return parent
     return None
 
@@ -628,12 +636,12 @@ def classify(
             )
         )
 
-    suspicious_wins = [row for row in rows if row.get("cur_luajit") is not None and row["cur_luajit"] < 0.70 and row["benchmark"].startswith("suite/")]
+    suspicious_wins = [row for row in rows if row.get("cur_luajit") is not None and row["cur_luajit"] < 0.70]
     no_filter_rows = [row for row in rows if row.get("mode") == "no_filter" and (row.get("exits") or 0) > 0]
     if suspicious_wins or no_filter_rows or deopt_count > 0:
         evidence = []
         if suspicious_wins:
-            evidence.append("suite cells much faster than LuaJIT: " + ", ".join(row["benchmark"] for row in suspicious_wins[:5]))
+            evidence.append("benchmark cells much faster than LuaJIT: " + ", ".join(row["benchmark"] for row in suspicious_wins[:5]))
         if no_filter_rows:
             evidence.append(f"{len(no_filter_rows)} no_filter cells still exit, so guards remain performance/correctness-sensitive")
         if deopt_count > 0:
@@ -644,7 +652,7 @@ def classify(
                 "P2",
                 "medium",
                 evidence,
-                "Run strict_guard with suite plus variants before trusting wins from guard/speculation changes.",
+                "Run strict_guard with matching domain benchmarks before trusting wins from guard/speculation changes.",
             )
         )
 
@@ -848,15 +856,9 @@ def main() -> int:
     parser.add_argument("--scale", action="append", default=[])
     parser.add_argument("--param", action="append", default=[])
     parser.add_argument("--scale-profile", choices=("none", "hot"), default="none")
-    parser.add_argument("--diag", action="store_true", help="also run scripts/diag.sh for suite benchmarks")
+    parser.add_argument("--diag", action="store_true", help="also run scripts/diag.sh for selected benchmarks")
     parser.add_argument("--pprof", action="store_true", help="also collect a CPU profile for the first benchmark")
-    parser.add_argument(
-        "--memprofile",
-        nargs="?",
-        const="collect",
-        default=None,
-        help="collect heap profile for the first suite benchmark, or read an existing profile path",
-    )
+    parser.add_argument("--memprofile", nargs="?", const="collect", default=None, help="collect heap profile for the first benchmark, or read an existing profile path")
     parser.add_argument(
         "--runtime-stats",
         type=Path,
@@ -864,7 +866,7 @@ def main() -> int:
     )
     parser.add_argument("--spec-state", type=Path, help="optional -tier2-spec-state-json file to fold into classification")
     parser.add_argument("--no-spec-state", action="store_true", help="do not collect Tier 2 speculation state automatically")
-    parser.add_argument("--warm-dump", action="store_true", help="also collect production-warm JIT PC maps for the first suite benchmark")
+    parser.add_argument("--warm-dump", action="store_true", help="also collect production-warm JIT PC maps for the first benchmark")
     parser.add_argument("--out-dir", type=Path, default=Path("/tmp/gscript-triage"))
     args = parser.parse_args()
 
@@ -917,22 +919,22 @@ def main() -> int:
         print(timing.stdout, file=sys.stderr)
         return timing.returncode
 
-    suite_benches = [name for bench in args.bench if (name := bench_id_to_suite_name(bench))]
+    selected_benches = [item for bench in args.bench if (item := bench_id_to_path(root, bench))]
     exit_md: Path | None = None
     exit_json: Path | None = None
-    if suite_benches:
+    if selected_benches:
         exit_md = out_dir / "exits.md"
         exit_json = out_dir / "exits.json"
         exit_cmd = [sys.executable, "benchmarks/profile_exits.py", "--timeout", args.timeout, "--json", str(exit_json), "--markdown", str(exit_md)]
-        for bench in suite_benches:
-            exit_cmd += ["--bench", bench]
-        run(exit_cmd, root, int(args.timeout) * max(1, len(suite_benches)))
+        for _, name, _ in selected_benches:
+            exit_cmd += ["--bench", name]
+        run(exit_cmd, root, int(args.timeout) * max(1, len(selected_benches)))
 
     diag_log: Path | None = None
-    if args.diag and suite_benches:
+    if args.diag and selected_benches:
         diag_log = out_dir / "diag.log"
-        diag_cmd = ["bash", "scripts/diag.sh", *[f"suite/{bench}" for bench in suite_benches]]
-        diag = run(diag_cmd, root, int(args.timeout) * max(1, len(suite_benches)))
+        diag_cmd = ["bash", "scripts/diag.sh", *[f"{group}/{name}" for group, name, _ in selected_benches]]
+        diag = run(diag_cmd, root, int(args.timeout) * max(1, len(selected_benches)))
         diag_log.write_text(diag.stdout)
 
     pprof_txt: Path | None = None
@@ -945,8 +947,9 @@ def main() -> int:
     pprof_binary: Path | None = None
     if args.pprof:
         first = args.bench[0]
-        suite_name = bench_id_to_suite_name(first)
-        if suite_name:
+        bench_info = bench_id_to_path(root, first)
+        if bench_info:
+            group, bench_name, bench_path = bench_info
             tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_pprof_"))
             try:
                 binary = tempdir / "gscript"
@@ -954,22 +957,23 @@ def main() -> int:
                 if build.returncode == 0:
                     pprof_binary = out_dir / "gscript.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
-                    cpu = out_dir / f"{suite_name}.pprof"
-                    run([str(binary), "-jit", "-cpuprofile", str(cpu), f"benchmarks/suite/{suite_name}.gs"], root, int(args.timeout))
+                    cpu = out_dir / f"{bench_name}.pprof"
+                    run([str(binary), "-jit", "-cpuprofile", str(cpu), str(bench_path.relative_to(root))], root, int(args.timeout))
                     pprof = run(["go", "tool", "pprof", "-top", "-nodecount=30", str(binary), str(cpu)], root, int(args.timeout))
-                    pprof_txt = out_dir / f"{suite_name}.pprof.txt"
+                    pprof_txt = out_dir / f"{bench_name}.pprof.txt"
                     pprof_txt.write_text(pprof.stdout)
-                    pprof_json = out_dir / f"{suite_name}.pprof.json"
+                    pprof_json = out_dir / f"{bench_name}.pprof.json"
                     pprof_json.write_text(json.dumps(parse_pprof_top(pprof_txt), indent=2) + "\n")
             finally:
                 shutil.rmtree(tempdir, ignore_errors=True)
 
     if args.memprofile:
         first = args.bench[0]
-        suite_name = bench_id_to_suite_name(first)
+        bench_info = bench_id_to_path(root, first)
         if args.memprofile != "collect":
             memprofile_path = Path(args.memprofile)
-        elif suite_name:
+        elif bench_info:
+            _, bench_name, bench_path = bench_info
             tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_mem_"))
             try:
                 binary = tempdir / "gscript"
@@ -977,12 +981,8 @@ def main() -> int:
                 if build.returncode == 0:
                     pprof_binary = out_dir / "gscript.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
-                    memprofile_path = out_dir / f"{suite_name}.memprofile"
-                    run(
-                        [str(binary), "-jit", "-memprofile", str(memprofile_path), f"benchmarks/suite/{suite_name}.gs"],
-                        root,
-                        int(args.timeout),
-                    )
+                    memprofile_path = out_dir / f"{bench_name}.memprofile"
+                    run([str(binary), "-jit", "-memprofile", str(memprofile_path), str(bench_path.relative_to(root))], root, int(args.timeout))
             finally:
                 shutil.rmtree(tempdir, ignore_errors=True)
         if memprofile_path and pprof_binary:
@@ -990,8 +990,9 @@ def main() -> int:
 
     if args.warm_dump:
         first = args.bench[0]
-        suite_name = bench_id_to_suite_name(first)
-        if suite_name:
+        bench_info = bench_id_to_path(root, first)
+        if bench_info:
+            _, bench_name, bench_path = bench_info
             tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_warm_"))
             try:
                 binary = tempdir / "gscript"
@@ -999,10 +1000,10 @@ def main() -> int:
                 if build.returncode == 0:
                     pprof_binary = out_dir / "gscript.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
-                    warm_dir = out_dir / f"{suite_name}.warm"
+                    warm_dir = out_dir / f"{bench_name}.warm"
                     if warm_dir.exists():
                         shutil.rmtree(warm_dir)
-                    cpu = out_dir / f"{suite_name}.warm.pprof"
+                    cpu = out_dir / f"{bench_name}.warm.pprof"
                     run(
                         [
                             str(binary),
@@ -1011,13 +1012,13 @@ def main() -> int:
                             str(cpu),
                             "-jit-dump-warm",
                             str(warm_dir),
-                            f"benchmarks/suite/{suite_name}.gs",
+                            str(bench_path.relative_to(root)),
                         ],
                         root,
                         int(args.timeout),
                     )
-                    pcmap_md = out_dir / f"{suite_name}.jit-pcmap.md"
-                    pcmap_json = out_dir / f"{suite_name}.jit-pcmap.json"
+                    pcmap_md = out_dir / f"{bench_name}.jit-pcmap.md"
+                    pcmap_json = out_dir / f"{bench_name}.jit-pcmap.json"
                     mapped = run(
                         [
                             sys.executable,
@@ -1053,8 +1054,8 @@ def main() -> int:
     artifacts = {
         "timing_json": artifact_status(timing_json, True),
         "timing_md": artifact_status(timing_md, True),
-        "exits_json": artifact_status(exit_json, bool(suite_benches), "only suite benchmarks support exit profiling"),
-        "exits_md": artifact_status(exit_md, bool(suite_benches), "only suite benchmarks support exit profiling"),
+        "exits_json": artifact_status(exit_json, bool(selected_benches), "no benchmark with a resolvable script path was selected"),
+        "exits_md": artifact_status(exit_md, bool(selected_benches), "no benchmark with a resolvable script path was selected"),
         "diag_log": artifact_status(diag_log, args.diag, "requested with --diag"),
         "pprof_txt": artifact_status(pprof_txt, args.pprof, "requested with --pprof"),
         "pprof_json": artifact_status(pprof_json, args.pprof, "parsed pprof top rows"),

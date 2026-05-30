@@ -1,5 +1,5 @@
 #!/bin/bash
-# Robust full-suite comparison guard.
+# Robust domain benchmark comparison guard.
 #
 # Usage:
 #   bash benchmarks/regression_guard.sh --runs=3

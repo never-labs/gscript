@@ -23,7 +23,7 @@ That's when I stopped writing the plan and started running the benchmark.
 
 ## Fifteen runs, one distribution
 
-A diagnostic sub-agent ran `gscript -jit benchmarks/suite/fibonacci_iterative.gs` fifteen times at HEAD (`6ba79c3`) and fifteen times at the R23 baseline (`df2e2ec`). Here's what came back:
+A diagnostic sub-agent ran `gscript -jit benchmarks/recursion/fibonacci_iterative.gs` fifteen times at HEAD (`6ba79c3`) and fifteen times at the R23 baseline (`df2e2ec`). Here's what came back:
 
 ```
 HEAD     mean: 0.292s ± 0.008s

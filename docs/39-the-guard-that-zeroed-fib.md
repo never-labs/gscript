@@ -84,7 +84,7 @@ R30 gets to decide which. R29 gets to write the fixture.
 
 ## What R29 actually shipped
 
-One file: `internal/methodjit/tier1_fib_dump_test.go`. It's a straight clone of `tier1_ack_dump_test.go`, pointed at `benchmarks/suite/fib.gs` instead of ackermann, asserting the current Tier 1 instruction count for fib as a sentinel. When R30 removes those two `LDR` + `CBZ` instructions, the fixture will drop by two. If the fix comes back with insn count unchanged, something went wrong with the edit and we catch it before running the benchmark suite.
+One file: `internal/methodjit/tier1_fib_dump_test.go`. It's a straight clone of `tier1_ack_dump_test.go`, pointed at `benchmarks/recursion/fib.gs` instead of ackermann, asserting the current Tier 1 instruction count for fib as a sentinel. When R30 removes those two `LDR` + `CBZ` instructions, the fixture will drop by two. If the fix comes back with insn count unchanged, something went wrong with the edit and we catch it before running the benchmark suite.
 
 No production code touched. No `tier1_call.go` edits. The full 1.3-second recovery is sitting right there, and the discipline is to leave it untouched until next round's analysis has had a chance to pick between A and B cleanly.
 

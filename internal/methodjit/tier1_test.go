@@ -579,7 +579,7 @@ result := is_even(10)
 
 // TestTier1_BenchmarkFiles runs actual .gs benchmark files.
 func TestTier1_BenchmarkFiles(t *testing.T) {
-	benchDir := filepath.Join("..", "..", "benchmarks", "suite")
+	benchDir := filepath.Join("..", "..", "benchmarks", "numeric")
 	files := []struct {
 		name   string
 		global string

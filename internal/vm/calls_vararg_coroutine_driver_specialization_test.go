@@ -8,7 +8,7 @@ import (
 )
 
 func TestCallsVarargCoroutineDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/official_hot/calls_vararg_coroutine_hot.gs")
+	src, err := os.ReadFile("../../benchmarks/calls/calls_vararg_coroutine.gs")
 	if err != nil {
 		t.Fatal(err)
 	}

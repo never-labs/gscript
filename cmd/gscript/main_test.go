@@ -531,15 +531,15 @@ func TestBenchCommandDispatchesCompareHarness(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"compare", "--bench", "suite/mandelbrot"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"compare", "--bench", "numeric/mandelbrot"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
 	if gotName != "python3" {
 		t.Fatalf("python command = %q, want python3", gotName)
 	}
-	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "suite/mandelbrot" {
-		t.Fatalf("args = %#v, want timing_compare.py --bench suite/mandelbrot", gotArgs)
+	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "numeric/mandelbrot" {
+		t.Fatalf("args = %#v, want timing_compare.py --bench numeric/mandelbrot", gotArgs)
 	}
 	if !strings.Contains(stdout.String(), "bench helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())
@@ -557,12 +557,12 @@ func TestBenchCommandDispatchesStrictHarness(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"strict", "--group", "suite"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"strict", "--group", "table"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "strict_guard.py")) || gotArgs[1] != "--group" || gotArgs[2] != "suite" {
-		t.Fatalf("args = %#v, want strict_guard.py --group suite", gotArgs)
+	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "strict_guard.py")) || gotArgs[1] != "--group" || gotArgs[2] != "table" {
+		t.Fatalf("args = %#v, want strict_guard.py --group table", gotArgs)
 	}
 }
 
@@ -577,12 +577,12 @@ func TestBenchCommandDispatchesDiagnoseHarness(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runBenchCommand([]string{"diagnose", "--bench", "suite/sieve", "--no-timing"}, &stdout, &stderr)
+	code := runBenchCommand([]string{"diagnose", "--bench", "control/sieve", "--no-timing"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "suite/sieve" || gotArgs[3] != "--no-timing" {
-		t.Fatalf("args = %#v, want diagnose.py --bench suite/sieve --no-timing", gotArgs)
+	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "control/sieve" || gotArgs[3] != "--no-timing" {
+		t.Fatalf("args = %#v, want diagnose.py --bench control/sieve --no-timing", gotArgs)
 	}
 }
 
@@ -599,15 +599,15 @@ func TestDiagCommandDispatchesDumpScript(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runDiagCommand([]string{"dump", "suite/sieve"}, &stdout, &stderr)
+	code := runDiagCommand([]string{"dump", "control/sieve"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runDiagCommand code = %d, stderr = %q", code, stderr.String())
 	}
 	if gotName != "bash" {
 		t.Fatalf("command = %q, want bash", gotName)
 	}
-	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "diag.sh")) || gotArgs[1] != "suite/sieve" {
-		t.Fatalf("args = %#v, want scripts/diag.sh suite/sieve", gotArgs)
+	if len(gotArgs) != 2 || !strings.HasSuffix(gotArgs[0], filepath.Join("scripts", "diag.sh")) || gotArgs[1] != "control/sieve" {
+		t.Fatalf("args = %#v, want scripts/diag.sh control/sieve", gotArgs)
 	}
 	if !strings.Contains(stdout.String(), "diag helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())

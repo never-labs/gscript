@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect Tier 2 exit profiles for selected suite benchmarks.
+"""Collect Tier 2 exit profiles for selected domain benchmarks.
 
 This is a profiling helper, not a benchmark gate. It builds the CLI once, runs
 each selected benchmark with -exit-stats-json, and aggregates exit codes,
@@ -21,17 +21,18 @@ from pathlib import Path
 
 
 DEFAULT_BENCHMARKS = [
-    "fib_recursive",
-    "ackermann",
-    "mutual_recursion",
-    "sort",
-    "table_array_access",
-    "table_field_access",
-    "string_bench",
-    "matmul",
-    "spectral_norm",
-    "fibonacci_iterative",
+    "recursion/fib_recursive",
+    "recursion/ackermann",
+    "recursion/mutual_recursion",
+    "table/sort",
+    "table/table_array_access",
+    "table/table_field_access",
+    "string/string_bench",
+    "numeric/matmul",
+    "numeric/spectral_norm",
+    "recursion/fibonacci_iterative",
 ]
+BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 
@@ -62,8 +63,25 @@ def build(root: Path, out: Path) -> None:
         raise SystemExit(proc.returncode)
 
 
+def benchmark_path(root: Path, bench: str) -> tuple[str, Path] | None:
+    if "/" in bench:
+        group, name = bench.split("/", 1)
+        groups = [group]
+    else:
+        name = bench
+        groups = list(BENCHMARK_GROUPS)
+    for group in groups:
+        path = root / "benchmarks" / group / f"{name}.gs"
+        if path.exists():
+            return f"{group}/{name}", path
+    return None
+
+
 def run_one(root: Path, gscript: Path, bench: str, mode: str, timeout: int) -> dict:
-    path = root / "benchmarks" / "suite" / f"{bench}.gs"
+    resolved = benchmark_path(root, bench)
+    if resolved is None:
+        return {"benchmark": bench, "status": "missing"}
+    benchmark_id, path = resolved
     if not path.exists():
         return {"benchmark": bench, "status": "missing"}
 
@@ -85,11 +103,11 @@ def run_one(root: Path, gscript: Path, bench: str, mode: str, timeout: int) -> d
         output = exc.stdout or ""
         if isinstance(output, bytes):
             output = output.decode(errors="replace")
-        return {"benchmark": bench, "status": "timeout", "output_tail": output[-1000:]}
+        return {"benchmark": benchmark_id, "status": "timeout", "output_tail": output[-1000:]}
 
     if proc.returncode != 0:
         return {
-            "benchmark": bench,
+            "benchmark": benchmark_id,
             "status": "error",
             "exit_code": proc.returncode,
             "output_tail": proc.stdout[-1000:],
@@ -98,13 +116,13 @@ def run_one(root: Path, gscript: Path, bench: str, mode: str, timeout: int) -> d
         stats = extract_exit_json(proc.stdout)
     except ValueError as exc:
         return {
-            "benchmark": bench,
+            "benchmark": benchmark_id,
             "status": "parse_error",
             "error": str(exc),
             "output_tail": proc.stdout[-1000:],
         }
     return {
-        "benchmark": bench,
+        "benchmark": benchmark_id,
         "status": "ok",
         "seconds": parse_time(proc.stdout),
         "stats": stats,
@@ -183,7 +201,7 @@ def markdown_report(results: list[dict], top: int) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bench", action="append", help="suite benchmark name; repeatable")
+    parser.add_argument("--bench", action="append", help="benchmark name or domain/name; repeatable")
     parser.add_argument("--mode", choices=("default", "no_filter"), default="default")
     parser.add_argument("--timeout", type=int, default=60)
     parser.add_argument("--json", type=Path, help="write raw profile JSON")

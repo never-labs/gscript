@@ -54,44 +54,44 @@ LuaJIT reference on this machine.
 ```text
 Benchmark                            Current     LuaJIT      Cur/LJ   Exits
 ---------------------------------------------------------------------------
-suite/matmul_dense_unroll2           0.234000s   0.240000s    0.98x       3
-extended/groupby_nested_agg          0.443000s   0.465000s    0.95x      56
-extended/actors_dispatch_mutation    0.453000s   0.478000s    0.95x       0
-extended/mixed_inventory_sim         0.120000s   0.127000s    0.94x    6413
-variants/closure_accumulator_variant 0.020250s   0.022000s    0.92x       0
-suite/table_field_access             0.017000s   0.019000s    0.89x      24
-suite/mandelbrot                     0.046000s   0.052000s    0.88x       0
-suite/spectral_norm_dense            0.066000s   0.077000s    0.86x       0
-suite/matmul_dense                   0.023500s   0.028000s    0.84x       3
-suite/nbody                          0.027000s   0.034000s    0.79x       1
-suite/table_array_access             0.045500s   0.058000s    0.78x      67
-suite/math_intensive                 0.046000s   0.059000s    0.78x       0
-suite/coroutine_bench                0.043000s   0.056000s    0.77x       0
-suite/method_dispatch                0.053000s   0.070000s    0.76x       0
-extended/json_table_walk             0.046000s   0.065000s    0.71x      20
-suite/matmul_dense_split2            0.020500s   0.029500s    0.69x       3
-variants/sort_mixed_numeric          0.021500s   0.034000s    0.63x       3
-suite/fannkuch                       0.012000s   0.019000s    0.63x       0
-suite/sort                           0.006000s   0.010000s    0.60x       3
-extended/producer_consumer_pipeline  0.026000s   0.043500s    0.60x       0
-suite/string_bench                   0.033500s   0.061000s    0.55x       1
-suite/sum_primes                     0.001000s   0.002000s    0.50x       0
-suite/object_creation                0.003625s   0.007750s    0.47x       0
-suite/closure_bench                  0.004000s   0.009000s    0.44x       0
-suite/sieve                          0.004000s   0.009125s    0.44x       0
-variants/matmul_row_variant          0.062000s   0.143000s    0.43x      40
-suite/matmul                         0.009125s   0.021500s    0.42x       1
-suite/spectral_norm                  0.002938s   0.007125s    0.41x       0
-variants/ack_nested_shifted          0.032000s   0.101000s    0.32x  120013
-extended/log_tokenize_format         0.025500s   0.085000s    0.30x       0
-suite/fibonacci_iterative            0.001969s   0.026000s    0.08x       2
-suite/binary_trees                   0.003000s   0.166000s    0.02x       0
-suite/mutual_recursion               0.031000s   3.998000s    0.01x       0
-suite/ackermann                      0.005851s   0.006000s    0.98x       0
-suite/matmul_dense_tb                0.023500s   0.026283s    0.89x       2
-suite/nbody_dense                    0.015734s   0.032000s    0.49x      39
-suite/fib                            0.006287s   0.024250s    0.26x       0
-suite/fib_recursive                  0.005812s   0.330000s    0.02x       0
+numeric/matmul_dense_unroll2           0.234000s   0.240000s    0.98x       3
+table/groupby_nested_agg          0.443000s   0.465000s    0.95x      56
+app/actors_dispatch_mutation    0.453000s   0.478000s    0.95x       0
+app/mixed_inventory_sim         0.120000s   0.127000s    0.94x    6413
+calls/closure_accumulator 0.020250s   0.022000s    0.92x       0
+table/table_field_access             0.017000s   0.019000s    0.89x      24
+numeric/mandelbrot                     0.046000s   0.052000s    0.88x       0
+numeric/spectral_norm_dense            0.066000s   0.077000s    0.86x       0
+numeric/matmul_dense                   0.023500s   0.028000s    0.84x       3
+numeric/nbody                          0.027000s   0.034000s    0.79x       1
+table/table_array_access             0.045500s   0.058000s    0.78x      67
+numeric/math_intensive                 0.046000s   0.059000s    0.78x       0
+calls/coroutine_bench                0.043000s   0.056000s    0.77x       0
+calls/method_dispatch                0.053000s   0.070000s    0.76x       0
+table/json_table_walk             0.046000s   0.065000s    0.71x      20
+numeric/matmul_dense_split2            0.020500s   0.029500s    0.69x       3
+table/sort_mixed_numeric          0.021500s   0.034000s    0.63x       3
+numeric/fannkuch                       0.012000s   0.019000s    0.63x       0
+table/sort                           0.006000s   0.010000s    0.60x       3
+concurrency/producer_consumer_pipeline  0.026000s   0.043500s    0.60x       0
+string/string_bench                   0.033500s   0.061000s    0.55x       1
+numeric/sum_primes                     0.001000s   0.002000s    0.50x       0
+calls/object_creation                0.003625s   0.007750s    0.47x       0
+calls/closure_bench                  0.004000s   0.009000s    0.44x       0
+control/sieve                          0.004000s   0.009125s    0.44x       0
+numeric/matmul_row          0.062000s   0.143000s    0.43x      40
+numeric/matmul                         0.009125s   0.021500s    0.42x       1
+numeric/spectral_norm                  0.002938s   0.007125s    0.41x       0
+recursion/ack_nested_shifted          0.032000s   0.101000s    0.32x  120013
+string/log_tokenize_format         0.025500s   0.085000s    0.30x       0
+recursion/fibonacci_iterative            0.001969s   0.026000s    0.08x       2
+recursion/binary_trees                   0.003000s   0.166000s    0.02x       0
+recursion/mutual_recursion               0.031000s   3.998000s    0.01x       0
+recursion/ackermann                      0.005851s   0.006000s    0.98x       0
+numeric/matmul_dense_tb                0.023500s   0.026283s    0.89x       2
+numeric/nbody_dense                    0.015734s   0.032000s    0.49x      39
+recursion/fib                            0.006287s   0.024250s    0.26x       0
+recursion/fib_recursive                  0.005812s   0.330000s    0.02x       0
 ```
 
 That table should not be read as a universal language benchmark. It is a local
@@ -104,10 +104,10 @@ beginning, and on that comparison the scoreboard is now green.
 The final apparent misses were deceptive:
 
 ```text
-suite/mutual_recursion
-extended/actors_dispatch_mutation
-extended/groupby_nested_agg
-suite/matmul_dense_unroll2
+recursion/mutual_recursion
+app/actors_dispatch_mutation
+table/groupby_nested_agg
+numeric/matmul_dense_unroll2
 ```
 
 `mutual_recursion` was the clearest example. The old benchmark used only 1,000

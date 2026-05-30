@@ -482,7 +482,7 @@ func parse(lines, n) {
 }
 
 func TestHasGenericStringFormatIntCallDetectsMixedInventory(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/extended/mixed_inventory_sim.gs")
+	src, err := os.ReadFile("../../benchmarks/app/mixed_inventory_sim.gs")
 	if err != nil {
 		t.Fatalf("read mixed_inventory_sim: %v", err)
 	}

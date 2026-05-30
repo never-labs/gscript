@@ -26,7 +26,7 @@ def timing_payload(current, head, *, current_status="ok", head_status="ok", sour
         "modes": ["default"],
         "results": [
             {
-                "group": "suite",
+                "group": "numeric",
                 "benchmark": "hot_loop",
                 "modes": {
                     "default": {
@@ -64,7 +64,7 @@ class PerformanceGateValidationTest(unittest.TestCase):
         proc = run_validate(timing_payload(1.20, 1.00), "--threshold", "0.10")
         self.assertEqual(proc.returncode, 1, proc.stdout)
         self.assertIn("Performance gate violations", proc.stdout)
-        self.assertIn("suite/hot_loop", proc.stdout)
+        self.assertIn("numeric/hot_loop", proc.stdout)
 
     def test_validate_only_rejects_low_resolution_rows(self):
         proc = run_validate(timing_payload(None, 1.00, current_status="low_resolution"))

@@ -113,7 +113,7 @@ func TestObjectCreationDump(t *testing.T) {
 	}
 
 	// Load benchmark source.
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/object_creation.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/calls/object_creation.gs")
 	if err != nil {
 		t.Fatalf("read object_creation.gs: %v", err)
 	}

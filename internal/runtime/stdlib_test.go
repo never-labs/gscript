@@ -613,7 +613,7 @@ func TestMathFloorCeil(t *testing.T) {
 // tier2-exit fallback) only check gf.Fast1 before falling back to gf.Fn.
 // Without Fast1, every math.floor call from those paths records a
 // native_call.fallback even though FastArg1 is wired up — observed as the
-// 144K math.floor fallbacks in benchmarks/extended/log_tokenize_format.gs.
+	// 144K math.floor fallbacks in benchmarks/string/log_tokenize_format.gs.
 func TestMathFloorFast1(t *testing.T) {
 	mathLib := buildMathLib()
 	v := mathLib.RawGetString("floor")

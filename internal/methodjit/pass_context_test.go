@@ -19,9 +19,15 @@ import (
 // isolation holds end-to-end for the keystone pass.
 func TestPassContext_RangeAnalysisCorpusEnforced(t *testing.T) {
 	roots := []string{
-		"../../benchmarks/suite",
-		"../../benchmarks/extended",
-		"../../benchmarks/variants",
+		"../../benchmarks/numeric",
+		"../../benchmarks/recursion",
+		"../../benchmarks/table",
+		"../../benchmarks/calls",
+		"../../benchmarks/string",
+		"../../benchmarks/concurrency",
+		"../../benchmarks/data",
+		"../../benchmarks/app",
+		"../../benchmarks/control",
 	}
 	var files []string
 	for _, root := range roots {

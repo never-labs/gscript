@@ -34,11 +34,11 @@ import (
 // Tier 2 pipeline and logs FPR allocation statistics for every proto.
 func TestFPRResidencyReport(t *testing.T) {
 	benches := []string{
-		"mandelbrot.gs",
-		"spectral_norm.gs",
-		"math_intensive.gs",
-		"nbody.gs",
-		"matmul.gs",
+		"numeric/mandelbrot.gs",
+		"numeric/spectral_norm.gs",
+		"numeric/math_intensive.gs",
+		"numeric/nbody.gs",
+		"numeric/matmul.gs",
 	}
 
 	for _, bench := range benches {
@@ -57,7 +57,7 @@ func TestFPRResidencyReport(t *testing.T) {
 func reportBenchmarkFPR(t *testing.T, benchFile string) {
 	t.Helper()
 
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/" + benchFile)
+	srcBytes, err := os.ReadFile("../../benchmarks/" + benchFile)
 	if err != nil {
 		t.Fatalf("read %s: %v", benchFile, err)
 	}

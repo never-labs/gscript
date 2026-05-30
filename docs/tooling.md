@@ -444,7 +444,7 @@ Suggested CLI:
 ```bash
 gscript test ./...
 gscript test tests --run TestStrings --mode=vm
-gscript test tests/official_lua_cases --mode=jit --json --output /tmp/test.json
+gscript test tests/language --mode=jit --json --output /tmp/test.json
 gscript test --junit /tmp/gscript-junit.xml --timeout=60s ./...
 ```
 
@@ -513,7 +513,7 @@ Suggested CLI:
 ```bash
 gscript bench compare --group=suite --mode=default --runs=5
 gscript bench strict --group=suite --group=extended --runs=3 --warmup=1
-gscript bench diagnose --bench=suite/spectral_norm --pprof --warm-dump
+gscript bench diagnose --bench=numeric/spectral_norm --pprof --warm-dump
 ```
 
 Suggested schema envelope:
@@ -625,7 +625,7 @@ Suggested CLI:
 ```bash
 gscript run --jit --diag=jit,exit,tier2,runtime-path script.gs \
   --diag-output /tmp/gscript-diag.json
-gscript diag collect --bench=suite/spectral_norm --out-dir=/tmp/gscript-diag
+gscript diag collect --bench=numeric/spectral_norm --out-dir=/tmp/gscript-diag
 gscript diag map-pc --warm-dir=/tmp/gscript-warm --profile=/tmp/cpu.pprof
 ```
 
@@ -794,7 +794,7 @@ python3 benchmarks/strict_guard.py --group suite --runs=3 --warmup=1 --timeout=9
 # release
 go test ./... -count=1 -p 1 -timeout=600s
 python3 benchmarks/strict_guard.py --group suite --group extended --group variants --group official --runs=5 --warmup=2 --timeout=240 --json /tmp/gscript-release-bench.json --markdown /tmp/gscript-release-bench.md
-python3 benchmarks/official_perf_coverage.py --check --json /tmp/official_perf_coverage.json --markdown /tmp/official_perf_coverage.md
+python3 benchmarks/conformance_perf_coverage.py --check --json /tmp/conformance_perf_coverage.json --markdown /tmp/conformance_perf_coverage.md
 ```
 
 ## Ordered Roadmap

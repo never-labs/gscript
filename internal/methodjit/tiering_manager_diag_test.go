@@ -35,20 +35,20 @@ import (
 // Parity is enforced by construction (both paths call compileTier2Pipeline)
 // but this test catches any future refactor that drifts.
 func TestDiag_ProductionParity_Sieve(t *testing.T) {
-	runParity(t, "sieve.gs", "sieve")
+	runParity(t, "control/sieve.gs", "sieve")
 }
 
 // TestDiag_ProductionParity_ObjectCreation — same check on the benchmark
 // that R35 was trying to regress-fix. This exercises a GC-heavy path
 // instead of the arithmetic-heavy sieve path.
 func TestDiag_ProductionParity_ObjectCreation(t *testing.T) {
-	runParity(t, "object_creation.gs", "new_vec3")
+	runParity(t, "calls/object_creation.gs", "new_vec3")
 }
 
 // TestDiag_ProductionParity_Mandelbrot — float-heavy path. Covers the
 // FP/SIMD classification branch in classifyARM64.
 func TestDiag_ProductionParity_Mandelbrot(t *testing.T) {
-	runParity(t, "mandelbrot.gs", "mandelbrot")
+	runParity(t, "numeric/mandelbrot.gs", "mandelbrot")
 }
 
 func runParity(t *testing.T, benchFile, fnName string) {
@@ -64,7 +64,7 @@ func runParity(t *testing.T, benchFile, fnName string) {
 	}
 	defer os.Unsetenv("GSCRIPT_TIER2_NO_FILTER")
 
-	src, err := os.ReadFile("../../benchmarks/suite/" + benchFile)
+	src, err := os.ReadFile("../../benchmarks/" + benchFile)
 	if err != nil {
 		t.Fatalf("read %s: %v", benchFile, err)
 	}
@@ -149,7 +149,7 @@ func runParity(t *testing.T, benchFile, fnName string) {
 // TestDiag_ProtoTreeDiag_Sieve exercises the bulk diagnostic walk and
 // verifies that every Tier-2-promotable proto shows up in the output.
 func TestDiag_ProtoTreeDiag_Sieve(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/suite/sieve.gs")
+	src, err := os.ReadFile("../../benchmarks/control/sieve.gs")
 	if err != nil {
 		t.Fatalf("read sieve.gs: %v", err)
 	}

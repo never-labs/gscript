@@ -33,9 +33,9 @@ Representative subset while iterating:
 
 ```bash
 python3 benchmarks/strict_guard.py --runs=3 --warmup=0 --max-repeat=8 \
-  --bench=suite/matmul \
-  --bench=variants/matmul_row_variant \
-  --bench=extended/json_table_walk
+  --bench=numeric/matmul \
+  --bench=numeric/matmul_row \
+  --bench=table/json_table_walk
 ```
 
 Use `--group=suite`, `--group=extended`, or `--group=variants` to narrow the

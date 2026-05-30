@@ -19,7 +19,7 @@ minimum condition for a release candidate.
 
 | Gate | Roadmap doc | Current evidence | Release condition |
 |---|---|---|---|
-| Language semantics | `docs/language-spec.md` | `tests/feature_matrix.json`, `tests/official_lua_cases/MANIFEST.md`, `tests/official_lua_cases/MISSING_CAPABILITIES.md` | Stable behavior is documented, intentional Lua differences are explicit, and known unsupported features have a decision. |
+| Language semantics | `docs/language-spec.md` | `tests/feature_matrix.json`, `tests/language/MANIFEST.md`, `tests/language/MISSING_CAPABILITIES.md` | Stable behavior is documented, intentional Lua differences are explicit, and known unsupported features have a decision. |
 | Go embedding API | `docs/embedding.md` | `gscript/*.go`, `gscript/gscript_test.go` | A Go host can compile, run, call functions, bind host functions, convert values, cancel execution, and configure libraries without importing `internal/*`. |
 | Standard library | `docs/stdlib.md` | `internal/runtime/stdlib_*.go`, official translated stdlib cases | Each exported module has documented contracts, error behavior, permission requirements, and tests. |
 | Security and isolation | `docs/security.md` | sandbox options, timeout/cancel tests, permission tests | Untrusted scripts can be run with CPU, wall-time, memory, recursion, IO, network, process, and module access bounded by host policy. |
@@ -141,9 +141,9 @@ Expected result:
 
 - every stable `docs/language-spec.md` section is referenced by
   `tests/feature_matrix.json` and has a semantic or official-case gate;
-- `tests/official_lua_cases/MANIFEST.md`,
-  `tests/official_lua_cases/KNOWN_FAILURES.md`, and
-  `tests/official_lua_cases/MISSING_CAPABILITIES.md` classify translated
+- `tests/language/MANIFEST.md`,
+  `tests/language/KNOWN_FAILURES.md`, and
+  `tests/language/MISSING_CAPABILITIES.md` classify translated
   oracle coverage and intentional gaps;
 - `docs/stdlib-contract.md` modules remain linked from official coverage or a
   documented capability entry;
@@ -183,8 +183,8 @@ go test ./tests -run Official -count=1
 Expected result:
 
 - translated official cases pass or are listed in
-  `tests/official_lua_cases/KNOWN_FAILURES.md`;
-- `tests/official_lua_cases/MISSING_CAPABILITIES.md` records deliberate
+  `tests/language/KNOWN_FAILURES.md`;
+- `tests/language/MISSING_CAPABILITIES.md` records deliberate
   GScript differences and future host-language-shaped capabilities.
 
 ### Performance Gate
@@ -212,7 +212,7 @@ not run the performance gate.
 
 ```bash
 go run ./cmd/gscript tests/01_basic.gs
-go run ./cmd/gscript -jit benchmarks/suite/table_field_access.gs
+go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs
 go run ./cmd/dump_bytecode tests/01_basic.gs
 bash scripts/release_artifacts_check.sh --build
 ```

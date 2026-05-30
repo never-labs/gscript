@@ -26,12 +26,12 @@ def args(**overrides):
 
 
 class TimingCompareDiagnosticTest(unittest.TestCase):
-    def test_official_low_resolution_gets_concrete_rerun_advice(self):
+    def test_conformance_low_resolution_gets_concrete_rerun_advice(self):
         spec = timing.BenchmarkSpec(
-            "official",
-            "calls_vararg_coroutine_hot",
-            "benchmarks/official_hot/calls_vararg_coroutine_hot.gs",
-            "benchmarks/lua_official_hot/calls_vararg_coroutine_hot.lua",
+            "calls",
+            "calls_vararg_coroutine",
+            "benchmarks/calls/calls_vararg_coroutine.gs",
+            "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
         )
         samples = [
             timing.Sample(
@@ -47,19 +47,19 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
 
         payload = asdict(subject)
         advice = payload["diagnostic"]["low_resolution"]
-        self.assertIn("official/calls_vararg_coroutine_hot:N_CALLS=880000", advice["scale"])
-        self.assertIn("--scale official/calls_vararg_coroutine_hot:N_CORO=360000", advice["rerun_args"])
+        self.assertIn("calls/calls_vararg_coroutine:N_CALLS=880000", advice["scale"])
+        self.assertIn("--scale calls/calls_vararg_coroutine:N_CORO=360000", advice["rerun_args"])
         self.assertEqual(advice["min_sample_seconds"], 0.05)
         self.assertEqual(advice["min_wall_repeat"], 8)
         self.assertEqual(advice["max_repeat"], 256)
 
     def test_markdown_reports_low_resolution_and_wall_repeat_diagnostics(self):
-        bench = timing.BenchmarkResult("calls_vararg_coroutine_hot", "official")
+        bench = timing.BenchmarkResult("calls_vararg_coroutine", "calls")
         spec = timing.BenchmarkSpec(
-            "official",
-            "calls_vararg_coroutine_hot",
-            "benchmarks/official_hot/calls_vararg_coroutine_hot.gs",
-            "benchmarks/lua_official_hot/calls_vararg_coroutine_hot.lua",
+            "calls",
+            "calls_vararg_coroutine",
+            "benchmarks/calls/calls_vararg_coroutine.gs",
+            "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
         )
         low_samples = [
             timing.Sample(status="low_resolution", repeat=128, script_total_seconds=0.0, wall_total_seconds=0.010)
@@ -81,7 +81,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
 
         report = timing.markdown([bench], ["default"], args())
         self.assertIn("## Low-Resolution Diagnostics", report)
-        self.assertIn("official/calls_vararg_coroutine_hot:N_CALLS=880000", report)
+        self.assertIn("calls/calls_vararg_coroutine:N_CALLS=880000", report)
         self.assertIn("--min-sample-seconds 0.050", report)
         self.assertIn("## Wall-Repeat Diagnostics", report)
         self.assertIn("scale workload enough for script_repeat", report)

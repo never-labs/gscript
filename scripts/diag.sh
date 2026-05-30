@@ -1,14 +1,14 @@
 #!/bin/bash
 # scripts/diag.sh — Production-parity Tier 2 diagnostic dump.
 #
-# For each benchmark under benchmarks/{suite,extended,variants}/, runs the
+# For each benchmark under benchmarks/<domain>/, runs the
 # full production Tier 2 compile pipeline on every Tier-2-promotable proto
 # and writes (nested under the originating subdirectory):
 #
-#   diag/<suite>/<bench>/<proto>.bin        — raw ARM64 code bytes
-#   diag/<suite>/<bench>/<proto>.ir.txt     — post-pipeline IR + regalloc + intrinsics
-#   diag/<suite>/<bench>/<proto>.asm.txt    — golang.org/x/arch ARM64 disasm
-#   diag/<suite>/<bench>/stats.json         — per-proto insn count + histogram
+#   diag/<domain>/<bench>/<proto>.bin        — raw ARM64 code bytes
+#   diag/<domain>/<bench>/<proto>.ir.txt     — post-pipeline IR + regalloc + intrinsics
+#   diag/<domain>/<bench>/<proto>.asm.txt    — golang.org/x/arch ARM64 disasm
+#   diag/<domain>/<bench>/stats.json         — per-proto insn count + histogram
 #
 # Plus an aggregate diag/summary.md with top drifters vs reference.json.
 #
@@ -19,18 +19,18 @@
 # would install at runtime. Rule 5 of CLAUDE.md is load-bearing on this.
 #
 # Usage:
-#   bash scripts/diag.sh all                  — dump every .gs in suite/, extended/, variants/
-#   bash scripts/diag.sh suite                — dump suite/ only
-#   bash scripts/diag.sh extended             — dump extended/ only
-#   bash scripts/diag.sh variants             — dump variants/ only
+#   bash scripts/diag.sh all                  — dump every domain benchmark
+#   bash scripts/diag.sh numeric              — dump numeric/ only
+#   bash scripts/diag.sh table                — dump table/ only
+#   bash scripts/diag.sh suite                — compatibility alias for legacy suite domains
 #   bash scripts/diag.sh <benchmark>          — dump a single benchmark.
 #                                                Forms accepted:
 #                                                  sieve, sieve.gs
-#                                                  suite/sieve, suite/sieve.gs
-#                                                  extended/json_table_walk
-#                                                  variants/ack_nested_shifted
+#                                                  control/sieve, control/sieve.gs
+#                                                  table/json_table_walk
+#                                                  recursion/ack_nested_shifted
 #                                                Bare basenames are searched in
-#                                                suite/ → extended/ → variants/.
+#                                                the domain order below.
 #
 # Runtime: ~3 seconds per benchmark, ~2 minutes for the full all-suite dump.
 
@@ -40,26 +40,38 @@ cd "$(dirname "$0")/.."
 BENCHMARK=""
 for arg in "$@"; do
     case "$arg" in
-        all|suite|extended|variants) BENCHMARK="$arg" ;;
+        all|numeric|recursion|table|calls|string|concurrency|data|app|control|suite|extended|variants|official|data_oriented) BENCHMARK="$arg" ;;
         *) BENCHMARK="$arg" ;;
     esac
 done
 
 if [ -z "$BENCHMARK" ]; then
-    echo "Usage: $0 <benchmark|all|suite|extended|variants>" >&2
+    echo "Usage: $0 <benchmark|all|domain>" >&2
     exit 2
 fi
 
 DIAG_ROOT="diag"
 mkdir -p "$DIAG_ROOT"
 
-# Discover which top-level benchmark dirs actually exist (variants/ is optional).
-SUITE_DIRS=()
-for d in suite extended variants; do
+# Discover which top-level benchmark domain dirs actually exist.
+DOMAIN_DIRS=()
+for d in numeric recursion table calls string concurrency data app control; do
     if [ -d "benchmarks/$d" ]; then
-        SUITE_DIRS+=("$d")
+        DOMAIN_DIRS+=("$d")
     fi
 done
+
+domain_list_for() {
+    case "$1" in
+        all) printf '%s\n' "${DOMAIN_DIRS[@]}" ;;
+        suite) printf '%s\n' numeric recursion table calls string control ;;
+        extended) printf '%s\n' app table string concurrency ;;
+        variants) printf '%s\n' recursion calls numeric table ;;
+        official) printf '%s\n' calls control table string app ;;
+        data_oriented) printf '%s\n' data ;;
+        *) printf '%s\n' "$1" ;;
+    esac
+}
 
 # Resolve benchmark list. Each entry is "<suite>/<file>.gs", relative to
 # benchmarks/. macOS bash 3.2 compatible (no mapfile, no associative arrays).
@@ -78,7 +90,7 @@ collect_dir() {
 
 case "$BENCHMARK" in
     all)
-        for d in "${SUITE_DIRS[@]}"; do
+        for d in "${DOMAIN_DIRS[@]}"; do
             collect_dir "$d"
         done
         # Wipe everything inside diag/ — both the new nested layout and any legacy
@@ -86,19 +98,58 @@ case "$BENCHMARK" in
         # stale stats.json behind. summary.md is regenerated at the end.
         find "$DIAG_ROOT" -mindepth 1 -maxdepth 1 ! -name summary.md -exec rm -rf {} +
         ;;
-    suite|extended|variants)
-        if [ ! -d "benchmarks/$BENCHMARK" ]; then
-            echo "No such suite: benchmarks/$BENCHMARK" >&2
-            exit 2
-        fi
-        collect_dir "$BENCHMARK"
-        rm -rf "$DIAG_ROOT/$BENCHMARK"
+    numeric|recursion|table|calls|string|concurrency|data|app|control|suite|extended|variants|official|data_oriented)
+        while IFS= read -r d; do
+            [ -n "$d" ] || continue
+            if [ ! -d "benchmarks/$d" ]; then
+                echo "No such benchmark domain: benchmarks/$d" >&2
+                exit 2
+            fi
+            collect_dir "$d"
+            rm -rf "$DIAG_ROOT/$d"
+        done <<EOF
+$(domain_list_for "$BENCHMARK")
+EOF
         ;;
     *)
-        # Single benchmark. Accept: name | name.gs | suite/name | suite/name.gs.
+        # Single benchmark. Accept: name | name.gs | domain/name | domain/name.gs.
         rel=""
         if [[ "$BENCHMARK" == */* ]]; then
             rel="$BENCHMARK"
+            case "$rel" in
+                suite/*)
+                    name="${rel#suite/}"
+                    for d in numeric recursion table calls string control; do
+                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
+                    done
+                    ;;
+                extended/*)
+                    name="${rel#extended/}"
+                    for d in app table string concurrency; do
+                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
+                    done
+                    ;;
+                variants/*)
+                    name="${rel#variants/}"
+                    [ "$name" = "closure_accumulator_variant" ] && name="closure_accumulator"
+                    [ "$name" = "matmul_row_variant" ] && name="matmul_row"
+                    for d in recursion calls numeric table; do
+                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
+                    done
+                    ;;
+                official/*)
+                    name="${rel#official/}"
+                    name="${name%_hot}"
+                    for d in calls control table string app; do
+                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
+                    done
+                    ;;
+                data_oriented/*)
+                    name="${rel#data_oriented/}"
+                    name="${name%_hot}"
+                    rel="data/${name%.gs}.gs"
+                    ;;
+            esac
             [[ "$rel" != *.gs ]] && rel="${rel}.gs"
             if [ ! -f "benchmarks/$rel" ]; then
                 echo "No such benchmark: benchmarks/$rel" >&2
@@ -106,14 +157,14 @@ case "$BENCHMARK" in
             fi
         else
             base="${BENCHMARK%.gs}"
-            for d in "${SUITE_DIRS[@]}"; do
+            for d in "${DOMAIN_DIRS[@]}"; do
                 if [ -f "benchmarks/$d/$base.gs" ]; then
                     rel="$d/$base.gs"
                     break
                 fi
             done
             if [ -z "$rel" ]; then
-                echo "No such benchmark in suite/, extended/, or variants/: $BENCHMARK" >&2
+                echo "No such domain benchmark: $BENCHMARK" >&2
                 exit 2
             fi
         fi
@@ -127,7 +178,7 @@ echo
 
 failed=()
 for bench in "${BENCHES[@]}"; do
-    sub="${bench%%/*}"               # suite | extended | variants
+    sub="${bench%%/*}"               # benchmark domain
     file="${bench#*/}"               # foo.gs
     name="${file%.gs}"               # foo
     out_dir="$DIAG_ROOT/$sub/$name"

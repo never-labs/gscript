@@ -26,41 +26,41 @@ VALIDATE_ONLY=""
 BENCHES=()
 
 CORE_BENCHES=(
-    "suite/mutual_recursion"
-    "suite/method_dispatch"
-    "suite/table_array_access"
-    "suite/spectral_norm"
-    "extended/actors_dispatch_mutation"
-    "official/calls_vararg_coroutine_hot"
-    "official/nextvar_table_hot"
+    "recursion/mutual_recursion"
+    "calls/method_dispatch"
+    "table/table_array_access"
+    "numeric/spectral_norm"
+    "app/actors_dispatch_mutation"
+    "calls/calls_vararg_coroutine"
+    "table/nextvar_table"
 )
 
 SMOKE_BENCHES=(
-    "suite/sieve"
-    "suite/table_array_access"
+    "control/sieve"
+    "table/table_array_access"
 )
 
 FEATURE_SMOKE_BENCHES=(
-    "extended/producer_consumer_pipeline"
-    "official/calls_vararg_coroutine_hot"
-    "official/stdlib_host_hot"
-    "data_oriented/soa_affine_many_hot"
-    "data_oriented/soa_masked_aggregate_hot"
+    "concurrency/producer_consumer_pipeline"
+    "calls/calls_vararg_coroutine"
+    "app/stdlib_host"
+    "data/soa_affine_many"
+    "data/soa_masked_aggregate"
 )
 
 STRICT_CORE_BENCHES=(
-    "suite/sieve"
-    "suite/string_bench"
-    "suite/table_array_access"
-    "extended/json_table_walk"
+    "control/sieve"
+    "string/string_bench"
+    "table/table_array_access"
+    "table/json_table_walk"
 )
 
 STRICT_FEATURE_BENCHES=(
-    "extended/producer_consumer_pipeline"
-    "official/calls_vararg_coroutine_hot"
-    "official/stdlib_host_hot"
-    "data_oriented/soa_affine_many_hot"
-    "data_oriented/soa_masked_aggregate_hot"
+    "concurrency/producer_consumer_pipeline"
+    "calls/calls_vararg_coroutine"
+    "app/stdlib_host"
+    "data/soa_affine_many"
+    "data/soa_masked_aggregate"
 )
 
 usage() {
@@ -71,7 +71,7 @@ Options:
   --smoke                 Run a short two-benchmark gate.
   --feature-smoke         Run hot-path smoke coverage for newer language features.
   --full                  Run all benchmark groups through timing_compare.py.
-  --bench ID              Add one benchmark selector, e.g. suite/spectral_norm.
+  --bench ID              Add one benchmark selector, e.g. numeric/spectral_norm.
   --runs N                Measured timing samples after calibration. Default: 5.
   --warmup N              Warmup samples after calibration. Default: 1.
   --timeout N             Timeout per command invocation. Default: 120.
@@ -359,7 +359,7 @@ violations = []
 for raw in rows:
     if not isinstance(raw, dict):
         continue
-    group = str(raw.get("group") or "suite")
+    group = str(raw.get("group") or "numeric")
     bench = str(raw.get("benchmark") or "")
     name = f"{group}/{bench}" if group and not bench.startswith(f"{group}/") else bench
     modes = raw.get("modes")
@@ -472,7 +472,6 @@ if [ "$STRICT" -eq 1 ]; then
         STRICT_CMD+=(--no-luajit)
     fi
     if [ "$PROFILE" != "full" ]; then
-        STRICT_CMD+=(--group suite --group extended --group official)
         if [ "$PROFILE" = "smoke" ]; then
             for bench in "${SMOKE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")

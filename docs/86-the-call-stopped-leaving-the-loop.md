@@ -31,22 +31,22 @@ biased.
 The full run made the map clear:
 
 ```text
-extended/mixed_inventory_sim:
+app/mixed_inventory_sim:
   about 6-7x slower than LuaJIT, with zero Tier 2 exits
 
-extended/actors_dispatch_mutation:
+app/actors_dispatch_mutation:
   about 3x slower than LuaJIT, with a small number of exits
 
-extended/producer_consumer_pipeline:
+concurrency/producer_consumer_pipeline:
   about 3x slower than LuaJIT, with coroutine and table payload pressure
 
-extended/json_table_walk:
+table/json_table_walk:
   about 2x slower than LuaJIT, with many string-format exits
 
-suite/table_array_access:
+table/table_array_access:
   about 2x slower than LuaJIT
 
-variants/ack_nested_shifted:
+recursion/ack_nested_shifted:
   call-exit dominated before the recursion fix
 ```
 
@@ -159,7 +159,7 @@ ee1e869 methodjit: infer typed table row array access
 The focused row now sits around:
 
 ```text
-suite/table_array_access:
+table/table_array_access:
   about 0.020s in the focused default run
   exits: 32
 ```
@@ -235,17 +235,17 @@ comparison used wall-clock repeat scaling with a pinned pre-recursion baseline:
 The result:
 
 ```text
-variants/ack_nested_shifted:
+recursion/ack_nested_shifted:
   0.154428s -> 0.007423s
   exits: 12
   LuaJIT: 0.104641s
 
-suite/fib_recursive:
+recursion/fib_recursive:
   0.551447s -> 0.006884s
   exits: 10
   LuaJIT: 0.340348s
 
-suite/mutual_recursion:
+recursion/mutual_recursion:
   0.006308s -> 0.005953s
   exits: 11
   LuaJIT: 0.006182s
@@ -338,22 +338,22 @@ After the merged patches, `go test ./...` passed.
 The full benchmark sampling still shows the remaining frontier clearly:
 
 ```text
-extended/mixed_inventory_sim:
+app/mixed_inventory_sim:
   about 0.151604s vs LuaJIT 0.025373s
 
-extended/actors_dispatch_mutation:
+app/actors_dispatch_mutation:
   about 0.046763s vs LuaJIT 0.013778s
 
-extended/producer_consumer_pipeline:
+concurrency/producer_consumer_pipeline:
   about 0.144591s vs LuaJIT 0.046532s
 
-suite/table_array_access:
+table/table_array_access:
   about 0.077875s hot-scaled vs LuaJIT 0.035909s
 
-suite/coroutine_bench:
+calls/coroutine_bench:
   about 0.206889s hot-scaled vs LuaJIT 0.097696s
 
-suite/string_bench:
+string/string_bench:
   about 0.020023s vs LuaJIT 0.011083s
 ```
 
@@ -362,13 +362,13 @@ Those rows are not solved by the recursion patch. They are the next map.
 But the recursive rows changed category:
 
 ```text
-variants/ack_nested_shifted:
+recursion/ack_nested_shifted:
   about 0.006586s vs LuaJIT 0.103675s in the full run
 
-suite/fib_recursive:
+recursion/fib_recursive:
   about 0.006705s vs LuaJIT 0.334850s in the full run
 
-suite/ackermann:
+recursion/ackermann:
   about 0.006749s vs LuaJIT 0.008155s
 ```
 

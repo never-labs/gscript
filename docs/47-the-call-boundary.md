@@ -185,7 +185,7 @@ On this machine, the progression for the suite benchmark was:
 
 | Mode | Time |
 |------|-----:|
-| VM, `benchmarks/suite/ackermann.gs` | ~0.287s |
+| VM, `benchmarks/recursion/ackermann.gs` | ~0.287s |
 | JIT before the `<main>` fix | ~0.41s |
 | JIT after boxed static self-call path | ~0.027-0.030s |
 | JIT after raw self ABI v1 | ~0.017-0.019s |

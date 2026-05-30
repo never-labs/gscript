@@ -1,13 +1,13 @@
 #!/bin/bash
 # Focused Tier 2 diagnostic runner.
 #
-# Runs suite benchmarks in VM mode, normal JIT mode, and with
+# Runs domain benchmarks in VM mode, normal JIT mode, and with
 # GSCRIPT_TIER2_NO_FILTER=1, preserving enough output to catch both
 # performance changes and "faster but wrong" checksum/output changes.
 #
 # Usage:
 #   bash benchmarks/diagnose_tier2.sh
-#   bash benchmarks/diagnose_tier2.sh nbody table_field_access math_intensive
+#   bash benchmarks/diagnose_tier2.sh numeric/nbody table/table_field_access numeric/math_intensive
 
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -110,7 +110,7 @@ fi
 if [[ "$#" -gt 0 ]]; then
     BENCHMARKS="$*"
 else
-    BENCHMARKS="fib fib_recursive sieve mandelbrot ackermann matmul spectral_norm nbody fannkuch sort sum_primes mutual_recursion method_dispatch closure_bench string_bench binary_trees table_field_access table_array_access coroutine_bench fibonacci_iterative math_intensive object_creation"
+    BENCHMARKS="recursion/fib recursion/fib_recursive control/sieve numeric/mandelbrot recursion/ackermann numeric/matmul numeric/spectral_norm numeric/nbody numeric/fannkuch table/sort numeric/sum_primes recursion/mutual_recursion calls/method_dispatch calls/closure_bench string/string_bench recursion/binary_trees table/table_field_access table/table_array_access calls/coroutine_bench recursion/fibonacci_iterative numeric/math_intensive calls/object_creation"
 fi
 
 printf "| %-22s | %-9s | %-9s | %-10s | %-9s | %-45s | %-55s |\n" \
@@ -119,10 +119,20 @@ printf "| %-22s | %-9s | %-9s | %-10s | %-9s | %-45s | %-55s |\n" \
     "----------------------" "---------" "---------" "----------" "---------" "---------------------------------------------" "-------------------------------------------------------"
 
 for bench in $BENCHMARKS; do
-    file="benchmarks/suite/${bench}.gs"
+    if [[ "$bench" == */* ]]; then
+        file="benchmarks/${bench}.gs"
+    else
+        file=""
+        for group in numeric recursion table calls string concurrency data app control; do
+            if [[ -f "benchmarks/$group/${bench}.gs" ]]; then
+                file="benchmarks/$group/${bench}.gs"
+                break
+            fi
+        done
+    fi
     if [[ ! -f "$file" ]]; then
         printf "| %-22s | %-9s | %-9s | %-8s | %-45s | %-55s |\n" \
-            "$bench" "missing" "n/a" "n/a" "missing suite file" ""
+            "$bench" "missing" "n/a" "n/a" "missing benchmark file" ""
         continue
     fi
 

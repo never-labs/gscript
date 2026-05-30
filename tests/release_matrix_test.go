@@ -31,7 +31,7 @@ func TestReleaseMatrixSpecSectionsHaveSemanticGate(t *testing.T) {
 	for i, feature := range matrix.Features {
 		id := decodeRequiredString(t, feature, i, "id")
 		sections := decodeRequiredStringList(t, feature, i, "spec_sections")
-		for _, field := range []string{"semantic_gate", "official_case"} {
+		for _, field := range []string{"semantic_gate", "conformance_case"} {
 			cell := decodeReleaseCoverageCell(t, feature, i, id, field)
 			if !releaseGateStatus(cell.Status) || len(cell.Refs) == 0 {
 				continue
@@ -51,22 +51,22 @@ func TestReleaseMatrixSpecSectionsHaveSemanticGate(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
-		t.Fatalf("stable language spec sections need semantic_gate or official_case refs in feature_matrix.json: %s", strings.Join(missing, ", "))
+		t.Fatalf("stable language spec sections need semantic_gate or conformance_case refs in feature_matrix.json: %s", strings.Join(missing, ", "))
 	}
 }
 
-func TestReleaseMatrixOfficialCasesHaveStatusAndClassification(t *testing.T) {
+func TestReleaseMatrixConformanceCasesHaveStatusAndClassification(t *testing.T) {
 	root := findRepoRoot(t)
-	caseDir := filepath.Join(root, "tests", "official_lua_cases")
-	pairs := readOfficialCasePairs(t, caseDir)
-	manifestCases, manifestCount := readOfficialManifestCases(t, root)
-	knownFailureCases := readBacktickCaseNames(t, filepath.Join(root, "tests", "official_lua_cases", "KNOWN_FAILURES.md"))
+	caseDir := filepath.Join(root, "tests", "language")
+	pairs := readConformanceCasePairs(t, caseDir)
+	manifestCases, manifestCount := readConformanceManifestCases(t, root)
+	knownFailureCases := readBacktickCaseNames(t, filepath.Join(root, "tests", "language", "KNOWN_FAILURES.md"))
 
 	if manifestCount != len(manifestCases) {
 		t.Fatalf("MANIFEST current translated passing count = %d, but table contains %d cases", manifestCount, len(manifestCases))
 	}
 	if manifestCount != len(pairs) {
-		t.Fatalf("MANIFEST current translated passing count = %d, but official case directory contains %d paired .lua/.gs cases", manifestCount, len(pairs))
+		t.Fatalf("MANIFEST current translated passing count = %d, but language conformance directory contains %d paired .lua/.gs cases", manifestCount, len(pairs))
 	}
 
 	var missing []string
@@ -78,7 +78,7 @@ func TestReleaseMatrixOfficialCasesHaveStatusAndClassification(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
-		t.Fatalf("official cases need a passing MANIFEST row or skipped KNOWN_FAILURES entry: %s", strings.Join(missing, ", "))
+		t.Fatalf("language conformance cases need a passing MANIFEST row or skipped KNOWN_FAILURES entry: %s", strings.Join(missing, ", "))
 	}
 }
 
@@ -86,9 +86,9 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	root := findRepoRoot(t)
 	testMatrix := readFileString(t, filepath.Join(root, "docs", "test-matrix.md"))
 	for _, ref := range []string{
-		"tests/official_lua_cases/MISSING_CAPABILITIES.md",
-		"tests/official_lua_cases/KNOWN_FAILURES.md",
-		"tests/official_lua_cases/MANIFEST.md",
+		"tests/language/MISSING_CAPABILITIES.md",
+		"tests/language/KNOWN_FAILURES.md",
+		"tests/language/MANIFEST.md",
 		"docs/stdlib-contract.md",
 	} {
 		if !strings.Contains(testMatrix, ref) {
@@ -97,13 +97,13 @@ func TestReleaseMatrixKnownGapDocsAreReleaseGateInputs(t *testing.T) {
 	}
 }
 
-func TestReleaseMatrixStdlibContractHasOfficialCoverageEntry(t *testing.T) {
+func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
 	root := findRepoRoot(t)
 	modules := readStdlibContractRows(t, root)
 	searchText := strings.ToLower(strings.Join([]string{
 		readFileString(t, filepath.Join(root, "tests", "feature_matrix.json")),
-		readFileString(t, filepath.Join(root, "tests", "official_lua_cases", "MANIFEST.md")),
-		readFileString(t, filepath.Join(root, "tests", "official_lua_cases", "MISSING_CAPABILITIES.md")),
+		readFileString(t, filepath.Join(root, "tests", "language", "MANIFEST.md")),
+		readFileString(t, filepath.Join(root, "tests", "language", "MISSING_CAPABILITIES.md")),
 	}, "\n"))
 
 	var missing []string
@@ -115,7 +115,7 @@ func TestReleaseMatrixStdlibContractHasOfficialCoverageEntry(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		sort.Strings(missing)
-		t.Fatalf("stdlib contract modules need an official translated case or documented capability entry: %s", strings.Join(missing, ", "))
+		t.Fatalf("stdlib contract modules need a conformance case or documented capability entry: %s", strings.Join(missing, ", "))
 	}
 }
 
@@ -160,11 +160,11 @@ func releaseIgnoredSpecSections() map[string]string {
 	}
 }
 
-func readOfficialCasePairs(t *testing.T, caseDir string) map[string]bool {
+func readConformanceCasePairs(t *testing.T, caseDir string) map[string]bool {
 	t.Helper()
 	entries, err := os.ReadDir(caseDir)
 	if err != nil {
-		t.Fatalf("read official case dir: %v", err)
+		t.Fatalf("read language conformance case dir: %v", err)
 	}
 	byExt := map[string]map[string]bool{
 		".gs":  {},
@@ -185,24 +185,24 @@ func readOfficialCasePairs(t *testing.T, caseDir string) map[string]bool {
 	pairs := map[string]bool{}
 	for name := range byExt[".gs"] {
 		if !byExt[".lua"][name] {
-			t.Fatalf("official case %s.gs has no matching .lua oracle", name)
+			t.Fatalf("language conformance case %s.gs has no matching .lua oracle", name)
 		}
 		pairs[name] = true
 	}
 	for name := range byExt[".lua"] {
 		if !byExt[".gs"][name] {
-			t.Fatalf("official case %s.lua has no matching .gs translation", name)
+			t.Fatalf("language conformance case %s.lua has no matching .gs translation", name)
 		}
 	}
 	if len(pairs) == 0 {
-		t.Fatal("official case directory contains no paired cases")
+		t.Fatal("language conformance case directory contains no paired cases")
 	}
 	return pairs
 }
 
-func readOfficialManifestCases(t *testing.T, root string) (map[string]bool, int) {
+func readConformanceManifestCases(t *testing.T, root string) (map[string]bool, int) {
 	t.Helper()
-	data := readFileString(t, filepath.Join(root, "tests", "official_lua_cases", "MANIFEST.md"))
+	data := readFileString(t, filepath.Join(root, "tests", "language", "MANIFEST.md"))
 	countRE := regexp.MustCompile(`Current translated passing cases:\s*([0-9]+)\.`)
 	countMatch := countRE.FindStringSubmatch(data)
 	if countMatch == nil {

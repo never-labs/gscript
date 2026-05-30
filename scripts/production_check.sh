@@ -191,12 +191,12 @@ add_release_smoke() {
         add_skip "Release Smoke" "missing tests/01_basic.gs"
         return
     fi
-    if [ ! -f benchmarks/suite/table_field_access.gs ]; then
-        add_skip "Release Smoke" "missing benchmarks/suite/table_field_access.gs"
+    if [ ! -f benchmarks/table/table_field_access.gs ]; then
+        add_skip "Release Smoke" "missing benchmarks/table/table_field_access.gs"
         return
     fi
     add_run "Release Smoke" \
-        "go run ./cmd/gscript tests/01_basic.gs && go run ./cmd/gscript -jit benchmarks/suite/table_field_access.gs && go run ./cmd/gscript inspect bytecode tests/01_basic.gs"
+        "go run ./cmd/gscript tests/01_basic.gs && go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs && go run ./cmd/gscript inspect bytecode tests/01_basic.gs"
 }
 
 build_quick_plan() {
@@ -216,8 +216,8 @@ build_full_plan() {
         "go test ./... -count=1"
     add_go_test "Feature Matrix" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
-    add_go_test "Official Lua Compatibility Surface" \
-        "go test ./tests -run Official -count=1"
+    add_go_test "Language Conformance Surface" \
+        "go test ./tests -run LanguageConformance -count=1"
     add_go_test "Release Matrix Metadata" \
         "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
     add_documentation_references

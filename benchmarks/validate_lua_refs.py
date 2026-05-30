@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate LuaJIT reference coverage for regression_guard defaults."""
+"""Validate LuaJIT reference coverage for domain benchmarks."""
 
 from __future__ import annotations
 
@@ -9,18 +9,22 @@ import subprocess
 import sys
 from pathlib import Path
 
-import regression_guard as guard
+import strict_guard as guard
 
 
-def suite_lua_refs(root: Path) -> list[str]:
-    suite_dir = root / "benchmarks" / "suite"
-    ordered = [name for name in guard.DEFAULT_BENCHMARKS if (suite_dir / f"{name}.gs").exists()]
-    extras = sorted(path.stem for path in suite_dir.glob("*.gs") if path.stem not in set(ordered))
-    return ordered + extras
+def lua_refs(root: Path) -> list[str]:
+    refs: list[str] = []
+    for group in guard.ALL_GROUPS:
+        for path in sorted((root / "benchmarks" / "lua_ref" / group).glob("*.lua")):
+            refs.append(f"{group}/{path.stem}")
+    return refs
 
 
 def validate_ref(root: Path, lua_bin: str, name: str, timeout: int) -> tuple[str, str]:
-    lua_file = root / "benchmarks" / "lua" / f"{name}.lua"
+    if "/" not in name:
+        return "missing", f"{name}: expected domain/name"
+    group, bench = name.split("/", 1)
+    lua_file = root / "benchmarks" / "lua_ref" / group / f"{bench}.lua"
     if not lua_file.exists():
         return "missing", f"{name}: missing {lua_file.relative_to(root)}"
 
@@ -49,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[1]
     failures: list[tuple[str, str]] = []
 
-    refs = suite_lua_refs(root)
+    refs = lua_refs(root)
     for name in refs:
         try:
             status, message = validate_ref(root, args.lua_bin, name, args.timeout)

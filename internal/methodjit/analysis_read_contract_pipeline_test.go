@@ -23,9 +23,15 @@ import (
 func TestReadContract_ProductionPipeline(t *testing.T) {
 	enforce := os.Getenv("GSCRIPT_ENFORCE_READ_CONTRACT") != "0"
 	roots := []string{
-		"../../benchmarks/suite",
-		"../../benchmarks/extended",
-		"../../benchmarks/variants",
+		"../../benchmarks/numeric",
+		"../../benchmarks/recursion",
+		"../../benchmarks/table",
+		"../../benchmarks/calls",
+		"../../benchmarks/string",
+		"../../benchmarks/concurrency",
+		"../../benchmarks/data",
+		"../../benchmarks/app",
+		"../../benchmarks/control",
 	}
 	var files []string
 	for _, root := range roots {

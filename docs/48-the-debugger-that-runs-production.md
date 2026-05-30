@@ -62,7 +62,7 @@ The first tool is the production JIT timeline:
 ```bash
 gscript -jit \
   -jit-timeline trace.jsonl \
-  benchmarks/suite/ackermann.gs
+  benchmarks/recursion/ackermann.gs
 ```
 
 It records tier events as they happen:
@@ -97,7 +97,7 @@ The second tool is the warm Tier 2 dump:
 gscript -jit \
   -jit-dump-warm /tmp/warm \
   -jit-dump-proto ack \
-  benchmarks/suite/ackermann.gs
+  benchmarks/recursion/ackermann.gs
 ```
 
 The important word is "warm."
@@ -191,8 +191,8 @@ instruction that is hot.
 The fifth tool is the production exit profile:
 
 ```bash
-gscript -jit -exit-stats benchmarks/suite/ackermann.gs
-gscript -jit -exit-stats-json benchmarks/suite/ackermann.gs
+gscript -jit -exit-stats benchmarks/recursion/ackermann.gs
+gscript -jit -exit-stats-json benchmarks/recursion/ackermann.gs
 ```
 
 It records exits on the real `executeTier2` path and aggregates them by:
@@ -282,7 +282,7 @@ gscript -jit \
   -jit-dump-proto ack \
   -exit-stats \
   -exit-stats-json \
-  benchmarks/suite/ackermann.gs
+  benchmarks/recursion/ackermann.gs
 ```
 
 That command exercises the real program, writes the tier chronology, captures
@@ -333,13 +333,13 @@ For Ackermann, the first question is no longer "is Tier 2 faster than Tier 1?"
 It is:
 
 ```bash
-gscript -jit -exit-stats -jit-dump-warm /tmp/ack benchmarks/suite/ackermann.gs
+gscript -jit -exit-stats -jit-dump-warm /tmp/ack benchmarks/recursion/ackermann.gs
 ```
 
 For method dispatch, it is not "maybe inline methods." It is:
 
 ```bash
-gscript -jit -exit-stats benchmarks/suite/method_dispatch.gs
+gscript -jit -exit-stats benchmarks/calls/method_dispatch.gs
 ```
 
 For a suspected regression, it is not "what pass changed recently?" It is:

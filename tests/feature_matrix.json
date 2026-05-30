@@ -14,7 +14,7 @@
     "tier1",
     "tier2",
     "semantic_gate",
-    "official_case",
+    "conformance_case",
     "perf_hot_case"
   ],
   "field_notes": {
@@ -23,8 +23,8 @@
     "interpreter": "Baseline VM/runtime semantic coverage.",
     "tier1": "MethodJIT Tier1 coverage or explicit exclusion.",
     "tier2": "MethodJIT Tier2 optimization/codegen coverage or explicit exclusion.",
-    "semantic_gate": "Fast CI or official translated case coverage that should block semantic regressions.",
-    "official_case": "Translated official Lua or comparable semantic cases.",
+    "semantic_gate": "Fast CI or conformance translated case coverage that should block semantic regressions.",
+    "conformance_case": "Translated conformance Lua or comparable semantic cases.",
     "perf_hot_case": "Hot-loop benchmark coverage, if the feature matters for steady-state performance."
   },
   "features": [
@@ -33,13 +33,13 @@
       "name": "Literals and constants",
       "category": "front-end",
       "spec_sections": ["Lexical Grammar", "Syntactic Grammar", "Core Behavioral Rules", "Stability Contract", "Lua-Compatible Surface"],
-      "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go", "tests/official_lua_cases/literals_strings_basic.gs"]},
-      "bytecode": {"status": "covered", "refs": ["tests/official_lua_cases/code_arithmetic_constants_more.gs", "tests/official_lua_cases/code_string_constant_closure_more.gs"]},
+      "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go", "tests/language/literals_strings_basic.gs"]},
+      "bytecode": {"status": "covered", "refs": ["tests/language/code_arithmetic_constants_more.gs", "tests/language/code_string_constant_closure_more.gs"]},
       "interpreter": {"status": "covered", "refs": ["tests/01_basic.gs", "internal/runtime/const_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/literals_long_brackets_more.gs", "tests/official_lua_cases/literals_control_escapes_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/literals_strings_basic.gs"]},
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/literals_long_brackets_more.gs", "tests/language/literals_control_escapes_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/literals_strings_basic.gs"]},
       "perf_hot_case": {"status": "semantic_only", "refs": []}
     },
     {
@@ -52,9 +52,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/arithmetic_test.go", "internal/runtime/arithmetic_edge_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/tier1_int_spec_test.go", "internal/methodjit/emit_arith_int48_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_tier2_correctness_test.go", "internal/methodjit/pass_float_strength_reduce_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/math_float_notation_coercion.gs", "tests/official_lua_cases/math_tonumber_decimal_edges.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/math_order_ops.gs", "tests/official_lua_cases/math_tonumber_base.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/math_intensive.gs", "benchmarks/official_hot/math_bit_utf8_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/math_float_notation_coercion.gs", "tests/language/math_tonumber_decimal_edges.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/math_order_ops.gs", "tests/language/math_tonumber_base.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/math_intensive.gs", "benchmarks/string/math_bit_utf8.gs"]}
     },
     {
       "id": "comparison_boolean_control",
@@ -66,9 +66,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/control_flow_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/tier1_compare_feedback_test.go", "internal/methodjit/emit_fused_branch_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/pass_guard_elim_test.go", "internal/methodjit/pass_range_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/constructs_short_circuit.gs", "tests/official_lua_cases/constructs_boolean_paths_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/constructs_precedence.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/sum_primes.gs", "benchmarks/suite/fannkuch.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/constructs_short_circuit.gs", "tests/language/constructs_boolean_paths_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/constructs_precedence.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/sum_primes.gs", "benchmarks/numeric/fannkuch.gs"]}
     },
     {
       "id": "loops_numeric_for",
@@ -80,9 +80,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/control_flow_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/loops_preheader_test.go", "internal/methodjit/tier1_int_analysis_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/pass_loop_bound_range_guard_test.go", "internal/methodjit/loop_region_versioning_exec_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/constructs_loop_break_count.gs", "tests/official_lua_cases/nextvar_numeric_for_more2.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/nextvar_numeric_for_float_counts.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/fibonacci_iterative.gs", "benchmarks/suite/sieve.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/constructs_loop_break_count.gs", "tests/language/nextvar_numeric_for_more2.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/nextvar_numeric_for_float_counts.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/recursion/fibonacci_iterative.gs", "benchmarks/control/sieve.gs"]}
     },
     {
       "id": "generic_for_pairs_next",
@@ -94,9 +94,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/table_ops_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/feedback_getfield_integration_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_table_array_bounds_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/nextvar_pairs_metamethod.gs", "tests/official_lua_cases/nextvar_ipairs_protocol_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/nextvar_next_pairs_copy.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/official_hot/nextvar_table_hot.gs", "benchmarks/extended/json_table_walk.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/nextvar_pairs_metamethod.gs", "tests/language/nextvar_ipairs_protocol_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/nextvar_next_pairs_copy.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/table/nextvar_table.gs", "benchmarks/table/json_table_walk.gs"]}
     },
     {
       "id": "functions_calls_returns",
@@ -108,9 +108,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/multireturn_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/tier1_call_regression_test.go", "internal/methodjit/r107_tco_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/tier2_call_entry_protocol_test.go", "internal/methodjit/tier2_continuation_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/calls_return_values.gs", "tests/official_lua_cases/calls_tail_varargs_more2.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/calls_nested_method_more.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/method_dispatch.gs", "benchmarks/suite/mutual_recursion.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/calls_return_values.gs", "tests/language/calls_tail_varargs_more2.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/calls_nested_method_more.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/calls/method_dispatch.gs", "benchmarks/recursion/mutual_recursion.gs"]}
     },
     {
       "id": "varargs_multireturn",
@@ -122,9 +122,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/multireturn_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/tier1_call_regression_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/tier2_call_entry_protocol_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/vararg_pack.gs", "tests/official_lua_cases/vararg_select.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/vararg_call_unpack_more.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/official_hot/calls_vararg_coroutine_hot.gs", "benchmarks/suite/closure_bench.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/vararg_pack.gs", "tests/language/vararg_select.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/vararg_call_unpack_more.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/calls/calls_vararg_coroutine.gs", "benchmarks/calls/closure_bench.gs"]}
     },
     {
       "id": "closures_upvalues",
@@ -136,9 +136,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/closure_advanced_test.go", "internal/runtime/scope_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/emit_upval.go", "internal/methodjit/closure_recurrence_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_inline_test.go", "internal/methodjit/emit_upval.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/closure_break_upvalues.gs", "tests/official_lua_cases/closure_loop_mutation_more2.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/closure_identity_more.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/closure_bench.gs", "benchmarks/variants/closure_accumulator_variant.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/closure_break_upvalues.gs", "tests/language/closure_loop_mutation_more2.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/closure_identity_more.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/calls/closure_bench.gs", "benchmarks/calls/closure_accumulator.gs"]}
     },
     {
       "id": "tables_arrays_fields",
@@ -150,9 +150,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/table_ctor_test.go", "internal/runtime/table_ops_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/emit_table_test.go", "internal/methodjit/pass_table_array_lower_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/pass_table_array_store_loop_test.go", "internal/methodjit/emit_table_typed_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/table_raw_helpers_more.gs", "tests/official_lua_cases/nextvar_table_remove_sequences.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/sort_table_insert_remove_concat.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/table_array_access.gs", "benchmarks/suite/table_field_access.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/table_raw_helpers_more.gs", "tests/language/nextvar_table_remove_sequences.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/sort_table_insert_remove_concat.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/table/table_array_access.gs", "benchmarks/table/table_field_access.gs"]}
     },
     {
       "id": "metatables_metamethods",
@@ -164,9 +164,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/metatable_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/pass_guard_field_callee_test.go", "internal/methodjit/pass_field_shape_call_split_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_field_call_poly_len_fusion_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/events_index_chain.gs", "tests/official_lua_cases/events_compare_metamethods.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/events_call_levels.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/official_hot/events_metamethod_hot.gs", "benchmarks/official_hot/call_len_pairs_metamethod_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/events_index_chain.gs", "tests/language/events_compare_metamethods.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/events_call_levels.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/table/events_metamethod.gs", "benchmarks/calls/call_len_pairs_metamethod.gs"]}
     },
     {
       "id": "strings_patterns_concat",
@@ -178,9 +178,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/string_ops_test.go", "internal/runtime/stdlib_string_extra_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/tier1_string_compare_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/string_tier2_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/strings_format_flags_more.gs", "tests/official_lua_cases/pm_gsub_captures.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/strings_table_concat_binary.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/string_bench.gs", "benchmarks/official_hot/strings_patterns_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/strings_format_flags_more.gs", "tests/language/pm_gsub_captures.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/strings_table_concat_binary.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/string/string_bench.gs", "benchmarks/string/strings_patterns.gs"]}
     },
     {
       "id": "errors_pcall_xpcall_defer",
@@ -192,9 +192,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/error_handling_test.go", "internal/runtime/defer_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/exit_resume_check_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/tier2_entry_deopt_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/errors_assert_pcall.gs", "tests/official_lua_cases/errors_xpcall_nested_error_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/errors_runtime_messages_more.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/official_hot/defer_protected_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/errors_assert_pcall.gs", "tests/language/errors_xpcall_nested_error_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/errors_runtime_messages_more.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/control/defer_protected.gs"]}
     },
     {
       "id": "coroutines",
@@ -206,9 +206,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/coroutine_test.go", "tests/08_coroutine.gs"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/coroutine_fusion_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/tier2_continuation_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/coroutine_tail_yield_more.gs", "tests/official_lua_cases/coroutine_recursive_yield_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/coroutine_wrap_sieve_more.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/coroutine_bench.gs", "benchmarks/extended/producer_consumer_pipeline.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/coroutine_tail_yield_more.gs", "tests/language/coroutine_recursive_yield_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/coroutine_wrap_sieve_more.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/calls/coroutine_bench.gs", "benchmarks/concurrency/producer_consumer_pipeline.gs"]}
     },
     {
       "id": "bitwise_bit32",
@@ -220,9 +220,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/bitwise_operator_test.go", "internal/runtime/stdlib_bit32_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/emit_ops_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_int_algebra_simplify_test.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/bitwise_direct_ops_more.gs", "tests/official_lua_cases/bwcoercion_bit32_numeric_strings.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/bitwise_bit32_shifts.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/math_intensive.gs", "benchmarks/official_hot/math_bit_utf8_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/bitwise_direct_ops_more.gs", "tests/language/bwcoercion_bit32_numeric_strings.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/bitwise_bit32_shifts.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/math_intensive.gs", "benchmarks/string/math_bit_utf8.gs"]}
     },
     {
       "id": "table_sort_stdlib",
@@ -234,9 +234,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/stdlib_table_extra_test.go", "internal/runtime/stdlib_sort_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/sort_pack_unpack.gs", "tests/official_lua_cases/sort_table_move.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/sort_invalid_order_function.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/sort.gs", "benchmarks/official_hot/table_sort_proxy_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/sort_pack_unpack.gs", "tests/language/sort_table_move.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/sort_invalid_order_function.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/table/sort.gs", "benchmarks/table/table_sort_proxy.gs"]}
     },
     {
       "id": "utf8",
@@ -248,9 +248,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/stdlib_utf8_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/utf8_codes_iterator.gs", "tests/official_lua_cases/utf8_offset_len_errors.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/utf8_basic.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/official_hot/math_bit_utf8_hot.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/utf8_codes_iterator.gs", "tests/language/utf8_offset_len_errors.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/utf8_basic.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/string/math_bit_utf8.gs"]}
     },
     {
       "id": "host_stdlibs",
@@ -262,9 +262,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/stdlib_json_test.go", "internal/runtime/stdlib_fs_test.go", "internal/runtime/stdlib_net_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/json_go_host_more.gs", "tests/official_lua_cases/fs_path_glob_cwd_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/net_http_methods_more.gs", "tests/official_lua_cases/process_exec_run_more.gs"]},
-      "perf_hot_case": {"status": "partial", "refs": ["benchmarks/official_hot/stdlib_host_hot.gs", "benchmarks/extended/json_table_walk.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/json_go_host_more.gs", "tests/language/fs_path_glob_cwd_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/net_http_methods_more.gs", "tests/language/process_exec_run_more.gs"]},
+      "perf_hot_case": {"status": "partial", "refs": ["benchmarks/app/stdlib_host.gs", "benchmarks/table/json_table_walk.gs"]}
     },
     {
       "id": "llm_native_integration",
@@ -277,7 +277,7 @@
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["gscript/gscript_test.go", "examples/embedding/embedding_test.go", "docs/embedding.md"]},
-      "official_case": {"status": "not_applicable", "refs": []},
+      "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
     {
@@ -291,7 +291,7 @@
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["gscript/gscript_test.go", "docs/test-matrix.md"]},
-      "official_case": {"status": "not_applicable", "refs": []},
+      "conformance_case": {"status": "not_applicable", "refs": []},
       "perf_hot_case": {"status": "not_applicable", "refs": []}
     },
     {
@@ -304,9 +304,9 @@
       "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/runtime/stdlib_vec_test.go", "internal/runtime/soa_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_matrix_codegen_test.go", "internal/methodjit/pass_matrix_lower.go"]},
-      "semantic_gate": {"status": "covered", "refs": ["tests/official_lua_cases/matrix_host_dense_more.gs", "tests/official_lua_cases/vec_color_geometry_hsl_more.gs"]},
-      "official_case": {"status": "covered", "refs": ["tests/official_lua_cases/matrix_host_dense_more.gs"]},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/matmul_dense.gs", "benchmarks/suite/spectral_norm_dense.gs"]}
+      "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.gs", "tests/language/vec_color_geometry_hsl_more.gs"]},
+      "conformance_case": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.gs"]},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/numeric/matmul_dense.gs", "benchmarks/numeric/spectral_norm_dense.gs"]}
     },
     {
       "id": "classes_methods_oop",
@@ -319,8 +319,8 @@
       "tier1": {"status": "partial", "refs": ["internal/methodjit/tier1_call_regression_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_field_shape_call_split_test.go"]},
       "semantic_gate": {"status": "partial", "refs": ["tests/12_advanced.gs"]},
-      "official_case": {"status": "not_applicable", "refs": []},
-      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/suite/method_dispatch.gs", "benchmarks/suite/object_creation.gs"]}
+      "conformance_case": {"status": "not_applicable", "refs": []},
+      "perf_hot_case": {"status": "covered", "refs": ["benchmarks/calls/method_dispatch.gs", "benchmarks/calls/object_creation.gs"]}
     }
   ]
 }

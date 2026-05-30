@@ -10,7 +10,7 @@ import (
 
 func boolTableMarkCountSource(t *testing.T) string {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "sieve.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "control", "sieve.gs"))
 	if err != nil {
 		t.Fatalf("read sieve benchmark: %v", err)
 	}

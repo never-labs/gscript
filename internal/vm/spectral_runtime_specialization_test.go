@@ -11,7 +11,7 @@ import (
 
 func spectralSource(t *testing.T, file string) string {
 	t.Helper()
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", file))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", file))
 	if err != nil {
 		t.Fatalf("read %s: %v", file, err)
 	}

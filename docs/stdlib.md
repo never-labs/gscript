@@ -131,5 +131,5 @@ record/replay 应以 [stdlib/llm.md](stdlib/llm.md) 中的 API 为稳定边界�
 2. 权限层：实现 interpreter-level capability policy，先覆盖 process/os/fs/http/debug，再给 CLI 和 embedded runtime 不同默认配置。
 3. 取消模型：新增 `context` 模块，并把 process/http/time 的 timeout、shutdown、sleep 迁到统一 cancellation contract。
 4. 数据边界：完善 json/csv/bytes/binary/crypto 的大 payload、streaming、二进制字符串和数字精度策略。
-5. 兼容收敛：继续用 `tests/official_lua_cases/MISSING_CAPABILITIES.md` 记录 Lua 官方 case 发现的新缺口，只补高价值兼容层，不追逐 Lua 内部实现协议。
+5. 兼容收敛：继续用 `tests/language/MISSING_CAPABILITIES.md` 记录 Lua 官方 case 发现的新缺口，只补高价值兼容层，不追逐 Lua 内部实现协议。
 6. 生产审计：为每个 host 能力补资源泄漏测试、race 测试、sandbox negative tests 和平台矩阵，形成发布前 checklist。

@@ -19,7 +19,7 @@ import (
 // pair, and that each PH it returns is a deterministic single-successor
 // outside predecessor of its header.
 func TestComputeLoopPreheaders_Mandelbrot(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/mandelbrot.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/numeric/mandelbrot.gs")
 	if err != nil {
 		t.Fatalf("read mandelbrot.gs: %v", err)
 	}

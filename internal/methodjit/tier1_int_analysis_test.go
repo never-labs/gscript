@@ -85,7 +85,7 @@ func TestKnownInt_ModKeepsIntResult(t *testing.T) {
 // TestKnownInt_Ackermann: verifies that on real ackermann bytecode, the
 // second EQ and both SUB PCs have both operands marked as known-int.
 func TestKnownInt_Ackermann(t *testing.T) {
-	srcBytes, err := os.ReadFile("../../benchmarks/suite/ackermann.gs")
+	srcBytes, err := os.ReadFile("../../benchmarks/recursion/ackermann.gs")
 	if err != nil {
 		t.Fatalf("read ackermann.gs: %v", err)
 	}

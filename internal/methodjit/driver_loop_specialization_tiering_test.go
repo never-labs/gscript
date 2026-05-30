@@ -91,7 +91,7 @@ func TestDriverLoopRuntimeSpecializationTieringUsesVMCapability(t *testing.T) {
 }
 
 func TestDriverLoopRuntimeSpecializationTieringKeepsDensePairwiseLoopOnVMRoute(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "nbody_dense.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "nbody_dense.gs"))
 	if err != nil {
 		t.Fatalf("read nbody_dense benchmark: %v", err)
 	}

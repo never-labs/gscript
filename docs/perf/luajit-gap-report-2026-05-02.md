@@ -67,16 +67,16 @@ Command shape:
 
 ```bash
 python3 benchmarks/strict_guard.py \
-  --bench suite/table_array_access \
-  --bench suite/coroutine_bench \
-  --bench suite/closure_bench \
-  --bench suite/string_bench \
-  --bench suite/table_field_access \
-  --bench extended/mixed_inventory_sim \
-  --bench extended/producer_consumer_pipeline \
-  --bench extended/actors_dispatch_mutation \
-  --bench extended/json_table_walk \
-  --bench extended/log_tokenize_format \
+  --bench table/table_array_access \
+  --bench calls/coroutine_bench \
+  --bench calls/closure_bench \
+  --bench string/string_bench \
+  --bench table/table_field_access \
+  --bench app/mixed_inventory_sim \
+  --bench concurrency/producer_consumer_pipeline \
+  --bench app/actors_dispatch_mutation \
+  --bench table/json_table_walk \
+  --bench string/log_tokenize_format \
   --mode default --mode no_filter --mode luajit \
   --runs 5 --warmup 1 --timeout 120
 ```
@@ -85,16 +85,16 @@ Ranked by best GScript mode against LuaJIT:
 
 | Benchmark | Best GScript | LuaJIT | Gap |
 | --- | ---: | ---: | ---: |
-| extended/mixed_inventory_sim | 0.152s | 0.022s | 6.91x slower |
-| extended/actors_dispatch_mutation | 0.039s | 0.011s | 3.55x slower |
-| extended/producer_consumer_pipeline | 0.127s | 0.043s | 2.95x slower |
-| suite/coroutine_bench | 0.019s | 0.00925s | 2.05x slower |
-| suite/table_array_access | 0.018s | 0.010s | 1.80x slower |
-| extended/json_table_walk | 0.031s | 0.017s | 1.82x slower |
-| suite/closure_bench | 0.0145s | 0.00875s | 1.66x slower |
-| suite/string_bench | 0.013s | 0.008s | 1.62x slower |
-| extended/log_tokenize_format | 0.133s | 0.083s | 1.60x slower |
-| suite/table_field_access | 0.019s | 0.019s | parity |
+| app/mixed_inventory_sim | 0.152s | 0.022s | 6.91x slower |
+| app/actors_dispatch_mutation | 0.039s | 0.011s | 3.55x slower |
+| concurrency/producer_consumer_pipeline | 0.127s | 0.043s | 2.95x slower |
+| calls/coroutine_bench | 0.019s | 0.00925s | 2.05x slower |
+| table/table_array_access | 0.018s | 0.010s | 1.80x slower |
+| table/json_table_walk | 0.031s | 0.017s | 1.82x slower |
+| calls/closure_bench | 0.0145s | 0.00875s | 1.66x slower |
+| string/string_bench | 0.013s | 0.008s | 1.62x slower |
+| string/log_tokenize_format | 0.133s | 0.083s | 1.60x slower |
+| table/table_field_access | 0.019s | 0.019s | parity |
 
 This changes the active work queue. The largest current gaps are now the
 extended mixed table and dispatch programs, not the old core numeric kernels.
@@ -113,9 +113,9 @@ remaining gaps. None cleared the merge bar:
 
 | Target | Tested direction | Result |
 | --- | --- | --- |
-| extended/mixed_inventory_sim | larger/open-addressed `string.format` result caches, stronger string hash, larger string-lookup probe limit, `math.floor` Fast1 path | regressed or failed to reproduce a win under the full guard |
-| extended/actors_dispatch_mutation | Tier 2 native-call envelope trimming, polymorphic `GetField` bounds-check trimming, typed-string `Len` fast path | at best 2.5-5%, below threshold; some nearby workloads moved the wrong way |
-| extended/producer_consumer_pipeline | small fixed-arity `NewTableFromCtorN` constructor fast paths | no material win; two variants regressed |
+| app/mixed_inventory_sim | larger/open-addressed `string.format` result caches, stronger string hash, larger string-lookup probe limit, `math.floor` Fast1 path | regressed or failed to reproduce a win under the full guard |
+| app/actors_dispatch_mutation | Tier 2 native-call envelope trimming, polymorphic `GetField` bounds-check trimming, typed-string `Len` fast path | at best 2.5-5%, below threshold; some nearby workloads moved the wrong way |
+| concurrency/producer_consumer_pipeline | small fixed-arity `NewTableFromCtorN` constructor fast paths | no material win; two variants regressed |
 
 The useful diagnostic findings are:
 
@@ -144,10 +144,10 @@ but it narrowed the safe search space:
 
 | Target | Tested direction | Result |
 | --- | --- | --- |
-| suite/table_array_access | store-loop preallocation threshold change and earlier typed-table kind verification | threshold change regressed the median from about 0.018s to about 0.041s; typed-kind cleanup stayed around 0.019-0.020s |
-| suite/coroutine_bench / extended/producer_consumer_pipeline | Tier 1 `OP_NEWOBJECTN` cache path for the five-field yielded payload | no win; `producer_consumer_pipeline` moved from about 0.128s to 0.141s on the first guard and 0.133s on rerun |
-| extended/actors_dispatch_mutation | delayed Tier 2 until field-dispatch feedback exists; narrower `FBString -> TypeString` propagation | delayed Tier 2 changed checksum and created an exit storm after actor mutation; string propagation was correctness-clean but stayed around 0.041s |
-| extended/mixed_inventory_sim | earlier Tier 2 admission for single-call long table loops; dense no-lock integer `string.format` result cache | broad admission did not enter Tier 2 in default mode and broke no-filter checksum; dense cache had no default-mode win |
+| table/table_array_access | store-loop preallocation threshold change and earlier typed-table kind verification | threshold change regressed the median from about 0.018s to about 0.041s; typed-kind cleanup stayed around 0.019-0.020s |
+| calls/coroutine_bench / concurrency/producer_consumer_pipeline | Tier 1 `OP_NEWOBJECTN` cache path for the five-field yielded payload | no win; `producer_consumer_pipeline` moved from about 0.128s to 0.141s on the first guard and 0.133s on rerun |
+| app/actors_dispatch_mutation | delayed Tier 2 until field-dispatch feedback exists; narrower `FBString -> TypeString` propagation | delayed Tier 2 changed checksum and created an exit storm after actor mutation; string propagation was correctness-clean but stayed around 0.041s |
+| app/mixed_inventory_sim | earlier Tier 2 admission for single-call long table loops; dense no-lock integer `string.format` result cache | broad admission did not enter Tier 2 in default mode and broke no-filter checksum; dense cache had no default-mode win |
 
 The resulting constraints are:
 
@@ -185,8 +185,8 @@ coroutine_bench, closure_bench, and string_bench. Timings printed as 0.000s
 are below benchmark display precision, not literal zero runtime.
 
 On the follow-up median-of-5 strict guard, the largest remaining comparable
-gaps are extended/mixed_inventory_sim, extended/actors_dispatch_mutation,
-extended/producer_consumer_pipeline, and extended/json_table_walk.
+gaps are app/mixed_inventory_sim, app/actors_dispatch_mutation,
+concurrency/producer_consumer_pipeline, and table/json_table_walk.
 ```
 
 Avoid current-tense claims that `matmul`, `fib`, `spectral_norm`, `sort`,

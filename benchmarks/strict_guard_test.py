@@ -138,7 +138,7 @@ class StrictGuardStatisticsTest(unittest.TestCase):
 
 class StrictGuardReportTest(unittest.TestCase):
     def test_markdown_marks_unreliable_results_without_ratio(self):
-        row = sg.BenchmarkResult("tiny")
+        row = sg.BenchmarkResult("tiny", "calls")
         row.modes["vm"] = sg.ModeResult("low_resolution")
         row.modes["default"] = sg.ModeResult(
             "ok",
@@ -152,32 +152,36 @@ class StrictGuardReportTest(unittest.TestCase):
             allow_wall_time=False,
         )
         markdown = sg.markdown_summary([row], ["vm", "default"], args)
-        self.assertIn("| suite/tiny | - | - | vm:low_resolution |", markdown)
-        self.assertIn("| suite/tiny | vm | low_resolution |", markdown)
+        self.assertIn("| calls/tiny | - | - | vm:low_resolution |", markdown)
+        self.assertIn("| calls/tiny | vm | low_resolution |", markdown)
 
     def test_repeat_overrides_accept_bench_group_bench_and_mode_bench(self):
-        overrides = sg.parse_repeat_overrides(["fib=4", "suite/fib=6", "default/sieve=8"])
+        overrides = sg.parse_repeat_overrides(["fib=4", "recursion/fib=6", "default/sieve=8"])
         self.assertEqual(sg.repeat_for(overrides, "vm", "fib"), 4)
-        self.assertEqual(sg.repeat_for(overrides, "vm", "fib", "suite/fib"), 6)
+        self.assertEqual(sg.repeat_for(overrides, "vm", "fib", "recursion/fib"), 6)
         self.assertEqual(sg.repeat_for(overrides, "default", "sieve"), 8)
         self.assertIsNone(sg.repeat_for(overrides, "vm", "sieve"))
 
     def test_discovery_includes_all_groups(self):
         root = Path(__file__).resolve().parents[1]
-        specs = sg.discover_specs(root, ["suite", "extended", "variants"])
+        specs = sg.discover_specs(root, ["numeric", "recursion", "table", "calls", "string", "app", "control"])
         ids = {spec.benchmark_id for spec in specs}
-        self.assertIn("suite/fib", ids)
-        self.assertIn("suite/matmul_dense", ids)
-        self.assertIn("extended/json_table_walk", ids)
-        self.assertIn("variants/matmul_row_variant", ids)
+        self.assertIn("recursion/fib", ids)
+        self.assertIn("numeric/matmul_dense", ids)
+        self.assertIn("table/json_table_walk", ids)
+        self.assertIn("numeric/matmul_row", ids)
 
-    def test_discovery_supports_official_group(self):
+    def test_discovery_supports_legacy_official_group_alias(self):
         root = Path(__file__).resolve().parents[1]
         specs = sg.discover_specs(root, ["official"])
+        ids = {spec.benchmark_id for spec in specs}
+        self.assertIn("calls/calls_vararg_coroutine", ids)
+        self.assertIn("table/events_metamethod", ids)
         for spec in specs:
-            self.assertEqual(spec.group, "official")
-            self.assertIn("benchmarks/official_hot", str(spec.gscript))
-            self.assertIn("benchmarks/lua_official_hot", str(spec.luajit))
+            self.assertIn(spec.group, {"calls", "control", "table", "string", "app"})
+            self.assertNotIn("official_hot", str(spec.gscript))
+            if spec.luajit is not None:
+                self.assertIn("benchmarks/lua_ref", str(spec.luajit))
 
 
 if __name__ == "__main__":

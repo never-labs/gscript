@@ -1,105 +1,54 @@
 # Testing Matrix
 
-This document maps the correctness and performance suites to their files and
-runner commands.
+This document maps the main correctness and performance gates to their files.
 
 ## Correctness
 
-| Area | Files | Runner |
+| Area | Files | Command |
 |---|---|---|
-| Core VM/JIT/runtime unit tests | `internal/vm`, `internal/runtime`, `internal/jit`, `internal/methodjit`, `tests` | `go test ./internal/vm ./internal/runtime ./internal/jit ./internal/methodjit ./tests -count=1` |
-| Hand-written language smoke tests | `tests/01_basic.gs` through `tests/12_advanced.gs` | Covered by `go test ./tests -count=1` |
-| Official Lua translated semantics | `tests/official_lua_cases/*.lua` and `tests/official_lua_cases/*.gs` | `go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v` |
-| Official JIT parity | same official case pairs | `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v` |
-| Gated real provider LLM smoke | `gscript/llm_integration_test.go`, `docs/embedding.md` | `GSCRIPT_LLM_INTEGRATION=1 GSCRIPT_ANTHROPIC_COMPAT_BASE_URL=... GSCRIPT_ANTHROPIC_COMPAT_API_KEY=... GSCRIPT_ANTHROPIC_COMPAT_MODEL=... go test ./gscript -run 'Test(AnthropicCompatibleLLMIntegration|AINativeSyntaxAnthropicCompatibleLLMIntegration)' -count=1 -v` |
-| Gated GLM LLM smoke | `gscript/llm_integration_test.go`, `docs/embedding.md`, `examples/ai_native_glm_smoke.gs`, `examples/ai_native_glm_direct_agent_tools.gs` | `GSCRIPT_LLM_INTEGRATION=1 GSCRIPT_GLM_API_KEY=... go test ./gscript -run 'Test(GLMAnthropicCompatibleLLMIntegration|AINativeSyntaxGLMIntegration|AINativeSyntaxGLMDirectAgentToolsIntegration)' -count=1 -v`; demo: `GSCRIPT_GLM_API_KEY=... gscript -jit=false examples/ai_native_glm_direct_agent_tools.gs` |
+| Core Go packages | `./...` | `go test ./... -count=1` |
+| Language conformance | `tests/language/*.lua` + `*.gs` | `go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v` |
+| JIT conformance parity | same conformance pairs | `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v` |
+| Feature and release metadata | `tests/feature_matrix.json`, release matrix tests | `go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1` |
 
-Official translated cases are semantic parity tests. They compare Lua output to
-GScript output and are not used as performance timings.
-
-The real provider LLM smoke tests are opt-in only. They skip under the default
-`go test` and `gscript ci` gates unless `GSCRIPT_LLM_INTEGRATION` and all
-provider endpoint/model/key variables are set. The GLM smoke mirrors the local
-`glm_cc` wrapper without shelling out to it: `GSCRIPT_GLM_API_KEY` may be
-replaced by `SENTINEL_GLM_API_KEY` or `GLM_API_KEY`; endpoint and model default
-to `https://open.bigmodel.cn/api/anthropic` and `glm-5.1`. The AI-native GLM
-cases cover multi-turn memory, explicit history, structured `agent output`, and
-direct agent tools via `tools: [extract_memory]`. Do not commit provider tokens;
-use local environment variables or CI secret storage.
+The conformance gate uses Lua output as the oracle and compares GScript VM
+output. The JIT parity mode compares `gscript -jit` output as well.
 
 ## Performance
 
-| Group | GScript files | LuaJIT refs | Purpose | Runner |
-|---|---|---|---|---|
-| `suite` | `benchmarks/suite/*.gs` | `benchmarks/lua/*.lua` | Stable core LuaJIT comparison set | `python3 benchmarks/strict_guard.py --group suite ...` |
-| `extended` | `benchmarks/extended/*.gs` and `benchmarks/extended/manifest.json` | `benchmarks/lua_extended/*.lua` | Broader workload coverage | `python3 benchmarks/strict_guard.py --group extended ...` |
-| `variants` | `benchmarks/variants/*.gs` | `benchmarks/lua_variants/*.lua` | Overfit and structural variant pressure | `python3 benchmarks/strict_guard.py --group variants ...` |
-| `official` | `benchmarks/official_hot/*.gs` | `benchmarks/lua_official_hot/*.lua` | Hot loops extracted from official semantic families | `python3 benchmarks/strict_guard.py --group official ...` |
+| Domain | Files | LuaJIT refs | Example |
+|---|---|---|---|
+| `numeric` | `benchmarks/numeric/*.gs` | `benchmarks/lua_ref/numeric/*.lua` | `python3 benchmarks/strict_guard.py --group numeric ...` |
+| `recursion` | `benchmarks/recursion/*.gs` | `benchmarks/lua_ref/recursion/*.lua` | `python3 benchmarks/strict_guard.py --group recursion ...` |
+| `table` | `benchmarks/table/*.gs` | `benchmarks/lua_ref/table/*.lua` | `python3 benchmarks/strict_guard.py --group table ...` |
+| `calls` | `benchmarks/calls/*.gs` | `benchmarks/lua_ref/calls/*.lua` | `python3 benchmarks/strict_guard.py --group calls ...` |
+| `string` | `benchmarks/string/*.gs` | `benchmarks/lua_ref/string/*.lua` | `python3 benchmarks/strict_guard.py --group string ...` |
+| `concurrency` | `benchmarks/concurrency/*.gs` | `benchmarks/lua_ref/concurrency/*.lua` | `python3 benchmarks/strict_guard.py --group concurrency ...` |
+| `data` | `benchmarks/data/*.gs` | `benchmarks/lua_ref/data/*.lua` | `python3 benchmarks/strict_guard.py --group data ...` |
+| `app` | `benchmarks/app/*.gs` | `benchmarks/lua_ref/app/*.lua` | `python3 benchmarks/strict_guard.py --group app ...` |
+| `control` | `benchmarks/control/*.gs` | `benchmarks/lua_ref/control/*.lua` | `python3 benchmarks/strict_guard.py --group control ...` |
 
-Default strict guard intentionally runs only `suite`, `extended`, and
-`variants`:
-
-```bash
-python3 benchmarks/strict_guard.py \
-  --mode default --mode luajit \
-  --group suite --group extended --group variants \
-  --runs 7 --warmup 3 --min-sample-seconds 0.10 \
-  --timeout 180 \
-  --json /tmp/gscript_hot_luajit_current.json \
-  --markdown /tmp/gscript_hot_luajit_current.md
-```
-
-Run the official hot group separately while these newly extracted gaps are being
-optimized:
+Full timing comparison:
 
 ```bash
-python3 benchmarks/strict_guard.py \
-  --group official \
-  --mode default --mode luajit \
-  --runs 3 --warmup 1 --min-sample-seconds 0.05 \
-  --timeout 240 \
-  --json /tmp/gscript_official_hot.json \
-  --markdown /tmp/gscript_official_hot.md
+python3 benchmarks/timing_compare.py --all-groups --runs=5 --warmup=1 \
+  --sort=luajit-gap \
+  --json /tmp/gscript_timing.json \
+  --markdown /tmp/gscript_timing.md
 ```
 
-For a true all-performance sweep, include all four groups explicitly:
+Strict truth pass:
 
 ```bash
-python3 benchmarks/strict_guard.py \
-  --mode default --mode luajit \
-  --group suite --group extended --group variants --group official \
-  --runs 3 --warmup 1 --min-sample-seconds 0.05 \
-  --timeout 240 \
-  --json /tmp/gscript_all_perf.json \
-  --markdown /tmp/gscript_all_perf.md
+python3 benchmarks/strict_guard.py --runs=3 --warmup=1 --timeout=90
 ```
 
-Use script `Time:` output for throughput claims. Do not use process wall time
-for short semantic cases; it mostly measures startup and compilation noise.
-
-## Coverage Audit
-
-`benchmarks/official_perf_coverage.py` maps the translated official semantic
-families to hot performance coverage:
-
-```bash
-python3 benchmarks/official_perf_coverage.py \
-  --check \
-  --markdown /tmp/official_perf_coverage.md \
-  --json /tmp/official_perf_coverage.json
-```
-
-Current interpretation:
-
-- `covered`: a semantic family has a corresponding hot benchmark.
-- `partial`: a family has some coverage but still needs a focused hot case.
-- `semantic_only`: the family is mostly cold semantics, host integration, IO,
-  diagnostics, or other behavior that should remain a correctness test unless
-  a real hot workload appears.
-
-For a guard-style invocation that fails on unclassified official families or
-broken benchmark references:
+Coverage audit:
 
 ```bash
 bash benchmarks/coverage_guard.sh
 ```
+
+`benchmarks/conformance_perf_coverage.py` maps conformance families to hot-loop
+benchmarks. It does not time tiny conformance programs directly because startup
+noise would dominate those results.

@@ -63,7 +63,7 @@ Use the benchmark tools for different jobs:
 | `benchmarks/regression_guard.sh` | Baseline regression gate for default JIT performance. |
 | `benchmarks/diagnose.py` | Artifact bundle for one or more benchmarks: timing, exits, runtime paths, Tier 2 perf, speculation state, worklist, and optional pprof/warm dumps. |
 | `benchmarks/profile_exits.py` | Exit/deopt attribution; use it to explain timing, not as the success metric. |
-| `benchmarks/official_perf_coverage.py` | Coverage audit from official semantic cases to hot performance cases. |
+| `benchmarks/conformance_perf_coverage.py` | Coverage audit from official semantic cases to hot performance cases. |
 
 ### Data-Oriented Array / SoA Benchmark Plan
 
@@ -166,7 +166,7 @@ Useful variants:
 
 ```bash
 bash scripts/performance_gate.sh --smoke
-bash scripts/performance_gate.sh --bench suite/spectral_norm --bench official/nextvar_table_hot
+bash scripts/performance_gate.sh --bench numeric/spectral_norm --bench table/nextvar_table
 bash scripts/performance_gate.sh --full --runs=5 --warmup=1 --out-dir /tmp/gscript_perf_full
 bash scripts/performance_gate.sh --validate-only /tmp/gscript_perf_full/timing_gate.json
 ```

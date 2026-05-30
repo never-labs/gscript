@@ -37,29 +37,29 @@ def timing_payload(rows):
 
 class PerfSubmitGuardTest(unittest.TestCase):
     def test_rejects_luajit_ratio_above_threshold(self):
-        rows = guard.load_rows(write_json(timing_payload([("suite/a", 0.81, 1.0)])))
+        rows = guard.load_rows(write_json(timing_payload([("numeric/a", 0.81, 1.0)])))
         violations = guard.check_rows(rows, ratio_threshold=0.8)
-        self.assertEqual([(v.kind, v.name) for v in violations], [("luajit", "suite/a")])
+        self.assertEqual([(v.kind, v.name) for v in violations], [("luajit", "numeric/a")])
 
     def test_rejects_regression_against_baseline(self):
-        candidate = guard.load_rows(write_json(timing_payload([("suite/a", 0.75, 1.0)])))
-        baseline = guard.load_rows(write_json(timing_payload([("suite/a", 0.70, 1.0)])))
+        candidate = guard.load_rows(write_json(timing_payload([("numeric/a", 0.75, 1.0)])))
+        baseline = guard.load_rows(write_json(timing_payload([("numeric/a", 0.70, 1.0)])))
         violations = guard.check_rows(candidate, baseline=baseline, ratio_threshold=0.8, regression_tolerance=0.03)
-        self.assertEqual([(v.kind, v.name) for v in violations], [("regression", "suite/a")])
+        self.assertEqual([(v.kind, v.name) for v in violations], [("regression", "numeric/a")])
 
     def test_accepts_under_threshold_without_regression(self):
-        candidate = guard.load_rows(write_json(timing_payload([("suite/a", 0.72, 1.0)])))
-        baseline = guard.load_rows(write_json(timing_payload([("suite/a", 0.71, 1.0)])))
+        candidate = guard.load_rows(write_json(timing_payload([("numeric/a", 0.72, 1.0)])))
+        baseline = guard.load_rows(write_json(timing_payload([("numeric/a", 0.71, 1.0)])))
         self.assertEqual(guard.check_rows(candidate, baseline=baseline, ratio_threshold=0.8), [])
 
     def test_skips_luajit_ratio_for_mixed_timing_sources(self):
-        rows = guard.load_rows(write_json(timing_payload([("suite/a", 0.02, 0.01, "wall_repeat", "script_repeat")])))
+        rows = guard.load_rows(write_json(timing_payload([("numeric/a", 0.02, 0.01, "wall_repeat", "script_repeat")])))
         self.assertEqual(guard.check_rows(rows, ratio_threshold=0.8), [])
-        self.assertNotIn("suite/a", guard.format_summary(rows, []))
+        self.assertNotIn("numeric/a", guard.format_summary(rows, []))
 
     def test_skips_baseline_regression_for_mixed_current_sources(self):
-        candidate = guard.load_rows(write_json(timing_payload([("suite/a", 0.90, 1.50, "wall_repeat", "script_repeat")])))
-        baseline = guard.load_rows(write_json(timing_payload([("suite/a", 0.70, 1.50, "script_repeat", "script_repeat")])))
+        candidate = guard.load_rows(write_json(timing_payload([("numeric/a", 0.90, 1.50, "wall_repeat", "script_repeat")])))
+        baseline = guard.load_rows(write_json(timing_payload([("numeric/a", 0.70, 1.50, "script_repeat", "script_repeat")])))
         self.assertEqual(
             guard.check_rows(candidate, baseline=baseline, ratio_threshold=0.8, regression_tolerance=0.03),
             [],

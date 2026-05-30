@@ -90,13 +90,13 @@ can become `low_resolution` when fallback is forbidden.
 `strict_guard.py` has a similar repeat calibration path, but with different
 defaults: default groups are `suite`, `extended`, and `variants`; `official`
 must be requested explicitly. Wall fallback is disabled unless
-`--allow-wall-time` is set. It also marks `official/defer_protected_hot` as a
+`--allow-wall-time` is set. It also marks `control/defer_protected` as a
 logical-time benchmark and prefers wall time for that case when wall timing is
 allowed.
 
 The official hot scripts mostly print `Time: %.3fs` from an in-script timer:
 GScript uses `time.now()` / `time.since()`, while Lua uses `os.clock()`.
-`official/defer_protected_hot` is the exception: both GScript and Lua versions
+`control/defer_protected` is the exception: both GScript and Lua versions
 print deterministic synthetic `logicalTime`, not elapsed wall or CPU time.
 
 The hot region is not fully uniform across official hot cases. Most scripts put
@@ -140,7 +140,7 @@ while `os.clock()` is CPU time in Lua. Comparing those is acceptable only when
 the workload is CPU-bound and not affected by sleep, I/O, or scheduling noise.
 Host-heavy official cases such as `stdlib_host_hot` should be treated carefully.
 
-Logical-time risk: `official/defer_protected_hot` reports a deterministic cost
+Logical-time risk: `control/defer_protected` reports a deterministic cost
 model, so its `Time:` output is not performance time. It should never be mixed
 into throughput rankings unless the reported source says logical or the harness
 substitutes wall time.
@@ -162,7 +162,7 @@ Every benchmark report row should expose these fields, even if some are empty:
 
 | Field | Meaning |
 |---|---|
-| `benchmark_id` | Stable `group/name`, e.g. `official/stdlib_host_hot`. |
+| `benchmark_id` | Stable `group/name`, e.g. `app/stdlib_host`. |
 | `subject` | `current`, `head`, `luajit`, or another compared runtime. |
 | `mode` | `default`, `vm`, `no_filter`, `luajit`, or Go benchmark mode. |
 | `status` | `ok`, `partial`, `low_resolution`, `no_time`, `timeout`, `error`, `skipped`, or `missing`. |
@@ -196,7 +196,7 @@ now wraps `timing_compare.py` and `strict_guard.py`, records JSON/Markdown
 artifacts, sorts current/HEAD results, fails low-resolution/unavailable rows,
 and applies separate script-time vs wall-time regression thresholds.
 
-1. Make `logical` a first-class timing source. `official/defer_protected_hot`
+1. Make `logical` a first-class timing source. `control/defer_protected`
    should not appear as ordinary `script_repeat`; reports should display
    `time_source=logical` or require wall substitution explicitly.
 

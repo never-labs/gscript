@@ -34,7 +34,7 @@
 - `python3 benchmarks/triage.py`：面向单个或少量 benchmark 的 timing + exit + 可选 diag/pprof/warm-dump bundle。
 - `python3 benchmarks/profile_exits.py`：Tier 2 exit/deopt profile。
 - `python3 benchmarks/jit_addr_map.py`：把 warm JIT PC map 和 pprof/raw PC 离线关联。
-- `python3 benchmarks/official_perf_coverage.py` 或 `bash benchmarks/coverage_guard.sh`：审计 translated official Lua 语义 case 与 hot benchmark 的覆盖关系。
+- `python3 benchmarks/conformance_perf_coverage.py` 或 `bash benchmarks/coverage_guard.sh`：审计 translated official Lua 语义 case 与 hot benchmark 的覆盖关系。
 - `python3 benchmarks/regression_guard.py` 或 `bash benchmarks/regression_guard.sh`：旧的 baseline regression workflow，仍保留兼容价值。
 - `bash benchmarks/set_baseline.sh`、`plot_history.sh`、`diagnose_tier2.sh`、`benchmarks/extended/run_all.sh`、`benchmarks/precision/run.sh` 等辅助入口。
 
@@ -46,7 +46,7 @@
 
 - 顶层推荐入口：`go test ./... -count=1 -p 1 -timeout=600s`。
 - `tests/integration_test.go` 直接通过 lexer/parser/interpreter 执行 `tests/01_basic.gs` 到 `tests/12_advanced.gs`。
-- `tests/official_lua_semantics_test.go` 构建 `./cmd/gscript`，用 `lua` 或 `LUA_BIN` 作为 oracle，对 `tests/official_lua_cases/*.lua` 与对应 `.gs` 比较输出；设置 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 时额外比较 `gscript -jit`。
+- `tests/official_lua_semantics_test.go` 构建 `./cmd/gscript`，用 `lua` 或 `LUA_BIN` 作为 oracle，对 `tests/language/*.lua` 与对应 `.gs` 比较输出；设置 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 时额外比较 `gscript -jit`。
 - `tests/feature_matrix_test.go` 校验 `tests/feature_matrix.json` schema 和 repo-relative refs。
 - `tests/jit_*.go`、`tests/trace_exec_test.go`、`benchmarks/*_test.go` 覆盖 JIT、benchmark correctness、warm micro-benchmark 等内部行为。
 

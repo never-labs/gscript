@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegexpRandomDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/official_hot/regexp_random_hot.gs")
+	src, err := os.ReadFile("../../benchmarks/string/regexp_random.gs")
 	if err != nil {
 		t.Fatal(err)
 	}

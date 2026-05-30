@@ -8,7 +8,7 @@ import (
 )
 
 func TestEventsMetamethodDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/official_hot/events_metamethod_hot.gs")
+	src, err := os.ReadFile("../../benchmarks/table/events_metamethod.gs")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,7 +19,7 @@ and hot performance cases.
 | `tier1` | MethodJIT Tier1 coverage, or an explicit `semantic_only`/`not_applicable` status. |
 | `tier2` | MethodJIT Tier2 optimization/codegen coverage, or an explicit exclusion. |
 | `semantic_gate` | CI or official-case gate that should block semantic regressions. |
-| `official_case` | Translated official Lua or comparable semantic cases. |
+| `conformance_case` | Translated official Lua or comparable semantic cases. |
 | `perf_hot_case` | Hot-loop benchmark coverage, when the feature matters for steady-state performance. |
 | `spec_sections` | Level-2 sections in `docs/language-spec.md` that define this feature's language contract. |
 
@@ -70,10 +70,10 @@ one feature row unless it is an explicitly ignored process/planning section.
 
 Release metadata is checked by `TestReleaseMatrix*` in
 `tests/release_matrix_test.go`. That gate requires every stable language-spec
-section to have a `semantic_gate` or `official_case` reference, every paired
+section to have a `semantic_gate` or `conformance_case` reference, every paired
 official translated case to be classified in
-`tests/official_lua_cases/MANIFEST.md` or recorded in
-`tests/official_lua_cases/KNOWN_FAILURES.md`, every known-gap ledger to be
+`tests/language/MANIFEST.md` or recorded in
+`tests/language/KNOWN_FAILURES.md`, every known-gap ledger to be
 named from `docs/test-matrix.md`, and every `docs/stdlib-contract.md` module to
 have an official-case or capability-ledger coverage entry.
 

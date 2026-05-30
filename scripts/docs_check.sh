@@ -176,7 +176,7 @@ def check_release_gate_docs() -> None:
             "bash scripts/performance_gate.sh --feature-smoke",
             "tests/feature_matrix.json",
             "docs/language-spec.md",
-            "tests/official_lua_cases/MISSING_CAPABILITIES.md",
+            "tests/language/MISSING_CAPABILITIES.md",
             "docs/stdlib-contract.md",
         ],
     )
@@ -188,8 +188,8 @@ def check_release_gate_docs() -> None:
             release_matrix_cmd,
             "scripts/docs_check.sh",
             "bash scripts/performance_gate.sh --feature-smoke",
-            "tests/official_lua_cases/MANIFEST.md",
-            "tests/official_lua_cases/KNOWN_FAILURES.md",
+            "tests/language/MANIFEST.md",
+            "tests/language/KNOWN_FAILURES.md",
         ],
     )
 

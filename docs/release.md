@@ -223,9 +223,9 @@ machine-readable ledgers:
 |---|---|
 | Language feature matrix | `tests/feature_matrix.json` |
 | Language spec contract | `docs/language-spec.md` |
-| Official translated cases | `tests/official_lua_cases/MANIFEST.md` |
-| Known official-case skips | `tests/official_lua_cases/KNOWN_FAILURES.md` |
-| Intentional capability gaps | `tests/official_lua_cases/MISSING_CAPABILITIES.md` |
+| Official translated cases | `tests/language/MANIFEST.md` |
+| Known official-case skips | `tests/language/KNOWN_FAILURES.md` |
+| Intentional capability gaps | `tests/language/MISSING_CAPABILITIES.md` |
 | Standard library contract | `docs/stdlib-contract.md` |
 
 The release is blocked if a language-facing change updates only prose or only

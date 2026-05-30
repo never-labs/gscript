@@ -8,7 +8,7 @@ import (
 )
 
 func TestStdlibHostDriverRuntimeSpecialization(t *testing.T) {
-	src, err := os.ReadFile("../../benchmarks/official_hot/stdlib_host_hot.gs")
+	src, err := os.ReadFile("../../benchmarks/app/stdlib_host.gs")
 	if err != nil {
 		t.Fatal(err)
 	}

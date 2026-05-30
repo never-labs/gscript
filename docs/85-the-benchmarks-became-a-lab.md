@@ -76,9 +76,9 @@ variants:
 ```
 
 The manifest lets the harness treat those groups uniformly while still making
-the distinction visible. A row such as `extended/mixed_inventory_sim` is not
+the distinction visible. A row such as `app/mixed_inventory_sim` is not
 accidentally compared as if it were the same kind of evidence as
-`suite/fib_recursive`.
+`recursion/fib_recursive`.
 
 That also made cleanup possible. Once the manifest is the source of truth,
 old shell scripts such as group-local `run_all.sh` entry points can be judged

@@ -4,8 +4,8 @@
 
 当前语义基线：
 
-- 兼容 oracle：`tests/official_lua_cases/MANIFEST.md` 中 441 个 translated official Lua case，默认比较 Lua oracle 与 `gscript -vm` 输出；设置 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 时还比较 `gscript -jit`。
-- 能力 ledger：`tests/official_lua_cases/MISSING_CAPABILITIES.md`。它记录已覆盖能力、明确非目标和后续翻译官方 case 时新增的候选能力。
+- 兼容 oracle：`tests/language/MANIFEST.md` 中 441 个 translated official Lua case，默认比较 Lua oracle 与 `gscript -vm` 输出；设置 `GSCRIPT_OFFICIAL_CHECK_JIT=1` 时还比较 `gscript -jit`。
+- 能力 ledger：`tests/language/MISSING_CAPABILITIES.md`。它记录已覆盖能力、明确非目标和后续翻译官方 case 时新增的候选能力。
 - 覆盖矩阵：`docs/language-feature-checklist.md` 与 `tests/feature_matrix.json`。语言语义稳定项必须同时有 parser/bytecode/runtime/official gate 或明确标为 `semantic_only` / `not_applicable`。
 - 实现锚点：`internal/runtime` 是值模型、标准库、解释器、错误、表、协程和 channel 语义源；`internal/vm` 是文件模式 bytecode、JIT gate 与 VM parity 源。
 
@@ -26,7 +26,7 @@ Phase 0 不以“代码能跑”为完成条件，而以“语义可被引用、
 Phase 0 验收 gate：
 
 ```bash
-go test ./tests -run 'TestFeatureMatrix|TestOfficialLuaTranslatedCases' -count=1
+go test ./tests -run 'TestFeatureMatrix|TestLanguageConformanceTranslatedCases' -count=1
 go test ./internal/runtime ./internal/vm ./gscript -count=1
 ```
 
@@ -550,8 +550,8 @@ Language stability is owned by VM semantics. JIT is an optimization tier and mus
 
 Required gates:
 
-- `go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v`
-- `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestOfficialLuaTranslatedCases -count=1 -v`
+- `go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v`
+- `GSCRIPT_OFFICIAL_CHECK_JIT=1 go test ./tests -run TestLanguageConformanceTranslatedCases -count=1 -v`
 - Focused `internal/runtime` tests for new interpreter/runtime behavior.
 - Focused `internal/vm` tests for compiler/opcode/source-diagnostic/JIT-gate parity.
 - `tests/feature_matrix.json` row updated for any new language feature.

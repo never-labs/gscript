@@ -21,10 +21,10 @@ func advance(dt) { return dt }
 	}
 
 	sources := []string{
-		"benchmarks/suite/fannkuch.gs",
-		"benchmarks/suite/sieve.gs",
-		"benchmarks/suite/matmul.gs",
-		"benchmarks/suite/nbody.gs",
+		"benchmarks/numeric/fannkuch.gs",
+		"benchmarks/control/sieve.gs",
+		"benchmarks/numeric/matmul.gs",
+		"benchmarks/numeric/nbody.gs",
 	}
 	for i, child := range proto.Protos {
 		child.Source = sources[i]
@@ -43,7 +43,7 @@ func advance(dt) { return dt }
 }
 
 func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "fannkuch.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "fannkuch.gs"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 }
 
 func TestPermutationFlipChecksumIgnoresBenchmarkMetadata(t *testing.T) {
-	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "suite", "fannkuch.gs"))
+	src, err := os.ReadFile(filepath.Join("..", "..", "benchmarks", "numeric", "fannkuch.gs"))
 	if err != nil {
 		t.Fatal(err)
 	}
