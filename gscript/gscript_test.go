@@ -346,6 +346,63 @@ missing_kind := missing_err.kind
 	}
 }
 
+func TestLoopReactApproveWhenPauses(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{res: gs.LLMTurnResult{
+				Status: "tool_calls",
+				Calls: []gs.LLMToolCall{{
+					ID:   "call_1",
+					Tool: "refund",
+					Args: map[string]any{"amount": int64(150)},
+				}},
+			}}
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMProvider(provider),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+refund := llm.tool("refund", func(amount) {
+    return "refund:" .. amount, nil
+}, {params: {"amount"}})
+result, err := loop.react({
+    user: "refund order",
+    tools: {refund},
+    approve_when: func(call) {
+        return call.tool == "refund" && call.args.amount > 100
+    },
+})
+pending_status := result.status
+pending_tool := result.payload.tool
+pending_amount := result.payload.args.amount
+resume, resume_err := loop.resume(result.token, {ok: true}, {refund})
+resume_status := resume.status
+resume_value := resume.value
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			pendingStatus, _ := vm.Get("pending_status")
+			pendingTool, _ := vm.Get("pending_tool")
+			pendingAmount, _ := vm.Get("pending_amount")
+			resumeStatus, _ := vm.Get("resume_status")
+			resumeValue, _ := vm.Get("resume_value")
+			if pendingStatus != "pending" || pendingTool != "refund" || pendingAmount != int64(150) {
+				t.Fatalf("pending status=%#v tool=%#v amount=%#v", pendingStatus, pendingTool, pendingAmount)
+			}
+			if resumeStatus != "dispatched" || resumeValue != "refund:150" {
+				t.Fatalf("resume status=%#v value=%#v", resumeStatus, resumeValue)
+			}
+		})
+	}
+}
+
 func TestLoopBudgets(t *testing.T) {
 	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
 		{

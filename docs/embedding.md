@@ -202,6 +202,9 @@ the full returned `result.history`.
 The `loop` module is a thin convenience layer over `llm.react`: `loop.react`
 accepts either explicit `messages` or `{system, user}` fields, and `loop.simple`
 performs a single-turn loop with the same result/error shape.
+`loop.react` also accepts `approve_when: func(call) { ... }`; when it returns
+truthy for a tool call, the loop returns `{status: "pending", token, payload}`
+instead of dispatching, and the same token can be resumed with `loop.resume`.
 Both `llm.react` and `loop.react` accept `budget: {tokens, turns, calls, money,
 time}` or the flat `budget_tokens` / `budget_turns` / `budget_calls` /
 `budget_money` / `budget_time` fields. Exhaustion returns

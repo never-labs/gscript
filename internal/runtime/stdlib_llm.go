@@ -372,7 +372,11 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
 		}
-		return llmReact(opts, p, call, currentContext(), hostLimit(), trace)
+		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
+			approveWhen: args[0].Table().RawGetString("approve_when"),
+			snapshots:   snapshots,
+			snapshotsMu: &snapshotsMu,
+		})
 	})
 
 	set("simple", func(args []Value) ([]Value, error) {
@@ -860,7 +864,17 @@ func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) 
 	return []Value{results[0], NilValue()}, nil
 }
 
-func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) ([]Value, error) {
+type llmHITL struct {
+	approveWhen Value
+	snapshots   map[string]Value
+	snapshotsMu *sync.Mutex
+}
+
+func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent), hitls ...*llmHITL) ([]Value, error) {
+	var hitl *llmHITL
+	if len(hitls) > 0 {
+		hitl = hitls[0]
+	}
 	messagesValue := opts.RawGetString("messages")
 	if !messagesValue.IsTable() {
 		llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: "llm.react requires messages"})
@@ -936,8 +950,16 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		case "tool_calls":
 			for i := range res.Calls {
 				callValue := llmToolCallValue(res.Calls[i])
-				history = append(history, llmAssistantCallMessage(callValue))
 				llmTrace(trace, LLMTraceEvent{Type: "tool_call", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+				if pending, err := llmMaybePauseForApproval(hitl, call, llmTableFromValues(history), callValue); !pending.IsNil() || err != nil {
+					if err != nil {
+						llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: "internal", Message: err.Error()})
+						return []Value{NilValue(), llmErrorValue("internal", err.Error())}, nil
+					}
+					llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "pending", Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+					return []Value{pending, NilValue()}, nil
+				}
+				history = append(history, llmAssistantCallMessage(callValue))
 				if err := cancel.check(); !err.IsNil() {
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
@@ -977,6 +999,37 @@ func llmTrace(trace func(LLMTraceEvent), event LLMTraceEvent) {
 	if trace != nil {
 		trace(event)
 	}
+}
+
+func llmMaybePauseForApproval(hitl *llmHITL, call FunctionCaller, history, pending Value) (Value, error) {
+	if hitl == nil || hitl.approveWhen.IsNil() || !hitl.approveWhen.IsFunction() {
+		return NilValue(), nil
+	}
+	results, err := call(hitl.approveWhen, []Value{pending})
+	if err != nil {
+		return NilValue(), err
+	}
+	if len(results) == 0 || !results[0].Truthy() {
+		return NilValue(), nil
+	}
+	token, err := llmSnapshotToken()
+	if err != nil {
+		return NilValue(), err
+	}
+	snapshot := NewTable()
+	snapshot.RawSetString("history", history)
+	snapshot.RawSetString("pending", pending)
+	hitl.snapshotsMu.Lock()
+	hitl.snapshots[token] = TableValue(snapshot)
+	hitl.snapshotsMu.Unlock()
+
+	result := NewTable()
+	result.RawSetString("status", StringValue("pending"))
+	result.RawSetString("token", StringValue(token))
+	result.RawSetString("payload", pending)
+	result.RawSetString("pending", pending)
+	result.RawSetString("history", history)
+	return TableValue(result), nil
 }
 
 func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetries int, trace func(LLMTraceEvent), step int64, callInfo LLMToolCall) ([]Value, Value) {
