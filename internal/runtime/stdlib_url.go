@@ -6,8 +6,24 @@ import (
 )
 
 // buildURLLib creates the "url" standard library table.
-func buildURLLib() *Table {
+func buildURLLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
+	checkURLString := func(s string) (Value, error) {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(s)); err != nil {
+			return NilValue(), err
+		}
+		return StringValue(s), nil
+	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -53,7 +69,11 @@ func buildURLLib() *Table {
 		result.RawSetString("port", StringValue(u.Port()))
 		result.RawSetString("path", StringValue(u.Path))
 		result.RawSetString("fragment", StringValue(u.Fragment))
-		result.RawSetString("raw", StringValue(u.String()))
+		raw := u.String()
+		if err := CheckProjectedHostStringBytes(maxHostResult(), len(raw)); err != nil {
+			return nil, err
+		}
+		result.RawSetString("raw", StringValue(raw))
 
 		// User info
 		if u.User != nil {
@@ -117,7 +137,11 @@ func buildURLLib() *Table {
 			}
 			u.RawQuery = q.Encode()
 		}
-		return []Value{StringValue(u.String())}, nil
+		v, err := checkURLString(u.String())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
 	})
 
 	// url.encode(str) -- percent-encode a string
@@ -125,7 +149,7 @@ func buildURLLib() *Table {
 		if !arg.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'url.encode' (string expected)")
 		}
-		return StringValue(url.QueryEscape(arg.Str())), nil
+		return checkURLString(url.QueryEscape(arg.Str()))
 	}
 	setFastArg1("encode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -144,7 +168,11 @@ func buildURLLib() *Table {
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return StringValue(decoded), NilValue(), 1, nil
+		v, err := checkURLString(decoded)
+		if err != nil {
+			return NilValue(), NilValue(), 0, err
+		}
+		return v, NilValue(), 1, nil
 	}
 	setFastArg1Ret2("decode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -172,7 +200,7 @@ func buildURLLib() *Table {
 			q.Set(k.String(), v.String())
 			k, v, ok = tbl.Next(k)
 		}
-		return StringValue(q.Encode()), nil
+		return checkURLString(q.Encode())
 	}
 	setFastArg1("queryEncode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -226,7 +254,11 @@ func buildURLLib() *Table {
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return StringValue(base.ResolveReference(ref).String()), NilValue(), 1, nil
+		v, err := checkURLString(base.ResolveReference(ref).String())
+		if err != nil {
+			return NilValue(), NilValue(), 0, err
+		}
+		return v, NilValue(), 1, nil
 	}
 	setFastArg2Ret2("join", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
@@ -265,7 +297,11 @@ func buildURLLib() *Table {
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
-		return []Value{StringValue(u.Hostname())}, nil
+		v, err := checkURLString(u.Hostname())
+		if err != nil {
+			return nil, err
+		}
+		return []Value{v}, nil
 	})
 
 	// url.getPath(str) -- extract just the path
@@ -277,7 +313,11 @@ func buildURLLib() *Table {
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return StringValue(u.Path), NilValue(), 1, nil
+		v, err := checkURLString(u.Path)
+		if err != nil {
+			return NilValue(), NilValue(), 0, err
+		}
+		return v, NilValue(), 1, nil
 	}
 	setFastArg1Ret2("getPath", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {

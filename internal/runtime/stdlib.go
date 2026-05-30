@@ -106,7 +106,7 @@ func (interp *Interpreter) registerStdlib() {
 
 	// --- Data formats ---
 	interp.globals.Define("csv", TableValue(buildCSVLib(interp)))
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.globals.Define("url", TableValue(buildURLLib(interp)))
 
 	// --- Utilities ---
 	interp.globals.Define("uuid", TableValue(buildUUIDLib()))

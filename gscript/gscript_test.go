@@ -679,6 +679,39 @@ func TestWithMaxHostResultBytesLimitsCryptoOutput(t *testing.T) {
 	}
 }
 
+func TestWithMaxHostResultBytesLimitsURLOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, src := range []string{
+				`value := url.encode("12345")`,
+				`value := url.decode("12345")`,
+				`value := url.build({scheme: "https", host: "example.com"})`,
+				`value := url.queryEncode({name: "12345"})`,
+				`value := url.join("https://example.com/", "12345")`,
+				`value := url.getHost("https://example.com/path")`,
+				`value := url.getPath("https://example.com/12345")`,
+			} {
+				opts := append([]gs.Option{
+					gs.WithLibs(gs.LibString | gs.LibURL),
+					gs.WithMaxHostResultBytes(4),
+				}, tc.opts...)
+				vm := gs.New(opts...)
+				err := vm.Exec(src)
+				var budgetErr *gs.BudgetError
+				if !errors.As(err, &budgetErr) || budgetErr.Resource != "host_result_bytes" || budgetErr.Limit != 4 {
+					t.Fatalf("%s expected host_result_bytes budget 4, got %T %v", src, err, err)
+				}
+			}
+		})
+	}
+}
+
 func TestWithMaxHostResultBytesLimitsCompressDecodeExpansion(t *testing.T) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
