@@ -224,6 +224,9 @@ an opaque token, and `loop.resume(token, approval, tools?)` materializes an
 approved or denied tool call back into history. Passing a tool list to
 `loop.resume` dispatches approved calls immediately; omitting it returns an
 `approved` result for the host or script to handle.
+Both functions also accept an optional store table with `save(token, snapshot)`,
+`load(token)`, and `delete(token)` functions, so approval tokens can survive
+outside the current VM process.
 
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:

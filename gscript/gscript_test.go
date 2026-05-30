@@ -346,6 +346,68 @@ missing_kind := missing_err.kind
 	}
 }
 
+func TestLoopSnapshotStore(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(append([]gs.Option{gs.WithLibs(gs.LibString | gs.LibLLM)}, tc.opts...)...)
+			if err := vm.Exec(`
+saved := nil
+saved_token := ""
+loaded_token := ""
+deleted_token := ""
+store := {
+    save: func(token, snapshot) {
+        saved_token = token
+        saved = snapshot
+        return true, nil
+    },
+    load: func(token) {
+        loaded_token = token
+        return saved, nil
+    },
+    delete: func(token) {
+        deleted_token = token
+        return true, nil
+    },
+}
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "gscript"}}, store)
+stored_name := saved.pending.args.name
+loaded, loaded_err := loop.resume("external-token", {ok: true}, {lookup}, store)
+loaded_status := loaded.status
+loaded_value := loaded.value
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			for name, want := range map[string]interface{}{
+				"stored_name":   "gscript",
+				"loaded_status": "dispatched",
+				"loaded_value":  "docs:gscript",
+				"loaded_token":  "external-token",
+				"deleted_token": "external-token",
+			} {
+				got, _ := vm.Get(name)
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+			token, _ := vm.Get("token")
+			savedToken, _ := vm.Get("saved_token")
+			if token == "" || token != savedToken {
+				t.Fatalf("token=%#v saved_token=%#v", token, savedToken)
+			}
+		})
+	}
+}
+
 func TestLoopReactApproveWhenPauses(t *testing.T) {
 	for _, tc := range []struct {
 		name string

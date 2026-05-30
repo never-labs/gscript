@@ -374,6 +374,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		}
 		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
+			store:       args[0].Table().RawGetString("store"),
 			snapshots:   snapshots,
 			snapshotsMu: &snapshotsMu,
 		})
@@ -426,6 +427,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		}
 		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
+			store:       args[0].Table().RawGetString("store"),
 			snapshots:   snapshots,
 			snapshotsMu: &snapshotsMu,
 		})
@@ -455,6 +457,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		}
 		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
+			store:       args[0].Table().RawGetString("store"),
 			snapshots:   snapshots,
 			snapshotsMu: &snapshotsMu,
 		})
@@ -481,26 +484,66 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		snapshotsMu.Lock()
 		snapshots[token] = TableValue(snapshot)
 		snapshotsMu.Unlock()
-		return []Value{StringValue(token)}, nil
+		if len(args) >= 3 && llmIsSnapshotStore(args[2]) {
+			if errVal, err := llmStoreSave(call, args[2].Table(), token, TableValue(snapshot)); err != nil {
+				return nil, err
+			} else if !errVal.IsNil() {
+				return []Value{NilValue(), errVal}, nil
+			}
+		}
+		return []Value{StringValue(token), NilValue()}, nil
 	})
 
 	set("resume", func(args []Value) ([]Value, error) {
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsTable() {
 			return nil, fmt.Errorf("bad argument to 'loop.resume' (token, approval expected)")
 		}
+		token := args[0].Str()
+		var tools *Table
+		var store Value
+		if len(args) >= 3 && args[2].IsTable() {
+			if llmIsSnapshotStore(args[2]) {
+				store = args[2]
+			} else {
+				tools = args[2].Table()
+			}
+		}
+		if len(args) >= 4 && llmIsSnapshotStore(args[3]) {
+			store = args[3]
+		}
 		snapshotsMu.Lock()
-		snapshot, ok := snapshots[args[0].Str()]
+		snapshot, ok := snapshots[token]
 		if !ok || !snapshot.IsTable() {
 			snapshotsMu.Unlock()
-			return []Value{NilValue(), llmErrorValue("validation", "snapshot not found")}, nil
+			if llmIsSnapshotStore(store) {
+				loaded, errVal, err := llmStoreLoad(call, store.Table(), token)
+				if err != nil {
+					return nil, err
+				}
+				if !errVal.IsNil() {
+					return []Value{NilValue(), errVal}, nil
+				}
+				snapshot = loaded
+			}
+			if !snapshot.IsTable() {
+				return []Value{NilValue(), llmErrorValue("validation", "snapshot not found")}, nil
+			}
+		} else {
+			delete(snapshots, token)
+			snapshotsMu.Unlock()
 		}
-		delete(snapshots, args[0].Str())
-		snapshotsMu.Unlock()
-		var tools *Table
-		if len(args) >= 3 && args[2].IsTable() {
-			tools = args[2].Table()
+		result, err := llmResumeSnapshot(snapshot.Table(), args[1].Table(), tools, call)
+		if err != nil {
+			return nil, err
 		}
-		return llmResumeSnapshot(snapshot.Table(), args[1].Table(), tools, call)
+		if llmIsSnapshotStore(store) {
+			if errVal, err := llmStoreDelete(call, store.Table(), token); err != nil {
+				return nil, err
+			} else if !errVal.IsNil() {
+				return []Value{NilValue(), errVal}, nil
+			}
+		}
+		return result, nil
 	})
 
 	return t
@@ -512,6 +555,54 @@ func llmSnapshotToken() (string, error) {
 		return "", fmt.Errorf("loop.snapshot: failed to generate token: %v", err)
 	}
 	return hex.EncodeToString(b[:]), nil
+}
+
+func llmIsSnapshotStore(v Value) bool {
+	if !v.IsTable() {
+		return false
+	}
+	t := v.Table()
+	return t.RawGetString("save").IsFunction() &&
+		t.RawGetString("load").IsFunction() &&
+		t.RawGetString("delete").IsFunction()
+}
+
+func llmStoreSave(call FunctionCaller, store *Table, token string, snapshot Value) (Value, error) {
+	return llmStoreCall(call, store.RawGetString("save"), []Value{StringValue(token), snapshot})
+}
+
+func llmStoreLoad(call FunctionCaller, store *Table, token string) (Value, Value, error) {
+	result, errVal, err := llmStoreCall2(call, store.RawGetString("load"), []Value{StringValue(token)})
+	if err != nil || !errVal.IsNil() {
+		return NilValue(), errVal, err
+	}
+	return result, NilValue(), nil
+}
+
+func llmStoreDelete(call FunctionCaller, store *Table, token string) (Value, error) {
+	return llmStoreCall(call, store.RawGetString("delete"), []Value{StringValue(token)})
+}
+
+func llmStoreCall(call FunctionCaller, fn Value, args []Value) (Value, error) {
+	_, errVal, err := llmStoreCall2(call, fn, args)
+	return errVal, err
+}
+
+func llmStoreCall2(call FunctionCaller, fn Value, args []Value) (Value, Value, error) {
+	if call == nil {
+		return NilValue(), llmErrorValue("internal", "snapshot store requires a function caller"), nil
+	}
+	results, err := call(fn, args)
+	if err != nil {
+		return NilValue(), NilValue(), err
+	}
+	if len(results) >= 2 && !results[1].IsNil() {
+		return NilValue(), results[1], nil
+	}
+	if len(results) == 0 {
+		return NilValue(), NilValue(), nil
+	}
+	return results[0], NilValue(), nil
 }
 
 func llmResumeSnapshot(snapshot, approval, tools *Table, call FunctionCaller) ([]Value, error) {
@@ -1037,6 +1128,7 @@ func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) 
 
 type llmHITL struct {
 	approveWhen Value
+	store       Value
 	snapshots   map[string]Value
 	snapshotsMu *sync.Mutex
 }
@@ -1193,6 +1285,13 @@ func llmMaybePauseForApproval(hitl *llmHITL, call FunctionCaller, history, pendi
 	hitl.snapshotsMu.Lock()
 	hitl.snapshots[token] = TableValue(snapshot)
 	hitl.snapshotsMu.Unlock()
+	if llmIsSnapshotStore(hitl.store) {
+		if errVal, err := llmStoreSave(call, hitl.store.Table(), token, TableValue(snapshot)); err != nil {
+			return NilValue(), err
+		} else if !errVal.IsNil() {
+			return NilValue(), fmt.Errorf("%s", errVal.String())
+		}
+	}
 
 	result := NewTable()
 	result.RawSetString("status", StringValue("pending"))
