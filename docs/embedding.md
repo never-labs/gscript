@@ -127,10 +127,16 @@ result, err := llm.react({
     messages: {llm.system("Use tools."), llm.user("find docs")},
     tools: {lookup},
     max_steps: 8,
+    max_tool_retries: 1,
 })
 if err != nil { return nil, err }
 return result.text, nil
 ```
+
+`llm.react` treats tool errors by `err.kind`: `network`, `provider`, and
+`internal` are transient and retried up to `max_tool_retries`;
+`validation`, `policy`, `user`, and `capability` are fed back as tool-error
+messages; unknown kinds are returned as fatal agent errors.
 
 For local command-backed experiments, `WithLLMCommand` can wrap an executable
 such as `glm_cc`:

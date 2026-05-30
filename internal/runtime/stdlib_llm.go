@@ -419,6 +419,10 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		maxSteps = 8
 	}
 	model := opts.RawGetString("model").Str()
+	maxToolRetries := int(toInt(opts.RawGetString("max_tool_retries")))
+	if maxToolRetries < 0 {
+		maxToolRetries = 0
+	}
 	for step := 0; step < maxSteps; step++ {
 		req := LLMTurnRequest{
 			Model:     model,
@@ -444,9 +448,9 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 			for i := range res.Calls {
 				callValue := llmToolCallValue(res.Calls[i])
 				history = append(history, llmAssistantCallMessage(callValue))
-				dispatchResult, err := llmDispatch(call, callValue.Table(), tools)
-				if err != nil {
-					return nil, err
+				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, maxToolRetries)
+				if !err.IsNil() {
+					return []Value{NilValue(), err}, nil
 				}
 				if len(dispatchResult) >= 2 && !dispatchResult[1].IsNil() {
 					message := dispatchResult[1].Table().RawGetString("message").Str()
@@ -464,6 +468,53 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 		}
 	}
 	return []Value{llmReactResultValue("stopped", "", "max_steps", NilValue(), history), NilValue()}, nil
+}
+
+func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetries int) ([]Value, Value) {
+	var lastErr Value
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		result, err := llmDispatch(call, callTable, tools)
+		if err != nil {
+			return nil, llmErrorValue("internal", err.Error())
+		}
+		if len(result) < 2 || result[1].IsNil() {
+			return result, NilValue()
+		}
+		lastErr = result[1]
+		kind := llmErrorKind(lastErr)
+		if llmRecoverableToolError(kind) {
+			return result, NilValue()
+		}
+		if !llmTransientToolError(kind) {
+			return nil, lastErr
+		}
+	}
+	return []Value{NilValue(), lastErr}, NilValue()
+}
+
+func llmErrorKind(v Value) string {
+	if !v.IsTable() {
+		return ""
+	}
+	return v.Table().RawGetString("kind").Str()
+}
+
+func llmRecoverableToolError(kind string) bool {
+	switch kind {
+	case "validation", "policy", "user", "capability":
+		return true
+	default:
+		return false
+	}
+}
+
+func llmTransientToolError(kind string) bool {
+	switch kind {
+	case "network", "provider", "internal":
+		return true
+	default:
+		return false
+	}
 }
 
 func llmReactResultValue(status, text, reason string, turn Value, history []Value) Value {

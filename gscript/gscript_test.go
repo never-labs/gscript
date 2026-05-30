@@ -208,6 +208,77 @@ history_len := #result.history
 	}
 }
 
+func TestLLMReactRetriesTransientToolErrors(t *testing.T) {
+	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+		{
+			Status: "tool_calls",
+			Calls: []gs.LLMToolCall{{
+				ID:   "call_1",
+				Tool: "lookup",
+				Args: map[string]any{"name": "gscript"},
+			}},
+		},
+		{Status: "final_answer", Text: "done"},
+	}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+attempts := 0
+lookup := llm.tool("lookup", func(name) {
+    attempts = attempts + 1
+    if attempts == 1 {
+        return nil, {kind: "network", message: "retry me"}
+    }
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+result, err := llm.react({
+    messages: {llm.user("find docs")},
+    tools: {lookup},
+    max_steps: 3,
+    max_tool_retries: 1,
+})
+status := result.status
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	attempts, _ := vm.Get("attempts")
+	status, _ := vm.Get("status")
+	if attempts != int64(2) || status != "done" {
+		t.Fatalf("attempts=%#v status=%#v", attempts, status)
+	}
+	if len(provider.requests) != 2 || len(provider.requests[1].Messages) != 3 || provider.requests[1].Messages[2].Value != "docs:gscript" {
+		t.Fatalf("requests = %#v", provider.requests)
+	}
+}
+
+func TestLLMReactFatalToolErrorPropagates(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+		Status: "tool_calls",
+		Calls: []gs.LLMToolCall{{
+			ID:   "call_1",
+			Tool: "lookup",
+			Args: map[string]any{"name": "gscript"},
+		}},
+	}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return nil, {kind: "fatal", message: "stop"}
+}, {params: {"name"}})
+result, err := llm.react({
+    messages: {llm.user("find docs")},
+    tools: {lookup},
+    max_steps: 1,
+})
+err_kind := err.kind
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	kind, _ := vm.Get("err_kind")
+	if kind != "fatal" {
+		t.Fatalf("err_kind = %#v", kind)
+	}
+}
+
 func TestLLMCommandProviderGLMCCSmoke(t *testing.T) {
 	if os.Getenv("GSCRIPT_GLM_CC_SMOKE") == "" {
 		t.Skip("set GSCRIPT_GLM_CC_SMOKE=1 to run glm_cc-backed llm.turn smoke")
