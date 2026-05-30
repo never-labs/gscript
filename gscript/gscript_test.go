@@ -408,6 +408,70 @@ loaded_value := loaded.value
 	}
 }
 
+func TestLoopSnapshotTraceEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var events []gs.LLMTraceEvent
+			opts := append([]gs.Option{
+				gs.WithLibs(gs.LibString | gs.LibLLM),
+				gs.WithLLMTrace(func(event gs.LLMTraceEvent) {
+					events = append(events, event)
+				}),
+			}, tc.opts...)
+			vm := gs.New(opts...)
+			if err := vm.Exec(`
+saved := nil
+store := {
+    save: func(token, snapshot) {
+        saved = snapshot
+        return true, nil
+    },
+    load: func(token) {
+        return saved, nil
+    },
+    delete: func(token) {
+        return true, nil
+    },
+}
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+token, snap_err := loop.snapshot({msg.user("find docs")}, {id: "call_1", tool: "lookup", args: {name: "gscript"}}, store)
+loaded, loaded_err := loop.resume(token, {ok: true}, {lookup}, store)
+`); err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			got := make([]string, 0, len(events))
+			for _, event := range events {
+				got = append(got, event.Type)
+			}
+			want := []string{
+				"snapshot_saved",
+				"snapshot_store_saved",
+				"resume_start",
+				"resume_loaded",
+				"resume_store_deleted",
+				"resume_done",
+			}
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Fatalf("events = %#v, want %#v", got, want)
+			}
+			if events[0].Token == "" || events[1].Token != events[0].Token || !events[1].Store {
+				t.Fatalf("snapshot events = %#v", events[:2])
+			}
+			if events[5].Status != "dispatched" || events[5].Token != events[0].Token || !events[5].Store {
+				t.Fatalf("resume done = %#v", events[5])
+			}
+		})
+	}
+}
+
 func TestLoopReactApproveWhenPauses(t *testing.T) {
 	for _, tc := range []struct {
 		name string

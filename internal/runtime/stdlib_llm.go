@@ -71,12 +71,14 @@ type LLMTraceEvent struct {
 	Status       string
 	Tool         string
 	CallID       string
+	Token        string
 	ErrorKind    string
 	Message      string
 	Step         int64
 	Attempt      int64
 	MessageCount int
 	ToolCount    int
+	Store        bool
 	Usage        LLMTurnUsage
 }
 
@@ -375,6 +377,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
 			store:       args[0].Table().RawGetString("store"),
+			trace:       trace,
 			snapshots:   snapshots,
 			snapshotsMu: &snapshotsMu,
 		})
@@ -428,6 +431,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
 			store:       args[0].Table().RawGetString("store"),
+			trace:       trace,
 			snapshots:   snapshots,
 			snapshotsMu: &snapshotsMu,
 		})
@@ -458,6 +462,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		result, err := llmReact(opts, p, call, currentContext(), hostLimit(), trace, &llmHITL{
 			approveWhen: args[0].Table().RawGetString("approve_when"),
 			store:       args[0].Table().RawGetString("store"),
+			trace:       trace,
 			snapshots:   snapshots,
 			snapshotsMu: &snapshotsMu,
 		})
@@ -484,12 +489,14 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		snapshotsMu.Lock()
 		snapshots[token] = TableValue(snapshot)
 		snapshotsMu.Unlock()
+		trace(LLMTraceEvent{Type: "snapshot_saved", Token: token})
 		if len(args) >= 3 && llmIsSnapshotStore(args[2]) {
 			if errVal, err := llmStoreSave(call, args[2].Table(), token, TableValue(snapshot)); err != nil {
 				return nil, err
 			} else if !errVal.IsNil() {
 				return []Value{NilValue(), errVal}, nil
 			}
+			trace(LLMTraceEvent{Type: "snapshot_store_saved", Token: token, Store: true})
 		}
 		return []Value{StringValue(token), NilValue()}, nil
 	})
@@ -511,6 +518,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		if len(args) >= 4 && llmIsSnapshotStore(args[3]) {
 			store = args[3]
 		}
+		trace(LLMTraceEvent{Type: "resume_start", Token: token, Store: llmIsSnapshotStore(store)})
 		snapshotsMu.Lock()
 		snapshot, ok := snapshots[token]
 		if !ok || !snapshot.IsTable() {
@@ -524,6 +532,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 					return []Value{NilValue(), errVal}, nil
 				}
 				snapshot = loaded
+				trace(LLMTraceEvent{Type: "resume_loaded", Token: token, Store: true})
 			}
 			if !snapshot.IsTable() {
 				return []Value{NilValue(), llmErrorValue("validation", "snapshot not found")}, nil
@@ -531,6 +540,7 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 		} else {
 			delete(snapshots, token)
 			snapshotsMu.Unlock()
+			trace(LLMTraceEvent{Type: "resume_loaded", Token: token})
 		}
 		result, err := llmResumeSnapshot(snapshot.Table(), args[1].Table(), tools, call)
 		if err != nil {
@@ -542,6 +552,10 @@ func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostRe
 			} else if !errVal.IsNil() {
 				return []Value{NilValue(), errVal}, nil
 			}
+			trace(LLMTraceEvent{Type: "resume_store_deleted", Token: token, Store: true})
+		}
+		if len(result) > 0 && result[0].IsTable() {
+			trace(LLMTraceEvent{Type: "resume_done", Token: token, Status: result[0].Table().RawGetString("status").Str(), Store: llmIsSnapshotStore(store)})
 		}
 		return result, nil
 	})
@@ -1129,6 +1143,7 @@ func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) 
 type llmHITL struct {
 	approveWhen Value
 	store       Value
+	trace       func(LLMTraceEvent)
 	snapshots   map[string]Value
 	snapshotsMu *sync.Mutex
 }
@@ -1285,12 +1300,14 @@ func llmMaybePauseForApproval(hitl *llmHITL, call FunctionCaller, history, pendi
 	hitl.snapshotsMu.Lock()
 	hitl.snapshots[token] = TableValue(snapshot)
 	hitl.snapshotsMu.Unlock()
+	llmTrace(hitl.trace, LLMTraceEvent{Type: "snapshot_saved", Token: token, Tool: pending.Table().RawGetString("tool").Str(), CallID: pending.Table().RawGetString("id").Str()})
 	if llmIsSnapshotStore(hitl.store) {
 		if errVal, err := llmStoreSave(call, hitl.store.Table(), token, TableValue(snapshot)); err != nil {
 			return NilValue(), err
 		} else if !errVal.IsNil() {
 			return NilValue(), fmt.Errorf("%s", errVal.String())
 		}
+		llmTrace(hitl.trace, LLMTraceEvent{Type: "snapshot_store_saved", Token: token, Store: true, Tool: pending.Table().RawGetString("tool").Str(), CallID: pending.Table().RawGetString("id").Str()})
 	}
 
 	result := NewTable()

@@ -100,8 +100,9 @@ vm := gscript.New(gscript.WithLibs(gscript.LibString|gscript.LibLLM), gscript.Wi
 ```
 
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
-tool-call, retry, and stop events with counts, status, usage, and tool names;
-prompt text and tool result values are intentionally omitted by default.
+tool-call, retry, HITL snapshot/resume, and stop events with counts, status,
+usage, token metadata, and tool names; prompt text and tool result values are
+intentionally omitted by default.
 
 ```go
 vm := gscript.New(
