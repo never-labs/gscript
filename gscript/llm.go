@@ -36,6 +36,64 @@ type LLMRecord struct {
 	Error   string
 }
 
+// LLMRecorder is a thread-safe record sink for deterministic LLM replay
+// fixtures. Pass recorder.Record to WithLLMRecorder.
+type LLMRecorder struct {
+	mu      sync.Mutex
+	records []LLMRecord
+}
+
+func NewLLMRecorder(records ...LLMRecord) *LLMRecorder {
+	rec := &LLMRecorder{}
+	for _, record := range records {
+		rec.records = append(rec.records, cloneLLMRecord(record))
+	}
+	return rec
+}
+
+func (r *LLMRecorder) Record(record LLMRecord) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.records = append(r.records, cloneLLMRecord(record))
+}
+
+func (r *LLMRecorder) Records() []LLMRecord {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]LLMRecord, len(r.records))
+	for i := range r.records {
+		out[i] = cloneLLMRecord(r.records[i])
+	}
+	return out
+}
+
+func (r *LLMRecorder) Reset() {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.records = nil
+}
+
+func (r *LLMRecorder) Save(path string) error {
+	return SaveLLMRecords(path, r.Records())
+}
+
+func LoadLLMRecorder(path string) (*LLMRecorder, error) {
+	records, err := LoadLLMRecords(path)
+	if err != nil {
+		return nil, err
+	}
+	return NewLLMRecorder(records...), nil
+}
+
 // WithLLMProvider installs the provider used by llm.turn. A nil provider makes
 // llm.turn return a provider error.
 func WithLLMProvider(provider LLMProvider) Option {

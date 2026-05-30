@@ -138,18 +138,16 @@ For deterministic tests and CI, hosts can record provider turns and replay them
 without reaching an external model:
 
 ```go
-var records []gscript.LLMRecord
+recorder := gscript.NewLLMRecorder()
 vm := gscript.New(
     gscript.WithLibs(gscript.LibString|gscript.LibLLM),
     gscript.WithLLMProvider(Provider{}),
-    gscript.WithLLMRecorder(func(record gscript.LLMRecord) {
-        records = append(records, record)
-    }),
+    gscript.WithLLMRecorder(recorder.Record),
 )
 
 replay := gscript.New(
     gscript.WithLibs(gscript.LibString|gscript.LibLLM),
-    gscript.WithLLMReplay(records),
+    gscript.WithLLMReplay(recorder.Records()),
 )
 ```
 
@@ -157,10 +155,11 @@ Replay is strict and sequential: each incoming request must match the next
 recorded request before the recorded result or provider error is returned.
 Go hosts can inspect replay failures with `errors.As` for
 `*gscript.LLMReplayMismatchError` and `*gscript.LLMReplayExhaustedError`.
-`NewLLMReplayProvider` also exposes `Remaining`, `Consumed`, `Reset`, and
-`Records` helpers for reusable evaluation fixtures. `MarshalLLMRecords`,
-`UnmarshalLLMRecords`, `SaveLLMRecords`, and `LoadLLMRecords` persist replay
-fixtures as stable JSON.
+`LLMRecorder` is a thread-safe sink with `Records`, `Reset`, and `Save` helpers.
+`NewLLMReplayProvider` exposes `Remaining`, `Consumed`, `Reset`, and `Records`
+helpers for reusable evaluation fixtures. `MarshalLLMRecords`,
+`UnmarshalLLMRecords`, `SaveLLMRecords`, `LoadLLMRecords`, and
+`LoadLLMRecorder` persist replay fixtures as stable JSON.
 
 Scripts call the backend through `llm.turn` and explicitly dispatch tool calls:
 

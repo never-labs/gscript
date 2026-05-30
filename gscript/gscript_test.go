@@ -1243,6 +1243,52 @@ usage := result.usage.output_tokens
 	}
 }
 
+func TestLLMRecorderHelper(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+		Status: "final_answer",
+		Text:   "recorded",
+	}}
+	recorder := gs.NewLLMRecorder()
+	vm := gs.New(
+		gs.WithLibs(gs.LibString|gs.LibLLM),
+		gs.WithLLMProvider(provider),
+		gs.WithLLMRecorder(recorder.Record),
+	)
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	records := recorder.Records()
+	if len(records) != 1 || records[0].Result.Text != "recorded" {
+		t.Fatalf("records = %#v", records)
+	}
+	records[0].Result.Text = "mutated"
+	if recorder.Records()[0].Result.Text != "recorded" {
+		t.Fatalf("Records returned mutable internal state")
+	}
+	path := filepath.Join(t.TempDir(), "records.json")
+	if err := recorder.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	loaded, err := gs.LoadLLMRecorder(path)
+	if err != nil {
+		t.Fatalf("LoadLLMRecorder: %v", err)
+	}
+	replay := gs.NewLLMReplayProvider(loaded.Records())
+	res, err := replay.Turn(context.Background(), recorder.Records()[0].Request)
+	if err != nil || res.Text != "recorded" {
+		t.Fatalf("Turn res=%#v err=%v", res, err)
+	}
+	recorder.Reset()
+	if got := recorder.Records(); len(got) != 0 {
+		t.Fatalf("after Reset records = %#v", got)
+	}
+}
+
 func TestLLMReplayRejectsMismatchedRequest(t *testing.T) {
 	records := []gs.LLMRecord{{
 		Request: gs.LLMTurnRequest{
