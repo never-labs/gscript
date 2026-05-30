@@ -1075,6 +1075,38 @@ kind := err.kind
 	}
 }
 
+func TestLLMReplayTypedErrors(t *testing.T) {
+	replay := gs.NewLLMReplayProvider([]gs.LLMRecord{{
+		Request: gs.LLMTurnRequest{
+			Model:    "mock-fast",
+			Messages: []gs.LLMMessage{{Role: "user", Text: "expected"}},
+		},
+		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+	}})
+	_, err := replay.Turn(context.Background(), gs.LLMTurnRequest{
+		Model:    "mock-fast",
+		Messages: []gs.LLMMessage{{Role: "user", Text: "actual"}},
+	})
+	var mismatch *gs.LLMReplayMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("err = %T %v, want LLMReplayMismatchError", err, err)
+	}
+	if mismatch.Turn != 0 || mismatch.Expected.Messages[0].Text != "expected" || mismatch.Actual.Messages[0].Text != "actual" {
+		t.Fatalf("mismatch = %#v", mismatch)
+	}
+	mismatch.Expected.Messages[0].Text = "mutated"
+	if replay.Remaining() != 0 {
+		t.Fatalf("remaining = %d, want 0", replay.Remaining())
+	}
+
+	empty := gs.NewLLMReplayProvider(nil)
+	_, err = empty.Turn(context.Background(), gs.LLMTurnRequest{})
+	var exhausted *gs.LLMReplayExhaustedError
+	if !errors.As(err, &exhausted) || exhausted.Turn != 0 {
+		t.Fatalf("err = %T %v, exhausted=%#v", err, err, exhausted)
+	}
+}
+
 func TestLLMTurnRequestProviderOptions(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))

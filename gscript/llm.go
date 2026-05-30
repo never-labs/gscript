@@ -143,6 +143,32 @@ type LLMReplayProvider struct {
 	next    int
 }
 
+// LLMReplayMismatchError reports a deterministic replay request mismatch.
+type LLMReplayMismatchError struct {
+	Turn     int
+	Expected LLMTurnRequest
+	Actual   LLMTurnRequest
+}
+
+func (e *LLMReplayMismatchError) Error() string {
+	if e == nil {
+		return "llm replay request mismatch"
+	}
+	return fmt.Sprintf("llm replay request mismatch at turn %d", e.Turn)
+}
+
+// LLMReplayExhaustedError reports that replay consumed all recorded turns.
+type LLMReplayExhaustedError struct {
+	Turn int
+}
+
+func (e *LLMReplayExhaustedError) Error() string {
+	if e == nil {
+		return "llm replay exhausted"
+	}
+	return fmt.Sprintf("llm replay exhausted at turn %d", e.Turn)
+}
+
 func NewLLMReplayProvider(records []LLMRecord) *LLMReplayProvider {
 	out := make([]LLMRecord, len(records))
 	for i := range records {
@@ -155,12 +181,16 @@ func (p *LLMReplayProvider) Turn(_ context.Context, req LLMTurnRequest) (LLMTurn
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.next >= len(p.records) {
-		return LLMTurnResult{}, fmt.Errorf("llm replay exhausted at turn %d", p.next)
+		return LLMTurnResult{}, &LLMReplayExhaustedError{Turn: p.next}
 	}
 	record := p.records[p.next]
 	p.next++
 	if !llmRequestsEqual(req, record.Request) {
-		return LLMTurnResult{}, fmt.Errorf("llm replay request mismatch at turn %d", p.next-1)
+		return LLMTurnResult{}, &LLMReplayMismatchError{
+			Turn:     p.next - 1,
+			Expected: cloneLLMRequest(record.Request),
+			Actual:   cloneLLMRequest(req),
+		}
 	}
 	if record.Error != "" {
 		return LLMTurnResult{}, fmt.Errorf("%s", record.Error)
