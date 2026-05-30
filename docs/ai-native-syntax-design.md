@@ -1,7 +1,7 @@
 # GScript AI-Native Syntax Design
 
-Status: design freeze candidate. No parser/runtime work should start from this
-document until the syntax and lowering rules have been reviewed.
+Status: accepted syntax proposal. Parser/runtime work should implement this
+surface incrementally by lowering to the existing LLM standard library.
 
 This document defines the language-level AI surface for GScript. The goal is to
 make AI workflows feel native while preserving the existing runtime investment:
@@ -57,9 +57,9 @@ Additional AI-layer literals:
 500ms  60s  2m  1h
 ```
 
-Duration literals are available only in AI metadata/budget positions in v1.
+Duration literals are available only in AI metadata/budget positions.
 They lower to the existing duration handling used by runtime budget options.
-Money literals such as `$0.25` are deferred; use `money: 0.25`.
+Money literals such as `$0.25` are not part of the language; use `money: 0.25`.
 
 ## 3. Capability Model
 
@@ -110,7 +110,7 @@ agent summarize(text) {
 The Go host binds `"fast"` to a provider, endpoint, key, timeout, retry policy,
 cost model, and audit policy.
 
-Optional script-level aliases are allowed, but they do not create providers:
+Script-level aliases are allowed, but they do not create providers:
 
 ```gscript
 models {
@@ -130,7 +130,7 @@ llm.register_model_alias({
 })
 ```
 
-Non-goal for v1:
+Non-goals:
 
 - Script syntax that directly reads API keys.
 - Script syntax that constructs HTTP provider clients.
@@ -224,6 +224,7 @@ Grammar:
 ```ebnf
 TurnExpr = "turn" "{" FieldBindings "}" ;
 TurnDecl = "turn" Ident "(" [ParamList] ")" "{" FieldBindings "}" ;
+FieldBindings = { Ident ":" Expr [ "," | ";" ] } ;
 ```
 
 Fields:
@@ -436,6 +437,12 @@ Rationale: a first-class `react` block is more ergonomic than requiring every
 user to write the manual turn/dispatch loop, while preserving `turn` as the only
 provider boundary.
 
+Grammar:
+
+```ebnf
+ReactExpr = "react" "{" FieldBindings "}" ;
+```
+
 ## 11. Budget Block
 
 Syntax:
@@ -466,8 +473,14 @@ llm.with_budget({turns: 8, tokens: 20000, time: 60s, money: 0.25}, func() {
 })
 ```
 
-Money literal `$0.25` is deferred. v1 uses normal numeric money fields to avoid
-adding another lexical edge before the rest of the syntax is proven.
+Money literal `$0.25` is not part of the language. Numeric money fields keep the
+lexer simpler and avoid a provider-specific currency assumption.
+
+Grammar:
+
+```ebnf
+BudgetStmt = "budget" "{" FieldBindings "}" Block ;
+```
 
 ## 12. Agent As Tool
 
@@ -647,6 +660,97 @@ lex/parse
 This order keeps formatter/linter aware of source syntax while keeping runtime
 execution mostly on existing mechanisms.
 
+## 18.1 Canonical Desugaring Shapes
+
+Implementations may use direct AST nodes internally, but the observable behavior
+must match these shapes.
+
+Tool:
+
+```gscript
+@requires("docs.read")
+@desc("Search docs.")
+tool search_docs(query) {
+    return docs.search(query), nil
+}
+```
+
+lowers as if written:
+
+```gscript
+search_docs := llm.tool("search_docs", func(query) {
+    return docs.search(query), nil
+}, {
+    description: "Search docs.",
+    params: {"query"},
+    requires: {"docs.read"},
+})
+```
+
+Agent:
+
+```gscript
+agent answer(question) {
+    model: "strong"
+    tools: {search_docs}
+    system: "Be precise."
+} {
+    return react { messages: {user(question)} }
+}
+```
+
+lowers as if written:
+
+```gscript
+answer := llm.agent("answer", {
+    model: "strong",
+    tools: {search_docs},
+    system: "Be precise.",
+}, func(question) {
+    return llm.react({
+        messages: {llm.user(question)},
+    })
+})
+```
+
+Turn:
+
+```gscript
+r, err := turn {
+    messages: {user(question)}
+    max: {tokens: 256}
+}
+```
+
+lowers as if written:
+
+```gscript
+r, err := llm.turn({
+    messages: {llm.user(question)},
+    max_tokens: 256,
+})
+```
+
+Budget:
+
+```gscript
+budget { turns: 4 } {
+    return answer(question)
+}
+```
+
+lowers as if written:
+
+```gscript
+return llm.with_budget({turns: 4}, func() {
+    return answer(question)
+})
+```
+
+The compiler can avoid allocating closure objects for these forms when it has a
+cleaner internal representation, but errors, trace events, record/replay, and
+ambient defaults must remain equivalent to the stdlib form.
+
 ## 19. Compatibility With Existing Stdlib API
 
 The current stdlib remains public:
@@ -793,19 +897,17 @@ agent support(message) {
 }
 ```
 
-## 21. Open Design Decisions
+## 21. Accepted Decisions
 
-These must be decided before implementation:
+These decisions are fixed for the first implementation:
 
-1. Should `react` become a keyword/block, or stay `llm.react` plus `agent`
-   ambient defaults? This document recommends a `react` block because it is the
-   common authoring path.
-2. Should short message constructors be globally available or only inside agent
-   bodies? This document recommends agent-body-only sugar.
-3. Should model aliases be syntax or config file only? This document permits
-   syntax but keeps provider binding in host code.
-4. Should `budget {}` be allowed as an expression? This document says no.
-5. Should money literals use `$0.25`? This document defers them.
+1. `react` is a keyword/block and lowers to `llm.react`.
+2. Short message constructors are available as sugar only inside agent bodies.
+3. `models` is syntax for logical aliases only; provider binding stays in Go
+   host code.
+4. `budget {}` is a statement, not an expression.
+5. Money literals such as `$0.25` are not supported; use numeric money fields.
+6. `memory` and `rag` remain standard library namespaces, not keywords.
 
 ## 22. Implementation Milestones After Design Approval
 
