@@ -177,9 +177,10 @@ Required controls:
   disables JIT until compiled channel creation uses the same check.
 - `WithMaxHostResultBytes`: limits string bytes returned from one native Go
   call, including stdlib functions and registered host callbacks. Process
-  output, `net`/`http` response bodies, predictable encoding outputs, and
-  compressed decode output are bounded while captured or expanded. Setting this
-  option disables JIT until compiled native calls use the same result check.
+  output, `net`/`http` response bodies, predictable encoding outputs, CSV
+  encoding, and compressed decode output are bounded while captured or
+  expanded. Setting this option disables JIT until compiled native calls use
+  the same result check.
 - `WithMaxModuleBytes`: limits bytes read by script-side module/file loading
   APIs such as `require`, `dofile`, `loadfile`, and `script.loadFile`.
   Host-side `CompileFile`/`ExecFile` calls are not counted.

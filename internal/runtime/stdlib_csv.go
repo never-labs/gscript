@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -9,8 +8,18 @@ import (
 )
 
 // buildCSVLib creates the "csv" standard library table.
-func buildCSVLib() *Table {
+func buildCSVLib(interps ...*Interpreter) *Table {
 	t := NewTable()
+	var interp *Interpreter
+	if len(interps) > 0 {
+		interp = interps[0]
+	}
+	maxHostResult := func() int64 {
+		if interp == nil {
+			return 0
+		}
+		return interp.maxHostResult
+	}
 
 	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -162,8 +171,8 @@ func buildCSVLib() *Table {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'csv.encode' (table expected)")
 		}
 		rows := rowsVal.Table()
-		var buf bytes.Buffer
-		w := csv.NewWriter(&buf)
+		buf := newHostResultBuffer(maxHostResult())
+		w := csv.NewWriter(buf)
 		configureCSVWriter(w, optsVal)
 
 		length := rows.Length()
@@ -212,8 +221,8 @@ func buildCSVLib() *Table {
 		}
 		rows := rowsVal.Table()
 		headersTbl := headersVal.Table()
-		var buf bytes.Buffer
-		w := csv.NewWriter(&buf)
+		buf := newHostResultBuffer(maxHostResult())
+		w := csv.NewWriter(buf)
 		configureCSVWriter(w, optsVal)
 
 		// Write header row

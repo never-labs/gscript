@@ -105,7 +105,7 @@ func (interp *Interpreter) registerStdlib() {
 	interp.globals.Define("testkit", TableValue(buildTestkitLib(interp)))
 
 	// --- Data formats ---
-	interp.globals.Define("csv", TableValue(buildCSVLib()))
+	interp.globals.Define("csv", TableValue(buildCSVLib(interp)))
 	interp.globals.Define("url", TableValue(buildURLLib()))
 
 	// --- Utilities ---
