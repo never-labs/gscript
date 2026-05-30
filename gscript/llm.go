@@ -258,6 +258,7 @@ func cloneLLMAny(v any) any {
 
 func llmRequestsEqual(a, b LLMTurnRequest) bool {
 	return a.Model == b.Model &&
+		a.ForceTool == b.ForceTool &&
 		a.MaxTokens == b.MaxTokens &&
 		a.Stream == b.Stream &&
 		reflect.DeepEqual(a.Stop, b.Stop) &&

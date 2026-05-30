@@ -151,6 +151,7 @@ tools := {lookup}
 result, err := llm.turn({
     messages: {msg.system("Use tools."), msg.user("find docs")},
     tools: tools,
+    force_tool: "lookup",
     max_tokens: 1024,
     stop: {"</answer>"},
     metadata: {trace_id: "request-123"},
@@ -183,7 +184,7 @@ return result.text, nil
 `internal` are transient and retried up to `max_tool_retries`;
 `validation`, `policy`, `user`, and `capability` are fed back as tool-error
 messages; unknown kinds are returned as fatal agent errors.
-Provider options such as `model`, `max_tokens`, `stream`, `stop`, and
+Provider options such as `model`, `force_tool`, `max_tokens`, `stream`, `stop`, and
 `metadata` are forwarded consistently by `llm.turn`, `llm.react`, and
 `loop.react`.
 

@@ -42,6 +42,7 @@ type LLMTurnRequest struct {
 	Model     string
 	Messages  []LLMMessage
 	Tools     []LLMTool
+	ForceTool string
 	MaxTokens int64
 	Stream    bool
 	Stop      []string
@@ -499,6 +500,7 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		"max_steps",
 		"max_tool_retries",
 		"max_history_tokens",
+		"force_tool",
 		"stop",
 		"metadata",
 		"budget",
@@ -555,6 +557,7 @@ func llmMessageTable(role, text string) *Table {
 func llmRequestFromTable(t *Table) (LLMTurnRequest, error) {
 	req := LLMTurnRequest{
 		Model:     t.RawGetString("model").Str(),
+		ForceTool: llmForceToolFromValue(t.RawGetString("force_tool")),
 		MaxTokens: toInt(t.RawGetString("max_tokens")),
 		Stream:    t.RawGetString("stream").Truthy(),
 		Stop:      llmStringSliceFromValue(t.RawGetString("stop")),
@@ -673,6 +676,16 @@ func llmStringMapFromValue(v Value) map[string]string {
 		return nil
 	}
 	return out
+}
+
+func llmForceToolFromValue(v Value) string {
+	if v.IsString() {
+		return v.Str()
+	}
+	if v.IsTable() {
+		return v.Table().RawGetString("name").Str()
+	}
+	return ""
 }
 
 func llmToolCallFromTable(t *Table) LLMToolCall {
@@ -815,6 +828,7 @@ func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx contex
 			Model:     model,
 			Messages:  llmMessagesFromValue(llmTableFromValues(requestHistory)),
 			Tools:     llmToolsFromValue(toolsValue),
+			ForceTool: llmForceToolFromValue(opts.RawGetString("force_tool")),
 			MaxTokens: toInt(opts.RawGetString("max_tokens")),
 			Stream:    opts.RawGetString("stream").Truthy(),
 			Stop:      llmStringSliceFromValue(opts.RawGetString("stop")),

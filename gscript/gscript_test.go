@@ -761,6 +761,7 @@ func TestLLMTurnRequestProviderOptions(t *testing.T) {
 result, err := llm.turn({
     model: "mock-fast",
     messages: {llm.user("hello")},
+    force_tool: "lookup",
     max_tokens: 16,
     stream: true,
     stop: {"END", "\n\n"},
@@ -771,6 +772,9 @@ result, err := llm.turn({
 	}
 	if provider.last.Model != "mock-fast" || provider.last.MaxTokens != 16 || !provider.last.Stream {
 		t.Fatalf("request = %#v", provider.last)
+	}
+	if provider.last.ForceTool != "lookup" {
+		t.Fatalf("force_tool = %#v", provider.last.ForceTool)
 	}
 	if len(provider.last.Stop) != 2 || provider.last.Stop[0] != "END" || provider.last.Stop[1] != "\n\n" {
 		t.Fatalf("stop = %#v", provider.last.Stop)
@@ -831,9 +835,14 @@ func TestLoopRequestProviderOptions(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
 	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
 result, err := loop.react({
     user: "hello",
     model: "mock-fast",
+    tools: {lookup},
+    force_tool: lookup,
     max_tokens: 32,
     stream: true,
     stop: {"DONE"},
@@ -848,6 +857,9 @@ result, err := loop.react({
 	req := provider.requests[0]
 	if req.Model != "mock-fast" || req.MaxTokens != 32 || !req.Stream {
 		t.Fatalf("request = %#v", req)
+	}
+	if req.ForceTool != "lookup" {
+		t.Fatalf("force_tool = %#v", req.ForceTool)
 	}
 	if len(req.Stop) != 1 || req.Stop[0] != "DONE" {
 		t.Fatalf("stop = %#v", req.Stop)
