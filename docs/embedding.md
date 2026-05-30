@@ -114,7 +114,9 @@ vm := gscript.New(
 ```
 
 `OpenAICompatibleLLMProvider` exposes the same adapter as a struct for custom
-HTTP clients, headers, local gateways, and test servers.
+HTTP clients, headers, local gateways, test servers, request timeouts, and
+bounded retries on transient network failures or `408` / `409` / `429` / `5xx`
+HTTP responses.
 
 Hosts can also attach a metadata-only trace sink. The runtime reports turn,
 tool-call, retry, HITL snapshot/resume, and stop events with counts, status,

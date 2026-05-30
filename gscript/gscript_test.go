@@ -879,6 +879,55 @@ func TestOpenAICompatibleLLMProvider(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleLLMProviderRetriesTransientStatus(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			http.Error(w, "slow down", http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`)
+	}))
+	defer server.Close()
+	provider := gs.OpenAICompatibleLLMProvider{
+		Endpoint:    server.URL,
+		Model:       "mock-fast",
+		Client:      server.Client(),
+		MaxAttempts: 2,
+	}
+	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+		Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+	})
+	if err != nil {
+		t.Fatalf("Turn: %v", err)
+	}
+	if attempts != 2 || res.Text != "ok" {
+		t.Fatalf("attempts=%d result=%#v", attempts, res)
+	}
+}
+
+func TestOpenAICompatibleLLMProviderTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		fmt.Fprint(w, `{}`)
+	}))
+	defer server.Close()
+	provider := gs.OpenAICompatibleLLMProvider{
+		Endpoint: server.URL,
+		Model:    "mock-fast",
+		Client:   server.Client(),
+		Timeout:  1 * time.Millisecond,
+	}
+	_, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+		Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+	})
+	if err == nil {
+		t.Fatal("Turn succeeded, want timeout")
+	}
+}
+
 func TestWithOpenAICompatibleLLM(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

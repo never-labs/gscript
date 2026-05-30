@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const defaultOpenAICompatibleEndpoint = "https://api.openai.com/v1/chat/completions"
@@ -15,11 +16,14 @@ const defaultOpenAICompatibleEndpoint = "https://api.openai.com/v1/chat/completi
 // OpenAICompatibleLLMProvider adapts llm.turn to the OpenAI Chat Completions
 // wire format used by OpenAI and many local or third-party model gateways.
 type OpenAICompatibleLLMProvider struct {
-	Endpoint string
-	APIKey   string
-	Model    string
-	Client   *http.Client
-	Headers  map[string]string
+	Endpoint     string
+	APIKey       string
+	Model        string
+	Client       *http.Client
+	Headers      map[string]string
+	Timeout      time.Duration
+	MaxAttempts  int
+	RetryBackoff time.Duration
 }
 
 func WithOpenAICompatibleLLM(endpoint, apiKey, model string) Option {
@@ -31,6 +35,11 @@ func WithOpenAICompatibleLLM(endpoint, apiKey, model string) Option {
 }
 
 func (p OpenAICompatibleLLMProvider) Turn(ctx context.Context, req LLMTurnRequest) (LLMTurnResult, error) {
+	if p.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.Timeout)
+		defer cancel()
+	}
 	endpoint := p.Endpoint
 	if endpoint == "" {
 		endpoint = defaultOpenAICompatibleEndpoint
@@ -46,9 +55,31 @@ func (p OpenAICompatibleLLMProvider) Turn(ctx context.Context, req LLMTurnReques
 	if err != nil {
 		return LLMTurnResult{}, err
 	}
+	attempts := p.MaxAttempts
+	if attempts <= 0 {
+		attempts = 1
+	}
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		res, retry, err := p.turnOnce(ctx, endpoint, body)
+		if err == nil {
+			return res, nil
+		}
+		lastErr = err
+		if !retry || attempt == attempts-1 {
+			return LLMTurnResult{}, err
+		}
+		if err := waitOpenAIRetry(ctx, p.RetryBackoff); err != nil {
+			return LLMTurnResult{}, err
+		}
+	}
+	return LLMTurnResult{}, lastErr
+}
+
+func (p OpenAICompatibleLLMProvider) turnOnce(ctx context.Context, endpoint string, body []byte) (LLMTurnResult, bool, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return LLMTurnResult{}, err
+		return LLMTurnResult{}, false, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	if p.APIKey != "" {
@@ -63,18 +94,39 @@ func (p OpenAICompatibleLLMProvider) Turn(ctx context.Context, req LLMTurnReques
 	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return LLMTurnResult{}, err
+		return LLMTurnResult{}, ctx.Err() == nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return LLMTurnResult{}, fmt.Errorf("openai-compatible llm status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+		return LLMTurnResult{}, openAIRetryableStatus(resp.StatusCode), fmt.Errorf("openai-compatible llm status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
 	}
 	var out openAIChatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return LLMTurnResult{}, err
+		return LLMTurnResult{}, false, err
 	}
-	return openAITurnResult(out), nil
+	return openAITurnResult(out), false, nil
+}
+
+func openAIRetryableStatus(status int) bool {
+	return status == http.StatusRequestTimeout ||
+		status == http.StatusConflict ||
+		status == http.StatusTooManyRequests ||
+		status >= 500
+}
+
+func waitOpenAIRetry(ctx context.Context, backoff time.Duration) error {
+	if backoff <= 0 {
+		return ctx.Err()
+	}
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 type openAIChatRequest struct {
