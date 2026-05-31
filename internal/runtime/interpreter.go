@@ -380,6 +380,13 @@ func (interp *Interpreter) SetMaxHostResultBytes(max int64) {
 	interp.maxHostResult = max
 }
 
+func (interp *Interpreter) MaxHostResultBytes() int64 {
+	if interp == nil {
+		return 0
+	}
+	return interp.maxHostResult
+}
+
 // SetLLMProvider sets the host-provided model backend used by the llm
 // standard library. A nil provider leaves llm.turn unavailable.
 func (interp *Interpreter) SetLLMProvider(provider LLMProvider) {

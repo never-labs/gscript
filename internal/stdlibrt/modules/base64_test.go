@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 // base64Interp creates an interpreter with the base64 library manually registered.
 func base64Interp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "base64", buildBase64Lib())
+	return runWithLib(t, src, "base64", BuildBase64(func() int64 { return 0 }))
 }
 
 // ==================================================================
@@ -118,7 +118,7 @@ func TestBase64URLRoundtrip(t *testing.T) {
 }
 
 func TestBase64GeneratedBindingsExposeFastPathsAndFallbacks(t *testing.T) {
-	lib := buildBase64Lib()
+	lib := BuildBase64(func() int64 { return 0 })
 
 	encode := lib.RawGetString("encode").GoFunction()
 	if encode == nil || encode.FastArg1 == nil {

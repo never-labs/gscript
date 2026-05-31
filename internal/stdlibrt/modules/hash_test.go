@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 // hashInterp creates an interpreter with the hash library manually registered.
 func hashInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "hash", buildHashLib())
+	return runWithLib(t, src, "hash", BuildHash())
 }
 
 // ==================================================================
@@ -169,7 +169,7 @@ func TestHashHMACSHA256DifferentKeys(t *testing.T) {
 }
 
 func TestHashGeneratedBindingsExposeFastPath(t *testing.T) {
-	lib := buildHashLib()
+	lib := BuildHash()
 
 	md5 := lib.RawGetString("md5").GoFunction()
 	if md5 == nil || md5.FastArg1 == nil {

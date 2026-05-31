@@ -12,7 +12,7 @@ import (
 	"github.com/never-labs/gscript/internal/parser"
 )
 
-// runWithFSPath creates a temp dir and runs GScript source with fs and path libs registered.
+// runWithFSPath creates a temp dir and runs GScript source with the fs lib registered.
 // Returns the interpreter and the temp dir path (caller should defer os.RemoveAll(tmpDir)).
 func runWithFSPath(t *testing.T, src string) (*Interpreter, string) {
 	t.Helper()
@@ -43,7 +43,6 @@ func runWithFSPathCaps(t *testing.T, src string, read, write bool) (*Interpreter
 	}
 	interp := New()
 	interp.globals.Define("fs", TableValue(buildFSLibWithCapabilities("", read, write, 0, 0)))
-	interp.globals.Define("path", TableValue(buildPathLib()))
 	// Provide the temp dir as a global for tests to use
 	interp.globals.Define("tmpDir", StringValue(tmpDir))
 	if err := interp.Exec(prog); err != nil {

@@ -873,6 +873,7 @@ func New(globals map[string]runtime.Value) *VM {
 	v.RegisterTableSortLib()
 	v.RegisterSortCallbackLib()
 	v.RegisterTableHigherOrderLib()
+	v.RegisterMigratedStdlibModules()
 	v.RegisterStringLib()
 	v.RegisterLLMLib()
 	v.RegisterHTTPLib()

@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"os"
@@ -21,7 +21,7 @@ func runWithPath(t *testing.T, src string) *Interpreter {
 		t.Fatalf("parse error: %v", err)
 	}
 	interp := New()
-	interp.globals.Define("path", TableValue(buildPathLib()))
+	interp.SetGlobal("path", TableValue(BuildPath()))
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestPath_Separator(t *testing.T) {
 }
 
 func TestPath_ExportsCommonFilepathOps(t *testing.T) {
-	lib := buildPathLib()
+	lib := BuildPath()
 	for _, name := range []string{
 		"clean",
 		"join",

@@ -41,12 +41,9 @@ func (interp *Interpreter) InstallStdlib() {
 	// --- Encoding / Crypto ---
 	std.RegisterTable("array", buildArrayLib())
 	std.RegisterTable("json", buildJSONLib())
-	std.RegisterTable("base64", buildBase64Lib(interp))
-	std.RegisterTable("hash", buildHashLib())
 
 	// --- File system & paths ---
 	std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))
-	std.RegisterTable("path", buildPathLib())
 
 	// --- Time & networking ---
 	std.RegisterTable("time", buildTimeLib())
@@ -101,7 +98,6 @@ func (interp *Interpreter) InstallStdlib() {
 	}))
 
 	// --- Utilities ---
-	std.RegisterTable("uuid", buildUUIDLib())
 	std.RegisterTable("bytes", buildBytesLib(interp))
 	std.RegisterTable("binary", buildBinaryLib(interp))
 
@@ -119,7 +115,6 @@ func (interp *Interpreter) InstallStdlib() {
 
 	// --- Low-level ---
 	std.RegisterTable("bit32", buildBit32Lib())
-	std.RegisterTable("bits", buildBitsLib())
 
 	// --- Random number generation ---
 	std.RegisterTable("rand", buildRandLib())

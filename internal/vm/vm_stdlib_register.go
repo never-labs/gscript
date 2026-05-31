@@ -11,6 +11,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
+	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {
@@ -59,6 +60,15 @@ func (ctx *vmStdlibInstallContext) RegisterTable(name string, table *runtime.Tab
 
 func (ctx *vmStdlibInstallContext) RegisterAlias(name string, value runtime.Value) {
 	ctx.vm.SetGlobal(name, value)
+}
+
+func (vm *VM) RegisterMigratedStdlibModules() {
+	ctx := vm.newStdlibInstallContext()
+	ctx.RegisterTable("base64", modules.BuildBase64(func() int64 { return vm.maxHostResult }))
+	ctx.RegisterTable("bits", modules.BuildBits())
+	ctx.RegisterTable("hash", modules.BuildHash())
+	ctx.RegisterTable("path", modules.BuildPath())
+	ctx.RegisterTable("uuid", modules.BuildUUID())
 }
 
 // RegisterProtectedCallLib installs VM-aware pcall/xpcall builtins so protected

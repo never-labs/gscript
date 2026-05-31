@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"regexp"
@@ -7,7 +7,7 @@ import (
 
 func TestUUIDv4(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	execOnInterp(t, interp, `result := uuid.v4()`)
 
@@ -25,7 +25,7 @@ func TestUUIDv4(t *testing.T) {
 
 func TestUUIDv4Unique(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	execOnInterp(t, interp, `
 		a := uuid.v4()
@@ -41,7 +41,7 @@ func TestUUIDv4Unique(t *testing.T) {
 
 func TestUUIDv4Raw(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	execOnInterp(t, interp, `result := uuid.v4Raw()`)
 
@@ -58,7 +58,7 @@ func TestUUIDv4Raw(t *testing.T) {
 
 func TestUUIDIsValid(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	execOnInterp(t, interp, `
 		a := uuid.isValid("550e8400-e29b-41d4-a716-446655440000")
@@ -79,7 +79,7 @@ func TestUUIDIsValid(t *testing.T) {
 
 func TestUUIDParse(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	execOnInterp(t, interp, `result := uuid.parse("550e8400-e29b-41d4-a716-446655440000")`)
 
@@ -103,7 +103,7 @@ func TestUUIDParse(t *testing.T) {
 
 func TestUUIDParseInvalid(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	execOnInterp(t, interp, `result, err := uuid.parse("not-a-uuid")`)
 
@@ -117,7 +117,7 @@ func TestUUIDParseInvalid(t *testing.T) {
 
 func TestUUIDNil(t *testing.T) {
 	interp := New()
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
+	interp.SetGlobal("uuid", TableValue(BuildUUID()))
 
 	// Use bracket notation since "nil" is a keyword in GScript
 	execOnInterp(t, interp, `result := uuid["nil"]()`)
