@@ -59,6 +59,14 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
         timing.validate_scale_selectors(specs, overrides)
         self.assertEqual(timing.scale_overrides_for(specs[0], overrides), overrides)
 
+    def test_scale_overrides_reject_short_name_aliases(self):
+        root = Path(__file__).resolve().parents[1]
+        specs = timing.select_specs(timing.discover_specs(root, timing.GROUPS), ["concurrency/goroutine_sleep"])
+        overrides = timing.parse_scale_overrides(["goroutine_sleep:N=10"])
+
+        with self.assertRaisesRegex(SystemExit, "unknown --scale/--param selector: goroutine_sleep"):
+            timing.validate_scale_selectors(specs, overrides)
+
     def test_conformance_low_resolution_gets_concrete_rerun_advice(self):
         spec = timing.BenchmarkSpec(
             "calls",

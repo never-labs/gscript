@@ -119,14 +119,14 @@ class ManifestTest(unittest.TestCase):
             bench = root / "benchmarks" / "numeric" / "case.gs"
             bench.parent.mkdir(parents=True)
             bench.write_text("-- test\n")
-            old_manifest = {
-                "benchmarks": [
+            current_manifest = {
+                "workloads": [
                     {
                         "id": "numeric/case",
-                        "group": "numeric",
+                        "domain": "numeric",
                         "name": "case",
-                        "gscript_path": "benchmarks/numeric/case.gs",
-                        "lua_path": "benchmarks/lua_ref/numeric/case.lua",
+                        "script": "benchmarks/numeric/case.gs",
+                        "comparison_reference": {"kind": "lua", "path": "benchmarks/lua_ref/numeric/case.lua"},
                         "params": {},
                         "recommended_scale": {"hot": {}},
                         "time_source_hint": "script_time_line",
@@ -135,7 +135,7 @@ class ManifestTest(unittest.TestCase):
                 ],
                 "time_source_hints": {"numeric/case": "script_time_line"},
             }
-            (root / "benchmarks" / "manifest.json").write_text(json.dumps(old_manifest))
+            (root / "benchmarks" / "manifest.json").write_text(json.dumps(current_manifest))
 
             manifest.ROOT = root
             try:
@@ -150,6 +150,33 @@ class ManifestTest(unittest.TestCase):
                     generated["workloads"][0]["comparison_reference"],
                     {"kind": "lua", "path": "benchmarks/lua_ref/numeric/case.lua"},
                 )
+            finally:
+                manifest.ROOT = original_root
+
+    def test_generated_benchmark_manifest_does_not_convert_legacy_benchmarks_array(self):
+        original_root = manifest.ROOT
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bench = root / "benchmarks" / "numeric" / "case.gs"
+            bench.parent.mkdir(parents=True)
+            bench.write_text("-- test\n")
+            legacy_manifest = {
+                "benchmarks": [
+                    {
+                        "id": "numeric/case",
+                        "group": "numeric",
+                        "name": "case",
+                        "gscript_path": "benchmarks/numeric/case.gs",
+                    }
+                ]
+            }
+            (root / "benchmarks" / "manifest.json").write_text(json.dumps(legacy_manifest))
+
+            manifest.ROOT = root
+            try:
+                generated = manifest.generated_manifest("benchmarks")
+                self.assertEqual(generated["workloads"], [])
+                self.assertNotIn("benchmarks", generated)
             finally:
                 manifest.ROOT = original_root
 

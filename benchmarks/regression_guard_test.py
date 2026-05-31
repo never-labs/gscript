@@ -89,6 +89,17 @@ Tier 2 Exit Profile:
         self.assertEqual(out["t2_attempted"], 1)
         self.assertTrue(out["regression"])
 
+    def test_resolve_benchmark_rejects_short_name_aliases(self):
+        root = Path(__file__).resolve().parents[1]
+
+        bench_id, script, _lua = rg.resolve_benchmark(root, "numeric/matmul")
+        self.assertEqual(bench_id, "numeric/matmul")
+        self.assertTrue(script.exists())
+
+        bench_id, script, _lua = rg.resolve_benchmark(root, "matmul")
+        self.assertEqual(bench_id, "matmul")
+        self.assertFalse(script.exists())
+
     def test_writes_csv_and_markdown_summary(self):
         row = rg.BenchmarkResult(
             benchmark="fib",

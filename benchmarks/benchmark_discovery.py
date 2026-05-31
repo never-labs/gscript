@@ -77,6 +77,19 @@ class SelectableSpec(Protocol):
 SpecT = TypeVar("SpecT", bound=SelectableSpec)
 
 
+def benchmark_id_from_selector(selector: str, allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> str | None:
+    text = selector.removeprefix("benchmarks/")
+    if text.endswith(".gs"):
+        text = text[:-3]
+    parts = text.split("/")
+    if len(parts) != 2:
+        return None
+    group, name = parts
+    if group not in allowed_groups or not name:
+        return None
+    return f"{group}/{name}"
+
+
 def canonical_group(group: str) -> list[str]:
     return [group]
 
@@ -86,15 +99,12 @@ def group_choices(allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[
 
 
 def selector_matches(selector: str, allowed: set[str]) -> bool:
-    return selector in allowed
+    benchmark_id = benchmark_id_from_selector(selector)
+    return benchmark_id in allowed if benchmark_id is not None else selector in allowed
 
 
 def spec_selectors(specs: Iterable[SelectableSpec]) -> set[str]:
-    selectors: set[str] = set()
-    for spec in specs:
-        selectors.add(spec.name)
-        selectors.add(spec.benchmark_id)
-    return selectors
+    return {spec.benchmark_id for spec in specs}
 
 
 def spec_selector_set(spec: SelectableSpec) -> set[str]:
@@ -115,7 +125,7 @@ def parse_selector_count_overrides(
     for value in values or []:
         if "=" not in value:
             raise argparse.ArgumentTypeError(
-                f"{option_name} entries must be BENCH=N, GROUP/BENCH=N, or MODE/BENCH=N"
+                f"{option_name} entries must be DOMAIN/BENCH=N or MODE/DOMAIN/BENCH=N"
             )
         key, raw_count = value.split("=", 1)
         try:
@@ -124,14 +134,19 @@ def parse_selector_count_overrides(
             raise argparse.ArgumentTypeError(f"invalid count in {value!r}") from exc
         if count <= 0:
             raise argparse.ArgumentTypeError("count must be > 0")
+        mode: str | None = None
+        selector = key
         if "/" in key:
             head, tail = key.split("/", 1)
             if head in modes_set:
-                overrides[(head, tail)] = count
-            else:
-                overrides[(None, key)] = count
-        else:
-            overrides[(None, key)] = count
+                mode = head
+                selector = tail
+        benchmark_id = benchmark_id_from_selector(selector)
+        if benchmark_id is None:
+            raise argparse.ArgumentTypeError(
+                f"{option_name} selector must be a domain benchmark id or path: {selector!r}"
+            )
+        overrides[(mode, benchmark_id)] = count
     return overrides
 
 
@@ -141,15 +156,12 @@ def selector_count_override(
     name: str,
     benchmark_id: str | None = None,
 ) -> int | None:
-    selectors = [name]
-    if benchmark_id:
-        selectors.insert(0, benchmark_id)
-    for selector in selectors:
-        if value := overrides.get((mode, selector)):
-            return value
-    for selector in selectors:
-        if value := overrides.get((None, selector)):
-            return value
+    if benchmark_id is None:
+        return None
+    if value := overrides.get((mode, benchmark_id)):
+        return value
+    if value := overrides.get((None, benchmark_id)):
+        return value
     return None
 
 
@@ -226,12 +238,12 @@ def select_specs(specs: list[SpecT], selectors: list[str] | None) -> list[SpecT]
         return specs
     selected: list[SpecT] = []
     for raw_selector in selectors:
-        matches = [spec for spec in specs if spec.benchmark_id == raw_selector or spec.name == raw_selector]
+        selector = benchmark_id_from_selector(raw_selector)
+        if selector is None:
+            raise SystemExit(f"unknown benchmark selector: {raw_selector}")
+        matches = [spec for spec in specs if spec.benchmark_id == selector]
         if not matches:
             raise SystemExit(f"unknown benchmark selector: {raw_selector}")
-        if len(matches) > 1 and "/" not in raw_selector:
-            ids = ", ".join(spec.benchmark_id for spec in matches)
-            raise SystemExit(f"ambiguous benchmark selector {raw_selector!r}; use one of: {ids}")
         for match in matches:
             if match not in selected:
                 selected.append(match)
@@ -239,16 +251,13 @@ def select_specs(specs: list[SpecT], selectors: list[str] | None) -> list[SpecT]
 
 
 def resolve_script_path(root: Path, bench: str, groups: list[str] | tuple[str, ...] = GROUPS) -> Path | None:
-    if "/" in bench:
-        group, name = bench.split("/", 1)
-        search_groups = [group]
-    else:
-        name = bench
-        search_groups = list(groups)
-    for group in search_groups:
-        path = root / "benchmarks" / group / f"{name}.gs"
-        if path.exists():
-            return path
+    benchmark_id = benchmark_id_from_selector(bench, groups)
+    if benchmark_id is None:
+        return None
+    group, name = benchmark_id.split("/", 1)
+    path = root / "benchmarks" / group / f"{name}.gs"
+    if path.exists():
+        return path
     return None
 
 

@@ -109,26 +109,6 @@ def reference_lua_path(case: dict[str, Any]) -> str | None:
     return None
 
 
-def domain_workloads(existing: dict[str, Any]) -> list[dict[str, Any]]:
-    workloads: list[dict[str, Any]] = []
-    for row in existing.get("benchmarks", []):
-        if not isinstance(row, dict):
-            continue
-        workload: dict[str, Any] = {
-            "id": row.get("id"),
-            "domain": row.get("group"),
-            "name": row.get("name"),
-            "script": row.get("gscript_path"),
-            "comparison_reference": {"kind": "lua", "path": row.get("lua_path")} if row.get("lua_path") else None,
-            "params": row.get("params", {}),
-            "recommended_scale": row.get("recommended_scale", {}),
-            "time_source_hint": row.get("time_source_hint"),
-            "tags": row.get("tags", []),
-        }
-        workloads.append(workload)
-    return workloads
-
-
 def load_manifest(root_name: str) -> dict[str, Any]:
     path = ROOT / root_name / "manifest.json"
     with path.open() as f:
@@ -152,7 +132,7 @@ def generated_manifest(root_name: str) -> dict[str, Any]:
                 if key in existing:
                     manifest[key] = existing[key]
             existing_workloads = existing.get("workloads")
-            manifest["workloads"] = existing_workloads if isinstance(existing_workloads, list) else domain_workloads(existing)
+            manifest["workloads"] = existing_workloads if isinstance(existing_workloads, list) else []
         else:
             manifest["workloads"] = []
     return manifest

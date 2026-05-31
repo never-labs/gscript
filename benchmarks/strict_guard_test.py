@@ -156,11 +156,10 @@ class StrictGuardReportTest(unittest.TestCase):
         self.assertIn("| calls/tiny | - | - | vm:low_resolution |", markdown)
         self.assertIn("| calls/tiny | vm | low_resolution |", markdown)
 
-    def test_repeat_overrides_accept_bench_group_bench_and_mode_bench(self):
-        overrides = sg.parse_repeat_overrides(["fib=4", "recursion/fib=6", "default/sieve=8"])
-        self.assertEqual(sg.repeat_for(overrides, "vm", "fib"), 4)
+    def test_repeat_overrides_accept_domain_ids_and_mode_domain_ids(self):
+        overrides = sg.parse_repeat_overrides(["recursion/fib=6", "default/control/sieve=8"])
         self.assertEqual(sg.repeat_for(overrides, "vm", "fib", "recursion/fib"), 6)
-        self.assertEqual(sg.repeat_for(overrides, "default", "sieve"), 8)
+        self.assertEqual(sg.repeat_for(overrides, "default", "sieve", "control/sieve"), 8)
         self.assertIsNone(sg.repeat_for(overrides, "vm", "sieve"))
 
     def test_repeat_overrides_accept_domain_group_selectors(self):

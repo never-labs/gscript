@@ -59,10 +59,10 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         self.assertIsNone(specs[1].luajit_rel)
         self.assertEqual(specs[2].base, "matmul")
 
-    def test_select_specs_rejects_ambiguous_short_names(self):
+    def test_select_specs_rejects_short_name_aliases(self):
         specs = [FakeSpec("numeric", "sort"), FakeSpec("table", "sort")]
 
-        with self.assertRaisesRegex(SystemExit, "ambiguous benchmark selector 'sort'"):
+        with self.assertRaisesRegex(SystemExit, "unknown benchmark selector: sort"):
             discovery.select_specs(specs, ["sort"])
 
     def test_select_specs_rejects_unknown_domain_selector(self):
@@ -71,27 +71,29 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "unknown benchmark selector"):
             discovery.select_specs(specs, ["missing_domain/events_metamethod"])
 
-    def test_spec_selectors_includes_short_and_canonical_names(self):
+    def test_spec_selectors_includes_only_canonical_domain_names(self):
         self.assertEqual(
             discovery.spec_selectors([FakeSpec("numeric", "matmul"), FakeSpec("calls", "closure_accumulator")]),
-            {"matmul", "numeric/matmul", "closure_accumulator", "calls/closure_accumulator"},
+            {"numeric/matmul", "calls/closure_accumulator"},
         )
 
     def test_selector_matches_spec_accepts_only_domain_selectors(self):
         self.assertTrue(discovery.selector_matches_spec("numeric/matmul", FakeSpec("numeric", "matmul")))
+        self.assertTrue(discovery.selector_matches_spec("benchmarks/numeric/matmul.gs", FakeSpec("numeric", "matmul")))
         self.assertFalse(discovery.selector_matches_spec("missing_domain/matmul", FakeSpec("numeric", "matmul")))
+        self.assertFalse(discovery.selector_matches_spec("matmul", FakeSpec("numeric", "matmul")))
         self.assertFalse(
             discovery.selector_matches_spec("missing_domain/events_metamethod", FakeSpec("table", "events_metamethod"))
         )
 
     def test_parse_selector_count_overrides_accepts_modes_and_domain_selectors(self):
         overrides = discovery.parse_selector_count_overrides(
-            ["fib=4", "numeric/matmul=6", "vm/table/events_metamethod=8"],
+            ["recursion/fib=4", "numeric/matmul=6", "vm/table/events_metamethod=8"],
             ["vm", "default"],
             "--repeat",
         )
 
-        self.assertEqual(discovery.selector_count_override(overrides, "default", "fib"), 4)
+        self.assertEqual(discovery.selector_count_override(overrides, "default", "fib", "recursion/fib"), 4)
         self.assertEqual(discovery.selector_count_override(overrides, "default", "matmul", "numeric/matmul"), 6)
         self.assertEqual(
             discovery.selector_count_override(overrides, "vm", "events_metamethod", "table/events_metamethod"),
@@ -102,9 +104,11 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
 
     def test_parse_selector_count_overrides_rejects_bad_counts(self):
         with self.assertRaises(argparse.ArgumentTypeError):
-            discovery.parse_selector_count_overrides(["fib=0"], ["vm"], "--repeat")
+            discovery.parse_selector_count_overrides(["recursion/fib=0"], ["vm"], "--repeat")
         with self.assertRaises(argparse.ArgumentTypeError):
-            discovery.parse_selector_count_overrides(["fib=nope"], ["vm"], "--repeat")
+            discovery.parse_selector_count_overrides(["recursion/fib=nope"], ["vm"], "--repeat")
+        with self.assertRaises(argparse.ArgumentTypeError):
+            discovery.parse_selector_count_overrides(["fib=4"], ["vm"], "--repeat")
 
     def test_resolve_script_path_rejects_unknown_suffix_selectors(self):
         with tempfile.TemporaryDirectory() as td:
@@ -116,8 +120,13 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 discovery.resolve_script_path(root, "calls/closure_accumulator"),
                 root / "benchmarks" / "calls" / "closure_accumulator.gs",
             )
+            self.assertEqual(
+                discovery.resolve_script_path(root, "benchmarks/calls/closure_accumulator.gs"),
+                root / "benchmarks" / "calls" / "closure_accumulator.gs",
+            )
             self.assertIsNone(discovery.resolve_script_path(root, "old_group/closure_accumulator"))
             self.assertIsNone(discovery.resolve_script_path(root, "calls/closure_accumulator_unknown"))
+            self.assertIsNone(discovery.resolve_script_path(root, "closure_accumulator"))
 
     def test_resolve_script_identity_returns_domain_group_name_and_path(self):
         with tempfile.TemporaryDirectory() as td:

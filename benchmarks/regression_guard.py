@@ -198,18 +198,12 @@ def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None)
 
 
 def resolve_benchmark(root: Path, bench: str) -> tuple[str, Path, Path | None]:
-    if "/" in bench:
-        group, name = bench.split("/", 1)
-        groups = [group]
-    else:
-        name = bench
-        groups = list(BENCHMARK_GROUPS)
-    for group in groups:
-        gs = root / "benchmarks" / group / f"{name}.gs"
-        if gs.exists():
-            lua = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
-            return f"{group}/{name}", gs, lua if lua.exists() else None
-    return bench, root / "benchmarks" / "__missing__" / f"{name}.gs", None
+    identity = discovery.resolve_script_identity(root, bench, BENCHMARK_GROUPS)
+    if identity is None:
+        return bench, root / "benchmarks" / "__missing__" / f"{bench}.gs", None
+    group, name, gs = identity
+    lua = root / "benchmarks" / "lua_ref" / group / f"{name}.lua"
+    return f"{group}/{name}", gs, lua if lua.exists() else None
 
 
 def run_mode(
@@ -476,7 +470,7 @@ def main(argv: list[str] | None = None) -> int:
             row.no_filter = run_mode("no_filter", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
             row.luajit = run_mode("luajit", bench, root, gscript_bin, luajit_bin, args.runs, args.timeout)
 
-            base = baseline.get(bench_id) or baseline.get(bench)
+            base = baseline.get(bench_id)
             row.baseline_seconds = base
             if base is not None and row.default and row.default.seconds is not None and base > 0:
                 row.regression_pct = ((row.default.seconds / base) - 1.0) * 100.0
