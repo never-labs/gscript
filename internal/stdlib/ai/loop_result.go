@@ -8,6 +8,12 @@ const (
 	ReactStatusDone    = "done"
 	ReactStatusStopped = "stopped"
 	ReactStatusPending = "pending"
+
+	TurnStatusFinalAnswer = "final_answer"
+	TurnStatusStop        = "stop"
+	TurnStatusToolCalls   = "tool_calls"
+
+	StopReasonMaxSteps = "max_steps"
 )
 
 // ErrorShape describes public loop error tables without depending on runtime
@@ -61,4 +67,24 @@ func IsDeadlineReason(reason string) bool {
 // ReactResult normalizes the scalar result fields for built-in loops.
 func ReactResult(status, text, reason string) ReactResultShape {
 	return ReactResultShape{Status: status, Text: text, Reason: reason}
+}
+
+// ReactDoneResult normalizes the scalar fields for a completed loop result.
+func ReactDoneResult(text string) ReactResultShape {
+	return ReactResult(ReactStatusDone, text, "")
+}
+
+// ReactStoppedResult normalizes the scalar fields for a stopped loop result.
+func ReactStoppedResult(reason string) ReactResultShape {
+	return ReactResult(ReactStatusStopped, "", reason)
+}
+
+// ReactPendingResult normalizes the scalar fields for a pending loop result.
+func ReactPendingResult() ReactResultShape {
+	return ReactResult(ReactStatusPending, "", "")
+}
+
+// IsFinalAnswerStatus reports whether a provider turn status completes a loop.
+func IsFinalAnswerStatus(status string) bool {
+	return status == "" || status == TurnStatusFinalAnswer
 }

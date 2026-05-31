@@ -32,3 +32,27 @@ func TestReactResult(t *testing.T) {
 		t.Fatalf("react result = %+v", result)
 	}
 }
+
+func TestReactResultHelpers(t *testing.T) {
+	done := ReactDoneResult("ok")
+	if done.Status != ReactStatusDone || done.Text != "ok" || done.Reason != "" {
+		t.Fatalf("done result = %+v", done)
+	}
+	stopped := ReactStoppedResult(StopReasonMaxSteps)
+	if stopped.Status != ReactStatusStopped || stopped.Text != "" || stopped.Reason != StopReasonMaxSteps {
+		t.Fatalf("stopped result = %+v", stopped)
+	}
+	pending := ReactPendingResult()
+	if pending.Status != ReactStatusPending || pending.Text != "" || pending.Reason != "" {
+		t.Fatalf("pending result = %+v", pending)
+	}
+}
+
+func TestIsFinalAnswerStatus(t *testing.T) {
+	if !IsFinalAnswerStatus("") || !IsFinalAnswerStatus(TurnStatusFinalAnswer) {
+		t.Fatalf("final answer statuses were not recognized")
+	}
+	if IsFinalAnswerStatus(TurnStatusToolCalls) {
+		t.Fatalf("tool calls should not be a final answer")
+	}
+}

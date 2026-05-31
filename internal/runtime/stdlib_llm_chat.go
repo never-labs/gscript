@@ -291,7 +291,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
 		if opts.RawGetString("messages").IsNil() {
-			normalized, err := llmLoopOptions(opts, 1)
+			normalized, err := llmLoopOptions(opts, stdlibai.DefaultSimpleMaxSteps)
 			if err != nil {
 				agentConfigMu.RUnlock()
 				trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
@@ -734,7 +734,7 @@ func llmInjectPlan(opts *Table, plan string) {
 }
 
 func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) Value {
-	if result.RawGetString("status").Str() != "done" {
+	if result.RawGetString("status").Str() != stdlibai.ReactStatusDone {
 		return NilValue()
 	}
 	maxIters := stdlibai.ReflectIterations(toInt(src.RawGetString("max_iters")))

@@ -75,7 +75,7 @@ func TestNormalizeLoopOptionsKeepsResponseFormat(t *testing.T) {
 
 func TestNormalizeReactControls(t *testing.T) {
 	got := NormalizeReactControls(0, -3, -4)
-	if got.MaxSteps != 8 || got.MaxToolRetries != 0 || got.MaxHistoryTokens != 0 {
+	if got.MaxSteps != int(DefaultReactMaxSteps) || got.MaxToolRetries != 0 || got.MaxHistoryTokens != 0 {
 		t.Fatalf("NormalizeReactControls defaults = %+v", got)
 	}
 

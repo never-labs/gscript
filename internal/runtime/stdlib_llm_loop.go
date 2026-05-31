@@ -42,10 +42,10 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		traces[0](event)
 	}
 	set := func(name string, fn func([]Value) ([]Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: "loop." + name, Fn: fn}))
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: stdlibai.LoopFunctionLabel("loop", name), Fn: fn}))
 	}
 
-	set("react", func(args []Value) ([]Value, error) {
+	set(stdlibai.LoopNameReact, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.react' (table expected)")
 		}
@@ -71,7 +71,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		})
 	})
 
-	set("simple", func(args []Value) ([]Value, error) {
+	set(stdlibai.LoopNameSimple, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.simple' (table expected)")
 		}
@@ -83,7 +83,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		opts, err := llmLoopOptions(args[0].Table(), 1)
+		opts, err := llmLoopOptions(args[0].Table(), stdlibai.DefaultSimpleMaxSteps)
 		if err != nil {
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
@@ -91,7 +91,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, nil)
 	})
 
-	set("plan_execute", func(args []Value) ([]Value, error) {
+	set(stdlibai.LoopNamePlanExecute, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.plan_execute' (table expected)")
 		}
@@ -130,7 +130,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		return result, nil
 	})
 
-	set("reflect", func(args []Value) ([]Value, error) {
+	set(stdlibai.LoopNameReflect, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.reflect' (table expected)")
 		}
@@ -257,7 +257,7 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 	plan, err := stdlibai.NormalizeLoopOptions(stdlibai.LoopOptionInput{
 		HasMessages:         messages.IsTable(),
 		HasUser:             !user.IsNil(),
-		HasMaxSteps:         !src.RawGetString("max_steps").IsNil(),
+		HasMaxSteps:         !src.RawGetString(stdlibai.OptionKeyMaxSteps).IsNil(),
 		HasResponseFormat:   !src.RawGetString("response_format").IsNil(),
 		HasStructuredOutput: src.RawGetString("output").IsTable(),
 		DefaultMaxSteps:     defaultMaxSteps,
@@ -281,7 +281,7 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		}
 	}
 	if plan.SetDefaultMaxSteps {
-		opts.RawSetString("max_steps", IntValue(plan.DefaultMaxSteps))
+		opts.RawSetString(stdlibai.OptionKeyMaxSteps, IntValue(plan.DefaultMaxSteps))
 	}
 	if plan.SetJSONResponseFormat {
 		opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
@@ -314,7 +314,7 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 	}
 	history := llmMessageValuesFromTable(messagesValue.Table())
 	controls := stdlibai.NormalizeReactControls(
-		toInt(opts.RawGetString("max_steps")),
+		toInt(opts.RawGetString(stdlibai.OptionKeyMaxSteps)),
 		toInt(opts.RawGetString("max_tool_retries")),
 		toInt(opts.RawGetString("max_history_tokens")),
 	)
@@ -364,8 +364,8 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 		}
 		budgets.chargeTurn(res.Usage)
 		switch res.Status {
-		case "", "final_answer":
-			result := llmReactResultValue("done", res.Text, "", turnValue, history)
+		case "", stdlibai.TurnStatusFinalAnswer:
+			result := llmReactResultValue(stdlibai.ReactDoneResult(res.Text), turnValue, history)
 			if value, errValue := llmStructuredOutputValue(opts, res.Text); !errValue.IsNil() {
 				repairedValue, repairedTurn, repairedText, repairErr, repaired := llmRepairStructuredOutput(opts, provider, ctx, maxHostResult, trace, budgets, cancel, model, toolsValue, history, res.Text, errValue, int64(step))
 				if !repairErr.IsNil() {
@@ -373,9 +373,9 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 					return []Value{NilValue(), repairErr}, nil
 				}
 				if repaired {
-					result = llmReactResultValue("done", repairedText, "", repairedTurn, history)
+					result = llmReactResultValue(stdlibai.ReactDoneResult(repairedText), repairedTurn, history)
 					result.Table().RawSetString("value", repairedValue)
-					llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
+					llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: stdlibai.ReactStatusDone})
 					return []Value{result, NilValue()}, nil
 				}
 				llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(errValue), Message: errValue.Table().RawGetString("message").Str()})
@@ -383,12 +383,12 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 			} else if !value.IsNil() {
 				result.Table().RawSetString("value", value)
 			}
-			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: "done"})
+			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: stdlibai.ReactStatusDone})
 			return []Value{result, NilValue()}, nil
-		case "stop":
-			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "stopped", Message: res.Reason})
-			return []Value{llmReactResultValue("stopped", "", res.Reason, turnValue, history), NilValue()}, nil
-		case "tool_calls":
+		case stdlibai.TurnStatusStop:
+			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusStopped, Message: res.Reason})
+			return []Value{llmReactResultValue(stdlibai.ReactStoppedResult(res.Reason), turnValue, history), NilValue()}, nil
+		case stdlibai.TurnStatusToolCalls:
 			for i := range res.Calls {
 				callValue := llmToolCallValue(res.Calls[i])
 				llmTrace(trace, LLMTraceEvent{Type: "tool_call", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
@@ -397,7 +397,7 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 						llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: "internal", Message: err.Error()})
 						return []Value{NilValue(), llmErrorValue("internal", err.Error())}, nil
 					}
-					llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "pending", Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+					llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 					return []Value{pending, NilValue()}, nil
 				}
 				history = append(history, llmAssistantCallMessage(callValue))
@@ -411,15 +411,15 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 				}
 				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, controls.MaxToolRetries, trace, int64(step), res.Calls[i])
 				if !err.IsNil() {
-					if llmErrorKind(err) == "pending" {
+					if llmErrorKind(err) == stdlibai.ReactStatusPending {
 						pendingPayload := err.Table().RawGetString("pending")
-						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "pending", Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 						if pendingPayload.IsTable() {
 							pendingPayload.Table().RawSetString("history", llmTableFromValues(history))
 							return []Value{pendingPayload, NilValue()}, nil
 						}
 						pending := NewTable()
-						pending.RawSetString("status", StringValue("pending"))
+						pending.RawSetString("status", StringValue(stdlibai.ReactStatusPending))
 						pending.RawSetString("history", llmTableFromValues(history))
 						return []Value{TableValue(pending), NilValue()}, nil
 					}
@@ -427,15 +427,15 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 					return []Value{NilValue(), err}, nil
 				}
 				if len(dispatchResult) >= 2 && !dispatchResult[1].IsNil() {
-					if llmErrorKind(dispatchResult[1]) == "pending" {
+					if llmErrorKind(dispatchResult[1]) == stdlibai.ReactStatusPending {
 						pendingPayload := dispatchResult[1].Table().RawGetString("pending")
-						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "pending", Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 						if pendingPayload.IsTable() {
 							pendingPayload.Table().RawSetString("history", llmTableFromValues(history))
 							return []Value{pendingPayload, NilValue()}, nil
 						}
 						pending := NewTable()
-						pending.RawSetString("status", StringValue("pending"))
+						pending.RawSetString("status", StringValue(stdlibai.ReactStatusPending))
 						pending.RawSetString("history", llmTableFromValues(history))
 						return []Value{TableValue(pending), NilValue()}, nil
 					}
@@ -452,12 +452,12 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 				}
 			}
 		default:
-			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: "stopped", Message: res.Status})
-			return []Value{llmReactResultValue("stopped", "", res.Status, turnValue, history), NilValue()}, nil
+			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusStopped, Message: res.Status})
+			return []Value{llmReactResultValue(stdlibai.ReactStoppedResult(res.Status), turnValue, history), NilValue()}, nil
 		}
 	}
-	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(controls.MaxSteps), Status: "stopped", Message: "max_steps"})
-	return []Value{llmReactResultValue("stopped", "", "max_steps", NilValue(), history), NilValue()}, nil
+	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(controls.MaxSteps), Status: stdlibai.ReactStatusStopped, Message: stdlibai.StopReasonMaxSteps})
+	return []Value{llmReactResultValue(stdlibai.ReactStoppedResult(stdlibai.StopReasonMaxSteps), NilValue(), history), NilValue()}, nil
 }
 
 func llmTrace(trace func(LLMTraceEvent), event LLMTraceEvent) {
@@ -498,7 +498,7 @@ func llmMaybePauseForApproval(hitl *llmHITL, call ScriptFunctionCaller, history,
 	}
 
 	result := NewTable()
-	result.RawSetString("status", StringValue("pending"))
+	result.RawSetString("status", StringValue(stdlibai.ReactStatusPending))
 	result.RawSetString("token", StringValue(token))
 	result.RawSetString("payload", pending)
 	result.RawSetString("pending", pending)
@@ -548,7 +548,7 @@ func llmRepairStructuredOutput(opts *Table, provider LLMProvider, ctx context.Co
 			return NilValue(), NilValue(), "", llmErrorValue("internal", err.Error()), true
 		}
 		budgets.chargeTurn(res.Usage)
-		if llmResultStatus(res) != "final_answer" {
+		if !stdlibai.IsFinalAnswerStatus(llmResultStatus(res)) {
 			lastErr = llmErrorValue("validation", "structured output repair did not return a final answer")
 			previousText = res.Text
 			continue
@@ -916,8 +916,7 @@ func llmTransientToolError(kind string) bool {
 	}
 }
 
-func llmReactResultValue(status, text, reason string, turn Value, history []Value) Value {
-	shape := stdlibai.ReactResult(status, text, reason)
+func llmReactResultValue(shape stdlibai.ReactResultShape, turn Value, history []Value) Value {
 	t := NewTable()
 	t.RawSetString("status", StringValue(shape.Status))
 	t.RawSetString("text", StringValue(shape.Text))

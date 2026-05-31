@@ -2,6 +2,15 @@ package ai
 
 import "fmt"
 
+const (
+	OptionKeyMaxSteps = "max_steps"
+
+	// DefaultSimpleMaxSteps is the public max_steps default for loop.simple.
+	DefaultSimpleMaxSteps int64 = 1
+	// DefaultReactMaxSteps is the internal safety default for react-style loops.
+	DefaultReactMaxSteps int64 = 8
+)
+
 // LoopOptionKeys are the script-visible loop/turn options copied from an
 // agent options table into the normalized request table.
 var LoopOptionKeys = []string{
@@ -12,7 +21,7 @@ var LoopOptionKeys = []string{
 	"top_p",
 	"response_format",
 	"stream",
-	"max_steps",
+	OptionKeyMaxSteps,
 	"max_tool_retries",
 	"max_history_tokens",
 	"force_tool",
@@ -82,7 +91,7 @@ func NormalizeLoopOptions(input LoopOptionInput) (LoopOptionPlan, error) {
 // the hot react loop. Value/Table decoding remains in the runtime adapter.
 func NormalizeReactControls(maxSteps, maxToolRetries, maxHistoryTokens int64) ReactControls {
 	if maxSteps <= 0 {
-		maxSteps = 8
+		maxSteps = DefaultReactMaxSteps
 	}
 	if maxToolRetries < 0 {
 		maxToolRetries = 0
