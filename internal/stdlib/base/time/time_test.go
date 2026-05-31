@@ -36,3 +36,40 @@ func TestLuaDateFormatConvertsRuntimeDirectives(t *testing.T) {
 		t.Fatalf("LuaDateFormat = %q, want %q", got, want)
 	}
 }
+
+func TestDurationFromSeconds(t *testing.T) {
+	got := DurationFromSeconds(1.25)
+	want := 1250 * gotime.Millisecond
+	if got != want {
+		t.Fatalf("DurationFromSeconds = %v, want %v", got, want)
+	}
+}
+
+func TestUTCConstructors(t *testing.T) {
+	fromUnix := UnixUTC(1, 2)
+	if fromUnix.Location() != gotime.UTC || fromUnix.Unix() != 1 || fromUnix.Nanosecond() != 2 {
+		t.Fatalf("UnixUTC = %v", fromUnix)
+	}
+
+	fromDate := DateUTC(2026, gotime.May, 31, 23, 4, 5, 6)
+	want := gotime.Date(2026, gotime.May, 31, 23, 4, 5, 6, gotime.UTC)
+	if !fromDate.Equal(want) || fromDate.Location() != gotime.UTC {
+		t.Fatalf("DateUTC = %v, want %v", fromDate, want)
+	}
+}
+
+func TestStrftimeLayoutFormatAndParse(t *testing.T) {
+	tm := gotime.Date(2026, gotime.May, 31, 23, 4, 5, 0, gotime.UTC)
+	got := FormatWithStrftimeLayout(tm, "%Y-%m-%d %H:%M:%S")
+	if got != "2026-05-31 23:04:05" {
+		t.Fatalf("FormatWithStrftimeLayout = %q", got)
+	}
+
+	parsed, err := ParseWithStrftimeLayout(got, "%Y-%m-%d %H:%M:%S")
+	if err != nil {
+		t.Fatalf("ParseWithStrftimeLayout error = %v", err)
+	}
+	if !parsed.Equal(tm) {
+		t.Fatalf("ParseWithStrftimeLayout = %v, want %v", parsed, tm)
+	}
+}

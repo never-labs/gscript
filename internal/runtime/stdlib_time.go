@@ -55,7 +55,7 @@ func tableToGoTime(v Value) (time.Time, error) {
 		f := unixVal.Number()
 		sec := int64(f)
 		nsec := int64((f - float64(sec)) * 1e9)
-		return time.Unix(sec, nsec).UTC(), nil
+		return stdtime.UnixUTC(sec, nsec), nil
 	}
 
 	// Otherwise reconstruct from fields
@@ -67,7 +67,7 @@ func tableToGoTime(v Value) (time.Time, error) {
 	sec := int(tbl.RawGet(StringValue("sec")).Int())
 	nsec := int(tbl.RawGet(StringValue("nsec")).Int())
 
-	return time.Date(year, month, day, hour, min, sec, nsec, time.UTC), nil
+	return stdtime.DateUTC(year, month, day, hour, min, sec, nsec), nil
 }
 
 func timeSinceValue(v Value) (Value, error) {
@@ -190,7 +190,7 @@ func buildTimeLib() *Table {
 			if errVal, cancelled := contextCancelledValue(done, errFn); cancelled {
 				return []Value{BoolValue(false), errVal}, nil
 			}
-			timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
+			timer := time.NewTimer(stdtime.DurationFromSeconds(secs))
 			defer timer.Stop()
 			select {
 			case <-timer.C:
@@ -206,7 +206,7 @@ func buildTimeLib() *Table {
 		if secs < 0 {
 			return nil, fmt.Errorf("bad argument #1 to 'time.sleep' (non-negative duration expected)")
 		}
-		time.Sleep(time.Duration(secs * float64(time.Second)))
+		time.Sleep(stdtime.DurationFromSeconds(secs))
 		return nil, nil
 	})
 
@@ -221,7 +221,7 @@ func buildTimeLib() *Table {
 		}
 		ch := NewChannel(1)
 		go func() {
-			time.Sleep(time.Duration(secs * float64(time.Second)))
+			time.Sleep(stdtime.DurationFromSeconds(secs))
 			_ = ch.Send(TableValue(goTimeToTable(time.Now())))
 		}()
 		return []Value{ChannelValue(ch)}, nil
@@ -246,7 +246,7 @@ func buildTimeLib() *Table {
 		if len(args) >= 2 {
 			nsec = toInt(args[1])
 		}
-		goTime := time.Unix(sec, nsec).UTC()
+		goTime := stdtime.UnixUTC(sec, nsec)
 		return []Value{TableValue(goTimeToTable(goTime))}, nil
 	})
 
@@ -256,8 +256,7 @@ func buildTimeLib() *Table {
 		if err != nil {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'time.format': %v", err)
 		}
-		layout := stdtime.LayoutFromStrftime(layoutVal.Str())
-		return StringValue(goTime.Format(layout)), nil
+		return StringValue(stdtime.FormatWithStrftimeLayout(goTime, layoutVal.Str())), nil
 	}
 	setFastArg2("format", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
@@ -273,8 +272,7 @@ func buildTimeLib() *Table {
 	// time.parse(str, layout) -> time table, nil | nil, errMsg
 	timeParse := func(strVal, layoutVal Value) (Value, Value, int, error) {
 		str := strVal.Str()
-		layout := stdtime.LayoutFromStrftime(layoutVal.Str())
-		goTime, err := time.Parse(layout, str)
+		goTime, err := stdtime.ParseWithStrftimeLayout(str, layoutVal.Str())
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
@@ -321,7 +319,7 @@ func buildTimeLib() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'time.add': %v", err)
 		}
 		secs := toFloat(args[1])
-		newTime := goTime.Add(time.Duration(secs * float64(time.Second)))
+		newTime := goTime.Add(stdtime.DurationFromSeconds(secs))
 		return []Value{TableValue(goTimeToTable(newTime))}, nil
 	})
 
@@ -333,7 +331,7 @@ func buildTimeLib() *Table {
 		hour := int(toInt(hourVal))
 		min := int(toInt(minVal))
 		sec := int(toInt(secVal))
-		goTime := time.Date(year, month, day, hour, min, sec, 0, time.UTC)
+		goTime := stdtime.DateUTC(year, month, day, hour, min, sec, 0)
 		return TableValue(goTimeToTable(goTime)), nil
 	}
 	setFastArg6("date", func(args []Value) ([]Value, error) {
@@ -353,7 +351,7 @@ func buildTimeLib() *Table {
 		if len(args) >= 6 {
 			sec = int(toInt(args[5]))
 		}
-		goTime := time.Date(year, month, day, hour, min, sec, 0, time.UTC)
+		goTime := stdtime.DateUTC(year, month, day, hour, min, sec, 0)
 		return []Value{TableValue(goTimeToTable(goTime))}, nil
 	}, timeDate6)
 

@@ -33,6 +33,26 @@ func LayoutFromStrftime(layout string) string {
 	return result
 }
 
+func DurationFromSeconds(seconds float64) gotime.Duration {
+	return gotime.Duration(seconds * float64(gotime.Second))
+}
+
+func UnixUTC(sec, nsec int64) gotime.Time {
+	return gotime.Unix(sec, nsec).UTC()
+}
+
+func DateUTC(year int, month gotime.Month, day, hour, min, sec, nsec int) gotime.Time {
+	return gotime.Date(year, month, day, hour, min, sec, nsec, gotime.UTC)
+}
+
+func FormatWithStrftimeLayout(t gotime.Time, layout string) string {
+	return t.Format(LayoutFromStrftime(layout))
+}
+
+func ParseWithStrftimeLayout(value, layout string) (gotime.Time, error) {
+	return gotime.Parse(LayoutFromStrftime(layout), value)
+}
+
 // LuaDateFormat formats t using the Lua os.date directive subset supported by
 // the runtime stdlib.
 func LuaDateFormat(format string, t gotime.Time) string {
