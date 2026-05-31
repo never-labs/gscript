@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/never-labs/gscript/internal/stdlib/host/filemode"
 )
 
 const (
@@ -118,12 +120,12 @@ func buildIOLib(interps ...*Interpreter) *Table {
 			mode = args[1].Str()
 		}
 
-		flag, ok := parseFileMode(mode)
+		flag, ok := filemode.Parse(mode)
 		if !ok {
 			return []Value{NilValue(), StringValue(fmt.Sprintf("invalid mode: %s", mode))}, nil
 		}
 
-		read, write := fileModeAccess(flag)
+		read, write := filemode.Access(flag)
 		resolved, err := resolveIOPath(interp, filename, read, write)
 		if err != nil {
 			return nil, err
@@ -226,32 +228,6 @@ func (interp *Interpreter) refreshIOLib() {
 	}
 }
 
-func parseFileMode(mode string) (int, bool) {
-	mode = strings.ReplaceAll(mode, "b", "")
-	switch mode {
-	case "r":
-		return os.O_RDONLY, true
-	case "w":
-		return os.O_WRONLY | os.O_CREATE | os.O_TRUNC, true
-	case "a":
-		return os.O_WRONLY | os.O_CREATE | os.O_APPEND, true
-	case "r+":
-		return os.O_RDWR, true
-	case "w+":
-		return os.O_RDWR | os.O_CREATE | os.O_TRUNC, true
-	case "a+":
-		return os.O_RDWR | os.O_CREATE | os.O_APPEND, true
-	default:
-		return 0, false
-	}
-}
-
-func fileModeAccess(flag int) (read, write bool) {
-	read = flag&os.O_WRONLY == 0 || flag&os.O_RDWR != 0
-	write = flag&(os.O_WRONLY|os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_APPEND) != 0
-	return read, write
-}
-
 func resolveIOPath(interp *Interpreter, path string, read, write bool) (string, error) {
 	if interp == nil {
 		return path, nil
@@ -267,7 +243,7 @@ func resolveIOPath(interp *Interpreter, path string, read, write bool) (string, 
 
 func inputOutputTarget(interp *Interpreter, v Value, stringMode int) (*gscriptFileHandle, error) {
 	if v.IsString() {
-		read, write := fileModeAccess(stringMode)
+		read, write := filemode.Access(stringMode)
 		path, err := resolveIOPath(interp, v.Str(), read, write)
 		if err != nil {
 			return nil, err
