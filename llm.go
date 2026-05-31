@@ -20,16 +20,89 @@ type LLMProvider interface {
 	Turn(context.Context, LLMTurnRequest) (LLMTurnResult, error)
 }
 
-type LLMMessage = runtime.LLMMessage
-type LLMTool = runtime.LLMTool
-type LLMToolCall = runtime.LLMToolCall
-type LLMTurnRequest = runtime.LLMTurnRequest
-type LLMTurnResult = runtime.LLMTurnResult
-type LLMTurnUsage = runtime.LLMTurnUsage
-type LLMTraceEvent = runtime.LLMTraceEvent
+type LLMMessage struct {
+	Role      string
+	Text      string
+	ToolCall  *LLMToolCall
+	ToolUseID string
+	Value     any
+	Error     string
+}
+
+type LLMTool struct {
+	Name        string
+	Description string
+	Params      []string
+	Requires    []string
+	Schema      any
+}
+
+type LLMToolCall struct {
+	ID   string
+	Tool string
+	Args map[string]any
+}
+
+type LLMTurnRequest struct {
+	Model          string
+	Messages       []LLMMessage
+	Tools          []LLMTool
+	ForceTool      string
+	MaxTokens      int64
+	Temperature    *float64
+	TopP           *float64
+	ResponseFormat any
+	Stream         bool
+	Stop           []string
+	Metadata       map[string]string
+}
+
+type LLMTurnUsage struct {
+	InputTokens  int64
+	OutputTokens int64
+	Cost         float64
+	LatencyMS    int64
+}
+
+type LLMTurnResult struct {
+	Status string
+	Text   string
+	Calls  []LLMToolCall
+	Reason string
+	Usage  LLMTurnUsage
+}
+
+type LLMTraceEvent struct {
+	Type         string
+	Model        string
+	Status       string
+	Tool         string
+	CallID       string
+	Token        string
+	ErrorKind    string
+	Message      string
+	Step         int64
+	Attempt      int64
+	MessageCount int
+	ToolCount    int
+	Store        bool
+	Usage        LLMTurnUsage
+}
+
 type LLMTraceSink func(LLMTraceEvent)
 type LLMRecordSink func(LLMRecord)
-type LLMProviderConfig = runtime.LLMProviderConfig
+
+// LLMProviderConfig is the public host-side shape of one script models {}
+// provider entry.
+type LLMProviderConfig struct {
+	Name          string
+	Protocol      string
+	BaseURL       string
+	APIKey        string
+	ProviderModel string
+	Provider      string
+}
+
 type LLMProviderFactory func(LLMProviderConfig) (LLMProvider, error)
 
 type LLMRecord struct {
@@ -39,11 +112,11 @@ type LLMRecord struct {
 }
 
 const (
-	LLMProviderErrorNetwork   = runtime.LLMProviderErrorNetwork
-	LLMProviderErrorAuth      = runtime.LLMProviderErrorAuth
-	LLMProviderErrorRateLimit = runtime.LLMProviderErrorRateLimit
-	LLMProviderErrorRequest   = runtime.LLMProviderErrorRequest
-	LLMProviderErrorProvider  = runtime.LLMProviderErrorProvider
+	LLMProviderErrorNetwork   = "network"
+	LLMProviderErrorAuth      = "auth"
+	LLMProviderErrorRateLimit = "rate_limit"
+	LLMProviderErrorRequest   = "request"
+	LLMProviderErrorProvider  = "provider"
 )
 
 // ClassifyLLMProviderError returns a stable diagnostic category for provider
@@ -226,7 +299,8 @@ type llmProviderAdapter struct {
 }
 
 func (a llmProviderAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
-	return a.provider.Turn(ctx, req)
+	res, err := a.provider.Turn(ctx, publicLLMTurnRequest(req))
+	return runtimeLLMTurnResult(res), err
 }
 
 func llmTraceAdapter(sink LLMTraceSink) runtime.LLMTraceSink {
@@ -234,7 +308,218 @@ func llmTraceAdapter(sink LLMTraceSink) runtime.LLMTraceSink {
 		return nil
 	}
 	return func(event runtime.LLMTraceEvent) {
-		sink(event)
+		sink(publicLLMTraceEvent(event))
+	}
+}
+
+func publicLLMProviderConfig(cfg runtime.LLMProviderConfig) LLMProviderConfig {
+	return LLMProviderConfig{
+		Name:          cfg.Name,
+		Protocol:      cfg.Protocol,
+		BaseURL:       cfg.BaseURL,
+		APIKey:        cfg.APIKey,
+		ProviderModel: cfg.ProviderModel,
+		Provider:      cfg.Provider,
+	}
+}
+
+func publicLLMTurnRequest(req runtime.LLMTurnRequest) LLMTurnRequest {
+	out := LLMTurnRequest{
+		Model:          req.Model,
+		ForceTool:      req.ForceTool,
+		MaxTokens:      req.MaxTokens,
+		Temperature:    cloneFloat64Ptr(req.Temperature),
+		TopP:           cloneFloat64Ptr(req.TopP),
+		ResponseFormat: cloneLLMAny(req.ResponseFormat),
+		Stream:         req.Stream,
+		Stop:           append([]string(nil), req.Stop...),
+		Metadata:       cloneStringMap(req.Metadata),
+	}
+	if len(req.Messages) > 0 {
+		out.Messages = make([]LLMMessage, len(req.Messages))
+		for i := range req.Messages {
+			out.Messages[i] = publicLLMMessage(req.Messages[i])
+		}
+	}
+	if len(req.Tools) > 0 {
+		out.Tools = make([]LLMTool, len(req.Tools))
+		for i := range req.Tools {
+			out.Tools[i] = publicLLMTool(req.Tools[i])
+		}
+	}
+	return out
+}
+
+func runtimeLLMTurnRequest(req LLMTurnRequest) runtime.LLMTurnRequest {
+	out := runtime.LLMTurnRequest{
+		Model:          req.Model,
+		ForceTool:      req.ForceTool,
+		MaxTokens:      req.MaxTokens,
+		Temperature:    cloneFloat64Ptr(req.Temperature),
+		TopP:           cloneFloat64Ptr(req.TopP),
+		ResponseFormat: cloneLLMAny(req.ResponseFormat),
+		Stream:         req.Stream,
+		Stop:           append([]string(nil), req.Stop...),
+		Metadata:       cloneStringMap(req.Metadata),
+	}
+	if len(req.Messages) > 0 {
+		out.Messages = make([]runtime.LLMMessage, len(req.Messages))
+		for i := range req.Messages {
+			out.Messages[i] = runtimeLLMMessage(req.Messages[i])
+		}
+	}
+	if len(req.Tools) > 0 {
+		out.Tools = make([]runtime.LLMTool, len(req.Tools))
+		for i := range req.Tools {
+			out.Tools[i] = runtimeLLMTool(req.Tools[i])
+		}
+	}
+	return out
+}
+
+func publicLLMMessage(msg runtime.LLMMessage) LLMMessage {
+	out := LLMMessage{
+		Role:      msg.Role,
+		Text:      msg.Text,
+		ToolUseID: msg.ToolUseID,
+		Value:     cloneLLMAny(msg.Value),
+		Error:     msg.Error,
+	}
+	if msg.ToolCall != nil {
+		call := publicLLMToolCall(*msg.ToolCall)
+		out.ToolCall = &call
+	}
+	return out
+}
+
+func runtimeLLMMessage(msg LLMMessage) runtime.LLMMessage {
+	out := runtime.LLMMessage{
+		Role:      msg.Role,
+		Text:      msg.Text,
+		ToolUseID: msg.ToolUseID,
+		Value:     cloneLLMAny(msg.Value),
+		Error:     msg.Error,
+	}
+	if msg.ToolCall != nil {
+		call := runtimeLLMToolCall(*msg.ToolCall)
+		out.ToolCall = &call
+	}
+	return out
+}
+
+func publicLLMTool(tool runtime.LLMTool) LLMTool {
+	return LLMTool{
+		Name:        tool.Name,
+		Description: tool.Description,
+		Params:      append([]string(nil), tool.Params...),
+		Requires:    append([]string(nil), tool.Requires...),
+		Schema:      cloneLLMAny(tool.Schema),
+	}
+}
+
+func runtimeLLMTool(tool LLMTool) runtime.LLMTool {
+	return runtime.LLMTool{
+		Name:        tool.Name,
+		Description: tool.Description,
+		Params:      append([]string(nil), tool.Params...),
+		Requires:    append([]string(nil), tool.Requires...),
+		Schema:      cloneLLMAny(tool.Schema),
+	}
+}
+
+func publicLLMToolCall(call runtime.LLMToolCall) LLMToolCall {
+	return LLMToolCall{
+		ID:   call.ID,
+		Tool: call.Tool,
+		Args: cloneLLMArgs(call.Args),
+	}
+}
+
+func runtimeLLMToolCall(call LLMToolCall) runtime.LLMToolCall {
+	return runtime.LLMToolCall{
+		ID:   call.ID,
+		Tool: call.Tool,
+		Args: cloneLLMArgs(call.Args),
+	}
+}
+
+func cloneLLMArgs(args map[string]any) map[string]any {
+	if args == nil {
+		return nil
+	}
+	out := make(map[string]any, len(args))
+	for k, v := range args {
+		out[k] = cloneLLMAny(v)
+	}
+	return out
+}
+
+func publicLLMTurnResult(res runtime.LLMTurnResult) LLMTurnResult {
+	out := LLMTurnResult{
+		Status: res.Status,
+		Text:   res.Text,
+		Reason: res.Reason,
+		Usage:  publicLLMTurnUsage(res.Usage),
+	}
+	if len(res.Calls) > 0 {
+		out.Calls = make([]LLMToolCall, len(res.Calls))
+		for i := range res.Calls {
+			out.Calls[i] = publicLLMToolCall(res.Calls[i])
+		}
+	}
+	return out
+}
+
+func runtimeLLMTurnResult(res LLMTurnResult) runtime.LLMTurnResult {
+	out := runtime.LLMTurnResult{
+		Status: res.Status,
+		Text:   res.Text,
+		Reason: res.Reason,
+		Usage:  runtimeLLMTurnUsage(res.Usage),
+	}
+	if len(res.Calls) > 0 {
+		out.Calls = make([]runtime.LLMToolCall, len(res.Calls))
+		for i := range res.Calls {
+			out.Calls[i] = runtimeLLMToolCall(res.Calls[i])
+		}
+	}
+	return out
+}
+
+func publicLLMTurnUsage(usage runtime.LLMTurnUsage) LLMTurnUsage {
+	return LLMTurnUsage{
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		Cost:         usage.Cost,
+		LatencyMS:    usage.LatencyMS,
+	}
+}
+
+func runtimeLLMTurnUsage(usage LLMTurnUsage) runtime.LLMTurnUsage {
+	return runtime.LLMTurnUsage{
+		InputTokens:  usage.InputTokens,
+		OutputTokens: usage.OutputTokens,
+		Cost:         usage.Cost,
+		LatencyMS:    usage.LatencyMS,
+	}
+}
+
+func publicLLMTraceEvent(event runtime.LLMTraceEvent) LLMTraceEvent {
+	return LLMTraceEvent{
+		Type:         event.Type,
+		Model:        event.Model,
+		Status:       event.Status,
+		Tool:         event.Tool,
+		CallID:       event.CallID,
+		Token:        event.Token,
+		ErrorKind:    event.ErrorKind,
+		Message:      event.Message,
+		Step:         event.Step,
+		Attempt:      event.Attempt,
+		MessageCount: event.MessageCount,
+		ToolCount:    event.ToolCount,
+		Store:        event.Store,
+		Usage:        publicLLMTurnUsage(event.Usage),
 	}
 }
 
@@ -261,11 +546,14 @@ func configuredLLMProviderFactory(opts vmOptions) runtime.LLMProviderFactory {
 		return nil
 	}
 	return func(cfg runtime.LLMProviderConfig) (runtime.LLMProvider, error) {
-		p, err := factory(cfg)
+		p, err := factory(publicLLMProviderConfig(cfg))
 		if err != nil || p == nil || opts.llmRecordSink == nil {
-			return p, err
+			if p == nil {
+				return nil, err
+			}
+			return llmProviderAdapter{provider: p}, err
 		}
-		return recordingLLMProvider{provider: p, sink: opts.llmRecordSink}, nil
+		return llmProviderAdapter{provider: recordingLLMProvider{provider: p, sink: opts.llmRecordSink}}, nil
 	}
 }
 

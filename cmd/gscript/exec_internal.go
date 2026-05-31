@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -55,23 +56,147 @@ func cliDefaultLLMProviderFactory(cfg runtime.LLMProviderConfig) (runtime.LLMPro
 	protocol := strings.ToLower(strings.ReplaceAll(cfg.Protocol, "_", "-"))
 	switch protocol {
 	case "openai", "openai-compatible", "openai-compat", "chat-completions":
-		return gscript.OpenAICompatibleLLMProvider{
+		return cliLLMProviderAdapter{provider: gscript.OpenAICompatibleLLMProvider{
 			Endpoint: cliOpenAIChatCompletionsEndpoint(cfg.BaseURL),
 			APIKey:   cfg.APIKey,
 			Model:    cfg.ProviderModel,
-		}, nil
+		}}, nil
 	case "anthropic", "anthropic-compatible", "anthropic-compat", "messages":
-		return gscript.AnthropicCompatibleLLMProvider{
+		return cliLLMProviderAdapter{provider: gscript.AnthropicCompatibleLLMProvider{
 			Endpoint: cfg.BaseURL,
 			APIKey:   cfg.APIKey,
 			Model:    cfg.ProviderModel,
-		}, nil
+		}}, nil
 	default:
 		if cfg.Protocol == "" {
 			return nil, fmt.Errorf("llm provider protocol not configured for model %q", cfg.Name)
 		}
 		return nil, fmt.Errorf("unsupported llm provider protocol %q for model %q", cfg.Protocol, cfg.Name)
 	}
+}
+
+type cliLLMProviderAdapter struct {
+	provider gscript.LLMProvider
+}
+
+func (a cliLLMProviderAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
+	res, err := a.provider.Turn(ctx, cliPublicLLMTurnRequest(req))
+	return cliRuntimeLLMTurnResult(res), err
+}
+
+func cliPublicLLMTurnRequest(req runtime.LLMTurnRequest) gscript.LLMTurnRequest {
+	out := gscript.LLMTurnRequest{
+		Model:          req.Model,
+		ForceTool:      req.ForceTool,
+		MaxTokens:      req.MaxTokens,
+		Temperature:    cloneFloat64Ptr(req.Temperature),
+		TopP:           cloneFloat64Ptr(req.TopP),
+		ResponseFormat: req.ResponseFormat,
+		Stream:         req.Stream,
+		Stop:           append([]string(nil), req.Stop...),
+		Metadata:       cloneStringMap(req.Metadata),
+	}
+	if len(req.Messages) > 0 {
+		out.Messages = make([]gscript.LLMMessage, len(req.Messages))
+		for i := range req.Messages {
+			out.Messages[i] = cliPublicLLMMessage(req.Messages[i])
+		}
+	}
+	if len(req.Tools) > 0 {
+		out.Tools = make([]gscript.LLMTool, len(req.Tools))
+		for i := range req.Tools {
+			out.Tools[i] = cliPublicLLMTool(req.Tools[i])
+		}
+	}
+	return out
+}
+
+func cliPublicLLMMessage(msg runtime.LLMMessage) gscript.LLMMessage {
+	out := gscript.LLMMessage{
+		Role:      msg.Role,
+		Text:      msg.Text,
+		ToolUseID: msg.ToolUseID,
+		Value:     msg.Value,
+		Error:     msg.Error,
+	}
+	if msg.ToolCall != nil {
+		call := cliPublicLLMToolCall(*msg.ToolCall)
+		out.ToolCall = &call
+	}
+	return out
+}
+
+func cliPublicLLMTool(tool runtime.LLMTool) gscript.LLMTool {
+	return gscript.LLMTool{
+		Name:        tool.Name,
+		Description: tool.Description,
+		Params:      append([]string(nil), tool.Params...),
+		Requires:    append([]string(nil), tool.Requires...),
+		Schema:      tool.Schema,
+	}
+}
+
+func cliPublicLLMToolCall(call runtime.LLMToolCall) gscript.LLMToolCall {
+	return gscript.LLMToolCall{
+		ID:   call.ID,
+		Tool: call.Tool,
+		Args: cloneAnyMap(call.Args),
+	}
+}
+
+func cliRuntimeLLMTurnResult(res gscript.LLMTurnResult) runtime.LLMTurnResult {
+	out := runtime.LLMTurnResult{
+		Status: res.Status,
+		Text:   res.Text,
+		Reason: res.Reason,
+		Usage: runtime.LLMTurnUsage{
+			InputTokens:  res.Usage.InputTokens,
+			OutputTokens: res.Usage.OutputTokens,
+			Cost:         res.Usage.Cost,
+			LatencyMS:    res.Usage.LatencyMS,
+		},
+	}
+	if len(res.Calls) > 0 {
+		out.Calls = make([]runtime.LLMToolCall, len(res.Calls))
+		for i := range res.Calls {
+			out.Calls[i] = runtime.LLMToolCall{
+				ID:   res.Calls[i].ID,
+				Tool: res.Calls[i].Tool,
+				Args: cloneAnyMap(res.Calls[i].Args),
+			}
+		}
+	}
+	return out
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	out := make(map[string]string, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func cloneAnyMap(src map[string]any) map[string]any {
+	if src == nil {
+		return nil
+	}
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func cloneFloat64Ptr(src *float64) *float64 {
+	if src == nil {
+		return nil
+	}
+	v := *src
+	return &v
 }
 
 func cliOpenAIChatCompletionsEndpoint(base string) string {
