@@ -46,6 +46,41 @@ class ManifestTest(unittest.TestCase):
             finally:
                 manifest.ROOT = original_root
 
+    def test_tests_manifest_discovery_includes_restructured_test_dirs(self):
+        original_root = manifest.ROOT
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for rel in (
+                "tests/llm/agent_case.gs",
+                "tests/integration/llm/provider_case.gs",
+                "tests/sdk/api_case.gs",
+                "tests/__pycache__/skip.gs",
+            ):
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("-- test\n")
+
+            manifest.ROOT = root
+            try:
+                self.assertEqual(
+                    [path.relative_to(root).as_posix() for path in manifest.iter_gscript_cases("tests")],
+                    [
+                        "tests/integration/llm/provider_case.gs",
+                        "tests/llm/agent_case.gs",
+                        "tests/sdk/api_case.gs",
+                    ],
+                )
+                self.assertEqual(
+                    [(case["path"], case["domain"]) for case in manifest.discover_cases("tests")],
+                    [
+                        ("tests/integration/llm/provider_case.gs", "integration"),
+                        ("tests/llm/agent_case.gs", "llm"),
+                        ("tests/sdk/api_case.gs", "sdk"),
+                    ],
+                )
+            finally:
+                manifest.ROOT = original_root
+
     def test_lua_ref_for_uses_peer_refs_for_tests_and_lua_ref_tree_for_benchmarks(self):
         original_root = manifest.ROOT
         with tempfile.TemporaryDirectory() as td:
