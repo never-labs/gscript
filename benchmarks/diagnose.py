@@ -480,6 +480,83 @@ def read_artifact_json(artifacts: list[CommandArtifact], name: str) -> Any:
     return None
 
 
+RUNTIME_SUMMARY_KEYS = (
+    "native_fallback",
+    "native_top_fallback",
+    "native_top_fast",
+    "coroutine_resume",
+    "coroutine_yield",
+    "table_array_get_hot",
+    "table_array_get_fallback",
+    "table_array_set_hot",
+    "table_array_set_fallback",
+    "table_string_get_cache_hit",
+    "table_string_get_scan_hit",
+    "table_string_get_map_hit",
+    "table_string_get_miss",
+    "table_string_set_append",
+    "table_string_set_map",
+    "table_string_set_promote",
+    "string_format_fast",
+    "string_concat_lazy",
+    "string_concat_builder",
+)
+
+
+def diagnostic_top_exit_text(row: DiagnosticRow) -> str:
+    if not row.top_exit:
+        return "-"
+    return (
+        f"{row.top_exit.get('exit_name')} {row.top_exit.get('reason')} "
+        f"pc={row.top_exit.get('pc')} count={row.top_exit.get('count')}"
+    )
+
+
+def diagnostic_work_text(row: DiagnosticRow) -> str:
+    if not row.work_action and not row.work_target:
+        return "-"
+    return f"{row.work_action}/{row.work_target} {row.work_proto} p={row.work_priority} {row.readiness}".strip()
+
+
+def diagnostic_runtime_bits(row: DiagnosticRow) -> list[str]:
+    bits = []
+    for key in RUNTIME_SUMMARY_KEYS:
+        value = row.runtime_summary.get(key)
+        if value:
+            bits.append(f"{key}={value}")
+    for key in sorted(row.tier2_call_summary):
+        value = row.tier2_call_summary.get(key)
+        if value:
+            bits.append(f"tier2_{key}={value}")
+    return bits
+
+
+def diagnostic_pprof_text(row: DiagnosticRow) -> str:
+    if row.pprof_runs == 0:
+        return "-"
+    return (
+        f"{'ok' if row.pprof_effective else 'low'} "
+        f"{row.pprof_samples_seconds:.3f}s/"
+        f"{row.pprof_runs} runs/repeat {row.pprof_script_repeat}"
+    )
+
+
+def diagnostic_markdown_row(row: DiagnosticRow) -> str:
+    return benchmark_output.markdown_row(
+        [
+            f"{row.group}/{row.benchmark}",
+            "-" if row.time_seconds is None else f"{row.time_seconds:.3f}s",
+            f"{row.t2_attempted}/{row.t2_compiled}/{row.t2_entered}",
+            str(row.exit_total),
+            diagnostic_top_exit_text(row),
+            diagnostic_work_text(row),
+            ", ".join(diagnostic_runtime_bits(row)) or "-",
+            diagnostic_pprof_text(row),
+            f"`{row.artifact_dir}`",
+        ]
+    )
+
+
 def render_summary(rows: list[DiagnosticRow]) -> str:
     lines = [
         "# Benchmark Diagnostics",
@@ -488,64 +565,7 @@ def render_summary(rows: list[DiagnosticRow]) -> str:
         "|---|---:|---:|---:|---|---|---|---|---|",
     ]
     for row in rows:
-        top = "-"
-        if row.top_exit:
-            top = f"{row.top_exit.get('exit_name')} {row.top_exit.get('reason')} pc={row.top_exit.get('pc')} count={row.top_exit.get('count')}"
-        work = "-"
-        if row.work_action or row.work_target:
-            work = f"{row.work_action}/{row.work_target} {row.work_proto} p={row.work_priority} {row.readiness}".strip()
-        runtime_bits = []
-        for key in (
-            "native_fallback",
-            "native_top_fallback",
-            "native_top_fast",
-            "coroutine_resume",
-            "coroutine_yield",
-            "table_array_get_hot",
-            "table_array_get_fallback",
-            "table_array_set_hot",
-            "table_array_set_fallback",
-            "table_string_get_cache_hit",
-            "table_string_get_scan_hit",
-            "table_string_get_map_hit",
-            "table_string_get_miss",
-            "table_string_set_append",
-            "table_string_set_map",
-            "table_string_set_promote",
-            "string_format_fast",
-            "string_concat_lazy",
-            "string_concat_builder",
-        ):
-            value = row.runtime_summary.get(key)
-            if value:
-                runtime_bits.append(f"{key}={value}")
-        for key in sorted(row.tier2_call_summary):
-            value = row.tier2_call_summary.get(key)
-            if value:
-                runtime_bits.append(f"tier2_{key}={value}")
-        lines.append(
-            benchmark_output.markdown_row(
-                [
-                    f"{row.group}/{row.benchmark}",
-                    "-" if row.time_seconds is None else f"{row.time_seconds:.3f}s",
-                    f"{row.t2_attempted}/{row.t2_compiled}/{row.t2_entered}",
-                    str(row.exit_total),
-                    top,
-                    work,
-                    ", ".join(runtime_bits) or "-",
-                    (
-                        "-"
-                        if row.pprof_runs == 0
-                        else (
-                            f"{'ok' if row.pprof_effective else 'low'} "
-                            f"{row.pprof_samples_seconds:.3f}s/"
-                            f"{row.pprof_runs} runs/repeat {row.pprof_script_repeat}"
-                        )
-                    ),
-                    f"`{row.artifact_dir}`",
-                ]
-            )
-        )
+        lines.append(diagnostic_markdown_row(row))
     return "\n".join(lines) + "\n"
 
 

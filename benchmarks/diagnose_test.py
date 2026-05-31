@@ -18,5 +18,57 @@ class DiagnoseSelectorTest(unittest.TestCase):
         self.assertEqual(diagnose.groups_for_args(args), ["data", "concurrency", "table"])
 
 
+class DiagnoseSummaryTest(unittest.TestCase):
+    def test_diagnostic_markdown_row_formats_runtime_and_profile_bits(self):
+        row = diagnose.DiagnosticRow(
+            benchmark="events_metamethod",
+            group="table",
+            script="benchmarks/table/events_metamethod.gs",
+            status="ok",
+            time_seconds=0.125,
+            t2_attempted=5,
+            t2_compiled=4,
+            t2_entered=3,
+            exit_total=2,
+            top_exit={"exit_name": "shape", "reason": "guard", "pc": 17, "count": 9},
+            work_action="compile",
+            work_target="loop",
+            work_proto="<main>",
+            work_priority=7,
+            readiness="ready",
+            runtime_summary={"native_fallback": 11, "string_format_fast": 3},
+            tier2_call_summary={"turn": 2},
+            pprof_runs=4,
+            pprof_script_repeat=8,
+            pprof_samples_seconds=0.321,
+            pprof_effective=True,
+            artifact_dir="out/table",
+        )
+
+        self.assertEqual(
+            diagnose.diagnostic_markdown_row(row),
+            (
+                "| table/events_metamethod | 0.125s | 5/4/3 | 2 | "
+                "shape guard pc=17 count=9 | compile/loop <main> p=7 ready | "
+                "native_fallback=11, string_format_fast=3, tier2_turn=2 | "
+                "ok 0.321s/4 runs/repeat 8 | `out/table` |"
+            ),
+        )
+
+    def test_diagnostic_markdown_row_formats_empty_optional_fields(self):
+        row = diagnose.DiagnosticRow(
+            benchmark="sum",
+            group="math",
+            script="benchmarks/math/sum.gs",
+            status="ok",
+            artifact_dir="out/math",
+        )
+
+        self.assertEqual(
+            diagnose.diagnostic_markdown_row(row),
+            "| math/sum | - | 0/0/0 | 0 | - | - | - | - | `out/math` |",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
