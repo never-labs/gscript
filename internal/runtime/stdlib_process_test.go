@@ -73,7 +73,7 @@ func TestProcessRun(t *testing.T) {
 
 func TestProcessRunContextCancelled(t *testing.T) {
 	interp := New()
-	interp.registerStdlib()
+	interp.InstallStdlib()
 	execOnInterp(t, interp, `
 ctx, cancel := context.withTimeout(0.01)
 _ = cancel

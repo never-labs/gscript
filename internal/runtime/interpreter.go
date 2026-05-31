@@ -66,8 +66,10 @@ type Interpreter struct {
 	ctx                context.Context
 }
 
-// New creates a new Interpreter with built-in globals.
-func New() *Interpreter {
+// NewCore creates an Interpreter with only language builtins installed.
+// Standard-library modules are installed by InstallStdlib. New keeps the
+// historical all-included behavior for direct runtime-package callers.
+func NewCore() *Interpreter {
 	interp := &Interpreter{
 		globals:           NewEnvironment(nil),
 		modules:           make(map[string]Value),
@@ -88,7 +90,13 @@ func New() *Interpreter {
 		activeGoroutines:  &atomic.Int64{},
 	}
 	interp.registerBuiltins()
-	interp.registerStdlib()
+	return interp
+}
+
+// New creates a new Interpreter with built-in globals and the standard library.
+func New() *Interpreter {
+	interp := NewCore()
+	interp.InstallStdlib()
 	return interp
 }
 

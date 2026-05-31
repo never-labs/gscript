@@ -58,7 +58,8 @@ func (vm *VM) Reset() {
 }
 
 func newVM(o vmOptions) *VM {
-	interp := runtime.New()
+	interp := runtime.NewCore()
+	interp.InstallStdlib()
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)

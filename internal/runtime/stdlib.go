@@ -4,9 +4,8 @@ import (
 	"context"
 )
 
-// registerStdlib registers all standard library tables as globals.
-// This is called from New() after registerBuiltins().
-func (interp *Interpreter) registerStdlib() {
+// InstallStdlib registers all standard-library tables as globals.
+func (interp *Interpreter) InstallStdlib() {
 	std := newStdlibInstallContext(interp)
 
 	// String library
