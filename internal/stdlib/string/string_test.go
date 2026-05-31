@@ -240,6 +240,34 @@ func TestLuaQuoteHelpers(t *testing.T) {
 	}
 }
 
+func TestLuaReplacementHelpers(t *testing.T) {
+	pattern, ok := CompileSimplePattern("(%d+)")
+	if !ok {
+		t.Fatalf("CompileSimplePattern returned ok=false")
+	}
+	count := 0
+	if got := ReplaceSimpleLuaPatternString("a12b34", pattern, "[%1:%0]", -1, &count); got != "a[12:12]b[34:34]" || count != 2 {
+		t.Fatalf("ReplaceSimpleLuaPatternString = %q, %d; want a[12:12]b[34:34], 2", got, count)
+	}
+	if err := ValidateLuaReplacementString("%2", 1); err == nil {
+		t.Fatalf("ValidateLuaReplacementString accepted invalid capture")
+	}
+}
+
+func TestParseDecimalNumber(t *testing.T) {
+	n, ok := ParseDecimalNumber(" -42 ")
+	if !ok || n.Kind != DecimalNumberInt || n.Int != -42 {
+		t.Fatalf("ParseDecimalNumber int = %#v, %v; want -42 int", n, ok)
+	}
+	n, ok = ParseDecimalNumber("3.5")
+	if !ok || n.Kind != DecimalNumberFloat || n.Float != 3.5 {
+		t.Fatalf("ParseDecimalNumber float = %#v, %v; want 3.5 float", n, ok)
+	}
+	if _, ok := ParseDecimalNumber("0x10"); ok {
+		t.Fatalf("ParseDecimalNumber accepted hex input")
+	}
+}
+
 func sameStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

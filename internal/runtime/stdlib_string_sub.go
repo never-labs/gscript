@@ -2,8 +2,6 @@ package runtime
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"unsafe"
 
 	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
@@ -77,20 +75,12 @@ func stringSubRaw(s string, start, end int64, hasEnd bool) string {
 }
 
 func stringToNumberRaw(raw string) (Value, bool) {
-	if v, ok := parseFastDecimalInt(raw); ok {
-		return v, true
+	n, ok := stdlibstring.ParseDecimalNumber(raw)
+	if !ok {
+		return NilValue(), false
 	}
-	s := strings.TrimSpace(raw)
-	if s != raw {
-		if v, ok := parseFastDecimalInt(s); ok {
-			return v, true
-		}
+	if n.Kind == stdlibstring.DecimalNumberInt {
+		return IntValue(n.Int), true
 	}
-	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return IntValue(i), true
-	}
-	if f, err := strconv.ParseFloat(s, 64); err == nil {
-		return FloatValue(f), true
-	}
-	return NilValue(), false
+	return FloatValue(n.Float), true
 }
