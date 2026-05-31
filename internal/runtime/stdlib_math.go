@@ -7,6 +7,7 @@ import (
 	"time"
 
 	basemath "github.com/never-labs/gscript/internal/stdlib/base/math"
+	baserand "github.com/never-labs/gscript/internal/stdlib/base/rand"
 )
 
 // buildMathLib creates the "math" standard library table.
@@ -385,8 +386,7 @@ func buildMathLib() *Table {
 				randomSeed2 = 0
 			}
 		}
-		mixedSeed2 := int64(uint64(randomSeed2) * uint64(0x9e3779b97f4a7c15))
-		rng = rand.New(rand.NewSource(randomSeed1 ^ mixedSeed2))
+		rng = rand.New(rand.NewSource(baserand.MixSeedPair(randomSeed1, randomSeed2)))
 		return []Value{IntValue(randomSeed1), IntValue(randomSeed2)}, nil
 	})
 

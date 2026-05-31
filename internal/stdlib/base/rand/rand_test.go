@@ -12,6 +12,15 @@ func TestMaskInt48(t *testing.T) {
 	}
 }
 
+func TestMixSeedPair(t *testing.T) {
+	if got := MixSeedPair(123, 0); got != 123 {
+		t.Fatalf("MixSeedPair with zero second seed = %d, want 123", got)
+	}
+	if MixSeedPair(123, 456) == 123 {
+		t.Fatalf("MixSeedPair should mix non-zero second seed")
+	}
+}
+
 func TestInclusiveSpan(t *testing.T) {
 	got, err := InclusiveSpan(3, 5)
 	if err != nil || got != 3 {

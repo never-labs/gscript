@@ -6,9 +6,14 @@ import (
 )
 
 const Int48Mask int64 = 0x7FFFFFFFFFFF
+const seedMixMultiplier uint64 = 0x9e3779b97f4a7c15
 
 func MaskInt48(n int64) int64 {
 	return n & Int48Mask
+}
+
+func MixSeedPair(seed1, seed2 int64) int64 {
+	return seed1 ^ int64(uint64(seed2)*seedMixMultiplier)
 }
 
 func InclusiveSpan(min, max int64) (int64, error) {
