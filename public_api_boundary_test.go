@@ -91,6 +91,9 @@ func TestRootPackageGoDocHidesRawRuntimeValues(t *testing.T) {
 		"func ToValue",
 		"func MustToValue",
 		"func FromValue",
+		"func ToPublicValue",
+		"func MustToPublicValue",
+		"func FromPublicValue",
 	} {
 		if strings.Contains(out, forbidden) {
 			t.Fatalf("root package go doc exposes %q:\n%s", forbidden, out)

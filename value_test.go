@@ -89,31 +89,18 @@ func TestPublicValueEncodeDecode(t *testing.T) {
 	}
 }
 
-func TestPublicValueConversionAliases(t *testing.T) {
-	v, err := gs.ToPublicValue("hello")
+func TestPublicValueDecodeHelpers(t *testing.T) {
+	v, err := gs.Decode("hello")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := v.String(); got != "hello" {
-		t.Fatalf("ToPublicValue().String() = %q, want hello", got)
-	}
-
-	must := gs.MustToPublicValue(42)
-	if got := must.Int(); got != 42 {
-		t.Fatalf("MustToPublicValue().Int() = %d, want 42", got)
+		t.Fatalf("Decode().String() = %q, want hello", got)
 	}
 
 	decoded := gs.MustDecode(true)
 	if !decoded.Bool() {
 		t.Fatalf("MustDecode(true).Bool() = false, want true")
-	}
-
-	rv, err := gs.FromPublicValue(gs.String("456"), reflect.TypeOf(int64(0)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := rv.Interface(); got != int64(456) {
-		t.Fatalf("FromPublicValue(string, int64) = %v (%T), want int64(456)", got, got)
 	}
 }
 
