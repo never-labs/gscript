@@ -93,7 +93,7 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 }
 
 // TestLLMSyntaxGLMIntegration verifies a real multi-turn GLM flow through
-// AI-native models/turn/agent syntax. It mirrors glm_cc's endpoint/key/model
+// LLM models/turn/agent syntax. It mirrors glm_cc's endpoint/key/model
 // env convention but never shells out to it.
 func TestLLMSyntaxGLMIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)

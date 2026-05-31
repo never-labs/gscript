@@ -54,7 +54,7 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 		{
 			name:      "json_answer",
 			system:    "Return only valid compact JSON. Do not wrap it in Markdown.",
-			user:      `Return {"language":"gscript","native_llm":true,"provider":"anthropic-compatible"}.`,
+			user:      `Return {"language":"gscript","llm_native":true,"provider":"anthropic-compatible"}.`,
 			maxTokens: 96,
 		},
 	} {
@@ -84,12 +84,12 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 	}
 }
 
-// TestLLMSyntaxAnthropicCompatibleLLMIntegration verifies that AI-native
+// TestLLMSyntaxAnthropicCompatibleLLMIntegration verifies that LLM
 // models/turn syntax can construct the same gated real-provider adapter. It is
 // intentionally skipped unless all real-provider environment variables are set.
 func TestLLMSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
 	if os.Getenv("GSCRIPT_LLM_INTEGRATION") == "" {
-		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run AI-native real provider smoke")
+		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run real provider smoke")
 	}
 	endpoint := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_BASE_URL")
 	apiKey := os.Getenv("GSCRIPT_ANTHROPIC_COMPAT_API_KEY")
@@ -115,7 +115,7 @@ models {
 result, err := turn {
     messages: messages {
         system: "You are a concise test assistant. Return plain text only."
-        user: "Reply with exactly: gscript ai native provider ok"
+        user: "Reply with exactly: gscript llm provider ok"
     }
     max_tokens: 32
     temperature: 0
