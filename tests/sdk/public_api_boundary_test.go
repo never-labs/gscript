@@ -106,14 +106,6 @@ func TestRootPackageGoDocHidesRawRuntimeValues(t *testing.T) {
 
 func TestRootPackageLLMProviderImplementationsStayOutOfRoot(t *testing.T) {
 	files := parseRootPackageFiles(t)
-	allowedRootConcrete := map[string]bool{
-		// Existing compatibility providers are still in the root package while
-		// they are migrated. New providers should live under llm/... and be
-		// exposed from root only through compatibility aliases or constructors.
-		"AnthropicCompatibleLLMProvider": true,
-		"OpenAICompatibleLLMProvider":    true,
-	}
-	seenConcrete := map[string]bool{}
 
 	for filename, file := range files {
 		imports := importAliases(file)
@@ -126,20 +118,10 @@ func TestRootPackageLLMProviderImplementationsStayOutOfRoot(t *testing.T) {
 				return true
 			}
 			if _, ok := spec.Type.(*ast.StructType); ok {
-				if allowedRootConcrete[spec.Name.Name] {
-					seenConcrete[spec.Name.Name] = true
-					return true
-				}
 				t.Fatalf("%s defines root LLM provider implementation %s; add provider implementations under github.com/never-labs/gscript/llm/... and keep root as a facade", filepath.Base(filename), spec.Name.Name)
 			}
 			return true
 		})
-	}
-
-	for name := range allowedRootConcrete {
-		if !seenConcrete[name] {
-			t.Fatalf("root concrete provider allowlist contains %s, but it no longer exists; remove the allowlist entry", name)
-		}
 	}
 }
 
