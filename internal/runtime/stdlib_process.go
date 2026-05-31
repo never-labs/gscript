@@ -1,13 +1,14 @@
 package runtime
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/never-labs/gscript/internal/stdlib/host/outputlimit"
 )
 
 // ProcessExitError is returned by process.exit so hosts can choose whether
@@ -18,55 +19,6 @@ type ProcessExitError struct {
 
 func (e *ProcessExitError) Error() string {
 	return fmt.Sprintf("process exit %d", e.Code)
-}
-
-type processOutputBudget struct {
-	max      int64
-	used     int64
-	exceeded bool
-}
-
-type processOutputBuffer struct {
-	buf    bytes.Buffer
-	budget *processOutputBudget
-}
-
-func newProcessOutputBuffers(max int64) (*processOutputBuffer, *processOutputBuffer) {
-	budget := &processOutputBudget{max: max}
-	return &processOutputBuffer{budget: budget}, &processOutputBuffer{budget: budget}
-}
-
-func (b *processOutputBuffer) Write(p []byte) (int, error) {
-	if b.budget == nil || b.budget.max <= 0 {
-		return b.buf.Write(p)
-	}
-	remaining := b.budget.max - b.budget.used
-	if remaining <= 0 {
-		b.budget.exceeded = true
-		return 0, fmt.Errorf("host result byte limit exceeded (%d)", b.budget.max)
-	}
-	if int64(len(p)) > remaining {
-		if remaining > 0 {
-			_, _ = b.buf.Write(p[:remaining])
-			b.budget.used += remaining
-		}
-		b.budget.exceeded = true
-		return int(remaining), fmt.Errorf("host result byte limit exceeded (%d)", b.budget.max)
-	}
-	n, err := b.buf.Write(p)
-	b.budget.used += int64(n)
-	return n, err
-}
-
-func (b *processOutputBuffer) String() string {
-	if b == nil {
-		return ""
-	}
-	return b.buf.String()
-}
-
-func (b *processOutputBuffer) Exceeded() bool {
-	return b != nil && b.budget != nil && b.budget.exceeded
 }
 
 // buildProcessLib creates the "process" standard library table.
@@ -193,9 +145,9 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 		}
 
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-		stdout, stderr := newProcessOutputBuffers(0)
+		stdout, stderr := outputlimit.NewBuffers(0)
 		if interp != nil {
-			stdout, stderr = newProcessOutputBuffers(interp.maxHostResult)
+			stdout, stderr = outputlimit.NewBuffers(interp.maxHostResult)
 		}
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
@@ -211,7 +163,7 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 
 		err := cmd.Run()
 		if stdout.Exceeded() || stderr.Exceeded() {
-			return nil, fmt.Errorf("host result byte limit exceeded (%d)", stdout.budget.max)
+			return nil, fmt.Errorf("host result byte limit exceeded (%d)", stdout.Limit())
 		}
 		exitCode := 0
 		ok := true
@@ -262,15 +214,15 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 			cmdArgs[i] = a.String()
 		}
 		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		stdout, stderr := newProcessOutputBuffers(0)
+		stdout, stderr := outputlimit.NewBuffers(0)
 		if interp != nil {
-			stdout, stderr = newProcessOutputBuffers(interp.maxHostResult)
+			stdout, stderr = outputlimit.NewBuffers(interp.maxHostResult)
 		}
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		err := cmd.Run()
 		if stdout.Exceeded() || stderr.Exceeded() {
-			return nil, fmt.Errorf("host result byte limit exceeded (%d)", stdout.budget.max)
+			return nil, fmt.Errorf("host result byte limit exceeded (%d)", stdout.Limit())
 		}
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
@@ -287,16 +239,16 @@ func buildProcessLib(interps ...*Interpreter) *Table {
 			return nil, fmt.Errorf("process shell access disabled")
 		}
 		cmd := exec.Command("/bin/sh", "-c", args[0].Str())
-		stdout, stderr := newProcessOutputBuffers(0)
+		stdout, stderr := outputlimit.NewBuffers(0)
 		if interp != nil {
-			stdout, stderr = newProcessOutputBuffers(interp.maxHostResult)
+			stdout, stderr = outputlimit.NewBuffers(interp.maxHostResult)
 		}
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
 		err := cmd.Run()
 		if stdout.Exceeded() || stderr.Exceeded() {
-			return nil, fmt.Errorf("host result byte limit exceeded (%d)", stdout.budget.max)
+			return nil, fmt.Errorf("host result byte limit exceeded (%d)", stdout.Limit())
 		}
 		exitCode := 0
 		ok := true
