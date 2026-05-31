@@ -10,6 +10,13 @@ import regression_guard
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def module_path() -> str:
+    for line in (ROOT / "go.mod").read_text().splitlines():
+        if line.startswith("module "):
+            return line.split()[1]
+    raise AssertionError("go.mod has no module declaration")
+
+
 class ScriptEntrypointConsistencyTest(unittest.TestCase):
     def test_diag_shell_uses_shared_discovery(self):
         diag = (ROOT / "scripts" / "diag.sh").read_text()
@@ -37,6 +44,15 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertEqual(coverage.BENCHMARK_GROUPS, expected)
         self.assertEqual(profile_exits.BENCHMARK_GROUPS, expected)
         self.assertEqual(regression_guard.BENCHMARK_GROUPS, expected)
+
+    def test_release_scripts_gate_current_module_path(self):
+        expected = module_path()
+        for script in ("production_check.sh", "release_artifacts_check.sh"):
+            with self.subTest(script=script):
+                text = (ROOT / "scripts" / script).read_text()
+                self.assertIn(expected, text)
+                self.assertNotIn("github.com/gscript/gscript", text)
+                self.assertNotIn("github.com/Never-Labs/gscript", text)
 
 
 if __name__ == "__main__":
