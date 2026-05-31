@@ -45,7 +45,6 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	std.RegisterTable("string", strLib)
 	interp.SetStringLibrary(strLib)
 
-	std.RegisterTable("math", buildMathLib())
 	std.RegisterTable("rl", rlLib(interp))
 	std.RegisterTable("io", buildIOLib(interp))
 	std.RegisterTable("os", buildOSLibWithPolicy(
@@ -56,7 +55,6 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 		interp.filesystemWrite,
 	))
 	std.RegisterTable("http", httpLib(interp))
-	std.RegisterTable("json", buildJSONLib())
 	std.RegisterTable("fs", buildFSLibWithCapabilities(
 		interp.filesystemRoot,
 		interp.filesystemRead,
@@ -108,6 +106,4 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 		}
 	}))
 
-	std.RegisterTable("matrix", buildMatrixLib())
-	std.RegisterTable("utf8", buildUTF8Lib(interp))
 }

@@ -70,29 +70,6 @@ func TestTypeOfCoroutineValue(t *testing.T) {
 	}
 }
 
-// --- math.type() ---
-
-func TestMathTypeInteger(t *testing.T) {
-	v := getGlobal(t, `result := math.type(42)`, "result")
-	if v.Str() != "integer" {
-		t.Errorf("expected 'integer', got %v", v)
-	}
-}
-
-func TestMathTypeFloat(t *testing.T) {
-	v := getGlobal(t, `result := math.type(3.14)`, "result")
-	if v.Str() != "float" {
-		t.Errorf("expected 'float', got %v", v)
-	}
-}
-
-func TestMathTypeNonNumber(t *testing.T) {
-	v := getGlobal(t, `result := math.type("hello")`, "result")
-	if v.Truthy() {
-		t.Errorf("expected false for non-number, got %v", v)
-	}
-}
-
 // --- tostring() ---
 
 func TestTostringNil(t *testing.T) {

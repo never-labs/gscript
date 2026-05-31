@@ -16,6 +16,21 @@ func runProgram(t *testing.T, src string) *runtime.Interpreter {
 	return interp
 }
 
+func runProgramExpectError(t *testing.T, src string) error {
+	t.Helper()
+	interp := runtime.NewCore()
+	installTestModules(interp)
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return err
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return err
+	}
+	return interp.Exec(prog)
+}
+
 func runWithLib(t *testing.T, src string, libName string, lib *runtime.Table) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()

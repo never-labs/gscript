@@ -50,7 +50,7 @@ func TestStdlibInstallerModuleAliasAndPackageLoadedSemantics(t *testing.T) {
 func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 	interp := NewCore()
 	interp.InstallStdlib()
-	for _, name := range []string{"json", "string", "llm"} {
+	for _, name := range []string{"string", "llm"} {
 		global := interp.GetGlobal(name)
 		if !global.IsTable() {
 			t.Fatalf("%s global is not a table", name)

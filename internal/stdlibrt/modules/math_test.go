@@ -26,6 +26,79 @@ func TestMathModuleBasicExecution(t *testing.T) {
 	}
 }
 
+func TestMathModuleRuntimeMigratedCoverage(t *testing.T) {
+	interp := runProgram(t, `
+		pi := math.pi
+		huge := math.huge
+		s := math.sin(0)
+		c := math.cos(0)
+		mx := math.max(1, 5, 3)
+		mn := math.min(1, 5, 3)
+		typ_i := math.type(42)
+		typ_f := math.type(3.14)
+		typ_s := math.type("hello")
+		e := math.exp(1)
+		l := math.log(math.exp(1))
+		l10 := math.log(100, 10)
+		i, frac := math.modf(3.75)
+		math.randomseed(42)
+		r0 := math.random()
+		r1 := math.random(10)
+		r2 := math.random(5, 10)
+	`)
+	if stdmath.Abs(interp.GetGlobal("pi").Number()-stdmath.Pi) > 1e-10 {
+		t.Fatalf("math.pi = %v", interp.GetGlobal("pi"))
+	}
+	if !stdmath.IsInf(interp.GetGlobal("huge").Number(), 1) {
+		t.Fatalf("math.huge = %v, want +Inf", interp.GetGlobal("huge"))
+	}
+	if got := interp.GetGlobal("s").Number(); got != 0 {
+		t.Fatalf("math.sin(0) = %v, want 0", got)
+	}
+	if got := interp.GetGlobal("c").Number(); got != 1 {
+		t.Fatalf("math.cos(0) = %v, want 1", got)
+	}
+	if got := interp.GetGlobal("mx").Int(); got != 5 {
+		t.Fatalf("math.max = %d, want 5", got)
+	}
+	if got := interp.GetGlobal("mn").Int(); got != 1 {
+		t.Fatalf("math.min = %d, want 1", got)
+	}
+	if got := interp.GetGlobal("typ_i").Str(); got != "integer" {
+		t.Fatalf("math.type(integer) = %q", got)
+	}
+	if got := interp.GetGlobal("typ_f").Str(); got != "float" {
+		t.Fatalf("math.type(float) = %q", got)
+	}
+	if interp.GetGlobal("typ_s").Truthy() {
+		t.Fatalf("math.type(non-number) = %v, want nil/falsey", interp.GetGlobal("typ_s"))
+	}
+	if stdmath.Abs(interp.GetGlobal("e").Number()-stdmath.E) > 1e-10 {
+		t.Fatalf("math.exp(1) = %v", interp.GetGlobal("e"))
+	}
+	if stdmath.Abs(interp.GetGlobal("l").Number()-1) > 1e-10 {
+		t.Fatalf("math.log(e) = %v", interp.GetGlobal("l"))
+	}
+	if stdmath.Abs(interp.GetGlobal("l10").Number()-2) > 1e-10 {
+		t.Fatalf("math.log(100, 10) = %v", interp.GetGlobal("l10"))
+	}
+	if got := interp.GetGlobal("i").Number(); got != 3 {
+		t.Fatalf("math.modf integer part = %v", got)
+	}
+	if stdmath.Abs(interp.GetGlobal("frac").Number()-0.75) > 1e-10 {
+		t.Fatalf("math.modf fraction = %v", interp.GetGlobal("frac"))
+	}
+	if r0 := interp.GetGlobal("r0"); !r0.IsFloat() || r0.Number() < 0 || r0.Number() >= 1 {
+		t.Fatalf("math.random() = %v, want [0,1)", r0)
+	}
+	if r1 := interp.GetGlobal("r1").Int(); r1 < 1 || r1 > 10 {
+		t.Fatalf("math.random(10) = %d, want [1,10]", r1)
+	}
+	if r2 := interp.GetGlobal("r2").Int(); r2 < 5 || r2 > 10 {
+		t.Fatalf("math.random(5, 10) = %d, want [5,10]", r2)
+	}
+}
+
 func TestMathModuleUnaryFastPaths(t *testing.T) {
 	mathLib := BuildMath()
 	cases := map[string]struct {

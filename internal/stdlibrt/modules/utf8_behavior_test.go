@@ -1,13 +1,9 @@
-package runtime
+package modules
 
 import (
 	"strings"
 	"testing"
 )
-
-// ==================================================================
-// UTF8 library tests
-// ==================================================================
 
 func TestUTF8Len(t *testing.T) {
 	interp := runProgram(t, `
@@ -128,43 +124,6 @@ func TestUTF8Codes(t *testing.T) {
 	}
 }
 
-func TestUTF8HotBuiltinsExposeFastArgPaths(t *testing.T) {
-	lib := buildUTF8Lib()
-	codepoint := lib.RawGetString("codepoint").GoFunction()
-	if codepoint == nil || codepoint.FastArg1 == nil || codepoint.FastArg2 == nil {
-		t.Fatalf("utf8.codepoint missing fast paths: %#v", codepoint)
-	}
-	got, err := codepoint.FastArg2(StringValue("AB"), IntValue(2))
-	if err != nil || !got.IsInt() || got.Int() != 66 {
-		t.Fatalf("utf8.codepoint FastArg2 got=%s err=%v", got.String(), err)
-	}
-
-	codes := lib.RawGetString("codes").GoFunction()
-	if codes == nil || codes.Fast1 == nil || codes.FastArg1 == nil {
-		t.Fatalf("utf8.codes missing fast paths: %#v", codes)
-	}
-	iterValue, err := codes.FastArg1(StringValue("AB"))
-	if err != nil {
-		t.Fatalf("utf8.codes FastArg1: %v", err)
-	}
-	iter := iterValue.GoFunction()
-	if iter == nil || iter.FastArg2Ret2 == nil {
-		t.Fatalf("utf8.codes iterator missing FastArg2Ret2: %#v", iter)
-	}
-	pos, cp, n, err := iter.FastArg2Ret2(NilValue(), NilValue())
-	if err != nil || n != 2 || pos.Int() != 1 || cp.Int() != 65 {
-		t.Fatalf("utf8.codes iterator first got pos=%s cp=%s n=%d err=%v", pos.String(), cp.String(), n, err)
-	}
-	pos, cp, n, err = iter.FastArg2Ret2(NilValue(), NilValue())
-	if err != nil || n != 2 || pos.Int() != 2 || cp.Int() != 66 {
-		t.Fatalf("utf8.codes iterator second got pos=%s cp=%s n=%d err=%v", pos.String(), cp.String(), n, err)
-	}
-	_, _, n, err = iter.FastArg2Ret2(NilValue(), NilValue())
-	if err != nil || n != 0 {
-		t.Fatalf("utf8.codes iterator end n=%d err=%v", n, err)
-	}
-}
-
 func TestUTF8Offset(t *testing.T) {
 	interp := runProgram(t, `
 		a := utf8.offset("中文测试", 2)
@@ -172,7 +131,6 @@ func TestUTF8Offset(t *testing.T) {
 	`)
 	a := interp.GetGlobal("a")
 	b := interp.GetGlobal("b")
-	// "中" is 3 bytes, so 2nd codepoint starts at byte 4
 	if a.Int() != 4 {
 		t.Errorf("expected 4, got %v", a)
 	}
