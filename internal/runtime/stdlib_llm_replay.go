@@ -1,17 +1,9 @@
 package runtime
 
-import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
-)
+import "github.com/never-labs/gscript/internal/stdlib/ai"
 
 func llmSnapshotToken() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", fmt.Errorf("loop.snapshot: failed to generate token: %v", err)
-	}
-	return hex.EncodeToString(b[:]), nil
+	return ai.SnapshotToken()
 }
 
 func llmIsSnapshotStore(v Value) bool {
