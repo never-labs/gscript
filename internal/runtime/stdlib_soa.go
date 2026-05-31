@@ -1,6 +1,10 @@
 package runtime
 
-import "fmt"
+import (
+	"fmt"
+
+	stdsoa "github.com/never-labs/gscript/internal/stdlib/data/soa"
+)
 
 // buildSoALib creates the "soa" data-oriented structure-of-arrays library.
 func buildSoALib() *Table {
@@ -1542,15 +1546,28 @@ func soaMaskValue(soaValue, columnValue, opValue, rhsValue Value) (Value, error)
 
 func soaShapeTable(s *SoA) *Table {
 	snapshot, _ := s.Snapshot()
+	columns := make([]stdsoa.ColumnShape, 0, len(snapshot.Columns))
+	for _, desc := range snapshot.Columns {
+		columns = append(columns, stdsoa.ColumnShape{
+			Name:    desc.Name,
+			DType:   desc.DType.String(),
+			Length:  desc.Len,
+			Version: desc.Version,
+		})
+	}
+	shape, err := stdsoa.NewShape(snapshot.Length, snapshot.ShapeVersion, columns)
+	if err != nil {
+		shape = stdsoa.Shape{Length: snapshot.Length, Version: snapshot.ShapeVersion, Columns: columns}
+	}
 	out := NewTable()
-	out.RawSetString("length", IntValue(int64(snapshot.Length)))
-	out.RawSetString("version", IntValue(int64(snapshot.ShapeVersion)))
+	out.RawSetString("length", IntValue(int64(shape.Length)))
+	out.RawSetString("version", IntValue(int64(shape.Version)))
 	cols := NewTable()
-	for i, desc := range snapshot.Columns {
+	for i, desc := range shape.Columns {
 		col := NewTable()
 		col.RawSetString("name", StringValue(desc.Name))
-		col.RawSetString("dtype", StringValue(desc.DType.String()))
-		col.RawSetString("length", IntValue(int64(desc.Len)))
+		col.RawSetString("dtype", StringValue(desc.DType))
+		col.RawSetString("length", IntValue(int64(desc.Length)))
 		col.RawSetString("version", IntValue(int64(desc.Version)))
 		cols.RawSetInt(int64(i+1), TableValue(col))
 	}
