@@ -197,25 +197,14 @@ func BuildTableMoveFunction(tableGet TableMoveGet, tableSet TableMoveSet, tryPla
 				if tryPlain != nil && tryPlain(src, dst, plan.First, plan.Last, plan.Target) {
 					return []Value{dst}, nil
 				}
-				if plan.Forward {
-					for i := int64(0); i < plan.Count; i++ {
-						v, err := tableGet(src, IntValue(plan.First+i))
-						if err != nil {
-							return nil, err
-						}
-						if err := tableSet(dst, IntValue(plan.Target+i), v); err != nil {
-							return nil, err
-						}
+				for n := int64(0); n < plan.Count; n++ {
+					offset := plan.Offset(n)
+					v, err := tableGet(src, IntValue(plan.First+offset))
+					if err != nil {
+						return nil, err
 					}
-				} else {
-					for i := plan.Count - 1; i >= 0; i-- {
-						v, err := tableGet(src, IntValue(plan.First+i))
-						if err != nil {
-							return nil, err
-						}
-						if err := tableSet(dst, IntValue(plan.Target+i), v); err != nil {
-							return nil, err
-						}
+					if err := tableSet(dst, IntValue(plan.Target+offset), v); err != nil {
+						return nil, err
 					}
 				}
 			}
@@ -274,7 +263,8 @@ func BuildTableInsertFunction(tableLen TableInsertLen, tableGet TableInsertGet, 
 			if tryPlain != nil && tryPlain(t, pos, value, length) {
 				return nil, nil
 			}
-			for i := length; i >= pos; i-- {
+			shift := tablelib.PlanInsertShift(length, pos)
+			for i := shift.Start; i >= shift.End && shift.Count > 0; i-- {
 				v, err := tableGet(t, IntValue(i))
 				if err != nil {
 					return nil, err
@@ -343,7 +333,8 @@ func BuildTableRemoveFunction(tableLen TableRemoveLen, tableGet TableRemoveGet, 
 			if err != nil {
 				return nil, err
 			}
-			for i := pos; i < length; i++ {
+			shift := tablelib.PlanRemoveShift(pos, length)
+			for i := shift.Start; i <= shift.End && shift.Count > 0; i++ {
 				v, err := tableGet(t, IntValue(i+1))
 				if err != nil {
 					return nil, err
@@ -389,23 +380,27 @@ func BuildTableUnpackFunction(name string, tableLen TableUnpackLen, tableGet Tab
 				return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
 			}
 			t := args[0]
-			i := int64(1)
 			j, err := tableLen(t)
 			if err != nil {
 				return nil, err
 			}
+			iArg, jArg := int64(0), int64(0)
+			hasI, hasJ := false, false
 			if len(args) >= 2 {
-				i = toInt(args[1])
+				iArg = toInt(args[1])
+				hasI = true
 			}
 			if len(args) >= 3 {
-				j = toInt(args[2])
+				jArg = toInt(args[2])
+				hasJ = true
 			}
-			count, err := tablelib.CheckUnpackRange(name, i, j)
+			r := tablelib.ResolveRange(1, j, iArg, jArg, hasI, hasJ)
+			count, err := tablelib.CheckUnpackRange(name, r.First, r.Last)
 			if err != nil {
 				return nil, err
 			}
 			result := make([]Value, 0, count)
-			for k := i; k <= j; k++ {
+			for k := r.First; k <= r.Last; k++ {
 				v, err := tableGet(t, IntValue(k))
 				if err != nil {
 					return nil, err
@@ -453,23 +448,26 @@ func buildTableLib() *Table {
 		if len(args) >= 2 && args[1].IsString() {
 			sep = args[1].Str()
 		}
-		i := int64(1)
-		j := int64(tbl.Length())
+		iArg, jArg := int64(0), int64(0)
+		hasI, hasJ := false, false
 		if len(args) >= 3 {
-			i = toInt(args[2])
+			iArg = toInt(args[2])
+			hasI = true
 		}
 		if len(args) >= 4 {
-			j = toInt(args[3])
+			jArg = toInt(args[3])
+			hasJ = true
 		}
+		r := tablelib.ResolveRange(1, int64(tbl.Length()), iArg, jArg, hasI, hasJ)
 
 		var b strings.Builder
-		for k := i; k <= j; k++ {
+		for k := r.First; k <= r.Last; k++ {
 			v := tbl.RawGet(IntValue(k))
 			s, ok := ConcatOperandString(v)
 			if !ok {
 				return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
 			}
-			if k > i {
+			if k > r.First {
 				b.WriteString(sep)
 			}
 			b.WriteString(s)
