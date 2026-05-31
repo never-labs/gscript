@@ -161,13 +161,14 @@ func buildFSLibWithCapabilities(root string, read, write bool, maxReadBytes, max
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
+		stat := hostfs.ProjectFileInfo(info)
 		tbl := NewTable()
-		tbl.RawSet(StringValue("name"), StringValue(info.Name()))
-		tbl.RawSet(StringValue("size"), IntValue(info.Size()))
-		tbl.RawSet(StringValue("mtime"), FloatValue(float64(info.ModTime().Unix())))
-		tbl.RawSet(StringValue("isdir"), BoolValue(info.IsDir()))
-		tbl.RawSet(StringValue("isfile"), BoolValue(!info.IsDir()))
-		tbl.RawSet(StringValue("mode"), StringValue(fmt.Sprintf("0%o", info.Mode().Perm())))
+		tbl.RawSet(StringValue("name"), StringValue(stat.Name))
+		tbl.RawSet(StringValue("size"), IntValue(stat.Size))
+		tbl.RawSet(StringValue("mtime"), FloatValue(float64(stat.MTime)))
+		tbl.RawSet(StringValue("isdir"), BoolValue(stat.IsDir))
+		tbl.RawSet(StringValue("isfile"), BoolValue(stat.IsFile()))
+		tbl.RawSet(StringValue("mode"), StringValue(stat.Mode))
 		return []Value{TableValue(tbl)}, nil
 	})
 
