@@ -2,7 +2,8 @@ package runtime
 
 import (
 	"fmt"
-	"math/bits"
+
+	bit32lib "github.com/never-labs/gscript/internal/stdlib/base/bit32"
 )
 
 // buildBit32Lib creates the "bit32" standard library table.
@@ -18,33 +19,33 @@ func buildBit32Lib() *Table {
 
 	// bit32.band(...) → uint32
 	set("band", func(args []Value) ([]Value, error) {
-		v, err := bit32FoldValues(args, "bit32.band", uint32(0xFFFFFFFF), func(a, b uint32) uint32 { return a & b })
+		v, err := bit32FoldValues(args, "bit32.band", uint32(0xFFFFFFFF), bit32lib.And)
 		if err != nil {
 			return nil, err
 		}
 		return []Value{v}, nil
 	})
-	installBit32FoldFastPaths(t.RawGetString("band").GoFunction(), "bit32.band", uint32(0xFFFFFFFF), func(a, b uint32) uint32 { return a & b })
+	installBit32FoldFastPaths(t.RawGetString("band").GoFunction(), "bit32.band", uint32(0xFFFFFFFF), bit32lib.And)
 
 	// bit32.bor(...) → uint32
 	set("bor", func(args []Value) ([]Value, error) {
-		v, err := bit32FoldValues(args, "bit32.bor", 0, func(a, b uint32) uint32 { return a | b })
+		v, err := bit32FoldValues(args, "bit32.bor", 0, bit32lib.Or)
 		if err != nil {
 			return nil, err
 		}
 		return []Value{v}, nil
 	})
-	installBit32FoldFastPaths(t.RawGetString("bor").GoFunction(), "bit32.bor", 0, func(a, b uint32) uint32 { return a | b })
+	installBit32FoldFastPaths(t.RawGetString("bor").GoFunction(), "bit32.bor", 0, bit32lib.Or)
 
 	// bit32.bxor(...) → uint32
 	set("bxor", func(args []Value) ([]Value, error) {
-		v, err := bit32FoldValues(args, "bit32.bxor", 0, func(a, b uint32) uint32 { return a ^ b })
+		v, err := bit32FoldValues(args, "bit32.bxor", 0, bit32lib.Xor)
 		if err != nil {
 			return nil, err
 		}
 		return []Value{v}, nil
 	})
-	installBit32FoldFastPaths(t.RawGetString("bxor").GoFunction(), "bit32.bxor", 0, func(a, b uint32) uint32 { return a ^ b })
+	installBit32FoldFastPaths(t.RawGetString("bxor").GoFunction(), "bit32.bxor", 0, bit32lib.Xor)
 
 	// bit32.bnot(n) → uint32
 	set("bnot", func(args []Value) ([]Value, error) {
@@ -82,9 +83,9 @@ func buildBit32Lib() *Table {
 			if err != nil {
 				return nil, err
 			}
-			result &= uint32(n)
+			result = bit32lib.And(result, uint32(n))
 		}
-		return []Value{BoolValue(result != 0)}, nil
+		return []Value{BoolValue(bit32lib.BtestResult(result))}, nil
 	})
 
 	// bit32.lshift(n, disp) → uint32
@@ -149,9 +150,7 @@ func buildBit32Lib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'bit32.test'")
 		}
-		n := uint32(toInt(args[0]))
-		pos := uint(toInt(args[1]))
-		return []Value{BoolValue((n & (1 << pos)) != 0)}, nil
+		return []Value{BoolValue(bit32lib.Test(toInt(args[0]), toInt(args[1])))}, nil
 	})
 
 	// bit32.set(n, pos) → uint32
@@ -159,9 +158,7 @@ func buildBit32Lib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'bit32.set'")
 		}
-		n := uint32(toInt(args[0]))
-		pos := uint(toInt(args[1]))
-		return []Value{IntValue(int64(n | (1 << pos)))}, nil
+		return []Value{IntValue(bit32lib.Set(toInt(args[0]), toInt(args[1])))}, nil
 	})
 
 	// bit32.clear(n, pos) → uint32
@@ -169,9 +166,7 @@ func buildBit32Lib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'bit32.clear'")
 		}
-		n := uint32(toInt(args[0]))
-		pos := uint(toInt(args[1]))
-		return []Value{IntValue(int64(n &^ (1 << pos)))}, nil
+		return []Value{IntValue(bit32lib.Clear(toInt(args[0]), toInt(args[1])))}, nil
 	})
 
 	// bit32.toggle(n, pos) → uint32
@@ -179,9 +174,7 @@ func buildBit32Lib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'bit32.toggle'")
 		}
-		n := uint32(toInt(args[0]))
-		pos := uint(toInt(args[1]))
-		return []Value{IntValue(int64(n ^ (1 << pos)))}, nil
+		return []Value{IntValue(bit32lib.Toggle(toInt(args[0]), toInt(args[1])))}, nil
 	})
 
 	// bit32.extract(n, field [, width]) → uint32
@@ -223,8 +216,7 @@ func buildBit32Lib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'bit32.countbits'")
 		}
-		n := uint32(toInt(args[0]))
-		return []Value{IntValue(int64(bits.OnesCount32(n)))}, nil
+		return []Value{IntValue(bit32lib.Countbits(toInt(args[0])))}, nil
 	})
 
 	// bit32.highbit(n) → int (position of highest set bit, 0-based; -1 if n=0)
@@ -232,11 +224,7 @@ func buildBit32Lib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'bit32.highbit'")
 		}
-		n := uint32(toInt(args[0]))
-		if n == 0 {
-			return []Value{IntValue(-1)}, nil
-		}
-		return []Value{IntValue(int64(31 - bits.LeadingZeros32(n)))}, nil
+		return []Value{IntValue(bit32lib.Highbit(toInt(args[0])))}, nil
 	})
 
 	// bit32.toHex(n [, digits]) → string
@@ -253,13 +241,6 @@ func buildBit32Lib() *Table {
 	})
 
 	return t
-}
-
-func bit32Mask(width uint) uint32 {
-	if width >= 32 {
-		return ^uint32(0)
-	}
-	return uint32((uint64(1) << width) - 1)
 }
 
 func installBit32FoldFastPaths(gf *GoFunction, name string, zero uint32, op func(uint32, uint32) uint32) {
@@ -451,7 +432,7 @@ func bit32BnotValue(v Value) (Value, error) {
 	if err != nil {
 		return NilValue(), err
 	}
-	return IntValue(int64(^uint32(n))), nil
+	return IntValue(bit32lib.Bnot(n)), nil
 }
 
 func bit32LshiftValue(nv, dispv Value) (Value, error) {
@@ -463,14 +444,7 @@ func bit32LshiftValue(nv, dispv Value) (Value, error) {
 	if err != nil {
 		return NilValue(), err
 	}
-	n := uint32(n64)
-	if disp < 0 {
-		return IntValue(int64(n >> uint(-disp))), nil
-	}
-	if disp >= 32 {
-		return IntValue(0), nil
-	}
-	return IntValue(int64(n << uint(disp))), nil
+	return IntValue(bit32lib.Lshift(n64, disp)), nil
 }
 
 func bit32RshiftValue(nv, dispv Value) (Value, error) {
@@ -482,20 +456,11 @@ func bit32RshiftValue(nv, dispv Value) (Value, error) {
 	if err != nil {
 		return NilValue(), err
 	}
-	n := uint32(n64)
-	if disp < 0 {
-		return IntValue(int64(n << uint(-disp))), nil
-	}
-	if disp >= 32 {
-		return IntValue(0), nil
-	}
-	return IntValue(int64(n >> uint(disp))), nil
+	return IntValue(bit32lib.Rshift(n64, disp)), nil
 }
 
 func bit32LrotateValue(a, b Value) Value {
-	n := uint32(toInt(a))
-	disp := int(toInt(b) & 31)
-	return IntValue(int64(bits.RotateLeft32(n, disp)))
+	return IntValue(bit32lib.Lrotate(toInt(a), toInt(b)))
 }
 
 func bit32LrotateValueNoError(a, b Value) (Value, error) {
@@ -503,9 +468,7 @@ func bit32LrotateValueNoError(a, b Value) (Value, error) {
 }
 
 func bit32RrotateValue(a, b Value) Value {
-	n := uint32(toInt(a))
-	disp := int(toInt(b) & 31)
-	return IntValue(int64(bits.RotateLeft32(n, -disp)))
+	return IntValue(bit32lib.Rrotate(toInt(a), toInt(b)))
 }
 
 func bit32RrotateValueNoError(a, b Value) (Value, error) {
@@ -521,17 +484,7 @@ func bit32ArshiftValue(nv, dispv Value) (Value, error) {
 	if err != nil {
 		return NilValue(), err
 	}
-	n := int32(uint32(n64))
-	if disp < 0 {
-		return IntValue(int64(uint32(n) << uint(-disp))), nil
-	}
-	if disp >= 32 {
-		if n < 0 {
-			return IntValue(int64(uint32(^uint32(0)))), nil
-		}
-		return IntValue(0), nil
-	}
-	return IntValue(int64(uint32(n >> uint(disp)))), nil
+	return IntValue(bit32lib.Arshift(n64, disp)), nil
 }
 
 func bit32ExtractArgs(args []Value) (Value, error) {
@@ -546,14 +499,13 @@ func bit32ExtractArgs(args []Value) (Value, error) {
 }
 
 func bit32ExtractValue(nv, fieldv, widthv Value) (Value, error) {
-	n := uint32(toInt(nv))
 	field := toInt(fieldv)
 	width := toInt(widthv)
-	if field < 0 || field >= 32 || width <= 0 || width > 32-field {
-		return NilValue(), fmt.Errorf("bad field or width")
+	n, err := bit32lib.Extract(toInt(nv), field, width)
+	if err != nil {
+		return NilValue(), err
 	}
-	mask := bit32Mask(uint(width))
-	return IntValue(int64((n >> field) & mask)), nil
+	return IntValue(n), nil
 }
 
 func bit32ReplaceArgs(args []Value) (Value, error) {
@@ -568,16 +520,13 @@ func bit32ReplaceArgs(args []Value) (Value, error) {
 }
 
 func bit32ReplaceValue(nv, valuev, fieldv, widthv Value) (Value, error) {
-	n := uint32(toInt(nv))
-	v := uint32(toInt(valuev))
 	field := toInt(fieldv)
 	width := toInt(widthv)
-	if field < 0 || field >= 32 || width <= 0 || width > 32-field {
-		return NilValue(), fmt.Errorf("bad field or width")
+	n, err := bit32lib.Replace(toInt(nv), toInt(valuev), field, width)
+	if err != nil {
+		return NilValue(), err
 	}
-	mask := bit32Mask(uint(width))
-	n = (n &^ (mask << field)) | ((v & mask) << field)
-	return IntValue(int64(n)), nil
+	return IntValue(n), nil
 }
 
 func bit32ValueArg(v Value, index int, name string) (int64, error) {
