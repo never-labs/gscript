@@ -69,6 +69,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 	}, stdlibinstall.ModuleOptions{
 		ScriptCaller: vm.callValue,
 		Less:         vm.valueLessThan,
+		SkipTable:    true,
 		Host: modules.HostOptions{
 			SkipHostIO:     true,
 			NetworkAllowed: func() bool { return vm.networkAccess },

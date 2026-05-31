@@ -424,8 +424,70 @@ func rawTableUnpackFunction(name string) *GoFunction {
 	)
 }
 
-// buildTableLib creates the "table" standard library table.
-func buildTableLib() *Table {
+// BuildTableConcatFunction builds table.concat around caller-provided table
+// access hooks. Raw callers pass RawGet/Length; interpreter and VM callers
+// pass metamethod-aware hooks.
+func BuildTableConcatFunction(tableLen TableUnpackLen, tableGet TableUnpackGet) *GoFunction {
+	return &GoFunction{
+		Name: "table.concat",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.concat' (table expected)")
+			}
+			t := args[0]
+			sep := ""
+			if len(args) >= 2 && args[1].IsString() {
+				sep = args[1].Str()
+			}
+			iArg, jArg := int64(0), int64(0)
+			hasI, hasJ := false, false
+			if len(args) >= 3 {
+				iArg = toInt(args[2])
+				hasI = true
+			}
+			if len(args) >= 4 {
+				jArg = toInt(args[3])
+				hasJ = true
+			}
+			length, err := tableLen(t)
+			if err != nil {
+				return nil, err
+			}
+			r := tablelib.ResolveRange(1, length, iArg, jArg, hasI, hasJ)
+
+			var b strings.Builder
+			for k := r.First; k <= r.Last; k++ {
+				v, err := tableGet(t, IntValue(k))
+				if err != nil {
+					return nil, err
+				}
+				s, ok := ConcatOperandString(v)
+				if !ok {
+					return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
+				}
+				if k > r.First {
+					b.WriteString(sep)
+				}
+				b.WriteString(s)
+			}
+			return []Value{StringValue(b.String())}, nil
+		},
+	}
+}
+
+func rawTableConcatFunction() *GoFunction {
+	return BuildTableConcatFunction(
+		func(t Value) (int64, error) {
+			return int64(t.Table().Length()), nil
+		},
+		func(t Value, key Value) (Value, error) {
+			return t.Table().RawGet(key), nil
+		},
+	)
+}
+
+// BuildTableLib creates the raw "table" standard library table.
+func BuildTableLib() *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -438,42 +500,7 @@ func buildTableLib() *Table {
 	t.RawSet(StringValue("insert"), FunctionValue(rawTableInsertFunction()))
 	t.RawSet(StringValue("remove"), FunctionValue(rawTableRemoveFunction()))
 
-	// table.concat(t [, sep [, i [, j]]]) -> string
-	set("concat", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.concat' (table expected)")
-		}
-		tbl := args[0].Table()
-		sep := ""
-		if len(args) >= 2 && args[1].IsString() {
-			sep = args[1].Str()
-		}
-		iArg, jArg := int64(0), int64(0)
-		hasI, hasJ := false, false
-		if len(args) >= 3 {
-			iArg = toInt(args[2])
-			hasI = true
-		}
-		if len(args) >= 4 {
-			jArg = toInt(args[3])
-			hasJ = true
-		}
-		r := tablelib.ResolveRange(1, int64(tbl.Length()), iArg, jArg, hasI, hasJ)
-
-		var b strings.Builder
-		for k := r.First; k <= r.Last; k++ {
-			v := tbl.RawGet(IntValue(k))
-			s, ok := ConcatOperandString(v)
-			if !ok {
-				return nil, fmt.Errorf("invalid value at index %d in table for 'concat'", k)
-			}
-			if k > r.First {
-				b.WriteString(sep)
-			}
-			b.WriteString(s)
-		}
-		return []Value{StringValue(b.String())}, nil
-	})
+	t.RawSet(StringValue("concat"), FunctionValue(rawTableConcatFunction()))
 
 	t.RawSet(StringValue("sort"), FunctionValue(rawTableSortFunction()))
 
@@ -764,6 +791,12 @@ func buildTableLib() *Table {
 	})
 
 	return t
+}
+
+// buildTableLib keeps the legacy runtime installer name local while public
+// stdlibrt assembly uses BuildTableLib through explicit hook options.
+func buildTableLib() *Table {
+	return BuildTableLib()
 }
 
 // buildTableSortWithInterp creates a table.sort that can call closure comparators.

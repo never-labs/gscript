@@ -67,6 +67,13 @@ func installTestModules(interp *runtime.Interpreter) {
 	stringLib := BuildString(interp.CallFunction, interp.MaxHostResultBytes)
 	interp.SetStringLibrary(stringLib)
 	installTestModule(interp, "string", runtime.TableValue(stringLib))
+	installTestModule(interp, "table", runtime.TableValue(BuildTable(TableOptions{
+		Call: interp.CallFunction,
+		Less: interp.ValueLessThan,
+		Len:  interp.TableLen,
+		Get:  interp.TableGet,
+		Set:  interp.TableSet,
+	})))
 	installTestModule(interp, "time", runtime.TableValue(BuildTime()))
 	installTestModule(interp, "url", runtime.TableValue(BuildURL(interp.MaxHostResultBytes)))
 	installTestModule(interp, "utf8", runtime.TableValue(BuildUTF8(interp.MaxHostResultBytes)))

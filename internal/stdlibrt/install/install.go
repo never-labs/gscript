@@ -34,6 +34,13 @@ func Install(interp *runtime.Interpreter) {
 			MaxHostResult:         interp.MaxHostResultBytes,
 			Call:                  interp.CallFunction,
 		},
+		Table: modules.TableOptions{
+			Call: interp.CallFunction,
+			Less: interp.ValueLessThan,
+			Len:  interp.TableLen,
+			Get:  interp.TableGet,
+			Set:  interp.TableSet,
+		},
 	})
 	InstallDebugAndTestkit(interp)
 	InstallLLM(interp)
@@ -43,6 +50,8 @@ type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
 	Less         modules.ValueLessFunc
 	Host         modules.HostOptions
+	Table        modules.TableOptions
+	SkipTable    bool
 }
 
 // InstallModules registers stdlibrt-owned modules on a runtime-compatible
@@ -102,6 +111,9 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 		Call: opts.ScriptCaller,
 	}))
 	installer.RegisterTable("string", modules.BuildString(opts.ScriptCaller, maxHostResult))
+	if !opts.SkipTable {
+		installer.RegisterTable("table", modules.BuildTable(opts.Table))
+	}
 	installer.RegisterTable("time", modules.BuildTime())
 	installer.RegisterTable("url", modules.BuildURL(maxHostResult))
 	installer.RegisterTable("utf8", modules.BuildUTF8(maxHostResult))

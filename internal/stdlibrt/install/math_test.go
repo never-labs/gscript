@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
 
 func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {
@@ -130,5 +131,33 @@ func TestInstallModulesRegistersStringFromStdlibrt(t *testing.T) {
 	upper := stringLib.Table().RawGetString("upper")
 	if !upper.IsFunction() {
 		t.Fatalf("string.upper is not a function: %v", upper)
+	}
+}
+
+func TestInstallModulesRegistersTableFromStdlibrt(t *testing.T) {
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	if got := interp.GetGlobal("table"); !got.IsNil() {
+		t.Fatalf("InstallRuntimeStdlib registered migrated table module: %v", got)
+	}
+
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
+		ScriptCaller: interp.CallFunction,
+		Table: modules.TableOptions{
+			Call: interp.CallFunction,
+			Less: interp.ValueLessThan,
+			Len:  interp.TableLen,
+			Get:  interp.TableGet,
+			Set:  interp.TableSet,
+		},
+	})
+	tableLib := interp.GetGlobal("table")
+	if !tableLib.IsTable() {
+		t.Fatalf("table global is not a table: %v", tableLib)
+	}
+	for _, name := range []string{"sort", "insert", "remove", "unpack", "spread", "move", "concat", "map", "reduce"} {
+		if got := tableLib.Table().RawGetString(name); !got.IsFunction() {
+			t.Fatalf("table.%s is not a function: %v", name, got)
+		}
 	}
 }

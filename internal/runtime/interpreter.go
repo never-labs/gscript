@@ -528,6 +528,53 @@ func (interp *Interpreter) Context() context.Context {
 	return interp.ctx
 }
 
+// TableLen returns the script-visible length of a table value, including
+// __len metamethod behavior. Standard-library modules use this explicit hook
+// instead of reaching into interpreter internals.
+func (interp *Interpreter) TableLen(v Value) (int64, error) {
+	if interp == nil {
+		if tbl := v.Table(); tbl != nil {
+			return int64(tbl.Length()), nil
+		}
+		return 0, nil
+	}
+	return interp.tableLenInt(v)
+}
+
+// TableGet returns the script-visible table lookup result, including __index
+// metamethod behavior.
+func (interp *Interpreter) TableGet(t Value, key Value) (Value, error) {
+	if interp == nil {
+		if tbl := t.Table(); tbl != nil {
+			return tbl.RawGet(key), nil
+		}
+		return NilValue(), nil
+	}
+	return interp.tableGet(t, key)
+}
+
+// TableSet applies script-visible table assignment semantics, including
+// __newindex metamethod behavior.
+func (interp *Interpreter) TableSet(t Value, key Value, val Value) error {
+	if interp == nil {
+		if tbl := t.Table(); tbl != nil {
+			tbl.RawSet(key, val)
+		}
+		return nil
+	}
+	return interp.tableSet(t, key, val)
+}
+
+// ValueLessThan applies script-visible less-than semantics, including __lt
+// metamethod behavior.
+func (interp *Interpreter) ValueLessThan(a Value, b Value) (bool, error) {
+	if interp == nil {
+		less, ok := a.LessThan(b)
+		return ok && less, nil
+	}
+	return interp.valLessThan(a, b)
+}
+
 func (interp *Interpreter) resetExecutionBudgets() {
 	interp.steps = 0
 	interp.nativeCalls = 0
