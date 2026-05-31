@@ -46,3 +46,39 @@ func TestMaskQueryIsComparableShape(t *testing.T) {
 		t.Fatalf("mask queries with different operators matched")
 	}
 }
+
+func TestColumnCacheKey(t *testing.T) {
+	key := NewColumnCacheKey("x", DTypeI64, 3)
+	if !key.Matches("x", NewDenseArrayMeta(DTypeI64, 3)) {
+		t.Fatalf("equivalent column cache key did not match")
+	}
+	if key.Matches("x", NewDenseArrayMeta(DTypeI64, 4)) {
+		t.Fatalf("column cache key ignored version")
+	}
+	if key.Matches("y", NewDenseArrayMeta(DTypeI64, 3)) {
+		t.Fatalf("column cache key ignored column")
+	}
+}
+
+func TestResultMetaValid(t *testing.T) {
+	if ResultMetaValid(NoDenseArrayMeta(), 1) {
+		t.Fatalf("missing result meta should not be valid")
+	}
+	if !ResultMetaValid(NewDenseArrayMeta(DTypeBool, 7), 7) {
+		t.Fatalf("matching result version should be valid")
+	}
+	if ResultMetaValid(NewDenseArrayMeta(DTypeBool, 7), 8) {
+		t.Fatalf("stale result version should not be valid")
+	}
+}
+
+func TestNextRingSlot(t *testing.T) {
+	slot, next := NextRingSlot(3, 2)
+	if slot != 1 || next != 4 {
+		t.Fatalf("NextRingSlot(3,2) = (%d,%d), want (1,4)", slot, next)
+	}
+	slot, next = NextRingSlot(3, 0)
+	if slot != 0 || next != 3 {
+		t.Fatalf("NextRingSlot(3,0) = (%d,%d), want (0,3)", slot, next)
+	}
+}

@@ -920,11 +920,10 @@ func soaMeanValue(soaValue, columnValue Value) (Value, error) {
 }
 
 type soaStatsCache struct {
-	soa     *SoA
-	column  string
-	array   *DenseArray
-	version uint64
-	valueV  Value
+	soa    *SoA
+	array  *DenseArray
+	key    stdsoa.ColumnCacheKey
+	valueV Value
 }
 
 func (c *soaStatsCache) value(soaValue, columnValue Value) (Value, error) {
@@ -940,8 +939,8 @@ func (c *soaStatsCache) value(soaValue, columnValue Value) (Value, error) {
 	if !ok {
 		return NilValue(), fmt.Errorf("soa column %q not found", name)
 	}
-	version := col.Version()
-	if c.soa == s && c.array == col && c.column == name && c.version == version && !c.valueV.IsNil() {
+	key := stdsoa.NewColumnCacheKey(name, col.DType().String(), col.Version())
+	if c.soa == s && c.array == col && c.key.Matches(name, key.Array) && !c.valueV.IsNil() {
 		return c.valueV, nil
 	}
 	v, err := col.StatsValue()
@@ -949,9 +948,8 @@ func (c *soaStatsCache) value(soaValue, columnValue Value) (Value, error) {
 		return NilValue(), err
 	}
 	c.soa = s
-	c.column = name
 	c.array = col
-	c.version = version
+	c.key = key
 	c.valueV = v
 	return v, nil
 }
@@ -974,11 +972,11 @@ func soaStatsValue(soaValue, columnValue Value) (Value, error) {
 }
 
 type soaIndicesWhereCache struct {
-	soa           *SoA
-	mask          *DenseArray
-	maskVersion   uint64
-	result        *DenseArray
-	resultVersion uint64
+	soa        *SoA
+	mask       *DenseArray
+	maskMeta   stdsoa.DenseArrayMeta
+	result     *DenseArray
+	resultMeta stdsoa.DenseArrayMeta
 }
 
 func (c *soaIndicesWhereCache) value(soaValue, maskValue Value) (Value, error) {
@@ -997,7 +995,7 @@ func (c *soaIndicesWhereCache) value(soaValue, maskValue Value) (Value, error) {
 	if err != nil {
 		return NilValue(), err
 	}
-	if c.soa == s && c.mask == mask && c.maskVersion == maskMeta.Version && c.result != nil && c.result.Version() == c.resultVersion {
+	if c.soa == s && c.mask == mask && c.maskMeta == maskMeta && c.result != nil && stdsoa.ResultMetaValid(c.resultMeta, c.result.Version()) {
 		return DenseArrayValue(c.result), nil
 	}
 	out, err := s.IndicesWhere(mask)
@@ -1006,9 +1004,9 @@ func (c *soaIndicesWhereCache) value(soaValue, maskValue Value) (Value, error) {
 	}
 	c.soa = s
 	c.mask = mask
-	c.maskVersion = maskMeta.Version
+	c.maskMeta = maskMeta
 	c.result = out
-	c.resultVersion = out.Version()
+	c.resultMeta = stdsoa.NewDenseArrayMeta(out.DType().String(), out.Version())
 	return DenseArrayValue(out), nil
 }
 
@@ -1025,13 +1023,13 @@ type soaMaskCache struct {
 }
 
 type soaMaskCacheEntry struct {
-	soa           *SoA
-	rhs           Value
-	left          *DenseArray
-	right         *DenseArray
-	query         stdsoa.MaskQuery
-	result        *DenseArray
-	resultVersion uint64
+	soa        *SoA
+	rhs        Value
+	left       *DenseArray
+	right      *DenseArray
+	query      stdsoa.MaskQuery
+	result     *DenseArray
+	resultMeta stdsoa.DenseArrayMeta
 }
 
 func (c *soaMaskCache) value(soaValue, columnValue, opValue, rhsValue Value) (Value, error) {
@@ -1079,7 +1077,7 @@ func (c *soaMaskCache) value(soaValue, columnValue, opValue, rhsValue Value) (Va
 			row.query == query &&
 			row.rhs == rhsValue &&
 			row.result != nil &&
-			row.result.Version() == row.resultVersion {
+			stdsoa.ResultMetaValid(row.resultMeta, row.result.Version()) {
 			return DenseArrayValue(row.result), nil
 		}
 	}
@@ -1087,15 +1085,16 @@ func (c *soaMaskCache) value(soaValue, columnValue, opValue, rhsValue Value) (Va
 	if err != nil {
 		return NilValue(), err
 	}
-	row := &c.rows[c.next%len(c.rows)]
-	c.next++
+	slot, next := stdsoa.NextRingSlot(c.next, len(c.rows))
+	c.next = next
+	row := &c.rows[slot]
 	row.soa = s
 	row.rhs = rhsValue
 	row.left = left
 	row.right = right
 	row.query = query
 	row.result = out
-	row.resultVersion = out.Version()
+	row.resultMeta = stdsoa.NewDenseArrayMeta(out.DType().String(), out.Version())
 	return DenseArrayValue(out), nil
 }
 
