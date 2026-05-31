@@ -3,11 +3,11 @@ package gscript
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/never-labs/gscript/internal/runtime"
 	llm "github.com/never-labs/gscript/llm"
+	llmcommand "github.com/never-labs/gscript/llm/command"
 )
 
 // LLMProvider is the Go embedding hook behind the llm standard library.
@@ -107,33 +107,7 @@ func WithLLMCommand(command string, args ...string) Option {
 	return WithLLMProvider(CommandLLMProvider{Command: command, Args: args})
 }
 
-type CommandLLMProvider struct {
-	Command string
-	Args    []string
-	Model   string
-}
-
-func (p CommandLLMProvider) Turn(ctx context.Context, req LLMTurnRequest) (LLMTurnResult, error) {
-	if p.Command == "" {
-		return LLMTurnResult{}, fmt.Errorf("llm command not configured")
-	}
-	args := append([]string{}, p.Args...)
-	if p.Model != "" && req.Model == "" {
-		req.Model = p.Model
-	}
-	if req.Model != "" && !containsModelFlag(args) {
-		args = append(args, "--model", req.Model)
-	}
-	args = append(args, renderLLMPrompt(req))
-	out, err := exec.CommandContext(ctx, p.Command, args...).CombinedOutput()
-	if err != nil {
-		return LLMTurnResult{}, fmt.Errorf("%s: %w: %s", p.Command, err, strings.TrimSpace(string(out)))
-	}
-	return LLMTurnResult{
-		Status: "final_answer",
-		Text:   strings.TrimRight(string(out), "\n"),
-	}, nil
-}
+type CommandLLMProvider = llmcommand.Provider
 
 type llmProviderAdapter struct {
 	provider LLMProvider
@@ -467,15 +441,6 @@ func LoadLLMRecords(path string) ([]LLMRecord, error) {
 	return llm.LoadRecords(path)
 }
 
-func containsModelFlag(args []string) bool {
-	for _, arg := range args {
-		if arg == "--model" || strings.HasPrefix(arg, "--model=") {
-			return true
-		}
-	}
-	return false
-}
-
 func cloneLLMRecord(record LLMRecord) LLMRecord {
 	return LLMRecord{
 		Request: cloneLLMRequest(record.Request),
@@ -556,29 +521,4 @@ func cloneLLMAny(v any) any {
 	default:
 		return v
 	}
-}
-
-func renderLLMPrompt(req LLMTurnRequest) string {
-	var b strings.Builder
-	for _, msg := range req.Messages {
-		switch msg.Role {
-		case "system":
-			b.WriteString("System: ")
-		case "assistant":
-			b.WriteString("Assistant: ")
-		case "tool":
-			b.WriteString("Tool: ")
-		default:
-			b.WriteString("User: ")
-		}
-		if msg.Text != "" {
-			b.WriteString(msg.Text)
-		} else if msg.Error != "" {
-			b.WriteString(msg.Error)
-		} else if msg.Value != nil {
-			b.WriteString(fmt.Sprint(msg.Value))
-		}
-		b.WriteByte('\n')
-	}
-	return strings.TrimSpace(b.String())
 }
