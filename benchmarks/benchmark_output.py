@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import re
+import subprocess
+import time
+
+
+@dataclass
+class TextCommandResult:
+    output: str
+    status: str
+    exit_code: int | None
+    wall_seconds: float
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 
@@ -28,6 +39,28 @@ def text_output(output: str | bytes | None) -> str:
     if isinstance(output, bytes):
         return output.decode(errors="replace")
     return output
+
+
+def run_text_command(cmd: list[str], timeout: float, env: dict[str, str] | None = None) -> TextCommandResult:
+    started = time.perf_counter()
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            timeout=timeout,
+            env=env,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        wall = time.perf_counter() - started
+        output = text_output(exc.stdout)
+        return TextCommandResult(output + f"\nTIMEOUT after {timeout}s", "timeout", None, wall)
+
+    wall = time.perf_counter() - started
+    status = "ok" if proc.returncode == 0 else "error"
+    return TextCommandResult(proc.stdout, status, proc.returncode, wall)
 
 
 def markdown_row(cells: list[object]) -> str:

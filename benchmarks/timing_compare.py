@@ -187,25 +187,8 @@ def parse_run(output: str, status: str, exit_code: int | None, wall_seconds: flo
 
 
 def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None) -> CommandRun:
-    started = time.perf_counter()
-    try:
-        proc = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-        wall = time.perf_counter() - started
-    except subprocess.TimeoutExpired as exc:
-        wall = time.perf_counter() - started
-        output = benchmark_output.text_output(exc.stdout)
-        return parse_run(output + f"\nTIMEOUT after {timeout}s", "timeout", None, wall)
-
-    status = "ok" if proc.returncode == 0 else "error"
-    return parse_run(proc.stdout, status, proc.returncode, wall)
+    result = benchmark_output.run_text_command(cmd, timeout, env)
+    return parse_run(result.output, result.status, result.exit_code, result.wall_seconds)
 
 
 def summarize_runs(

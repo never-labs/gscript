@@ -225,28 +225,9 @@ def compute_stats(values: list[float]) -> Stats:
 
 
 def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None) -> CommandRun:
-    started = time.perf_counter()
-    try:
-        proc = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout,
-            env=env,
-            check=False,
-        )
-        wall = time.perf_counter() - started
-    except subprocess.TimeoutExpired as exc:
-        wall = time.perf_counter() - started
-        output = benchmark_output.text_output(exc.stdout)
-        run = parse_command_run(output + f"\nTIMEOUT after {timeout}s", "timeout")
-        run.wall_seconds = wall
-        return run
-
-    status = "ok" if proc.returncode == 0 else "error"
-    run = parse_command_run(proc.stdout, status, proc.returncode)
-    run.wall_seconds = wall
+    result = benchmark_output.run_text_command(cmd, timeout, env)
+    run = parse_command_run(result.output, result.status, result.exit_code)
+    run.wall_seconds = result.wall_seconds
     return run
 
 
