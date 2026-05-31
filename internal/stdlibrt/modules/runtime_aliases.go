@@ -13,8 +13,12 @@ type (
 )
 
 const (
-	TypeFloat = runtime.TypeFloat
-	TypeInt   = runtime.TypeInt
+	TypeBool   = runtime.TypeBool
+	TypeFloat  = runtime.TypeFloat
+	TypeInt    = runtime.TypeInt
+	TypeNil    = runtime.TypeNil
+	TypeString = runtime.TypeString
+	TypeTable  = runtime.TypeTable
 )
 
 var (

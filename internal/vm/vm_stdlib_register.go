@@ -69,6 +69,12 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 	}, stdlibinstall.ModuleOptions{
 		ScriptCaller: vm.callValue,
 		Less:         vm.valueLessThan,
+		Host: modules.HostOptions{
+			SkipHostIO:     true,
+			NetworkAllowed: func() bool { return vm.networkAccess },
+			MaxHostResult:  func() int64 { return vm.maxHostResult },
+			Call:           vm.callValue,
+		},
 	})
 }
 
@@ -739,7 +745,7 @@ func (vm *VM) RegisterLLMLib() {
 
 func (vm *VM) RegisterHTTPLib() {
 	std := vm.newStdlibInstallContext()
-	httpLib := runtime.TableValue(runtime.BuildHTTPLibWithCallerAndPolicy(vm.callValue, func() bool {
+	httpLib := runtime.TableValue(modules.BuildHTTPWithCallerAndPolicy(vm.callValue, func() bool {
 		return vm.networkAccess
 	}, func() int64 {
 		return vm.maxHostResult

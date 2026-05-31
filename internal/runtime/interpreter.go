@@ -213,6 +213,10 @@ func (interp *Interpreter) SetNetworkAccess(enabled bool) {
 	interp.networkAccess = enabled
 }
 
+func (interp *Interpreter) NetworkAccessEnabled() bool {
+	return interp == nil || interp.networkAccess
+}
+
 // SetDebugAccess controls script-side debug APIs. Internal debug frame
 // accounting remains active for host diagnostics.
 func (interp *Interpreter) SetDebugAccess(enabled bool) {
@@ -233,6 +237,21 @@ func (interp *Interpreter) SetProcessExecution(enabled bool) {
 // SetProcessShell controls process.shell.
 func (interp *Interpreter) SetProcessShell(enabled bool) {
 	interp.processShell = enabled
+}
+
+func (interp *Interpreter) FilesystemRoot() string {
+	if interp == nil {
+		return ""
+	}
+	return interp.filesystemRoot
+}
+
+func (interp *Interpreter) FilesystemReadEnabled() bool {
+	return interp == nil || interp.filesystemRead
+}
+
+func (interp *Interpreter) FilesystemWriteEnabled() bool {
+	return interp == nil || interp.filesystemWrite
 }
 
 // SetFilesystemEnabled controls script-side filesystem APIs such as fs,
@@ -425,11 +444,25 @@ func (interp *Interpreter) SetMaxFilesystemReadBytes(max int64) {
 	interp.refreshFSLib()
 }
 
+func (interp *Interpreter) MaxFilesystemReadBytes() int64 {
+	if interp == nil {
+		return 0
+	}
+	return interp.maxFSReadBytes
+}
+
 // SetMaxFilesystemWriteBytes limits bytes written by fs.writefile,
 // fs.appendfile, and fs.copy. A non-positive value disables the limit.
 func (interp *Interpreter) SetMaxFilesystemWriteBytes(max int64) {
 	interp.maxFSWriteBytes = max
 	interp.refreshFSLib()
+}
+
+func (interp *Interpreter) MaxFilesystemWriteBytes() int64 {
+	if interp == nil {
+		return 0
+	}
+	return interp.maxFSWriteBytes
 }
 
 // SetContext installs a host cancellation context checked at interpreter

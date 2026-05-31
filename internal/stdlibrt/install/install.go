@@ -16,12 +16,26 @@ func Install(interp *runtime.Interpreter) {
 	interp.InstallStdlib()
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
 		ScriptCaller: interp.CallFunction,
+		Host: modules.HostOptions{
+			NetworkAllowed:     interp.NetworkAccessEnabled,
+			FilesystemRoot:     interp.FilesystemRoot,
+			FilesystemRead:     interp.FilesystemReadEnabled,
+			FilesystemWrite:    interp.FilesystemWriteEnabled,
+			MaxFSReadBytes:     interp.MaxFilesystemReadBytes,
+			MaxFSWriteBytes:    interp.MaxFilesystemWriteBytes,
+			EnvironmentRead:    interp.EnvironmentReadEnabled,
+			EnvironmentWrite:   interp.EnvironmentWriteEnabled,
+			EnvironmentAllowed: interp.EnvironmentAllowed,
+			MaxHostResult:      interp.MaxHostResultBytes,
+			Call:               interp.CallFunction,
+		},
 	})
 }
 
 type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
 	Less         modules.ValueLessFunc
+	Host         modules.HostOptions
 }
 
 // InstallModules registers stdlibrt-owned modules on a runtime-compatible
@@ -38,6 +52,13 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	if len(options) > 0 {
 		opts = options[0]
 	}
+	hostOpts := opts.Host
+	if hostOpts.MaxHostResult == nil {
+		hostOpts.MaxHostResult = maxHostResult
+	}
+	if hostOpts.Call == nil {
+		hostOpts.Call = opts.ScriptCaller
+	}
 	installer.RegisterTable("array", modules.BuildArray())
 	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
 	installer.RegisterTable("binary", modules.BuildBinary(maxHostResult))
@@ -51,6 +72,13 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("crypto", modules.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", modules.BuildCSV(maxHostResult))
 	installer.RegisterTable("encoding", modules.BuildEncoding(maxHostResult))
+	if !hostOpts.SkipHostIO {
+		installer.RegisterTable("fs", modules.BuildFSWithPolicy(hostOpts))
+		installer.RegisterTable("http", modules.BuildHTTP(hostOpts))
+		installer.RegisterTable("io", modules.BuildIO(hostOpts))
+		installer.RegisterTable("net", modules.BuildNet(hostOpts))
+		installer.RegisterTable("os", modules.BuildOSWithPolicy(hostOpts))
+	}
 	installer.RegisterTable("hash", modules.BuildHash())
 	installer.RegisterTable("log", modules.BuildLog())
 	installer.RegisterTable("path", modules.BuildPath())

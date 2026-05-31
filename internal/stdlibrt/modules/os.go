@@ -1,7 +1,8 @@
-package runtime
+package modules
 
 import (
 	"fmt"
+	"github.com/never-labs/gscript/internal/runtime"
 	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
 	"os"
 	"strings"
@@ -11,72 +12,32 @@ import (
 // startTime is used by os.clock() to measure CPU time (approximated as wall time).
 var startTime = time.Now()
 
-func buildOSLib() *Table {
-	return buildOSLibWithPolicy(true, true, nil, "", true)
+func BuildOS() *Table {
+	return BuildOSWithPolicy(HostOptions{})
 }
 
-// SetEnvironmentCapabilities controls script-side environment variable read and
-// write access independently. It refreshes os in place so package.loaded.os
-// observes the same policy.
-func (interp *Interpreter) SetEnvironmentCapabilities(read, write bool) {
-	interp.environmentRead = read
-	interp.environmentWrite = write
-	interp.refreshOSLib()
+func BuildOSWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) *Table {
+	return BuildOSWithPolicy(HostOptions{
+		EnvironmentRead:  func() bool { return envRead },
+		EnvironmentWrite: func() bool { return envWrite },
+		EnvironmentAllowed: func(name string) bool {
+			return allowedEnv == nil || allowedEnv[name]
+		},
+		FilesystemWrite: func() bool { return true },
+	})
 }
 
-func (interp *Interpreter) EnvironmentReadEnabled() bool {
-	return interp == nil || interp.environmentRead
-}
-
-func (interp *Interpreter) EnvironmentWriteEnabled() bool {
-	return interp == nil || interp.environmentWrite
-}
-
-func (interp *Interpreter) EnvironmentAllowed(name string) bool {
-	return interp == nil || interp.allowedEnv == nil || interp.allowedEnv[name]
-}
-
-// SetEnvironmentAllowlist restricts script-side environment APIs to the named
-// variables. A nil slice allows all environment variables; an empty non-nil
-// slice allows none.
-func (interp *Interpreter) SetEnvironmentAllowlist(names []string) {
-	if names == nil {
-		interp.allowedEnv = nil
-	} else {
-		allowed := make(map[string]bool, len(names))
-		for _, name := range names {
-			allowed[name] = true
-		}
-		interp.allowedEnv = allowed
-	}
-	interp.refreshOSLib()
-}
-
-func (interp *Interpreter) refreshOSLib() {
-	if v, ok := interp.globals.Get("os"); ok && v.IsTable() {
-		osLib := TableValue(buildOSLibWithPolicy(
-			interp.environmentRead,
-			interp.environmentWrite,
-			interp.allowedEnv,
-			interp.filesystemRoot,
-			interp.filesystemWrite,
-		))
-		interp.globals.Define("os", osLib)
-		interp.modules["os"] = osLib
-		interp.markPackageLoaded("os", osLib)
-	}
-}
-
-// buildOSLibWithEnvironment creates the "os" standard library table.
-func buildOSLibWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) *Table {
-	return buildOSLibWithPolicy(envRead, envWrite, allowedEnv, "", true)
-}
-
-// buildOSLibWithPolicy creates the "os" standard library table.
-func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fsRoot string, fsWrite bool) *Table {
-	t := NewTable()
+func BuildOSWithPolicy(opts HostOptions) *Table {
+	t := markStdlibrtModule(NewTable())
+	envRead := func() bool { return hostBool(opts.EnvironmentRead, true) }
+	envWrite := func() bool { return hostBool(opts.EnvironmentWrite, true) }
+	fsRoot := func() string { return hostString(opts.FilesystemRoot) }
+	fsWrite := func() bool { return hostBool(opts.FilesystemWrite, true) }
 	envAllowed := func(name string) bool {
-		return allowedEnv == nil || allowedEnv[name]
+		if opts.EnvironmentAllowed == nil {
+			return true
+		}
+		return opts.EnvironmentAllowed(name)
 	}
 	envDenied := func(name string) error {
 		return fmt.Errorf("environment variable not allowed: %s", name)
@@ -97,7 +58,7 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 	}
 	setEnvRead := func(name string, fn func([]Value) ([]Value, error)) {
 		set(name, func(args []Value) ([]Value, error) {
-			if !envRead {
+			if !envRead() {
 				return nil, fmt.Errorf("environment read access disabled")
 			}
 			return fn(args)
@@ -105,7 +66,7 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 	}
 	setEnvWrite := func(name string, fn func([]Value) ([]Value, error)) {
 		set(name, func(args []Value) ([]Value, error) {
-			if !envWrite {
+			if !envWrite() {
 				return nil, fmt.Errorf("environment write access disabled")
 			}
 			return fn(args)
@@ -113,17 +74,17 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 	}
 	setFSWrite := func(name string, fn func([]Value) ([]Value, error)) {
 		set(name, func(args []Value) ([]Value, error) {
-			if !fsWrite {
+			if !fsWrite() {
 				return nil, fmt.Errorf("filesystem write access disabled")
 			}
 			return fn(args)
 		})
 	}
 	resolveFSWritePath := func(path string) (string, error) {
-		if !fsWrite {
+		if !fsWrite() {
 			return "", fmt.Errorf("filesystem write access disabled")
 		}
-		return resolveSandboxPath(fsRoot, path)
+		return resolveSandboxPath(fsRoot(), path)
 	}
 
 	// os.time() -> unix timestamp
@@ -168,7 +129,7 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 				return nil, fmt.Errorf("bad argument #1 to 'os.exit' (number or boolean expected)")
 			}
 		}
-		return nil, &ProcessExitError{Code: code}
+		return nil, &runtime.ProcessExitError{Code: code}
 	})
 
 	// os.getenv(name) -> string or nil
@@ -226,8 +187,8 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 	// os.tmpname() -> string
 	setFSWrite("tmpname", func(args []Value) ([]Value, error) {
 		dir := ""
-		if fsRoot != "" {
-			dir = fsRoot
+		if fsRoot() != "" {
+			dir = fsRoot()
 		}
 		f, err := os.CreateTemp(dir, "gscript_*")
 		if err != nil {
@@ -307,7 +268,7 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 
 	// os.expand(s) -- expand $VAR and ${VAR} in string using os.Expand
 	osExpand := func(arg Value) (Value, error) {
-		if !envRead {
+		if !envRead() {
 			return NilValue(), fmt.Errorf("environment read access disabled")
 		}
 		if !arg.IsString() {
