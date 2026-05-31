@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // Tier2SnapshotCallback is called after each successful optimizer module run,

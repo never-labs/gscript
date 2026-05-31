@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // Kind identifies the public kind of a GScript value.

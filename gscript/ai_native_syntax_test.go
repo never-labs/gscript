@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 )
 
 func TestAINativeSyntaxExecutesThroughLLMStdlib(t *testing.T) {

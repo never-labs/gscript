@@ -3,7 +3,7 @@ package vm
 import (
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 const mathBitUTF8LoopSpecializationSource = `

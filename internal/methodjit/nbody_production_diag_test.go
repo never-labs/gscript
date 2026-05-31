@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // TestDiag_NbodyProduction compiles nbody advance() through TieringManager

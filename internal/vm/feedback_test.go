@@ -7,9 +7,9 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/lexer"
-	"github.com/Never-Labs/gscript/internal/parser"
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // compileProto compiles GScript source and returns the proto.

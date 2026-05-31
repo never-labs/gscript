@@ -9,8 +9,8 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/Never-Labs/gscript/internal/jit"
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // emitGetField emits ARM64 code for OpGetField (table field read).

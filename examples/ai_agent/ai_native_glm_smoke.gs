@@ -9,7 +9,7 @@
 //   GSCRIPT_GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic \
 //   GSCRIPT_GLM_API_KEY=... \
 //   GSCRIPT_GLM_MODEL=glm-5.1 \
-//   gscript examples/ai_native_glm_smoke.gs
+//   gscript examples/ai_agent/ai_native_glm_smoke.gs
 
 models {
     default: "glm-smoke"

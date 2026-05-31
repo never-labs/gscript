@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // ToValue converts a Go value to a GScript Value using reflection.

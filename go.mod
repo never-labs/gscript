@@ -1,4 +1,4 @@
-module github.com/Never-Labs/gscript
+module github.com/never-labs/gscript
 
 go 1.25.7
 

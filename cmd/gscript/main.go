@@ -17,11 +17,11 @@ import (
 	"strconv"
 	"strings"
 
-	gscript "github.com/Never-Labs/gscript/gscript"
-	"github.com/Never-Labs/gscript/internal/lexer"
-	"github.com/Never-Labs/gscript/internal/parser"
-	"github.com/Never-Labs/gscript/internal/runtime"
-	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
+	gscript "github.com/never-labs/gscript/gscript"
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
+	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
 // jitStatsReporter is implemented by the platform-specific JIT engine wrapper
@@ -83,6 +83,8 @@ func main() {
 			os.Exit(runConfigCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "diag":
 			os.Exit(runDiagCommand(os.Args[2:], os.Stdout, os.Stderr))
+		case "diagnose":
+			os.Exit(runDiagnoseCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "doc":
 			os.Exit(runDocCommand(os.Args[2:], os.Stdout, os.Stderr))
 		case "eval":
@@ -456,25 +458,17 @@ func buildCapabilities() cliCapabilities {
 }
 
 func buildStdlibLayerCapabilities() []cliStdlibLayer {
-	byLayer := map[string][]cliStdlibModule{}
-	for _, module := range runtime.StdlibModules() {
-		byLayer[module.Layer] = append(byLayer[module.Layer], cliStdlibModule{
-			Name:         module.Name,
-			Capabilities: append([]string(nil), module.Capabilities...),
-			SafeDefault:  module.SafeDefault,
-		})
-	}
-	order := []string{
-		runtime.StdlibLayerBase,
-		runtime.StdlibLayerHost,
-		runtime.StdlibLayerAI,
-		runtime.StdlibLayerData,
-		runtime.StdlibLayerVendor,
-		runtime.StdlibLayerCompat,
-	}
-	layers := make([]cliStdlibLayer, 0, len(order))
-	for _, name := range order {
-		modules := byLayer[name]
+	layerNames := runtime.StdlibLayers()
+	layers := make([]cliStdlibLayer, 0, len(layerNames))
+	for _, name := range layerNames {
+		modules := make([]cliStdlibModule, 0)
+		for _, module := range runtime.StdlibModulesForLayer(name) {
+			modules = append(modules, cliStdlibModule{
+				Name:         module.Name,
+				Capabilities: append([]string(nil), module.Capabilities...),
+				SafeDefault:  module.SafeDefault,
+			})
+		}
 		sort.Slice(modules, func(i, j int) bool {
 			return modules[i].Name < modules[j].Name
 		})
@@ -997,8 +991,11 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		return 2
 	}
 	paths := fs.Args()
+	if len(paths) == 0 {
+		paths = []string{defaultTestPath()}
+	}
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] <path-or-dir>")
+		fmt.Fprintln(errw, "usage: gscript test [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]")
 		return 2
 	}
 	if !flagWasSet(fs, "format") {
@@ -1051,6 +1048,13 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 		return 1
 	}
 	return 0
+}
+
+func defaultTestPath() string {
+	if info, err := os.Stat("tests"); err == nil && info.IsDir() {
+		return "tests"
+	}
+	return "."
 }
 
 func validTestGoldenMode(mode string) bool {

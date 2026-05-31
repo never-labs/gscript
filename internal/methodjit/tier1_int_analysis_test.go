@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // bit returns a uint64 with the specified slot bits set.

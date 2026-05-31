@@ -7,7 +7,7 @@ import (
 	"sync"
 	"unicode"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // capitalizeFirst returns the string with the first letter uppercased.

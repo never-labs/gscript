@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/Never-Labs/gscript/internal/runtime"
+import "github.com/never-labs/gscript/internal/runtime"
 
 func closureFromValue(v runtime.Value) (*Closure, bool) {
 	if p := v.VMClosurePointer(); p != nil {

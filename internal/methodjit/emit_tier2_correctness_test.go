@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // tier2TestTimeout is the per-test timeout. Tests that hang (indicating a

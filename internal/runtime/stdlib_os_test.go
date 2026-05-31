@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/lexer"
-	"github.com/Never-Labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
 )
 
 func execOSProgram(t *testing.T, interp *Interpreter, src string) error {

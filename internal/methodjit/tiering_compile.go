@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 type tier2CompileDelayError struct {

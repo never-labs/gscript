@@ -2,7 +2,7 @@
 
 package gscript
 
-import bytecodevm "github.com/Never-Labs/gscript/internal/vm"
+import bytecodevm "github.com/never-labs/gscript/internal/vm"
 
 func enableJIT(_ *bytecodevm.VM) {
 	// JIT not available on this platform.

@@ -8,7 +8,7 @@
 // stays there forever to prevent deopt-reopt cycles.
 package vm
 
-import "github.com/Never-Labs/gscript/internal/runtime"
+import "github.com/never-labs/gscript/internal/runtime"
 
 // ParamTypeFeedbackEntry records per-parameter type observations at function entry.
 // Tier 2 uses this to insert speculative type guards on parameters before SSA

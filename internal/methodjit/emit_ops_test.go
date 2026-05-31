@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // runVMByName compiles the source, executes the top-level, then calls a

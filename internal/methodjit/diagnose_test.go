@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // TestDiagnose_SimpleAdd: f(3,4)=7. Verify Match=true, report contains IR.

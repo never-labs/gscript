@@ -31,7 +31,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/jit"
 )
 
 const (

@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
 // VM is a GScript virtual machine instance.

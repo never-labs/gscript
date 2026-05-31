@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // TestOSR_BasicForLoop verifies that OSR triggers for a function with a

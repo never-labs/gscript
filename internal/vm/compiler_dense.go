@@ -3,7 +3,7 @@ package vm
 import (
 	"fmt"
 
-	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/ast"
 )
 
 func (c *compiler) compileDenseLitExpr(e *ast.DenseLitExpr, dest int) error {

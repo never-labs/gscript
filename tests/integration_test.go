@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/lexer"
-	"github.com/Never-Labs/gscript/internal/parser"
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // runGScript executes a GScript source string and captures its print output.
@@ -57,7 +57,7 @@ func runGScriptFile(t *testing.T, filename string) string {
 }
 
 func TestBasicArithmetic(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "01_basic.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "01_basic.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"3", "7", "20", "2.5", "1", "256"}
 	if len(lines) != len(expected) {
@@ -72,7 +72,7 @@ func TestBasicArithmetic(t *testing.T) {
 }
 
 func TestStrings(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "02_strings.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "02_strings.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"hello world", "5", "HELLO", "ell", "ababab"}
 	if len(lines) != len(expected) {
@@ -87,7 +87,7 @@ func TestStrings(t *testing.T) {
 }
 
 func TestControlFlow(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "03_control.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "03_control.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"medium", "55", "128"}
 	if len(lines) != len(expected) {
@@ -102,7 +102,7 @@ func TestControlFlow(t *testing.T) {
 }
 
 func TestFunctions(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "04_functions.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "04_functions.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	// add(3,4) = 7
 	// divmod(17,5): q = 3.4, r = 2
@@ -120,7 +120,7 @@ func TestFunctions(t *testing.T) {
 }
 
 func TestTables(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "05_tables.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "05_tables.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"5",     // #arr
@@ -144,7 +144,7 @@ func TestTables(t *testing.T) {
 }
 
 func TestClosures(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "06_closures.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "06_closures.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"1", "2", "11", "3", "12"}
 	if len(lines) != len(expected) {
@@ -159,7 +159,7 @@ func TestClosures(t *testing.T) {
 }
 
 func TestMetatable(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "07_metatable.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "07_metatable.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"Rex says woof",
@@ -179,7 +179,7 @@ func TestMetatable(t *testing.T) {
 }
 
 func TestCoroutine(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "08_coroutine.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "08_coroutine.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"1", "4", "9", "16", "25"}
 	if len(lines) != len(expected) {
@@ -194,7 +194,7 @@ func TestCoroutine(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "09_error.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "09_error.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"false",                // ok (pcall caught error)
@@ -219,7 +219,7 @@ func TestError(t *testing.T) {
 }
 
 func TestStringOps(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "10_string_ops.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "10_string_ops.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{
 		"13",               // string.len
@@ -242,7 +242,7 @@ func TestStringOps(t *testing.T) {
 }
 
 func TestIterator(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "11_iterator.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "11_iterator.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	// ipairs output: 1 a, 2 b, 3 c, 4 d
 	// pairs sorted output: x 1, y 2, z 3
@@ -262,7 +262,7 @@ func TestIterator(t *testing.T) {
 }
 
 func TestAdvanced(t *testing.T) {
-	out := runGScriptFile(t, filepath.Join(".", "12_advanced.gs"))
+	out := runGScriptFile(t, filepath.Join("smoke", "12_advanced.gs"))
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	expected := []string{"832040"}
 	if len(lines) != len(expected) {
@@ -279,9 +279,9 @@ func TestAdvanced(t *testing.T) {
 // TestExamples runs example programs to make sure they don't error.
 func TestExamples(t *testing.T) {
 	examples := []string{
-		filepath.Join("..", "examples", "fib.gs"),
-		filepath.Join("..", "examples", "counter.gs"),
-		filepath.Join("..", "examples", "class.gs"),
+		filepath.Join("..", "examples", "hello", "fib.gs"),
+		filepath.Join("..", "examples", "hello", "counter.gs"),
+		filepath.Join("..", "examples", "hello", "class.gs"),
 	}
 	for _, ex := range examples {
 		t.Run(filepath.Base(ex), func(t *testing.T) {

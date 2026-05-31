@@ -3,7 +3,7 @@
 package methodjit
 
 import (
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 	"testing"
 )
 

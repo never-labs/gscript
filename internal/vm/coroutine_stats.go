@@ -3,7 +3,7 @@ package vm
 import (
 	"sync/atomic"
 
-	rt "github.com/Never-Labs/gscript/internal/runtime"
+	rt "github.com/never-labs/gscript/internal/runtime"
 )
 
 // CoroutineStatsSnapshot is a point-in-time copy of VM coroutine counters.

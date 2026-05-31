@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/arch/arm64/arm64asm"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 func TestTier2_GetTableArrayBool(t *testing.T) {

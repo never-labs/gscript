@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 )
 
 func TestErrorAPI_parseAndRuntimeKinds(t *testing.T) {

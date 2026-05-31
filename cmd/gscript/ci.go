@@ -69,7 +69,7 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 	case "smoke":
 		return []ciCommand{
 			{Name: "Go smoke tests", Args: []string{"go", "test", "./cmd/gscript", "./gscript", "./internal/runtime", "./internal/vm", "-count=1"}},
-			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/gscript", "check", "--no-test", "--no-docs", "tests/01_basic.gs"}},
+			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/gscript", "check", "--no-test", "--no-docs", "tests/smoke/01_basic.gs"}},
 			{Name: "Worktree audit", Args: []string{"bash", "scripts/worktree_audit.sh"}},
 		}, nil
 	case "pr":

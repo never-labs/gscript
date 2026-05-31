@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 const (

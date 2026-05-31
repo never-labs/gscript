@@ -11,8 +11,8 @@
 package methodjit
 
 import (
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // LoopTableArrayFact describes a table-array access admitted by loop-region

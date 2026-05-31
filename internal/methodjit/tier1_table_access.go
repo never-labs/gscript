@@ -8,8 +8,8 @@
 package methodjit
 
 import (
-	"github.com/Never-Labs/gscript/internal/jit"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 func emitBaselineGetTable(asm *jit.Assembler, inst uint32, pc int, feedbackEnabled bool) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 	lua "github.com/yuin/gopher-lua"
 	"go.starlark.net/starlark"
 )

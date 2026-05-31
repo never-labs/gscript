@@ -1,5 +1,5 @@
 // GScript Web Server Demo
-// Run: ./gscript examples/webserver.gs
+// Run: ./gscript examples/web/webserver.gs
 
 router := http.newRouter()
 

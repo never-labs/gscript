@@ -8,8 +8,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/Never-Labs/gscript/internal/methodjit"
-	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/methodjit"
+	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
 func cliEnableJIT(bvm *bytecodevm.VM, opts jitCLIOptions) (jitStatsReporter, error) {

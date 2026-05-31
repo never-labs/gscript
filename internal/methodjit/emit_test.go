@@ -10,7 +10,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // TestEmit_ReturnConst: func f() { return 42 } — compile, execute, verify returns 42.

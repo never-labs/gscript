@@ -4,12 +4,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 )
 
 // BenchmarkChessAI runs the chess_bench.gs Xiangqi AI benchmark script using the VM.
 func BenchmarkChessAI(b *testing.B) {
-	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "chess_bench.gs"))
+	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "game_engine", "chess_bench.gs"))
 	if err != nil {
 		b.Fatalf("failed to resolve chess_bench.gs path: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestChessAI_Completes(t *testing.T) {
 		t.Skip("skipping chess AI benchmark in short mode")
 	}
 
-	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "chess_bench.gs"))
+	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "game_engine", "chess_bench.gs"))
 	if err != nil {
 		t.Fatalf("failed to resolve chess_bench.gs path: %v", err)
 	}

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func TestTestFilesSingleFile(t *testing.T) {
@@ -481,8 +481,8 @@ func TestCheckCommandJSONRunsEnabledSteps(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if !report.OK || len(report.Steps) != 4 {
-		t.Fatalf("report = %+v, want four passing steps", report)
+	if !report.OK || len(report.Steps) != 5 {
+		t.Fatalf("report = %+v, want five passing steps", report)
 	}
 	for _, step := range report.Steps {
 		if !step.OK || step.Skipped || step.ExitCode != 0 {
@@ -499,7 +499,7 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runCheckCommand([]string{"--json", "--no-test", "--no-docs", dir}, &stdout, &stderr)
+	code := runCheckCommand([]string{"--json", "--no-test", "--no-manifest", "--no-docs", dir}, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("runCheckCommand code = %d, want 1", code)
 	}
@@ -507,14 +507,17 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("stdout is not JSON check report: %v; stdout = %q", err, stdout.String())
 	}
-	if report.OK || len(report.Steps) != 4 {
-		t.Fatalf("report = %+v, want failed report with four steps", report)
+	if report.OK || len(report.Steps) != 5 {
+		t.Fatalf("report = %+v, want failed report with five steps", report)
 	}
 	if !report.Steps[2].Skipped || !report.Steps[2].OK {
 		t.Fatalf("test step = %+v, want skipped ok", report.Steps[2])
 	}
 	if !report.Steps[3].Skipped || !report.Steps[3].OK {
-		t.Fatalf("docs step = %+v, want skipped ok", report.Steps[3])
+		t.Fatalf("manifest step = %+v, want skipped ok", report.Steps[3])
+	}
+	if !report.Steps[4].Skipped || !report.Steps[4].OK {
+		t.Fatalf("docs step = %+v, want skipped ok", report.Steps[4])
 	}
 }
 
@@ -543,6 +546,80 @@ func TestBenchCommandDispatchesCompareHarness(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "bench helper ok") {
 		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}
+
+func TestBenchCommandDefaultsToQuickCompare(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand(nil, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 9 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "control/sieve" || gotArgs[3] != "--runs" || gotArgs[4] != "1" || gotArgs[5] != "--warmup" || gotArgs[6] != "0" || gotArgs[7] != "--timeout" || gotArgs[8] != "60" {
+		t.Fatalf("args = %#v, want timing_compare.py quick control/sieve profile", gotArgs)
+	}
+}
+
+func TestBenchCommandDispatchesBenchmarkSelector(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"table/table_field_access", "--runs", "2"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 5 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "timing_compare.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "table/table_field_access" || gotArgs[3] != "--runs" || gotArgs[4] != "2" {
+		t.Fatalf("args = %#v, want timing_compare.py --bench table/table_field_access --runs 2", gotArgs)
+	}
+}
+
+func TestBenchCommandDispatchesProfiles(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var calls [][]string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		calls = append(calls, append([]string{name}, args...))
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if code := runBenchCommand([]string{"--quick"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("quick code = %d, stderr = %q", code, stderr.String())
+	}
+	if code := runBenchCommand([]string{"--full"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("full code = %d, stderr = %q", code, stderr.String())
+	}
+	if code := runBenchCommand([]string{"--guard"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("guard code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(calls) != 3 {
+		t.Fatalf("calls = %#v, want three profile dispatches", calls)
+	}
+	if !strings.HasSuffix(calls[0][1], filepath.Join("benchmarks", "timing_compare.py")) || !containsString(calls[0], "table/table_array_access") {
+		t.Fatalf("quick call = %#v, want timing quick profile", calls[0])
+	}
+	if !strings.HasSuffix(calls[1][1], filepath.Join("benchmarks", "timing_compare.py")) || !containsString(calls[1], "--all-groups") {
+		t.Fatalf("full call = %#v, want timing full profile", calls[1])
+	}
+	if !strings.HasSuffix(calls[2][1], filepath.Join("benchmarks", "strict_guard.py")) || !containsString(calls[2], "control/sieve") {
+		t.Fatalf("guard call = %#v, want strict guard profile", calls[2])
 	}
 }
 
@@ -648,6 +725,26 @@ func TestDiagCommandRejectsUnknownMode(t *testing.T) {
 	}
 }
 
+func TestDiagnoseCommandDispatchesBenchmarkSelector(t *testing.T) {
+	oldBenchExecCommand := benchExecCommand
+	t.Cleanup(func() { benchExecCommand = oldBenchExecCommand })
+	var gotArgs []string
+	benchExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "bench")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runDiagnoseCommand([]string{"table/table_field_access", "--no-timing"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDiagnoseCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 4 || !strings.HasSuffix(gotArgs[0], filepath.Join("benchmarks", "diagnose.py")) || gotArgs[1] != "--bench" || gotArgs[2] != "table/table_field_access" || gotArgs[3] != "--no-timing" {
+		t.Fatalf("args = %#v, want diagnose.py --bench table/table_field_access --no-timing", gotArgs)
+	}
+}
+
 func TestInspectBytecodeDumpsMainProto(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ok.gs")
@@ -686,6 +783,68 @@ print(add(1, 2))
 	out := stdout.String()
 	if strings.Contains(out, "=== <main>") || !strings.Contains(out, "RETURN") {
 		t.Fatalf("stdout = %q, want named proto disassembly only", out)
+	}
+}
+
+func TestInspectDirectivesDumpsFileDirectives(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "directives.gs")
+	src := `//gscript:build linux, darwin
+//gscript:test integration slow
+//gscript:cap docs.read,net.client
+//gscript:feature ai-native
+//@gscript:build ignored
+func main() {}
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runInspectCommand([]string{"directives", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	out := stdout.String()
+	for _, want := range []string{
+		"1:1 build linux, darwin",
+		"2:1 test integration slow",
+		"3:1 cap docs.read,net.client",
+		"4:1 feature ai-native",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout = %q, want %q", out, want)
+		}
+	}
+	if strings.Contains(out, "ignored") {
+		t.Fatalf("stdout = %q, want @ syntax ignored", out)
+	}
+}
+
+func TestInspectDirectivesDumpsJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "directives_json.gs")
+	src := `//gscript:cap fs.read, net.client
+print("ok")
+`
+	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runInspectCommand([]string{"directives", "--json", path}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runInspectCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var directives []inspectFileDirective
+	if err := json.Unmarshal(stdout.Bytes(), &directives); err != nil {
+		t.Fatalf("stdout is not JSON directives: %v; stdout = %q", err, stdout.String())
+	}
+	if len(directives) != 1 {
+		t.Fatalf("directives = %#v, want one", directives)
+	}
+	if got := directives[0]; got.Kind != "cap" || got.Line != 1 || got.Column != 1 || len(got.Args) != 2 || got.Args[0] != "fs.read" || got.Args[1] != "net.client" {
+		t.Fatalf("directive = %#v, want cap fs.read net.client at 1:1", got)
 	}
 }
 
@@ -906,6 +1065,38 @@ func TestTestFilesDirectoryCollectsGSFilesSorted(t *testing.T) {
 		if files[i] != want[i] {
 			t.Fatalf("testFiles = %#v, want %#v", files, want)
 		}
+	}
+}
+
+func TestRunTestCommandDefaultsToCurrentDirectory(t *testing.T) {
+	dir := t.TempDir()
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWD); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+	if err := os.WriteFile(filepath.Join(dir, "ok.gs"), []byte("x := 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--format=json"}, cliRunOptions{UseVM: false}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	var result testRunResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("stdout is not JSON test result: %v; stdout = %q", err, stdout.String())
+	}
+	if !result.OK || result.Total != 1 || result.Passed != 1 {
+		t.Fatalf("result = %+v, want one passing default-directory test", result)
 	}
 }
 

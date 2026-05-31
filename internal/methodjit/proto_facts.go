@@ -2,7 +2,7 @@
 
 package methodjit
 
-import "github.com/Never-Labs/gscript/internal/vm"
+import "github.com/never-labs/gscript/internal/vm"
 
 func protoHasNoCallLikeOps(proto *vm.FuncProto) bool {
 	if proto == nil {

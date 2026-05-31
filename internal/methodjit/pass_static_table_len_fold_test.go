@@ -3,8 +3,8 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 func TestStaticTableLenFold_FoldsDominatingSetListLen(t *testing.T) {

@@ -69,6 +69,15 @@ var stdlibModules = []StdlibModuleInfo{
 	{Name: "vec", Layer: StdlibLayerData, SafeDefault: true},
 }
 
+var stdlibLayerOrder = []string{
+	StdlibLayerBase,
+	StdlibLayerHost,
+	StdlibLayerAI,
+	StdlibLayerData,
+	StdlibLayerVendor,
+	StdlibLayerCompat,
+}
+
 func StdlibModules() []StdlibModuleInfo {
 	out := make([]StdlibModuleInfo, len(stdlibModules))
 	for i, module := range stdlibModules {
@@ -78,10 +87,36 @@ func StdlibModules() []StdlibModuleInfo {
 	return out
 }
 
+func StdlibModule(name string) (StdlibModuleInfo, bool) {
+	for _, module := range stdlibModules {
+		if module.Name == name {
+			module.Capabilities = append([]string(nil), module.Capabilities...)
+			return module, true
+		}
+	}
+	return StdlibModuleInfo{}, false
+}
+
 func StdlibModuleNames() []string {
 	out := make([]string, len(stdlibModules))
 	for i, module := range stdlibModules {
 		out[i] = module.Name
+	}
+	return out
+}
+
+func StdlibLayers() []string {
+	return append([]string(nil), stdlibLayerOrder...)
+}
+
+func StdlibModulesForLayer(layer string) []StdlibModuleInfo {
+	var out []StdlibModuleInfo
+	for _, module := range stdlibModules {
+		if module.Layer != layer {
+			continue
+		}
+		module.Capabilities = append([]string(nil), module.Capabilities...)
+		out = append(out, module)
 	}
 	return out
 }

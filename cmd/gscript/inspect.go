@@ -1,30 +1,36 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/Never-Labs/gscript/internal/lexer"
-	"github.com/Never-Labs/gscript/internal/parser"
-	bytecodevm "github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
+	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
 func runInspectCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(errw, "usage: gscript inspect bytecode [--proto NAME] <file.gs>")
+		fmt.Fprintln(errw, "       gscript inspect directives [--json] <file.gs>")
 		return 2
 	}
 	switch args[0] {
 	case "bytecode":
 		return runInspectBytecodeCommand(args[1:], outw, errw)
+	case "directives":
+		return runInspectDirectivesCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
 		fmt.Fprintln(outw, "usage: gscript inspect bytecode [--proto NAME] <file.gs>")
+		fmt.Fprintln(outw, "       gscript inspect directives [--json] <file.gs>")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript inspect: unknown mode %q (want bytecode)\n", args[0])
+		fmt.Fprintf(errw, "gscript inspect: unknown mode %q (want bytecode or directives)\n", args[0])
 		return 2
 	}
 }
@@ -57,6 +63,80 @@ func runInspectBytecodeCommand(args []string, outw, errw io.Writer) int {
 	}
 	dumpInspectProto(outw, "<main>", proto, 0)
 	return 0
+}
+
+type inspectFileDirective struct {
+	Kind   string   `json:"kind"`
+	Args   []string `json:"args,omitempty"`
+	Text   string   `json:"text,omitempty"`
+	Line   int      `json:"line"`
+	Column int      `json:"column"`
+}
+
+func runInspectDirectivesCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("inspect directives", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print directives as JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	paths := fs.Args()
+	if len(paths) != 1 {
+		fmt.Fprintln(errw, "usage: gscript inspect directives [--json] <file.gs>")
+		return 2
+	}
+	directives, err := parseFileDirectivesForInspect(paths[0])
+	if err != nil {
+		fmt.Fprintf(errw, "%s: %v\n", paths[0], err)
+		return 1
+	}
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(inspectDirectiveRows(directives)); err != nil {
+			fmt.Fprintf(errw, "gscript inspect directives: write json: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+	for _, directive := range directives {
+		if directive.Text == "" {
+			fmt.Fprintf(outw, "%d:%d %s\n", directive.P.Line, directive.P.Column, directive.Kind)
+			continue
+		}
+		fmt.Fprintf(outw, "%d:%d %s %s\n", directive.P.Line, directive.P.Column, directive.Kind, directive.Text)
+	}
+	return 0
+}
+
+func inspectDirectiveRows(directives []ast.FileDirective) []inspectFileDirective {
+	out := make([]inspectFileDirective, 0, len(directives))
+	for _, directive := range directives {
+		out = append(out, inspectFileDirective{
+			Kind:   directive.Kind,
+			Args:   directive.Args,
+			Text:   directive.Text,
+			Line:   directive.P.Line,
+			Column: directive.P.Column,
+		})
+	}
+	return out
+}
+
+func parseFileDirectivesForInspect(filename string) ([]ast.FileDirective, error) {
+	src, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	tokens, err := lexer.New(string(src)).Tokenize()
+	if err != nil {
+		return nil, fmt.Errorf("lexer error: %w", err)
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return nil, fmt.Errorf("parse error: %w", err)
+	}
+	return prog.FileDirectives, nil
 }
 
 func compileFileForInspect(filename string) (*bytecodevm.FuncProto, error) {

@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/Never-Labs/gscript/internal/runtime"
+import "github.com/never-labs/gscript/internal/runtime"
 
 func (vm *VM) tryFuseStringSubToNumber(frame *CallFrame, base int, a int, nArgs int, rawC int, gf *runtime.GoFunction) (bool, error) {
 	if gf == nil ||

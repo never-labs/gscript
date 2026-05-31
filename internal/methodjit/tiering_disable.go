@@ -5,7 +5,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 type tier0DisableDecision struct {

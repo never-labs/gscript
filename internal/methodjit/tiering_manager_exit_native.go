@@ -14,9 +14,9 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/jit"
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // errNestedNativeCallExit is a known bridge limitation: the current

@@ -5,7 +5,7 @@ import (
 	"math"
 	"os"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 )
 
 // ---- Game Engine Types ----

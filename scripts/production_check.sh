@@ -187,8 +187,8 @@ add_release_smoke() {
         add_skip "Release Smoke" "missing go"
         return
     fi
-    if [ ! -f tests/01_basic.gs ]; then
-        add_skip "Release Smoke" "missing tests/01_basic.gs"
+    if [ ! -f tests/smoke/01_basic.gs ]; then
+        add_skip "Release Smoke" "missing tests/smoke/01_basic.gs"
         return
     fi
     if [ ! -f benchmarks/table/table_field_access.gs ]; then
@@ -196,7 +196,7 @@ add_release_smoke() {
         return
     fi
     add_run "Release Smoke" \
-        "go run ./cmd/gscript tests/01_basic.gs && go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs && go run ./cmd/gscript inspect bytecode tests/01_basic.gs"
+        "go run ./cmd/gscript tests/smoke/01_basic.gs && go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs && go run ./cmd/gscript inspect bytecode tests/smoke/01_basic.gs"
 }
 
 build_quick_plan() {

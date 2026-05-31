@@ -6,7 +6,7 @@ import (
 	"sort"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // Tier2FeedbackSnapshot captures the feedback maturity seen by one Tier 2

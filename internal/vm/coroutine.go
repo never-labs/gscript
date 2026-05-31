@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	rt "github.com/Never-Labs/gscript/internal/runtime"
+	rt "github.com/never-labs/gscript/internal/runtime"
 )
 
 // VMCoroutineStatus represents the state of a VM coroutine.

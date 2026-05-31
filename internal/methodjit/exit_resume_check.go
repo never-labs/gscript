@@ -8,8 +8,8 @@ import (
 	"sort"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 const exitResumeCheckEnv = "GSCRIPT_EXIT_RESUME_CHECK"

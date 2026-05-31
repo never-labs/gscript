@@ -5,7 +5,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/jit"
 )
 
 // emitTableArrayLoadExit handles a typed-array load miss by executing the

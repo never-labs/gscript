@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 )
 
 func ExampleCompile() {

@@ -25,7 +25,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // TestDiag_ProductionParity_Sieve asserts that CompileForDiagnostics remains

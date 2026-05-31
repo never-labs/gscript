@@ -1,7 +1,7 @@
 package benchmarks
 
 import (
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 	"testing"
 )
 

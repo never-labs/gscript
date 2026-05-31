@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Never-Labs/gscript/internal/ast"
-	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/lexer"
 )
 
 // Parser implements a recursive descent parser for GScript.

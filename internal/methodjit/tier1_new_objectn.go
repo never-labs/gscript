@@ -5,8 +5,8 @@ package methodjit
 import (
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/jit"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 func emitBaselineNewObjectN(asm *jit.Assembler, inst uint32, pc int, proto *vm.FuncProto, caches []newTableCacheEntry, preserveCoroutinePayloadFastPath bool) {

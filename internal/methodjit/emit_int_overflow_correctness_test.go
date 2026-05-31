@@ -21,8 +21,8 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // TestTier2_IntOverflow_Loop_Matches_VM is the canonical R77 failing

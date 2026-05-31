@@ -1,8 +1,8 @@
 package methodjit
 
 import (
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // Test-only builders that construct domain fact structs from pre-populated maps.

@@ -1,6 +1,6 @@
 // Smoke test and usage tour for the current structure-of-arrays stdlib.
 // Run with:
-//   go run ./cmd/gscript examples/data_oriented/soa_kernels.gs
+//   go run ./cmd/gscript examples/data_processing/data_oriented/soa_kernels.gs
 
 func check(name, ok) {
     assert(ok)

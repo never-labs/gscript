@@ -32,13 +32,17 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	noFmt := fs.Bool("no-fmt", false, "skip formatter check")
 	noLint := fs.Bool("no-lint", false, "skip lint")
 	noTest := fs.Bool("no-test", false, "skip tests")
+	noManifest := fs.Bool("no-manifest", false, "skip test and benchmark manifest coverage check")
 	noDocs := fs.Bool("no-docs", false, "skip docs check")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	paths := fs.Args()
+	if len(paths) == 0 {
+		paths = []string{"."}
+	}
 	if len(paths) != 1 {
-		fmt.Fprintln(errw, "usage: gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-docs] <path-or-dir>")
+		fmt.Fprintln(errw, "usage: gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [path-or-dir]")
 		return 2
 	}
 
@@ -68,6 +72,9 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 	runStep("test", *noTest, func() int {
 		return runTestCommand([]string{path}, cliRunOptions{UseVM: false}, io.Discard, errw)
 	})
+	runStep("manifest", *noManifest, func() int {
+		return runManifestCheck(errw, errw)
+	})
 	runStep("docs", *noDocs, func() int {
 		docsOut := outw
 		if *jsonOut {
@@ -95,6 +102,31 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 		}
 	}
 	if !report.OK {
+		return 1
+	}
+	return 0
+}
+
+func runManifestCheck(outw, errw io.Writer) int {
+	script, err := findScriptFromCWD(filepath.Join("tests", "manifest.py"))
+	if err != nil {
+		fmt.Fprintf(errw, "gscript check: %v\n", err)
+		return 1
+	}
+	python := os.Getenv("GSCRIPT_CHECK_PYTHON")
+	if python == "" {
+		python = "python3"
+	}
+	cmd := checkExecCommand(python, script, "check", "tests", "benchmarks")
+	cmd.Stdout = outw
+	cmd.Stderr = errw
+	cmd.Dir = filepath.Dir(filepath.Dir(script))
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(errw, "gscript check: %v\n", err)
 		return 1
 	}
 	return 0

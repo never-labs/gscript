@@ -3,8 +3,8 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 func TestSourceFeedbackRefresh_RestoresInlinedGetTableKindAndType(t *testing.T) {

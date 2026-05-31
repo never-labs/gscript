@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/Never-Labs/gscript/gscript"
-	"github.com/Never-Labs/gscript/internal/runtime"
+	gs "github.com/never-labs/gscript/gscript"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 type hostModuleService struct {

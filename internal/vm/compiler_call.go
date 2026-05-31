@@ -6,7 +6,7 @@ package vm
 // method lookup. Pure code movement from compiler.go; declarations verbatim.
 
 import (
-	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/ast"
 )
 
 func (c *compiler) compileCallExprMulti(call *ast.CallExpr, dest int, nResults int) error {

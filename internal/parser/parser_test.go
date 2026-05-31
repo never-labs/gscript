@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/ast"
-	"github.com/Never-Labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/lexer"
 )
 
 // helper: lex and parse the source, fail the test on error
@@ -382,7 +382,7 @@ agent answer(q) {
 }
 
 func TestAINativeExampleParses(t *testing.T) {
-	src, err := os.ReadFile("../../examples/ai_native_agent.gs")
+	src, err := os.ReadFile("../../examples/ai_agent/ai_native_agent.gs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,6 +501,19 @@ tool lookup() {
 	}
 	if len(tool.Requires) != 1 || tool.Requires[0] != "none" {
 		t.Fatalf("tool requires = %#v", tool.Requires)
+	}
+}
+
+func TestAtSyntaxFileDirectiveIgnored(t *testing.T) {
+	prog := mustParse(t, `//@gscript:build linux
+//gscript:cap fs.read
+func main() {}
+`)
+	if len(prog.FileDirectives) != 1 {
+		t.Fatalf("file directives = %#v, want one", prog.FileDirectives)
+	}
+	if got := prog.FileDirectives[0].Kind; got != "cap" {
+		t.Fatalf("directive kind = %q, want cap", got)
 	}
 }
 

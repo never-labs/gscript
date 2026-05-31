@@ -3,7 +3,7 @@ package vm
 import (
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 type spectralMultiplyKind uint8

@@ -12,7 +12,7 @@ Checks scripts/release_artifacts.sh without changing its implementation.
 Default mode runs a dry-run and verifies the planned artifact names and metadata.
 With --build, the script builds into a temporary output directory unless
 --output-dir is provided, then verifies SHA256SUMS and runs the built binary
-against tests/01_basic.gs.
+against tests/smoke/01_basic.gs.
 
 Options:
       --build           Run a real local build after the dry-run check
@@ -153,7 +153,7 @@ require_cmd go
 require_cmd grep
 require_cmd awk
 require_file "$release_script"
-require_file "$repo_root/tests/01_basic.gs"
+require_file "$repo_root/tests/smoke/01_basic.gs"
 
 goos="$(go env GOOS)"
 goarch="$(go env GOARCH)"
@@ -231,7 +231,7 @@ require_contains "$metadata_path" "goos=$goos"
 require_contains "$metadata_path" "goarch=$goarch"
 
 verify_checksums "$out_dir"
-"$binary_path" tests/01_basic.gs >/dev/null
+"$binary_path" tests/smoke/01_basic.gs >/dev/null
 
 echo "release_artifacts_check.sh: build artifacts verified in $out_dir"
 echo "release_artifacts_check.sh: pass"

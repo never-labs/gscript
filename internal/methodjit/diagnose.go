@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // Snapshot records the IR state at one point in the pipeline.

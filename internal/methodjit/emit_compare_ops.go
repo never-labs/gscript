@@ -8,7 +8,7 @@
 package methodjit
 
 import (
-	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/jit"
 )
 
 // emitFloatCmp emits ARM64 code for float comparison (OpLtFloat, OpLeFloat).

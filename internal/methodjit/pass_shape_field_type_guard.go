@@ -3,7 +3,7 @@ package methodjit
 import (
 	"fmt"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 var shapeFieldTypeGuardPassAllowedDomains = allowedDomainsForModule(

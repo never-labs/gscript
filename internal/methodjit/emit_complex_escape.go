@@ -5,7 +5,7 @@ package methodjit
 import (
 	"math"
 
-	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/jit"
 )
 
 func (ec *emitContext) emitComplexEscapeInSet(instr *Instr) {

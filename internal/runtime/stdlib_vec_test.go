@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/lexer"
-	"github.com/Never-Labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
 )
 
 // runWithVec parses and executes source code with vec and color libs pre-registered.

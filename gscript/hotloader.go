@@ -13,8 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/Never-Labs/gscript/internal/ast"
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // HotLoader compiles GScript files into atomically swappable program handles.

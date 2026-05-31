@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 func TestNewAnalysisResultInitializesMapsAndPreservesNilSentinels(t *testing.T) {

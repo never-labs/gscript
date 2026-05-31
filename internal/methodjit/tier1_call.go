@@ -32,8 +32,8 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/jit"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // Struct layout constants for vm.Closure and vm.FuncProto.

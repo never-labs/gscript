@@ -25,8 +25,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/Never-Labs/gscript/internal/jit"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // slotOff returns the byte offset for a VM register slot.

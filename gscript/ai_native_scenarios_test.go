@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/Never-Labs/gscript/gscript"
+	gs "github.com/never-labs/gscript/gscript"
 )
 
 func TestAINativeDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
@@ -775,7 +775,7 @@ func TestAINativeAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 			}}
 			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
 
-			if err := vm.ExecFile(filepath.Join("..", "examples", "ai_native_incident_response.gs")); err != nil {
+			if err := vm.ExecFile(filepath.Join("..", "examples", "ai_agent", "ai_native_incident_response.gs")); err != nil {
 				t.Fatalf("ExecFile: %v", err)
 			}
 

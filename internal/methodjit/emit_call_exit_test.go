@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // makeCallExitVM creates a VM with all globals from the source set up.

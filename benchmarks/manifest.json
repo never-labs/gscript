@@ -1,5 +1,882 @@
 {
   "schema_version": 2,
+  "case_count": 68,
+  "cases": [
+    {
+      "id": "app/actors_dispatch_mutation",
+      "path": "benchmarks/app/actors_dispatch_mutation.gs",
+      "domain": "app",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua",
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "app/mixed_inventory_sim",
+      "path": "benchmarks/app/mixed_inventory_sim.gs",
+      "domain": "app",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/app/mixed_inventory_sim.lua",
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "app/stdlib_host",
+      "path": "benchmarks/app/stdlib_host.gs",
+      "domain": "app",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/app/stdlib_host.lua",
+      "status": "active",
+      "tags": [
+        "app",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/call_len_pairs_metamethod",
+      "path": "benchmarks/calls/call_len_pairs_metamethod.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/calls_vararg_coroutine",
+      "path": "benchmarks/calls/calls_vararg_coroutine.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/closure_accumulator",
+      "path": "benchmarks/calls/closure_accumulator.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/closure_accumulator.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/closure_bench",
+      "path": "benchmarks/calls/closure_bench.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/closure_bench.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/coroutine_bench",
+      "path": "benchmarks/calls/coroutine_bench.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/coroutine_bench.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/method_dispatch",
+      "path": "benchmarks/calls/method_dispatch.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/method_dispatch.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "calls/object_creation",
+      "path": "benchmarks/calls/object_creation.gs",
+      "domain": "calls",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/calls/object_creation.lua",
+      "status": "active",
+      "tags": [
+        "calls",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "concurrency/context_cancel",
+      "path": "benchmarks/concurrency/context_cancel.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/goroutine_cpu",
+      "path": "benchmarks/concurrency/goroutine_cpu.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/goroutine_sleep",
+      "path": "benchmarks/concurrency/goroutine_sleep.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/mutex_once",
+      "path": "benchmarks/concurrency/mutex_once.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/producer_consumer_pipeline",
+      "path": "benchmarks/concurrency/producer_consumer_pipeline.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua",
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "concurrency/select_blocking",
+      "path": "benchmarks/concurrency/select_blocking.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/select_comma_ok",
+      "path": "benchmarks/concurrency/select_comma_ok.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/select_default",
+      "path": "benchmarks/concurrency/select_default.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/select_timeout",
+      "path": "benchmarks/concurrency/select_timeout.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/sync_group",
+      "path": "benchmarks/concurrency/sync_group.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "concurrency/waitgroup",
+      "path": "benchmarks/concurrency/waitgroup.gs",
+      "domain": "concurrency",
+      "kind": "benchmark",
+      "lua_ref": null,
+      "status": "active",
+      "tags": [
+        "concurrency",
+        "benchmark"
+      ]
+    },
+    {
+      "id": "control/defer_protected",
+      "path": "benchmarks/control/defer_protected.gs",
+      "domain": "control",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/control/defer_protected.lua",
+      "status": "active",
+      "tags": [
+        "control",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "control/sieve",
+      "path": "benchmarks/control/sieve.gs",
+      "domain": "control",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/control/sieve.lua",
+      "status": "active",
+      "tags": [
+        "control",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_affine_many",
+      "path": "benchmarks/data/soa_affine_many.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_affine_many.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_clamp",
+      "path": "benchmarks/data/soa_clamp.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_clamp.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_dot",
+      "path": "benchmarks/data/soa_dot.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_dot.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_filter_gather",
+      "path": "benchmarks/data/soa_filter_gather.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_filter_gather.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_mask_compare",
+      "path": "benchmarks/data/soa_mask_compare.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_mask_compare.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_masked_aggregate",
+      "path": "benchmarks/data/soa_masked_aggregate.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_masked_aggregate.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_reducers",
+      "path": "benchmarks/data/soa_reducers.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_reducers.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_scan",
+      "path": "benchmarks/data/soa_scan.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_scan.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_scatter",
+      "path": "benchmarks/data/soa_scatter.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_scatter.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "data/soa_select",
+      "path": "benchmarks/data/soa_select.gs",
+      "domain": "data",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/data/soa_select.lua",
+      "status": "active",
+      "tags": [
+        "data",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/fannkuch",
+      "path": "benchmarks/numeric/fannkuch.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/fannkuch.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/mandelbrot",
+      "path": "benchmarks/numeric/mandelbrot.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/mandelbrot.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/math_intensive",
+      "path": "benchmarks/numeric/math_intensive.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/math_intensive.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/matmul",
+      "path": "benchmarks/numeric/matmul.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/matmul.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/matmul_dense",
+      "path": "benchmarks/numeric/matmul_dense.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/matmul_dense_split2",
+      "path": "benchmarks/numeric/matmul_dense_split2.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/matmul_dense_tb",
+      "path": "benchmarks/numeric/matmul_dense_tb.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/matmul_dense_unroll2",
+      "path": "benchmarks/numeric/matmul_dense_unroll2.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/matmul_row",
+      "path": "benchmarks/numeric/matmul_row.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/matmul_row.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/nbody",
+      "path": "benchmarks/numeric/nbody.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/nbody.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/nbody_dense",
+      "path": "benchmarks/numeric/nbody_dense.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/nbody_dense.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/spectral_norm",
+      "path": "benchmarks/numeric/spectral_norm.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/spectral_norm.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/spectral_norm_dense",
+      "path": "benchmarks/numeric/spectral_norm_dense.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "numeric/sum_primes",
+      "path": "benchmarks/numeric/sum_primes.gs",
+      "domain": "numeric",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/numeric/sum_primes.lua",
+      "status": "active",
+      "tags": [
+        "numeric",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/ack_nested_shifted",
+      "path": "benchmarks/recursion/ack_nested_shifted.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/ackermann",
+      "path": "benchmarks/recursion/ackermann.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/ackermann.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/binary_trees",
+      "path": "benchmarks/recursion/binary_trees.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/binary_trees.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/fib",
+      "path": "benchmarks/recursion/fib.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/fib.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/fib_recursive",
+      "path": "benchmarks/recursion/fib_recursive.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/fib_recursive.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/fibonacci_iterative",
+      "path": "benchmarks/recursion/fibonacci_iterative.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "recursion/mutual_recursion",
+      "path": "benchmarks/recursion/mutual_recursion.gs",
+      "domain": "recursion",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/recursion/mutual_recursion.lua",
+      "status": "active",
+      "tags": [
+        "recursion",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "string/log_tokenize_format",
+      "path": "benchmarks/string/log_tokenize_format.gs",
+      "domain": "string",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/string/log_tokenize_format.lua",
+      "status": "active",
+      "tags": [
+        "string",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "string/math_bit_utf8",
+      "path": "benchmarks/string/math_bit_utf8.gs",
+      "domain": "string",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/string/math_bit_utf8.lua",
+      "status": "active",
+      "tags": [
+        "string",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "string/regexp_random",
+      "path": "benchmarks/string/regexp_random.gs",
+      "domain": "string",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/string/regexp_random.lua",
+      "status": "active",
+      "tags": [
+        "string",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "string/string_bench",
+      "path": "benchmarks/string/string_bench.gs",
+      "domain": "string",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/string/string_bench.lua",
+      "status": "active",
+      "tags": [
+        "string",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "string/strings_patterns",
+      "path": "benchmarks/string/strings_patterns.gs",
+      "domain": "string",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/string/strings_patterns.lua",
+      "status": "active",
+      "tags": [
+        "string",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/events_metamethod",
+      "path": "benchmarks/table/events_metamethod.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/events_metamethod.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/groupby_nested_agg",
+      "path": "benchmarks/table/groupby_nested_agg.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/groupby_nested_agg.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/json_table_walk",
+      "path": "benchmarks/table/json_table_walk.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/json_table_walk.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/nextvar_table",
+      "path": "benchmarks/table/nextvar_table.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/nextvar_table.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/sort",
+      "path": "benchmarks/table/sort.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/sort.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/sort_mixed_numeric",
+      "path": "benchmarks/table/sort_mixed_numeric.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/sort_mixed_numeric.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/table_array_access",
+      "path": "benchmarks/table/table_array_access.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/table_array_access.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/table_field_access",
+      "path": "benchmarks/table/table_field_access.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/table_field_access.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    },
+    {
+      "id": "table/table_sort_proxy",
+      "path": "benchmarks/table/table_sort_proxy.gs",
+      "domain": "table",
+      "kind": "benchmark",
+      "lua_ref": "benchmarks/lua_ref/table/table_sort_proxy.lua",
+      "status": "active",
+      "tags": [
+        "table",
+        "benchmark",
+        "lua_ref"
+      ]
+    }
+  ],
   "time_source_hints": {
     "script_time_line": "Benchmark prints a final Time: ...s line; harness may repeat or fall back to wall time when script timing is too small."
   },
@@ -16,6 +893,107 @@
     "data",
     "app",
     "control"
+  ],
+  "path_roles": {
+    "benchmark_domains": [
+      "benchmarks/numeric",
+      "benchmarks/recursion",
+      "benchmarks/table",
+      "benchmarks/calls",
+      "benchmarks/string",
+      "benchmarks/concurrency",
+      "benchmarks/data",
+      "benchmarks/app",
+      "benchmarks/control"
+    ],
+    "reference_domains": [
+      "benchmarks/lua_ref"
+    ],
+    "history": [
+      "benchmarks/data/history"
+    ],
+    "tool_scripts": [
+      "benchmarks/audit_guard.py",
+      "benchmarks/conformance_perf_coverage.py",
+      "benchmarks/coverage_guard.sh",
+      "benchmarks/debug_artifact.py",
+      "benchmarks/diagnose.py",
+      "benchmarks/diagnose_tier2.sh",
+      "benchmarks/jit_addr_map.py",
+      "benchmarks/perf_submit_guard.py",
+      "benchmarks/plot_history.sh",
+      "benchmarks/profile_exits.py",
+      "benchmarks/rank_luajit_gaps.py",
+      "benchmarks/regression_guard.py",
+      "benchmarks/regression_guard.sh",
+      "benchmarks/set_baseline.sh",
+      "benchmarks/strict_guard.py",
+      "benchmarks/strict_guard.sh",
+      "benchmarks/timing_compare.py",
+      "benchmarks/triage.py",
+      "benchmarks/validate_lua_refs.py"
+    ],
+    "legacy_reference": [
+      "benchmarks/lua_ref/legacy"
+    ],
+    "go_reference_libraries": [
+      "benchmarks/data_oriented"
+    ],
+    "go_commands": [
+      "benchmarks/cmd/data_oriented_bench"
+    ]
+  },
+  "compatibility": {
+    "legacy_group_aliases": {
+      "suite": [
+        "numeric",
+        "recursion",
+        "table",
+        "calls",
+        "string",
+        "control"
+      ],
+      "extended": [
+        "app",
+        "table",
+        "string",
+        "concurrency"
+      ],
+      "variants": [
+        "recursion",
+        "calls",
+        "numeric",
+        "table"
+      ],
+      "official": [
+        "calls",
+        "control",
+        "table",
+        "string",
+        "app"
+      ],
+      "data_oriented": [
+        "data"
+      ]
+    },
+    "forwarded_commands": [
+      {
+        "legacy_path": "benchmarks/data_oriented/cmd/data_oriented_bench",
+        "canonical_path": "benchmarks/cmd/data_oriented_bench",
+        "status": "compatible_forwarder"
+      }
+    ]
+  },
+  "auxiliary_benchmark_sets": [
+    {
+      "id": "data_oriented_go_reference",
+      "kind": "go_reference_microbenchmarks",
+      "library_path": "benchmarks/data_oriented",
+      "canonical_command": "benchmarks/cmd/data_oriented_bench",
+      "legacy_command": "benchmarks/data_oriented/cmd/data_oriented_bench",
+      "migration_status": "not_moved_import_path_is_public_to_repo",
+      "notes": "Go package path remains stable; canonical runner moved to benchmarks/cmd with legacy command forwarding."
+    }
   ],
   "benchmarks": [
     {

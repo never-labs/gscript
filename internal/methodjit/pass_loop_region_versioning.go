@@ -1,6 +1,6 @@
 package methodjit
 
-import "github.com/Never-Labs/gscript/internal/vm"
+import "github.com/never-labs/gscript/internal/vm"
 
 // LoopRegionVersioningPass recognizes single-entry natural loops whose
 // preheader carries typed table-array facts and whose header branch proves a

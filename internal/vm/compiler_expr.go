@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/ast"
 )
 
 func (c *compiler) compileExprTo(expr ast.Expr, dest int) error {

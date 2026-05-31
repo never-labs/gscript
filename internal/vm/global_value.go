@@ -1,6 +1,6 @@
 package vm
 
-import "github.com/Never-Labs/gscript/internal/runtime"
+import "github.com/never-labs/gscript/internal/runtime"
 
 func (vm *VM) globalValue(name string) (runtime.Value, bool) {
 	if vm.globalOverrides != nil {

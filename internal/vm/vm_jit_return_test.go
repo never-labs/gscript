@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 type resultBufferJIT struct {

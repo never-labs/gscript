@@ -3,7 +3,7 @@ package runtime
 import (
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/ast"
 )
 
 // FuncProto holds the parsed function information (shared across all closures

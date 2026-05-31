@@ -7,7 +7,7 @@ import (
 	"sort"
 	"unsafe"
 
-	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/jit"
 )
 
 func (ec *emitContext) initTier2BlockCounters() {

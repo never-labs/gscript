@@ -5,7 +5,7 @@ package methodjit
 import (
 	"testing"
 
-	"github.com/Never-Labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/internal/vm"
 )
 
 // Source containing a function that calls coroutine.resume in a hot loop.

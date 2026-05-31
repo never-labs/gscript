@@ -8,7 +8,7 @@
 package methodjit
 
 import (
-	"github.com/Never-Labs/gscript/internal/jit"
+	"github.com/never-labs/gscript/internal/jit"
 )
 
 // emitDeopt emits ARM64 code that bails out to the interpreter.

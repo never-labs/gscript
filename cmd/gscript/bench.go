@@ -14,8 +14,10 @@ var benchExecCommand = exec.Command
 
 func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript bench [compare|strict|diagnose] [benchmark-harness-flags...]")
-		return 2
+		return runBenchHarness("compare", []string{"--bench", "control/sieve", "--runs", "1", "--warmup", "0", "--timeout", "60"}, outw, errw)
+	}
+	if profileMode, profileArgs, rest, ok := benchProfileArgs(args); ok {
+		return runBenchHarness(profileMode, append(profileArgs, rest...), outw, errw)
 	}
 	mode := args[0]
 	harnessArgs := args[1:]
@@ -25,8 +27,15 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	if len(mode) > 0 && mode[0] == '-' {
 		mode = "compare"
 		harnessArgs = args
+	} else if isBenchmarkSelector(mode) {
+		mode = "compare"
+		harnessArgs = append([]string{"--bench", args[0]}, args[1:]...)
 	}
 
+	return runBenchHarness(mode, harnessArgs, outw, errw)
+}
+
+func runBenchHarness(mode string, harnessArgs []string, outw, errw io.Writer) int {
 	script, err := benchScriptForMode(mode)
 	if err != nil {
 		fmt.Fprintf(errw, "gscript bench: %v\n", err)
@@ -57,6 +66,49 @@ func runBenchCommand(args []string, outw, errw io.Writer) int {
 	return 0
 }
 
+func runDiagnoseCommand(args []string, outw, errw io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(errw, "usage: gscript diagnose <benchmark> [diagnose-flags...]")
+		return 2
+	}
+	return runBenchHarness("diagnose", normalizeBenchmarkSelectorArgs(args), outw, errw)
+}
+
+func benchProfileArgs(args []string) (string, []string, []string, bool) {
+	if len(args) == 0 {
+		return "", nil, nil, false
+	}
+	switch args[0] {
+	case "--quick":
+		return "compare", []string{"--bench", "control/sieve", "--bench", "table/table_array_access", "--runs", "1", "--warmup", "0", "--timeout", "60"}, args[1:], true
+	case "--full":
+		return "compare", []string{"--all-groups"}, args[1:], true
+	case "--guard":
+		return "strict", []string{"--bench", "control/sieve", "--bench", "table/table_array_access", "--runs", "1", "--warmup", "0", "--timeout", "60"}, args[1:], true
+	default:
+		return "", nil, nil, false
+	}
+}
+
+func normalizeBenchmarkSelectorArgs(args []string) []string {
+	if len(args) == 0 || len(args[0]) == 0 || args[0][0] == '-' {
+		return args
+	}
+	return append([]string{"--bench", args[0]}, args[1:]...)
+}
+
+func isBenchmarkSelector(arg string) bool {
+	if arg == "" || arg[0] == '-' {
+		return false
+	}
+	switch arg {
+	case "compare", "timing", "strict", "diagnose", "help":
+		return false
+	default:
+		return true
+	}
+}
+
 func benchScriptForMode(mode string) (string, error) {
 	switch mode {
 	case "compare":
@@ -74,7 +126,7 @@ func benchScriptForMode(mode string) (string, error) {
 
 func findBenchmarkScript(name string) (string, error) {
 	if name == "" {
-		return "", errors.New("usage: gscript bench [compare|strict|diagnose] [benchmark-harness-flags...]")
+		return "", errors.New("usage: gscript bench [--quick|--full|--guard|BENCH|compare|strict|diagnose] [benchmark-harness-flags...]")
 	}
 	dir, err := os.Getwd()
 	if err != nil {
