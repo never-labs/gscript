@@ -452,6 +452,7 @@ func stdlibAllowedNames(libs LibFlags) map[string]bool {
 		"soa":       libs&LibSoA != 0,
 		"sort":      libs&LibSort != 0,
 		"string":    libs&LibString != 0,
+		"sync":      true,
 		"table":     libs&LibTable != 0,
 		"testkit":   libs&LibTestkit != 0,
 		"time":      libs&LibTime != 0,

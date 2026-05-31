@@ -63,7 +63,7 @@ const (
 		LibJSON | LibBase64 | LibHash | LibVec | LibColor |
 		LibRegexp | LibUTF8 | LibBit32 | LibBinary | LibBits |
 		LibBytes | LibCSV | LibURL | LibUUID | LibMatrix |
-		LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
+		LibPath | LibTime | LibRand | LibSort | LibEncoding | LibCompress | LibCrypto |
 		LibContainer | LibArray | LibSoA
 
 	// LibApp is a convenient preset for application development (no GL).
