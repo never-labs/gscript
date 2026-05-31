@@ -26,8 +26,10 @@ func execOnInterp(t *testing.T, interp *Interpreter, src string) {
 }
 
 func TestProcessWhich(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	execOnInterp(t, interp, `result := process.which("ls")`)
 
 	v := interp.GetGlobal("result")
@@ -40,8 +42,10 @@ func TestProcessWhich(t *testing.T) {
 }
 
 func TestProcessWhichNotFound(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	execOnInterp(t, interp, `result := process.which("__nonexistent_binary_12345__")`)
 
 	v := interp.GetGlobal("result")
@@ -51,8 +55,10 @@ func TestProcessWhichNotFound(t *testing.T) {
 }
 
 func TestProcessRun(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	execOnInterp(t, interp, `result := process.run("echo hello")`)
 
 	v := interp.GetGlobal("result")
@@ -73,8 +79,10 @@ func TestProcessRun(t *testing.T) {
 }
 
 func TestProcessRunContextCancelled(t *testing.T) {
-	interp := New()
-	interp.InstallStdlib()
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	state := NewScriptContextState()
 	time.AfterFunc(10*time.Millisecond, func() {
 		state.Cancel(StringValue("deadline exceeded"))
@@ -104,8 +112,10 @@ result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
 }
 
 func TestProcessShell(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	execOnInterp(t, interp, `result := process.shell("echo hello && echo world")`)
 
 	v := interp.GetGlobal("result")
@@ -120,8 +130,10 @@ func TestProcessShell(t *testing.T) {
 }
 
 func TestProcessPid(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	execOnInterp(t, interp, `pid := process.pid()`)
 
 	v := interp.GetGlobal("pid")
@@ -131,8 +143,10 @@ func TestProcessPid(t *testing.T) {
 }
 
 func TestProcessEnv(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 
 	os.Setenv("GSCRIPT_TEST_PROC_ENV", "test_value")
 	defer os.Unsetenv("GSCRIPT_TEST_PROC_ENV")
@@ -150,8 +164,10 @@ func TestProcessEnv(t *testing.T) {
 }
 
 func TestProcessExec(t *testing.T) {
-	interp := New()
-	interp.globals.Define("process", TableValue(buildProcessLib()))
+	interp := NewCore()
+	processModule := TableValue(buildProcessLib(interp))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
 	execOnInterp(t, interp, `result := process.exec("echo", "hello")`)
 
 	v := interp.GetGlobal("result")

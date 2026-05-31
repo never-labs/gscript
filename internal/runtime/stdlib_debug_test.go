@@ -6,7 +6,10 @@ import (
 )
 
 func TestDebugStackAndTraceback(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	debugModule := TableValue(buildDebugLib(interp))
+	interp.SetGlobal("debug", debugModule)
+	interp.SetModule("debug", debugModule)
 
 	execBinaryIOTest(t, interp, `
 		func inner() {
@@ -35,7 +38,10 @@ func TestDebugStackAndTraceback(t *testing.T) {
 }
 
 func TestDebugFunctionInfoGlobalsAndValue(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	debugModule := TableValue(buildDebugLib(interp))
+	interp.SetGlobal("debug", debugModule)
+	interp.SetModule("debug", debugModule)
 
 	execBinaryIOTest(t, interp, `
 		globalValue := 42
@@ -70,7 +76,10 @@ func TestDebugFunctionInfoGlobalsAndValue(t *testing.T) {
 }
 
 func TestDebugHookAndSink(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	debugModule := TableValue(buildDebugLib(interp))
+	interp.SetGlobal("debug", debugModule)
+	interp.SetModule("debug", debugModule)
 
 	execBinaryIOTest(t, interp, `
 		events := {}

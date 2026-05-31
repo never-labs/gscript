@@ -232,9 +232,12 @@ func runOnInterp(t *testing.T, interp *Interpreter, src string) {
 }
 
 func TestTableFilter(t *testing.T) {
-	interp := New()
-	tblLib := interp.GetGlobal("table").Table()
+	interp := NewCore()
+	tblLib := buildTableLib()
 	buildTableHigherOrderWithInterp(interp, tblLib)
+	tableModule := TableValue(tblLib)
+	interp.SetGlobal("table", tableModule)
+	interp.SetModule("table", tableModule)
 
 	runOnInterp(t, interp, `
 		t := {1, 2, 3, 4, 5, 6}
@@ -251,9 +254,12 @@ func TestTableFilter(t *testing.T) {
 }
 
 func TestTableMap(t *testing.T) {
-	interp := New()
-	tblLib := interp.GetGlobal("table").Table()
+	interp := NewCore()
+	tblLib := buildTableLib()
 	buildTableHigherOrderWithInterp(interp, tblLib)
+	tableModule := TableValue(tblLib)
+	interp.SetGlobal("table", tableModule)
+	interp.SetModule("table", tableModule)
 
 	runOnInterp(t, interp, `
 		t := {1, 2, 3}
@@ -276,9 +282,12 @@ func TestTableMap(t *testing.T) {
 }
 
 func TestTableReduce(t *testing.T) {
-	interp := New()
-	tblLib := interp.GetGlobal("table").Table()
+	interp := NewCore()
+	tblLib := buildTableLib()
 	buildTableHigherOrderWithInterp(interp, tblLib)
+	tableModule := TableValue(tblLib)
+	interp.SetGlobal("table", tableModule)
+	interp.SetModule("table", tableModule)
 
 	runOnInterp(t, interp, `
 		t := {1, 2, 3, 4, 5}

@@ -49,7 +49,7 @@ func TestOSEnvironReturnsEnvironmentTable(t *testing.T) {
 
 func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
 	t.Setenv("GSCRIPT_OS_READ_DISABLED_TEST", "secret")
-	interp := New()
+	interp := newCoreWithTableModule("os", buildOSLib())
 	interp.SetEnvironmentCapabilities(false, true)
 
 	for _, tc := range []struct {
@@ -77,7 +77,7 @@ func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
 
 func TestOSEnvironmentWriteCapabilityRequired(t *testing.T) {
 	t.Setenv("GSCRIPT_OS_WRITE_DISABLED_TEST", "visible")
-	interp := New()
+	interp := newCoreWithTableModule("os", buildOSLib())
 	interp.SetEnvironmentCapabilities(true, false)
 
 	if err := execOSProgram(t, interp, `x := os.getenv("GSCRIPT_OS_WRITE_DISABLED_TEST")`); err != nil {

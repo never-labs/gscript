@@ -3,7 +3,10 @@ package runtime
 import "testing"
 
 func TestTestkitMemorySnapshotDiffAndCheck(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	testkitModule := TableValue(buildTestkitLib(interp))
+	interp.SetGlobal("testkit", testkitModule)
+	interp.SetModule("testkit", testkitModule)
 
 	execBinaryIOTest(t, interp, `
 		before := testkit.snapshot()
@@ -28,7 +31,10 @@ func TestTestkitMemorySnapshotDiffAndCheck(t *testing.T) {
 }
 
 func TestTestkitValueAndFunctionInspectors(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	testkitModule := TableValue(buildTestkitLib(interp))
+	interp.SetGlobal("testkit", testkitModule)
+	interp.SetModule("testkit", testkitModule)
 
 	execBinaryIOTest(t, interp, `
 		func sample(a, b, ...) {
@@ -71,7 +77,10 @@ func TestTestkitValueAndFunctionInspectors(t *testing.T) {
 }
 
 func TestTestkitProtect(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	testkitModule := TableValue(buildTestkitLib(interp))
+	interp.SetGlobal("testkit", testkitModule)
+	interp.SetModule("testkit", testkitModule)
 
 	execBinaryIOTest(t, interp, `
 		func ok(a, b) {

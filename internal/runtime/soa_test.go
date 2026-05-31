@@ -73,7 +73,7 @@ func TestSoARowAndSetRow(t *testing.T) {
 }
 
 func TestSoAStdlibZipColumnRow(t *testing.T) {
-	interp := New()
+	interp := newCoreWithTableModule("soa", buildSoALib())
 	if err := runSource(interp, `
 xs := []f64{1, 2, 3}
 ys := xs * 10
@@ -251,7 +251,7 @@ fillWhereOK := soa.fillWhere(filled, "ok", []bool{true, false, true}, true)
 }
 
 func TestSoANativeColumnKernels(t *testing.T) {
-	interp := New()
+	interp := newCoreWithTableModule("soa", buildSoALib())
 	if err := runSource(interp, `
 xs := []f64{1, 2, 3}
 vx := []f64{10, 20, 30}
@@ -854,7 +854,7 @@ func TestSoAHotBuiltinsExposeFastArgPaths(t *testing.T) {
 }
 
 func TestSoADirectColumnAndRowAccess(t *testing.T) {
-	interp := New()
+	interp := newCoreWithTableModule("soa", buildSoALib())
 	if err := runSource(interp, `
 points := soa.zip({
     x: []f64{1, 2, 3},

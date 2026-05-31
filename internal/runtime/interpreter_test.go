@@ -48,52 +48,89 @@ func getGlobal(t *testing.T, src string, name string) Value {
 	return interp.GetGlobal(name)
 }
 
+func runCoreProgram(t *testing.T, src string) *Interpreter {
+	t.Helper()
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	interp := NewCore()
+	if err := interp.Exec(prog); err != nil {
+		t.Fatalf("exec error: %v", err)
+	}
+	return interp
+}
+
+func runCoreProgramExpectError(t *testing.T, src string) error {
+	t.Helper()
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		return err
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return err
+	}
+	interp := NewCore()
+	return interp.Exec(prog)
+}
+
+func getCoreGlobal(t *testing.T, src string, name string) Value {
+	t.Helper()
+	interp := runCoreProgram(t, src)
+	return interp.GetGlobal(name)
+}
+
 // ==================================================================
 // 1. Basic arithmetic
 // ==================================================================
 
 func TestArithmeticIntAdd(t *testing.T) {
-	v := getGlobal(t, `result := 1 + 2`, "result")
+	v := getCoreGlobal(t, `result := 1 + 2`, "result")
 	if !v.IsInt() || v.Int() != 3 {
 		t.Errorf("expected int 3, got %v", v)
 	}
 }
 
 func TestArithmeticIntSub(t *testing.T) {
-	v := getGlobal(t, `result := 10 - 3`, "result")
+	v := getCoreGlobal(t, `result := 10 - 3`, "result")
 	if !v.IsInt() || v.Int() != 7 {
 		t.Errorf("expected int 7, got %v", v)
 	}
 }
 
 func TestArithmeticIntMul(t *testing.T) {
-	v := getGlobal(t, `result := 6 * 7`, "result")
+	v := getCoreGlobal(t, `result := 6 * 7`, "result")
 	if !v.IsInt() || v.Int() != 42 {
 		t.Errorf("expected int 42, got %v", v)
 	}
 }
 
 func TestGoStyleNumberLiterals(t *testing.T) {
-	v := getGlobal(t, `result := 0xFF + 0b1010 + 0o20 + 1_000`, "result")
+	v := getCoreGlobal(t, `result := 0xFF + 0b1010 + 0o20 + 1_000`, "result")
 	if !v.IsInt() || v.Int() != 1281 {
 		t.Errorf("expected int 1281, got %v", v)
 	}
 
-	f := getGlobal(t, `result := 1_2.5 + 1e1`, "result")
+	f := getCoreGlobal(t, `result := 1_2.5 + 1e1`, "result")
 	if !f.IsFloat() || f.Float() != 22.5 {
 		t.Errorf("expected float 22.5, got %v", f)
 	}
 }
 
 func TestArithmeticIntDivExact(t *testing.T) {
-	v := getGlobal(t, `result := 10 / 2`, "result")
+	v := getCoreGlobal(t, `result := 10 / 2`, "result")
 	if !v.IsInt() || v.Int() != 5 {
 		t.Errorf("expected int 5, got %v", v)
 	}
 }
 
 func TestArithmeticIntDivFloat(t *testing.T) {
-	v := getGlobal(t, `result := 10 / 3`, "result")
+	v := getCoreGlobal(t, `result := 10 / 3`, "result")
 	if !v.IsFloat() {
 		t.Errorf("expected float, got %v (type %s)", v, v.TypeName())
 	}
@@ -104,49 +141,49 @@ func TestArithmeticIntDivFloat(t *testing.T) {
 }
 
 func TestArithmeticMod(t *testing.T) {
-	v := getGlobal(t, `result := 10 % 3`, "result")
+	v := getCoreGlobal(t, `result := 10 % 3`, "result")
 	if !v.IsInt() || v.Int() != 1 {
 		t.Errorf("expected int 1, got %v", v)
 	}
 }
 
 func TestArithmeticPow(t *testing.T) {
-	v := getGlobal(t, `result := 2 ** 10`, "result")
+	v := getCoreGlobal(t, `result := 2 ** 10`, "result")
 	if !v.IsInt() || v.Int() != 1024 {
 		t.Errorf("expected int 1024, got %v", v)
 	}
 }
 
 func TestArithmeticPrecedence(t *testing.T) {
-	v := getGlobal(t, `result := 2 + 3 * 4`, "result")
+	v := getCoreGlobal(t, `result := 2 + 3 * 4`, "result")
 	if !v.IsInt() || v.Int() != 14 {
 		t.Errorf("expected int 14, got %v", v)
 	}
 }
 
 func TestArithmeticFloatAdd(t *testing.T) {
-	v := getGlobal(t, `result := 1.5 + 2.5`, "result")
+	v := getCoreGlobal(t, `result := 1.5 + 2.5`, "result")
 	if !v.IsFloat() || v.Float() != 4.0 {
 		t.Errorf("expected float 4.0, got %v", v)
 	}
 }
 
 func TestArithmeticMixedIntFloat(t *testing.T) {
-	v := getGlobal(t, `result := 1 + 2.5`, "result")
+	v := getCoreGlobal(t, `result := 1 + 2.5`, "result")
 	if !v.IsFloat() || v.Float() != 3.5 {
 		t.Errorf("expected float 3.5, got %v", v)
 	}
 }
 
 func TestUnaryMinus(t *testing.T) {
-	v := getGlobal(t, `result := -42`, "result")
+	v := getCoreGlobal(t, `result := -42`, "result")
 	if !v.IsInt() || v.Int() != -42 {
 		t.Errorf("expected int -42, got %v", v)
 	}
 }
 
 func TestUnaryNot(t *testing.T) {
-	v := getGlobal(t, `result := !true`, "result")
+	v := getCoreGlobal(t, `result := !true`, "result")
 	if !v.IsBool() || v.Bool() {
 		t.Errorf("expected false, got %v", v)
 	}
@@ -157,7 +194,7 @@ func TestUnaryNot(t *testing.T) {
 // ==================================================================
 
 func TestDeclareAndAssign(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		x := 10
 		x = x + 5
 		result := x
@@ -168,7 +205,7 @@ func TestDeclareAndAssign(t *testing.T) {
 }
 
 func TestMultiDeclare(t *testing.T) {
-	interp := runProgram(t, `a, b := 1, 2`)
+	interp := runCoreProgram(t, `a, b := 1, 2`)
 	a := interp.GetGlobal("a")
 	b := interp.GetGlobal("b")
 	if !a.IsInt() || a.Int() != 1 {
@@ -180,7 +217,7 @@ func TestMultiDeclare(t *testing.T) {
 }
 
 func TestCompoundAssign(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		x := 10
 		x += 5
 		result := x
@@ -191,7 +228,7 @@ func TestCompoundAssign(t *testing.T) {
 }
 
 func TestIncDec(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		a := 10
 		a++
 		b := 5
@@ -210,21 +247,21 @@ func TestIncDec(t *testing.T) {
 // ==================================================================
 
 func TestStringConcat(t *testing.T) {
-	v := getGlobal(t, `result := "hello" .. " " .. "world"`, "result")
+	v := getCoreGlobal(t, `result := "hello" .. " " .. "world"`, "result")
 	if !v.IsString() || v.Str() != "hello world" {
 		t.Errorf("expected 'hello world', got %v", v)
 	}
 }
 
 func TestStringLength(t *testing.T) {
-	v := getGlobal(t, `result := #"hello"`, "result")
+	v := getCoreGlobal(t, `result := #"hello"`, "result")
 	if !v.IsInt() || v.Int() != 5 {
 		t.Errorf("expected int 5, got %v", v)
 	}
 }
 
 func TestStringNumberConcat(t *testing.T) {
-	v := getGlobal(t, `result := "count: " .. 42`, "result")
+	v := getCoreGlobal(t, `result := "count: " .. 42`, "result")
 	if !v.IsString() || v.Str() != "count: 42" {
 		t.Errorf("expected 'count: 42', got %v", v)
 	}
@@ -235,7 +272,7 @@ func TestStringNumberConcat(t *testing.T) {
 // ==================================================================
 
 func TestIfTrue(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		result := 0
 		if true {
 			result = 1
@@ -247,7 +284,7 @@ func TestIfTrue(t *testing.T) {
 }
 
 func TestIfFalse(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		result := 0
 		if false {
 			result = 1
@@ -259,7 +296,7 @@ func TestIfFalse(t *testing.T) {
 }
 
 func TestIfElse(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		result := 0
 		if false {
 			result = 1
@@ -273,7 +310,7 @@ func TestIfElse(t *testing.T) {
 }
 
 func TestIfElseIf(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		x := 15
 		result := 0
 		if x < 10 {
@@ -294,7 +331,7 @@ func TestIfElseIf(t *testing.T) {
 // ==================================================================
 
 func TestForWhile(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		i := 0
 		sum := 0
 		for i < 5 {
@@ -309,7 +346,7 @@ func TestForWhile(t *testing.T) {
 }
 
 func TestForNumCStyle(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		sum := 0
 		for i := 0; i < 5; i++ {
 			sum += i
@@ -322,7 +359,7 @@ func TestForNumCStyle(t *testing.T) {
 }
 
 func TestForBreak(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		sum := 0
 		for i := 0; i < 100; i++ {
 			if i >= 5 {
@@ -338,7 +375,7 @@ func TestForBreak(t *testing.T) {
 }
 
 func TestForContinue(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		sum := 0
 		for i := 0; i < 10; i++ {
 			if i % 2 == 0 {
@@ -355,7 +392,7 @@ func TestForContinue(t *testing.T) {
 }
 
 func TestForRange(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {10, 20, 30}
 		sum := 0
 		for k, v := range t {
@@ -373,7 +410,7 @@ func TestForRange(t *testing.T) {
 // ==================================================================
 
 func TestFuncDecl(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func add(a, b) {
 			return a + b
 		}
@@ -385,7 +422,7 @@ func TestFuncDecl(t *testing.T) {
 }
 
 func TestFuncLiteral(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		mul := func(a, b) {
 			return a * b
 		}
@@ -397,7 +434,7 @@ func TestFuncLiteral(t *testing.T) {
 }
 
 func TestFuncNoReturn(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func noop() {
 		}
 		result := noop()
@@ -412,7 +449,7 @@ func TestFuncNoReturn(t *testing.T) {
 // ==================================================================
 
 func TestMultipleReturn(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		func swap(a, b) {
 			return b, a
 		}
@@ -429,7 +466,7 @@ func TestMultipleReturn(t *testing.T) {
 }
 
 func TestMultiReturnExpansionAsLastArg(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func pair() {
 			return 10, 20
 		}
@@ -444,7 +481,7 @@ func TestMultiReturnExpansionAsLastArg(t *testing.T) {
 }
 
 func TestMultiReturnTruncated(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func pair() {
 			return 10, 20
 		}
@@ -461,7 +498,7 @@ func TestMultiReturnTruncated(t *testing.T) {
 // ==================================================================
 
 func TestNestedScope(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		x := 1
 		if true {
 			x := 2
@@ -478,7 +515,7 @@ func TestNestedScope(t *testing.T) {
 }
 
 func TestScopeAssignment(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		x := 1
 		if true {
 			x = 10
@@ -496,7 +533,7 @@ func TestScopeAssignment(t *testing.T) {
 // ==================================================================
 
 func TestFibonacci(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func fib(n) {
 			if n <= 1 {
 				return n
@@ -511,7 +548,7 @@ func TestFibonacci(t *testing.T) {
 }
 
 func TestFactorial(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func fact(n) {
 			if n <= 1 {
 				return 1
@@ -530,7 +567,7 @@ func TestFactorial(t *testing.T) {
 // ==================================================================
 
 func TestTableLiteral(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		t := {x: 10, y: 20}
 		rx := t.x
 		ry := t["y"]
@@ -546,7 +583,7 @@ func TestTableLiteral(t *testing.T) {
 }
 
 func TestTableFieldAssign(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {}
 		t.x = 42
 		result := t.x
@@ -557,7 +594,7 @@ func TestTableFieldAssign(t *testing.T) {
 }
 
 func TestTableIndexAssign(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {}
 		t["key"] = "value"
 		result := t["key"]
@@ -572,7 +609,7 @@ func TestTableIndexAssign(t *testing.T) {
 // ==================================================================
 
 func TestTableArray(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {10, 20, 30, 40, 50}
 		result := t[3]
 	`, "result")
@@ -582,7 +619,7 @@ func TestTableArray(t *testing.T) {
 }
 
 func TestTableLength(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {10, 20, 30}
 		result := #t
 	`, "result")
@@ -592,7 +629,7 @@ func TestTableLength(t *testing.T) {
 }
 
 func TestTableMixed(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		t := {10, 20, name: "test", 30}
 		a := t[1]
 		b := t[2]
@@ -622,7 +659,7 @@ func TestTableMixed(t *testing.T) {
 // ==================================================================
 
 func TestUndefinedVariable(t *testing.T) {
-	err := runProgramExpectError(t, `result := x`)
+	err := runCoreProgramExpectError(t, `result := x`)
 	if err == nil {
 		t.Fatal("expected error for undefined variable")
 	}
@@ -632,14 +669,14 @@ func TestUndefinedVariable(t *testing.T) {
 }
 
 func TestTypeErrorArithmetic(t *testing.T) {
-	err := runProgramExpectError(t, `result := "hello" + 1`)
+	err := runCoreProgramExpectError(t, `result := "hello" + 1`)
 	if err == nil {
 		t.Fatal("expected error for string + int")
 	}
 }
 
 func TestTypeErrorCallNonFunction(t *testing.T) {
-	err := runProgramExpectError(t, `
+	err := runCoreProgramExpectError(t, `
 		x := 42
 		x()
 	`)
@@ -652,14 +689,14 @@ func TestTypeErrorCallNonFunction(t *testing.T) {
 }
 
 func TestDivisionByZero(t *testing.T) {
-	err := runProgramExpectError(t, `result := 1 / 0`)
+	err := runCoreProgramExpectError(t, `result := 1 / 0`)
 	if err == nil {
 		t.Fatal("expected error for division by zero")
 	}
 }
 
 func TestIndexNonTable(t *testing.T) {
-	err := runProgramExpectError(t, `
+	err := runCoreProgramExpectError(t, `
 		x := 42
 		result := x.field
 	`)
@@ -688,7 +725,7 @@ func TestComparison(t *testing.T) {
 		{`result := "a" < "b"`, true},
 	}
 	for _, tt := range tests {
-		v := getGlobal(t, tt.src, "result")
+		v := getCoreGlobal(t, tt.src, "result")
 		if !v.IsBool() || v.Bool() != tt.expect {
 			t.Errorf("%s: expected %v, got %v", tt.src, tt.expect, v)
 		}
@@ -697,30 +734,30 @@ func TestComparison(t *testing.T) {
 
 func TestLogicShortCircuit(t *testing.T) {
 	// && returns first falsy or last truthy
-	v := getGlobal(t, `result := true && 42`, "result")
+	v := getCoreGlobal(t, `result := true && 42`, "result")
 	if !v.IsInt() || v.Int() != 42 {
 		t.Errorf("expected 42, got %v", v)
 	}
 
-	v = getGlobal(t, `result := false && 42`, "result")
+	v = getCoreGlobal(t, `result := false && 42`, "result")
 	if !v.IsBool() || v.Bool() {
 		t.Errorf("expected false, got %v", v)
 	}
 
 	// || returns first truthy or last falsy
-	v = getGlobal(t, `result := nil || 42`, "result")
+	v = getCoreGlobal(t, `result := nil || 42`, "result")
 	if !v.IsInt() || v.Int() != 42 {
 		t.Errorf("expected 42, got %v", v)
 	}
 
-	v = getGlobal(t, `result := 1 || 42`, "result")
+	v = getCoreGlobal(t, `result := 1 || 42`, "result")
 	if !v.IsInt() || v.Int() != 1 {
 		t.Errorf("expected 1, got %v", v)
 	}
 }
 
 func TestNilTruthiness(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		result := 0
 		if nil {
 			result = 1
@@ -732,7 +769,7 @@ func TestNilTruthiness(t *testing.T) {
 }
 
 func TestZeroIsTruthy(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		result := 0
 		if 0 {
 			result = 1
@@ -745,7 +782,7 @@ func TestZeroIsTruthy(t *testing.T) {
 }
 
 func TestPrintCapture(t *testing.T) {
-	interp := runProgram(t, `print("hello", "world")`)
+	interp := runCoreProgram(t, `print("hello", "world")`)
 	output := interp.Output()
 	if len(output) != 1 || output[0] != "hello\tworld" {
 		t.Errorf("expected print output 'hello\\tworld', got %v", output)
@@ -753,17 +790,17 @@ func TestPrintCapture(t *testing.T) {
 }
 
 func TestTypeFunction(t *testing.T) {
-	v := getGlobal(t, `result := type(42)`, "result")
+	v := getCoreGlobal(t, `result := type(42)`, "result")
 	if !v.IsString() || v.Str() != "number" {
 		t.Errorf("expected 'number', got %v", v)
 	}
 
-	v = getGlobal(t, `result := type("hello")`, "result")
+	v = getCoreGlobal(t, `result := type("hello")`, "result")
 	if !v.IsString() || v.Str() != "string" {
 		t.Errorf("expected 'string', got %v", v)
 	}
 
-	v = getGlobal(t, `result := type(nil)`, "result")
+	v = getCoreGlobal(t, `result := type(nil)`, "result")
 	if !v.IsString() || v.Str() != "nil" {
 		t.Errorf("expected 'nil', got %v", v)
 	}
@@ -771,7 +808,7 @@ func TestTypeFunction(t *testing.T) {
 
 func TestForRangeKeys(t *testing.T) {
 	// Test that for-range captures keys
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {10, 20, 30}
 		sum := 0
 		for k := range t {
@@ -786,7 +823,7 @@ func TestForRangeKeys(t *testing.T) {
 }
 
 func TestVarArgs(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func sum(...) {
 			s := 0
 			for i := 1; i <= #...; i++ {
@@ -802,7 +839,7 @@ func TestVarArgs(t *testing.T) {
 }
 
 func TestNestedFunctionCalls(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func double(x) {
 			return x * 2
 		}
@@ -817,7 +854,7 @@ func TestNestedFunctionCalls(t *testing.T) {
 }
 
 func TestTableNestedAccess(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		t := {inner: {value: 42}}
 		result := t.inner.value
 	`, "result")
@@ -827,7 +864,7 @@ func TestTableNestedAccess(t *testing.T) {
 }
 
 func TestFuncAsValue(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func apply(f, x) {
 			return f(x)
 		}
@@ -842,14 +879,14 @@ func TestFuncAsValue(t *testing.T) {
 }
 
 func TestEqualityNil(t *testing.T) {
-	v := getGlobal(t, `result := nil == nil`, "result")
+	v := getCoreGlobal(t, `result := nil == nil`, "result")
 	if !v.IsBool() || !v.Bool() {
 		t.Errorf("expected true, got %v", v)
 	}
 }
 
 func TestInfiniteLoopBreak(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		count := 0
 		for {
 			count++
@@ -870,7 +907,7 @@ func TestInfiniteLoopBreak(t *testing.T) {
 
 // Test 1: Basic closure captures variable (counter pattern)
 func TestClosureCapture(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		func makeCounter() {
 			n := 0
 			return func() {
@@ -899,7 +936,7 @@ func TestClosureCapture(t *testing.T) {
 
 // Test 2: Shared upvalue between two closures
 func TestClosureSharedUpvalue(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func makePair() {
 			x := 0
 			inc := func() { x = x + 1 }
@@ -918,7 +955,7 @@ func TestClosureSharedUpvalue(t *testing.T) {
 
 // Test 3: Closure captures loop variable (each iteration creates new scope)
 func TestClosureInLoop(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		funcs := {}
 		for i := 1; i <= 3; i++ {
 			ii := i
@@ -944,7 +981,7 @@ func TestClosureInLoop(t *testing.T) {
 
 // Test 4: Deeply nested closures
 func TestClosureNestedDeep(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func outer() {
 			x := 10
 			func middle() {
@@ -965,7 +1002,7 @@ func TestClosureNestedDeep(t *testing.T) {
 
 // Test 5: Two closures from the same scope share upvalue (global scope)
 func TestClosureMutualGlobal(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		a := 0
 		inc := func() { a = a + 1 }
 		get := func() { return a }
@@ -980,7 +1017,7 @@ func TestClosureMutualGlobal(t *testing.T) {
 
 // Test 6: Recursive closure via named function
 func TestClosureRecursiveFib(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func fib(n) {
 			if n < 2 {
 				return n
@@ -996,7 +1033,7 @@ func TestClosureRecursiveFib(t *testing.T) {
 
 // Test 7: Closure captures variable that changes after closure creation
 func TestClosureLateBinding(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		x := 10
 		f := func() { return x }
 		x = 20
@@ -1010,7 +1047,7 @@ func TestClosureLateBinding(t *testing.T) {
 
 // Test 8: Adder factory (closure over parameter)
 func TestClosureOverParam(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func makeAdder(n) {
 			return func(x) { return x + n }
 		}
@@ -1024,7 +1061,7 @@ func TestClosureOverParam(t *testing.T) {
 
 // Test 9: Multiple independent counters
 func TestClosureIndependentCounters(t *testing.T) {
-	interp := runProgram(t, `
+	interp := runCoreProgram(t, `
 		func makeCounter() {
 			n := 0
 			return func() {
@@ -1052,7 +1089,7 @@ func TestClosureIndependentCounters(t *testing.T) {
 
 // Test 10: Closure with varargs
 func TestClosureSimpleArgs(t *testing.T) {
-	v := getGlobal(t, `
+	v := getCoreGlobal(t, `
 		func sum(a, b, c) {
 			return a + b + c
 		}

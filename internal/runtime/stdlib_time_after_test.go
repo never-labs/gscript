@@ -3,7 +3,7 @@ package runtime
 import "testing"
 
 func TestTimeAfterChannel(t *testing.T) {
-	interp := New()
+	interp := newCoreWithTableModule("time", buildTimeLib())
 	tokens, err := lexerNew(`
 deadline := time.after(0.001)
 result := "none"

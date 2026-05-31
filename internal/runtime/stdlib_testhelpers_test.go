@@ -39,3 +39,11 @@ func runWithLib(t *testing.T, src string, libName string, lib *Table) *Interpret
 	}
 	return interp
 }
+
+func newCoreWithTableModule(name string, lib *Table) *Interpreter {
+	interp := NewCore()
+	module := TableValue(lib)
+	interp.SetGlobal(name, module)
+	interp.SetModule(name, module)
+	return interp
+}

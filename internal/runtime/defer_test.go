@@ -6,7 +6,7 @@ import (
 )
 
 func TestDeferRunsFunctionScopeLIFO(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		order := ""
@@ -33,7 +33,10 @@ func TestDeferRunsFunctionScopeLIFO(t *testing.T) {
 }
 
 func TestDeferRunsOnErrorAndSupportsMethods(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	ioModule := TableValue(buildIOLib(interp))
+	interp.SetGlobal("io", ioModule)
+	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "defer.txt")
 	interp.SetGlobal("file", StringValue(path))
 
@@ -62,7 +65,10 @@ func TestDeferRunsOnErrorAndSupportsMethods(t *testing.T) {
 }
 
 func TestDeferRunsAtTopLevelScriptExit(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	ioModule := TableValue(buildIOLib(interp))
+	interp.SetGlobal("io", ioModule)
+	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "top.txt")
 	interp.SetGlobal("file", StringValue(path))
 
@@ -72,7 +78,10 @@ func TestDeferRunsAtTopLevelScriptExit(t *testing.T) {
 		assert(f:write("top"))
 	`)
 
-	check := New()
+	check := NewCore()
+	checkIOModule := TableValue(buildIOLib(check))
+	check.SetGlobal("io", checkIOModule)
+	check.SetModule("io", checkIOModule)
 	check.SetGlobal("file", StringValue(path))
 	execBinaryIOTest(t, check, `
 		f := io.open(file, "r")

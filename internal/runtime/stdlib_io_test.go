@@ -24,7 +24,10 @@ func execBinaryIOTest(t *testing.T, interp *Interpreter, src string) {
 }
 
 func TestIOFileHandleSeekFlushTypeAndClose(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	ioModule := TableValue(buildIOLib(interp))
+	interp.SetGlobal("io", ioModule)
+	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "seek.txt")
 	interp.SetGlobal("file", StringValue(path))
 
@@ -65,7 +68,10 @@ func TestIOFileHandleSeekFlushTypeAndClose(t *testing.T) {
 }
 
 func TestIOInputOutputAndTmpfile(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	ioModule := TableValue(buildIOLib(interp))
+	interp.SetGlobal("io", ioModule)
+	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "redirect.txt")
 	interp.SetGlobal("file", StringValue(path))
 
@@ -104,7 +110,10 @@ func TestIOInputOutputAndTmpfile(t *testing.T) {
 }
 
 func TestIOReadFormatsLineWithNewlineBytesAndMultipleResults(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	ioModule := TableValue(buildIOLib(interp))
+	interp.SetGlobal("io", ioModule)
+	interp.SetModule("io", ioModule)
 	path := filepath.Join(t.TempDir(), "read-formats.txt")
 	interp.SetGlobal("file", StringValue(path))
 

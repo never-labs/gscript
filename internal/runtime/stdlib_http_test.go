@@ -153,7 +153,7 @@ func TestHTTPResponseStatus(t *testing.T) {
 
 func TestHTTPEndToEnd(t *testing.T) {
 	// Create an interpreter and use http library to handle a request
-	interp := New()
+	interp := NewCore()
 
 	// Get the buildResponseTable and buildRequestTable via a real handler
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +191,7 @@ func TestHTTPEndToEnd(t *testing.T) {
 
 func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 	// Test that the interpreter can call a GScript handler function
-	interp := New()
+	interp := NewCore()
 
 	// Create a GScript handler function as a GoFunction for simplicity
 	handlerFn := FunctionValue(&GoFunction{
@@ -233,7 +233,10 @@ func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 }
 
 func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	httpModule := TableValue(httpLib(interp))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
 	src := `
 		server := http.listen("127.0.0.1:0", func(req, res) {
 			res.write("ok:" .. req.path)
@@ -280,7 +283,10 @@ func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
 }
 
 func TestHTTPRouterBackgroundShutdown(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	httpModule := TableValue(httpLib(interp))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
 	src := `
 		router := http.newRouter()
 		router.get("/route", func(req, res) {
@@ -323,7 +329,10 @@ func TestHTTPListenBackgroundPortConflictFailsSynchronously(t *testing.T) {
 	}
 	defer ln.Close()
 
-	interp := New()
+	interp := NewCore()
+	httpModule := TableValue(httpLib(interp))
+	interp.SetGlobal("http", httpModule)
+	interp.SetModule("http", httpModule)
 	src := fmt.Sprintf(`
 		ok, err := pcall(http.listen, "%s", func(req, res) {}, {background: true})
 	`, ln.Addr().String())

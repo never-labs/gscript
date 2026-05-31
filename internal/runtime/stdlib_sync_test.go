@@ -4,7 +4,13 @@ import "testing"
 
 func runSyncTestScript(t *testing.T, code string) *Interpreter {
 	t.Helper()
-	interp := New()
+	interp := NewCore()
+	syncModule := TableValue(BuildSyncLibWithCaller(interp.callFunction))
+	interp.SetGlobal("sync", syncModule)
+	interp.SetModule("sync", syncModule)
+	timeModule := TableValue(buildTimeLib())
+	interp.SetGlobal("time", timeModule)
+	interp.SetModule("time", timeModule)
 	tokens, err := lexerNew(code)
 	if err != nil {
 		t.Fatalf("lexer: %v", err)

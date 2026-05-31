@@ -6,7 +6,7 @@ import (
 )
 
 func TestCompileStringSourceNameInSyntaxDiagnostics(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 	_, err := interp.CompileString("value := @", WithScriptSourceName("host/generated.gs"))
 	if err == nil {
 		t.Fatal("CompileString succeeded, want syntax error")
@@ -20,7 +20,13 @@ func TestCompileStringSourceNameInSyntaxDiagnostics(t *testing.T) {
 }
 
 func TestScriptCompileSourceNameInDebugFramesAndRuntimeDiagnostics(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	scriptModule := TableValue(buildScriptLib(interp))
+	interp.SetGlobal("script", scriptModule)
+	interp.SetModule("script", scriptModule)
+	debugModule := TableValue(buildDebugLib(interp))
+	interp.SetGlobal("debug", debugModule)
+	interp.SetModule("debug", debugModule)
 
 	execBinaryIOTest(t, interp, `
 		fn := script.compile("func inner() {\n  info := debug.info(0)\n  trace := debug.traceback(\"boom\")\n  return info.sourceName, info.line, info.column, trace\n}\nreturn inner()", {sourceName: "virtual/generated.gs"})
@@ -57,7 +63,7 @@ func TestScriptCompileSourceNameInDebugFramesAndRuntimeDiagnostics(t *testing.T)
 }
 
 func TestLoadSourceNameInReturnedSyntaxError(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		fn, compileErr := load("func broken( {", "virtual/syntax.gs")
