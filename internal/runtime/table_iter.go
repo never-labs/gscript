@@ -130,6 +130,10 @@ func (t *Table) PairsKeysSnapshot() []Value {
 	if t == nil {
 		return nil
 	}
+	if t.mu != nil {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+	}
 	if t.needsKeyRebuild() {
 		t.rebuildKeys()
 	}

@@ -57,8 +57,7 @@ func TestReleaseMatrixSpecSectionsHaveSemanticGate(t *testing.T) {
 
 func TestReleaseMatrixConformanceCasesHaveStatusAndClassification(t *testing.T) {
 	root := findRepoRoot(t)
-	caseDir := filepath.Join(root, "tests", "language")
-	pairs := readConformanceCasePairs(t, caseDir)
+	pairs := readConformanceCasePairs(t, root)
 	manifestCases, manifestCount := readConformanceManifestCases(t, root)
 	knownFailureCases := readBacktickCaseNames(t, filepath.Join(root, "tests", "language", "KNOWN_FAILURES.md"))
 
@@ -160,42 +159,15 @@ func releaseIgnoredSpecSections() map[string]string {
 	}
 }
 
-func readConformanceCasePairs(t *testing.T, caseDir string) map[string]bool {
+func readConformanceCasePairs(t *testing.T, root string) map[string]bool {
 	t.Helper()
-	entries, err := os.ReadDir(caseDir)
-	if err != nil {
-		t.Fatalf("read language conformance case dir: %v", err)
-	}
-	byExt := map[string]map[string]bool{
-		".gs":  {},
-		".lua": {},
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := filepath.Ext(entry.Name())
-		if byExt[ext] == nil {
-			continue
-		}
-		name := strings.TrimSuffix(entry.Name(), ext)
-		byExt[ext][name] = true
-	}
-
+	cases := readManifestConformanceCases(t, root)
 	pairs := map[string]bool{}
-	for name := range byExt[".gs"] {
-		if !byExt[".lua"][name] {
-			t.Fatalf("language conformance case %s.gs has no matching .lua oracle", name)
+	for _, testCase := range cases {
+		if pairs[testCase.Name] {
+			t.Fatalf("tests manifest has duplicate language conformance case %q", testCase.Name)
 		}
-		pairs[name] = true
-	}
-	for name := range byExt[".lua"] {
-		if !byExt[".gs"][name] {
-			t.Fatalf("language conformance case %s.lua has no matching .gs translation", name)
-		}
-	}
-	if len(pairs) == 0 {
-		t.Fatal("language conformance case directory contains no paired cases")
+		pairs[testCase.Name] = true
 	}
 	return pairs
 }
