@@ -8,6 +8,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 	llm "github.com/never-labs/gscript/llm"
 	llmcommand "github.com/never-labs/gscript/llm/command"
+	llmopenai "github.com/never-labs/gscript/llm/openai"
 )
 
 // LLMProvider is the Go embedding hook behind the llm standard library.
@@ -377,7 +378,7 @@ func defaultLLMProviderFactory(cfg LLMProviderConfig) (LLMProvider, error) {
 	switch protocol {
 	case "openai", "openai-compatible", "openai-compat", "chat-completions":
 		return OpenAICompatibleLLMProvider{
-			Endpoint: openAIChatCompletionsEndpoint(cfg.BaseURL),
+			Endpoint: llmopenai.ChatCompletionsEndpoint(cfg.BaseURL),
 			APIKey:   cfg.APIKey,
 			Model:    cfg.ProviderModel,
 		}, nil
@@ -521,4 +522,23 @@ func cloneLLMAny(v any) any {
 	default:
 		return v
 	}
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if src == nil {
+		return nil
+	}
+	out := make(map[string]string, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func cloneFloat64Ptr(src *float64) *float64 {
+	if src == nil {
+		return nil
+	}
+	out := *src
+	return &out
 }
