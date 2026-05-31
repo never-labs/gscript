@@ -27,7 +27,7 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertIn("discovery.canonical_group(selector)", diag)
         self.assertIn("discovery.resolve_script_path(root, selector)", diag)
         self.assertNotIn("domain_list_for()", diag)
-        for alias in discovery.LEGACY_GROUP_ALIASES:
+        for alias in discovery.COMPATIBILITY_GROUP_ALIASES:
             self.assertNotIn(f"{alias}) printf", diag)
 
     def test_benchmark_shell_wrappers_exec_matching_python(self):

@@ -18,7 +18,7 @@ class FakeSpec:
 
 
 class BenchmarkDiscoveryTest(unittest.TestCase):
-    def test_group_choices_includes_canonical_and_legacy_group_names(self):
+    def test_group_choices_includes_canonical_and_compatibility_group_names(self):
         self.assertEqual(
             discovery.group_choices(discovery.GROUPS),
             [
@@ -69,7 +69,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "ambiguous benchmark selector 'sort'"):
             discovery.select_specs(specs, ["sort"])
 
-    def test_select_specs_accepts_legacy_hot_alias(self):
+    def test_select_specs_accepts_historical_hot_alias(self):
         specs = [FakeSpec("table", "events_metamethod")]
 
         self.assertEqual(discovery.select_specs(specs, ["official/events_metamethod_hot"]), specs)
@@ -80,14 +80,14 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             {"matmul", "numeric/matmul", "closure_accumulator", "calls/closure_accumulator"},
         )
 
-    def test_selector_matches_spec_accepts_legacy_aliases(self):
+    def test_selector_matches_spec_accepts_compatibility_aliases(self):
         self.assertTrue(discovery.selector_matches_spec("suite/matmul", FakeSpec("numeric", "matmul")))
         self.assertTrue(
             discovery.selector_matches_spec("official/events_metamethod_hot", FakeSpec("table", "events_metamethod"))
         )
         self.assertFalse(discovery.selector_matches_spec("suite/matmul", FakeSpec("table", "sort")))
 
-    def test_parse_selector_count_overrides_accepts_modes_and_legacy_aliases(self):
+    def test_parse_selector_count_overrides_accepts_modes_and_compatibility_aliases(self):
         overrides = discovery.parse_selector_count_overrides(
             ["fib=4", "suite/matmul=6", "vm/official/events_metamethod_hot=8"],
             ["vm", "default"],
@@ -135,7 +135,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             )
             self.assertIsNone(discovery.resolve_script_identity(root, "official/missing_hot"))
 
-    def test_groups_for_selectors_includes_legacy_selector_domains(self):
+    def test_groups_for_selectors_includes_compatibility_selector_domains(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             for group, name in (("concurrency", "goroutine_sleep"), ("table", "events_metamethod")):

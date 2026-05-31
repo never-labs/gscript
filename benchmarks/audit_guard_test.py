@@ -42,9 +42,9 @@ class AuditGuardTest(unittest.TestCase):
         self.assertIn("| tiny | 0.000s | Needs calibrated repeats or ns/op bench |", report)
         self.assertIn("| missing_ref | 25 |", report)
 
-    def test_rejects_legacy_results_map(self):
+    def test_rejects_previous_schema_results_map(self):
         with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "legacy.json"
+            path = Path(td) / "previous_schema.json"
             path.write_text(json.dumps({"results": {"fib": {}}}))
             with self.assertRaises(ValueError):
                 audit.load_rows(path)

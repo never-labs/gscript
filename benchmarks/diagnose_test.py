@@ -8,7 +8,7 @@ import diagnose
 
 
 class DiagnoseSelectorTest(unittest.TestCase):
-    def test_groups_for_args_accepts_legacy_group_and_selector_aliases(self):
+    def test_groups_for_args_accepts_compatibility_group_and_selector_aliases(self):
         args = argparse.Namespace(
             all_groups=False,
             group=["data_oriented"],

@@ -35,7 +35,7 @@ DEFAULT_ORDER = [
 
 GROUPS = ["numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control"]
 
-LEGACY_GROUP_ALIASES = {
+COMPATIBILITY_GROUP_ALIASES = {
     "suite": ["numeric", "recursion", "table", "calls", "string", "control"],
     "extended": ["app", "table", "string", "concurrency"],
     "variants": ["recursion", "calls", "numeric", "table"],
@@ -43,7 +43,7 @@ LEGACY_GROUP_ALIASES = {
     "data_oriented": ["data"],
 }
 
-LEGACY_BENCH_ALIASES = {
+COMPATIBILITY_BENCH_ALIASES = {
     "recursion/ackermann": "recursion/ackermann",
     "recursion/binary_trees": "recursion/binary_trees",
     "calls/closure_bench": "calls/closure_bench",
@@ -93,7 +93,7 @@ LEGACY_BENCH_ALIASES = {
     "string/strings_patterns": "string/strings_patterns",
     "table/table_sort_proxy": "table/table_sort_proxy",
 }
-LEGACY_BENCH_ALIASES.update({
+COMPATIBILITY_BENCH_ALIASES.update({
     "suite/ackermann": "recursion/ackermann",
     "suite/binary_trees": "recursion/binary_trees",
     "suite/closure_bench": "calls/closure_bench",
@@ -188,26 +188,26 @@ SpecT = TypeVar("SpecT", bound=SelectableSpec)
 
 
 def canonical_group(group: str) -> list[str]:
-    return LEGACY_GROUP_ALIASES.get(group, [group])
+    return COMPATIBILITY_GROUP_ALIASES.get(group, [group])
 
 
 def group_choices(allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[str]:
     allowed = set(allowed_groups)
     aliases = [
         alias
-        for alias, canonical_names in LEGACY_GROUP_ALIASES.items()
+        for alias, canonical_names in COMPATIBILITY_GROUP_ALIASES.items()
         if all(canonical in allowed for canonical in canonical_names)
     ]
     return [*allowed_groups, *aliases]
 
 
 def canonical_selector(selector: str) -> str:
-    if selector in LEGACY_BENCH_ALIASES:
-        return LEGACY_BENCH_ALIASES[selector]
+    if selector in COMPATIBILITY_BENCH_ALIASES:
+        return COMPATIBILITY_BENCH_ALIASES[selector]
     if "/" not in selector:
         return selector
     group, name = selector.split("/", 1)
-    groups = LEGACY_GROUP_ALIASES.get(group)
+    groups = COMPATIBILITY_GROUP_ALIASES.get(group)
     if groups and len(groups) == 1:
         return f"{groups[0]}/{name}"
     return selector
@@ -219,7 +219,7 @@ def selector_candidates(selector: str) -> list[str]:
     if canonical != selector or "/" not in selector:
         return out
     group, name = selector.split("/", 1)
-    for canonical_group_name in LEGACY_GROUP_ALIASES.get(group, []):
+    for canonical_group_name in COMPATIBILITY_GROUP_ALIASES.get(group, []):
         candidate = f"{canonical_group_name}/{name}"
         if candidate not in out:
             out.append(candidate)

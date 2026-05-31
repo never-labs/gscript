@@ -71,6 +71,6 @@ gaps.
 no-filter JIT, and LuaJIT where a reference exists, then checks output stability
 and timing quality.
 
-Legacy selectors such as `suite/fib`, `extended/json_table_walk`, and
+Historical selectors such as `suite/fib`, `extended/json_table_walk`, and
 `official/events_metamethod_hot` are accepted as aliases, but new scripts and
 reports should use domain IDs.

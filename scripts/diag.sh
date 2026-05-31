@@ -22,7 +22,7 @@
 #   bash scripts/diag.sh all                  — dump every domain benchmark
 #   bash scripts/diag.sh numeric              — dump numeric/ only
 #   bash scripts/diag.sh table                — dump table/ only
-#   bash scripts/diag.sh suite                — legacy alias for numeric/recursion/table/calls/string/control
+#   bash scripts/diag.sh suite                — compatibility alias for numeric/recursion/table/calls/string/control
 #   bash scripts/diag.sh <benchmark>          — dump a single benchmark.
 #                                                Forms accepted:
 #                                                  sieve, sieve.gs
@@ -55,7 +55,7 @@ mkdir -p "$DIAG_ROOT"
 
 # Resolve benchmark list. Each entry is "<domain>/<file>.gs", relative to
 # benchmarks/. Keep selector compatibility in benchmark_discovery.py so the
-# shell entrypoint does not grow a second source of truth for legacy aliases.
+# shell entrypoint does not grow a second source of truth for compatibility aliases.
 BENCHES=()
 while IFS= read -r bench; do
     [ -n "$bench" ] || continue
@@ -100,8 +100,8 @@ if [ ${#BENCHES[@]} -eq 0 ]; then
 fi
 
 if [ "$BENCHMARK" = "all" ]; then
-    # Wipe everything inside diag/ — both the new nested layout and any legacy
-    # flat dirs from prior runs — so a renamed/removed source can't leave a
+    # Wipe everything inside diag/ — both the new nested layout and any
+    # previous-schema flat dirs — so a renamed/removed source can't leave a
     # stale stats.json behind. summary.md is regenerated at the end.
     find "$DIAG_ROOT" -mindepth 1 -maxdepth 1 ! -name summary.md -exec rm -rf {} +
 fi

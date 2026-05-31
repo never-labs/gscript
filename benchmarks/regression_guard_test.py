@@ -13,17 +13,17 @@ class RegressionGuardParsingTest(unittest.TestCase):
         self.assertEqual(rg.parse_time("result: 42\nTime: 0.123s\n"), 0.123)
         self.assertIsNone(rg.parse_time("no time here"))
 
-    def test_parse_legacy_baseline_seconds(self):
+    def test_parse_previous_baseline_seconds(self):
         self.assertEqual(rg.parse_seconds("Time: 1.500s"), 1.5)
         self.assertEqual(rg.parse_seconds("2.5ms"), 0.0025)
         self.assertIsNone(rg.parse_seconds("N/A"))
         self.assertIsNone(rg.parse_seconds("Time: s"))
 
-    def test_loads_legacy_and_guard_baseline_schemas(self):
+    def test_loads_previous_and_guard_baseline_schemas(self):
         with tempfile.TemporaryDirectory() as td:
-            legacy = Path(td) / "legacy.json"
-            legacy.write_text(json.dumps({"results": {"fib": {"jit": "Time: 1.500s"}}}))
-            self.assertEqual(rg.load_baseline(legacy), {"fib": 1.5})
+            previous_schema = Path(td) / "previous_schema.json"
+            previous_schema.write_text(json.dumps({"results": {"fib": {"jit": "Time: 1.500s"}}}))
+            self.assertEqual(rg.load_baseline(previous_schema), {"fib": 1.5})
 
             guard = Path(td) / "guard.json"
             guard.write_text(

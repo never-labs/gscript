@@ -8,7 +8,7 @@ import triage
 
 
 class TriageSelectorTest(unittest.TestCase):
-    def test_bench_script_path_accepts_timing_compare_legacy_aliases(self):
+    def test_bench_script_path_accepts_timing_compare_compatibility_aliases(self):
         root = Path(__file__).resolve().parents[1]
 
         self.assertEqual(
@@ -24,7 +24,7 @@ class TriageSelectorTest(unittest.TestCase):
             ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
         )
 
-    def test_groups_for_benches_uses_shared_legacy_selector_resolution(self):
+    def test_groups_for_benches_uses_shared_compatibility_selector_resolution(self):
         root = Path(__file__).resolve().parents[1]
 
         self.assertEqual(

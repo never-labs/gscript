@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	// Compatibility forwarder for the legacy command path.
+	// Compatibility forwarder for the previous command path.
 	// The canonical entrypoint is benchmarks/cmd/data_oriented_bench.
 	os.Exit(report.RunCLI(os.Args[1:], os.Stdout, os.Stderr))
 }

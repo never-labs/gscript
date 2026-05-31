@@ -97,7 +97,7 @@ def normalize_benchmark_outputs(paths: list[Path]) -> list[dict[str, Any]]:
         if isinstance(results, list):
             rows.extend(normalize_result_list(results, source))
         elif isinstance(results, dict):
-            rows.extend(normalize_legacy_result_map(results, source))
+            rows.extend(normalize_previous_schema_result_map(results, source))
     return rows
 
 
@@ -125,7 +125,7 @@ def normalize_result_list(results: list[Any], source: str) -> list[dict[str, Any
     return rows
 
 
-def normalize_legacy_result_map(results: dict[str, Any], source: str) -> list[dict[str, Any]]:
+def normalize_previous_schema_result_map(results: dict[str, Any], source: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for benchmark, modes in results.items():
         if not isinstance(modes, dict):

@@ -933,8 +933,8 @@
       "benchmarks/triage.py",
       "benchmarks/validate_lua_refs.py"
     ],
-    "legacy_reference": [
-      "benchmarks/lua_ref/legacy"
+    "historical_reference": [
+      "benchmarks/lua_ref/historical"
     ],
     "go_reference_libraries": [
       "benchmarks/data_oriented"
@@ -944,7 +944,7 @@
     ]
   },
   "compatibility": {
-    "legacy_group_aliases": {
+    "compatibility_group_aliases": {
       "suite": [
         "numeric",
         "recursion",
@@ -978,7 +978,7 @@
     },
     "forwarded_commands": [
       {
-        "legacy_path": "benchmarks/data_oriented/cmd/data_oriented_bench",
+        "previous_path": "benchmarks/data_oriented/cmd/data_oriented_bench",
         "canonical_path": "benchmarks/cmd/data_oriented_bench",
         "status": "compatible_forwarder"
       }
@@ -990,9 +990,9 @@
       "kind": "go_reference_microbenchmarks",
       "library_path": "benchmarks/data_oriented",
       "canonical_command": "benchmarks/cmd/data_oriented_bench",
-      "legacy_command": "benchmarks/data_oriented/cmd/data_oriented_bench",
+      "compatibility_command": "benchmarks/data_oriented/cmd/data_oriented_bench",
       "migration_status": "not_moved_import_path_is_public_to_repo",
-      "notes": "Go package path remains stable; canonical runner moved to benchmarks/cmd with legacy command forwarding."
+      "notes": "Go package path remains stable; canonical runner moved to benchmarks/cmd with compatibility command forwarding."
     }
   ],
   "benchmarks": [

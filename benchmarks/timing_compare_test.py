@@ -34,7 +34,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
         specs = timing.discover_specs(root, timing.GROUPS)
         self.assertEqual({spec.benchmark_id for spec in specs}, expected)
 
-    def test_select_specs_accepts_legacy_group_selector_aliases(self):
+    def test_select_specs_accepts_compatibility_group_selector_aliases(self):
         root = Path(__file__).resolve().parents[1]
         specs = timing.discover_specs(root, timing.GROUPS)
 
@@ -51,7 +51,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
             ["table/events_metamethod"],
         )
 
-    def test_scale_overrides_accept_legacy_group_selector_aliases(self):
+    def test_scale_overrides_accept_compatibility_group_selector_aliases(self):
         root = Path(__file__).resolve().parents[1]
         specs = timing.select_specs(timing.discover_specs(root, timing.GROUPS), ["extended/goroutine_sleep"])
         overrides = timing.parse_scale_overrides(["extended/goroutine_sleep:N=10"])

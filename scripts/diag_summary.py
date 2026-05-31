@@ -39,13 +39,13 @@ def main(diag_root):
             latest = json.load(f)
 
     # Layout v2: diag/<domain>/<bench>/stats.json.
-    # Layout v1 (legacy): diag/<bench>/stats.json — still tolerated.
+    # Layout v1 (previous schema): diag/<bench>/stats.json — still tolerated.
     benches = []  # list of (label, domain, name, stats_path)
     for top in sorted(diag_root.iterdir()):
         if not top.is_dir():
             continue
         if (top / "stats.json").exists():
-            benches.append((top.name, "legacy", top.name, top))
+            benches.append((top.name, "previous_schema", top.name, top))
             continue
         for sub in sorted(top.iterdir()):
             if sub.is_dir() and (sub / "stats.json").exists():
