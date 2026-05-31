@@ -1,10 +1,159 @@
 package regexp
 
 import (
+	stdregexp "regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 )
+
+var compileCache sync.Map // map[string]*regexp.Regexp
+
+func Compile(pattern string) (*stdregexp.Regexp, error) {
+	if cached, ok := compileCache.Load(pattern); ok {
+		return cached.(*stdregexp.Regexp), nil
+	}
+	re, err := stdregexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	actual, _ := compileCache.LoadOrStore(pattern, re)
+	return actual.(*stdregexp.Regexp), nil
+}
+
+func Match(pattern, s string) (bool, error) {
+	re, err := Compile(pattern)
+	if err != nil {
+		return false, err
+	}
+	return re.MatchString(s), nil
+}
+
+func Find(pattern, s string) (string, bool, error) {
+	if m, found, ok := FastFindString(pattern, s); ok {
+		return m, found, nil
+	}
+	re, err := Compile(pattern)
+	if err != nil {
+		return "", false, err
+	}
+	m, found := FindCompiled(re, s)
+	return m, found, nil
+}
+
+func FindCompiled(re *stdregexp.Regexp, s string) (string, bool) {
+	if m, found, ok := FastFindString(re.String(), s); ok {
+		return m, found
+	}
+	m := re.FindString(s)
+	if m == "" && !re.MatchString(s) {
+		return "", false
+	}
+	return m, true
+}
+
+func FindSubmatchIndexCompiled(re *stdregexp.Regexp, s string) ([]int, bool) {
+	if loc, ok := FastFindSubmatchIndex(re.String(), s); ok {
+		if loc == nil {
+			return nil, false
+		}
+		return loc, true
+	}
+	loc := re.FindStringSubmatchIndex(s)
+	if loc == nil {
+		return nil, false
+	}
+	return loc, true
+}
+
+func FindAllStrings(pattern, s string, n int) ([]string, error) {
+	if matches, ok := FastFindAllStrings(pattern, s, n); ok {
+		return matches, nil
+	}
+	re, err := Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	return FindAllStringsCompiled(re, s, n), nil
+}
+
+func FindAllStringsCompiled(re *stdregexp.Regexp, s string, n int) []string {
+	if matches, ok := FastFindAllStrings(re.String(), s, n); ok {
+		return matches
+	}
+	return re.FindAllString(s, n)
+}
+
+func FindAllSubmatchIndex(pattern, s string, n int) ([][]int, error) {
+	if allMatches, ok := FastFindAllSubmatchIndex(pattern, s, n); ok {
+		return allMatches, nil
+	}
+	re, err := Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	return FindAllSubmatchIndexCompiled(re, s, n), nil
+}
+
+func FindAllSubmatchIndexCompiled(re *stdregexp.Regexp, s string, n int) [][]int {
+	if allMatches, ok := FastFindAllSubmatchIndex(re.String(), s, n); ok {
+		return allMatches
+	}
+	return re.FindAllStringSubmatchIndex(s, n)
+}
+
+func ReplaceFirst(pattern, s, repl string) (string, error) {
+	re, err := Compile(pattern)
+	if err != nil {
+		return "", err
+	}
+	return ReplaceFirstCompiled(re, s, repl), nil
+}
+
+func ReplaceFirstCompiled(re *stdregexp.Regexp, s, repl string) string {
+	loc := re.FindStringIndex(s)
+	if loc == nil {
+		return s
+	}
+	return s[:loc[0]] + repl + s[loc[1]:]
+}
+
+func ReplaceAllString(pattern, s, repl string) (string, error) {
+	if out, ok := FastReplaceAllString(pattern, s, repl); ok {
+		return out, nil
+	}
+	re, err := Compile(pattern)
+	if err != nil {
+		return "", err
+	}
+	return ReplaceAllStringCompiled(re, s, repl), nil
+}
+
+func ReplaceAllStringCompiled(re *stdregexp.Regexp, s, repl string) string {
+	if out, ok := FastReplaceAllString(re.String(), s, repl); ok {
+		return out
+	}
+	return re.ReplaceAllString(s, repl)
+}
+
+func Split(pattern, s string, n int) ([]string, error) {
+	if parts, ok := FastSplitStrings(pattern, s, n); ok {
+		return parts, nil
+	}
+	re, err := Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+	return SplitCompiled(re, s, n), nil
+}
+
+func SplitCompiled(re *stdregexp.Regexp, s string, n int) []string {
+	if parts, ok := FastSplitStrings(re.String(), s, n); ok {
+		return parts
+	}
+	return re.Split(s, n)
+}
 
 func FastFindSubmatchIndex(pattern, s string) ([]int, bool) {
 	switch pattern {

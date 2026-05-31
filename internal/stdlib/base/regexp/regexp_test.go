@@ -27,6 +27,68 @@ func TestFastFindStringUnsupported(t *testing.T) {
 	}
 }
 
+func TestCompileCachesRegexp(t *testing.T) {
+	first, err := Compile("[a-z]+")
+	if err != nil {
+		t.Fatalf("Compile first: %v", err)
+	}
+	second, err := Compile("[a-z]+")
+	if err != nil {
+		t.Fatalf("Compile second: %v", err)
+	}
+	if first != second {
+		t.Fatalf("Compile returned different pointers for same pattern")
+	}
+}
+
+func TestCompileInvalidPattern(t *testing.T) {
+	if _, err := Compile("[invalid"); err == nil {
+		t.Fatalf("Compile invalid pattern returned nil error")
+	}
+}
+
+func TestPureHelpersMatchRegexp(t *testing.T) {
+	matched, err := Match("^hello", "hello world")
+	if err != nil {
+		t.Fatalf("Match: %v", err)
+	}
+	if !matched {
+		t.Fatalf("Match = false, want true")
+	}
+
+	found, ok, err := Find("[0-9]+", "abc123")
+	if err != nil {
+		t.Fatalf("Find: %v", err)
+	}
+	if !ok || found != "123" {
+		t.Fatalf("Find = %q, %v; want 123, true", found, ok)
+	}
+
+	found, ok, err = Find("^", "abc")
+	if err != nil {
+		t.Fatalf("Find empty match: %v", err)
+	}
+	if !ok || found != "" {
+		t.Fatalf("Find empty match = %q, %v; want empty, true", found, ok)
+	}
+
+	if out, err := ReplaceFirst("[0-9]+", "a1b22", "X"); err != nil || out != "aXb22" {
+		t.Fatalf("ReplaceFirst = %q, %v; want aXb22, nil", out, err)
+	}
+
+	if out, err := ReplaceAllString("[0-9]+", "a1b22", "X"); err != nil || out != "aXbX" {
+		t.Fatalf("ReplaceAllString = %q, %v; want aXbX, nil", out, err)
+	}
+
+	parts, err := Split(",\\s*", "a, b, c", -1)
+	if err != nil {
+		t.Fatalf("Split: %v", err)
+	}
+	if want := []string{"a", "b", "c"}; !reflect.DeepEqual(parts, want) {
+		t.Fatalf("Split = %#v, want %#v", parts, want)
+	}
+}
+
 func TestFastFindAllStringsMatchesRegexp(t *testing.T) {
 	for _, n := range []int{-1, 0, 1, 2, 10} {
 		got, ok := FastFindAllStrings("[0-9]+", "a1b22c333", n)
