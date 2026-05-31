@@ -1,6 +1,10 @@
 package runtime
 
-import "fmt"
+import (
+	"fmt"
+
+	stdlibai "github.com/never-labs/gscript/internal/stdlib/ai"
+)
 
 // BuildLLMHistoryLib creates the "history" stdlib table with helpers for
 // searching and mutating conversation history values produced by agents and
@@ -11,51 +15,6 @@ func BuildLLMHistoryLib() *Table {
 	t := NewTable()
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: "history." + name, Fn: fn}))
-	}
-
-	matches := func(msg *Table, opts *Table) bool {
-		if msg == nil {
-			return false
-		}
-		for _, key := range opts.PairsKeysSnapshot() {
-			if !key.IsString() {
-				continue
-			}
-			k := key.Str()
-			want := opts.RawGet(key)
-			switch k {
-			case "role":
-				if msg.RawGetString("role").Str() != want.Str() {
-					return false
-				}
-			case "tool":
-				name := ""
-				if call := msg.RawGetString("tool_call"); call.IsTable() {
-					name = call.Table().RawGetString("tool").Str()
-				}
-				if name == "" && msg.RawGetString("role").Str() == "tool" {
-					// tool result messages don't carry the tool name directly;
-					// match via tool_use_id prefix or skip.
-					return false
-				}
-				if name != want.Str() {
-					return false
-				}
-			case "tool_use_id", "id":
-				if msg.RawGetString("tool_use_id").Str() != want.Str() {
-					return false
-				}
-			case "has_error":
-				if want.Truthy() != (msg.RawGetString("error").Str() != "") {
-					return false
-				}
-			default:
-				if msg.RawGetString(k).Str() != want.Str() {
-					return false
-				}
-			}
-		}
-		return true
 	}
 
 	iter := func(historyVal, optsVal Value, yield func(idx int, msg Value) bool) {
@@ -69,12 +28,13 @@ func BuildLLMHistoryLib() *Table {
 		} else {
 			opts = NewTable()
 		}
+		filters := llmHistoryFilters(opts)
 		for i := 1; i <= ht.Length(); i++ {
 			m := ht.RawGet(IntValue(int64(i)))
 			if !m.IsTable() {
 				continue
 			}
-			if !matches(m.Table(), opts) {
+			if !stdlibai.MatchHistoryMessage(llmHistoryMessageSummary(m.Table()), filters) {
 				continue
 			}
 			if !yield(i, m) {
@@ -145,4 +105,46 @@ func BuildLLMHistoryLib() *Table {
 	})
 
 	return t
+}
+
+func llmHistoryMessageSummary(msg *Table) stdlibai.HistoryMessage {
+	if msg == nil {
+		return stdlibai.HistoryMessage{}
+	}
+	fields := make(map[string]string)
+	for _, key := range msg.PairsKeysSnapshot() {
+		if !key.IsString() {
+			continue
+		}
+		fields[key.Str()] = msg.RawGet(key).Str()
+	}
+	tool := ""
+	if call := msg.RawGetString("tool_call"); call.IsTable() {
+		tool = call.Table().RawGetString("tool").Str()
+	}
+	return stdlibai.HistoryMessage{
+		Role:      msg.RawGetString("role").Str(),
+		Tool:      tool,
+		ToolUseID: msg.RawGetString("tool_use_id").Str(),
+		Error:     msg.RawGetString("error").Str(),
+		Fields:    fields,
+	}
+}
+
+func llmHistoryFilters(opts *Table) map[string]stdlibai.HistoryFilterValue {
+	out := make(map[string]stdlibai.HistoryFilterValue)
+	if opts == nil {
+		return out
+	}
+	for _, key := range opts.PairsKeysSnapshot() {
+		if !key.IsString() {
+			continue
+		}
+		want := opts.RawGet(key)
+		out[key.Str()] = stdlibai.HistoryFilterValue{
+			String: want.Str(),
+			Truthy: want.Truthy(),
+		}
+	}
+	return out
 }
