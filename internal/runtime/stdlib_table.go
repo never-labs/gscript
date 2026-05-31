@@ -793,8 +793,8 @@ func BuildTableLib() *Table {
 	return t
 }
 
-// buildTableLib keeps the legacy runtime installer name local while public
-// stdlibrt assembly uses BuildTableLib through explicit hook options.
+// buildTableLib keeps the runtime installer name local while public stdlibrt
+// assembly uses BuildTableLib through explicit hook options.
 func buildTableLib() *Table {
 	return BuildTableLib()
 }

@@ -5,12 +5,11 @@ import (
 	"unsafe"
 )
 
-// stdlib_identity_ptrs.go holds the non-string stdlib identity-token accessors
-// (tonumber/select/pairs/ipairs/rawget/rawset/rawlen/type/next/getmetatable)
-// and the select range/result helpers. These are misplaced relative to the
-// string library but moved here verbatim.
+// builtin_identity_ptrs.go holds the identity-token accessors for native
+// builtins such as tonumber/select/pairs/ipairs/rawget/rawset/rawlen/type/next.
 //
-// Pure code movement from stdlib_string.go; no behavior change.
+// The JIT uses these stable pointers to recognize runtime-owned functions
+// without depending on Go function pointer equality.
 
 func StdToNumberIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdToNumberIdentity)

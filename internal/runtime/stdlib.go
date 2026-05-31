@@ -11,9 +11,9 @@ func (interp *Interpreter) InstallRuntimeStdlib() {
 	interp.installStdlib(false)
 }
 
-// InstallStdlib registers all legacy runtime standard-library tables as
-// globals. Newer embedding entry points should prefer runtime.NewCore plus
-// stdlibrt/install.Install so migrated modules are installed from stdlibrt.
+// InstallStdlib registers the standard-library tables that are still owned by
+// runtime. Newer embedding entry points should prefer runtime.NewCore plus
+// stdlibrt/install.Install so external modules are installed from stdlibrt.
 func (interp *Interpreter) InstallStdlib() {
 	interp.installStdlib(true)
 }
@@ -22,7 +22,7 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	std := newStdlibInstallContext(interp)
 
 	if includeMigratedCompat {
-		interp.installLegacyMigratedStdlib(std)
+		interp.installRuntimeOwnedStdlib(std)
 	}
 
 	// --- System ---
@@ -31,10 +31,10 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	std.InstallPackage(interp.scriptDir)
 }
 
-// installLegacyMigratedStdlib is the compatibility path for runtime.New and
-// direct runtime.Interpreter.InstallStdlib callers. Public embedding goes
-// through stdlibrt/install, so new migrated modules should not be added here.
-func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
+// installRuntimeOwnedStdlib registers the few stdlib surfaces that have not yet
+// moved behind stdlibrt/modules. Public embedding goes through stdlibrt/install,
+// so newly extracted modules should not be added here.
+func (interp *Interpreter) installRuntimeOwnedStdlib(std StdlibInstaller) {
 	tblLib := buildTableLib()
 	buildTableProxyWithInterp(interp, tblLib)
 	buildTableSortWithInterp(interp, tblLib)
