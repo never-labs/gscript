@@ -24,6 +24,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import benchmark_output
 import benchmark_discovery as discovery
 import timing_compare as timing_harness
 
@@ -733,8 +734,7 @@ def write_report(
     ]
     for item in bottlenecks:
         lines.append(
-            "| "
-            + " | ".join(
+            benchmark_output.markdown_row(
                 [
                     item.priority,
                     item.category,
@@ -743,7 +743,6 @@ def write_report(
                     item.recommendation,
                 ]
             )
-            + " |"
         )
 
     lines += [
@@ -755,8 +754,7 @@ def write_report(
     ]
     for row in sorted(rows, key=lambda r: r.get("cur_luajit") or -1, reverse=True):
         lines.append(
-            "| "
-            + " | ".join(
+            benchmark_output.markdown_row(
                 [
                     row["benchmark"],
                     fmt_scale(row["scale"]),
@@ -773,7 +771,6 @@ def write_report(
                     verdict(row),
                 ]
             )
-            + " |"
         )
 
     lines += ["", "## Artifacts", "", f"- summary JSON: `{summary_json}`", f"- timing report: `{timing_md}`"]
@@ -791,7 +788,7 @@ def write_report(
         lines.append(f"- JIT PC map summary: `{pcmap_md}`")
     lines += ["", "## Artifact Status", "", "| Artifact | Status | Path | Note |", "|---|---|---|---|"]
     for name, status in sorted(artifacts.items()):
-        lines.append(f"| {name} | {status.status} | `{status.path or '-'}` | {status.note or '-'} |")
+        lines.append(benchmark_output.markdown_row([name, status.status, f"`{status.path or '-'}`", status.note or "-"]))
     out.write_text("\n".join(lines) + "\n")
 
 
