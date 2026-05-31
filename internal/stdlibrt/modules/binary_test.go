@@ -13,7 +13,8 @@ func newBinaryModulesInterp() *runtime.Interpreter {
 }
 
 func newStringPackAliasInterp() *runtime.Interpreter {
-	interp := runtime.New()
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
 	installTestModule(interp, "bytes", runtime.TableValue(BuildBytes(interp.MaxHostResultBytes)))
 	return interp
 }

@@ -20,7 +20,8 @@ func runWithVec(t *testing.T, src string) *Interpreter {
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
-	interp := runtime.New()
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
 	interp.SetGlobal("vec", TableValue(BuildVec()))
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)

@@ -37,7 +37,7 @@ assert(points.missing == nil)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			interp := runtime.New()
+			interp := newCLIInterpreter()
 			if err := tc.run(interp, source); err != nil {
 				t.Fatalf("run: %v", err)
 			}

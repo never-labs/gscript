@@ -134,7 +134,7 @@ project := extracted.value.project
 			t.Setenv("GSCRIPT_GLM_BASE_URL", server.URL)
 			t.Setenv("GSCRIPT_GLM_API_KEY", "test-key")
 			t.Setenv("GSCRIPT_GLM_MODEL", "mock-glm")
-			interp := runtime.New()
+			interp := newCLIInterpreter()
 			installCLILLMProviderFactory(interp)
 			if err := tc.run(interp, source); err != nil {
 				t.Fatalf("run: %v", err)

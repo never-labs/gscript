@@ -8,7 +8,8 @@ import (
 
 func contextInterp(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
-	interp := runtime.New()
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
 	installTestModule(interp, "context", runtime.TableValue(BuildContext()))
 	execOnInterp(t, interp, src)
 	return interp

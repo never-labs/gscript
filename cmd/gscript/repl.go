@@ -20,7 +20,7 @@ func runREPLCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(errw, "usage: gscript repl")
 		return 2
 	}
-	interp := runtime.New()
+	interp := newCLIInterpreter()
 	interp.SetArgs("<repl>", nil)
 	_ = outw
 	runREPL(interp)

@@ -9,7 +9,6 @@ import (
 	"runtime/pprof"
 
 	gscript "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func runDefaultCommand(outw, errw io.Writer) int {
@@ -118,7 +117,7 @@ func runDefaultCommand(outw, errw io.Writer) int {
 			}
 			return 0
 		}
-		interp := runtime.New()
+		interp := newCLIInterpreter()
 		installCLILLMProviderFactory(interp)
 		interp.SetArgs("<eval>", flag.Args())
 		if err := runStringVM(interp, *eval, runOpts.UseJIT, runOpts.ShowJITStats, runOpts.JIT); err != nil {
@@ -132,7 +131,7 @@ func runDefaultCommand(outw, errw io.Writer) int {
 	}
 
 	if len(args) == 0 {
-		interp := runtime.New()
+		interp := newCLIInterpreter()
 		installCLILLMProviderFactory(interp)
 		interp.SetArgs("<repl>", nil)
 		runREPL(interp)
@@ -144,7 +143,7 @@ func runDefaultCommand(outw, errw io.Writer) int {
 	if canUsePublicRunPath(runOpts) {
 		err = runPublicScriptFile(filename, args[1:], runOpts)
 	} else {
-		interp := runtime.New()
+		interp := newCLIInterpreter()
 		installCLILLMProviderFactory(interp)
 		err = runScriptFile(interp, filename, args[1:], runOpts)
 	}

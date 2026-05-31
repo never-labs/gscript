@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int {
@@ -199,7 +197,7 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 		} else if canUsePublicRunPath(opts) {
 			runErr = runPublicScriptFile(filename, nil, opts)
 		} else {
-			interp := runtime.New()
+			interp := newCLIInterpreter()
 			runErr = runScriptFile(interp, filename, nil, opts)
 		}
 		if runErr != nil {
@@ -299,7 +297,7 @@ func runScriptFileCapturingStdout(filename string, opts cliRunOptions) ([]byte, 
 			runErr = runPublicScriptFile(filename, nil, opts)
 			return
 		}
-		interp := runtime.New()
+		interp := newCLIInterpreter()
 		runErr = runScriptFile(interp, filename, nil, opts)
 	}()
 
