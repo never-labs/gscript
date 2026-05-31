@@ -117,7 +117,11 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	}
 	std.RegisterTable("soa", buildSoALib())
 
-	std.RegisterTable("utf8", buildUTF8Lib(interp))
+	if includeMigratedHostIO {
+		// Historical direct-runtime install path. Public embedding now installs
+		// utf8 from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("utf8", buildUTF8Lib(interp))
+	}
 
 	std.InstallPackage(interp.scriptDir)
 }

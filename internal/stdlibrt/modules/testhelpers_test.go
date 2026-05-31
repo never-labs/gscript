@@ -63,6 +63,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "regexp", runtime.TableValue(BuildRegexp()))
 	installTestModule(interp, "sort", runtime.TableValue(BuildSortLibWithCaller(interp.CallFunction)))
 	installTestModule(interp, "url", runtime.TableValue(BuildURL(interp.MaxHostResultBytes)))
+	installTestModule(interp, "utf8", runtime.TableValue(BuildUTF8(interp.MaxHostResultBytes)))
 	installTestModule(interp, "uuid", runtime.TableValue(BuildUUID()))
 	installTestModule(interp, "vec", runtime.TableValue(BuildVec()))
 }
