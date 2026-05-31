@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	stringlib "github.com/never-labs/gscript/internal/stdlib/base/string"
+	stringformat "github.com/never-labs/gscript/internal/stdlib/base/stringformat"
 )
 
 // stdlib_string_format.go holds string.format: the public fast-arity value
@@ -50,26 +51,13 @@ func stringFormatValue(args []Value) (Value, error) {
 			continue
 		}
 
-		start := i - 1 // include the %
-		for i < len(formatStr) && stringlib.IsFormatFlag(formatStr[i]) {
-			i++
-		}
-		for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
-			i++
-		}
-		if i < len(formatStr) && formatStr[i] == '.' {
-			i++
-			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
-				i++
-			}
-		}
-
-		if i >= len(formatStr) {
+		token, ok := stringformat.ScanToken(formatStr, i-1)
+		if !ok {
 			return NilValue(), fmt.Errorf("invalid format string")
 		}
-		spec := formatStr[i]
-		i++
-		fmtSpec := formatStr[start:i]
+		spec := token.Verb
+		i = token.End
+		fmtSpec := token.Spec
 
 		if argIdx >= len(args) {
 			return NilValue(), fmt.Errorf("bad argument #%d to 'string.format' (no value)", argIdx+1)
@@ -274,18 +262,9 @@ func StringFormatSingleInt(pattern string, n int64) (Value, bool, error) {
 	return v, true, nil
 }
 
-type simpleFormatPart struct {
-	lit   string
-	spec  string
-	verb  byte
-	pad   byte
-	width int
-	prec  int
-}
-
 type simpleFormatProgram struct {
 	formatStr string
-	parts     []simpleFormatPart
+	parts     []stringformat.Part
 	minArgs   int
 	litBytes  int
 	singleInt bool
@@ -389,161 +368,23 @@ func simpleFormatFastSlot(s string) uint64 {
 }
 
 func compileSimpleFormat(formatStr string) (*simpleFormatProgram, bool, error) {
-	parts := make([]simpleFormatPart, 0, 4)
-	litStart := 0
-	argCount := 0
-	litBytes := 0
-	for i := 0; i < len(formatStr); {
-		if formatStr[i] != '%' {
-			i++
-			continue
-		}
-		if i+1 >= len(formatStr) {
-			return nil, false, fmt.Errorf("invalid format string (ends with %%)")
-		}
-		if formatStr[i+1] == '%' {
-			return nil, false, nil
-		}
-		if i > litStart {
-			lit := formatStr[litStart:i]
-			parts = append(parts, simpleFormatPart{lit: lit})
-			litBytes += len(lit)
-		}
-
-		start := i
-		i++
-		for i < len(formatStr) && stringlib.IsFormatFlag(formatStr[i]) {
-			if formatStr[i] != '0' {
-				return nil, false, nil
-			}
-			i++
-		}
-		for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
-			i++
-		}
-		precisionStart := -1
-		if i < len(formatStr) && formatStr[i] == '.' {
-			precisionStart = i
-			i++
-			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
-				i++
-			}
-		}
-		if i >= len(formatStr) {
-			return nil, false, fmt.Errorf("invalid format string")
-		}
-		verb := formatStr[i]
-		i++
-		switch verb {
-		case 'd', 'i', 'u', 'x', 'X', 'o':
-			if precisionStart >= 0 {
-				return nil, false, nil
-			}
-			part, ok := compileSimpleIntegerFormatPart(formatStr[start:i], verb)
-			if !ok {
-				return nil, false, nil
-			}
-			parts = append(parts, part)
-		case 'f':
-			part, ok := compileSimpleFloatFormatPart(formatStr[start:i])
-			if !ok {
-				return nil, false, nil
-			}
-			parts = append(parts, part)
-		case 's':
-			if precisionStart >= 0 || i-start != 2 {
-				return nil, false, nil
-			}
-			parts = append(parts, simpleFormatPart{spec: "%s", verb: verb})
-		default:
-			return nil, false, nil
-		}
-		argCount++
-		litStart = i
-	}
-	if argCount == 0 {
+	prog, status := stringformat.CompileSimple(formatStr)
+	switch status {
+	case stringformat.CompileOK:
+		return &simpleFormatProgram{
+			formatStr: formatStr,
+			parts:     prog.Parts,
+			minArgs:   prog.ArgCount + 1,
+			litBytes:  prog.LitBytes,
+			singleInt: prog.SingleInt,
+		}, true, nil
+	case stringformat.CompileErrEndsWithPercent:
+		return nil, false, fmt.Errorf("invalid format string (ends with %%)")
+	case stringformat.CompileErrInvalid:
+		return nil, false, fmt.Errorf("invalid format string")
+	default:
 		return nil, false, nil
 	}
-	if litStart < len(formatStr) {
-		lit := formatStr[litStart:]
-		parts = append(parts, simpleFormatPart{lit: lit})
-		litBytes += len(lit)
-	}
-	return &simpleFormatProgram{
-		formatStr: formatStr,
-		parts:     parts,
-		minArgs:   argCount + 1,
-		litBytes:  litBytes,
-		singleInt: argCount == 1 && simpleFormatHasSingleIntegerArg(parts),
-	}, true, nil
-}
-
-func compileSimpleIntegerFormatPart(fmtSpec string, verb byte) (simpleFormatPart, bool) {
-	if len(fmtSpec) < 2 || fmtSpec[0] != '%' || fmtSpec[len(fmtSpec)-1] != verb {
-		return simpleFormatPart{}, false
-	}
-	pos := 1
-	pad := byte(' ')
-	if pos < len(fmtSpec)-1 && fmtSpec[pos] == '0' {
-		pad = '0'
-		pos++
-	}
-	width := 0
-	for pos < len(fmtSpec)-1 && fmtSpec[pos] >= '0' && fmtSpec[pos] <= '9' {
-		width = width*10 + int(fmtSpec[pos]-'0')
-		pos++
-	}
-	if pos != len(fmtSpec)-1 {
-		return simpleFormatPart{}, false
-	}
-	return simpleFormatPart{spec: fmtSpec, verb: verb, pad: pad, width: width}, true
-}
-
-func compileSimpleFloatFormatPart(fmtSpec string) (simpleFormatPart, bool) {
-	if len(fmtSpec) < 3 || fmtSpec[0] != '%' || fmtSpec[len(fmtSpec)-1] != 'f' {
-		return simpleFormatPart{}, false
-	}
-	pos := 1
-	width := 0
-	for pos < len(fmtSpec)-1 && fmtSpec[pos] >= '0' && fmtSpec[pos] <= '9' {
-		width = width*10 + int(fmtSpec[pos]-'0')
-		pos++
-	}
-	prec := 6
-	if pos < len(fmtSpec)-1 && fmtSpec[pos] == '.' {
-		pos++
-		prec = 0
-		if pos >= len(fmtSpec)-1 || fmtSpec[pos] < '0' || fmtSpec[pos] > '9' {
-			return simpleFormatPart{}, false
-		}
-		for pos < len(fmtSpec)-1 && fmtSpec[pos] >= '0' && fmtSpec[pos] <= '9' {
-			prec = prec*10 + int(fmtSpec[pos]-'0')
-			pos++
-		}
-	}
-	if pos != len(fmtSpec)-1 || prec > 9 {
-		return simpleFormatPart{}, false
-	}
-	return simpleFormatPart{spec: fmtSpec, verb: 'f', width: width, prec: prec}, true
-}
-
-func simpleFormatHasSingleIntegerArg(parts []simpleFormatPart) bool {
-	seen := false
-	for _, part := range parts {
-		if part.verb == 0 {
-			continue
-		}
-		switch part.verb {
-		case 'd', 'i', 'u', 'x', 'X', 'o':
-			if seen {
-				return false
-			}
-			seen = true
-		default:
-			return false
-		}
-	}
-	return seen
 }
 
 func (p *simpleFormatProgram) formatValue(args []Value) (Value, error) {
@@ -655,13 +496,13 @@ func (p *simpleFormatProgram) format(args []Value) (string, error) {
 	buf.Grow(p.litBytes + 16*(p.minArgs-1))
 	argIdx := 1
 	for _, part := range p.parts {
-		if part.verb == 0 {
-			buf.WriteString(part.lit)
+		if part.Verb == 0 {
+			buf.WriteString(part.Lit)
 			continue
 		}
 		arg := args[argIdx]
 		argIdx++
-		switch part.verb {
+		switch part.Verb {
 		case 'd', 'i', 'u', 'x', 'X', 'o':
 			writeCompiledIntegerFormat(&buf, part, toInt(arg))
 		case 'f':
@@ -681,8 +522,8 @@ func (p *simpleFormatProgram) formatTwoArgs(arg0, arg1 Value) (string, error) {
 	buf.Grow(p.litBytes + 32)
 	argIdx := 0
 	for _, part := range p.parts {
-		if part.verb == 0 {
-			buf.WriteString(part.lit)
+		if part.Verb == 0 {
+			buf.WriteString(part.Lit)
 			continue
 		}
 		var arg Value
@@ -695,7 +536,7 @@ func (p *simpleFormatProgram) formatTwoArgs(arg0, arg1 Value) (string, error) {
 			return "", fmt.Errorf("bad argument #%d to 'string.format' (no value)", argIdx+2)
 		}
 		argIdx++
-		switch part.verb {
+		switch part.Verb {
 		case 'd', 'i', 'u', 'x', 'X', 'o':
 			writeCompiledIntegerFormat(&buf, part, toInt(arg))
 		case 'f':
@@ -715,8 +556,8 @@ func (p *simpleFormatProgram) formatFixedArgs(args []Value) (string, error) {
 	buf.Grow(p.litBytes + 16*len(args))
 	argIdx := 0
 	for _, part := range p.parts {
-		if part.verb == 0 {
-			buf.WriteString(part.lit)
+		if part.Verb == 0 {
+			buf.WriteString(part.Lit)
 			continue
 		}
 		if argIdx >= len(args) {
@@ -724,7 +565,7 @@ func (p *simpleFormatProgram) formatFixedArgs(args []Value) (string, error) {
 		}
 		arg := args[argIdx]
 		argIdx++
-		switch part.verb {
+		switch part.Verb {
 		case 'd', 'i', 'u', 'x', 'X', 'o':
 			writeCompiledIntegerFormat(&buf, part, toInt(arg))
 		case 'f':
@@ -740,8 +581,8 @@ func (p *simpleFormatProgram) formatSingleInt(n int64) string {
 	var buf strings.Builder
 	buf.Grow(p.litBytes + 16)
 	for _, part := range p.parts {
-		if part.verb == 0 {
-			buf.WriteString(part.lit)
+		if part.Verb == 0 {
+			buf.WriteString(part.Lit)
 			continue
 		}
 		writeCompiledIntegerFormat(&buf, part, n)
@@ -749,21 +590,21 @@ func (p *simpleFormatProgram) formatSingleInt(n int64) string {
 	return buf.String()
 }
 
-func writeCompiledFloatFormat(buf *strings.Builder, part simpleFormatPart, f float64) {
+func writeCompiledFloatFormat(buf *strings.Builder, part stringformat.Part, f float64) {
 	var scratch [128]byte
-	digits := strconv.AppendFloat(scratch[:0], f, 'f', part.prec, 64)
-	if part.width <= len(digits) {
+	digits := strconv.AppendFloat(scratch[:0], f, 'f', part.Prec, 64)
+	if part.Width <= len(digits) {
 		buf.Write(digits)
 		return
 	}
-	for i := 0; i < part.width-len(digits); i++ {
+	for i := 0; i < part.Width-len(digits); i++ {
 		buf.WriteByte(' ')
 	}
 	buf.Write(digits)
 }
 
-func writeCompiledIntegerFormat(buf *strings.Builder, part simpleFormatPart, n int64) {
-	stringlib.WritePaddedInteger(buf, part.verb, part.pad, part.width, n)
+func writeCompiledIntegerFormat(buf *strings.Builder, part stringformat.Part, n int64) {
+	stringlib.WritePaddedInteger(buf, part.Verb, part.Pad, part.Width, n)
 }
 
 func scanSimpleFormatCacheRoots(visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
