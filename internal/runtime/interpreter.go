@@ -415,6 +415,13 @@ func (interp *Interpreter) SetLLMProvider(provider LLMProvider) {
 	interp.llmProvider = provider
 }
 
+func (interp *Interpreter) LLMProvider() LLMProvider {
+	if interp == nil {
+		return nil
+	}
+	return interp.llmProvider
+}
+
 // SetLLMProviderFactory installs the constructor used by llm.register_models
 // entries that declare a protocol/base URL instead of relying on a host
 // provider. A nil factory keeps model configs as aliases only.
@@ -422,10 +429,24 @@ func (interp *Interpreter) SetLLMProviderFactory(factory LLMProviderFactory) {
 	interp.llmProviderFactory = factory
 }
 
+func (interp *Interpreter) LLMProviderFactory() LLMProviderFactory {
+	if interp == nil {
+		return nil
+	}
+	return interp.llmProviderFactory
+}
+
 // SetLLMTraceSink sets the optional host-side trace sink for llm.turn/react.
 // Trace events intentionally carry metadata only, not prompt text.
 func (interp *Interpreter) SetLLMTraceSink(sink LLMTraceSink) {
 	interp.llmTraceSink = sink
+}
+
+func (interp *Interpreter) LLMTraceSink() LLMTraceSink {
+	if interp == nil {
+		return nil
+	}
+	return interp.llmTraceSink
 }
 
 // SetMaxModuleBytes limits bytes read by script-side file loading APIs such as
@@ -472,6 +493,13 @@ func (interp *Interpreter) MaxFilesystemWriteBytes() int64 {
 // statement/loop checkpoints. A nil context disables cancellation polling.
 func (interp *Interpreter) SetContext(ctx context.Context) {
 	interp.ctx = ctx
+}
+
+func (interp *Interpreter) Context() context.Context {
+	if interp == nil {
+		return nil
+	}
+	return interp.ctx
 }
 
 func (interp *Interpreter) resetExecutionBudgets() {

@@ -1,6 +1,8 @@
 package install
 
 import (
+	"context"
+
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
@@ -27,6 +29,7 @@ func Install(interp *runtime.Interpreter) {
 			Call:               interp.CallFunction,
 		},
 	})
+	InstallLLM(interp)
 }
 
 type ModuleOptions struct {
@@ -89,6 +92,33 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("utf8", modules.BuildUTF8(maxHostResult))
 	installer.RegisterTable("uuid", modules.BuildUUID())
 	installer.RegisterTable("vec", modules.BuildVec())
+}
+
+func InstallLLM(interp *runtime.Interpreter) {
+	if interp == nil {
+		return
+	}
+	modules.InstallLLM(interpreterInstaller{interp: interp}, modules.LLMOptions{
+		Call: interp.CallFunction,
+		Provider: func() runtime.LLMProvider {
+			return interp.LLMProvider()
+		},
+		ProviderFactory: func() runtime.LLMProviderFactory {
+			return interp.LLMProviderFactory()
+		},
+		MaxHostResult: interp.MaxHostResultBytes,
+		Context: func() context.Context {
+			if ctx := interp.Context(); ctx != nil {
+				return ctx
+			}
+			return context.Background()
+		},
+		Trace: func(event runtime.LLMTraceEvent) {
+			if sink := interp.LLMTraceSink(); sink != nil {
+				sink(event)
+			}
+		},
+	})
 }
 
 type interpreterInstaller struct {

@@ -76,42 +76,45 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 
-	// --- AI model integration ---
-	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
-		return interp.llmProvider
-	}, func() LLMProviderFactory {
-		return interp.llmProviderFactory
-	}, func() int64 {
-		return interp.maxHostResult
-	}, func() context.Context {
-		if interp.ctx == nil {
-			return context.Background()
-		}
-		return interp.ctx
-	}, func(event LLMTraceEvent) {
-		if interp.llmTraceSink != nil {
-			interp.llmTraceSink(event)
-		}
-	})
-	std.RegisterTable("llm", llmLib)
-	std.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
-	std.RegisterTable("msg", BuildLLMMessageLib())
-	std.RegisterTable("history", BuildLLMHistoryLib())
-	std.RegisterTable("chat", BuildChatLib())
-	std.RegisterTable("loop", BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
-		return interp.llmProvider
-	}, func() int64 {
-		return interp.maxHostResult
-	}, func() context.Context {
-		if interp.ctx == nil {
-			return context.Background()
-		}
-		return interp.ctx
-	}, func(event LLMTraceEvent) {
-		if interp.llmTraceSink != nil {
-			interp.llmTraceSink(event)
-		}
-	}))
+	if includeMigratedHostIO {
+		// Historical direct-runtime install path. Public embedding now installs
+		// LLM bindings from stdlibrt/modules through stdlibrt/install.
+		llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
+			return interp.llmProvider
+		}, func() LLMProviderFactory {
+			return interp.llmProviderFactory
+		}, func() int64 {
+			return interp.maxHostResult
+		}, func() context.Context {
+			if interp.ctx == nil {
+				return context.Background()
+			}
+			return interp.ctx
+		}, func(event LLMTraceEvent) {
+			if interp.llmTraceSink != nil {
+				interp.llmTraceSink(event)
+			}
+		})
+		std.RegisterTable("llm", llmLib)
+		std.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
+		std.RegisterTable("msg", BuildLLMMessageLib())
+		std.RegisterTable("history", BuildLLMHistoryLib())
+		std.RegisterTable("chat", BuildChatLib())
+		std.RegisterTable("loop", BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
+			return interp.llmProvider
+		}, func() int64 {
+			return interp.maxHostResult
+		}, func() context.Context {
+			if interp.ctx == nil {
+				return context.Background()
+			}
+			return interp.ctx
+		}, func(event LLMTraceEvent) {
+			if interp.llmTraceSink != nil {
+				interp.llmTraceSink(event)
+			}
+		}))
+	}
 
 	if includeMigratedHostIO {
 		// Historical direct-runtime install path. Public embedding now installs
