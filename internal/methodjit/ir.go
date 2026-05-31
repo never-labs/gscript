@@ -1,13 +1,3 @@
-// Package methodjit implements a V8 Maglev-style method JIT compiler.
-// It compiles entire functions (not traces) to native ARM64 code via
-// a CFG-based SSA intermediate representation.
-//
-// Architecture:
-//
-//	Bytecode → GraphBuilder → CFG SSA IR → (future: Optimize → RegAlloc → Emit → ARM64)
-//
-// The IR uses the Braun et al. algorithm for SSA construction:
-// single forward pass, lazy phi insertion, no dominance frontier computation.
 package methodjit
 
 import (

@@ -21,6 +21,7 @@ import (
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibmeta"
 	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
@@ -354,7 +355,7 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 }
 
 func buildCapabilities() cliCapabilities {
-	modules := runtime.StdlibModuleNames()
+	modules := stdlibmeta.ModuleNames()
 	sort.Strings(modules)
 	return cliCapabilities{
 		SchemaVersion: 1,
@@ -458,11 +459,11 @@ func buildCapabilities() cliCapabilities {
 }
 
 func buildStdlibLayerCapabilities() []cliStdlibLayer {
-	layerNames := runtime.StdlibLayers()
+	layerNames := stdlibmeta.Layers()
 	layers := make([]cliStdlibLayer, 0, len(layerNames))
 	for _, name := range layerNames {
 		modules := make([]cliStdlibModule, 0)
-		for _, module := range runtime.StdlibModulesForLayer(name) {
+		for _, module := range stdlibmeta.ModulesForLayer(name) {
 			modules = append(modules, cliStdlibModule{
 				Name:         module.Name,
 				Capabilities: append([]string(nil), module.Capabilities...),

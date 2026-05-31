@@ -6,14 +6,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibmeta"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {
-	for _, name := range runtime.StdlibModuleNames() {
+	for _, name := range stdlibmeta.ModuleNames() {
 		if allowed[name] {
 			continue
 		}

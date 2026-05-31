@@ -7,11 +7,13 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/gscript/internal/stdlibmeta"
 )
 
 func TestStdlibContractDocumentsRuntimeModules(t *testing.T) {
 	root := findRepoRoot(t)
-	runtimeModules := readRuntimeStdlibModuleNames(t, root)
+	runtimeModules := readStdlibModuleNames(t)
 	contractRows := readStdlibContractRows(t, root)
 
 	for _, name := range runtimeModules {
@@ -21,35 +23,19 @@ func TestStdlibContractDocumentsRuntimeModules(t *testing.T) {
 	}
 }
 
-func readRuntimeStdlibModuleNames(t *testing.T, root string) []string {
+func readStdlibModuleNames(t *testing.T) []string {
 	t.Helper()
 
-	data, err := os.ReadFile(filepath.Join(root, "internal", "runtime", "stdlib.go"))
-	if err != nil {
-		t.Fatalf("read runtime stdlib registry: %v", err)
-	}
-
-	blockRE := regexp.MustCompile(`(?s)var\s+stdlibModules\s*=\s*\[\]StdlibModuleInfo\s*\{(.*?)\n\}`)
-	match := blockRE.FindStringSubmatch(string(data))
-	if match == nil {
-		t.Fatal("runtime stdlib registry stdlibModules block not found")
-	}
-
-	nameRE := regexp.MustCompile(`Name:\s*"([^"]+)"`)
-	matches := nameRE.FindAllStringSubmatch(match[1], -1)
-	if len(matches) == 0 {
-		t.Fatal("runtime stdlib registry contains no module names")
-	}
-
 	seen := map[string]bool{}
-	names := make([]string, 0, len(matches))
-	for _, match := range matches {
-		name := match[1]
+	names := stdlibmeta.ModuleNames()
+	for _, name := range names {
 		if seen[name] {
 			t.Fatalf("runtime stdlib registry has duplicate module %q", name)
 		}
 		seen[name] = true
-		names = append(names, name)
+	}
+	if len(names) == 0 {
+		t.Fatal("runtime stdlib registry contains no module names")
 	}
 	sort.Strings(names)
 	return names

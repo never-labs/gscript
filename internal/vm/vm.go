@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibmeta"
 )
 
 const (
@@ -1092,7 +1093,7 @@ func clonePackageTableForChild(parent *runtime.Table) *runtime.Table {
 		parentLoaded := parent.RawGetString("loaded")
 		if parentLoaded.IsTable() {
 			src := parentLoaded.Table()
-			for _, name := range runtime.StdlibModuleNames() {
+			for _, name := range stdlibmeta.ModuleNames() {
 				if v := src.RawGetString(name); !v.IsNil() {
 					loaded.RawSetString(name, v)
 				}

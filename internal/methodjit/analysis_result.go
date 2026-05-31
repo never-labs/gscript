@@ -1,4 +1,3 @@
-// Package methodjit implements a V8 Maglev-style method JIT compiler.
 package methodjit
 
 import (
