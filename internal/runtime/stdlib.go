@@ -18,7 +18,7 @@ func (interp *Interpreter) InstallStdlib() {
 	interp.installStdlib(true)
 }
 
-func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
+func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	std := newStdlibInstallContext(interp)
 
 	// String library
@@ -36,13 +36,13 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	buildTableHigherOrderWithInterp(interp, tblLib)
 	std.RegisterTable("table", tblLib)
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		// Historical direct-runtime install path. Public embedding now installs
 		// math from stdlibrt/modules through stdlibrt/install.
 		std.RegisterTable("math", buildMathLib())
 	}
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		// Historical direct-runtime install path. Public embedding now installs
 		// these from stdlibrt/modules through stdlibrt/install.
 		std.RegisterTable("io", buildIOLib(interp))
@@ -53,19 +53,19 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	// Raylib game library (window, drawing, input, audio)
 	std.RegisterTable("rl", rlLib(interp))
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		// Historical direct-runtime install path. Public embedding now installs
 		// json from stdlibrt/modules through stdlibrt/install.
 		std.RegisterTable("json", buildJSONLib())
 	}
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))
 	}
 
 	// --- Time & networking ---
 	std.RegisterTable("time", buildTimeLib())
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		std.RegisterTable("net", buildNetLib(interp))
 	}
 
@@ -76,7 +76,7 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		// Historical direct-runtime install path. Public embedding now installs
 		// LLM bindings from stdlibrt/modules through stdlibrt/install.
 		llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
@@ -116,14 +116,14 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 		}))
 	}
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		// Historical direct-runtime install path. Public embedding now installs
 		// matrix from stdlibrt/modules through stdlibrt/install.
 		std.RegisterTable("matrix", buildMatrixLib())
 	}
 	std.RegisterTable("soa", buildSoALib())
 
-	if includeMigratedHostIO {
+	if includeMigratedCompat {
 		// Historical direct-runtime install path. Public embedding now installs
 		// utf8 from stdlibrt/modules through stdlibrt/install.
 		std.RegisterTable("utf8", buildUTF8Lib(interp))
