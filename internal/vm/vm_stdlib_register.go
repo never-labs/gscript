@@ -40,6 +40,27 @@ func (vm *VM) setPackageLoaded(name string, val runtime.Value) {
 	}
 }
 
+type vmStdlibInstallContext struct {
+	vm *VM
+}
+
+func (vm *VM) newStdlibInstallContext() *vmStdlibInstallContext {
+	return &vmStdlibInstallContext{vm: vm}
+}
+
+func (ctx *vmStdlibInstallContext) RegisterModule(name string, module runtime.Value) {
+	ctx.vm.SetGlobal(name, module)
+	ctx.vm.setPackageLoaded(name, module)
+}
+
+func (ctx *vmStdlibInstallContext) RegisterTable(name string, table *runtime.Table) {
+	ctx.RegisterModule(name, runtime.TableValue(table))
+}
+
+func (ctx *vmStdlibInstallContext) RegisterAlias(name string, value runtime.Value) {
+	ctx.vm.SetGlobal(name, value)
+}
+
 // RegisterProtectedCallLib installs VM-aware pcall/xpcall builtins so protected
 // calls can invoke ordinary VM closures.
 
@@ -736,20 +757,21 @@ func (vm *VM) SetStringMeta(meta *runtime.Table) {
 // string.gsub replacements.
 
 func (vm *VM) RegisterStringLib() {
+	std := vm.newStdlibInstallContext()
 	var strLib *runtime.Table
 	if existing, ok := vm.globals["string"]; ok && existing.IsTable() {
 		strLib = runtime.RefreshStringLibWithCaller(existing.Table(), vm.callValue, func() int64 { return vm.maxHostResult })
 	} else {
 		strLib = runtime.BuildStringLibWithCaller(vm.callValue, func() int64 { return vm.maxHostResult })
-		vm.SetGlobal("string", runtime.TableValue(strLib))
 	}
+	std.RegisterTable("string", strLib)
 	meta := runtime.NewTable()
 	meta.RawSet(runtime.StringValue("__index"), runtime.TableValue(strLib))
 	vm.stringMeta = meta
-	vm.setPackageLoaded("string", runtime.TableValue(strLib))
 }
 
 func (vm *VM) RegisterLLMLib() {
+	std := vm.newStdlibInstallContext()
 	llmLib := runtime.TableValue(runtime.BuildLLMLib(vm.callValue, func() runtime.LLMProvider {
 		return vm.llmProvider
 	}, func() runtime.LLMProviderFactory {
@@ -766,20 +788,16 @@ func (vm *VM) RegisterLLMLib() {
 			vm.llmTraceSink(event)
 		}
 	}))
-	vm.SetGlobal("llm", llmLib)
+	std.RegisterModule("llm", llmLib)
 	if llmTable := llmLib.Table(); llmTable != nil {
-		vm.SetGlobal("toolof", llmTable.RawGetString("toolof"))
+		std.RegisterAlias("toolof", llmTable.RawGetString("toolof"))
 	}
-	vm.setPackageLoaded("llm", llmLib)
 	msgLib := runtime.TableValue(runtime.BuildLLMMessageLib())
-	vm.SetGlobal("msg", msgLib)
-	vm.setPackageLoaded("msg", msgLib)
+	std.RegisterModule("msg", msgLib)
 	historyLib := runtime.TableValue(runtime.BuildLLMHistoryLib())
-	vm.SetGlobal("history", historyLib)
-	vm.setPackageLoaded("history", historyLib)
+	std.RegisterModule("history", historyLib)
 	chatLib := runtime.TableValue(runtime.BuildChatLib())
-	vm.SetGlobal("chat", chatLib)
-	vm.setPackageLoaded("chat", chatLib)
+	std.RegisterModule("chat", chatLib)
 	loopLib := runtime.TableValue(runtime.BuildLLMLoopLib(vm.callValue, func() runtime.LLMProvider {
 		return vm.llmProvider
 	}, func() int64 {
@@ -794,24 +812,23 @@ func (vm *VM) RegisterLLMLib() {
 			vm.llmTraceSink(event)
 		}
 	}))
-	vm.SetGlobal("loop", loopLib)
-	vm.setPackageLoaded("loop", loopLib)
+	std.RegisterModule("loop", loopLib)
 }
 
 func (vm *VM) RegisterHTTPLib() {
+	std := vm.newStdlibInstallContext()
 	httpLib := runtime.TableValue(runtime.BuildHTTPLibWithCallerAndPolicy(vm.callValue, func() bool {
 		return vm.networkAccess
 	}, func() int64 {
 		return vm.maxHostResult
 	}))
-	vm.SetGlobal("http", httpLib)
-	vm.setPackageLoaded("http", httpLib)
+	std.RegisterModule("http", httpLib)
 }
 
 func (vm *VM) RegisterSyncLib() {
+	std := vm.newStdlibInstallContext()
 	syncLib := runtime.TableValue(runtime.BuildSyncLibWithTaskLauncher(vm.callValue, vm.launchSyncTask))
-	vm.SetGlobal("sync", syncLib)
-	vm.setPackageLoaded("sync", syncLib)
+	std.RegisterModule("sync", syncLib)
 }
 
 func (vm *VM) RegisterScriptLib() {
