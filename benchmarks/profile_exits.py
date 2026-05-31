@@ -19,6 +19,8 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
+import benchmark_discovery as discovery
+
 
 DEFAULT_BENCHMARKS = [
     "recursion/fib_recursive",
@@ -32,7 +34,7 @@ DEFAULT_BENCHMARKS = [
     "numeric/spectral_norm",
     "recursion/fibonacci_iterative",
 ]
-BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
+BENCHMARK_GROUPS = tuple(discovery.GROUPS)
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 

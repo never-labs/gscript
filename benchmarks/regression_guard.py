@@ -24,6 +24,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
 
+import benchmark_discovery as discovery
+
 
 DEFAULT_BENCHMARKS = [
     "recursion/fib",
@@ -49,7 +51,7 @@ DEFAULT_BENCHMARKS = [
     "numeric/math_intensive",
     "calls/object_creation",
 ]
-BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
+BENCHMARK_GROUPS = tuple(discovery.GROUPS)
 
 
 TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)

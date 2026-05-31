@@ -2,6 +2,9 @@ import unittest
 from pathlib import Path
 
 import benchmark_discovery as discovery
+import conformance_perf_coverage as coverage
+import profile_exits
+import regression_guard
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +31,12 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         gate = (ROOT / "scripts" / "performance_gate.sh").read_text()
         self.assertIn("python3 benchmarks/timing_compare.py", gate)
         self.assertIn("python3 benchmarks/strict_guard.py", gate)
+
+    def test_python_benchmark_entrypoints_share_discovery_groups(self):
+        expected = tuple(discovery.GROUPS)
+        self.assertEqual(coverage.BENCHMARK_GROUPS, expected)
+        self.assertEqual(profile_exits.BENCHMARK_GROUPS, expected)
+        self.assertEqual(regression_guard.BENCHMARK_GROUPS, expected)
 
 
 if __name__ == "__main__":

@@ -16,9 +16,11 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import benchmark_discovery as discovery
+
 
 ROOT = Path(__file__).resolve().parents[1]
-BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
+BENCHMARK_GROUPS = tuple(discovery.GROUPS)
 
 
 @dataclass(frozen=True)
