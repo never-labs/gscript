@@ -76,6 +76,22 @@ func TestRuntimeStdlibWrappersDoNotImportProviderImplementations(t *testing.T) {
 	})
 }
 
+func TestRuntimeDoesNotImportStdlibImplementations(t *testing.T) {
+	runtimeRoot := filepath.Join(repoRoot(t), "internal", "runtime")
+
+	forEachGoFile(t, runtimeRoot, func(path string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, importPath := range parseImports(t, path) {
+			if importPath == "github.com/never-labs/gscript/internal/stdlib" ||
+				strings.HasPrefix(importPath, "github.com/never-labs/gscript/internal/stdlib/") {
+				t.Fatalf("%s imports %s; runtime must depend on shared substrates or stdlibrt adapters, not stdlib implementation packages", relativeToRoot(t, path), importPath)
+			}
+		}
+	})
+}
+
 func hasGoFile(t *testing.T, dir string) bool {
 	t.Helper()
 	found := false
