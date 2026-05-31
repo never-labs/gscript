@@ -6,7 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"strings"
+
+	stdbytes "github.com/never-labs/gscript/internal/stdlib/data/bytes"
 )
 
 // buildBytesLib creates the "bytes" standard library table.
@@ -223,7 +224,7 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'bytes.fromHex' (string expected)")
 		}
-		data, err := hex.DecodeString(args[0].Str())
+		data, err := stdbytes.DecodeHex(args[0].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -236,10 +237,10 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'bytes.toHex' (string expected)")
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), hex.EncodedLen(StringLen(args[0]))); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), stdbytes.EncodedHexLen(StringLen(args[0]))); err != nil {
 			return nil, err
 		}
-		return []Value{StringValue(hex.EncodeToString([]byte(args[0].Str())))}, nil
+		return []Value{StringValue(stdbytes.ToHex(args[0].Str()))}, nil
 	})
 
 	// bytes.xor(s1, s2) -- XOR two byte strings of equal length
@@ -247,19 +248,14 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'bytes.xor' (string expected)")
 		}
-		s1 := []byte(args[0].Str())
-		s2 := []byte(args[1].Str())
-		if len(s1) != len(s2) {
-			return nil, fmt.Errorf("bytes.xor: strings must have equal length (got %d and %d)", len(s1), len(s2))
-		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), len(s1)); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), StringLen(args[0])); err != nil {
 			return nil, err
 		}
-		result := make([]byte, len(s1))
-		for i := range s1 {
-			result[i] = s1[i] ^ s2[i]
+		result, err := stdbytes.XOR(args[0].Str(), args[1].Str())
+		if err != nil {
+			return nil, fmt.Errorf("bytes.xor: %w", err)
 		}
-		return []Value{StringValue(string(result))}, nil
+		return []Value{StringValue(result)}, nil
 	})
 
 	// bytes.compare(s1, s2) -- -1, 0, 1 (lexicographic comparison)
@@ -267,8 +263,7 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'bytes.compare' (string expected)")
 		}
-		cmp := bytes.Compare([]byte(args[0].Str()), []byte(args[1].Str()))
-		return []Value{IntValue(int64(cmp))}, nil
+		return []Value{IntValue(int64(stdbytes.Compare(args[0].Str(), args[1].Str())))}, nil
 	})
 
 	// bytes.repeat(s, n) -- repeat byte string n times
@@ -278,19 +273,24 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 		}
 		s := args[0].Str()
 		n := int(toInt(args[1]))
-		if n <= 0 {
-			return []Value{StringValue("")}, nil
-		}
-		if len(s) > 0 && n > int(^uint(0)>>1)/len(s) {
+		repeatedLen, err := stdbytes.RepeatLen(s, n)
+		if err != nil {
 			if maxHostResult() > 0 {
 				return nil, fmt.Errorf("host result byte limit exceeded (%d)", maxHostResult())
 			}
-			return nil, fmt.Errorf("bytes.repeat: result too large")
+			return nil, fmt.Errorf("bytes.repeat: %w", err)
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), len(s)*n); err != nil {
+		if repeatedLen == 0 {
+			return []Value{StringValue("")}, nil
+		}
+		if err := CheckProjectedHostStringBytes(maxHostResult(), repeatedLen); err != nil {
 			return nil, err
 		}
-		return []Value{StringValue(strings.Repeat(s, n))}, nil
+		result, err := stdbytes.Repeat(s, n)
+		if err != nil {
+			return nil, fmt.Errorf("bytes.repeat: %w", err)
+		}
+		return []Value{StringValue(result)}, nil
 	})
 
 	// bytes.concat(...) -- concatenate multiple strings/buffers
