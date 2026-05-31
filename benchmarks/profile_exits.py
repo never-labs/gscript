@@ -54,7 +54,7 @@ def parse_time(output: str) -> float | None:
 
 def build(root: Path, out: Path) -> None:
     proc = subprocess.run(
-        ["go", "build", "-o", str(out), "./cmd/gscript/"],
+        ["go", "build", "-o", str(out), "./cmd/gscript"],
         cwd=root,
         text=True,
         stdout=subprocess.PIPE,

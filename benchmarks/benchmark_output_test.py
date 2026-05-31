@@ -76,7 +76,7 @@ class BenchmarkOutputTest(unittest.TestCase):
             output.build_gscript(Path("/repo"), Path("/tmp/gscript"))
 
         run.assert_called_once_with(
-            ["go", "build", "-o", "/tmp/gscript", "./cmd/gscript/"],
+            ["go", "build", "-o", "/tmp/gscript", "./cmd/gscript"],
             cwd=Path("/repo"),
             stdout=output.subprocess.PIPE,
             stderr=output.subprocess.STDOUT,

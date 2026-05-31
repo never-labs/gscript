@@ -12,10 +12,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-GSCRIPT_BIN="/tmp/gscript_diag_tier2_$$"
-RESULTS_DIR="/tmp/gscript_diag_tier2_results_$$"
+TMP_BASE="${TMPDIR:-/tmp}"
+GSCRIPT_BIN="$(mktemp "${TMP_BASE%/}/gscript_diag_tier2.XXXXXX")"
+RESULTS_DIR="$(mktemp -d "${TMP_BASE%/}/gscript_diag_tier2_results.XXXXXX")"
 TIMEOUT_SEC="${TIMEOUT_SEC:-60}"
-mkdir -p "$RESULTS_DIR"
 
 cleanup() {
     rm -f "$GSCRIPT_BIN"
@@ -102,7 +102,7 @@ extract_failures() {
     ' "$file" | tr '\n' ';' | sed 's/;$/ /; s/|/\\|/g'
 }
 
-if ! go build -o "$GSCRIPT_BIN" ./cmd/gscript/ 2>&1; then
+if ! go build -o "$GSCRIPT_BIN" ./cmd/gscript 2>&1; then
     echo "ERROR: build failed" >&2
     exit 1
 fi

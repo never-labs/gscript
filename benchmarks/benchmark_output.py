@@ -68,7 +68,7 @@ def run_text_command(cmd: list[str], timeout: float, env: dict[str, str] | None 
 
 def build_gscript(root: Path, out: Path, failure_message: str | None = None) -> None:
     proc = subprocess.run(
-        ["go", "build", "-o", str(out), "./cmd/gscript/"],
+        ["go", "build", "-o", str(out), "./cmd/gscript"],
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

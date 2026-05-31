@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -28,6 +29,8 @@ import benchmark_output
 import benchmark_discovery as discovery
 import timing_compare as timing_harness
 
+
+DEFAULT_OUT_DIR = Path(os.environ.get("TMPDIR", "/tmp")) / "gscript-triage"
 
 PPROF_ROW_RE = re.compile(
     r"^\s*(?P<flat>[0-9.]+)(?P<flat_unit>ns|us|ms|s)?\s+"
@@ -386,7 +389,7 @@ def collect_spec_state(root: Path, out_dir: Path, bench: str, timeout: int) -> P
     tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_spec_"))
     try:
         binary = tempdir / "gscript"
-        build = run(["go", "build", "-o", str(binary), "./cmd/gscript/"], root, timeout)
+        build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, timeout)
         if build.returncode != 0:
             return None
         spec_state_json = out_dir / "tier2-spec-state.json"
@@ -843,7 +846,7 @@ def main() -> int:
     parser.add_argument("--spec-state", type=Path, help="optional -tier2-spec-state-json file to fold into classification")
     parser.add_argument("--no-spec-state", action="store_true", help="do not collect Tier 2 speculation state automatically")
     parser.add_argument("--warm-dump", action="store_true", help="also collect production-warm JIT PC maps for the first benchmark")
-    parser.add_argument("--out-dir", type=Path, default=Path("/tmp/gscript-triage"))
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
@@ -928,7 +931,7 @@ def main() -> int:
             tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_pprof_"))
             try:
                 binary = tempdir / "gscript"
-                build = run(["go", "build", "-o", str(binary), "./cmd/gscript/"], root, int(args.timeout))
+                build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, int(args.timeout))
                 if build.returncode == 0:
                     pprof_binary = out_dir / "gscript.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
@@ -952,7 +955,7 @@ def main() -> int:
             tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_mem_"))
             try:
                 binary = tempdir / "gscript"
-                build = run(["go", "build", "-o", str(binary), "./cmd/gscript/"], root, int(args.timeout))
+                build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, int(args.timeout))
                 if build.returncode == 0:
                     pprof_binary = out_dir / "gscript.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
@@ -971,7 +974,7 @@ def main() -> int:
             tempdir = Path(tempfile.mkdtemp(prefix="gscript_triage_warm_"))
             try:
                 binary = tempdir / "gscript"
-                build = run(["go", "build", "-o", str(binary), "./cmd/gscript/"], root, int(args.timeout))
+                build = run(["go", "build", "-o", str(binary), "./cmd/gscript"], root, int(args.timeout))
                 if build.returncode == 0:
                     pprof_binary = out_dir / "gscript.pprof.bin"
                     shutil.copy2(binary, pprof_binary)
