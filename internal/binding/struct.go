@@ -1,4 +1,4 @@
-package gscript
+package binding
 
 import (
 	"fmt"
@@ -21,13 +21,6 @@ func capitalizeFirst(s string) string {
 	return string(r)
 }
 
-// StructBinding holds configuration for a bound Go struct type.
-type StructBinding struct {
-	typeName    string
-	typ         reflect.Type
-	constructor reflect.Value // optional custom constructor func
-}
-
 // bindStructToInterp creates a GScript "class" table for a Go struct type
 // and registers it as a global in the interpreter.
 //
@@ -42,7 +35,7 @@ type StructBinding struct {
 //	print(v.X)           -- field access
 //	v.X = 5              -- field set
 //	print(v.Length())     -- method call
-func bindStructToInterp(interp *runtime.Interpreter, name string, proto interface{}, customCtor interface{}) error {
+func (c Converter) BindStructToInterp(interp *runtime.Interpreter, name string, proto interface{}, customCtor interface{}) error {
 	var typ reflect.Type
 	if proto != nil {
 		typ = reflect.TypeOf(proto)
@@ -96,7 +89,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 					f = rv.FieldByName(capitalizeFirst(fieldName))
 				}
 				if f.IsValid() && f.CanInterface() {
-					val, err := reflectToValue(f)
+					val, err := c.ReflectToValue(f)
 					if err != nil {
 						return []runtime.Value{runtime.NilValue()}, nil
 					}
@@ -116,7 +109,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 				}
 			}
 			if method.IsValid() {
-				fn, err := wrapGoFunc(method)
+				fn, err := c.WrapGoFunc(method)
 				if err != nil {
 					return []runtime.Value{runtime.NilValue()}, nil
 				}
@@ -164,7 +157,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 				return nil, fmt.Errorf("struct %s has no settable field %q", name, fieldName)
 			}
 
-			goFieldVal, err := fromValue(val, f.Type())
+			goFieldVal, err := c.FromValue(val, f.Type())
 			if err != nil {
 				return nil, fmt.Errorf("setting field %q: %v", fieldName, err)
 			}
@@ -197,7 +190,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 	if customCtor != nil {
 		// Use the custom constructor function
 		ctorVal := reflect.ValueOf(customCtor)
-		wrappedCtor, err := wrapGoFunc(ctorVal)
+		wrappedCtor, err := c.WrapGoFunc(ctorVal)
 		if err != nil {
 			return fmt.Errorf("BindStruct: invalid constructor: %v", err)
 		}
@@ -217,7 +210,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 					return results, nil
 				}
 				// Convert struct return to instance table
-				rv, err2 := fromValue(result, typ)
+				rv, err2 := c.FromValue(result, typ)
 				if err2 != nil {
 					return results, nil
 				}
@@ -244,7 +237,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 					if i >= len(args) {
 						break
 					}
-					goVal, err := fromValue(args[i], f.Type)
+					goVal, err := c.FromValue(args[i], f.Type)
 					if err != nil {
 						return nil, fmt.Errorf("%s.new field %s: %v", name, f.Name, err)
 					}
@@ -296,7 +289,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 				if !method.IsValid() {
 					return nil, fmt.Errorf("%s.%s: method not found", name, capturedMethod.Name)
 				}
-				wrapped, err := wrapGoFunc(method)
+				wrapped, err := c.WrapGoFunc(method)
 				if err != nil {
 					return nil, err
 				}
@@ -323,7 +316,7 @@ func makeStructInstance(rv reflect.Value, instanceMeta *runtime.Table) runtime.V
 
 // structToValue converts a Go struct reflect.Value into a GScript table instance.
 // This is used when returning Go structs from wrapped functions.
-func structToValue(rv reflect.Value) (runtime.Value, error) {
+func (c Converter) structToValue(rv reflect.Value) (runtime.Value, error) {
 	// Create a simple instance meta with __index for field access
 	typ := rv.Type()
 	name := typ.Name()
@@ -361,7 +354,7 @@ func structToValue(rv reflect.Value) (runtime.Value, error) {
 					f = deref.FieldByName(capitalizeFirst(fieldName))
 				}
 				if f.IsValid() && f.CanInterface() {
-					val, err := reflectToValue(f)
+					val, err := c.ReflectToValue(f)
 					if err != nil {
 						return []runtime.Value{runtime.NilValue()}, nil
 					}
@@ -381,7 +374,7 @@ func structToValue(rv reflect.Value) (runtime.Value, error) {
 				}
 			}
 			if method.IsValid() {
-				fn, err := wrapGoFunc(method)
+				fn, err := c.WrapGoFunc(method)
 				if err != nil {
 					return []runtime.Value{runtime.NilValue()}, nil
 				}
@@ -429,7 +422,7 @@ func structToValue(rv reflect.Value) (runtime.Value, error) {
 				return nil, fmt.Errorf("struct %s has no settable field %q", name, fieldName)
 			}
 
-			goFieldVal, err := fromValue(val, f.Type())
+			goFieldVal, err := c.FromValue(val, f.Type())
 			if err != nil {
 				return nil, fmt.Errorf("setting field %q: %v", fieldName, err)
 			}
@@ -474,7 +467,7 @@ func extractGoValue(val runtime.Value) reflect.Value {
 }
 
 // fromValueStruct attempts to convert a GScript table back to a Go struct.
-func fromValueStruct(val runtime.Value, target reflect.Type) (reflect.Value, error) {
+func (c Converter) fromValueStruct(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	// Try registry first
 	if val.IsTable() {
 		goVal := extractGoValue(val)
@@ -500,7 +493,7 @@ func fromValueStruct(val runtime.Value, target reflect.Type) (reflect.Value, err
 			if gsVal.IsNil() {
 				continue
 			}
-			fv, err := fromValue(gsVal, f.Type)
+			fv, err := c.FromValue(gsVal, f.Type)
 			if err != nil {
 				continue
 			}

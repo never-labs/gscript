@@ -1,4 +1,4 @@
-package gscript
+package binding
 
 import (
 	"fmt"
@@ -20,13 +20,13 @@ import (
 //	map[string]T      -> table (hash)
 //	struct / *struct   -> table (fields + methods via metatable)
 //	func              -> function (reflected, see wrapGoFunc)
-func toValue(v interface{}) (runtime.Value, error) {
+func (c Converter) ToValue(v interface{}) (runtime.Value, error) {
 	if v == nil {
 		return runtime.NilValue(), nil
 	}
 
-	if pv, ok := v.(Value); ok {
-		return fromPublic(pv), nil
+	if c.isPublicValue(v) {
+		return c.FromPublic(v), nil
 	}
 
 	// Pass through if already a runtime.Value
@@ -34,10 +34,10 @@ func toValue(v interface{}) (runtime.Value, error) {
 		return rv, nil
 	}
 
-	return reflectToValue(reflect.ValueOf(v))
+	return c.ReflectToValue(reflect.ValueOf(v))
 }
 
-func reflectToValue(rv reflect.Value) (runtime.Value, error) {
+func (c Converter) ReflectToValue(rv reflect.Value) (runtime.Value, error) {
 	if !rv.IsValid() {
 		return runtime.NilValue(), nil
 	}
@@ -72,7 +72,7 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 		}
 		t := runtime.NewTable()
 		for i := 0; i < rv.Len(); i++ {
-			elem, err := reflectToValue(rv.Index(i))
+			elem, err := c.ReflectToValue(rv.Index(i))
 			if err != nil {
 				return runtime.NilValue(), err
 			}
@@ -86,11 +86,11 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 		}
 		t := runtime.NewTable()
 		for _, key := range rv.MapKeys() {
-			k, err := reflectToValue(key)
+			k, err := c.ReflectToValue(key)
 			if err != nil {
 				continue
 			}
-			v, err := reflectToValue(rv.MapIndex(key))
+			v, err := c.ReflectToValue(rv.MapIndex(key))
 			if err != nil {
 				continue
 			}
@@ -99,10 +99,10 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 		return runtime.TableValue(t), nil
 
 	case reflect.Struct:
-		return structToValue(rv)
+		return c.structToValue(rv)
 
 	case reflect.Func:
-		fn, err := wrapGoFunc(rv)
+		fn, err := c.WrapGoFunc(rv)
 		if err != nil {
 			return runtime.NilValue(), err
 		}
@@ -112,7 +112,7 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 		if rv.IsNil() {
 			return runtime.NilValue(), nil
 		}
-		return reflectToValue(rv.Elem())
+		return c.ReflectToValue(rv.Elem())
 	}
 
 	return runtime.NilValue(), fmt.Errorf("unsupported Go type: %s", rv.Type())
@@ -120,17 +120,19 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 
 // fromValue converts an internal GScript value to a Go value of the target type.
 // If target is nil, uses a default mapping (int64, float64, string, map, etc.)
-func fromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
+func (c Converter) FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	if target == nil {
-		return fromValueDefault(val)
+		return c.FromValueDefault(val)
 	}
-	if target == reflect.TypeOf(Value{}) {
-		return reflect.ValueOf(toPublic(val)), nil
+	if target == c.PublicValueType {
+		if out, ok := c.publicValue(val); ok {
+			return out, nil
+		}
 	}
 
 	// Handle pointer targets
 	if target.Kind() == reflect.Ptr {
-		elem, err := fromValue(val, target.Elem())
+		elem, err := c.FromValue(val, target.Elem())
 		if err != nil {
 			return reflect.Value{}, err
 		}
@@ -207,7 +209,7 @@ func fromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 		slice := reflect.MakeSlice(target, n, n)
 		for i := 1; i <= n; i++ {
 			elem := t.RawGet(runtime.IntValue(int64(i)))
-			goElem, err := fromValue(elem, target.Elem())
+			goElem, err := c.FromValue(elem, target.Elem())
 			if err != nil {
 				return reflect.Value{}, err
 			}
@@ -227,9 +229,9 @@ func fromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 			if !ok {
 				break
 			}
-			goKey, err := fromValue(k, target.Key())
+			goKey, err := c.FromValue(k, target.Key())
 			if err == nil {
-				goVal, err := fromValue(v, target.Elem())
+				goVal, err := c.FromValue(v, target.Elem())
 				if err == nil {
 					m.SetMapIndex(goKey, goVal)
 				}
@@ -239,12 +241,12 @@ func fromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 		return m, nil
 
 	case reflect.Struct:
-		return fromValueStruct(val, target)
+		return c.fromValueStruct(val, target)
 
 	case reflect.Interface:
 		if target.NumMethod() == 0 {
 			// interface{}
-			rv, err := fromValueDefault(val)
+			rv, err := c.FromValueDefault(val)
 			if err != nil {
 				return reflect.Value{}, err
 			}
@@ -261,7 +263,7 @@ func fromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 }
 
 // fromValueDefault converts without a target type hint.
-func fromValueDefault(val runtime.Value) (reflect.Value, error) {
+func (c Converter) FromValueDefault(val runtime.Value) (reflect.Value, error) {
 	switch {
 	case val.IsNil():
 		return reflect.ValueOf(nil), nil
@@ -281,7 +283,7 @@ func fromValueDefault(val runtime.Value) (reflect.Value, error) {
 			arr := make([]interface{}, n)
 			for i := 1; i <= n; i++ {
 				elem := t.RawGet(runtime.IntValue(int64(i)))
-				rv, err := fromValueDefault(elem)
+				rv, err := c.FromValueDefault(elem)
 				if err == nil && rv.IsValid() {
 					arr[i-1] = rv.Interface()
 				}
@@ -295,7 +297,7 @@ func fromValueDefault(val runtime.Value) (reflect.Value, error) {
 			if !ok {
 				break
 			}
-			rv, err := fromValueDefault(v)
+			rv, err := c.FromValueDefault(v)
 			if err == nil && rv.IsValid() {
 				m[k.String()] = rv.Interface()
 			}
@@ -310,7 +312,7 @@ func fromValueDefault(val runtime.Value) (reflect.Value, error) {
 
 // wrapGoFunc wraps a Go function (reflect.Value) as a GoFunction callable from GScript.
 // It uses reflection to convert arguments and return values automatically.
-func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
+func (c Converter) WrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 	fnType := fn.Type()
 	if fnType.Kind() != reflect.Func {
 		return nil, fmt.Errorf("expected func, got %s", fnType.Kind())
@@ -324,7 +326,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 		defer func() {
 			if r := recover(); r != nil {
 				results = nil
-				err = &HostCallbackPanicError{Name: gf.Name, Value: r}
+				err = c.hostCallbackPanicError(gf.Name, r)
 			}
 		}()
 
@@ -350,7 +352,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 					} else {
 						gsVal = runtime.NilValue()
 					}
-					rv, err := fromValue(gsVal, elemType)
+					rv, err := c.FromValue(gsVal, elemType)
 					if err != nil {
 						return nil, fmt.Errorf("arg %d: %v", i+j, err)
 					}
@@ -366,7 +368,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 			} else {
 				gsVal = runtime.NilValue()
 			}
-			rv, err := fromValue(gsVal, argType)
+			rv, err := c.FromValue(gsVal, argType)
 			if err != nil {
 				return nil, fmt.Errorf("arg %d: %v", i, err)
 			}
@@ -390,14 +392,14 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 		if hasError && numOut > 0 {
 			lastOut := out[numOut-1]
 			if !lastOut.IsNil() {
-				return nil, &HostCallbackError{Name: gf.Name, Err: lastOut.Interface().(error)}
+				return nil, c.hostCallbackError(gf.Name, lastOut.Interface().(error))
 			}
 			out = out[:numOut-1]
 		}
 
 		result := make([]runtime.Value, 0, len(out))
 		for _, rv := range out {
-			gsVal, err := reflectToValue(rv)
+			gsVal, err := c.ReflectToValue(rv)
 			if err != nil {
 				return nil, err
 			}
