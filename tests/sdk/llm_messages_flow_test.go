@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestAINativeNamedAgentFlowAndDirectTurnSugar(t *testing.T) {
+func TestLLMNamedAgentFlowAndDirectTurnSugar(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -98,7 +98,7 @@ turn_text := turn_result.text
 	}
 }
 
-func TestAINativeMessagesBlockAllowsMixedMessageItems(t *testing.T) {
+func TestLLMMessagesBlockAllowsMixedMessageItems(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -155,7 +155,7 @@ history_len := #history
 	}
 }
 
-func TestAINativeHistoryHelpersAndValidateOutput(t *testing.T) {
+func TestLLMHistoryHelpersAndValidateOutput(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -217,7 +217,7 @@ user_count := #all_users
 	}
 }
 
-func TestAINativeFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
+func TestLLMFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option

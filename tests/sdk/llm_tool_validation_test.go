@@ -6,7 +6,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
+func TestLLMSyntaxValidationAllowsStaticToolCapsCoverage(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option
@@ -64,7 +64,7 @@ func f(caps) {
 	}
 }
 
-func TestAINativeSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T) {
+func TestLLMSyntaxValidationAllowsDynamicDefaultsToolCapsRefs(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option
@@ -100,7 +100,7 @@ agent answer(q) {
 	}
 }
 
-func TestAINativeSyntaxValidationAllowsDynamicToolRefs(t *testing.T) {
+func TestLLMSyntaxValidationAllowsDynamicToolRefs(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option
@@ -126,7 +126,7 @@ func f(tools) {
 	}
 }
 
-func TestAINativeSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
+func TestLLMSyntaxValidationAllowsScopedToolRefs(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option

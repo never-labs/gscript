@@ -6,7 +6,7 @@
 //   model:    GSCRIPT_GLM_MODEL or GLM_MODEL, default glm-5.1
 //
 // Run without committing tokens:
-//   GSCRIPT_GLM_API_KEY=... gscript -jit=false examples/ai_agent/ai_native_glm_direct_agent_tools.gs
+//   GSCRIPT_GLM_API_KEY=... gscript -jit=false examples/llm/glm_direct_agent_tools.gs
 
 func env_first(a, b, c, fallback) {
     v := os.getenv(a)

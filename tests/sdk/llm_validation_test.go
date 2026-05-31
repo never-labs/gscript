@@ -7,7 +7,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeSyntaxValidation(t *testing.T) {
+func TestLLMSyntaxValidation(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		src  string
@@ -243,7 +243,7 @@ func f() {
 	}
 }
 
-func TestAINativeSyntaxValidationAllowsAliasOnlyModels(t *testing.T) {
+func TestLLMSyntaxValidationAllowsAliasOnlyModels(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option

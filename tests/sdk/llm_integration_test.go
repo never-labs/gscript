@@ -84,10 +84,10 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 	}
 }
 
-// TestAINativeSyntaxAnthropicCompatibleLLMIntegration verifies that AI-native
+// TestLLMSyntaxAnthropicCompatibleLLMIntegration verifies that AI-native
 // models/turn syntax can construct the same gated real-provider adapter. It is
 // intentionally skipped unless all real-provider environment variables are set.
-func TestAINativeSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
+func TestLLMSyntaxAnthropicCompatibleLLMIntegration(t *testing.T) {
 	if os.Getenv("GSCRIPT_LLM_INTEGRATION") == "" {
 		t.Skip("set GSCRIPT_LLM_INTEGRATION=1 to run AI-native real provider smoke")
 	}

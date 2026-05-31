@@ -6,7 +6,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
+func TestLLMAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -30,7 +30,7 @@ func TestAINativeAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Use delegated research: Agents can be delegated as tools."},
 			}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_research(topic) {
@@ -139,7 +139,7 @@ tool_confidence := result.history[4].value.confidence
 	}
 }
 
-func TestAINativeAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
+func TestLLMAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -163,7 +163,7 @@ func TestAINativeAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Delegation complete."},
 			}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_research(topic) {
@@ -257,7 +257,7 @@ alias_name := alias_delegate.name
 	}
 }
 
-func TestAINativeAgentScenarioDirectAgentInToolsList(t *testing.T) {
+func TestLLMAgentScenarioDirectAgentInToolsList(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -281,7 +281,7 @@ func TestAINativeAgentScenarioDirectAgentInToolsList(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Direct delegation complete."},
 			}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_research(topic) {

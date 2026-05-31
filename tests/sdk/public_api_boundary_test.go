@@ -2,9 +2,7 @@ package gscript_test
 
 import (
 	"os/exec"
-	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -199,13 +197,8 @@ func TestPublicValueCanCallHostAndScriptBoundaries(t *testing.T) {
 
 func rootGoDoc(t *testing.T) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	root := filepath.Dir(file)
 	cmd := exec.Command("go", "doc", ".")
-	cmd.Dir = root
+	cmd.Dir = repoRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go doc .: %v\n%s", err, out)

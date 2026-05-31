@@ -6,7 +6,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeAgentTurnScenarioRecordReplay(t *testing.T) {
+func TestLLMAgentTurnScenarioRecordReplay(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option

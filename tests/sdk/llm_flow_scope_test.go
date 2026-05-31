@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestAINativeAgentFlowImplicitConfigLocalsAreWhitelistedAndShadowable(t *testing.T) {
+func TestLLMAgentFlowImplicitConfigLocalsAreWhitelistedAndShadowable(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -52,7 +52,7 @@ shadowed := out.shadowed
 	}
 }
 
-func TestAINativeAgentFlowDoesNotInjectArbitraryMetaFields(t *testing.T) {
+func TestLLMAgentFlowDoesNotInjectArbitraryMetaFields(t *testing.T) {
 	for _, field := range []struct {
 		name   string
 		config string

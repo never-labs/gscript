@@ -8,7 +8,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
+func TestLLMDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
 	cases := []struct {
 		name string
 		opts []gs.Option
@@ -26,7 +26,7 @@ func TestAINativeDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "ok"}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 history := messages {
@@ -58,7 +58,7 @@ result, err := turn {
 	}
 }
 
-func TestAINativeAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
+func TestLLMAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -68,7 +68,7 @@ func TestAINativeAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "Paris"}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 models {
@@ -117,7 +117,7 @@ answer_text := result.text
 	}
 }
 
-func TestAINativeAgentScenarioReactToolAutoDispatch(t *testing.T) {
+func TestLLMAgentScenarioReactToolAutoDispatch(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -137,7 +137,7 @@ func TestAINativeAgentScenarioReactToolAutoDispatch(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "GScript docs found."},
 			}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 //gscript:requires none
@@ -191,7 +191,7 @@ history_len := #result.history
 	}
 }
 
-func TestAINativeAgentScenarioComplexFlowCustomTurns(t *testing.T) {
+func TestLLMAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -211,7 +211,7 @@ func TestAINativeAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Agents need explicit history."},
 			}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 //gscript:requires none

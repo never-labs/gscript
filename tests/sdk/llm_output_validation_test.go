@@ -7,7 +7,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeAgentOutputValidationError(t *testing.T) {
+func TestLLMAgentOutputValidationError(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -17,7 +17,7 @@ func TestAINativeAgentOutputValidationError(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `not json`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_contact(text) {
@@ -50,7 +50,7 @@ err_kind := err.kind
 	}
 }
 
-func TestAINativeAgentOutputValidationMissingField(t *testing.T) {
+func TestLLMAgentOutputValidationMissingField(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -60,7 +60,7 @@ func TestAINativeAgentOutputValidationMissingField(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada"}`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_contact(text) {
@@ -97,7 +97,7 @@ err_message := err.message
 	}
 }
 
-func TestAINativeAgentOutputValidationTypeMismatch(t *testing.T) {
+func TestLLMAgentOutputValidationTypeMismatch(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -107,7 +107,7 @@ func TestAINativeAgentOutputValidationTypeMismatch(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","score":"high","ok":true,"meta":{}}`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent classify(text) {

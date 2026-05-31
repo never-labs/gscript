@@ -6,7 +6,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeSyntaxExecutesThroughLLMStdlib(t *testing.T) {
+func TestLLMSyntaxExecutesThroughLLMStdlib(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option

@@ -92,10 +92,10 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 	assertLLMSmokeText(t, res.Text, "gscript glm smoke ok")
 }
 
-// TestAINativeSyntaxGLMIntegration verifies a real multi-turn GLM flow through
+// TestLLMSyntaxGLMIntegration verifies a real multi-turn GLM flow through
 // AI-native models/turn/agent syntax. It mirrors glm_cc's endpoint/key/model
 // env convention but never shells out to it.
-func TestAINativeSyntaxGLMIntegration(t *testing.T) {
+func TestLLMSyntaxGLMIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)
 	t.Setenv("GSCRIPT_GLM_BASE_URL", cfg.Endpoint)
 	t.Setenv("GSCRIPT_GLM_API_KEY", cfg.APIKey)
@@ -225,10 +225,10 @@ if stored_err != nil {
 	}
 }
 
-// TestAINativeSyntaxGLMDirectAgentToolsIntegration verifies a real GLM
+// TestLLMSyntaxGLMDirectAgentToolsIntegration verifies a real GLM
 // agent-as-tool loop using a direct agent value in tools: [agent]. It is gated
 // the same way as the other GLM smokes and never invokes glm_cc.
-func TestAINativeSyntaxGLMDirectAgentToolsIntegration(t *testing.T) {
+func TestLLMSyntaxGLMDirectAgentToolsIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)
 	t.Setenv("GSCRIPT_GLM_BASE_URL", cfg.Endpoint)
 	t.Setenv("GSCRIPT_GLM_API_KEY", cfg.APIKey)

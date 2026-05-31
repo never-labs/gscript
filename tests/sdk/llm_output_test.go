@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestAINativeDirectTurnResponseFormatProviderRequest(t *testing.T) {
+func TestLLMDirectTurnResponseFormatProviderRequest(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -15,7 +15,7 @@ func TestAINativeDirectTurnResponseFormatProviderRequest(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 result, err := turn {
@@ -92,7 +92,7 @@ text := result.text
 	}
 }
 
-func TestAINativeAgentOutputStructuredValue(t *testing.T) {
+func TestLLMAgentOutputStructuredValue(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -102,7 +102,7 @@ func TestAINativeAgentOutputStructuredValue(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract_contact(text) {
@@ -147,7 +147,7 @@ email := result.value.email
 	}
 }
 
-func TestAINativeAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
+func TestLLMAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -157,7 +157,7 @@ func TestAINativeAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"ok":true}`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract(text) {
@@ -191,7 +191,7 @@ ok := result.value.ok
 	}
 }
 
-func TestAINativeCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
+func TestLLMCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -201,7 +201,7 @@ func TestAINativeCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `not json`}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
 agent extract(text) {

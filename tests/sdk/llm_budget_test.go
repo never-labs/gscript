@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestAINativeStandaloneBudgetLimitsDirectTurns(t *testing.T) {
+func TestLLMStandaloneBudgetLimitsDirectTurns(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -48,7 +48,7 @@ budget { turns: 1 } {
 	}
 }
 
-func TestAINativeStandaloneBudgetNestedIntersectionUsesOuterTokens(t *testing.T) {
+func TestLLMStandaloneBudgetNestedIntersectionUsesOuterTokens(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -93,7 +93,7 @@ budget { tokens: 5 } {
 	}
 }
 
-func TestAINativeStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
+func TestLLMStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option

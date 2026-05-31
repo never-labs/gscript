@@ -205,7 +205,7 @@ text := result.text
 	}
 }
 
-func TestAINativeModelsProviderConfigOpenAICompatible(t *testing.T) {
+func TestLLMModelsProviderConfigOpenAICompatible(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option

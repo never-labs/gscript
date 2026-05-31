@@ -136,7 +136,7 @@ func TestClassifyLLMProviderError(t *testing.T) {
 	}
 }
 
-func TestAINativeModelsProviderConfigPreservesHostProvider(t *testing.T) {
+func TestLLMModelsProviderConfigPreservesHostProvider(t *testing.T) {
 	for _, mode := range []struct {
 		name string
 		opts []gs.Option

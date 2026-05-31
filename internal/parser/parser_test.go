@@ -382,7 +382,7 @@ agent answer(q) {
 }
 
 func TestAINativeExampleParses(t *testing.T) {
-	src, err := os.ReadFile("../../examples/ai_agent/ai_native_agent.gs")
+	src, err := os.ReadFile("../../examples/llm/agent.gs")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,7 @@ import (
 	gs "github.com/never-labs/gscript"
 )
 
-func TestAINativeAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
+func TestLLMAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		opts []gs.Option
@@ -40,9 +40,9 @@ func TestAINativeAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 				},
 				{Status: "final_answer", Text: "Incident brief: checkout latency spike, follow runbook."},
 			}}
-			vm := gs.New(aiNativeScenarioOptions(provider, tc.opts...)...)
+			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
-			if err := vm.ExecFile(filepath.Join("examples", "ai_agent", "ai_native_incident_response.gs")); err != nil {
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), "examples", "llm", "incident_response.gs")); err != nil {
 				t.Fatalf("ExecFile: %v", err)
 			}
 
