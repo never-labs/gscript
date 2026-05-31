@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	binfmt "github.com/never-labs/gscript/internal/stdlib/binary"
+	binfmt "github.com/never-labs/gscript/internal/binaryfmt"
 )
 
 func BuildBinary(maxHostResult func() int64) *Table {

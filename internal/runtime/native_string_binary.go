@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	binfmt "github.com/never-labs/gscript/internal/stdlib/binary"
+	binfmt "github.com/never-labs/gscript/internal/binaryfmt"
 )
 
 // These adapters back the runtime-native string.pack/unpack/packsize entries.
 // The binary stdlib module has its own thin Value adapter in stdlibrt/modules;
-// both paths share the format codec in internal/stdlib/binary.
+// both paths share the format codec in internal/binaryfmt.
 func binaryPackValues(apiName string, args []Value, maxHostResult int64) ([]Value, error) {
 	if len(args) < 1 || !args[0].IsString() {
 		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
