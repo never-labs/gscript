@@ -1,6 +1,9 @@
 package stringlib
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestStringTransforms(t *testing.T) {
 	if got := Upper("héllo"); got != "HÉLLO" {
@@ -100,6 +103,48 @@ func TestSplitHelpers(t *testing.T) {
 	}
 	if _, ok := SplitProject("a,b", ",", 3); ok {
 		t.Fatal("SplitProject out of range returned ok")
+	}
+}
+
+func TestFormatHelpers(t *testing.T) {
+	for _, b := range []byte{'-', '+', ' ', '#', '0'} {
+		if !IsFormatFlag(b) {
+			t.Fatalf("IsFormatFlag(%q) = false", b)
+		}
+	}
+	if IsFormatFlag('9') {
+		t.Fatal("IsFormatFlag accepted digit")
+	}
+
+	var buf strings.Builder
+	if !WriteFastIntegerFormat(&buf, "%05d", 'd', -12) {
+		t.Fatal("WriteFastIntegerFormat rejected %05d")
+	}
+	if got := buf.String(); got != "-0012" {
+		t.Fatalf("WriteFastIntegerFormat = %q", got)
+	}
+	buf.Reset()
+	WritePaddedInteger(&buf, 'X', ' ', 4, 0x2a)
+	if got := buf.String(); got != "  2A" {
+		t.Fatalf("WritePaddedInteger = %q", got)
+	}
+}
+
+func TestLuaQuoteHelpers(t *testing.T) {
+	if got := LuaQuoteNil(); got != "nil" {
+		t.Fatalf("LuaQuoteNil = %q", got)
+	}
+	if got := LuaQuoteBool(true); got != "true" {
+		t.Fatalf("LuaQuoteBool = %q", got)
+	}
+	if got := LuaQuoteInt(-42); got != "-42" {
+		t.Fatalf("LuaQuoteInt = %q", got)
+	}
+	if got := LuaQuoteFloat(1.25); got != "1.25" {
+		t.Fatalf("LuaQuoteFloat = %q", got)
+	}
+	if got := LuaQuoteString("a\n\"b\\"); got != `"a\n\"b\\"` {
+		t.Fatalf("LuaQuoteString = %q", got)
 	}
 }
 

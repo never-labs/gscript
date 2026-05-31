@@ -2,12 +2,13 @@ package runtime
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
+
+	stringlib "github.com/never-labs/gscript/internal/stdlib/base/string"
 )
 
 // stdlib_string_format.go holds string.format: the public fast-arity value
@@ -50,7 +51,7 @@ func stringFormatValue(args []Value) (Value, error) {
 		}
 
 		start := i - 1 // include the %
-		for i < len(formatStr) && isFormatFlag(formatStr[i]) {
+		for i < len(formatStr) && stringlib.IsFormatFlag(formatStr[i]) {
 			i++
 		}
 		for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
@@ -79,7 +80,7 @@ func stringFormatValue(args []Value) (Value, error) {
 		switch spec {
 		case 'd', 'i', 'u':
 			n := toInt(arg)
-			if !writeFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, string(spec), "d", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
@@ -87,19 +88,19 @@ func stringFormatValue(args []Value) (Value, error) {
 			buf.WriteString(fmt.Sprintf(fmtSpec, toFloat(arg)))
 		case 'x':
 			n := toInt(arg)
-			if !writeFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, "x", "x", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
 		case 'X':
 			n := toInt(arg)
-			if !writeFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, "X", "X", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
 		case 'o':
 			n := toInt(arg)
-			if !writeFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, "o", "o", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
@@ -142,47 +143,15 @@ func luaPointerString(v Value) string {
 func luaQuoteLiteral(v Value) (string, error) {
 	switch v.Type() {
 	case TypeNil:
-		return "nil", nil
+		return stringlib.LuaQuoteNil(), nil
 	case TypeBool:
-		if v.Bool() {
-			return "true", nil
-		}
-		return "false", nil
+		return stringlib.LuaQuoteBool(v.Bool()), nil
 	case TypeInt:
-		return strconv.FormatInt(v.Int(), 10), nil
+		return stringlib.LuaQuoteInt(v.Int()), nil
 	case TypeFloat:
-		f := v.Float()
-		if math.IsInf(f, 1) {
-			return "1e9999", nil
-		}
-		if math.IsInf(f, -1) {
-			return "-1e9999", nil
-		}
-		if math.IsNaN(f) {
-			return "(0/0)", nil
-		}
-		return strconv.FormatFloat(f, 'g', -1, 64), nil
+		return stringlib.LuaQuoteFloat(v.Float()), nil
 	case TypeString:
-		var buf strings.Builder
-		buf.WriteByte('"')
-		for _, c := range v.Str() {
-			switch c {
-			case '"':
-				buf.WriteString(`\"`)
-			case '\\':
-				buf.WriteString(`\\`)
-			case '\n':
-				buf.WriteString(`\n`)
-			case '\r':
-				buf.WriteString(`\r`)
-			case '\000':
-				buf.WriteString(`\0`)
-			default:
-				buf.WriteRune(c)
-			}
-		}
-		buf.WriteByte('"')
-		return buf.String(), nil
+		return stringlib.LuaQuoteString(v.Str()), nil
 	default:
 		return "", fmt.Errorf("bad argument to 'string.format' (value has no literal form)")
 	}
@@ -303,65 +272,6 @@ func StringFormatSingleInt(pattern string, n int64) (Value, bool, error) {
 	v := StringValue(prog.formatSingleInt(n))
 	prog.storeCachedResult(n, v)
 	return v, true, nil
-}
-
-func writeFastIntegerFormat(buf *strings.Builder, fmtSpec string, spec byte, n int64) bool {
-	if len(fmtSpec) < 2 || fmtSpec[0] != '%' || fmtSpec[len(fmtSpec)-1] != spec {
-		return false
-	}
-	pos := 1
-	pad := byte(' ')
-	if pos < len(fmtSpec)-1 && fmtSpec[pos] == '0' {
-		pad = '0'
-		pos++
-	}
-	width := 0
-	for pos < len(fmtSpec)-1 && fmtSpec[pos] >= '0' && fmtSpec[pos] <= '9' {
-		width = width*10 + int(fmtSpec[pos]-'0')
-		pos++
-	}
-	if pos != len(fmtSpec)-1 {
-		return false
-	}
-
-	var scratch [64]byte
-	digits := scratch[:0]
-	switch spec {
-	case 'd', 'i', 'u':
-		digits = strconv.AppendInt(digits, n, 10)
-	case 'x':
-		digits = strconv.AppendInt(digits, n, 16)
-	case 'X':
-		digits = strconv.AppendInt(digits, n, 16)
-		for i, b := range digits {
-			if b >= 'a' && b <= 'f' {
-				digits[i] = b - ('a' - 'A')
-			}
-		}
-	case 'o':
-		digits = strconv.AppendInt(digits, n, 8)
-	default:
-		return false
-	}
-
-	if width <= len(digits) {
-		buf.Write(digits)
-		return true
-	}
-	padCount := width - len(digits)
-	if pad == '0' && len(digits) > 0 && digits[0] == '-' {
-		buf.WriteByte('-')
-		for i := 0; i < padCount; i++ {
-			buf.WriteByte('0')
-		}
-		buf.Write(digits[1:])
-		return true
-	}
-	for i := 0; i < padCount; i++ {
-		buf.WriteByte(pad)
-	}
-	buf.Write(digits)
-	return true
 }
 
 type simpleFormatPart struct {
@@ -502,7 +412,7 @@ func compileSimpleFormat(formatStr string) (*simpleFormatProgram, bool, error) {
 
 		start := i
 		i++
-		for i < len(formatStr) && isFormatFlag(formatStr[i]) {
+		for i < len(formatStr) && stringlib.IsFormatFlag(formatStr[i]) {
 			if formatStr[i] != '0' {
 				return nil, false, nil
 			}
@@ -853,43 +763,7 @@ func writeCompiledFloatFormat(buf *strings.Builder, part simpleFormatPart, f flo
 }
 
 func writeCompiledIntegerFormat(buf *strings.Builder, part simpleFormatPart, n int64) {
-	var scratch [64]byte
-	digits := scratch[:0]
-	switch part.verb {
-	case 'd', 'i', 'u':
-		digits = strconv.AppendInt(digits, n, 10)
-	case 'x':
-		digits = strconv.AppendInt(digits, n, 16)
-	case 'X':
-		digits = strconv.AppendInt(digits, n, 16)
-		for i, b := range digits {
-			if b >= 'a' && b <= 'f' {
-				digits[i] = b - ('a' - 'A')
-			}
-		}
-	case 'o':
-		digits = strconv.AppendInt(digits, n, 8)
-	default:
-		return
-	}
-
-	if part.width <= len(digits) {
-		buf.Write(digits)
-		return
-	}
-	padCount := part.width - len(digits)
-	if part.pad == '0' && len(digits) > 0 && digits[0] == '-' {
-		buf.WriteByte('-')
-		for i := 0; i < padCount; i++ {
-			buf.WriteByte('0')
-		}
-		buf.Write(digits[1:])
-		return
-	}
-	for i := 0; i < padCount; i++ {
-		buf.WriteByte(part.pad)
-	}
-	buf.Write(digits)
+	stringlib.WritePaddedInteger(buf, part.verb, part.pad, part.width, n)
 }
 
 func scanSimpleFormatCacheRoots(visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {
@@ -911,15 +785,6 @@ func scanSimpleFormatCacheRoots(visitor func(unsafe.Pointer), seen map[uintptr]s
 				ScanValueRoots(Value(bits), visitor, seen)
 			}
 		}
-	}
-}
-
-func isFormatFlag(b byte) bool {
-	switch b {
-	case '-', '+', ' ', '#', '0':
-		return true
-	default:
-		return false
 	}
 }
 
