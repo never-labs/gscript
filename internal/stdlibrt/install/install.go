@@ -94,6 +94,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("path", modules.BuildPath())
 	installer.RegisterTable("rand", modules.BuildRand())
 	installer.RegisterTable("regexp", modules.BuildRegexp())
+	installer.RegisterTable("rl", modules.BuildRL())
 	installer.RegisterTable("sort", modules.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("soa", modules.BuildSOA())
 	installer.RegisterTable("sync", modules.BuildSync(modules.SyncOptions{

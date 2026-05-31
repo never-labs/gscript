@@ -40,9 +40,6 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 		interp.installLegacyMigratedStdlib(std)
 	}
 
-	// Raylib game library (window, drawing, input, audio)
-	std.RegisterTable("rl", rlLib(interp))
-
 	// --- System ---
 	std.RegisterTable("script", buildScriptLib(interp))
 	std.RegisterTable("debug", buildDebugLib(interp))
@@ -56,6 +53,7 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 // through stdlibrt/install, so new migrated modules should not be added here.
 func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	std.RegisterTable("math", buildMathLib())
+	std.RegisterTable("rl", rlLib(interp))
 	std.RegisterTable("io", buildIOLib(interp))
 	std.RegisterTable("os", buildOSLibWithPolicy(
 		interp.environmentRead,
