@@ -14,14 +14,45 @@ func Install(interp *runtime.Interpreter) {
 		return
 	}
 	interp.InstallStdlib()
-	installModule(interp, "base64", runtime.TableValue(modules.BuildBase64(interp.MaxHostResultBytes)))
-	installModule(interp, "bits", runtime.TableValue(modules.BuildBits()))
-	installModule(interp, "hash", runtime.TableValue(modules.BuildHash()))
-	installModule(interp, "path", runtime.TableValue(modules.BuildPath()))
-	installModule(interp, "uuid", runtime.TableValue(modules.BuildUUID()))
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
 }
 
-func installModule(interp *runtime.Interpreter, name string, module runtime.Value) {
-	interp.SetGlobal(name, module)
-	interp.SetModule(name, module)
+// InstallModules registers stdlibrt-owned modules on a runtime-compatible
+// installer. VM and tree-walker entry points use this to avoid separate module
+// construction paths while the broader stdlib continues to migrate.
+func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int64) {
+	if installer == nil {
+		return
+	}
+	if maxHostResult == nil {
+		maxHostResult = func() int64 { return 0 }
+	}
+	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
+	installer.RegisterTable("bits", modules.BuildBits())
+	installer.RegisterTable("hash", modules.BuildHash())
+	installer.RegisterTable("path", modules.BuildPath())
+	installer.RegisterTable("uuid", modules.BuildUUID())
+}
+
+type interpreterInstaller struct {
+	interp *runtime.Interpreter
+}
+
+func (installer interpreterInstaller) RegisterModule(name string, module runtime.Value) {
+	if installer.interp == nil {
+		return
+	}
+	installer.interp.SetGlobal(name, module)
+	installer.interp.SetModule(name, module)
+}
+
+func (installer interpreterInstaller) RegisterTable(name string, table *runtime.Table) {
+	installer.RegisterModule(name, runtime.TableValue(table))
+}
+
+func (installer interpreterInstaller) RegisterAlias(name string, value runtime.Value) {
+	if installer.interp == nil {
+		return
+	}
+	installer.interp.SetGlobal(name, value)
 }
