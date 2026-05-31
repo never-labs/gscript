@@ -641,16 +641,11 @@ def scaled_path(
 
 
 def build_gscript(root: Path, out: Path) -> None:
-    proc = subprocess.run(
-        ["go", "build", "-o", str(out), "./cmd/gscript/"],
-        cwd=root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+    benchmark_output.build_gscript(
+        root,
+        out,
+        failure_message="build failed in {root} with exit {exit_code}",
     )
-    if proc.returncode != 0:
-        print(proc.stdout, file=sys.stderr)
-        raise SystemExit(f"build failed in {root} with exit {proc.returncode}")
 
 
 def export_head_snapshot(repo: Path, dest: Path, ref: str) -> None:

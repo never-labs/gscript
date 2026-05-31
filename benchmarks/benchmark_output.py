@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 import subprocess
+import sys
 import time
+from pathlib import Path
 
 
 @dataclass
@@ -61,6 +63,21 @@ def run_text_command(cmd: list[str], timeout: float, env: dict[str, str] | None 
     wall = time.perf_counter() - started
     status = "ok" if proc.returncode == 0 else "error"
     return TextCommandResult(proc.stdout, status, proc.returncode, wall)
+
+
+def build_gscript(root: Path, out: Path, failure_message: str | None = None) -> None:
+    proc = subprocess.run(
+        ["go", "build", "-o", str(out), "./cmd/gscript/"],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        print(proc.stdout, file=sys.stderr)
+        message = failure_message or f"build failed with exit {proc.returncode}"
+        raise SystemExit(message.format(root=root, exit_code=proc.returncode))
 
 
 def markdown_row(cells: list[object]) -> str:

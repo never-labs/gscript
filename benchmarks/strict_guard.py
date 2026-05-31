@@ -19,7 +19,6 @@ import re
 import shutil
 import statistics
 import subprocess
-import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass, field
@@ -485,17 +484,7 @@ def run_mode(
 
 
 def build_gscript(root: Path, out: Path) -> None:
-    proc = subprocess.run(
-        ["go", "build", "-o", str(out), "./cmd/gscript/"],
-        cwd=root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        print(proc.stdout, file=sys.stderr)
-        raise SystemExit(f"build failed with exit {proc.returncode}")
+    benchmark_output.build_gscript(root, out)
 
 
 def parse_repeat_overrides(values: list[str] | None) -> dict[tuple[str | None, str], int]:

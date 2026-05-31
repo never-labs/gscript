@@ -1,6 +1,8 @@
 import re
 import sys
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import benchmark_output as output
 
@@ -57,6 +59,34 @@ class BenchmarkOutputTest(unittest.TestCase):
         self.assertIsNone(result.exit_code)
         self.assertIn("TIMEOUT after 0.05s", result.output)
         self.assertGreaterEqual(result.wall_seconds, 0)
+
+    def test_build_gscript_uses_standard_go_command(self):
+        with mock.patch("benchmark_output.subprocess.run") as run:
+            run.return_value = mock.Mock(returncode=0, stdout="")
+
+            output.build_gscript(Path("/repo"), Path("/tmp/gscript"))
+
+        run.assert_called_once_with(
+            ["go", "build", "-o", "/tmp/gscript", "./cmd/gscript/"],
+            cwd=Path("/repo"),
+            stdout=output.subprocess.PIPE,
+            stderr=output.subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+
+    def test_build_gscript_keeps_custom_failure_message(self):
+        with mock.patch("benchmark_output.subprocess.run") as run, mock.patch("benchmark_output.print") as print_:
+            run.return_value = mock.Mock(returncode=12, stdout="compiler output")
+
+            with self.assertRaisesRegex(SystemExit, "build failed in /repo with exit 12"):
+                output.build_gscript(
+                    Path("/repo"),
+                    Path("/tmp/gscript"),
+                    failure_message="build failed in {root} with exit {exit_code}",
+                )
+
+        print_.assert_called_once_with("compiler output", file=output.sys.stderr)
 
 
 if __name__ == "__main__":
