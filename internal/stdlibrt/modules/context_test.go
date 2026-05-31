@@ -11,6 +11,7 @@ func contextInterp(t *testing.T, src string) *runtime.Interpreter {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	installTestModule(interp, "context", runtime.TableValue(BuildContext()))
+	installTestModule(interp, "time", runtime.TableValue(BuildTime()))
 	execOnInterp(t, interp, src)
 	return interp
 }

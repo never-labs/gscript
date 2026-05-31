@@ -64,7 +64,11 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	}
 
 	// --- Time & networking ---
-	std.RegisterTable("time", buildTimeLib())
+	if includeMigratedCompat {
+		// Historical direct-runtime install path. Public embedding now installs
+		// time from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("time", buildTimeLib())
+	}
 	if includeMigratedCompat {
 		std.RegisterTable("net", buildNetLib(interp))
 	}

@@ -27,3 +27,22 @@ func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {
 		t.Fatalf("math.floor missing fast paths after stdlibrt install: %#v", gf)
 	}
 }
+
+func TestInstallModulesRegistersTimeFromStdlibrt(t *testing.T) {
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	if got := interp.GetGlobal("time"); !got.IsNil() {
+		t.Fatalf("InstallRuntimeStdlib registered migrated time module: %v", got)
+	}
+
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
+	timeLib := interp.GetGlobal("time")
+	if !timeLib.IsTable() {
+		t.Fatalf("time global is not a table: %v", timeLib)
+	}
+	for _, name := range []string{"sleep", "after", "now", "since", "unix"} {
+		if got := timeLib.Table().RawGetString(name); !got.IsFunction() {
+			t.Fatalf("time.%s is not a function: %v", name, got)
+		}
+	}
+}

@@ -88,6 +88,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("rand", modules.BuildRand())
 	installer.RegisterTable("regexp", modules.BuildRegexp())
 	installer.RegisterTable("sort", modules.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
+	installer.RegisterTable("time", modules.BuildTime())
 	installer.RegisterTable("url", modules.BuildURL(maxHostResult))
 	installer.RegisterTable("utf8", modules.BuildUTF8(maxHostResult))
 	installer.RegisterTable("uuid", modules.BuildUUID())
