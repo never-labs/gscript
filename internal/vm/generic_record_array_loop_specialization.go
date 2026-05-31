@@ -209,10 +209,10 @@ func (vm *VM) runGenericRecordArrayLoopSpecializationN(proto *FuncProto, args []
 	if proto == nil || steps <= 0 || proto.IsVarArg || len(args) != proto.NumParams {
 		return false, nil
 	}
-	cache := proto.GenericRecordArrayLoopSpecialization
+	cache := proto.RuntimeSpecs.GenericRecordArrayLoopSpecialization
 	if cache == nil {
 		cache = &genericRecordArrayLoopSpecializationCache{eligible: true}
-		proto.GenericRecordArrayLoopSpecialization = cache
+		proto.RuntimeSpecs.GenericRecordArrayLoopSpecialization = cache
 	}
 	if !cache.eligible {
 		return false, nil

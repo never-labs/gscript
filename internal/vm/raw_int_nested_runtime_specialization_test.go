@@ -46,10 +46,10 @@ func TestRawIntNestedRuntimeSpecializationRecognitionCacheAndDiagnostics(t *test
 	if !cachedRuntimeSpecializationRecognized(fn, runtimeSpecializationRawIntNested) {
 		t.Fatal("raw nested int runtime specialization rejected by hot cache")
 	}
-	if fn.RuntimeSpecialization == nil || fn.RuntimeSpecialization.recognized == 0 {
+	if fn.RuntimeSpecs.RuntimeSpecialization == nil || fn.RuntimeSpecs.RuntimeSpecialization.recognized == 0 {
 		t.Fatal("runtime specialization cache was not populated")
 	}
-	if fn.RawIntNestedSpecialization == nil || fn.RawIntNestedSpecialization.plan == nil {
+	if fn.RuntimeSpecs.RawIntNestedSpecialization == nil || fn.RuntimeSpecs.RawIntNestedSpecialization.plan == nil {
 		t.Fatal("raw nested int specialization cache was not populated")
 	}
 	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(fn), "nested_int_recurrence")

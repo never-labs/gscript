@@ -14,79 +14,88 @@ type globalCacheEntry struct {
 // FuncProto is the bytecode function prototype.
 // It contains the compiled instructions, constants, and metadata for a function.
 type FuncProto struct {
-	Name                                  string                                      // function name (for debugging)
-	Source                                string                                      // source file
-	LineDefined                           int                                         // line where the function is defined
-	NumParams                             int                                         // number of fixed parameters
-	IsVarArg                              bool                                        // whether the function accepts varargs
-	UsesVarargBytecode                    bool                                        // true when bytecode actually reads varargs via OP_VARARG
-	MaxStack                              int                                         // maximum number of registers used
-	Code                                  []uint32                                    // bytecode instructions
-	Constants                             []runtime.Value                             // constant pool
-	TableCtors2                           []TableCtor2                                // static two-field table constructors
-	TableCtorsN                           []TableCtorN                                // static small string-field table constructors
-	Upvalues                              []UpvalDesc                                 // upvalue descriptors
-	ReadOnlyLocals                        map[int]string                              // local register -> binding name for const checks
-	Protos                                []*FuncProto                                // nested function prototypes
-	LineInfo                              []int                                       // source line for each instruction (debug)
-	GlobalCache                           []globalCacheEntry                          // lazily-initialized cache indexed by constant pool index
-	FieldCache                            []runtime.FieldCacheEntry                   // lazily-initialized inline cache for GETFIELD/SETFIELD, indexed by PC
-	FieldPolyCache                        []runtime.FieldPolyCacheEntry               // lazily-initialized 4-way static field cache, indexed by PC
-	ResumePayloadCache                    []int8                                      // per-PC cache for ResumePayloadIsFieldOnly: 0 unknown, 1 false, 2 true
-	RuntimeSpecialization                 *runtimeSpecializationProtoCache            // guarded runtime specialization recognizer cache, nil until first probe
-	CallSiteNoResultRuntime               *runtimeSpecializationProtoCache            // guarded no-result call-site runtime specialization cache, nil until first probe
-	PermutationFlipChecksumSpecialization *permutationFlipChecksumSpecializationCache // guarded runtime-generated permutation checksum specialization cache
-	MatrixMultiplySpecialization          *matrixMultiplySpecializationCache          // guarded runtime-generated matrix multiply specialization cache
-	DenseMatrixMultiplyTBSpecialization   *denseMatrixMultiplyTBSpecializationCache   // guarded runtime-generated dense transposed matrix multiply specialization cache
-	SpectralRuntimeSpecialization         *spectralRuntimeSpecializationCache         // guarded runtime-generated spectral call-site runtime specialization cache
-	SoAColumnAffineUpdateSpecialization   *soaColumnAffineUpdateCache                 // guarded runtime-generated SoA column affine update specialization cache
-	SoAAffineManyLiteralSpecialization    []soaAffineManyLiteralCallSiteCache         // caller-side SoA affineMany literal sequence cache, indexed by OP_NEWTABLE PC
-	RecordWalkFoldSpecialization          *recordWalkFoldSpecializationCache          // guarded runtime-generated record walk/fold specialization cache
-	BoolTableMarkCountSpecialization      *boolTableMarkCountSpecializationCache      // guarded runtime-generated bool table mark-count specialization cache
-	TableAffineUpdateModuloSpecialization *tableAffineUpdateModuloLeafCache           // guarded runtime-generated table affine update modulo cache
-	RecordPairwiseNumericSpecialization   *recordPairwiseNumericSpecializationCache   // guarded runtime-generated pairwise record numeric specialization cache
-	GenericRecordArrayLoopSpecialization  *genericRecordArrayLoopSpecializationCache  // guarded runtime-generated scalar record-array loop cache
-	RecursiveTableSpecialization          *recursiveTableSpecializationCache          // guarded runtime recursive table builder/fold specialization cache
-	RawIntNestedSpecialization            *rawIntNestedSpecializationCache            // guarded runtime nested raw-int recurrence specialization cache
-	HasSelfCalls                          bool                                        // true if function has recursive calls to itself (set during JIT compilation)
-	LeafNoCall                            bool                                        // true if bytecode has no call/yield/resume/go operations
-	Tier2LeafNoCall                       bool                                        // true if optimized Tier 2 IR has no nested call/yield/resume operations
-	NoGlobalOps                           bool                                        // true if bytecode has no get/set global operations
-	CallCount                             int                                         // JIT call count (avoids map lookup in VM hot path)
-	JITDisabled                           bool                                        // true when the method JIT made a permanent per-proto stay-interpreted decision
-	NumericToIntegerWrapperShape          int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
-	UTF8CodepointSumLoopShape             int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
-	IndexRawSlotFallbackShape             int8                                        // cached __index raw-slot fallback recognition: 0 unknown, 1 yes, -1 no
-	IndexRawSlotFallbackPC                int                                         // start PC for cached raw-slot fallback shape
-	TableIteratorModuloFoldShape          int8                                        // cached runtime recognition: 0 unknown, 1 yes, -1 no
-	TableIteratorModuloFoldSpec           tableIteratorModuloFoldSpec                 // cached table iterator modulo-fold shape when recognized
-	Feedback                              FeedbackVector                              // lazily-initialized per-PC type feedback for Method JIT
-	TableKeyFeedback                      TableKeyFeedbackVector                      // lazily-initialized per-PC table int-key range feedback
-	FieldAccessFeedback                   FieldAccessFeedbackVector                   // lazily-initialized per-PC table field shape feedback
-	CallSiteFeedback                      CallSiteFeedbackVector                      // lazily-initialized per-PC callsite feedback for guarded specialization
-	ArgShapeFeedback                      ArgArrayElementShapeFeedbackVector          // lazily-initialized per-parameter direct table shape feedback
-	ArgArrayElementShapeFeedback          ArgArrayElementShapeFeedbackVector          // lazily-initialized per-parameter array element shape feedback
-	ArgDenseMatrixStrideFeedback          DenseMatrixStrideFeedbackVector             // lazily-initialized per-parameter DenseMatrix stride feedback
-	ArgIntRangeFeedback                   []IntRangeFeedback                          // lazily-initialized per-parameter integer range feedback
-	ParamTypeFeedback                     []ParamTypeFeedbackEntry                    // lazily-initialized per-parameter type feedback
-	CompiledCodePtr                       uintptr                                     // pointer to baseline JIT compiled code (set after CompileBaseline)
-	DirectEntryPtr                        uintptr                                     // pointer to direct entry point for native BLR calls
-	Tier2DirectEntryPtr                   uintptr                                     // pointer to Tier 2 direct entry for Method JIT call IC refresh
-	Tier2LeafEntryPtr                     uintptr                                     // pointer to Tier 2 boxed leaf entry that returns the boxed result in X0
-	DirectEntryVersion                    uint64                                      // increments when DirectEntryPtr/Tier2DirectEntryPtr publication changes
-	Tier2NumericEntryPtr                  uintptr                                     // pointer to Tier 2 raw-int numeric entry for guarded peer calls
-	Tier2TypedEntryPtr                    uintptr                                     // pointer to Tier 2 typed table/int entry for guarded peer calls
-	Tier2TypedClobberEntryPtr             uintptr                                     // pointer to Tier 2 typed peer entry with caller-saved clobber protocol
-	Tier2TypedEntryABI                    uint64                                      // signature for Tier2TypedEntryPtr parameter/result ABI
-	GlobalValCachePtr                     uintptr                                     // pointer to BaselineFunc.GlobalValCache[0] (for BLR callee GETGLOBAL)
-	GlobalValCacheGen                     uint64                                      // BaselineFunc.CachedGlobalGen (for BLR callee generation check)
-	Tier2GlobalCachePtr                   uintptr                                     // pointer to CompiledFunction.GlobalCache[0] (for Tier 2 BLR callees)
-	Tier2GlobalCacheGenPtr                uintptr                                     // pointer to CompiledFunction.GlobalCacheGen (for Tier 2 BLR callees)
-	Tier2GlobalIndexPtr                   uintptr                                     // pointer to CompiledFunction.GlobalIndexByConst[0] (for Tier 2 indexed globals)
-	Tier2Promoted                         bool                                        // set true when TieringManager compiles this proto at Tier 2
-	NeedsTier2                            bool                                        // set true when Tier 2 applied ops (e.g., intrinsics) that Tier 1 would execute differently
-	EnteredTier2                          byte                                        // R146: set to 1 by Tier 2 native prologue on first entry — observable signal that native code actually ran (not just compiled)
-	TableStringKeyCache                   []runtime.TableStringKeyCacheEntry
+	Name                         string                             // function name (for debugging)
+	Source                       string                             // source file
+	LineDefined                  int                                // line where the function is defined
+	NumParams                    int                                // number of fixed parameters
+	IsVarArg                     bool                               // whether the function accepts varargs
+	UsesVarargBytecode           bool                               // true when bytecode actually reads varargs via OP_VARARG
+	MaxStack                     int                                // maximum number of registers used
+	Code                         []uint32                           // bytecode instructions
+	Constants                    []runtime.Value                    // constant pool
+	TableCtors2                  []TableCtor2                       // static two-field table constructors
+	TableCtorsN                  []TableCtorN                       // static small string-field table constructors
+	Upvalues                     []UpvalDesc                        // upvalue descriptors
+	ReadOnlyLocals               map[int]string                     // local register -> binding name for const checks
+	Protos                       []*FuncProto                       // nested function prototypes
+	LineInfo                     []int                              // source line for each instruction (debug)
+	GlobalCache                  []globalCacheEntry                 // lazily-initialized cache indexed by constant pool index
+	FieldCache                   []runtime.FieldCacheEntry          // lazily-initialized inline cache for GETFIELD/SETFIELD, indexed by PC
+	FieldPolyCache               []runtime.FieldPolyCacheEntry      // lazily-initialized 4-way static field cache, indexed by PC
+	ResumePayloadCache           []int8                             // per-PC cache for ResumePayloadIsFieldOnly: 0 unknown, 1 false, 2 true
+	RuntimeSpecs                 FuncProtoRuntimeSpecializations    // runtime-generated specialization caches outside native ABI layout
+	HasSelfCalls                 bool                               // true if function has recursive calls to itself (set during JIT compilation)
+	LeafNoCall                   bool                               // true if bytecode has no call/yield/resume/go operations
+	Tier2LeafNoCall              bool                               // true if optimized Tier 2 IR has no nested call/yield/resume operations
+	NoGlobalOps                  bool                               // true if bytecode has no get/set global operations
+	CallCount                    int                                // JIT call count (avoids map lookup in VM hot path)
+	JITDisabled                  bool                               // true when the method JIT made a permanent per-proto stay-interpreted decision
+	Feedback                     FeedbackVector                     // lazily-initialized per-PC type feedback for Method JIT
+	TableKeyFeedback             TableKeyFeedbackVector             // lazily-initialized per-PC table int-key range feedback
+	FieldAccessFeedback          FieldAccessFeedbackVector          // lazily-initialized per-PC table field shape feedback
+	CallSiteFeedback             CallSiteFeedbackVector             // lazily-initialized per-PC callsite feedback for guarded specialization
+	ArgShapeFeedback             ArgArrayElementShapeFeedbackVector // lazily-initialized per-parameter direct table shape feedback
+	ArgArrayElementShapeFeedback ArgArrayElementShapeFeedbackVector // lazily-initialized per-parameter array element shape feedback
+	ArgDenseMatrixStrideFeedback DenseMatrixStrideFeedbackVector    // lazily-initialized per-parameter DenseMatrix stride feedback
+	ArgIntRangeFeedback          []IntRangeFeedback                 // lazily-initialized per-parameter integer range feedback
+	ParamTypeFeedback            []ParamTypeFeedbackEntry           // lazily-initialized per-parameter type feedback
+	CompiledCodePtr              uintptr                            // pointer to baseline JIT compiled code (set after CompileBaseline)
+	DirectEntryPtr               uintptr                            // pointer to direct entry point for native BLR calls
+	Tier2DirectEntryPtr          uintptr                            // pointer to Tier 2 direct entry for Method JIT call IC refresh
+	Tier2LeafEntryPtr            uintptr                            // pointer to Tier 2 boxed leaf entry that returns the boxed result in X0
+	DirectEntryVersion           uint64                             // increments when DirectEntryPtr/Tier2DirectEntryPtr publication changes
+	Tier2NumericEntryPtr         uintptr                            // pointer to Tier 2 raw-int numeric entry for guarded peer calls
+	Tier2TypedEntryPtr           uintptr                            // pointer to Tier 2 typed table/int entry for guarded peer calls
+	Tier2TypedClobberEntryPtr    uintptr                            // pointer to Tier 2 typed peer entry with caller-saved clobber protocol
+	Tier2TypedEntryABI           uint64                             // signature for Tier2TypedEntryPtr parameter/result ABI
+	GlobalValCachePtr            uintptr                            // pointer to BaselineFunc.GlobalValCache[0] (for BLR callee GETGLOBAL)
+	GlobalValCacheGen            uint64                             // BaselineFunc.CachedGlobalGen (for BLR callee generation check)
+	Tier2GlobalCachePtr          uintptr                            // pointer to CompiledFunction.GlobalCache[0] (for Tier 2 BLR callees)
+	Tier2GlobalCacheGenPtr       uintptr                            // pointer to CompiledFunction.GlobalCacheGen (for Tier 2 BLR callees)
+	Tier2GlobalIndexPtr          uintptr                            // pointer to CompiledFunction.GlobalIndexByConst[0] (for Tier 2 indexed globals)
+	Tier2Promoted                bool                               // set true when TieringManager compiles this proto at Tier 2
+	NeedsTier2                   bool                               // set true when Tier 2 applied ops (e.g., intrinsics) that Tier 1 would execute differently
+	EnteredTier2                 byte                               // R146: set to 1 by Tier 2 native prologue on first entry — observable signal that native code actually ran (not just compiled)
+	TableStringKeyCache          []runtime.TableStringKeyCacheEntry
+}
+
+// FuncProtoRuntimeSpecializations groups runtime-generated specialization
+// caches and recognizer memos that are read only by Go code. Keep native ABI
+// layout fields such as entry pointers, call counters, and inline caches on
+// FuncProto itself because ARM64 code reads them by object offset.
+type FuncProtoRuntimeSpecializations struct {
+	RuntimeSpecialization                 *runtimeSpecializationProtoCache
+	CallSiteNoResultRuntime               *runtimeSpecializationProtoCache
+	PermutationFlipChecksumSpecialization *permutationFlipChecksumSpecializationCache
+	MatrixMultiplySpecialization          *matrixMultiplySpecializationCache
+	DenseMatrixMultiplyTBSpecialization   *denseMatrixMultiplyTBSpecializationCache
+	SpectralRuntimeSpecialization         *spectralRuntimeSpecializationCache
+	SoAColumnAffineUpdateSpecialization   *soaColumnAffineUpdateCache
+	SoAAffineManyLiteralSpecialization    []soaAffineManyLiteralCallSiteCache
+	RecordWalkFoldSpecialization          *recordWalkFoldSpecializationCache
+	BoolTableMarkCountSpecialization      *boolTableMarkCountSpecializationCache
+	TableAffineUpdateModuloSpecialization *tableAffineUpdateModuloLeafCache
+	RecordPairwiseNumericSpecialization   *recordPairwiseNumericSpecializationCache
+	GenericRecordArrayLoopSpecialization  *genericRecordArrayLoopSpecializationCache
+	RecursiveTableSpecialization          *recursiveTableSpecializationCache
+	RawIntNestedSpecialization            *rawIntNestedSpecializationCache
+
+	NumericToIntegerWrapperShape int8
+	UTF8CodepointSumLoopShape    int8
+	IndexRawSlotFallbackShape    int8
+	IndexRawSlotFallbackPC       int
+	TableIteratorModuloFoldShape int8
+	TableIteratorModuloFoldSpec  tableIteratorModuloFoldSpec
 }
 
 type MethodJITCallableTier string

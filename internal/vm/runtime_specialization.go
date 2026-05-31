@@ -708,7 +708,7 @@ func cachedRuntimeSpecializationBits(proto *FuncProto) uint64 {
 	if proto == nil {
 		return 0
 	}
-	if cache := proto.RuntimeSpecialization; cache != nil {
+	if cache := proto.RuntimeSpecs.RuntimeSpecialization; cache != nil {
 		return cache.recognized
 	}
 	return runtimeSpecializationCacheForProto(proto).recognized
@@ -718,7 +718,7 @@ func cachedCallSiteNoResultRuntimeSpecializationBits(proto *FuncProto) uint64 {
 	if proto == nil {
 		return 0
 	}
-	if cache := proto.CallSiteNoResultRuntime; cache != nil {
+	if cache := proto.RuntimeSpecs.CallSiteNoResultRuntime; cache != nil {
 		return cache.recognized
 	}
 	return callSiteNoResultRuntimeSpecializationCacheForProto(proto).recognized
@@ -747,7 +747,7 @@ func hotCallSiteNoResultRuntimeSpecializationRecognized(proto *FuncProto, id int
 
 func runtimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecializationProtoCache {
 	fp := runtimeSpecializationFingerprintForProto(proto)
-	cache := proto.RuntimeSpecialization
+	cache := proto.RuntimeSpecs.RuntimeSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache
 	}
@@ -760,13 +760,13 @@ func runtimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecialization
 			cache.recognized |= uint64(1) << uint(i)
 		}
 	}
-	proto.RuntimeSpecialization = cache
+	proto.RuntimeSpecs.RuntimeSpecialization = cache
 	return cache
 }
 
 func callSiteNoResultRuntimeSpecializationCacheForProto(proto *FuncProto) *runtimeSpecializationProtoCache {
 	fp := runtimeSpecializationFingerprintForProto(proto)
-	cache := proto.CallSiteNoResultRuntime
+	cache := proto.RuntimeSpecs.CallSiteNoResultRuntime
 	if cache != nil && cache.fingerprint == fp {
 		return cache
 	}
@@ -779,6 +779,6 @@ func callSiteNoResultRuntimeSpecializationCacheForProto(proto *FuncProto) *runti
 			cache.recognized |= uint64(1) << uint(i)
 		}
 	}
-	proto.CallSiteNoResultRuntime = cache
+	proto.RuntimeSpecs.CallSiteNoResultRuntime = cache
 	return cache
 }

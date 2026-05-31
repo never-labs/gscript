@@ -43,7 +43,7 @@ func TestNumericArrayRegionSortNoResultRuntimeSpecializationDiagnostics(t *testi
 	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(quicksort, callSiteNoResultRuntimeSpecializationNumericArrayRegionSort) {
 		t.Fatal("numeric_array_region_sort rejected by no-result runtime specialization cache")
 	}
-	if quicksort.CallSiteNoResultRuntime == nil || quicksort.CallSiteNoResultRuntime.recognized == 0 {
+	if quicksort.RuntimeSpecs.CallSiteNoResultRuntime == nil || quicksort.RuntimeSpecs.CallSiteNoResultRuntime.recognized == 0 {
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 

@@ -528,16 +528,16 @@ func spectralRuntimeSpecializationSpecForProto(p *FuncProto) (*spectralRuntimeSp
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.SpectralRuntimeSpecialization
+	cache := p.RuntimeSpecs.SpectralRuntimeSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeSpectralRuntimeSpecializationSpec(p)
 	if !ok {
-		p.SpectralRuntimeSpecialization = &spectralRuntimeSpecializationCache{fingerprint: fp}
+		p.RuntimeSpecs.SpectralRuntimeSpecialization = &spectralRuntimeSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.SpectralRuntimeSpecialization = &spectralRuntimeSpecializationCache{fingerprint: fp, spec: spec}
+	p.RuntimeSpecs.SpectralRuntimeSpecialization = &spectralRuntimeSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

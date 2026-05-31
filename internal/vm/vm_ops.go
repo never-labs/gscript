@@ -240,16 +240,16 @@ func (vm *VM) fastIndexStringDispatch(fn, receiver, key runtime.Value) (runtime.
 		result, err := vm.tableGet(global, runtime.StringValue(fieldName))
 		return result, true, err
 	}
-	if cl.Proto.IndexRawSlotFallbackShape == 0 {
+	if cl.Proto.RuntimeSpecs.IndexRawSlotFallbackShape == 0 {
 		if matchIndexRawSlotFallbackShape(code, constants, pc) {
-			cl.Proto.IndexRawSlotFallbackShape = 1
-			cl.Proto.IndexRawSlotFallbackPC = pc
+			cl.Proto.RuntimeSpecs.IndexRawSlotFallbackShape = 1
+			cl.Proto.RuntimeSpecs.IndexRawSlotFallbackPC = pc
 		} else {
-			cl.Proto.IndexRawSlotFallbackShape = -1
+			cl.Proto.RuntimeSpecs.IndexRawSlotFallbackShape = -1
 		}
 	}
-	if cl.Proto.IndexRawSlotFallbackShape > 0 {
-		if result, ok, err := vm.fastIndexRawSlotFallback(receiver, key, code, constants, cl.Proto.IndexRawSlotFallbackPC); ok || err != nil {
+	if cl.Proto.RuntimeSpecs.IndexRawSlotFallbackShape > 0 {
+		if result, ok, err := vm.fastIndexRawSlotFallback(receiver, key, code, constants, cl.Proto.RuntimeSpecs.IndexRawSlotFallbackPC); ok || err != nil {
 			return result, ok, err
 		}
 	}
@@ -431,14 +431,14 @@ func (vm *VM) fastNewIndexRawSlotSet(fn, receiver, key, val runtime.Value) (bool
 		return false, nil
 	}
 	proto := cl.Proto
-	if proto.IndexRawSlotFallbackShape == 0 {
+	if proto.RuntimeSpecs.IndexRawSlotFallbackShape == 0 {
 		if matchNewIndexRawSlotSetShape(proto.Code, proto.Constants) {
-			proto.IndexRawSlotFallbackShape = 1
+			proto.RuntimeSpecs.IndexRawSlotFallbackShape = 1
 		} else {
-			proto.IndexRawSlotFallbackShape = -1
+			proto.RuntimeSpecs.IndexRawSlotFallbackShape = -1
 		}
 	}
-	if proto.IndexRawSlotFallbackShape < 1 {
+	if proto.RuntimeSpecs.IndexRawSlotFallbackShape < 1 {
 		return false, nil
 	}
 	if !receiver.IsTable() || !key.IsString() || !vm.globalIsStdRawGet("rawget") || len(proto.Constants) < 2 || !proto.Constants[1].IsString() {

@@ -74,7 +74,7 @@ func fold_rows(rows, n, passes) {
 	if !cachedRuntimeSpecializationRecognized(fold, runtimeSpecializationRecordWalkFold) {
 		t.Fatal("record_walk_fold rejected by runtime specialization cache")
 	}
-	if fold.RecordWalkFoldSpecialization == nil || fold.RecordWalkFoldSpecialization.spec == nil {
+	if fold.RuntimeSpecs.RecordWalkFoldSpecialization == nil || fold.RuntimeSpecs.RecordWalkFoldSpecialization.spec == nil {
 		t.Fatal("record_walk_fold proto-local spec was not generated")
 	}
 	if spec.recordFields != [6]string{"ident", "flavor", "live", "account", "counters", "labels"} ||

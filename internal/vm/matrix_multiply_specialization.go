@@ -282,16 +282,16 @@ func matrixMultiplySpecializationSpecForProto(p *FuncProto) (*matrixMultiplySpec
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.MatrixMultiplySpecialization
+	cache := p.RuntimeSpecs.MatrixMultiplySpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeMatrixMultiplySpecializationSpec(p)
 	if !ok {
-		p.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp}
+		p.RuntimeSpecs.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp, spec: spec}
+	p.RuntimeSpecs.MatrixMultiplySpecialization = &matrixMultiplySpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 
@@ -640,16 +640,16 @@ func denseMatrixMultiplyTBSpecializationSpecForProto(p *FuncProto) (*denseMatrix
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.DenseMatrixMultiplyTBSpecialization
+	cache := p.RuntimeSpecs.DenseMatrixMultiplyTBSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeDenseMatrixMultiplyTBSpecializationSpec(p)
 	if !ok {
-		p.DenseMatrixMultiplyTBSpecialization = &denseMatrixMultiplyTBSpecializationCache{fingerprint: fp}
+		p.RuntimeSpecs.DenseMatrixMultiplyTBSpecialization = &denseMatrixMultiplyTBSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.DenseMatrixMultiplyTBSpecialization = &denseMatrixMultiplyTBSpecializationCache{fingerprint: fp, spec: spec}
+	p.RuntimeSpecs.DenseMatrixMultiplyTBSpecialization = &denseMatrixMultiplyTBSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

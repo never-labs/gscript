@@ -25,19 +25,19 @@ func cachedTableIteratorModuloFoldSpecForProto(p *FuncProto) (tableIteratorModul
 	if p == nil {
 		return tableIteratorModuloFoldSpec{}, false
 	}
-	switch p.TableIteratorModuloFoldShape {
+	switch p.RuntimeSpecs.TableIteratorModuloFoldShape {
 	case 1:
-		return p.TableIteratorModuloFoldSpec, true
+		return p.RuntimeSpecs.TableIteratorModuloFoldSpec, true
 	case -1:
 		return tableIteratorModuloFoldSpec{}, false
 	}
 	spec, ok := tableIteratorModuloFoldSpecForProto(p)
 	if ok {
-		p.TableIteratorModuloFoldSpec = spec
-		p.TableIteratorModuloFoldShape = 1
+		p.RuntimeSpecs.TableIteratorModuloFoldSpec = spec
+		p.RuntimeSpecs.TableIteratorModuloFoldShape = 1
 		return spec, true
 	}
-	p.TableIteratorModuloFoldShape = -1
+	p.RuntimeSpecs.TableIteratorModuloFoldShape = -1
 	return tableIteratorModuloFoldSpec{}, false
 }
 

@@ -49,7 +49,7 @@ func (t *Table) rebuildKeys() {
 		}
 	}
 	// Flat string slices
-	for i, k := range t.skeys {
+	for i, k := range t.skeys[:min(len(t.skeys), len(t.svals))] {
 		if !t.svals[i].IsNil() {
 			t.keys = append(t.keys, StringValue(k))
 		}

@@ -59,7 +59,7 @@ func TestPermutationFlipChecksumRecognizesCurrentBenchmarkShape(t *testing.T) {
 	if !cachedRuntimeSpecializationRecognized(child, runtimeSpecializationPermutationFlipChecksum) {
 		t.Fatal("permutation flip checksum rejected by runtime specialization cache")
 	}
-	if child.PermutationFlipChecksumSpecialization == nil || child.PermutationFlipChecksumSpecialization.spec == nil {
+	if child.RuntimeSpecs.PermutationFlipChecksumSpecialization == nil || child.RuntimeSpecs.PermutationFlipChecksumSpecialization.spec == nil {
 		t.Fatal("permutation flip checksum proto-local spec was not generated")
 	}
 }

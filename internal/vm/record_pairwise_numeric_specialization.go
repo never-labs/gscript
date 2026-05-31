@@ -81,10 +81,10 @@ func (vm *VM) runRecordPairwiseNumericSpecializationN(cl *Closure, args []runtim
 		return false, nil
 	}
 	proto := cl.Proto
-	cache := proto.RecordPairwiseNumericSpecialization
+	cache := proto.RuntimeSpecs.RecordPairwiseNumericSpecialization
 	if cache == nil {
 		cache = &recordPairwiseNumericSpecializationCache{eligible: true}
-		proto.RecordPairwiseNumericSpecialization = cache
+		proto.RuntimeSpecs.RecordPairwiseNumericSpecialization = cache
 	}
 	if isDenseRecordMatrixAdvanceProto(proto) {
 		spec := cache.denseSpec

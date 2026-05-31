@@ -156,10 +156,10 @@ func (vm *VM) tryRecursiveTableBuildFoldRegion(frame *CallFrame, base int, build
 }
 
 func recursiveTableSpecializationForProto(proto *FuncProto) *recursiveTableSpecializationCache {
-	cache := proto.RecursiveTableSpecialization
+	cache := proto.RuntimeSpecs.RecursiveTableSpecialization
 	if cache == nil {
 		cache = analyzeRecursiveTableSpecialization(proto)
-		proto.RecursiveTableSpecialization = cache
+		proto.RuntimeSpecs.RecursiveTableSpecialization = cache
 	}
 	return cache
 }

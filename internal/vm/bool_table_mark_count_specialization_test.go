@@ -29,10 +29,10 @@ func TestBoolTableMarkCountRuntimeSpecializationDiagnostics(t *testing.T) {
 	if !cachedRuntimeSpecializationRecognized(sieve, runtimeSpecializationBoolTableMarkCount) {
 		t.Fatal("bool_table_mark_count rejected by runtime specialization cache")
 	}
-	if sieve.RuntimeSpecialization == nil || sieve.RuntimeSpecialization.recognized == 0 {
+	if sieve.RuntimeSpecs.RuntimeSpecialization == nil || sieve.RuntimeSpecs.RuntimeSpecialization.recognized == 0 {
 		t.Fatal("runtime specialization cache was not populated")
 	}
-	if sieve.BoolTableMarkCountSpecialization == nil || sieve.BoolTableMarkCountSpecialization.spec == nil {
+	if sieve.RuntimeSpecs.BoolTableMarkCountSpecialization == nil || sieve.RuntimeSpecs.BoolTableMarkCountSpecialization.spec == nil {
 		t.Fatal("bool table mark-count proto-local spec was not generated")
 	}
 

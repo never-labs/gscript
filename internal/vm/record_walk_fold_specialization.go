@@ -144,16 +144,16 @@ func recordWalkFoldSpecForProto(p *FuncProto) (*recordWalkFoldSpec, bool) {
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.RecordWalkFoldSpecialization
+	cache := p.RuntimeSpecs.RecordWalkFoldSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeRecordWalkFoldSpec(p)
 	if !ok {
-		p.RecordWalkFoldSpecialization = &recordWalkFoldSpecializationCache{fingerprint: fp}
+		p.RuntimeSpecs.RecordWalkFoldSpecialization = &recordWalkFoldSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.RecordWalkFoldSpecialization = &recordWalkFoldSpecializationCache{fingerprint: fp, spec: spec}
+	p.RuntimeSpecs.RecordWalkFoldSpecialization = &recordWalkFoldSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

@@ -42,17 +42,17 @@ func isUTF8CodepointSumLoopProto(proto *FuncProto, pc int, a int) bool {
 	if proto == nil {
 		return false
 	}
-	switch proto.UTF8CodepointSumLoopShape {
+	switch proto.RuntimeSpecs.UTF8CodepointSumLoopShape {
 	case 1:
 		return true
 	case -1:
 		return false
 	}
 	if matchUTF8CodepointSumLoopProto(proto, pc, a) {
-		proto.UTF8CodepointSumLoopShape = 1
+		proto.RuntimeSpecs.UTF8CodepointSumLoopShape = 1
 		return true
 	}
-	proto.UTF8CodepointSumLoopShape = -1
+	proto.RuntimeSpecs.UTF8CodepointSumLoopShape = -1
 	return false
 }
 

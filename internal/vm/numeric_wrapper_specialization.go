@@ -97,17 +97,17 @@ func isNumericToIntegerWrapperProto(proto *FuncProto) bool {
 	if proto == nil {
 		return false
 	}
-	switch proto.NumericToIntegerWrapperShape {
+	switch proto.RuntimeSpecs.NumericToIntegerWrapperShape {
 	case 1:
 		return true
 	case -1:
 		return false
 	}
 	if matchNumericToIntegerWrapperProto(proto) {
-		proto.NumericToIntegerWrapperShape = 1
+		proto.RuntimeSpecs.NumericToIntegerWrapperShape = 1
 		return true
 	}
-	proto.NumericToIntegerWrapperShape = -1
+	proto.RuntimeSpecs.NumericToIntegerWrapperShape = -1
 	return false
 }
 

@@ -54,13 +54,13 @@ func isSoAColumnAffineUpdateProto(p *FuncProto) bool {
 
 func soaColumnAffineUpdateSpecForProto(p *FuncProto) (soaColumnAffineUpdateSpec, bool) {
 	var spec soaColumnAffineUpdateSpec
-	if p != nil && p.SoAColumnAffineUpdateSpecialization != nil {
-		c := p.SoAColumnAffineUpdateSpecialization
+	if p != nil && p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization != nil {
+		c := p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization
 		return c.spec, c.recognized
 	}
 	spec, ok := recognizeSoAColumnAffineUpdateSpec(p)
 	if p != nil {
-		p.SoAColumnAffineUpdateSpecialization = &soaColumnAffineUpdateCache{
+		p.RuntimeSpecs.SoAColumnAffineUpdateSpecialization = &soaColumnAffineUpdateCache{
 			recognized: ok,
 			spec:       spec,
 		}
@@ -135,10 +135,10 @@ func soaAffineManyLiteralSpecForProto(p *FuncProto, startPC int) (soaAffineManyL
 	if p == nil || startPC < 0 || startPC >= len(p.Code) {
 		return spec, false
 	}
-	if len(p.SoAAffineManyLiteralSpecialization) != len(p.Code) {
-		p.SoAAffineManyLiteralSpecialization = make([]soaAffineManyLiteralCallSiteCache, len(p.Code))
+	if len(p.RuntimeSpecs.SoAAffineManyLiteralSpecialization) != len(p.Code) {
+		p.RuntimeSpecs.SoAAffineManyLiteralSpecialization = make([]soaAffineManyLiteralCallSiteCache, len(p.Code))
 	}
-	cache := &p.SoAAffineManyLiteralSpecialization[startPC]
+	cache := &p.RuntimeSpecs.SoAAffineManyLiteralSpecialization[startPC]
 	if cache.probed {
 		return cache.spec, cache.recognized
 	}
@@ -289,8 +289,8 @@ func (vm *VM) runSoAColumnAffineUpdateRuntimeSpecialization(cl *Closure, args []
 			return false, nil
 		}
 		spec.guard = guard
-		if cl != nil && cl.Proto != nil && cl.Proto.SoAColumnAffineUpdateSpecialization != nil {
-			cl.Proto.SoAColumnAffineUpdateSpecialization.spec = spec
+		if cl != nil && cl.Proto != nil && cl.Proto.RuntimeSpecs.SoAColumnAffineUpdateSpecialization != nil {
+			cl.Proto.RuntimeSpecs.SoAColumnAffineUpdateSpecialization.spec = spec
 		}
 	}
 	if err := s.Affine(spec.dstName, spec.srcName, args[1].Number(), args[2].Number()); err != nil {

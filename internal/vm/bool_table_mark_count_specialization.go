@@ -85,16 +85,16 @@ func boolTableMarkCountSpecializationSpecForProto(p *FuncProto) (*boolTableMarkC
 		return nil, false
 	}
 	fp := runtimeSpecializationFingerprintForProto(p)
-	cache := p.BoolTableMarkCountSpecialization
+	cache := p.RuntimeSpecs.BoolTableMarkCountSpecialization
 	if cache != nil && cache.fingerprint == fp {
 		return cache.spec, cache.spec != nil
 	}
 	spec, ok := analyzeBoolTableMarkCountSpecializationSpec(p.Code)
 	if !ok {
-		p.BoolTableMarkCountSpecialization = &boolTableMarkCountSpecializationCache{fingerprint: fp}
+		p.RuntimeSpecs.BoolTableMarkCountSpecialization = &boolTableMarkCountSpecializationCache{fingerprint: fp}
 		return nil, false
 	}
-	p.BoolTableMarkCountSpecialization = &boolTableMarkCountSpecializationCache{fingerprint: fp, spec: spec}
+	p.RuntimeSpecs.BoolTableMarkCountSpecialization = &boolTableMarkCountSpecializationCache{fingerprint: fp, spec: spec}
 	return spec, true
 }
 

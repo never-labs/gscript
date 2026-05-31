@@ -42,10 +42,10 @@ func TestSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 		if !cachedCallSiteNoResultRuntimeSpecializationRecognized(tc.proto, tc.id) {
 			t.Fatalf("%s rejected by no-result runtime specialization cache", tc.name)
 		}
-		if tc.proto.SpectralRuntimeSpecialization == nil || tc.proto.SpectralRuntimeSpecialization.spec == nil {
+		if tc.proto.RuntimeSpecs.SpectralRuntimeSpecialization == nil || tc.proto.RuntimeSpecs.SpectralRuntimeSpecialization.spec == nil {
 			t.Fatalf("%s proto-local spec was not generated", tc.name)
 		}
-		if got := tc.proto.SpectralRuntimeSpecialization.spec.kind; got != tc.kind {
+		if got := tc.proto.RuntimeSpecs.SpectralRuntimeSpecialization.spec.kind; got != tc.kind {
 			t.Fatalf("%s kind = %d, want %d", tc.name, got, tc.kind)
 		}
 		diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(tc.proto), tc.name)
@@ -92,10 +92,10 @@ func TestDenseSpectralRuntimeSpecializationDiagnostics(t *testing.T) {
 	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(multiplyAtAv, callSiteNoResultRuntimeSpecializationSpectralDenseCoefficientMatrixAtAVector) {
 		t.Fatal("dense_coefficient_matrix_ata_vector rejected by no-result runtime specialization cache")
 	}
-	if multiplyAtAv.SpectralRuntimeSpecialization == nil || multiplyAtAv.SpectralRuntimeSpecialization.spec == nil {
+	if multiplyAtAv.RuntimeSpecs.SpectralRuntimeSpecialization == nil || multiplyAtAv.RuntimeSpecs.SpectralRuntimeSpecialization.spec == nil {
 		t.Fatal("dense spectral proto-local spec was not generated")
 	}
-	if got := multiplyAtAv.SpectralRuntimeSpecialization.spec.kind; got != spectralRuntimeSpecializationDenseAtAv {
+	if got := multiplyAtAv.RuntimeSpecs.SpectralRuntimeSpecialization.spec.kind; got != spectralRuntimeSpecializationDenseAtAv {
 		t.Fatalf("dense spectral kind = %d, want %d", got, spectralRuntimeSpecializationDenseAtAv)
 	}
 }

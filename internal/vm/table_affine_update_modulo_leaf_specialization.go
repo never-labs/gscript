@@ -26,13 +26,13 @@ func isTableAffineUpdateModuloLeafProto(p *FuncProto) bool {
 
 func tableAffineUpdateModuloLeafSpecForProto(p *FuncProto) (tableAffineUpdateModuloLeafSpec, bool) {
 	var spec tableAffineUpdateModuloLeafSpec
-	if p != nil && p.TableAffineUpdateModuloSpecialization != nil {
-		c := p.TableAffineUpdateModuloSpecialization
+	if p != nil && p.RuntimeSpecs.TableAffineUpdateModuloSpecialization != nil {
+		c := p.RuntimeSpecs.TableAffineUpdateModuloSpecialization
 		return c.spec, c.recognized
 	}
 	spec, ok := recognizeTableAffineUpdateModuloLeafSpec(p)
 	if p != nil {
-		p.TableAffineUpdateModuloSpecialization = &tableAffineUpdateModuloLeafCache{
+		p.RuntimeSpecs.TableAffineUpdateModuloSpecialization = &tableAffineUpdateModuloLeafCache{
 			recognized: ok,
 			spec:       spec,
 		}
@@ -131,8 +131,8 @@ func tableAffineUpdateModuloLeafCacheForProto(p *FuncProto) *tableAffineUpdateMo
 	if p == nil {
 		return nil
 	}
-	if p.TableAffineUpdateModuloSpecialization == nil {
+	if p.RuntimeSpecs.TableAffineUpdateModuloSpecialization == nil {
 		tableAffineUpdateModuloLeafSpecForProto(p)
 	}
-	return p.TableAffineUpdateModuloSpecialization
+	return p.RuntimeSpecs.TableAffineUpdateModuloSpecialization
 }

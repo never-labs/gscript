@@ -1058,6 +1058,7 @@ func (vm *VM) attachIsolatedChildJIT(parent *VM) {
 
 func (vm *VM) launchSyncTask(fn runtime.Value, args []runtime.Value, done func(error)) {
 	taskArgs := append([]runtime.Value(nil), args...)
+	vm.markGlobalTablesConcurrent()
 	go func() {
 		goVM := newIsolatedChildVM(vm)
 		defer goVM.Close()

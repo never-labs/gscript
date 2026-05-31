@@ -51,7 +51,7 @@ func TestRecordPairwiseCallSiteNoResultRuntimeSpecializationDiagnostics(t *testi
 	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(advance, callSiteNoResultRuntimeSpecializationRecordPairwiseNumeric) {
 		t.Fatal("record_pairwise_numeric rejected by no-result runtime specialization cache")
 	}
-	if advance.CallSiteNoResultRuntime == nil || advance.CallSiteNoResultRuntime.recognized == 0 {
+	if advance.RuntimeSpecs.CallSiteNoResultRuntime == nil || advance.RuntimeSpecs.CallSiteNoResultRuntime.recognized == 0 {
 		t.Fatal("no-result runtime specialization cache was not populated")
 	}
 

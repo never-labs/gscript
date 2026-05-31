@@ -30,11 +30,11 @@ func TestMatrixMultiplyRuntimeSpecializationDiagnostics(t *testing.T) {
 	if !cachedRuntimeSpecializationRecognized(matmul, runtimeSpecializationMatrixMultiply) {
 		t.Fatal("matrix_multiply rejected by runtime specialization cache")
 	}
-	if matmul.MatrixMultiplySpecialization == nil || matmul.MatrixMultiplySpecialization.spec == nil {
+	if matmul.RuntimeSpecs.MatrixMultiplySpecialization == nil || matmul.RuntimeSpecs.MatrixMultiplySpecialization.spec == nil {
 		t.Fatal("matrix_multiply proto-local spec was not generated")
 	}
-	if matmul.MatrixMultiplySpecialization.spec.kind != matrixMultiplySpecializationPlain {
-		t.Fatalf("matrix_multiply kind = %d, want plain", matmul.MatrixMultiplySpecialization.spec.kind)
+	if matmul.RuntimeSpecs.MatrixMultiplySpecialization.spec.kind != matrixMultiplySpecializationPlain {
+		t.Fatalf("matrix_multiply kind = %d, want plain", matmul.RuntimeSpecs.MatrixMultiplySpecialization.spec.kind)
 	}
 
 	diag := requireRuntimeSpecializationDiagnostic(t, DiagnoseCallSiteRuntimeSpecializationProto(matmul), "matrix_multiply")
@@ -111,7 +111,7 @@ func TestDenseMatrixMultiplyTransposedRuntimeSpecializationDiagnostics(t *testin
 	if !cachedCallSiteNoResultRuntimeSpecializationRecognized(matmul, callSiteNoResultRuntimeSpecializationDenseMatrixMultiplyTransposed) {
 		t.Fatal("dense_matrix_multiply_transposed rejected by no-result runtime specialization cache")
 	}
-	if matmul.DenseMatrixMultiplyTBSpecialization == nil || matmul.DenseMatrixMultiplyTBSpecialization.spec == nil {
+	if matmul.RuntimeSpecs.DenseMatrixMultiplyTBSpecialization == nil || matmul.RuntimeSpecs.DenseMatrixMultiplyTBSpecialization.spec == nil {
 		t.Fatal("dense transposed matrix multiply proto-local spec was not generated")
 	}
 
