@@ -50,17 +50,8 @@ func TestStdlibInstallerModuleAliasAndPackageLoadedSemantics(t *testing.T) {
 func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 	interp := NewCore()
 	interp.InstallStdlib()
-	for _, name := range []string{"string"} {
-		global := interp.GetGlobal(name)
-		if !global.IsTable() {
-			t.Fatalf("%s global is not a table", name)
-		}
-		if got := interp.packageLoaded(name); got != global {
-			t.Fatalf("package.loaded.%s does not match global", name)
-		}
-		if got := interp.modules[name]; got != global {
-			t.Fatalf("require cache %s does not match global", name)
-		}
+	if got := interp.GetGlobal("script"); !got.IsTable() {
+		t.Fatalf("script global = %v, want table", got)
 	}
 	if got := interp.packageLoaded("toolof"); !got.IsNil() {
 		t.Fatalf("package.loaded.toolof = %v, want nil", got)
@@ -70,6 +61,9 @@ func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 	}
 	if got := interp.GetGlobal("llm"); !got.IsNil() {
 		t.Fatalf("llm global = %v, want nil before stdlibrt install", got)
+	}
+	if got := interp.GetGlobal("string"); !got.IsNil() {
+		t.Fatalf("string global = %v, want nil before stdlibrt install", got)
 	}
 }
 
@@ -88,7 +82,7 @@ func TestRuntimeNewIsCoreOnly(t *testing.T) {
 func TestExplicitInstallStdlibOmitsMigratedHostIOTables(t *testing.T) {
 	interp := NewCore()
 	interp.InstallStdlib()
-	for _, name := range []string{"fs", "http", "io", "net", "os", "table"} {
+	for _, name := range []string{"fs", "http", "io", "net", "os", "string", "table"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
 			t.Fatalf("%s global = %v, want nil before stdlibrt install", name, got)
 		}

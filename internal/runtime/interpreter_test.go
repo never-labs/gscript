@@ -21,6 +21,7 @@ func runProgram(t *testing.T, src string) *Interpreter {
 	}
 	interp := NewCore()
 	interp.InstallStdlib()
+	installNativeStringForRuntimeTests(interp)
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)
 	}
@@ -40,6 +41,7 @@ func runProgramExpectError(t *testing.T, src string) error {
 	}
 	interp := NewCore()
 	interp.InstallStdlib()
+	installNativeStringForRuntimeTests(interp)
 	return interp.Exec(prog)
 }
 
@@ -85,6 +87,13 @@ func getCoreGlobal(t *testing.T, src string, name string) Value {
 	t.Helper()
 	interp := runCoreProgram(t, src)
 	return interp.GetGlobal(name)
+}
+
+func installNativeStringForRuntimeTests(interp *Interpreter) {
+	strLib := BuildStringLibWithCaller(interp.callFunction, func() int64 { return interp.maxHostResult })
+	interp.SetStringLibrary(strLib)
+	installer := newStdlibInstallContext(interp)
+	installer.RegisterTable("string", strLib)
 }
 
 // ==================================================================
