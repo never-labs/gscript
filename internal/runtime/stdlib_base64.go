@@ -1,8 +1,9 @@
 package runtime
 
 import (
-	"encoding/base64"
 	"fmt"
+
+	base64lib "github.com/never-labs/gscript/internal/stdlib/base/base64"
 )
 
 // buildBase64Lib creates the "base64" standard library table.
@@ -39,10 +40,10 @@ func buildBase64Lib(interps ...*Interpreter) *Table {
 		if !arg.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'base64.encode' (string expected)")
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.StdEncoding.EncodedLen(StringLen(arg))); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.EncodedLen(StringLen(arg))); err != nil {
 			return NilValue(), err
 		}
-		return StringValue(base64.StdEncoding.EncodeToString([]byte(arg.Str()))), nil
+		return StringValue(base64lib.Encode(arg.Str())), nil
 	}
 	setFastArg1("encode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -57,14 +58,14 @@ func buildBase64Lib(interps ...*Interpreter) *Table {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.decode' (string expected)")
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.StdEncoding.DecodedLen(StringLen(arg))); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.DecodedLen(StringLen(arg))); err != nil {
 			return NilValue(), NilValue(), 0, err
 		}
-		decoded, err := base64.StdEncoding.DecodeString(arg.Str())
+		decoded, err := base64lib.Decode(arg.Str())
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return StringValue(string(decoded)), NilValue(), 1, nil
+		return StringValue(decoded), NilValue(), 1, nil
 	}
 	setFastArg1Ret2("decode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -85,10 +86,10 @@ func buildBase64Lib(interps ...*Interpreter) *Table {
 		if !arg.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'base64.urlEncode' (string expected)")
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.RawURLEncoding.EncodedLen(StringLen(arg))); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.URLEncodedLen(StringLen(arg))); err != nil {
 			return NilValue(), err
 		}
-		return StringValue(base64.RawURLEncoding.EncodeToString([]byte(arg.Str()))), nil
+		return StringValue(base64lib.URLEncode(arg.Str())), nil
 	}
 	setFastArg1("urlEncode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -103,14 +104,14 @@ func buildBase64Lib(interps ...*Interpreter) *Table {
 		if !arg.IsString() {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.urlDecode' (string expected)")
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64.RawURLEncoding.DecodedLen(StringLen(arg))); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.URLDecodedLen(StringLen(arg))); err != nil {
 			return NilValue(), NilValue(), 0, err
 		}
-		decoded, err := base64.RawURLEncoding.DecodeString(arg.Str())
+		decoded, err := base64lib.URLDecode(arg.Str())
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
 		}
-		return StringValue(string(decoded)), NilValue(), 1, nil
+		return StringValue(decoded), NilValue(), 1, nil
 	}
 	setFastArg1Ret2("urlDecode", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
