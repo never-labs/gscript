@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	gscript "github.com/never-labs/gscript/gscript"
 )
 
 func runRunCommand(args []string, outw, errw io.Writer) int {
@@ -32,8 +32,7 @@ func runRunCommand(args []string, outw, errw io.Writer) int {
 	}
 
 	filename := paths[0]
-	interp := runtime.New()
-	if err := runScriptFile(interp, filename, paths[1:], cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}); err != nil {
+	if err := runPublicScriptFile(filename, paths[1:], cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}); err != nil {
 		if code, ok := processExitCode(err); ok {
 			return code
 		}
@@ -42,4 +41,19 @@ func runRunCommand(args []string, outw, errw io.Writer) int {
 	}
 	_ = outw
 	return 0
+}
+
+func runPublicScriptFile(filename string, args []string, opts cliRunOptions) error {
+	vm := gscript.New(publicRunOptions(opts, filename, args)...)
+	return vm.ExecFile(filename)
+}
+
+func publicRunOptions(opts cliRunOptions, script string, args []string) []gscript.Option {
+	gsOpts := []gscript.Option{gscript.WithArgs(script, args...)}
+	if opts.UseJIT {
+		gsOpts = append(gsOpts, gscript.WithJIT())
+	} else if opts.UseVM {
+		gsOpts = append(gsOpts, gscript.WithVM())
+	}
+	return gsOpts
 }

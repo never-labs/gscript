@@ -9,8 +9,10 @@ import (
 
 func TestCallResultRangeGuardPass_GuardsProfiledFieldCallResult(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "call_result_range",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "call_result_range",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	for i := 0; i < int(callResultRangeGuardMinCount); i++ {
 		proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
@@ -55,8 +57,10 @@ func TestCallResultRangeGuardPass_GuardsProfiledFieldCallResult(t *testing.T) {
 
 func TestCallResultRangeGuardPass_RangeAnalysisConsumesGuard(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "call_result_range_safe",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "call_result_range_safe",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	for i := 0; i < int(callResultRangeGuardMinCount); i++ {
 		proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
@@ -90,8 +94,10 @@ func TestCallResultRangeGuardPass_RangeAnalysisConsumesGuard(t *testing.T) {
 
 func TestCallResultRangeGuardPass_GuardsProfiledBoxedCallResult(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "call_result_boxed",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "call_result_boxed",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	for i := 0; i < int(callResultRangeGuardMinCount); i++ {
 		proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 1)
@@ -133,8 +139,10 @@ func TestCallResultRangeGuardPass_GuardsProfiledBoxedCallResult(t *testing.T) {
 func TestCallResultRangeGuardPass_SpeculatesStableBoxedCallWithIntegerUse(t *testing.T) {
 	calleeProto := &vm.FuncProto{Name: "callee"}
 	proto := &vm.FuncProto{
-		Name:             "call_result_boxed_int_use",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "call_result_boxed_int_use",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	proto.CallSiteFeedback[0].Count = 1
 	proto.CallSiteFeedback[0].NArgs = 1
@@ -178,8 +186,10 @@ func TestCallResultRangeGuardPass_SpeculatesStableBoxedCallWithIntegerUse(t *tes
 
 func TestCallResultRangeGuardPass_SpeculatesStableFieldCallFloor(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "call_result_spec",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "call_result_spec",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
 	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
@@ -213,8 +223,10 @@ func TestCallResultRangeGuardPass_SpeculatesStableFieldCallFloor(t *testing.T) {
 
 func TestCallResultRangeGuardPass_SkipsSuppressedIntRange(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "call_result_suppressed",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "call_result_suppressed",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	proto.CallSiteFeedback[0].ObserveCall(runtime.NilValue(), nil, 1, 2)
 	fn := &Function{

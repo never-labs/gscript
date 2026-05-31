@@ -130,8 +130,28 @@ func newVM(o vmOptions) *VM {
 	if o.requirePath != "" {
 		interp.SetScriptDir(o.requirePath)
 	}
+	if o.argsSet {
+		interp.SetArgs(o.argScript, o.args)
+	}
 
 	return &VM{interp: interp, opts: o, goImportAllowed: goImportAllowed}
+}
+
+// SetArgs updates the script entrypoint arguments on an existing VM. The
+// global arg table follows GScript's Lua-compatible convention: arg[0] is
+// script and arg[1..n] are args.
+func (vm *VM) SetArgs(script string, args []string) {
+	if vm == nil {
+		return
+	}
+	copied := append([]string(nil), args...)
+	vm.interp.SetArgs(script, copied)
+	if vm.bvm != nil {
+		vm.copyInterpreterGlobalToBytecode(vm.bvm, "arg")
+	}
+	vm.opts.argScript = script
+	vm.opts.args = copied
+	vm.opts.argsSet = true
 }
 
 // Exec compiles and executes a GScript source string.

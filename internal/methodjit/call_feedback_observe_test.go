@@ -112,9 +112,11 @@ func TestMergeTier2CallCacheFeedbackRecordsPolymorphicVMProtos(t *testing.T) {
 	calleeA := &vm.FuncProto{Name: "a"}
 	calleeB := &vm.FuncProto{Name: "b"}
 	caller := &vm.FuncProto{
-		Name:             "caller",
-		Code:             []uint32{vm.EncodeABC(vm.OP_CALL, 0, 2, 2)},
-		CallSiteFeedback: make([]vm.CallSiteFeedback, 1),
+		Name: "caller",
+		Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 2, 2)},
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: make([]vm.CallSiteFeedback, 1),
+		},
 	}
 	cf := &CompiledFunction{}
 	mergeTier2CallCacheEntryForTest(caller, cf, 0, 0, calleeA, calleeB)
@@ -140,9 +142,11 @@ func TestMergeTier2CallCacheFeedbackRecordsPolymorphicVMProtos(t *testing.T) {
 func TestMergeBaselineCallCacheFeedbackRecordsStableVMClosure(t *testing.T) {
 	callee := &vm.FuncProto{Name: "callee", Code: []uint32{vm.EncodeABC(vm.OP_RETURN, 0, 1, 0)}}
 	caller := &vm.FuncProto{
-		Name:             "caller",
-		Code:             []uint32{vm.EncodeABC(vm.OP_CALL, 0, 1, 2)},
-		CallSiteFeedback: make([]vm.CallSiteFeedback, 1),
+		Name: "caller",
+		Code: []uint32{vm.EncodeABC(vm.OP_CALL, 0, 1, 2)},
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: make([]vm.CallSiteFeedback, 1),
+		},
 	}
 	cl := vm.NewClosure(callee)
 	boxed := runtime.VMClosureFunctionValue(unsafe.Pointer(cl), cl)

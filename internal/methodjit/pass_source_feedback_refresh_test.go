@@ -9,9 +9,11 @@ import (
 
 func TestSourceFeedbackRefresh_RestoresInlinedGetTableKindAndType(t *testing.T) {
 	source := &vm.FuncProto{
-		Code:             make([]uint32, 3),
-		Feedback:         make([]vm.TypeFeedback, 3),
-		TableKeyFeedback: vm.NewTableKeyFeedbackVector(3),
+		Code: make([]uint32, 3),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			Feedback:         make([]vm.TypeFeedback, 3),
+			TableKeyFeedback: vm.NewTableKeyFeedbackVector(3),
+		},
 	}
 	source.Feedback[1].Kind = vm.FBKindInt
 	source.Feedback[1].Result = vm.FBInt
@@ -39,8 +41,10 @@ func TestSourceFeedbackRefresh_RestoresInlinedGetTableKindAndType(t *testing.T) 
 
 func TestSourceFeedbackRefresh_RestoresInlinedSetTableKind(t *testing.T) {
 	source := &vm.FuncProto{
-		Code:     make([]uint32, 3),
-		Feedback: make([]vm.TypeFeedback, 3),
+		Code: make([]uint32, 3),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			Feedback: make([]vm.TypeFeedback, 3),
+		},
 	}
 	source.Feedback[1].Kind = vm.FBKindInt
 
@@ -65,8 +69,10 @@ func TestSourceFeedbackRefresh_RestoresInlinedSetTableKind(t *testing.T) {
 
 func TestSourceFeedbackRefresh_RestoresInlinedGetFieldShapeAndType(t *testing.T) {
 	source := &vm.FuncProto{
-		Code:                make([]uint32, 3),
-		FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
+		Code: make([]uint32, 3),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
+		},
 	}
 	source.FieldAccessFeedback[1].ObserveFieldCache(runtime.FieldCacheEntry{
 		ShapeID:  42,
@@ -96,10 +102,12 @@ func TestSourceFeedbackRefresh_RestoresInlinedGetFieldShapeAndType(t *testing.T)
 
 func TestSourceFeedbackRefresh_RestoresRuntimeFieldPolyShapeCases(t *testing.T) {
 	source := &vm.FuncProto{
-		Code:                make([]uint32, 3),
-		Constants:           []runtime.Value{runtime.StringValue("kind")},
-		FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
-		FieldPolyCache:      make([]runtime.FieldPolyCacheEntry, 3*runtime.FieldPolyCacheWays),
+		Code:      make([]uint32, 3),
+		Constants: []runtime.Value{runtime.StringValue("kind")},
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
+		},
+		FieldPolyCache: make([]runtime.FieldPolyCacheEntry, 3*runtime.FieldPolyCacheWays),
 	}
 	source.FieldAccessFeedback[1].ObserveFieldCache(runtime.FieldCacheEntry{
 		ShapeID:  42,
@@ -135,8 +143,10 @@ func TestSourceFeedbackRefresh_RestoresRuntimeFieldPolyShapeCases(t *testing.T) 
 
 func TestSourceFeedbackRefresh_RestoresInlinedSetFieldShape(t *testing.T) {
 	source := &vm.FuncProto{
-		Code:                make([]uint32, 3),
-		FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
+		Code: make([]uint32, 3),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			FieldAccessFeedback: vm.NewFieldAccessFeedbackVector(3),
+		},
 	}
 	source.FieldAccessFeedback[1].ObserveFieldCache(runtime.FieldCacheEntry{
 		ShapeID:  99,

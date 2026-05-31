@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/never-labs/gscript/internal/runtime"
+	gscript "github.com/never-labs/gscript/gscript"
 )
 
 func runEvalCommand(args []string, outw, errw io.Writer) int {
@@ -31,15 +31,16 @@ func runEvalCommand(args []string, outw, errw io.Writer) int {
 		*useVM = true
 	}
 
-	interp := runtime.New()
-	interp.SetArgs("<eval>", rest[1:])
-	var err error
-	if *useVM {
-		err = runStringVM(interp, rest[0], *useJIT, false, jitCLIOptions{})
-	} else {
-		err = runString(interp, rest[0])
-	}
+	vm := gscript.New(publicRunOptions(cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}, "<eval>", rest[1:])...)
+	prog, err := gscript.Compile(rest[0], gscript.WithSourceName("<eval>"))
 	if err != nil {
+		if code, ok := processExitCode(err); ok {
+			return code
+		}
+		fmt.Fprintf(errw, "error: %v\n", err)
+		return 1
+	}
+	if err := vm.Run(prog); err != nil {
 		if code, ok := processExitCode(err); ok {
 			return code
 		}

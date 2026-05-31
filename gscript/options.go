@@ -133,6 +133,9 @@ type vmOptions struct {
 	llmTraceSink       LLMTraceSink
 	llmRecordSink      LLMRecordSink
 	goImports          map[string]any
+	argScript          string
+	args               []string
+	argsSet            bool
 	useVM              bool // use bytecode VM instead of tree-walker
 	useJIT             bool // enable JIT compilation (implies useVM)
 }
@@ -165,6 +168,16 @@ type SecurityPolicy struct {
 
 // Option configures a VM instance.
 type Option func(*vmOptions)
+
+// WithArgs sets the script entrypoint arguments. The global arg table follows
+// GScript's Lua-compatible convention: arg[0] is script and arg[1..n] are args.
+func WithArgs(script string, args ...string) Option {
+	return func(o *vmOptions) {
+		o.argScript = script
+		o.args = append([]string(nil), args...)
+		o.argsSet = true
+	}
+}
 
 // WithLibs sets which standard libraries are available.
 // Default: LibAll

@@ -206,7 +206,12 @@ func TestTableArrayStaticBounds_UsesProfiledTableLenRange(t *testing.T) {
 }
 
 func TestTableArrayStaticBounds_UsesProfiledAccessTableLenRange(t *testing.T) {
-	proto := &vm.FuncProto{Name: "profiled_access_table_len_bounds", TableKeyFeedback: vm.NewTableKeyFeedbackVector(8)}
+	proto := &vm.FuncProto{
+		Name: "profiled_access_table_len_bounds",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			TableKeyFeedback: vm.NewTableKeyFeedbackVector(8),
+		},
+	}
 	fn := &Function{Proto: proto, NumRegs: 1, Analysis: NewAnalysisResult()}
 	entry := &Block{ID: 0}
 	fn.Entry = entry

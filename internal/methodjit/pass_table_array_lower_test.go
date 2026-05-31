@@ -147,9 +147,11 @@ func TestTableArrayLower_SkipsDynamicStringKeyCacheSite(t *testing.T) {
 
 func TestTableArrayLower_SkipsStringKeyFeedbackSite(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:     "table_array_string_key_feedback",
-		Code:     make([]uint32, 4),
-		Feedback: vm.NewFeedbackVector(4),
+		Name: "table_array_string_key_feedback",
+		Code: make([]uint32, 4),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			Feedback: vm.NewFeedbackVector(4),
+		},
 	}
 	proto.Feedback[2].Right = vm.FBString
 	fn := &Function{Proto: proto, NumRegs: 2}
@@ -688,9 +690,11 @@ func TestTableArrayLower_SetTableBeforeSameTableReadStillLowers(t *testing.T) {
 
 func TestTableArrayLower_RefreshesInlinedSourceFeedback(t *testing.T) {
 	source := &vm.FuncProto{
-		Code:             make([]uint32, 3),
-		Feedback:         make([]vm.TypeFeedback, 3),
-		TableKeyFeedback: vm.NewTableKeyFeedbackVector(3),
+		Code: make([]uint32, 3),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			Feedback:         make([]vm.TypeFeedback, 3),
+			TableKeyFeedback: vm.NewTableKeyFeedbackVector(3),
+		},
 	}
 	source.Feedback[1].Kind = vm.FBKindInt
 	source.Feedback[1].Result = vm.FBInt
@@ -898,9 +902,11 @@ func TestTableArrayNestedLoad_FusesSameBlockMixedRowInt(t *testing.T) {
 func TestDenseMatrixNestedLoadLowerUsesDenseFeedback(t *testing.T) {
 	fn := &Function{
 		Proto: &vm.FuncProto{
-			Name:             "dense_matrix_nested_load_lower",
-			Code:             make([]uint32, 4),
-			TableKeyFeedback: vm.NewTableKeyFeedbackVector(4),
+			Name: "dense_matrix_nested_load_lower",
+			Code: make([]uint32, 4),
+			FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+				TableKeyFeedback: vm.NewTableKeyFeedbackVector(4),
+			},
 		},
 		NumRegs: 4,
 	}

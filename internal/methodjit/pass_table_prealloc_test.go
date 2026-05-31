@@ -351,9 +351,11 @@ func TestTablePreallocHintPassRecoversDefsByValueID(t *testing.T) {
 
 func TestTablePreallocHintPassUsesObservedMaxIntKeyAndCarriesKind(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "prealloc_bool_range",
-		Code:             make([]uint32, 4),
-		TableKeyFeedback: vm.NewTableKeyFeedbackVector(4),
+		Name: "prealloc_bool_range",
+		Code: make([]uint32, 4),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			TableKeyFeedback: vm.NewTableKeyFeedbackVector(4),
+		},
 	}
 	proto.TableKeyFeedback[2].ObserveIntKey(runtime.IntValue(4096))
 	fn := &Function{Proto: proto, NumRegs: 3}
@@ -390,9 +392,11 @@ func TestTablePreallocHintPassAddsHeadroomForLargeOuterLoopFeedback(t *testing.T
 	const sourcePC = 2
 	observedMax := int64(tier2FeedbackOuterLoopArrayHint + 8191)
 	proto := &vm.FuncProto{
-		Name:             "prealloc_large_loop",
-		Code:             make([]uint32, 4),
-		TableKeyFeedback: vm.NewTableKeyFeedbackVector(4),
+		Name: "prealloc_large_loop",
+		Code: make([]uint32, 4),
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			TableKeyFeedback: vm.NewTableKeyFeedbackVector(4),
+		},
 	}
 	proto.TableKeyFeedback[sourcePC].ObserveIntKey(runtime.IntValue(observedMax))
 
@@ -686,9 +690,11 @@ func TestTablePreallocHintPassLoopLocalTableKeepsSmallHint(t *testing.T) {
 func TestTablePreallocHintPassPolymorphicFeedbackForcesMixedPrealloc(t *testing.T) {
 	fn := &Function{
 		Proto: &vm.FuncProto{
-			Name:             "prealloc_poly_kind",
-			Feedback:         make([]vm.TypeFeedback, 3),
-			TableKeyFeedback: make([]vm.TableKeyFeedback, 3),
+			Name: "prealloc_poly_kind",
+			FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+				Feedback:         make([]vm.TypeFeedback, 3),
+				TableKeyFeedback: make([]vm.TableKeyFeedback, 3),
+			},
 		},
 		NumRegs: 3,
 	}

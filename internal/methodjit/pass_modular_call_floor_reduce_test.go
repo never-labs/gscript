@@ -39,8 +39,10 @@ func TestModularCallFloorReducePass_ReducesAdditiveModuloLeaf(t *testing.T) {
 
 func TestCallResultRangeGuardPass_SkipsModuloReducedFloorCall(t *testing.T) {
 	proto := &vm.FuncProto{
-		Name:             "modular_floor_guard_skip",
-		CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		Name: "modular_floor_guard_skip",
+		FuncProtoFeedbackState: vm.FuncProtoFeedbackState{
+			CallSiteFeedback: vm.NewCallSiteFeedbackVector(1),
+		},
 	}
 	fn := &Function{Proto: proto, Analysis: NewAnalysisResult()}
 	b := &Block{ID: 0, defs: make(map[int]*Value)}
