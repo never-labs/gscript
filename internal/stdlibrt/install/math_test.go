@@ -84,3 +84,25 @@ func TestInstallModulesRegistersSOAFromStdlibrt(t *testing.T) {
 		t.Fatalf("soa.len missing fast path after stdlibrt install: %#v", lenFn)
 	}
 }
+
+func TestInstallModulesRegistersSyncFromStdlibrt(t *testing.T) {
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	if got := interp.GetGlobal("sync"); !got.IsNil() {
+		t.Fatalf("InstallRuntimeStdlib registered migrated sync module: %v", got)
+	}
+
+	Install(interp)
+	syncLib := interp.GetGlobal("sync")
+	if !syncLib.IsTable() {
+		t.Fatalf("sync global is not a table: %v", syncLib)
+	}
+	if !syncLib.Table().RawGetString("__stdlibrt_module").Truthy() {
+		t.Fatalf("sync global was not installed from stdlibrt")
+	}
+	for _, name := range []string{"waitgroup", "mutex", "rwmutex", "once", "group"} {
+		if got := syncLib.Table().RawGetString(name); !got.IsFunction() {
+			t.Fatalf("sync.%s is not a function: %v", name, got)
+		}
+	}
+}

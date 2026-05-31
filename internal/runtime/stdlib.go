@@ -45,7 +45,6 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 
 	// --- System ---
 	std.RegisterTable("script", buildScriptLib(interp))
-	std.RegisterTable("sync", BuildSyncLibWithCaller(interp.callFunction))
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 
@@ -78,6 +77,7 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	std.RegisterTable("net", buildNetLib(interp))
 	std.RegisterTable("process", buildProcessLib(interp))
 	std.RegisterTable("soa", buildSoALib())
+	std.RegisterTable("sync", BuildSyncLibWithCaller(interp.callFunction))
 
 	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider
