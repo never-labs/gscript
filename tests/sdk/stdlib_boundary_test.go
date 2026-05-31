@@ -60,19 +60,18 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 	})
 }
 
-func TestRuntimeStdlibWrappersDoNotImportProviderImplementations(t *testing.T) {
+func TestRuntimeDoesNotImportHostedProviderImplementations(t *testing.T) {
 	runtimeRoot := filepath.Join(repoRoot(t), "internal", "runtime")
 
 	forEachGoFile(t, runtimeRoot, func(path string) {
-		name := filepath.Base(path)
-		if !strings.HasPrefix(name, "stdlib") || strings.HasSuffix(name, "_test.go") {
+		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
 		for _, importPath := range parseImports(t, path) {
 			if importPath == "github.com/never-labs/gscript/llm/openai" ||
 				importPath == "github.com/never-labs/gscript/llm/anthropic" ||
 				importPath == "github.com/never-labs/gscript/llm/command" {
-				t.Fatalf("%s imports provider implementation %s; runtime stdlib wrappers should depend on protocol/adapter surfaces, not hosted provider packages", relativeToRoot(t, path), importPath)
+				t.Fatalf("%s imports provider implementation %s; runtime should depend on protocol/adapter surfaces, not hosted provider packages", relativeToRoot(t, path), importPath)
 			}
 		}
 	})

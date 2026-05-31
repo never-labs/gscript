@@ -112,7 +112,7 @@ class ManifestTest(unittest.TestCase):
             finally:
                 manifest.ROOT = original_root
 
-    def test_generated_benchmark_manifest_uses_domain_workloads_without_legacy_entries(self):
+    def test_generated_benchmark_manifest_uses_domain_workloads_without_old_schema_entries(self):
         original_root = manifest.ROOT
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -153,14 +153,14 @@ class ManifestTest(unittest.TestCase):
             finally:
                 manifest.ROOT = original_root
 
-    def test_generated_benchmark_manifest_does_not_convert_legacy_benchmarks_array(self):
+    def test_generated_benchmark_manifest_does_not_convert_old_benchmarks_array(self):
         original_root = manifest.ROOT
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             bench = root / "benchmarks" / "numeric" / "case.gs"
             bench.parent.mkdir(parents=True)
             bench.write_text("-- test\n")
-            legacy_manifest = {
+            old_schema_manifest = {
                 "benchmarks": [
                     {
                         "id": "numeric/case",
@@ -170,7 +170,7 @@ class ManifestTest(unittest.TestCase):
                     }
                 ]
             }
-            (root / "benchmarks" / "manifest.json").write_text(json.dumps(legacy_manifest))
+            (root / "benchmarks" / "manifest.json").write_text(json.dumps(old_schema_manifest))
 
             manifest.ROOT = root
             try:
