@@ -10,47 +10,6 @@ import (
 	binfmt "github.com/never-labs/gscript/internal/stdlib/binary"
 )
 
-// buildBinaryLib creates the "binary" standard library table.
-func buildBinaryLib(interps ...*Interpreter) *Table {
-	t := NewTable()
-	var interp *Interpreter
-	if len(interps) > 0 {
-		interp = interps[0]
-	}
-	maxHostResult := func() int64 {
-		if interp == nil {
-			return 0
-		}
-		return interp.maxHostResult
-	}
-
-	set := func(name string, fn func([]Value) ([]Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
-			Name: "binary." + name,
-			Fn:   fn,
-		}))
-	}
-
-	// binary.pack(format, ...) -> string
-	//
-	// Format tokens are whitespace/comma separated. The default byte order is
-	// little-endian; use a leading "le"/"<" or "be"/">" token or prefix
-	// ("be:u16") to switch. Supported fields:
-	// i8/u8/i16/u16/i32/u32/i64/u64/f32/f64/string/str/bytes.
-	// string and bytes are length-prefixed with a u32 unless written as
-	// string:N or bytes:N, which encodes exactly N raw bytes.
-	set("pack", func(args []Value) ([]Value, error) { return binaryPackValues("binary.pack", args, maxHostResult()) })
-
-	// binary.unpack(format, data [, offset]) -> values..., nextOffset
-	// Offset is 1-based, matching GScript string positions.
-	set("unpack", func(args []Value) ([]Value, error) { return binaryUnpackValues("binary.unpack", args) })
-
-	// binary.size(format) -> byte count, or nil,err for variable-size formats.
-	set("size", func(args []Value) ([]Value, error) { return binarySizeValues("binary.size", args) })
-
-	return t
-}
-
 func binaryPackValues(apiName string, args []Value, maxHostResult int64) ([]Value, error) {
 	if len(args) < 1 || !args[0].IsString() {
 		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
