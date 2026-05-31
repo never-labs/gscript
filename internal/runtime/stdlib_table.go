@@ -21,6 +21,155 @@ func CheckTableUnpackRange(name string, i, j int64) (int, error) {
 	return int(count), nil
 }
 
+type TableSortCaller func(Value, []Value) ([]Value, error)
+type TableSortLess func(Value, Value) (bool, error)
+type TableSortLen func(Value) (int64, error)
+type TableSortGet func(Value, Value) (Value, error)
+type TableSortSet func(Value, Value, Value) error
+type TableSortTryPlainArraySort func(Value, int64) bool
+
+// BuildTableSortFunction builds table.sort around caller-provided table access
+// and comparison hooks. VM/interpreter callers pass metamethod-aware hooks;
+// the base runtime library passes raw table hooks.
+func BuildTableSortFunction(call TableSortCaller, less TableSortLess, tableLen TableSortLen, tableGet TableSortGet, tableSet TableSortSet, tryPlain TableSortTryPlainArraySort) *GoFunction {
+	sortTable := func(t Value, comp Value, hasComp bool) error {
+		length, err := tableLen(t)
+		if err != nil {
+			return err
+		}
+		if length < 0 {
+			length = 0
+		}
+		if !hasComp && tryPlain != nil && tryPlain(t, length) {
+			return nil
+		}
+
+		elems := make([]Value, int(length))
+		for i := 0; i < len(elems); i++ {
+			v, err := tableGet(t, IntValue(int64(i+1)))
+			if err != nil {
+				return err
+			}
+			elems[i] = v
+		}
+
+		var sortErr error
+		if hasComp && comp.IsFunction() {
+			sort.SliceStable(elems, func(a, b int) bool {
+				if sortErr != nil {
+					return false
+				}
+				results, err := call(comp, []Value{elems[a], elems[b]})
+				if err != nil {
+					sortErr = err
+					return false
+				}
+				if len(results) > 0 && results[0].Truthy() {
+					reverse, err := call(comp, []Value{elems[b], elems[a]})
+					if err != nil {
+						sortErr = err
+						return false
+					}
+					if len(reverse) > 0 && reverse[0].Truthy() {
+						sortErr = fmt.Errorf("invalid order function for sorting")
+						return false
+					}
+					return true
+				}
+				return false
+			})
+		} else {
+			sort.SliceStable(elems, func(a, b int) bool {
+				if sortErr != nil {
+					return false
+				}
+				ok, err := less(elems[a], elems[b])
+				if err != nil {
+					sortErr = err
+					return false
+				}
+				return ok
+			})
+		}
+		if sortErr != nil {
+			return sortErr
+		}
+
+		for i, v := range elems {
+			if err := tableSet(t, IntValue(int64(i+1)), v); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	return &GoFunction{
+		Name: "table.sort",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+			}
+			comp := NilValue()
+			if len(args) >= 2 {
+				comp = args[1]
+			}
+			if err := sortTable(args[0], comp, len(args) >= 2); err != nil {
+				return nil, err
+			}
+			return nil, nil
+		},
+		FastArg1: func(t Value) (Value, error) {
+			if !t.IsTable() {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+			}
+			if err := sortTable(t, NilValue(), false); err != nil {
+				return NilValue(), err
+			}
+			return NilValue(), nil
+		},
+		FastArg2: func(t, comp Value) (Value, error) {
+			if !t.IsTable() {
+				return NilValue(), fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+			}
+			if err := sortTable(t, comp, true); err != nil {
+				return NilValue(), err
+			}
+			return NilValue(), nil
+		},
+	}
+}
+
+func rawTableSortFunction() *GoFunction {
+	return BuildTableSortFunction(
+		func(fn Value, args []Value) ([]Value, error) {
+			if gf := fn.GoFunction(); gf != nil {
+				return gf.Fn(args)
+			}
+			return nil, fmt.Errorf("table.sort comparator must be a Go function or use default ordering")
+		},
+		func(a, b Value) (bool, error) {
+			ok, comparable := a.LessThan(b)
+			if comparable {
+				return ok, nil
+			}
+			return false, nil
+		},
+		func(t Value) (int64, error) {
+			return int64(t.Table().Length()), nil
+		},
+		func(t Value, key Value) (Value, error) {
+			return t.Table().RawGet(key), nil
+		},
+		func(t Value, key Value, val Value) error {
+			t.Table().RawSet(key, val)
+			return nil
+		},
+		func(t Value, length int64) bool {
+			return t.Table().TryPlainArraySort(length)
+		},
+	)
+}
+
 // buildTableLib creates the "table" standard library table.
 func buildTableLib() *Table {
 	t := NewTable()
@@ -125,85 +274,7 @@ func buildTableLib() *Table {
 		return []Value{StringValue(b.String())}, nil
 	})
 
-	// table.sort(t [, comp])
-	set("sort", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
-		}
-		tbl := args[0].Table()
-		length := tbl.Length()
-
-		// Extract array elements
-		elems := make([]Value, length)
-		for i := 0; i < length; i++ {
-			elems[i] = tbl.RawGet(IntValue(int64(i + 1)))
-		}
-
-		var sortErr error
-		if len(args) >= 2 && args[1].IsFunction() {
-			comp := args[1]
-			sort.SliceStable(elems, func(a, b int) bool {
-				if sortErr != nil {
-					return false
-				}
-				// The comparator is stored but we need the interpreter to call it.
-				// We use GoFunction's Fn directly if possible.
-				var results []Value
-				if gf := comp.GoFunction(); gf != nil {
-					var err error
-					results, err = gf.Fn([]Value{elems[a], elems[b]})
-					if err != nil {
-						sortErr = err
-						return false
-					}
-				} else {
-					// For closure-based comparators, we can't call them here
-					// without access to the interpreter. Return a default ordering.
-					// This is a limitation; table.sort with closure comparators
-					// will be handled via the interpreter's callFunction.
-					sortErr = fmt.Errorf("table.sort comparator must be a Go function or use default ordering")
-					return false
-				}
-				if len(results) > 0 && results[0].Truthy() {
-					var reverse []Value
-					var err error
-					if gf := comp.GoFunction(); gf != nil {
-						reverse, err = gf.Fn([]Value{elems[b], elems[a]})
-					}
-					if err != nil {
-						sortErr = err
-						return false
-					}
-					if len(reverse) > 0 && reverse[0].Truthy() {
-						sortErr = fmt.Errorf("invalid order function for sorting")
-						return false
-					}
-					return true
-				}
-				return false
-			})
-		} else {
-			// Default sort: numbers before strings, then by value
-			sort.SliceStable(elems, func(a, b int) bool {
-				va, vb := elems[a], elems[b]
-				less, ok := va.LessThan(vb)
-				if ok {
-					return less
-				}
-				return false
-			})
-		}
-
-		if sortErr != nil {
-			return nil, sortErr
-		}
-
-		// Write back
-		for i, v := range elems {
-			tbl.RawSet(IntValue(int64(i+1)), v)
-		}
-		return nil, nil
-	})
+	t.RawSet(StringValue("sort"), FunctionValue(rawTableSortFunction()))
 
 	// table.unpack(t [, i [, j]]) -> values
 	tableUnpack := func(name string, args []Value) ([]Value, error) {
@@ -550,79 +621,19 @@ func buildTableLib() *Table {
 // buildTableSortWithInterp creates a table.sort that can call closure comparators.
 // This is registered separately because it needs access to the interpreter.
 func buildTableSortWithInterp(interp *Interpreter, tblLib *Table) {
-	tblLib.RawSet(StringValue("sort"), FunctionValue(&GoFunction{
-		Name: "table.sort",
-		Fn: func(args []Value) ([]Value, error) {
-			if len(args) < 1 || !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
+	tblLib.RawSet(StringValue("sort"), FunctionValue(BuildTableSortFunction(
+		interp.callFunction,
+		interp.valLessThan,
+		interp.tableLenInt,
+		interp.tableGet,
+		interp.tableSet,
+		func(t Value, length int64) bool {
+			if tbl := t.Table(); tbl != nil && tbl.TryPlainArraySort(length) {
+				return true
 			}
-			t := args[0]
-			length, err := interp.tableLenInt(t)
-			if err != nil {
-				return nil, err
-			}
-			if length < 0 {
-				length = 0
-			}
-
-			elems := make([]Value, int(length))
-			for i := 0; i < len(elems); i++ {
-				v, err := interp.tableGet(t, IntValue(int64(i+1)))
-				if err != nil {
-					return nil, err
-				}
-				elems[i] = v
-			}
-
-			var sortErr error
-			if len(args) >= 2 && args[1].IsFunction() {
-				comp := args[1]
-				sort.SliceStable(elems, func(a, b int) bool {
-					if sortErr != nil {
-						return false
-					}
-					results, err := interp.callFunction(comp, []Value{elems[a], elems[b]})
-					if err != nil {
-						sortErr = err
-						return false
-					}
-					if len(results) > 0 && results[0].Truthy() {
-						reverse, err := interp.callFunction(comp, []Value{elems[b], elems[a]})
-						if err != nil {
-							sortErr = err
-							return false
-						}
-						if len(reverse) > 0 && reverse[0].Truthy() {
-							sortErr = fmt.Errorf("invalid order function for sorting")
-							return false
-						}
-						return true
-					}
-					return false
-				})
-			} else {
-				sort.SliceStable(elems, func(a, b int) bool {
-					va, vb := elems[a], elems[b]
-					less, ok := va.LessThan(vb)
-					if ok {
-						return less
-					}
-					return false
-				})
-			}
-
-			if sortErr != nil {
-				return nil, sortErr
-			}
-
-			for i, v := range elems {
-				if err := interp.tableSet(t, IntValue(int64(i+1)), v); err != nil {
-					return nil, err
-				}
-			}
-			return nil, nil
+			return false
 		},
-	}))
+	)))
 }
 
 func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {

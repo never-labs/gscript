@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -172,110 +171,19 @@ func (vm *VM) RegisterTableSortLib() {
 }
 
 func (vm *VM) newTableSortFunction() *runtime.GoFunction {
-	sortTable := func(t runtime.Value, comp runtime.Value, hasComp bool) error {
-		length, err := vm.tableLenInt(t)
-		if err != nil {
-			return err
-		}
-		if length < 0 {
-			length = 0
-		}
-		if !hasComp {
+	return runtime.BuildTableSortFunction(
+		vm.callValue,
+		vm.valueLessThan,
+		vm.tableLenInt,
+		vm.tableGet,
+		vm.tableSet,
+		func(t runtime.Value, length int64) bool {
 			if tbl := t.Table(); tbl != nil && tbl.TryPlainArraySort(length) {
-				return nil
+				return true
 			}
-		}
-		elems := make([]runtime.Value, int(length))
-		for i := 0; i < len(elems); i++ {
-			v, err := vm.tableGet(t, runtime.IntValue(int64(i+1)))
-			if err != nil {
-				return err
-			}
-			elems[i] = v
-		}
-
-		var sortErr error
-		if hasComp && comp.IsFunction() {
-			sort.SliceStable(elems, func(a, b int) bool {
-				if sortErr != nil {
-					return false
-				}
-				results, err := vm.callValue(comp, []runtime.Value{elems[a], elems[b]})
-				if err != nil {
-					sortErr = err
-					return false
-				}
-				if len(results) > 0 && results[0].Truthy() {
-					reverse, err := vm.callValue(comp, []runtime.Value{elems[b], elems[a]})
-					if err != nil {
-						sortErr = err
-						return false
-					}
-					if len(reverse) > 0 && reverse[0].Truthy() {
-						sortErr = fmt.Errorf("invalid order function for sorting")
-						return false
-					}
-					return true
-				}
-				return false
-			})
-		} else {
-			sort.SliceStable(elems, func(a, b int) bool {
-				if sortErr != nil {
-					return false
-				}
-				less, err := vm.valueLessThan(elems[a], elems[b])
-				if err != nil {
-					sortErr = err
-					return false
-				}
-				return less
-			})
-		}
-		if sortErr != nil {
-			return sortErr
-		}
-		for i, val := range elems {
-			if err := vm.tableSet(t, runtime.IntValue(int64(i+1)), val); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	return &runtime.GoFunction{
-		Name: "table.sort",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) < 1 || !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
-			}
-			comp := runtime.NilValue()
-			if len(args) >= 2 {
-				comp = args[1]
-			}
-			if err := sortTable(args[0], comp, len(args) >= 2); err != nil {
-				return nil, err
-			}
-			return nil, nil
+			return false
 		},
-		FastArg1: func(t runtime.Value) (runtime.Value, error) {
-			if !t.IsTable() {
-				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
-			}
-			if err := sortTable(t, runtime.NilValue(), false); err != nil {
-				return runtime.NilValue(), err
-			}
-			return runtime.NilValue(), nil
-		},
-		FastArg2: func(t, comp runtime.Value) (runtime.Value, error) {
-			if !t.IsTable() {
-				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'table.sort' (table expected)")
-			}
-			if err := sortTable(t, comp, true); err != nil {
-				return runtime.NilValue(), err
-			}
-			return runtime.NilValue(), nil
-		},
-	}
+	)
 }
 
 // RegisterTableHigherOrderLib installs VM-aware table higher-order helpers so
