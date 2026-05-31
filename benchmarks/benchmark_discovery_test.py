@@ -89,6 +89,23 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 ["data", "concurrency", "table"],
             )
 
+    def test_groups_for_selectors_ignores_selectors_outside_allowed_groups(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for group, name in (("data", "soa_dot"), ("concurrency", "goroutine_sleep")):
+                (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
+                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+
+            self.assertEqual(
+                discovery.groups_for_selectors(
+                    root,
+                    ["data"],
+                    ["extended/goroutine_sleep"],
+                    allowed_groups=["data"],
+                ),
+                ["data"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

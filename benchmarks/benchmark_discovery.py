@@ -269,11 +269,11 @@ def groups_for_selectors(
 ) -> list[str]:
     out = canonical_groups(list(groups or allowed_groups), allowed_groups)
     for selector in selectors or []:
-        path = resolve_script_path(root, selector, allowed_groups)
-        if path is None:
+        identity = resolve_script_identity(root, selector, allowed_groups)
+        if identity is None:
             continue
-        group = path.parent.name
-        if group in allowed_groups and group not in out:
+        group = identity[0]
+        if group not in out:
             out.append(group)
     return out
 
