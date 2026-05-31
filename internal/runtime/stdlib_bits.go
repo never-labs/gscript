@@ -2,7 +2,8 @@ package runtime
 
 import (
 	"fmt"
-	gobits "math/bits"
+
+	basebits "github.com/never-labs/gscript/internal/stdlib/base/bits"
 )
 
 // buildBitsLib creates the GScript-native "bits" standard library.
@@ -21,45 +22,27 @@ func buildBitsLib() *Table {
 	}
 
 	set("and", func(args []Value) ([]Value, error) {
-		if len(args) == 0 {
-			return []Value{IntValue(-1)}, nil
-		}
-		result, err := bitsIntArg(args, 0, "bits.and")
+		nums, err := bitsIntArgs(args, "bits.and")
 		if err != nil {
 			return nil, err
 		}
-		for i := 1; i < len(args); i++ {
-			n, err := bitsIntArg(args, i, "bits.and")
-			if err != nil {
-				return nil, err
-			}
-			result &= n
-		}
-		return []Value{IntValue(result)}, nil
+		return []Value{IntValue(basebits.And(nums...))}, nil
 	})
 
 	set("or", func(args []Value) ([]Value, error) {
-		var result int64
-		for i := range args {
-			n, err := bitsIntArg(args, i, "bits.or")
-			if err != nil {
-				return nil, err
-			}
-			result |= n
+		nums, err := bitsIntArgs(args, "bits.or")
+		if err != nil {
+			return nil, err
 		}
-		return []Value{IntValue(result)}, nil
+		return []Value{IntValue(basebits.Or(nums...))}, nil
 	})
 
 	set("xor", func(args []Value) ([]Value, error) {
-		var result int64
-		for i := range args {
-			n, err := bitsIntArg(args, i, "bits.xor")
-			if err != nil {
-				return nil, err
-			}
-			result ^= n
+		nums, err := bitsIntArgs(args, "bits.xor")
+		if err != nil {
+			return nil, err
 		}
-		return []Value{IntValue(result)}, nil
+		return []Value{IntValue(basebits.Xor(nums...))}, nil
 	})
 
 	set("not", func(args []Value) ([]Value, error) {
@@ -67,7 +50,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(^n)}, nil
+		return []Value{IntValue(basebits.Not(n))}, nil
 	})
 
 	set("shl", func(args []Value) ([]Value, error) {
@@ -75,10 +58,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		if shift >= 64 {
-			return []Value{IntValue(0)}, nil
-		}
-		return []Value{IntValue(int64(uint64(n) << shift))}, nil
+		return []Value{IntValue(basebits.Shl(n, shift))}, nil
 	})
 
 	set("shr", func(args []Value) ([]Value, error) {
@@ -86,10 +66,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		if shift >= 64 {
-			return []Value{IntValue(0)}, nil
-		}
-		return []Value{IntValue(int64(uint64(n) >> shift))}, nil
+		return []Value{IntValue(basebits.Shr(n, shift))}, nil
 	})
 
 	set("sar", func(args []Value) ([]Value, error) {
@@ -97,13 +74,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		if shift >= 64 {
-			if n < 0 {
-				return []Value{IntValue(-1)}, nil
-			}
-			return []Value{IntValue(0)}, nil
-		}
-		return []Value{IntValue(n >> shift)}, nil
+		return []Value{IntValue(basebits.Sar(n, shift))}, nil
 	})
 
 	set("rotl", func(args []Value) ([]Value, error) {
@@ -115,7 +86,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(gobits.RotateLeft64(uint64(n), int(shift))))}, nil
+		return []Value{IntValue(basebits.Rotl(n, shift))}, nil
 	})
 
 	set("rotr", func(args []Value) ([]Value, error) {
@@ -127,7 +98,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(gobits.RotateLeft64(uint64(n), -int(shift))))}, nil
+		return []Value{IntValue(basebits.Rotr(n, shift))}, nil
 	})
 
 	set("test", func(args []Value) ([]Value, error) {
@@ -135,7 +106,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{BoolValue((uint64(n) & (uint64(1) << pos)) != 0)}, nil
+		return []Value{BoolValue(basebits.Test(n, pos))}, nil
 	})
 
 	set("set", func(args []Value) ([]Value, error) {
@@ -143,7 +114,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(uint64(n) | (uint64(1) << pos)))}, nil
+		return []Value{IntValue(basebits.Set(n, pos))}, nil
 	})
 
 	set("clear", func(args []Value) ([]Value, error) {
@@ -151,7 +122,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(uint64(n) &^ (uint64(1) << pos)))}, nil
+		return []Value{IntValue(basebits.Clear(n, pos))}, nil
 	})
 
 	set("toggle", func(args []Value) ([]Value, error) {
@@ -159,7 +130,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(uint64(n) ^ (uint64(1) << pos)))}, nil
+		return []Value{IntValue(basebits.Toggle(n, pos))}, nil
 	})
 
 	set("ones", func(args []Value) ([]Value, error) {
@@ -167,7 +138,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(gobits.OnesCount64(uint64(n))))}, nil
+		return []Value{IntValue(int64(basebits.Ones(n)))}, nil
 	})
 
 	set("leadingZeros", func(args []Value) ([]Value, error) {
@@ -175,7 +146,7 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(gobits.LeadingZeros64(uint64(n))))}, nil
+		return []Value{IntValue(int64(basebits.LeadingZeros(n)))}, nil
 	})
 
 	set("trailingZeros", func(args []Value) ([]Value, error) {
@@ -183,10 +154,22 @@ func buildBitsLib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		return []Value{IntValue(int64(gobits.TrailingZeros64(uint64(n))))}, nil
+		return []Value{IntValue(int64(basebits.TrailingZeros(n)))}, nil
 	})
 
 	return t
+}
+
+func bitsIntArgs(args []Value, name string) ([]int64, error) {
+	nums := make([]int64, len(args))
+	for i := range args {
+		n, err := bitsIntArg(args, i, name)
+		if err != nil {
+			return nil, err
+		}
+		nums[i] = n
+	}
+	return nums, nil
 }
 
 func bitsIntArg(args []Value, index int, name string) (int64, error) {
