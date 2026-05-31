@@ -770,6 +770,13 @@ def fmt_ratio(value: float | None) -> str:
     return f"{value:.2f}x"
 
 
+def fmt_change(current: float | None, baseline: float | None) -> str:
+    value = ratio(current, baseline)
+    if value is None or math.isnan(value) or math.isinf(value):
+        return "-"
+    return f"{(value - 1.0) * 100.0:+.2f}%"
+
+
 def result_note(result: SubjectResult | None) -> str:
     if result is None:
         return "-"
@@ -813,7 +820,7 @@ def luajit_hot_ratio(current: SubjectResult | None, luajit: SubjectResult | None
 def print_table(results: list[BenchmarkResult], modes: list[str]) -> None:
     header = (
         f"{'Benchmark':<34} {'Scale':<18} {'Mode':<9} {'Current':>12} {'HEAD':>12} {'LuaJIT':>12} "
-        f"{'Cur/HEAD':>9} {'Cur/LJ':>9} {'CV cur':>8} {'CI95':>8} {'Repeat':>7} {'Source':<12} {'Exits':>7}"
+        f"{'HEAD Δ':>9} {'Cur/LJ':>9} {'CV cur':>8} {'CI95':>8} {'Repeat':>7} {'Source':<12} {'Exits':>7}"
     )
     print(header)
     print("-" * len(header))
@@ -828,7 +835,7 @@ def print_table(results: list[BenchmarkResult], modes: list[str]) -> None:
             print(
                 f"{row.group + '/' + row.benchmark:<34} {fmt_scale(row.scale):<18} {mode:<9} "
                 f"{fmt_seconds(cur_s):>12} {fmt_seconds(head_s):>12} {fmt_seconds(lj_s):>12} "
-                f"{fmt_ratio(ratio(cur_s, head_s)):>9} {fmt_ratio(luajit_hot_ratio(current, luajit)):>9} "
+                f"{fmt_change(cur_s, head_s):>9} {fmt_ratio(luajit_hot_ratio(current, luajit)):>9} "
                 f"{fmt_pct(current.stats.cv_pct if current else None):>8} "
                 f"{fmt_pct(current.stats.ci95_half_width_pct if current else None):>8} "
                 f"{(current.repeat if current else 0):>7} "
@@ -917,7 +924,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
         "",
         "## Measurements",
         "",
-        "| Benchmark | Scale | Mode | Current | HEAD | LuaJIT | Current/HEAD | Current/LuaJIT | Repeat | CV current | CI95 current | CV HEAD | Exits current | Source | Note |",
+        "| Benchmark | Scale | Mode | Current | HEAD | LuaJIT | Current/HEAD Δ | Current/LuaJIT | Repeat | CV current | CI95 current | CV HEAD | Exits current | Source | Note |",
         "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for row in results:
@@ -937,7 +944,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                         fmt_seconds(cur_s),
                         fmt_seconds(head_s),
                         fmt_seconds(lj_s),
-                        fmt_ratio(ratio(cur_s, head_s)),
+                        fmt_change(cur_s, head_s),
                         fmt_ratio(luajit_hot_ratio(current, luajit)),
                         str(current.repeat if current else 0),
                         fmt_pct(current.stats.cv_pct if current else None),

@@ -1096,7 +1096,7 @@ func replaceBalancedPatternTable(s string, open, close byte, repl *Table, maxRep
 	})
 }
 
-func replaceBalancedPatternFunction(s string, open, close byte, fn Value, caller FunctionCaller, maxRepl int, count *int) (string, error) {
+func replaceBalancedPatternFunction(s string, open, close byte, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
 	return replaceBalancedPattern(s, open, close, maxRepl, count, func(loc []int) (string, error) {
 		return callLuaReplacementFunction(s, loc, luaPatternProgram{}, fn, caller)
 	})
@@ -1131,7 +1131,7 @@ func replaceBalancedPattern(s string, open, close byte, maxRepl int, count *int,
 	return b.String(), nil
 }
 
-func replaceLuaPatternFunction(s string, re *regexp.Regexp, prog luaPatternProgram, fn Value, caller FunctionCaller, maxRepl int, count *int) (string, error) {
+func replaceLuaPatternFunction(s string, re *regexp.Regexp, prog luaPatternProgram, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
 	matches := prog.findAllSubmatchIndex(re, s)
 	if len(matches) == 0 {
 		return s, nil
@@ -1217,7 +1217,7 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, prog luaPatternProgram,
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Value, caller FunctionCaller, maxRepl int, count *int) (string, error) {
+func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
 	if pattern == nil {
 		return s, nil
 	}
@@ -1351,7 +1351,7 @@ func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string
 	return b.String()
 }
 
-func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, caller FunctionCaller) (string, error) {
+func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, caller ScriptFunctionCaller) (string, error) {
 	args := simpleReplacementFunctionArgsStack(s, m)
 	results, err := callGScriptFunction(fn, args, caller)
 	if err != nil {
@@ -1435,7 +1435,7 @@ func expandSimpleLuaReplacement(s string, m simpleLuaPatternMatch, repl string) 
 	return b.String()
 }
 
-func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn Value, caller FunctionCaller) (string, error) {
+func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn Value, caller ScriptFunctionCaller) (string, error) {
 	results, err := callGScriptFunction(fn, luaReplacementFunctionArgs(s, loc, prog), caller)
 	if err != nil {
 		return "", err
@@ -1454,7 +1454,7 @@ func callLuaReplacementFunction(s string, loc []int, prog luaPatternProgram, fn 
 	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
 }
 
-func callGScriptFunction(fn Value, args []Value, caller FunctionCaller) ([]Value, error) {
+func callGScriptFunction(fn Value, args []Value, caller ScriptFunctionCaller) ([]Value, error) {
 	if caller != nil {
 		return caller(fn, args)
 	}

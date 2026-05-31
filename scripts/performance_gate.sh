@@ -40,6 +40,16 @@ SMOKE_BENCHES=(
     "table/table_array_access"
 )
 
+PHASE_SMOKE_BENCHES=(
+    "control/sieve"
+    "table/table_array_access"
+    "concurrency/producer_consumer_pipeline"
+    "calls/calls_vararg_coroutine"
+    "app/stdlib_host"
+    "data/soa_affine_many"
+    "data/soa_masked_aggregate"
+)
+
 FEATURE_SMOKE_BENCHES=(
     "concurrency/producer_consumer_pipeline"
     "calls/calls_vararg_coroutine"
@@ -69,6 +79,7 @@ Usage: bash scripts/performance_gate.sh [options]
 
 Options:
   --smoke                 Run a short two-benchmark gate.
+  --phase-smoke           Run stage-end correctness + performance smoke.
   --feature-smoke         Run hot-path smoke coverage for newer language features.
   --full                  Run all benchmark groups through timing_compare.py.
   --bench ID              Add one benchmark selector, e.g. numeric/spectral_norm.
@@ -96,6 +107,12 @@ while [ "$#" -gt 0 ]; do
             RUNS=1
             WARMUP=0
             TIMEOUT=60
+            ;;
+        --phase-smoke)
+            PROFILE="phase_smoke"
+            RUNS=2
+            WARMUP=1
+            TIMEOUT=90
             ;;
         --feature-smoke)
             PROFILE="feature_smoke"
@@ -430,6 +447,11 @@ elif [ "$PROFILE" = "smoke" ]; then
     for bench in "${SMOKE_BENCHES[@]}"; do
         TIMING_CMD+=(--bench "$bench")
     done
+elif [ "$PROFILE" = "phase_smoke" ]; then
+    TIMING_CMD+=(--all-groups)
+    for bench in "${PHASE_SMOKE_BENCHES[@]}"; do
+        TIMING_CMD+=(--bench "$bench")
+    done
 elif [ "$PROFILE" = "feature_smoke" ]; then
     TIMING_CMD+=(--all-groups)
     for bench in "${FEATURE_SMOKE_BENCHES[@]}"; do
@@ -474,6 +496,10 @@ if [ "$STRICT" -eq 1 ]; then
     if [ "$PROFILE" != "full" ]; then
         if [ "$PROFILE" = "smoke" ]; then
             for bench in "${SMOKE_BENCHES[@]}"; do
+                STRICT_CMD+=(--bench "$bench")
+            done
+        elif [ "$PROFILE" = "phase_smoke" ]; then
+            for bench in "${PHASE_SMOKE_BENCHES[@]}"; do
                 STRICT_CMD+=(--bench "$bench")
             done
         elif [ "$PROFILE" = "feature_smoke" ]; then

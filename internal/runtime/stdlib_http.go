@@ -10,8 +10,6 @@ import (
 	"sync"
 )
 
-type httpScriptCaller func(Value, []Value) ([]Value, error)
-
 func httpLib(interp *Interpreter) *Table {
 	return buildHTTPLibWithPolicy(interp.callFunction, func() bool { return interp == nil || interp.networkAccess }, func() int64 {
 		if interp == nil {
@@ -21,19 +19,19 @@ func httpLib(interp *Interpreter) *Table {
 	})
 }
 
-func BuildHTTPLibWithCaller(call httpScriptCaller) *Table {
+func BuildHTTPLibWithCaller(call ScriptFunctionCaller) *Table {
 	return buildHTTPLibWithPolicy(call, nil, nil)
 }
 
-func BuildHTTPLibWithCallerAndNetworkPolicy(call httpScriptCaller, networkAllowed func() bool) *Table {
+func BuildHTTPLibWithCallerAndNetworkPolicy(call ScriptFunctionCaller, networkAllowed func() bool) *Table {
 	return buildHTTPLibWithPolicy(call, networkAllowed, nil)
 }
 
-func BuildHTTPLibWithCallerAndPolicy(call httpScriptCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
+func BuildHTTPLibWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
 	return buildHTTPLibWithPolicy(call, networkAllowed, maxHostResult)
 }
 
-func buildHTTPLibWithPolicy(call httpScriptCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
+func buildHTTPLibWithPolicy(call ScriptFunctionCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
 	t := NewTable()
 	var handlerMu sync.Mutex
 	hostResultLimit := func() int64 {
@@ -286,7 +284,7 @@ func buildResponseTable(w http.ResponseWriter, r *http.Request) Value {
 }
 
 // buildRouterTable creates a router with route registration.
-func buildRouterTable(call httpScriptCaller, maxHostResult func() int64) *Table {
+func buildRouterTable(call ScriptFunctionCaller, maxHostResult func() int64) *Table {
 	t := NewTable()
 	mux := http.NewServeMux()
 	var handlerMu sync.Mutex
@@ -452,7 +450,7 @@ func buildHTTPServerHandleTable(handle *httpServerHandle) *Table {
 	return t
 }
 
-func callHTTPHandler(call httpScriptCaller, mu *sync.Mutex, handler Value, req, res Value) ([]Value, error) {
+func callHTTPHandler(call ScriptFunctionCaller, mu *sync.Mutex, handler Value, req, res Value) ([]Value, error) {
 	mu.Lock()
 	defer mu.Unlock()
 	return call(handler, []Value{req, res})

@@ -34,6 +34,8 @@ func TestLanguageConformanceTranslatedCases(t *testing.T) {
 	for _, testCase := range cases {
 		testCase := testCase
 		t.Run(testCase.Name, func(t *testing.T) {
+			t.Parallel()
+
 			want := normalizeProcessOutput(runCommand(t, root, 10*time.Second, luaBin, testCase.LuaPath))
 			vm := runCommandResult(root, 10*time.Second, gscriptBin, "-vm", testCase.GScriptPath)
 

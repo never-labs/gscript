@@ -85,14 +85,10 @@ func NativeStringFormatIntCachePtr() unsafe.Pointer {
 	return unsafe.Pointer(&nativeStringFormatIntCache[0])
 }
 
-// FunctionCaller invokes a GScript function value from the active execution
-// engine. Stdlib functions that accept callbacks use it to stay VM-aware.
-type FunctionCaller func(Value, []Value) ([]Value, error)
-
 // BuildStringLibWithCaller creates the "string" standard library table using
 // caller for function-valued replacements. A nil caller still supports native
 // GoFunction callbacks.
-func BuildStringLibWithCaller(caller FunctionCaller, maxHostResults ...func() int64) *Table {
+func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...func() int64) *Table {
 	t := NewTable()
 	maxHostResult := func() int64 {
 		if len(maxHostResults) == 0 || maxHostResults[0] == nil {
@@ -1101,7 +1097,7 @@ func BuildStringLibWithCaller(caller FunctionCaller, maxHostResults ...func() in
 
 // RefreshStringLibWithCaller updates an existing string library table in place,
 // preserving module identity for require/package.loaded users.
-func RefreshStringLibWithCaller(t *Table, caller FunctionCaller, maxHostResults ...func() int64) *Table {
+func RefreshStringLibWithCaller(t *Table, caller ScriptFunctionCaller, maxHostResults ...func() int64) *Table {
 	if t == nil {
 		return BuildStringLibWithCaller(caller, maxHostResults...)
 	}

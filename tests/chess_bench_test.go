@@ -1,6 +1,7 @@
 package tests_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -29,6 +30,9 @@ func BenchmarkChessAI(b *testing.B) {
 func TestChessAI_Completes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping chess AI benchmark in short mode")
+	}
+	if os.Getenv("GSCRIPT_RUN_CHESS_BENCH_TEST") != "1" {
+		t.Skip("set GSCRIPT_RUN_CHESS_BENCH_TEST=1 to run the long chess benchmark completion test")
 	}
 
 	chessBenchPath, err := filepath.Abs(filepath.Join("..", "examples", "game_engine", "chess_bench.gs"))

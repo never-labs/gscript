@@ -152,7 +152,7 @@ func ClassifyLLMProviderError(err error) string {
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage
 // runtime substrate for the agent layer: future syntax can compile to these
 // functions without changing provider or tool-dispatch semantics.
-func BuildLLMLib(call FunctionCaller, provider func() LLMProvider, providerFactory func() LLMProviderFactory, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
+func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, providerFactory func() LLMProviderFactory, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
 	t := NewTable()
 
 	hostLimit := func() int64 {
@@ -873,7 +873,7 @@ func BuildLLMHistoryLib() *Table {
 	return t
 }
 
-func BuildLLMLoopLib(call FunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
+func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
 	t := NewTable()
 	snapshots := map[string]Value{}
 	var snapshotsMu sync.Mutex
@@ -1130,11 +1130,11 @@ func llmIsSnapshotStore(v Value) bool {
 		t.RawGetString("delete").IsFunction()
 }
 
-func llmStoreSave(call FunctionCaller, store *Table, token string, snapshot Value) (Value, error) {
+func llmStoreSave(call ScriptFunctionCaller, store *Table, token string, snapshot Value) (Value, error) {
 	return llmStoreCall(call, store.RawGetString("save"), []Value{StringValue(token), snapshot})
 }
 
-func llmStoreLoad(call FunctionCaller, store *Table, token string) (Value, Value, error) {
+func llmStoreLoad(call ScriptFunctionCaller, store *Table, token string) (Value, Value, error) {
 	result, errVal, err := llmStoreCall2(call, store.RawGetString("load"), []Value{StringValue(token)})
 	if err != nil || !errVal.IsNil() {
 		return NilValue(), errVal, err
@@ -1142,16 +1142,16 @@ func llmStoreLoad(call FunctionCaller, store *Table, token string) (Value, Value
 	return result, NilValue(), nil
 }
 
-func llmStoreDelete(call FunctionCaller, store *Table, token string) (Value, error) {
+func llmStoreDelete(call ScriptFunctionCaller, store *Table, token string) (Value, error) {
 	return llmStoreCall(call, store.RawGetString("delete"), []Value{StringValue(token)})
 }
 
-func llmStoreCall(call FunctionCaller, fn Value, args []Value) (Value, error) {
+func llmStoreCall(call ScriptFunctionCaller, fn Value, args []Value) (Value, error) {
 	_, errVal, err := llmStoreCall2(call, fn, args)
 	return errVal, err
 }
 
-func llmStoreCall2(call FunctionCaller, fn Value, args []Value) (Value, Value, error) {
+func llmStoreCall2(call ScriptFunctionCaller, fn Value, args []Value) (Value, Value, error) {
 	if call == nil {
 		return NilValue(), llmErrorValue("internal", "snapshot store requires a function caller"), nil
 	}
@@ -1168,7 +1168,7 @@ func llmStoreCall2(call FunctionCaller, fn Value, args []Value) (Value, Value, e
 	return results[0], NilValue(), nil
 }
 
-func llmResumeSnapshot(snapshot, approval, tools *Table, call FunctionCaller) ([]Value, error) {
+func llmResumeSnapshot(snapshot, approval, tools *Table, call ScriptFunctionCaller) ([]Value, error) {
 	historyValue := snapshot.RawGetString("history")
 	pendingValue := snapshot.RawGetString("pending")
 	if !historyValue.IsTable() || !pendingValue.IsTable() {
@@ -1883,7 +1883,7 @@ func llmIsAgentValue(v Value) bool {
 // so it can be passed directly inside a `tools: [...]` list. The wrapper calls
 // the agent through `call`, unwraps result.value, and propagates pending/stopped
 // statuses as tool-level signals.
-func llmAgentFunctionToToolTable(call FunctionCaller, agent Value) *Table {
+func llmAgentFunctionToToolTable(call ScriptFunctionCaller, agent Value) *Table {
 	meta, _ := llmAgentMetadataForValue(agent)
 	name := meta.Name
 	if name == "" {
@@ -1959,7 +1959,7 @@ func llmToolsListHasAgents(v Value) bool {
 // agent function value, returns a new list with that entry replaced by a
 // synthesized tool table. The original list is not mutated. If no agent values
 // are present, the input value is returned unchanged.
-func llmNormalizeToolsValue(call FunctionCaller, v Value) Value {
+func llmNormalizeToolsValue(call ScriptFunctionCaller, v Value) Value {
 	if !llmToolsListHasAgents(v) {
 		return v
 	}
@@ -2011,7 +2011,7 @@ func llmCheckToolCaps(tools, caps *Table) Value {
 	return NilValue()
 }
 
-func llmDispatch(call FunctionCaller, callTable, tools *Table) ([]Value, error) {
+func llmDispatch(call ScriptFunctionCaller, callTable, tools *Table) ([]Value, error) {
 	toolName := callTable.RawGetString("tool").Str()
 	if toolName == "" {
 		return []Value{NilValue(), llmErrorValue("validation", "tool call missing tool name")}, nil
@@ -2046,7 +2046,7 @@ type llmHITL struct {
 	snapshotsMu *sync.Mutex
 }
 
-func llmReact(opts *Table, provider LLMProvider, call FunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent), ambient llmBudgetGroup, hitls ...*llmHITL) ([]Value, error) {
+func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent), ambient llmBudgetGroup, hitls ...*llmHITL) ([]Value, error) {
 	var hitl *llmHITL
 	if len(hitls) > 0 {
 		hitl = hitls[0]
@@ -2222,7 +2222,7 @@ func llmTrace(trace func(LLMTraceEvent), event LLMTraceEvent) {
 	}
 }
 
-func llmMaybePauseForApproval(hitl *llmHITL, call FunctionCaller, history, pending Value) (Value, error) {
+func llmMaybePauseForApproval(hitl *llmHITL, call ScriptFunctionCaller, history, pending Value) (Value, error) {
 	if hitl == nil || hitl.approveWhen.IsNil() || !hitl.approveWhen.IsFunction() {
 		return NilValue(), nil
 	}
@@ -2262,7 +2262,7 @@ func llmMaybePauseForApproval(hitl *llmHITL, call FunctionCaller, history, pendi
 	return TableValue(result), nil
 }
 
-func llmDispatchWithRetry(call FunctionCaller, callTable, tools *Table, maxRetries int, trace func(LLMTraceEvent), step int64, callInfo LLMToolCall) ([]Value, Value) {
+func llmDispatchWithRetry(call ScriptFunctionCaller, callTable, tools *Table, maxRetries int, trace func(LLMTraceEvent), step int64, callInfo LLMToolCall) ([]Value, Value) {
 	var lastErr Value
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		result, err := llmDispatch(call, callTable, tools)

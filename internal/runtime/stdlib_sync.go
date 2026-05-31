@@ -16,7 +16,7 @@ type scriptTaskGroup struct {
 	errCount int
 	ctx      Value
 	cancel   Value
-	call     SyncFunctionCaller
+	call     ScriptFunctionCaller
 }
 
 type scriptOnce struct {
@@ -24,14 +24,13 @@ type scriptOnce struct {
 	err  error
 }
 
-type SyncFunctionCaller func(Value, []Value) ([]Value, error)
 type SyncTaskLauncher func(Value, []Value, func(error))
 
-func BuildSyncLibWithCaller(call SyncFunctionCaller) *Table {
+func BuildSyncLibWithCaller(call ScriptFunctionCaller) *Table {
 	return BuildSyncLibWithTaskLauncher(call, defaultSyncTaskLauncher(call))
 }
 
-func BuildSyncLibWithTaskLauncher(call SyncFunctionCaller, launch SyncTaskLauncher) *Table {
+func BuildSyncLibWithTaskLauncher(call ScriptFunctionCaller, launch SyncTaskLauncher) *Table {
 	t := NewTable()
 	t.RawSetString("waitgroup", FunctionValue(&GoFunction{
 		Name: "sync.waitgroup",
@@ -66,7 +65,7 @@ func BuildSyncLibWithTaskLauncher(call SyncFunctionCaller, launch SyncTaskLaunch
 	return t
 }
 
-func syncGroupFromArgs(call SyncFunctionCaller, launch SyncTaskLauncher, args []Value) ([]Value, error) {
+func syncGroupFromArgs(call ScriptFunctionCaller, launch SyncTaskLauncher, args []Value) ([]Value, error) {
 	if len(args) == 0 || args[0].IsNil() {
 		state := newScriptContextState()
 		ctx := TableValue(newScriptContextTable(state))
@@ -84,7 +83,7 @@ func syncGroupFromArgs(call SyncFunctionCaller, launch SyncTaskLauncher, args []
 	return []Value{TableValue(newScriptTaskGroupTable(call, launch, ctx, cancel))}, nil
 }
 
-func defaultSyncTaskLauncher(call SyncFunctionCaller) SyncTaskLauncher {
+func defaultSyncTaskLauncher(call ScriptFunctionCaller) SyncTaskLauncher {
 	return func(fn Value, args []Value, done func(error)) {
 		go func() {
 			var err error
@@ -151,7 +150,7 @@ func waitGroupAdd(state *scriptWaitGroup, delta int) (err error) {
 	return nil
 }
 
-func newScriptTaskGroupTable(call SyncFunctionCaller, launch SyncTaskLauncher, ctx, cancel Value) *Table {
+func newScriptTaskGroupTable(call ScriptFunctionCaller, launch SyncTaskLauncher, ctx, cancel Value) *Table {
 	state := &scriptTaskGroup{ctx: ctx, cancel: cancel, call: call}
 	if launch == nil {
 		launch = defaultSyncTaskLauncher(func(Value, []Value) ([]Value, error) {
@@ -333,7 +332,7 @@ func newScriptRWMutexTable() *Table {
 	return t
 }
 
-func newScriptOnceTable(call SyncFunctionCaller) *Table {
+func newScriptOnceTable(call ScriptFunctionCaller) *Table {
 	state := &scriptOnce{}
 	t := NewTable()
 	t.RawSetString("do", FunctionValue(&GoFunction{
