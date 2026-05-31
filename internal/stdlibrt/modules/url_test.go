@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 func TestURLParse(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `result := url.parse("https://user:pass@example.com:8080/path?q=1&r=2#frag")`)
 
@@ -38,7 +38,7 @@ func TestURLParse(t *testing.T) {
 
 func TestURLEncodeDecode(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `
 		encoded := url.encode("hello world & more")
@@ -54,7 +54,7 @@ func TestURLEncodeDecode(t *testing.T) {
 
 func TestURLQueryEncodeDecode(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `
 		encoded := url.queryEncode({a: "1", b: "hello world"})
@@ -72,7 +72,7 @@ func TestURLQueryEncodeDecode(t *testing.T) {
 
 func TestURLJoin(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `result := url.join("https://example.com/base/", "../other")`)
 
@@ -84,7 +84,7 @@ func TestURLJoin(t *testing.T) {
 
 func TestURLIsValid(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `
 		a := url.isValid("https://example.com")
@@ -101,7 +101,7 @@ func TestURLIsValid(t *testing.T) {
 
 func TestURLGetHost(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `result := url.getHost("https://example.com:8080/path")`)
 
@@ -112,7 +112,7 @@ func TestURLGetHost(t *testing.T) {
 
 func TestURLGetPath(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `result := url.getPath("https://example.com/foo/bar")`)
 
@@ -123,7 +123,7 @@ func TestURLGetPath(t *testing.T) {
 
 func TestURLBuild(t *testing.T) {
 	interp := New()
-	interp.globals.Define("url", TableValue(buildURLLib()))
+	interp.SetGlobal("url", TableValue(BuildURL(nil)))
 
 	execOnInterp(t, interp, `
 		result := url.build({

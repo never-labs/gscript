@@ -29,8 +29,14 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	}
 	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
 	installer.RegisterTable("bits", modules.BuildBits())
+	installer.RegisterTable("compress", modules.BuildCompress(maxHostResult))
+	installer.RegisterTable("csv", modules.BuildCSV(maxHostResult))
+	installer.RegisterTable("encoding", modules.BuildEncoding(maxHostResult))
 	installer.RegisterTable("hash", modules.BuildHash())
 	installer.RegisterTable("path", modules.BuildPath())
+	installer.RegisterTable("rand", modules.BuildRand())
+	installer.RegisterTable("regexp", modules.BuildRegexp())
+	installer.RegisterTable("url", modules.BuildURL(maxHostResult))
 	installer.RegisterTable("uuid", modules.BuildUUID())
 }
 

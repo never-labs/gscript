@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 // encodingInterp creates an interpreter with the encoding library registered.
 func encodingInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "encoding", buildEncodingLib())
+	return runWithLib(t, src, "encoding", BuildEncoding(nil))
 }
 
 // ==================================================================

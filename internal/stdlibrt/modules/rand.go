@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -8,11 +8,11 @@ import (
 	stdrand "github.com/never-labs/gscript/internal/stdlib/rand"
 )
 
-// buildRandLib creates the "rand" standard library table.
+// BuildRand creates the "rand" standard library table.
 // Provides a dedicated random number generation library with seeded generators,
 // distributions, shuffle, choice, and other utilities.
 // Inspired by Odin's math/rand package.
-func buildRandLib() *Table {
+func BuildRand() *Table {
 	t := NewTable()
 
 	// Local random source, seeded with current time by default

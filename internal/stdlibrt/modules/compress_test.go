@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 // compressInterp creates an interpreter with the compress library registered.
 func compressInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "compress", buildCompressLib())
+	return runWithLib(t, src, "compress", BuildCompress(nil))
 }
 
 // ==================================================================

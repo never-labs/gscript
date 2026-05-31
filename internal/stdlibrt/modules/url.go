@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -6,21 +6,11 @@ import (
 	urllib "github.com/never-labs/gscript/internal/stdlib/url"
 )
 
-// buildURLLib creates the "url" standard library table.
-func buildURLLib(interps ...*Interpreter) *Table {
+// BuildURL creates the "url" standard library table.
+func BuildURL(maxHostResult func() int64) *Table {
 	t := NewTable()
-	var interp *Interpreter
-	if len(interps) > 0 {
-		interp = interps[0]
-	}
-	maxHostResult := func() int64 {
-		if interp == nil {
-			return 0
-		}
-		return interp.maxHostResult
-	}
 	checkURLString := func(s string) (Value, error) {
-		if err := CheckProjectedHostStringBytes(maxHostResult(), len(s)); err != nil {
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(s)); err != nil {
 			return NilValue(), err
 		}
 		return StringValue(s), nil
@@ -70,7 +60,7 @@ func buildURLLib(interps ...*Interpreter) *Table {
 		result.RawSetString("port", StringValue(u.Port))
 		result.RawSetString("path", StringValue(u.Path))
 		result.RawSetString("fragment", StringValue(u.Fragment))
-		if err := CheckProjectedHostStringBytes(maxHostResult(), len(u.Raw)); err != nil {
+		if err := CheckProjectedHostStringBytes(hostResultLimit(maxHostResult), len(u.Raw)); err != nil {
 			return nil, err
 		}
 		result.RawSetString("raw", StringValue(u.Raw))

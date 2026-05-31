@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 // randInterp creates an interpreter with the rand library registered.
 func randInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "rand", buildRandLib())
+	return runWithLib(t, src, "rand", BuildRand())
 }
 
 // ==================================================================

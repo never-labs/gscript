@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -7,21 +7,11 @@ import (
 	basecompress "github.com/never-labs/gscript/internal/stdlib/compress"
 )
 
-// buildCompressLib creates the "compress" standard library table.
+// BuildCompress creates the "compress" standard library table.
 // Provides gzip, zlib, and deflate compression/decompression.
 // Inspired by Odin's compress package (gzip, zlib).
-func buildCompressLib(interps ...*Interpreter) *Table {
+func BuildCompress(maxHostResult func() int64) *Table {
 	t := NewTable()
-	var interp *Interpreter
-	if len(interps) > 0 {
-		interp = interps[0]
-	}
-	maxHostResult := func() int64 {
-		if interp == nil {
-			return 0
-		}
-		return interp.maxHostResult
-	}
 
 	setFastArg2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value, Value) (Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
@@ -76,7 +66,7 @@ func buildCompressLib(interps ...*Interpreter) *Table {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.gzipDecode' (string expected)")
 		}
 		decoded, err := basecompress.GzipDecode(arg.Str(), func(r io.Reader) ([]byte, error) {
-			return ReadAllWithHostResultLimit(r, maxHostResult())
+			return ReadAllWithHostResultLimit(r, hostResultLimit(maxHostResult))
 		})
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
@@ -134,7 +124,7 @@ func buildCompressLib(interps ...*Interpreter) *Table {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.zlibDecode' (string expected)")
 		}
 		decoded, err := basecompress.ZlibDecode(arg.Str(), func(r io.Reader) ([]byte, error) {
-			return ReadAllWithHostResultLimit(r, maxHostResult())
+			return ReadAllWithHostResultLimit(r, hostResultLimit(maxHostResult))
 		})
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
@@ -192,7 +182,7 @@ func buildCompressLib(interps ...*Interpreter) *Table {
 			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'compress.deflateDecode' (string expected)")
 		}
 		decoded, err := basecompress.DeflateDecode(arg.Str(), func(r io.Reader) ([]byte, error) {
-			return ReadAllWithHostResultLimit(r, maxHostResult())
+			return ReadAllWithHostResultLimit(r, hostResultLimit(maxHostResult))
 		})
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil

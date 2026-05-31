@@ -56,10 +56,6 @@ func (interp *Interpreter) InstallStdlib() {
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 
-	// --- Data formats ---
-	std.RegisterTable("csv", buildCSVLib(interp))
-	std.RegisterTable("url", buildURLLib(interp))
-
 	// --- AI model integration ---
 	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider
@@ -109,24 +105,13 @@ func (interp *Interpreter) InstallStdlib() {
 	std.RegisterTable("matrix", buildMatrixLib())
 	std.RegisterTable("soa", buildSoALib())
 
-	// --- Text processing ---
-	std.RegisterTable("regexp", buildRegexpLib())
 	std.RegisterTable("utf8", buildUTF8Lib(interp))
 
 	// --- Low-level ---
 	std.RegisterTable("bit32", buildBit32Lib())
 
-	// --- Random number generation ---
-	std.RegisterTable("rand", buildRandLib())
-
 	// --- Sorting utilities ---
 	std.RegisterTable("sort", buildSortLib(interp))
-
-	// --- Encoding utilities ---
-	std.RegisterTable("encoding", buildEncodingLib(interp))
-
-	// --- Compression ---
-	std.RegisterTable("compress", buildCompressLib(interp))
 
 	// --- Cryptography ---
 	std.RegisterTable("crypto", buildCryptoLib(interp))

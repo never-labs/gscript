@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -180,7 +180,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 func regexpStringSliceTable(values []string) Value {
 	tbl := NewSequentialArrayTable(len(values))
 	for i, s := range values {
-		tbl.array[i+1] = StringValue(s)
+		tbl.RawSetInt(int64(i+1), StringValue(s))
 	}
 	return TableValue(tbl)
 }
@@ -190,9 +190,9 @@ func regexpStringMatrixTable(values [][]string) Value {
 	for i, matches := range values {
 		sub := NewSequentialArrayTable(len(matches))
 		for j, m := range matches {
-			sub.array[j+1] = StringValue(m)
+			sub.RawSetInt(int64(j+1), StringValue(m))
 		}
-		tbl.array[i+1] = TableValue(sub)
+		tbl.RawSetInt(int64(i+1), TableValue(sub))
 	}
 	return TableValue(tbl)
 }
@@ -203,10 +203,10 @@ func regexpSubmatchIndexTable(s string, loc []int) Value {
 	for i := 0; i < n; i++ {
 		start, end := loc[i*2], loc[i*2+1]
 		if start < 0 || end < 0 {
-			tbl.array[i+1] = StringValue("")
+			tbl.RawSetInt(int64(i+1), StringValue(""))
 			continue
 		}
-		tbl.array[i+1] = StringValue(s[start:end])
+		tbl.RawSetInt(int64(i+1), StringValue(s[start:end]))
 	}
 	return TableValue(tbl)
 }
@@ -214,13 +214,13 @@ func regexpSubmatchIndexTable(s string, loc []int) Value {
 func regexpSubmatchIndexMatrixTable(s string, values [][]int) Value {
 	tbl := NewSequentialArrayTable(len(values))
 	for i, loc := range values {
-		tbl.array[i+1] = regexpSubmatchIndexTable(s, loc)
+		tbl.RawSetInt(int64(i+1), regexpSubmatchIndexTable(s, loc))
 	}
 	return TableValue(tbl)
 }
 
-// buildRegexpLib creates the "regexp" standard library table.
-func buildRegexpLib() *Table {
+// BuildRegexp creates the "regexp" standard library table.
+func BuildRegexp() *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {

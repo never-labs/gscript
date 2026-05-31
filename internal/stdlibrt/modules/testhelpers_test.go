@@ -8,15 +8,6 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 )
 
-type Interpreter = runtime.Interpreter
-type Value = runtime.Value
-
-var (
-	New         = runtime.NewCore
-	StringValue = runtime.StringValue
-	TableValue  = runtime.TableValue
-)
-
 func runProgram(t *testing.T, src string) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()
@@ -52,8 +43,14 @@ func execOnInterp(t *testing.T, interp *runtime.Interpreter, src string) {
 func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "base64", runtime.TableValue(BuildBase64(interp.MaxHostResultBytes)))
 	installTestModule(interp, "bits", runtime.TableValue(BuildBits()))
+	installTestModule(interp, "compress", runtime.TableValue(BuildCompress(interp.MaxHostResultBytes)))
+	installTestModule(interp, "csv", runtime.TableValue(BuildCSV(interp.MaxHostResultBytes)))
+	installTestModule(interp, "encoding", runtime.TableValue(BuildEncoding(interp.MaxHostResultBytes)))
 	installTestModule(interp, "hash", runtime.TableValue(BuildHash()))
 	installTestModule(interp, "path", runtime.TableValue(BuildPath()))
+	installTestModule(interp, "rand", runtime.TableValue(BuildRand()))
+	installTestModule(interp, "regexp", runtime.TableValue(BuildRegexp()))
+	installTestModule(interp, "url", runtime.TableValue(BuildURL(interp.MaxHostResultBytes)))
 	installTestModule(interp, "uuid", runtime.TableValue(BuildUUID()))
 }
 
