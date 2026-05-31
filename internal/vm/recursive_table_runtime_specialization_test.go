@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -27,7 +28,7 @@ func TestRecursiveTableCallSiteRunsWithoutTier2Promotion(t *testing.T) {
 root := makeTree(4)
 result := checkTree(root)
 `)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -77,7 +78,7 @@ func TestRecursiveTableRuntimeSpecializationRecognitionCacheAndDiagnostics(t *te
 
 func TestRecursiveTableRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *testing.T) {
 	top := compileProto(t, recursiveTableSpecializationSource)
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("runtime error: %v", err)
@@ -165,7 +166,7 @@ result := checkTree(root)
 
 func TestRecursiveTableNonRecursiveCallSiteEntryDoesNotTrigger(t *testing.T) {
 	top := compileProto(t, recursiveTableSpecializationSource)
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("runtime error: %v", err)

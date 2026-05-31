@@ -9,6 +9,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"os"
 	"strings"
 	"testing"
@@ -33,7 +34,7 @@ func sum(n) {
 result := sum(10000)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -125,7 +126,7 @@ func gcd(a, b) {
 result := gcd(20, 8)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -170,7 +171,7 @@ func gcd_bench(n) {
 result := gcd_bench(1200)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -220,7 +221,7 @@ func sum_with_init(n) {
 result := sum_with_init(5000)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -280,7 +281,7 @@ step(particles, 1200)
 result := checksum(particles, 1200)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -341,7 +342,7 @@ result := test_points(1000)
 	run := func(useJIT bool) float64 {
 		t.Helper()
 		proto := compileProto(t, src)
-		globals := runtime.NewInterpreterGlobals()
+		globals := vmtest.NewInterpreterGlobals()
 		v := vm.New(globals)
 		if useJIT {
 			v.SetMethodJIT(NewTieringManager())

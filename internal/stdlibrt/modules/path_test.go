@@ -4,28 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
 )
 
 // runWithPath creates an interpreter with path lib and executes source.
 func runWithPath(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	tokens, err := lexer.New(src).Tokenize()
-	if err != nil {
-		t.Fatalf("lexer error: %v", err)
-	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	interp := New()
-	interp.SetGlobal("path", TableValue(BuildPath()))
-	if err := interp.Exec(prog); err != nil {
-		t.Fatalf("exec error: %v", err)
-	}
-	return interp
+	return runWithLib(t, src, "path", BuildPath())
 }
 
 // ==================================================================

@@ -47,6 +47,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"sort"
 	"testing"
 
@@ -61,7 +62,7 @@ import (
 func runTier2Globals(t *testing.T, src string) (globals map[string]runtime.Value, entered []string, failed map[string]string) {
 	t.Helper()
 	proto := compileProto(t, src)
-	g := runtime.NewInterpreterGlobals()
+	g := vmtest.NewInterpreterGlobals()
 	v := vm.New(g)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -80,7 +81,7 @@ func runTier2Globals(t *testing.T, src string) (globals map[string]runtime.Value
 // excluded from the differential.
 func builtinGlobals(t *testing.T) map[string]struct{} {
 	t.Helper()
-	g := runtime.NewInterpreterGlobals()
+	g := vmtest.NewInterpreterGlobals()
 	v := vm.New(g)
 	defer v.Close()
 	base := v.Globals()

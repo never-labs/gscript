@@ -12,6 +12,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"os"
 	"testing"
 
@@ -24,7 +25,7 @@ import (
 func runWithTieringManager(t *testing.T, src string) (*vm.VM, *TieringManager) {
 	t.Helper()
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -105,7 +106,7 @@ for s := 1; s <= 20; s++ {
 result := checksum(particles, 10)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -161,7 +162,7 @@ func add(a, b) {
 result := add(3, 4)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -190,7 +191,7 @@ result := add(3, 4)
 
 	// Run again: add should now execute via Tier 2.
 	proto2 := compileProto(t, src)
-	globals2 := runtime.NewInterpreterGlobals()
+	globals2 := vmtest.NewInterpreterGlobals()
 	v2 := vm.New(globals2)
 	tm2 := NewTieringManager()
 	// Pre-populate Tier 2 for the add function.
@@ -261,7 +262,7 @@ for i := 1; i <= 200; i++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -303,7 +304,7 @@ for i := 1; i <= 5; i++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -354,7 +355,7 @@ for i := 1; i <= 20; i++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -446,7 +447,7 @@ for i := 1; i <= 20; i++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -513,7 +514,7 @@ for i := 1; i <= 10; i++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -584,7 +585,7 @@ for i := 1; i <= 100; i++ {
 }
 `
 	proto2 := compileProto(t, src2)
-	globals2 := runtime.NewInterpreterGlobals()
+	globals2 := vmtest.NewInterpreterGlobals()
 	v2 := vm.New(globals2)
 	tm2 := NewTieringManager()
 	v2.SetMethodJIT(tm2)
@@ -1297,7 +1298,7 @@ for i := 1; i <= 20; i++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -1338,7 +1339,7 @@ func run() {
 result := run()
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -1428,7 +1429,7 @@ docs := build_documents(40)
 result := checksum_documents(docs, 40)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)

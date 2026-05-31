@@ -9,11 +9,10 @@ import (
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
-// Core tree-walking interpreter: the Interpreter type, its constructor New /
-// NewInterpreterGlobals, and the global-environment / args / package-cache
-// accessors. Builtin registration, metamethod helpers, statement and
-// expression evaluation, and numeric parsing live in the sibling
-// interpreter_*.go files.
+// Core tree-walking interpreter: the Interpreter type, its constructors, and
+// the global-environment / args / package-cache accessors. Builtin
+// registration, metamethod helpers, statement and expression evaluation, and
+// numeric parsing live in the sibling interpreter_*.go files.
 // Interpreter is the tree-walking evaluator for GScript programs.
 type Interpreter struct {
 	globals            *Environment
@@ -67,8 +66,8 @@ type Interpreter struct {
 }
 
 // NewCore creates an Interpreter with only language builtins installed.
-// Standard-library modules are installed by InstallStdlib. New keeps the
-// historical all-included behavior for direct runtime-package callers.
+// Standard-library modules are installed explicitly by InstallStdlib or by the
+// public embedding layer through internal/stdlibrt.
 func NewCore() *Interpreter {
 	interp := &Interpreter{
 		globals:           NewEnvironment(nil),
@@ -93,11 +92,10 @@ func NewCore() *Interpreter {
 	return interp
 }
 
-// New creates a new Interpreter with built-in globals and the standard library.
+// New creates a new core Interpreter with language builtins only.
+// Public embedding entry points install stdlib through internal/stdlibrt.
 func New() *Interpreter {
-	interp := NewCore()
-	interp.InstallStdlib()
-	return interp
+	return NewCore()
 }
 
 // Globals returns the global environment.
@@ -158,13 +156,6 @@ func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
 	if !allowed["llm"] {
 		interp.globals.Delete("toolof")
 	}
-}
-
-// NewInterpreterGlobals creates a fresh globals map with all builtins and stdlib registered.
-// This is used by the bytecode VM to get the same standard library as the tree-walker.
-func NewInterpreterGlobals() map[string]Value {
-	interp := New()
-	return interp.ExportGlobals()
 }
 
 // SetGlobal defines or overwrites a global variable.

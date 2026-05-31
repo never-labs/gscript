@@ -11,6 +11,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 	"time"
 
@@ -31,7 +32,7 @@ result := fib(5)
 `
 	// Parse & compile source to top-level proto.
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -163,7 +164,7 @@ func TestTier2RecursionDeeperFib(t *testing.T) {
 				src += "result = fib(" + itoaDiag(tc.n) + ")\n"
 			}
 			proto := compileProto(t, src)
-			globals := runtime.NewInterpreterGlobals()
+			globals := vmtest.NewInterpreterGlobals()
 			v := vm.New(globals)
 			tm := NewTieringManager()
 			v.SetMethodJIT(tm)

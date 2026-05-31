@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"math"
 	"testing"
 
@@ -740,7 +741,7 @@ var benchmarkFloatSink float64
 func compileBenchmarkFunction(b testing.TB, src, name string) (*VM, runtime.Value) {
 	b.Helper()
 	proto := compileSourceTB(b, src)
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	if _, err := v.Execute(proto); err != nil {
 		b.Fatal(err)
 	}

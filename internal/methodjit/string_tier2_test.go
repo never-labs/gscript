@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"math"
 	"testing"
 
@@ -14,7 +15,7 @@ func runStringFuncVM(t *testing.T, src, fnName string, args []runtime.Value) []r
 	t.Helper()
 
 	top := compileTop(t, src)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -40,7 +41,7 @@ func runStringFuncForcedTier2WithManager(t *testing.T, src, fnName string, args 
 	}
 
 	top := compileTop(t, src)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("JIT execute top: %v", err)
@@ -360,7 +361,7 @@ func format_case(pattern, i) {
 		t.Fatal("proto format_case not found")
 	}
 	proto.EnsureFeedback()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)
@@ -443,7 +444,7 @@ func lookup(inv, n) {
 		t.Fatalf("GetTableStringFormatInt count=%d, want 1\n%s", got, Print(optimized))
 	}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)
@@ -643,7 +644,7 @@ func dyn(pattern, prefix, n, code) {
 	want := requireOneString(t, "VM", runStringFuncVM(t, src, "dyn", args))
 
 	top := compileTop(t, src)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)
@@ -806,7 +807,7 @@ func lookup(n) {
 	}
 	proto.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -866,7 +867,7 @@ func update(n) {
 	}
 	proto.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -925,7 +926,7 @@ func build(n) {
 	}
 	proto.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -981,7 +982,7 @@ func lookup(tbl, keys, n) {
 	keys.RawSetInt(4, runtime.StringValue("k15"))
 	args := []runtime.Value{runtime.TableValue(tbl), runtime.TableValue(keys), runtime.IntValue(80)}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -1048,7 +1049,7 @@ func lookup(tbl, n) {
 	}
 	proto.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -1116,7 +1117,7 @@ func lookup(n) {
 	}
 	proto.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -1179,7 +1180,7 @@ func lookup(n) {
 	}
 	proto.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -1227,7 +1228,7 @@ func lookup(tbl, key) {
 	tbl.RawSetString("region", runtime.IntValue(42))
 	args := []runtime.Value{runtime.TableValue(tbl), runtime.StringValue("region")}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)
@@ -1301,7 +1302,7 @@ func lookup_update(tbl, key) {
 	tbl.RawSetString("region", runtime.IntValue(41))
 	args := []runtime.Value{runtime.TableValue(tbl), runtime.StringValue("region")}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("VM execute top: %v", err)

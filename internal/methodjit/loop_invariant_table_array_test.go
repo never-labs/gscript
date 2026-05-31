@@ -3,9 +3,9 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -110,7 +110,7 @@ func aggregate(n, passes) {
 result := aggregate(2000, 2)
 `
 	proto := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -192,7 +192,7 @@ func run_world(actors, n, ticks) {
 result := run_world(build_actors(3), 3, 1)
 `
 	proto := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()

@@ -19,9 +19,9 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -58,7 +58,7 @@ for i := 1; i <= 15; i++ {
 result := x
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -92,7 +92,7 @@ for i := 1; i <= 15; i++ {
 result := x
 `
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	if _, err := vVM.Execute(protoVM); err != nil {

@@ -2,12 +2,14 @@ package modules
 
 import (
 	"testing"
+
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // sortInterp creates an interpreter with the sort library registered.
 func sortInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	interp := New()
+	interp := runtime.NewCore()
 	sortLib := BuildSortLibWithCaller(interp.CallFunction)
 	interp.SetGlobal("sort", TableValue(sortLib))
 	interp.SetModule("sort", TableValue(sortLib))

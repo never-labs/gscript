@@ -13,6 +13,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -73,7 +74,7 @@ func allBenchVM(b *testing.B, src string, args []runtime.Value) {
 func allBenchTier1(b *testing.B, src string, args []runtime.Value) {
 	b.Helper()
 	proto := compileTopB(b, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 

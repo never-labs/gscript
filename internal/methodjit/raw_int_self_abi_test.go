@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"encoding/binary"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 	"unsafe"
 
@@ -1123,7 +1124,7 @@ func assertNumericEntryAvoidsCtxRegsReload(t *testing.T, code []byte, off int) {
 func runForcedTier2ByName(t *testing.T, top *vm.FuncProto, fnName string, compileNames []string, args []runtime.Value) ([]runtime.Value, map[string]byte) {
 	t.Helper()
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

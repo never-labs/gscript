@@ -6,6 +6,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"os"
 	"sort"
 	"strings"
@@ -268,7 +269,7 @@ result := #lines
 		t.Fatal("build_lines proto not found")
 	}
 	tm := NewTieringManager()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	v.SetMethodJIT(tm)
 	if _, err := v.Execute(top); err != nil {
@@ -550,7 +551,7 @@ func format_loop(pattern, n) {
 		t.Fatal("dynamic pattern should not be accepted before runtime feedback")
 	}
 	proto.EnsureFeedback()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)
@@ -1143,7 +1144,7 @@ result := gcd(20, 8)
 result = gcd(12, 8)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -1234,7 +1235,7 @@ for call := 1; call <= 5; call++ {
 }
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -1266,7 +1267,7 @@ func sum(n) {
 result := sum(10)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)

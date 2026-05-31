@@ -3,9 +3,9 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -28,7 +28,7 @@ func run(n) {
 
 result := run(2000)
 `)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	v.EnableCoroutineStats()
 	v.SetMethodJIT(NewTieringManager())

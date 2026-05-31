@@ -9,6 +9,7 @@ package methodjit
 
 import (
 	"context"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"math"
 	"os"
 	"testing"
@@ -51,7 +52,7 @@ func compareTier2Result(t *testing.T, src, globalName string) {
 
 	// Run 1: VM only (no JIT) — oracle
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 
@@ -74,7 +75,7 @@ func compareTier2Result(t *testing.T, src, globalName string) {
 
 	// Run 2: With TieringManager (Tier 2)
 	protoJIT := compileProto(t, src)
-	globalsJIT := runtime.NewInterpreterGlobals()
+	globalsJIT := vmtest.NewInterpreterGlobals()
 	vJIT := vm.New(globalsJIT)
 	defer vJIT.Close()
 	tm := NewTieringManager()
@@ -128,7 +129,7 @@ result := sum
 	compareTier2Result(t, src, "result")
 
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -254,7 +255,7 @@ result := walk_docs(docs, 2000)
 	compareTier2Result(t, src, "result")
 
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -308,7 +309,7 @@ for i := 1; i <= 200; i++ {
 	compareTier2Result(t, src, "result")
 
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -390,7 +391,7 @@ for iter := 1; iter <= 3; iter++ {
 
 	// Verify expected value: 25 primes up to 100
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -465,7 +466,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Verify expected value: fib(30) = 832040
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -540,7 +541,7 @@ p = create_particles(1000)
 result := checksum(p, 1000)
 `
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	if _, err := vVM.Execute(protoVM); err != nil {
@@ -549,7 +550,7 @@ result := checksum(p, 1000)
 	vmResult := vVM.GetGlobal("result")
 
 	protoJIT := compileProto(t, src)
-	globalsJIT := runtime.NewInterpreterGlobals()
+	globalsJIT := vmtest.NewInterpreterGlobals()
 	vJIT := vm.New(globalsJIT)
 	defer vJIT.Close()
 	tm := NewTieringManager()
@@ -593,7 +594,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Verify expected value: sum(1..100) = 5050
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -628,7 +629,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Verify expected value: (1+2+3+4)*(5+6+7+8) = 10*26 = 260
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -663,7 +664,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Verify expected value: sum(1..100) = 5050.0
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -694,7 +695,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Verify expected value: 0.5 * sum(1..100) = 0.5 * 5050 = 2525.0
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -756,7 +757,7 @@ result := sum_points(100)
 
 	// Verify expected value independently via VM.
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -814,7 +815,7 @@ func bench_fib_iter(n, reps) {
 result := bench_fib_iter(30, 20)
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -858,7 +859,7 @@ func inc(x) {
 		t.Fatal("inc proto not found")
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(proto); err != nil {
@@ -933,7 +934,7 @@ result := bench(10, 3)
 
 	// fib(10) = 55. Verify VM independently.
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -985,7 +986,7 @@ result := compute_distance(100)
 
 	// Independent sanity check: sum of sqrt(i) for i=1..100 ~= 671.4629.
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -1021,7 +1022,7 @@ for r := 1; r <= 3; r++ {
 	compareTier2Result(t, src, "result")
 
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -1050,7 +1051,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Independent sanity check: 3^4 = 81.
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)
@@ -1087,7 +1088,7 @@ for iter := 1; iter <= 5; iter++ {
 
 	// Independent sanity check: 3*3 + 4*4 + 7*7 = 9 + 16 + 49 = 74.
 	protoVM := compileProto(t, src)
-	globalsVM := runtime.NewInterpreterGlobals()
+	globalsVM := vmtest.NewInterpreterGlobals()
 	vVM := vm.New(globalsVM)
 	defer vVM.Close()
 	vVM.Execute(protoVM)

@@ -9,6 +9,7 @@ package methodjit
 
 import (
 	"encoding/binary"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
@@ -128,7 +129,7 @@ func build(n) {
 }
 `
 	top := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -185,7 +186,7 @@ func build(n) {
 }
 `
 	top := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -536,7 +537,7 @@ func fill(n) {
 }
 `
 	top := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -585,7 +586,7 @@ func clear_sparse(v) {
 }
 `
 	top := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -709,7 +710,7 @@ after := arr[1]
 result := after - before
 `
 	proto := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -747,7 +748,7 @@ func miss_then_sum(arr, missKey) {
 	}
 	seedIntTableFeedback(fnProto)
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -832,7 +833,7 @@ func read_then_set(arr, key, val) {
 	}
 	seedIntTableFeedback(fnProto)
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -1043,7 +1044,7 @@ func readRight(t) {
 obj := {left: 1, right: 42}
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

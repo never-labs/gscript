@@ -2,6 +2,7 @@ package vm
 
 import (
 	"errors"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -37,7 +38,7 @@ func (j *resultBufferJIT) ExecuteWithResultBuffer(compiled interface{}, regs []r
 func (j *resultBufferJIT) SetCallVM(v *VM) {}
 
 func TestMethodJITReceivesReusableReturnBuffer(t *testing.T) {
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	jit := &resultBufferJIT{value: runtime.IntValue(123)}
 	v.SetMethodJIT(jit)
 
@@ -58,7 +59,7 @@ func TestMethodJITReceivesReusableReturnBuffer(t *testing.T) {
 
 func TestMethodJITBufferedReturnFallbackPreservesInterpreterMultiReturn(t *testing.T) {
 	proto := compileProto(t, `func f() { return 1, 2 }`)
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	if _, err := v.Execute(proto); err != nil {
 		t.Fatalf("Execute top: %v", err)
 	}

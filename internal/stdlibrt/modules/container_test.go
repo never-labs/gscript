@@ -7,12 +7,7 @@ import (
 // containerInterp creates an interpreter with the container library registered.
 func containerInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	interp := New()
-	containerLib := BuildContainer()
-	interp.SetGlobal("container", TableValue(containerLib))
-	interp.SetModule("container", TableValue(containerLib))
-	execOnInterp(t, interp, src)
-	return interp
+	return runWithLib(t, src, "container", BuildContainer())
 }
 
 // ==================================================================

@@ -4,10 +4,10 @@ package methodjit
 
 import (
 	"encoding/binary"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -32,7 +32,7 @@ result := fib_iter(70)
 	}
 	proto.EnsureFeedback()
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

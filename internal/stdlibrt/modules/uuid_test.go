@@ -6,10 +6,7 @@ import (
 )
 
 func TestUUIDv4(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
-	execOnInterp(t, interp, `result := uuid.v4()`)
+	interp := runWithLib(t, `result := uuid.v4()`, "uuid", BuildUUID())
 
 	v := interp.GetGlobal("result")
 	if !v.IsString() {
@@ -24,13 +21,10 @@ func TestUUIDv4(t *testing.T) {
 }
 
 func TestUUIDv4Unique(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		a := uuid.v4()
 		b := uuid.v4()
-	`)
+	`, "uuid", BuildUUID())
 
 	a := interp.GetGlobal("a").Str()
 	b := interp.GetGlobal("b").Str()
@@ -40,10 +34,7 @@ func TestUUIDv4Unique(t *testing.T) {
 }
 
 func TestUUIDv4Raw(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
-	execOnInterp(t, interp, `result := uuid.v4Raw()`)
+	interp := runWithLib(t, `result := uuid.v4Raw()`, "uuid", BuildUUID())
 
 	v := interp.GetGlobal("result")
 	s := v.Str()
@@ -57,14 +48,11 @@ func TestUUIDv4Raw(t *testing.T) {
 }
 
 func TestUUIDIsValid(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		a := uuid.isValid("550e8400-e29b-41d4-a716-446655440000")
 		b := uuid.isValid("not-a-uuid")
 		c := uuid.isValid("550E8400-E29B-41D4-A716-446655440000")
-	`)
+	`, "uuid", BuildUUID())
 
 	if !interp.GetGlobal("a").Bool() {
 		t.Errorf("expected true for valid UUID")
@@ -78,10 +66,7 @@ func TestUUIDIsValid(t *testing.T) {
 }
 
 func TestUUIDParse(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
-	execOnInterp(t, interp, `result := uuid.parse("550e8400-e29b-41d4-a716-446655440000")`)
+	interp := runWithLib(t, `result := uuid.parse("550e8400-e29b-41d4-a716-446655440000")`, "uuid", BuildUUID())
 
 	v := interp.GetGlobal("result")
 	if !v.IsTable() {
@@ -102,10 +87,7 @@ func TestUUIDParse(t *testing.T) {
 }
 
 func TestUUIDParseInvalid(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
-	execOnInterp(t, interp, `result, err := uuid.parse("not-a-uuid")`)
+	interp := runWithLib(t, `result, err := uuid.parse("not-a-uuid")`, "uuid", BuildUUID())
 
 	if !interp.GetGlobal("result").IsNil() {
 		t.Errorf("expected nil for invalid UUID")
@@ -116,11 +98,8 @@ func TestUUIDParseInvalid(t *testing.T) {
 }
 
 func TestUUIDNil(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("uuid", TableValue(BuildUUID()))
-
 	// Use bracket notation since "nil" is a keyword in GScript
-	execOnInterp(t, interp, `result := uuid["nil"]()`)
+	interp := runWithLib(t, `result := uuid["nil"]()`, "uuid", BuildUUID())
 
 	v := interp.GetGlobal("result")
 	if v.Str() != "00000000-0000-0000-0000-000000000000" {

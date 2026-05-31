@@ -1,13 +1,14 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func TestVMStdlibModuleIdentityAcrossGlobalPackageAndRequire(t *testing.T) {
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 
 	global := v.GetGlobal("json")

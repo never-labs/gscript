@@ -8,6 +8,7 @@ package methodjit
 
 import (
 	"fmt"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -33,7 +34,7 @@ func runVMFull(t *testing.T, src string) map[string]runtime.Value {
 	if err != nil {
 		t.Fatalf("compile error: %v", err)
 	}
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	_, err = v.Execute(proto)
@@ -58,7 +59,7 @@ func runVMFullWithJIT(t *testing.T, src string) map[string]runtime.Value {
 	if err != nil {
 		t.Fatalf("compile error: %v", err)
 	}
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	engine := NewBaselineJITEngine()
@@ -114,7 +115,7 @@ func compareVMvsJIT(t *testing.T, src, globalName string) {
 func runTier1ProgramForTest(t *testing.T, src string) (*vm.VM, *vm.FuncProto) {
 	t.Helper()
 	proto := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	engine := NewBaselineJITEngine()
 	v.SetMethodJIT(engine)

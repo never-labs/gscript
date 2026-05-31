@@ -5,16 +5,13 @@ import (
 )
 
 func TestBytesNew(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.new()
 		buf.write("hello")
 		buf.write(" world")
 		result := buf.toString()
 		length := buf.len()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "hello world" {
 		t.Errorf("expected 'hello world', got '%s'", interp.GetGlobal("result").Str())
@@ -25,14 +22,11 @@ func TestBytesNew(t *testing.T) {
 }
 
 func TestBytesFromString(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.fromString("hello")
 		result := buf.toString()
 		length := buf.len()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "hello" {
 		t.Errorf("expected 'hello', got '%s'", interp.GetGlobal("result").Str())
@@ -43,16 +37,13 @@ func TestBytesFromString(t *testing.T) {
 }
 
 func TestBytesWriteByte(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.new()
 		buf.writeByte(65)
 		buf.writeByte(66)
 		buf.writeByte(67)
 		result := buf.toString()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "ABC" {
 		t.Errorf("expected 'ABC', got '%s'", interp.GetGlobal("result").Str())
@@ -60,12 +51,9 @@ func TestBytesWriteByte(t *testing.T) {
 }
 
 func TestBytesToHex(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		result := bytes.toHex("hello")
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "68656c6c6f" {
 		t.Errorf("expected '68656c6c6f', got '%s'", interp.GetGlobal("result").Str())
@@ -73,13 +61,10 @@ func TestBytesToHex(t *testing.T) {
 }
 
 func TestBytesFromHex(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.fromHex("68656c6c6f")
 		result := buf.toString()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "hello" {
 		t.Errorf("expected 'hello', got '%s'", interp.GetGlobal("result").Str())
@@ -87,13 +72,10 @@ func TestBytesFromHex(t *testing.T) {
 }
 
 func TestBytesBufferToHex(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.fromString("AB")
 		result := buf.toHex()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "4142" {
 		t.Errorf("expected '4142', got '%s'", interp.GetGlobal("result").Str())
@@ -101,16 +83,13 @@ func TestBytesBufferToHex(t *testing.T) {
 }
 
 func TestBytesReset(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.new()
 		buf.write("hello")
 		buf.reset()
 		result := buf.toString()
 		length := buf.len()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "" {
 		t.Errorf("expected empty string after reset, got '%s'", interp.GetGlobal("result").Str())
@@ -121,13 +100,10 @@ func TestBytesReset(t *testing.T) {
 }
 
 func TestBytesBufferBytes(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.fromString("AB")
 		result := buf.bytes()
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	v := interp.GetGlobal("result").Table()
 	if v.Length() != 2 {
@@ -142,15 +118,12 @@ func TestBytesBufferBytes(t *testing.T) {
 }
 
 func TestBytesReadByte(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.fromString("ABC")
 		a := buf.readByte(1)
 		b := buf.readByte(2)
 		c := buf.readByte(4)
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("a").Int() != 65 {
 		t.Errorf("expected 65, got %v", interp.GetGlobal("a"))
@@ -164,13 +137,10 @@ func TestBytesReadByte(t *testing.T) {
 }
 
 func TestBytesReadString(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.fromString("hello world")
 		result := buf.readString(1, 5)
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "hello" {
 		t.Errorf("expected 'hello', got '%s'", interp.GetGlobal("result").Str())
@@ -178,12 +148,9 @@ func TestBytesReadString(t *testing.T) {
 }
 
 func TestBytesXor(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		result := bytes.xor("ab", "cd")
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	v := interp.GetGlobal("result").Str()
 	// 'a' ^ 'c' = 0x61 ^ 0x63 = 0x02
@@ -194,14 +161,11 @@ func TestBytesXor(t *testing.T) {
 }
 
 func TestBytesCompare(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		a := bytes.compare("abc", "abd")
 		b := bytes.compare("abc", "abc")
 		c := bytes.compare("abd", "abc")
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("a").Int() != -1 {
 		t.Errorf("expected -1, got %v", interp.GetGlobal("a"))
@@ -215,12 +179,9 @@ func TestBytesCompare(t *testing.T) {
 }
 
 func TestBytesRepeat(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		result := bytes.repeat("ab", 3)
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "ababab" {
 		t.Errorf("expected 'ababab', got '%s'", interp.GetGlobal("result").Str())
@@ -228,12 +189,9 @@ func TestBytesRepeat(t *testing.T) {
 }
 
 func TestBytesConcat(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		result := bytes.concat("hello", " ", "world")
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("result").Str() != "hello world" {
 		t.Errorf("expected 'hello world', got '%s'", interp.GetGlobal("result").Str())
@@ -241,15 +199,12 @@ func TestBytesConcat(t *testing.T) {
 }
 
 func TestBytesWriteInt(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.new()
 		buf.writeInt8(42)
 		length := buf.len()
 		b := buf.readByte(1)
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("length").Int() != 1 {
 		t.Errorf("expected length=1, got %v", interp.GetGlobal("length"))
@@ -260,16 +215,13 @@ func TestBytesWriteInt(t *testing.T) {
 }
 
 func TestBytesWriteInt16(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		buf := bytes.new()
 		buf.writeInt16(256)
 		length := buf.len()
 		lo := buf.readByte(1)
 		hi := buf.readByte(2)
-	`)
+	`, "bytes", BuildBytes(func() int64 { return 0 }))
 
 	if interp.GetGlobal("length").Int() != 2 {
 		t.Errorf("expected length=2, got %v", interp.GetGlobal("length"))

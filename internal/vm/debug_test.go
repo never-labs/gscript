@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
@@ -131,7 +132,7 @@ func compileAndRunWithSource(t *testing.T, src, sourceName string) map[string]ru
 		t.Fatalf("compile error: %v", err)
 	}
 	setProtoSourceForTest(proto, sourceName)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	vm := New(globals)
 	_, err = vm.Execute(proto)
 	if err != nil {

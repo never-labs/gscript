@@ -19,7 +19,8 @@ func runProgram(t *testing.T, src string) *Interpreter {
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
-	interp := New()
+	interp := NewCore()
+	interp.InstallStdlib()
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)
 	}
@@ -37,7 +38,8 @@ func runProgramExpectError(t *testing.T, src string) error {
 	if err != nil {
 		return err
 	}
-	interp := New()
+	interp := NewCore()
+	interp.InstallStdlib()
 	return interp.Exec(prog)
 }
 

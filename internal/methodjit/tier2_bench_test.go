@@ -11,6 +11,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -73,7 +74,7 @@ func BenchmarkTier2Reg_Sum10000(b *testing.B) {
 func tier1BenchHelper(b *testing.B, src string, args []runtime.Value) {
 	b.Helper()
 	proto := compileTopB(b, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 

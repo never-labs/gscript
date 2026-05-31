@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/lexer"
@@ -23,7 +24,7 @@ func compileAndRunWithCoroutineStats(t *testing.T, src string) CoroutineStatsSna
 		t.Fatalf("compile error: %v", err)
 	}
 
-	bvm := New(runtime.NewInterpreterGlobals())
+	bvm := New(vmtest.NewInterpreterGlobals())
 	bvm.EnableCoroutineStats()
 	if _, err := bvm.Execute(proto); err != nil {
 		t.Fatalf("runtime error: %v", err)

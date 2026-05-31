@@ -7,11 +7,11 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"os"
 	"testing"
 	"unsafe"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -138,14 +138,14 @@ checksum := run(20000, 1)
 		t.Fatal("declared-vararg addmod must not publish Tier 1 direct-entry BLR")
 	}
 
-	vmOnly := vm.New(runtime.NewInterpreterGlobals())
+	vmOnly := vm.New(vmtest.NewInterpreterGlobals())
 	defer vmOnly.Close()
 	if _, err := vmOnly.Execute(top); err != nil {
 		t.Fatalf("VM execute: %v", err)
 	}
 	want := vmOnly.GetGlobal("checksum")
 
-	jitVM := vm.New(runtime.NewInterpreterGlobals())
+	jitVM := vm.New(vmtest.NewInterpreterGlobals())
 	defer jitVM.Close()
 	jitVM.SetMethodJIT(NewTieringManager())
 	if _, err := jitVM.Execute(top); err != nil {

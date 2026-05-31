@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -75,7 +76,7 @@ func TestMutualRecursiveIntSCCModMatchesVMIntSemantics(t *testing.T) {
 
 func TestMutualRecursiveIntSCCExecutesHofstadter(t *testing.T) {
 	top := compileProto(t, mutualIntHofstadterSrc)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -111,7 +112,7 @@ for rep := 1; rep <= 1000; rep++ {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -141,7 +142,7 @@ func replacement(n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()

@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -28,7 +29,7 @@ func compileAndRun(t *testing.T, src string) map[string]runtime.Value {
 		t.Fatalf("compile error: %v", err)
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	vm := New(globals)
 	_, err = vm.Execute(proto)
 	if err != nil {
@@ -127,7 +128,7 @@ if type(3.5) == "number" {
 		t.Fatalf("OP_ISNUMBER count = %d, want at least 3\n%s", got, Disassemble(proto))
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	if _, err := New(globals).Execute(proto); err != nil {
 		t.Fatalf("runtime error: %v", err)
 	}
@@ -220,7 +221,7 @@ func compileOrRunError(t *testing.T, src string) error {
 	if err != nil {
 		return err
 	}
-	_, err = New(runtime.NewInterpreterGlobals()).Execute(proto)
+	_, err = New(vmtest.NewInterpreterGlobals()).Execute(proto)
 	return err
 }
 
@@ -253,7 +254,7 @@ func compileAndRunWithOutput(t *testing.T, src string) (map[string]runtime.Value
 	}
 
 	var buf strings.Builder
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	// Override print to capture output
 	globals["print"] = runtime.FunctionValue(&runtime.GoFunction{
 		Name: "print",
@@ -1562,7 +1563,7 @@ func compileAndRunExpectError(t *testing.T, src string) error {
 		t.Fatalf("compile error: %v", err)
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	vm := New(globals)
 	_, err = vm.Execute(proto)
 	return err
@@ -2284,7 +2285,7 @@ func worker() {
 go worker()
 result := <-ch
 `)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := New(globals)
 	parentJIT := &isolatedChildJITProbe{childCreated: make(chan *isolatedChildJITProbe, 1)}
 	v.SetMethodJIT(parentJIT)
@@ -2339,7 +2340,7 @@ for i := 1; i <= workers; i++ {
 	sum = sum + <-ch
 }
 `)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := New(globals)
 	if _, err := v.Execute(proto); err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -2366,7 +2367,7 @@ for i := 1; i <= 4; i++ {
 ok, err, count := group.wait()
 ctxCancelled := group.context().cancelled()
 `)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := New(globals)
 	if _, err := v.Execute(proto); err != nil {
 		t.Fatalf("Execute: %v", err)

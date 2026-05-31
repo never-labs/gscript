@@ -4,6 +4,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 	"unsafe"
 
@@ -33,7 +34,7 @@ func compileProto(t *testing.T, src string) *FuncProto {
 // runWithFeedback enables feedback on the proto, executes, and returns it.
 func runWithFeedback(t *testing.T, proto *FuncProto) {
 	t.Helper()
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := New(globals)
 	_, err := v.Execute(proto)
 	if err != nil {

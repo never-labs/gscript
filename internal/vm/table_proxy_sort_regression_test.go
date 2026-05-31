@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
@@ -85,7 +86,7 @@ func TestVMTableSortProxyUsesVMClosureComparator(t *testing.T) {
 }
 
 func TestVMTableSortExposesFastArgPaths(t *testing.T) {
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	New(globals)
 	sortFn := globals["table"].Table().RawGetString("sort").GoFunction()
 	if sortFn == nil || sortFn.FastArg1 == nil || sortFn.FastArg2 == nil {

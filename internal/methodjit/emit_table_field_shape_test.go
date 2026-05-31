@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"math"
 	"testing"
 
@@ -125,7 +126,7 @@ func TestTier2_FieldDynamicCacheBoundsMissFallsBack(t *testing.T) {
 func runFieldShapeTier2(t *testing.T, src, fnName string, args, warmArgs []runtime.Value) ([]runtime.Value, *TieringManager, *vm.FuncProto) {
 	t.Helper()
 	top := compileTop(t, src)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)

@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"encoding/binary"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"math"
 	"os"
 	"strings"
@@ -66,7 +67,7 @@ func caller(f, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -142,7 +143,7 @@ func TestTier1CallICNoFilterClosureBenchDoesNotCrash(t *testing.T) {
 		t.Fatalf("read closure_bench.gs: %v", err)
 	}
 	top := compileProto(t, string(src))
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -188,7 +189,7 @@ func caller(f, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -257,7 +258,7 @@ func run(actors, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -313,7 +314,7 @@ func run(funcs, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -396,7 +397,7 @@ func caller(f, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -456,7 +457,7 @@ func caller(f, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -514,7 +515,7 @@ func caller(f, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -578,7 +579,7 @@ func caller(f, t) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -642,7 +643,7 @@ func rec_bump_then_exit(t, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -700,7 +701,7 @@ func driver() {
 result := driver()
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -754,7 +755,7 @@ func driver() {
 result := driver()
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -805,7 +806,7 @@ warm := {}
 warm[1] = 10
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -862,7 +863,7 @@ floats := {}
 floats[1] = 1.5
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -919,7 +920,7 @@ proxy := {}
 setmetatable(proxy, {__index: {x: 41}})
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -974,7 +975,7 @@ func call_read(f, t) {
 own := {x: 10}
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

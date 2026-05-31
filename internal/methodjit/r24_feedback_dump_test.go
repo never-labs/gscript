@@ -12,10 +12,10 @@ package methodjit
 
 import (
 	"fmt"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -132,7 +132,7 @@ c = matmul(a, b, N)
 `
 	proto := compileProto(t, src)
 	// Execute WITH the same proto so feedback is populated on THIS instance.
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)
@@ -171,7 +171,7 @@ result = energy()
 result = energy()
 `
 	proto := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)

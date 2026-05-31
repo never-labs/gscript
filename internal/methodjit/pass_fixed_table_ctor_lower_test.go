@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
@@ -659,7 +660,7 @@ func build(n) {
 		t.Fatal("build proto not found")
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -734,7 +735,7 @@ func build(n) {
 		t.Fatal("build proto not found")
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -793,7 +794,7 @@ func build(n) {
 		t.Fatal("build proto not found")
 	}
 
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

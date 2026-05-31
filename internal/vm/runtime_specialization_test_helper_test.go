@@ -1,11 +1,11 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func compileSpectralSpecializationTestProgram(t *testing.T, src string) (*FuncProto, *VM) {
@@ -22,7 +22,7 @@ func compileSpectralSpecializationTestProgram(t *testing.T, src string) (*FuncPr
 	if err != nil {
 		t.Fatalf("compile error: %v", err)
 	}
-	return proto, New(runtime.NewInterpreterGlobals())
+	return proto, New(vmtest.NewInterpreterGlobals())
 }
 
 func findTestProtoByName(proto *FuncProto, name string) *FuncProto {

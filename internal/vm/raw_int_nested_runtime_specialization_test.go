@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 
@@ -84,7 +85,7 @@ result := nestwave(2, 6)
 
 func TestRawIntNestedRuntimeSpecializationFallsBackWhenSelfGlobalChanges(t *testing.T) {
 	top := compileProto(t, rawIntNestedShiftedSource)
-	v := New(runtime.NewInterpreterGlobals())
+	v := New(vmtest.NewInterpreterGlobals())
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("runtime error: %v", err)
 	}

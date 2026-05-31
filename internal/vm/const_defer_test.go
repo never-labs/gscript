@@ -2,6 +2,7 @@ package vm
 
 import (
 	"errors"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"path/filepath"
 	"testing"
 
@@ -56,7 +57,7 @@ func TestVMConstBindingRejectsAssignment(t *testing.T) {
 		ok, err := pcall(func() {
 			x = 11
 		})
-	`, runtime.NewInterpreterGlobals())
+	`, vmtest.NewInterpreterGlobals())
 
 	if g["ok"].Truthy() {
 		t.Fatalf("assigning a const binding should fail")
@@ -74,7 +75,7 @@ func TestVMConstBindingAllowsTableMutationButNotRebind(t *testing.T) {
 			cfg = {}
 		})
 		count := cfg.count
-	`, runtime.NewInterpreterGlobals())
+	`, vmtest.NewInterpreterGlobals())
 
 	if got := g["count"].Int(); got != 2 {
 		t.Fatalf("count = %d, want 2", got)
@@ -95,7 +96,7 @@ func TestVMConstBindingCapturedByClosure(t *testing.T) {
 			return x, ok
 		}
 		value, ok := outer()
-	`, runtime.NewInterpreterGlobals())
+	`, vmtest.NewInterpreterGlobals())
 
 	if got := g["value"].Int(); got != 3 {
 		t.Fatalf("value = %d, want 3", got)
@@ -120,7 +121,7 @@ func TestVMDeferRunsFunctionScopeLIFO(t *testing.T) {
 			return 7
 		}
 		result := work()
-	`, runtime.NewInterpreterGlobals())
+	`, vmtest.NewInterpreterGlobals())
 
 	if got := g["result"].Int(); got != 7 {
 		t.Fatalf("result = %d, want 7", got)
@@ -131,7 +132,7 @@ func TestVMDeferRunsFunctionScopeLIFO(t *testing.T) {
 }
 
 func TestVMDeferRunsOnErrorAndSupportsMethods(t *testing.T) {
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	path := filepath.Join(t.TempDir(), "defer.txt")
 	globals["file"] = runtime.StringValue(path)
 
@@ -160,7 +161,7 @@ func TestVMDeferRunsOnErrorAndSupportsMethods(t *testing.T) {
 }
 
 func TestVMDeferRunsAtTopLevelScriptExit(t *testing.T) {
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	path := filepath.Join(t.TempDir(), "top.txt")
 	globals["file"] = runtime.StringValue(path)
 
@@ -170,7 +171,7 @@ func TestVMDeferRunsAtTopLevelScriptExit(t *testing.T) {
 		assert(f:write("top"))
 	`, globals)
 
-	checkGlobals := runtime.NewInterpreterGlobals()
+	checkGlobals := vmtest.NewInterpreterGlobals()
 	checkGlobals["file"] = runtime.StringValue(path)
 	g := compileAndRunVMConstDefer(t, `
 		f := io.open(file, "r")
@@ -183,7 +184,7 @@ func TestVMDeferRunsAtTopLevelScriptExit(t *testing.T) {
 }
 
 func TestVMOSExitRunsTopLevelDefers(t *testing.T) {
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	path := filepath.Join(t.TempDir(), "top-exit.txt")
 	globals["file"] = runtime.StringValue(path)
 
@@ -201,7 +202,7 @@ func TestVMOSExitRunsTopLevelDefers(t *testing.T) {
 		t.Fatalf("exit code = %d, want 5", exitErr.Code)
 	}
 
-	checkGlobals := runtime.NewInterpreterGlobals()
+	checkGlobals := vmtest.NewInterpreterGlobals()
 	checkGlobals["file"] = runtime.StringValue(path)
 	g := compileAndRunVMConstDefer(t, `
 		f := io.open(file, "r")

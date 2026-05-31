@@ -48,7 +48,8 @@ func TestStdlibInstallerModuleAliasAndPackageLoadedSemantics(t *testing.T) {
 }
 
 func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
-	interp := New()
+	interp := NewCore()
+	interp.InstallStdlib()
 	for _, name := range []string{"json", "string", "llm"} {
 		global := interp.GetGlobal(name)
 		if !global.IsTable() {
@@ -69,15 +70,28 @@ func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 	}
 }
 
-func TestRuntimeNewKeepsLegacyMigratedHostIOTables(t *testing.T) {
+func TestRuntimeNewIsCoreOnly(t *testing.T) {
 	interp := New()
+	for _, name := range []string{"script", "string", "table", "json", "llm", "fs"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s global = %v, want nil before explicit stdlib install", name, got)
+		}
+		if _, ok := interp.modules[name]; ok {
+			t.Fatalf("%s was inserted into require cache before explicit stdlib install", name)
+		}
+	}
+}
+
+func TestExplicitInstallStdlibKeepsLegacyMigratedHostIOTables(t *testing.T) {
+	interp := NewCore()
+	interp.InstallStdlib()
 	for _, name := range []string{"fs", "http", "io", "net", "os"} {
 		global := interp.GetGlobal(name)
 		if !global.IsTable() {
 			t.Fatalf("%s global is not a table", name)
 		}
 		if global.Table().RawGetString("__stdlibrt_module").Truthy() {
-			t.Fatalf("%s global was installed from stdlibrt; runtime.New must keep legacy direct builders", name)
+			t.Fatalf("%s global was installed from stdlibrt; explicit runtime InstallStdlib must keep legacy direct builders", name)
 		}
 		if got := interp.packageLoaded(name); got != global {
 			t.Fatalf("package.loaded.%s does not match global", name)

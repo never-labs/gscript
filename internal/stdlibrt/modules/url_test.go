@@ -5,10 +5,7 @@ import (
 )
 
 func TestURLParse(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `result := url.parse("https://user:pass@example.com:8080/path?q=1&r=2#frag")`)
+	interp := runWithLib(t, `result := url.parse("https://user:pass@example.com:8080/path?q=1&r=2#frag")`, "url", BuildURL(nil))
 
 	v := interp.GetGlobal("result")
 	if !v.IsTable() {
@@ -37,13 +34,10 @@ func TestURLParse(t *testing.T) {
 }
 
 func TestURLEncodeDecode(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		encoded := url.encode("hello world & more")
 		decoded := url.decode(encoded)
-	`)
+	`, "url", BuildURL(nil))
 
 	encoded := interp.GetGlobal("encoded").Str()
 	decoded := interp.GetGlobal("decoded").Str()
@@ -53,13 +47,10 @@ func TestURLEncodeDecode(t *testing.T) {
 }
 
 func TestURLQueryEncodeDecode(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		encoded := url.queryEncode({a: "1", b: "hello world"})
 		decoded := url.queryDecode(encoded)
-	`)
+	`, "url", BuildURL(nil))
 
 	decoded := interp.GetGlobal("decoded").Table()
 	if decoded.RawGet(StringValue("a")).Str() != "1" {
@@ -71,10 +62,7 @@ func TestURLQueryEncodeDecode(t *testing.T) {
 }
 
 func TestURLJoin(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `result := url.join("https://example.com/base/", "../other")`)
+	interp := runWithLib(t, `result := url.join("https://example.com/base/", "../other")`, "url", BuildURL(nil))
 
 	v := interp.GetGlobal("result")
 	if v.Str() != "https://example.com/other" {
@@ -83,13 +71,10 @@ func TestURLJoin(t *testing.T) {
 }
 
 func TestURLIsValid(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		a := url.isValid("https://example.com")
 		b := url.isValid("not a url")
-	`)
+	`, "url", BuildURL(nil))
 
 	if !interp.GetGlobal("a").Bool() {
 		t.Errorf("expected true for valid URL")
@@ -100,10 +85,7 @@ func TestURLIsValid(t *testing.T) {
 }
 
 func TestURLGetHost(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `result := url.getHost("https://example.com:8080/path")`)
+	interp := runWithLib(t, `result := url.getHost("https://example.com:8080/path")`, "url", BuildURL(nil))
 
 	if interp.GetGlobal("result").Str() != "example.com" {
 		t.Errorf("expected 'example.com', got '%s'", interp.GetGlobal("result").Str())
@@ -111,10 +93,7 @@ func TestURLGetHost(t *testing.T) {
 }
 
 func TestURLGetPath(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `result := url.getPath("https://example.com/foo/bar")`)
+	interp := runWithLib(t, `result := url.getPath("https://example.com/foo/bar")`, "url", BuildURL(nil))
 
 	if interp.GetGlobal("result").Str() != "/foo/bar" {
 		t.Errorf("expected '/foo/bar', got '%s'", interp.GetGlobal("result").Str())
@@ -122,10 +101,7 @@ func TestURLGetPath(t *testing.T) {
 }
 
 func TestURLBuild(t *testing.T) {
-	interp := New()
-	interp.SetGlobal("url", TableValue(BuildURL(nil)))
-
-	execOnInterp(t, interp, `
+	interp := runWithLib(t, `
 		result := url.build({
 			scheme: "https",
 			host: "example.com",
@@ -133,7 +109,7 @@ func TestURLBuild(t *testing.T) {
 			path: "/api/v1",
 			query: {key: "value"}
 		})
-	`)
+	`, "url", BuildURL(nil))
 
 	v := interp.GetGlobal("result").Str()
 	if v != "https://example.com:8080/api/v1?key=value" {

@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"fmt"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 	"unsafe"
@@ -223,7 +224,7 @@ func f(n) {
 		t.Fatalf("expected at least one cacheable NewTable site (%v) in optimized IR:\n%s", sites, Print(optimized))
 	}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)

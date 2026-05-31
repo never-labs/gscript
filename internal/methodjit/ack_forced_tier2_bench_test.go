@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -19,7 +20,7 @@ func ack(m, n) {
 
 func BenchmarkAckermannVMCallValueSteady(b *testing.B) {
 	top := compileTopB(b, ackBenchmarkSource)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		b.Fatalf("execute top: %v", err)
@@ -57,7 +58,7 @@ func BenchmarkAckermannForcedTier2CallValueSteady(b *testing.B) {
 		b.Fatal("ack proto not found")
 	}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		b.Fatalf("execute top: %v", err)
@@ -105,7 +106,7 @@ func BenchmarkAckermannForcedTier2DirectSteady(b *testing.B) {
 		b.Fatal("ack proto not found")
 	}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		b.Fatalf("execute top: %v", err)
@@ -176,7 +177,7 @@ func TestAckermannForcedTier2DirectExecuteStatus(t *testing.T) {
 		t.Fatal("ack proto not found")
 	}
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)
@@ -219,7 +220,7 @@ func TestAckermannForcedTier2RepeatedCallValueDoesNotCorruptRuntime(t *testing.T
 			t.Fatal("ack proto not found")
 		}
 
-		v := vm.New(runtime.NewInterpreterGlobals())
+		v := vm.New(vmtest.NewInterpreterGlobals())
 		if _, err := v.Execute(top); err != nil {
 			v.Close()
 			t.Fatalf("iter %d execute top: %v", iter, err)
@@ -249,7 +250,7 @@ func TestAckermannForcedTier2RepeatedCallValueDoesNotCorruptRuntime(t *testing.T
 
 		// Rebuild stdlib globals after forced JIT execution. Long-running Go
 		// benchmarks crashed here when native code polluted process state.
-		globals := runtime.NewInterpreterGlobals()
+		globals := vmtest.NewInterpreterGlobals()
 		if globals == nil {
 			t.Fatalf("iter %d NewInterpreterGlobals returned nil", iter)
 		}

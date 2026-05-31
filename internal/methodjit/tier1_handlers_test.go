@@ -6,6 +6,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -82,7 +83,7 @@ func TestHandleCall_RecordsFeedbackAtCallPC(t *testing.T) {
 	})
 	regs[1] = runtime.IntValue(42)
 
-	engine := &BaselineJITEngine{callVM: vm.New(runtime.NewInterpreterGlobals())}
+	engine := &BaselineJITEngine{callVM: vm.New(vmtest.NewInterpreterGlobals())}
 	ctx := &ExecContext{
 		BaselineA:  0,
 		BaselineB:  2,
@@ -118,7 +119,7 @@ func TestHandleCall_UsesCompiledSpecializationExecutor(t *testing.T) {
 	fn := runtime.FunctionValue(&runtime.GoFunction{Name: "sentinel"})
 	regs := []runtime.Value{fn, runtime.IntValue(41), runtime.NilValue()}
 	engine := &BaselineJITEngine{
-		callVM: vm.New(runtime.NewInterpreterGlobals()),
+		callVM: vm.New(vmtest.NewInterpreterGlobals()),
 		protocolCallExecutor: func(gotFn runtime.Value, gotRegs []runtime.Value, absSlot, nArgs, nRets int) (bool, error) {
 			if gotFn != fn || absSlot != 0 || nArgs != 1 || nRets != 1 {
 				t.Fatalf("executor args fn=%v abs=%d nArgs=%d nRets=%d", gotFn, absSlot, nArgs, nRets)

@@ -5,12 +5,12 @@ package methodjit
 import (
 	"encoding/json"
 	"errors"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/vm"
 )
 
@@ -28,7 +28,7 @@ a := sum(10)
 b := sum(20)
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	tm := NewTieringManager()
 	v.SetMethodJIT(tm)

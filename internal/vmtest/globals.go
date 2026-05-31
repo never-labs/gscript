@@ -1,0 +1,16 @@
+package vmtest
+
+import (
+	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibrt/install"
+)
+
+// NewInterpreterGlobals returns globals for VM/JIT tests that need the full
+// stdlib surface. It builds that surface through the stdlibrt installer instead
+// of depending on runtime.New(), keeping the runtime core usable without the
+// complete standard library.
+func NewInterpreterGlobals() map[string]runtime.Value {
+	interp := runtime.NewCore()
+	install.Install(interp)
+	return interp.ExportGlobals()
+}

@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -60,7 +61,7 @@ result := u[0] + v[0]
 func TestCallSiteRuntimeSpecializationExitLowersStableNoResultCall(t *testing.T) {
 	t.Skip("spectral call-site no-result lowering is disabled until its fallback contract preserves VM semantics")
 	top := compileProto(t, spectralRuntimeSpecializationRuntimeSpecializationExitSrc)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	tm := NewTieringManager()
@@ -117,7 +118,7 @@ for i := 0; i < 3; i++ {
 	}
 	caller.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("warm execute: %v", err)
@@ -157,7 +158,7 @@ caller(sinkB, 1)
 	}
 	caller.EnsureFeedback()
 
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("warm execute: %v", err)
@@ -180,7 +181,7 @@ func inc(x) {
 	total = total + x
 }
 `)
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("execute top: %v", err)

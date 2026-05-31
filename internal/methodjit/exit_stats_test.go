@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"bytes"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ func bool_len(t) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -135,7 +136,7 @@ func bool_len(t) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

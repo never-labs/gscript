@@ -4,6 +4,7 @@ package methodjit
 
 import (
 	"encoding/binary"
+	"github.com/never-labs/gscript/internal/vmtest"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,7 +35,7 @@ root := makeTree(5)
 `
 	const want = 63
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -117,7 +118,7 @@ root := makeTree(5)
 `
 	const want = 63
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -185,7 +186,7 @@ root := makeTree(4)
 `
 	const want = 31
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -277,7 +278,7 @@ func is_sorted(arr, n) {
 }
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -357,7 +358,7 @@ func TestTypedTableSelfABI_EnsureRegisterBudgetPregrowsTypedFrames(t *testing.T)
 	}
 
 	tm := NewTieringManager()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	v.SetMethodJIT(tm)
 
@@ -452,7 +453,7 @@ goodRoot := {left: 1, payload: goodLeaf}
 badRoot := {left: 1, payload: 123}
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -503,7 +504,7 @@ func BenchmarkTypedTableSelfABI_CheckTreeForcedTier2ColdFieldExit(b *testing.B) 
 func benchTypedTableSelfCheckTree(b *testing.B, coldFieldCache bool) {
 	b.Helper()
 	top := compileTopB(b, typedTableSelfCheckTreeSource(8))
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -614,7 +615,7 @@ func checkTree(node) {
 root := makeTree(3)
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
@@ -668,7 +669,7 @@ func driver() {
 result := driver()
 `
 	top := compileProto(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {

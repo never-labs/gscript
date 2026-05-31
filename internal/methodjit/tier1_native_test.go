@@ -7,6 +7,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/lexer"
@@ -117,7 +118,7 @@ if nilpair.left == nil {
 }
 `
 	proto := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	engine := NewBaselineJITEngine()
@@ -193,7 +194,7 @@ for i := 1; i <= 200; i++ {
 }
 `
 	proto := compileTop(t, src)
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	engine := NewBaselineJITEngine()
@@ -349,7 +350,7 @@ for i := 1; i <= 240; i++ {
 		t.Fatal("f proto not found")
 	}
 	fProto.EnsureFeedback()
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	defer v.Close()
 	engine := NewBaselineJITEngine()
@@ -1070,7 +1071,7 @@ func compileAndRunForFeedback(t *testing.T, src string) (*vm.VM, *vm.FuncProto) 
 	for _, child := range proto.Protos {
 		child.EnsureFeedback()
 	}
-	globals := runtime.NewInterpreterGlobals()
+	globals := vmtest.NewInterpreterGlobals()
 	v := vm.New(globals)
 	engine := NewBaselineJITEngine()
 	v.SetMethodJIT(engine)

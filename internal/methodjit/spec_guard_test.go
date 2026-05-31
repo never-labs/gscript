@@ -3,6 +3,7 @@
 package methodjit
 
 import (
+	"github.com/never-labs/gscript/internal/vmtest"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -73,7 +74,7 @@ func format_case(pattern, i) {
 		t.Fatal("proto format_case not found")
 	}
 	proto.EnsureFeedback()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("Execute top: %v", err)
@@ -110,7 +111,7 @@ func format_case(pattern, i) {
 		t.Fatal("proto format_case not found")
 	}
 	proto.EnsureFeedback()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("Execute top: %v", err)
@@ -237,7 +238,7 @@ func read_x(t) {
 		t.Fatal("proto read_x not found")
 	}
 	proto.EnsureFeedback()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("Execute top: %v", err)
@@ -278,7 +279,7 @@ func read_x(t) {
 		t.Fatal("proto read_x not found")
 	}
 	proto.EnsureFeedback()
-	v := vm.New(runtime.NewInterpreterGlobals())
+	v := vm.New(vmtest.NewInterpreterGlobals())
 	defer v.Close()
 	if _, err := v.Execute(top); err != nil {
 		t.Fatalf("Execute top: %v", err)
