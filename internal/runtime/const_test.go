@@ -3,7 +3,7 @@ package runtime
 import "testing"
 
 func TestConstBindingRejectsAssignment(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		const x := 10
@@ -21,7 +21,7 @@ func TestConstBindingRejectsAssignment(t *testing.T) {
 }
 
 func TestConstBindingAllowsTableMutationButNotRebind(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		const cfg = {count: 1}
@@ -41,7 +41,7 @@ func TestConstBindingAllowsTableMutationButNotRebind(t *testing.T) {
 }
 
 func TestConstBindingCapturedByClosure(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		func outer() {

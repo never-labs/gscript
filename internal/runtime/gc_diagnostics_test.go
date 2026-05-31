@@ -3,7 +3,7 @@ package runtime
 import "testing"
 
 func TestCollectGarbageStats(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		before := collectgarbage("stats")
@@ -34,7 +34,7 @@ func TestCollectGarbageStats(t *testing.T) {
 }
 
 func TestCollectGarbageStatsWithDeferCleanup(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		closed := false

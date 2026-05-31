@@ -3,7 +3,7 @@ package runtime
 import "testing"
 
 func TestBitwiseExpressionOperators(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		a := 240 & 60
@@ -36,7 +36,7 @@ func TestBitwiseExpressionOperators(t *testing.T) {
 }
 
 func TestBitwiseExpressionErrors(t *testing.T) {
-	interp := New()
+	interp := NewCore()
 
 	execBinaryIOTest(t, interp, `
 		okShift, errShift := pcall(func() { return 1 << -1 })
