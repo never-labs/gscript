@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestFmtStdinAINativeIndentation(t *testing.T) {
+func TestFmtStdinLLMIndentation(t *testing.T) {
 	src := `tool lookup(query) {
 return "found:" .. query, nil
 }
@@ -93,7 +93,7 @@ budget { turns: 1 } {
 	defer func() { cliStdin = oldStdin }()
 
 	var stdout, stderr bytes.Buffer
-	code := runFmtCommand([]string{"--stdin-file-name", "ai_native.gs"}, &stdout, &stderr)
+	code := runFmtCommand([]string{"--stdin-file-name", "llm.gs"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("runFmtCommand code = %d, stderr = %q", code, stderr.String())
 	}
@@ -181,7 +181,7 @@ total:=1+  2
 	}
 }
 
-func aiNativeToolchainCoverageSource() []byte {
+func llmToolchainCoverageSource() []byte {
 	return []byte(`// lookup searches project docs.
 //gscript:requires docs.read
 //gscript:param query search query
@@ -243,8 +243,8 @@ _ = answer_err
 `)
 }
 
-func TestFmtAINativeSyntaxCoverage(t *testing.T) {
-	formatted, err := formatSource("ai_native.gs", aiNativeToolchainCoverageSource())
+func TestFmtLLMSyntaxCoverage(t *testing.T) {
+	formatted, err := formatSource("llm.gs", llmToolchainCoverageSource())
 	if err != nil {
 		t.Fatalf("formatSource: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestFmtAINativeSyntaxCoverage(t *testing.T) {
 		"llm.validate_output({summary: \"docs\"}, {summary: \"example\"})",
 	} {
 		if !strings.Contains(string(formatted), want) {
-			t.Fatalf("formatted AI-native source missing %q:\n%s", want, formatted)
+			t.Fatalf("formatted LLM source missing %q:\n%s", want, formatted)
 		}
 	}
 	if strings.Contains(string(formatted), "}  \n") {
@@ -266,12 +266,12 @@ func TestFmtAINativeSyntaxCoverage(t *testing.T) {
 	if !strings.HasSuffix(string(formatted), "\n") {
 		t.Fatalf("formatted source does not end with newline: %q", string(formatted))
 	}
-	formattedAgain, err := formatSource("ai_native.gs", formatted)
+	formattedAgain, err := formatSource("llm.gs", formatted)
 	if err != nil {
 		t.Fatalf("format formatted source: %v", err)
 	}
 	if !bytes.Equal(formattedAgain, formatted) {
-		t.Fatalf("AI-native formatting is not idempotent:\nonce:\n%s\ntwice:\n%s", formatted, formattedAgain)
+		t.Fatalf("LLM formatting is not idempotent:\nonce:\n%s\ntwice:\n%s", formatted, formattedAgain)
 	}
 }
 

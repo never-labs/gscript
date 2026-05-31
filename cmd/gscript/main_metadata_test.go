@@ -44,16 +44,16 @@ func TestCapabilitiesJSON(t *testing.T) {
 		t.Fatalf("stdlib_layers = %#v, want ai/llm, host/fs, and data/soa", caps.StdlibLayers)
 	}
 	for _, want := range []string{"agent", "tool", "turn", "messages_bare_expr", "direct_agent_tools", "toolof"} {
-		if !caps.AINative.Enabled || !containsString(caps.AINative.Syntax, want) {
-			t.Fatalf("ai_native syntax = %#v, want %q", caps.AINative.Syntax, want)
+		if !caps.LLM.Enabled || !containsString(caps.LLM.Syntax, want) {
+			t.Fatalf("llm syntax = %#v, want %q", caps.LLM.Syntax, want)
 		}
 	}
-	if !containsString(caps.AINative.ToolMetadata, "gscript:requires") || !containsString(caps.AINative.StaticValidation, "static_tool_capabilities") || !containsString(caps.AINative.Tooling, "lint-sarif") {
-		t.Fatalf("ai_native capabilities = %+v, want metadata, static validation, and tooling entries", caps.AINative)
+	if !containsString(caps.LLM.ToolMetadata, "gscript:requires") || !containsString(caps.LLM.StaticValidation, "static_tool_capabilities") || !containsString(caps.LLM.Tooling, "lint-sarif") {
+		t.Fatalf("llm capabilities = %+v, want metadata, static validation, and tooling entries", caps.LLM)
 	}
 	for _, want := range []string{"llm.toolof", "llm.agent_as_tool", "llm.validate_output", "msg.assistant_call", "msg.tool_result", "history.find", "history.find_all", "history.last", "history.append"} {
-		if !containsString(caps.AINative.RuntimePrimitives, want) {
-			t.Fatalf("ai_native runtime primitives = %#v, want %q", caps.AINative.RuntimePrimitives, want)
+		if !containsString(caps.LLM.RuntimePrimitives, want) {
+			t.Fatalf("llm runtime primitives = %#v, want %q", caps.LLM.RuntimePrimitives, want)
 		}
 	}
 	if !containsString(caps.Commands, "bench") || !containsString(caps.Commands, "capabilities") || !containsString(caps.Commands, "check") || !containsString(caps.Commands, "ci") || !containsString(caps.Commands, "config") || !containsString(caps.Commands, "diag") || !containsString(caps.Commands, "doc") || !containsString(caps.Commands, "env") || !containsString(caps.Commands, "eval") || !containsString(caps.Commands, "fmt") || !containsString(caps.Commands, "help") || !containsString(caps.Commands, "inspect") || !containsString(caps.Commands, "lint") || !containsString(caps.Commands, "mod") || !containsString(caps.Commands, "repl") || !containsString(caps.Commands, "run") || !containsString(caps.Commands, "test") || !containsString(caps.Commands, "version") {

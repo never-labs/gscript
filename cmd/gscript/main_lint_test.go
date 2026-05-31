@@ -36,10 +36,10 @@ func TestLintCommandUsesConfiguredFormat(t *testing.T) {
 	}
 }
 
-func TestLintAINativeSyntaxCoverage(t *testing.T) {
+func TestLintLLMSyntaxCoverage(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "ai_native.gs")
-	src := aiNativeToolchainCoverageSource()
+	path := filepath.Join(dir, "llm.gs")
+	src := llmToolchainCoverageSource()
 	if err := os.WriteFile(path, src, 0644); err != nil {
 		t.Fatal(err)
 	}

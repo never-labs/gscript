@@ -280,7 +280,7 @@ func TestKeywords(t *testing.T) {
 	})
 }
 
-func TestAINativeSoftKeywordsRemainIdentifiers(t *testing.T) {
+func TestLLMSoftKeywordsRemainIdentifiers(t *testing.T) {
 	expectTokens(t, "agent tool turn flow budget models", []Token{
 		{Type: TOKEN_IDENT, Value: "agent"},
 		{Type: TOKEN_IDENT, Value: "tool"},

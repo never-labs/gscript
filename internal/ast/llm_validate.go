@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// ValidateAINative checks source-level invariants for AI-native declarations
+// ValidateLLM checks source-level invariants for LLM declarations
 // before they are lowered to ordinary stdlib calls.
-func ValidateAINative(prog *Program) error {
+func ValidateLLM(prog *Program) error {
 	if prog == nil {
 		return nil
 	}
@@ -43,7 +43,7 @@ func ValidateAINative(prog *Program) error {
 				return err
 			}
 		}
-		if err := ctx.validateAINativeStmt(stmt, true); err != nil {
+		if err := ctx.validateLLMStmt(stmt, true); err != nil {
 			return err
 		}
 	}
@@ -113,36 +113,36 @@ func cloneStringMap(src map[string]string) map[string]string {
 	return dst
 }
 
-func (ctx *aiValidationContext) validateAINativeStmt(stmt Stmt, topLevel bool) error {
+func (ctx *aiValidationContext) validateLLMStmt(stmt Stmt, topLevel bool) error {
 	if stmt == nil {
 		return nil
 	}
 	switch s := stmt.(type) {
 	case *DeclareStmt:
-		return ctx.validateAINativeExprList(s.Values)
+		return ctx.validateLLMExprList(s.Values)
 	case *AssignStmt:
-		if err := ctx.validateAINativeExprList(s.Targets); err != nil {
+		if err := ctx.validateLLMExprList(s.Targets); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExprList(s.Values)
+		return ctx.validateLLMExprList(s.Values)
 	case *CompoundAssignStmt:
-		if err := ctx.validateAINativeExpr(s.Target); err != nil {
+		if err := ctx.validateLLMExpr(s.Target); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExpr(s.Value)
+		return ctx.validateLLMExpr(s.Value)
 	case *IncDecStmt:
-		return ctx.validateAINativeExpr(s.Target)
+		return ctx.validateLLMExpr(s.Target)
 	case *CallStmt:
-		return ctx.validateAINativeExpr(s.Call)
+		return ctx.validateLLMExpr(s.Call)
 	case *GoStmt:
-		return ctx.validateAINativeExpr(s.Call)
+		return ctx.validateLLMExpr(s.Call)
 	case *DeferStmt:
-		return ctx.validateAINativeExpr(s.Call)
+		return ctx.validateLLMExpr(s.Call)
 	case *SendStmt:
-		if err := ctx.validateAINativeExpr(s.Channel); err != nil {
+		if err := ctx.validateLLMExpr(s.Channel); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExpr(s.Value)
+		return ctx.validateLLMExpr(s.Value)
 	case *AgentDefaultsDeclStmt:
 		if !topLevel {
 			return fmt.Errorf("line %d: agent defaults must be declared at module scope", s.P.Line)
@@ -152,14 +152,14 @@ func (ctx *aiValidationContext) validateAINativeStmt(stmt Stmt, topLevel bool) e
 			return fmt.Errorf("line %d: models must be declared at module scope", s.P.Line)
 		}
 	case *BlockStmt:
-		return ctx.child().validateAINativeStmtList(s.Stmts, false)
+		return ctx.child().validateLLMStmtList(s.Stmts, false)
 	case *FuncDeclStmt:
-		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
 	case *ToolDeclStmt:
 		if err := validateToolDecl(s); err != nil {
 			return err
 		}
-		return ctx.validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.validateLLMStmtList(s.Body.Stmts, false)
 	case *AgentDeclStmt:
 		if err := ctx.validateAIToolsConfig(fmt.Sprintf("agent %s", s.Name), s.Config); err != nil {
 			return err
@@ -168,108 +168,108 @@ func (ctx *aiValidationContext) validateAINativeStmt(stmt Stmt, topLevel bool) e
 			return err
 		}
 		if s.Flow != nil {
-			return ctx.child().validateAINativeStmtList(s.Flow.Stmts, false)
+			return ctx.child().validateLLMStmtList(s.Flow.Stmts, false)
 		}
 	case *BudgetStmt:
-		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
 	case *IfStmt:
-		if err := ctx.validateAINativeExpr(s.Cond); err != nil {
+		if err := ctx.validateLLMExpr(s.Cond); err != nil {
 			return err
 		}
-		if err := ctx.child().validateAINativeStmtList(s.Body.Stmts, false); err != nil {
+		if err := ctx.child().validateLLMStmtList(s.Body.Stmts, false); err != nil {
 			return err
 		}
 		for _, ei := range s.ElseIfs {
-			if err := ctx.validateAINativeExpr(ei.Cond); err != nil {
+			if err := ctx.validateLLMExpr(ei.Cond); err != nil {
 				return err
 			}
 		}
 		for _, ei := range s.ElseIfs {
-			if err := ctx.child().validateAINativeStmtList(ei.Body.Stmts, false); err != nil {
+			if err := ctx.child().validateLLMStmtList(ei.Body.Stmts, false); err != nil {
 				return err
 			}
 		}
 		if s.ElseBody != nil {
-			return ctx.child().validateAINativeStmtList(s.ElseBody.Stmts, false)
+			return ctx.child().validateLLMStmtList(s.ElseBody.Stmts, false)
 		}
 	case *ForStmt:
-		if err := ctx.validateAINativeExpr(s.Cond); err != nil {
+		if err := ctx.validateLLMExpr(s.Cond); err != nil {
 			return err
 		}
-		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
 	case *ForNumStmt:
-		if err := ctx.validateAINativeStmt(s.Init, false); err != nil {
+		if err := ctx.validateLLMStmt(s.Init, false); err != nil {
 			return err
 		}
-		if err := ctx.validateAINativeExpr(s.Cond); err != nil {
+		if err := ctx.validateLLMExpr(s.Cond); err != nil {
 			return err
 		}
-		if err := ctx.validateAINativeStmt(s.Post, false); err != nil {
+		if err := ctx.validateLLMStmt(s.Post, false); err != nil {
 			return err
 		}
-		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
 	case *ForRangeStmt:
-		if err := ctx.validateAINativeExpr(s.Iter); err != nil {
+		if err := ctx.validateLLMExpr(s.Iter); err != nil {
 			return err
 		}
-		return ctx.child().validateAINativeStmtList(s.Body.Stmts, false)
+		return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
 	case *ReturnStmt:
-		return ctx.validateAINativeExprList(s.Values)
+		return ctx.validateLLMExprList(s.Values)
 	case *SelectStmt:
 		for _, c := range s.Cases {
-			if err := ctx.child().validateAINativeStmtList(c.Body.Stmts, false); err != nil {
+			if err := ctx.child().validateLLMStmtList(c.Body.Stmts, false); err != nil {
 				return err
 			}
 		}
 		if s.Default != nil {
-			return ctx.child().validateAINativeStmtList(s.Default.Stmts, false)
+			return ctx.child().validateLLMStmtList(s.Default.Stmts, false)
 		}
 	}
 	return nil
 }
 
-func (ctx *aiValidationContext) validateAINativeExprList(exprs []Expr) error {
+func (ctx *aiValidationContext) validateLLMExprList(exprs []Expr) error {
 	for _, expr := range exprs {
-		if err := ctx.validateAINativeExpr(expr); err != nil {
+		if err := ctx.validateLLMExpr(expr); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
+func (ctx *aiValidationContext) validateLLMExpr(expr Expr) error {
 	if expr == nil {
 		return nil
 	}
 	switch e := expr.(type) {
 	case *BinaryExpr:
-		if err := ctx.validateAINativeExpr(e.Left); err != nil {
+		if err := ctx.validateLLMExpr(e.Left); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExpr(e.Right)
+		return ctx.validateLLMExpr(e.Right)
 	case *UnaryExpr:
-		return ctx.validateAINativeExpr(e.Operand)
+		return ctx.validateLLMExpr(e.Operand)
 	case *ParenExpr:
-		return ctx.validateAINativeExpr(e.Inner)
+		return ctx.validateLLMExpr(e.Inner)
 	case *IndexExpr:
-		if err := ctx.validateAINativeExpr(e.Table); err != nil {
+		if err := ctx.validateLLMExpr(e.Table); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExpr(e.Index)
+		return ctx.validateLLMExpr(e.Index)
 	case *FieldExpr:
-		return ctx.validateAINativeExpr(e.Table)
+		return ctx.validateLLMExpr(e.Table)
 	case *CallExpr:
-		if err := ctx.validateAINativeExpr(e.Func); err != nil {
+		if err := ctx.validateLLMExpr(e.Func); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExprList(e.Args)
+		return ctx.validateLLMExprList(e.Args)
 	case *MethodCallExpr:
-		if err := ctx.validateAINativeExpr(e.Object); err != nil {
+		if err := ctx.validateLLMExpr(e.Object); err != nil {
 			return err
 		}
-		return ctx.validateAINativeExprList(e.Args)
+		return ctx.validateLLMExprList(e.Args)
 	case *FuncLitExpr:
-		return ctx.child().validateAINativeStmtList(e.Body.Stmts, false)
+		return ctx.child().validateLLMStmtList(e.Body.Stmts, false)
 	case *AgentLitExpr:
 		if err := ctx.validateAIToolsConfig("agent expression", e.Config); err != nil {
 			return err
@@ -278,39 +278,39 @@ func (ctx *aiValidationContext) validateAINativeExpr(expr Expr) error {
 			return err
 		}
 		if e.Flow != nil {
-			return ctx.child().validateAINativeStmtList(e.Flow.Stmts, false)
+			return ctx.child().validateLLMStmtList(e.Flow.Stmts, false)
 		}
 	case *TurnExpr:
 		return ctx.validateAIToolsConfig("turn", e.Config)
 	case *MessagesExpr:
 		return ctx.validateAIMessageFields(e.Fields)
 	case *ListLitExpr:
-		return ctx.validateAINativeExprList(e.Values)
+		return ctx.validateLLMExprList(e.Values)
 	case *TableLitExpr:
 		for _, f := range e.Fields {
-			if err := ctx.validateAINativeExpr(f.Key); err != nil {
+			if err := ctx.validateLLMExpr(f.Key); err != nil {
 				return err
 			}
-			if err := ctx.validateAINativeExpr(f.Value); err != nil {
+			if err := ctx.validateLLMExpr(f.Value); err != nil {
 				return err
 			}
 		}
 	case *DenseLitExpr:
-		return ctx.validateAINativeExprList(e.Values)
+		return ctx.validateLLMExprList(e.Values)
 	case *RecvExpr:
-		return ctx.validateAINativeExpr(e.Channel)
+		return ctx.validateLLMExpr(e.Channel)
 	case *MakeChanExpr:
-		return ctx.validateAINativeExpr(e.Size)
+		return ctx.validateLLMExpr(e.Size)
 	}
 	return nil
 }
 
 func (ctx *aiValidationContext) validateAIConfigExprs(config []ConfigField) error {
 	for _, f := range config {
-		if err := ctx.validateAINativeExpr(f.Key); err != nil {
+		if err := ctx.validateLLMExpr(f.Key); err != nil {
 			return err
 		}
-		if err := ctx.validateAINativeExpr(f.Value); err != nil {
+		if err := ctx.validateLLMExpr(f.Value); err != nil {
 			return err
 		}
 	}
@@ -319,10 +319,10 @@ func (ctx *aiValidationContext) validateAIConfigExprs(config []ConfigField) erro
 
 func (ctx *aiValidationContext) validateAIMessageFields(fields []TableField) error {
 	for _, f := range fields {
-		if err := ctx.validateAINativeExpr(f.Key); err != nil {
+		if err := ctx.validateLLMExpr(f.Key); err != nil {
 			return err
 		}
-		if err := ctx.validateAINativeExpr(f.Value); err != nil {
+		if err := ctx.validateLLMExpr(f.Value); err != nil {
 			return err
 		}
 	}
@@ -566,14 +566,14 @@ func capAllows(caps []string, req string) bool {
 	return false
 }
 
-func (ctx *aiValidationContext) validateAINativeStmtList(stmts []Stmt, topLevel bool) error {
+func (ctx *aiValidationContext) validateLLMStmtList(stmts []Stmt, topLevel bool) error {
 	for _, stmt := range stmts {
 		if tool, ok := stmt.(*ToolDeclStmt); ok {
 			if err := ctx.declareTool(tool); err != nil {
 				return err
 			}
 		}
-		if err := ctx.validateAINativeStmt(stmt, topLevel); err != nil {
+		if err := ctx.validateLLMStmt(stmt, topLevel); err != nil {
 			return err
 		}
 	}

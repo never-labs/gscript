@@ -19,7 +19,7 @@ type cliCapabilities struct {
 	Commands      []string               `json:"commands"`
 	StdlibModules []string               `json:"stdlib_modules"`
 	StdlibLayers  []cliStdlibLayer       `json:"stdlib_layers"`
-	AINative      cliAINativeCapability  `json:"ai_native"`
+	LLM           cliLLMCapability       `json:"llm"`
 	Tooling       cliToolingCapability   `json:"tooling"`
 }
 
@@ -46,7 +46,7 @@ type cliStdlibModule struct {
 	SafeDefault  bool     `json:"safe_default,omitempty"`
 }
 
-type cliAINativeCapability struct {
+type cliLLMCapability struct {
 	Enabled           bool     `json:"enabled"`
 	Syntax            []string `json:"syntax"`
 	ToolMetadata      []string `json:"tool_metadata"`
@@ -106,7 +106,7 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 	}
 	fmt.Fprintf(outw, "platform: %s/%s\n", caps.Platform.GOOS, caps.Platform.GOARCH)
 	fmt.Fprintf(outw, "jit: %t\n", caps.Execution.JIT)
-	fmt.Fprintf(outw, "ai-native: %t (%s)\n", caps.AINative.Enabled, strings.Join(caps.AINative.Syntax, ", "))
+	fmt.Fprintf(outw, "llm: %t (%s)\n", caps.LLM.Enabled, strings.Join(caps.LLM.Syntax, ", "))
 	fmt.Fprintf(outw, "commands: %s\n", strings.Join(caps.Commands, ", "))
 	fmt.Fprintf(outw, "stdlib modules: %d\n", len(caps.StdlibModules))
 	return 0
@@ -130,7 +130,7 @@ func buildCapabilities() cliCapabilities {
 		Commands:      cliCommandNames(),
 		StdlibModules: modules,
 		StdlibLayers:  buildStdlibLayerCapabilities(),
-		AINative: cliAINativeCapability{
+		LLM: cliLLMCapability{
 			Enabled: true,
 			Syntax: []string{
 				"models",

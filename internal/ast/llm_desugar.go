@@ -2,11 +2,11 @@ package ast
 
 import "sort"
 
-// DesugarAINative rewrites AI-native syntax into the existing stdlib-shaped
+// DesugarLLM rewrites LLM syntax into the existing stdlib-shaped
 // AST. The parser keeps dedicated nodes so tooling can see source intent, while
 // interpreters and bytecode compilers can call this boundary once and execute
 // the same llm.* runtime substrate as hand-written library code.
-func DesugarAINative(prog *Program) *Program {
+func DesugarLLM(prog *Program) *Program {
 	if prog == nil {
 		return nil
 	}

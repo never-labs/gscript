@@ -200,7 +200,7 @@ func TestConstDeclareStmt(t *testing.T) {
 	}
 }
 
-func TestAINativeSyntaxParses(t *testing.T) {
+func TestLLMSyntaxParses(t *testing.T) {
 	prog := mustParse(t, `
 models {
     default: "glm-fast"
@@ -279,7 +279,7 @@ manual := agent(q) {
 	}
 }
 
-func TestAINativeSyntaxPositions(t *testing.T) {
+func TestLLMSyntaxPositions(t *testing.T) {
 	prog := mustParse(t, `
 models {
     default: "fast"
@@ -326,7 +326,7 @@ agent answer(q) {
 	}
 }
 
-func TestAINativeValidationReportsStaticToolListElementLine(t *testing.T) {
+func TestLLMValidationReportsStaticToolListElementLine(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		src  string
@@ -373,15 +373,15 @@ agent answer(q) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prog := mustParse(t, tc.src)
-			err := ast.ValidateAINative(prog)
+			err := ast.ValidateLLM(prog)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
-				t.Fatalf("ValidateAINative error = %v, want substring %q", err, tc.want)
+				t.Fatalf("ValidateLLM error = %v, want substring %q", err, tc.want)
 			}
 		})
 	}
 }
 
-func TestAINativeExampleParses(t *testing.T) {
+func TestLLMExampleParses(t *testing.T) {
 	src, err := os.ReadFile("../../examples/llm/agent.gs")
 	if err != nil {
 		t.Fatal(err)
@@ -392,7 +392,7 @@ func TestAINativeExampleParses(t *testing.T) {
 	}
 }
 
-func TestAINativeToolCommentDirectivesParseAndDesugar(t *testing.T) {
+func TestLLMToolCommentDirectivesParseAndDesugar(t *testing.T) {
 	prog := mustParse(t, `
 // Lookup docs.
 //gscript:requires docs.read, net.client
@@ -419,7 +419,7 @@ tool search_docs(query, limit) {
 		t.Fatalf("param docs = %#v", tool.ParamDocs)
 	}
 
-	desugared := ast.DesugarAINative(prog)
+	desugared := ast.DesugarLLM(prog)
 	decl, ok := desugared.Stmts[0].(*ast.DeclareStmt)
 	if !ok || len(decl.Values) != 1 {
 		t.Fatalf("desugared stmt = %#v", desugared.Stmts[0])
@@ -455,7 +455,7 @@ func TestFileDirectivesParse(t *testing.T) {
 	prog := mustParse(t, `//gscript:build linux, darwin
 //gscript:test integration slow
 //gscript:cap docs.read,net.client
-//gscript:feature ai-native
+//gscript:feature llm
 func main() {}
 `)
 	if len(prog.FileDirectives) != 4 {
@@ -476,7 +476,7 @@ func main() {}
 	if got := prog.FileDirectives[2].Args; len(got) != 2 || got[0] != "docs.read" || got[1] != "net.client" {
 		t.Fatalf("cap args = %#v", got)
 	}
-	if got := prog.FileDirectives[3].Text; got != "ai-native" {
+	if got := prog.FileDirectives[3].Text; got != "llm" {
 		t.Fatalf("feature text = %q", got)
 	}
 }
@@ -544,7 +544,7 @@ func TestGoImportDesugarsToRequireDeclaration(t *testing.T) {
 	}
 }
 
-func TestAINativeToolCommentBlankLineDoesNotAttach(t *testing.T) {
+func TestLLMToolCommentBlankLineDoesNotAttach(t *testing.T) {
 	prog := mustParse(t, `
 // Stale docs.
 

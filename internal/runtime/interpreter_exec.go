@@ -20,10 +20,10 @@ import (
 
 // Exec executes a program (top-level statement list).
 func (interp *Interpreter) Exec(prog *ast.Program) error {
-	if err := ast.ValidateAINative(prog); err != nil {
+	if err := ast.ValidateLLM(prog); err != nil {
 		return err
 	}
-	prog = ast.DesugarAINative(prog)
+	prog = ast.DesugarLLM(prog)
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return err
 	}
@@ -51,10 +51,10 @@ func (interp *Interpreter) ExecString(src string) ([]Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ast.ValidateAINative(prog); err != nil {
+	if err := ast.ValidateLLM(prog); err != nil {
 		return nil, err
 	}
-	prog = ast.DesugarAINative(prog)
+	prog = ast.DesugarLLM(prog)
 	if err := ast.ValidateLabelControl(prog); err != nil {
 		return nil, err
 	}

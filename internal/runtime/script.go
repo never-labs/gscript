@@ -184,10 +184,10 @@ func (interp *Interpreter) execProgramWithOptions(prog *ast.Program, opts Script
 }
 
 func (interp *Interpreter) execProgram(prog *ast.Program, env *Environment) ([]Value, error) {
-	if err := ast.ValidateAINative(prog); err != nil {
+	if err := ast.ValidateLLM(prog); err != nil {
 		return nil, err
 	}
-	prog = ast.DesugarAINative(prog)
+	prog = ast.DesugarLLM(prog)
 	var lastRet []Value
 	interp.pushDeferFrame()
 	for _, stmt := range prog.Stmts {

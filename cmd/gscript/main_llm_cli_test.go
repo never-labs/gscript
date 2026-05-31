@@ -13,7 +13,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 )
 
-func TestCLIAINativeAnthropicCompatibleRequestsKeepPrompts(t *testing.T) {
+func TestCLILLMAnthropicCompatibleRequestsKeepPrompts(t *testing.T) {
 	type anthropicRequest struct {
 		Model    string `json:"model"`
 		System   string `json:"system"`

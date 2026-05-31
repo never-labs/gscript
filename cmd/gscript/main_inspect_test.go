@@ -56,7 +56,7 @@ func TestInspectDirectivesDumpsFileDirectives(t *testing.T) {
 	src := `//gscript:build linux, darwin
 //gscript:test integration slow
 //gscript:cap docs.read,net.client
-//gscript:feature ai-native
+//gscript:feature llm
 //@gscript:build ignored
 func main() {}
 `
@@ -74,7 +74,7 @@ func main() {}
 		"1:1 build linux, darwin",
 		"2:1 test integration slow",
 		"3:1 cap docs.read,net.client",
-		"4:1 feature ai-native",
+		"4:1 feature llm",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
