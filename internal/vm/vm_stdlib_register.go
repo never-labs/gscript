@@ -737,7 +737,10 @@ func (vm *VM) RegisterHTTPLib() {
 
 func (vm *VM) RegisterSyncLib() {
 	std := vm.newStdlibInstallContext()
-	syncLib := runtime.TableValue(runtime.BuildSyncLibWithTaskLauncher(vm.callValue, vm.launchSyncTask))
+	syncLib := runtime.TableValue(modules.BuildSync(modules.SyncOptions{
+		Call:   vm.callValue,
+		Launch: vm.launchSyncTask,
+	}))
 	std.RegisterModule("sync", syncLib)
 }
 

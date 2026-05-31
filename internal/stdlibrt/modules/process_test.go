@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"os"
@@ -6,30 +6,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
-func execOnInterp(t *testing.T, interp *Interpreter, src string) {
+func processInterp(t *testing.T) *runtime.Interpreter {
 	t.Helper()
-	tokens, err := lexer.New(src).Tokenize()
-	if err != nil {
-		t.Fatalf("lexer error: %v", err)
-	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if err := interp.Exec(prog); err != nil {
-		t.Fatalf("exec error: %v", err)
-	}
+	interp := runtime.NewCore()
+	processModule := runtime.TableValue(BuildProcessWithPolicy(HostOptions{
+		ProcessExecution:      interp.ProcessExecutionEnabled,
+		ProcessShell:          interp.ProcessShellEnabled,
+		EnvironmentRead:       interp.EnvironmentReadEnabled,
+		EnvironmentWrite:      interp.EnvironmentWriteEnabled,
+		EnvironmentAllowed:    interp.EnvironmentAllowed,
+		FilesystemRoot:        interp.FilesystemRoot,
+		ResolveFilesystemPath: interp.ResolveFilesystemPath,
+		MaxHostResult:         interp.MaxHostResultBytes,
+	}))
+	interp.SetGlobal("process", processModule)
+	interp.SetModule("process", processModule)
+	return interp
 }
 
 func TestProcessWhich(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 	execOnInterp(t, interp, `result := process.which("ls")`)
 
 	v := interp.GetGlobal("result")
@@ -42,10 +41,7 @@ func TestProcessWhich(t *testing.T) {
 }
 
 func TestProcessWhichNotFound(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 	execOnInterp(t, interp, `result := process.which("__nonexistent_binary_12345__")`)
 
 	v := interp.GetGlobal("result")
@@ -55,10 +51,7 @@ func TestProcessWhichNotFound(t *testing.T) {
 }
 
 func TestProcessRun(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 	execOnInterp(t, interp, `result := process.run("echo hello")`)
 
 	v := interp.GetGlobal("result")
@@ -66,28 +59,25 @@ func TestProcessRun(t *testing.T) {
 		t.Fatalf("expected table result, got %s", v.TypeName())
 	}
 	tbl := v.Table()
-	if !tbl.RawGet(StringValue("ok")).Bool() {
+	if !tbl.RawGet(runtime.StringValue("ok")).Bool() {
 		t.Errorf("expected ok=true")
 	}
-	stdout := tbl.RawGet(StringValue("stdout")).Str()
+	stdout := tbl.RawGet(runtime.StringValue("stdout")).Str()
 	if strings.TrimSpace(stdout) != "hello" {
 		t.Errorf("expected stdout='hello', got '%s'", stdout)
 	}
-	if tbl.RawGet(StringValue("code")).Int() != 0 {
-		t.Errorf("expected code=0, got %v", tbl.RawGet(StringValue("code")))
+	if tbl.RawGet(runtime.StringValue("code")).Int() != 0 {
+		t.Errorf("expected code=0, got %v", tbl.RawGet(runtime.StringValue("code")))
 	}
 }
 
 func TestProcessRunContextCancelled(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
-	state := NewScriptContextState()
+	interp := processInterp(t)
+	state := runtime.NewScriptContextState()
 	time.AfterFunc(10*time.Millisecond, func() {
-		state.Cancel(StringValue("deadline exceeded"))
+		state.Cancel(runtime.StringValue("deadline exceeded"))
 	})
-	interp.SetGlobal("ctx", TableValue(NewScriptContextTable(state)))
+	interp.SetGlobal("ctx", runtime.TableValue(runtime.NewScriptContextTable(state)))
 	execOnInterp(t, interp, `
 result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
 `)
@@ -97,43 +87,37 @@ result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
 		t.Fatalf("expected table result, got %s", v.TypeName())
 	}
 	tbl := v.Table()
-	if tbl.RawGet(StringValue("ok")).Bool() {
+	if tbl.RawGet(runtime.StringValue("ok")).Bool() {
 		t.Fatalf("expected ok=false")
 	}
-	if !tbl.RawGet(StringValue("cancelled")).Bool() {
+	if !tbl.RawGet(runtime.StringValue("cancelled")).Bool() {
 		t.Fatalf("expected cancelled=true")
 	}
-	if got := tbl.RawGet(StringValue("err")); !got.IsString() || got.Str() != "deadline exceeded" {
+	if got := tbl.RawGet(runtime.StringValue("err")); !got.IsString() || got.Str() != "deadline exceeded" {
 		t.Fatalf("err = %v, want deadline exceeded", got)
 	}
-	if strings.Contains(tbl.RawGet(StringValue("stdout")).Str(), "late") {
+	if strings.Contains(tbl.RawGet(runtime.StringValue("stdout")).Str(), "late") {
 		t.Fatalf("process was not cancelled before late output")
 	}
 }
 
 func TestProcessShell(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 	execOnInterp(t, interp, `result := process.shell("echo hello && echo world")`)
 
 	v := interp.GetGlobal("result")
 	tbl := v.Table()
-	if !tbl.RawGet(StringValue("ok")).Bool() {
+	if !tbl.RawGet(runtime.StringValue("ok")).Bool() {
 		t.Errorf("expected ok=true")
 	}
-	stdout := tbl.RawGet(StringValue("stdout")).Str()
+	stdout := tbl.RawGet(runtime.StringValue("stdout")).Str()
 	if !strings.Contains(stdout, "hello") || !strings.Contains(stdout, "world") {
 		t.Errorf("expected stdout to contain 'hello' and 'world', got '%s'", stdout)
 	}
 }
 
 func TestProcessPid(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 	execOnInterp(t, interp, `pid := process.pid()`)
 
 	v := interp.GetGlobal("pid")
@@ -143,10 +127,7 @@ func TestProcessPid(t *testing.T) {
 }
 
 func TestProcessEnv(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 
 	os.Setenv("GSCRIPT_TEST_PROC_ENV", "test_value")
 	defer os.Unsetenv("GSCRIPT_TEST_PROC_ENV")
@@ -157,17 +138,14 @@ func TestProcessEnv(t *testing.T) {
 	if !v.IsTable() {
 		t.Fatalf("expected table, got %s", v.TypeName())
 	}
-	val := v.Table().RawGet(StringValue("GSCRIPT_TEST_PROC_ENV"))
+	val := v.Table().RawGet(runtime.StringValue("GSCRIPT_TEST_PROC_ENV"))
 	if val.Str() != "test_value" {
 		t.Errorf("expected 'test_value', got '%s'", val.Str())
 	}
 }
 
 func TestProcessExec(t *testing.T) {
-	interp := NewCore()
-	processModule := TableValue(buildProcessLib(interp))
-	interp.SetGlobal("process", processModule)
-	interp.SetModule("process", processModule)
+	interp := processInterp(t)
 	execOnInterp(t, interp, `result := process.exec("echo", "hello")`)
 
 	v := interp.GetGlobal("result")

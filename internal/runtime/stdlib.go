@@ -64,9 +64,7 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	))
 	std.RegisterTable("time", buildTimeLib())
 	std.RegisterTable("net", buildNetLib(interp))
-	std.RegisterTable("process", buildProcessLib(interp))
 	std.RegisterTable("soa", buildSoALib())
-	std.RegisterTable("sync", BuildSyncLibWithCaller(interp.callFunction))
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 
