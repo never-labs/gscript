@@ -856,15 +856,16 @@ func llmBudgetDuration(v Value) time.Duration {
 }
 
 func llmBudgetError(dimension string, limit, used int64) Value {
+	shape := stdlibai.BudgetExceededError(dimension, limit, used)
 	t := NewTable()
-	t.RawSetString("kind", StringValue("budget"))
-	t.RawSetString("dimension", StringValue(dimension))
-	t.RawSetString("message", StringValue("llm budget exceeded: "+dimension))
-	if limit > 0 {
-		t.RawSetString("limit", IntValue(limit))
+	t.RawSetString("kind", StringValue(shape.Kind))
+	t.RawSetString("dimension", StringValue(shape.Dimension))
+	t.RawSetString("message", StringValue(shape.Message))
+	if shape.Limit > 0 {
+		t.RawSetString("limit", IntValue(shape.Limit))
 	}
-	if used > 0 {
-		t.RawSetString("used", IntValue(used))
+	if shape.Used > 0 {
+		t.RawSetString("used", IntValue(shape.Used))
 	}
 	return TableValue(t)
 }
@@ -905,16 +906,10 @@ func (c llmCancel) check() Value {
 }
 
 func llmCancelError(reason string) Value {
-	if reason == "" {
-		reason = "cancelled"
-	}
-	kind := "cancelled"
-	if reason == "deadline exceeded" || reason == "context deadline exceeded" {
-		kind = "deadline"
-	}
+	shape := stdlibai.CancelledError(reason)
 	t := NewTable()
-	t.RawSetString("kind", StringValue(kind))
-	t.RawSetString("message", StringValue(reason))
+	t.RawSetString("kind", StringValue(shape.Kind))
+	t.RawSetString("message", StringValue(shape.Message))
 	return TableValue(t)
 }
 
@@ -944,10 +939,11 @@ func llmTransientToolError(kind string) bool {
 }
 
 func llmReactResultValue(status, text, reason string, turn Value, history []Value) Value {
+	shape := stdlibai.ReactResult(status, text, reason)
 	t := NewTable()
-	t.RawSetString("status", StringValue(status))
-	t.RawSetString("text", StringValue(text))
-	t.RawSetString("reason", StringValue(reason))
+	t.RawSetString("status", StringValue(shape.Status))
+	t.RawSetString("text", StringValue(shape.Text))
+	t.RawSetString("reason", StringValue(shape.Reason))
 	t.RawSetString("result", turn)
 	t.RawSetString("history", llmTableFromValues(history))
 	return TableValue(t)
