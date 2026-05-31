@@ -87,6 +87,125 @@ func TestRuntimeTableMoveRejectsNonTableDestination(t *testing.T) {
 	}
 }
 
+func TestRuntimeTableInsertProxyThroughMetamethods(t *testing.T) {
+	interp := runProgram(t, `
+		backing := {[1]: "a", [2]: "c", [3]: "d"}
+		ops := {}
+		opn := 0
+		reads := 0
+		writes := 0
+		proxy := setmetatable({}, {
+			__len: func() { return 3 },
+			__index: func(_, k) {
+				reads = reads + 1
+				opn = opn + 1
+				ops[opn] = "r" .. k
+				return backing[k]
+			},
+			__newindex: func(_, k, v) {
+				writes = writes + 1
+				opn = opn + 1
+				ops[opn] = "w" .. k .. "=" .. v
+				backing[k] = v
+			},
+		})
+
+		table.insert(proxy, 2, "b")
+		r1 := backing[1]
+		r2 := backing[2]
+		r3 := backing[3]
+		r4 := backing[4]
+	`)
+	if got := interp.GetGlobal("r1").Str(); got != "a" {
+		t.Fatalf("r1 = %q, want a", got)
+	}
+	if got := interp.GetGlobal("r2").Str(); got != "b" {
+		t.Fatalf("r2 = %q, want b", got)
+	}
+	if got := interp.GetGlobal("r3").Str(); got != "c" {
+		t.Fatalf("r3 = %q, want c", got)
+	}
+	if got := interp.GetGlobal("r4").Str(); got != "d" {
+		t.Fatalf("r4 = %q, want d", got)
+	}
+	if got := interp.GetGlobal("reads").Int(); got != 2 {
+		t.Fatalf("reads = %d, want 2", got)
+	}
+	if got := interp.GetGlobal("writes").Int(); got != 3 {
+		t.Fatalf("writes = %d, want 3", got)
+	}
+	ops := interp.GetGlobal("ops").Table()
+	wantOps := []string{"r3", "w4=d", "r2", "w3=c", "w2=b"}
+	for i, want := range wantOps {
+		if got := ops.RawGet(IntValue(int64(i + 1))).Str(); got != want {
+			t.Fatalf("ops[%d] = %q, want %q", i+1, got, want)
+		}
+	}
+}
+
+func TestRuntimeTableRemoveProxyThroughMetamethods(t *testing.T) {
+	interp := runProgram(t, `
+		backing := {[1]: "a", [2]: "b", [3]: "c", [4]: "d"}
+		ops := {}
+		opn := 0
+		reads := 0
+		writes := 0
+		proxy := setmetatable({}, {
+			__len: func() { return 4 },
+			__index: func(_, k) {
+				reads = reads + 1
+				opn = opn + 1
+				ops[opn] = "r" .. k
+				return backing[k]
+			},
+			__newindex: func(_, k, v) {
+				writes = writes + 1
+				opn = opn + 1
+				if v == nil {
+					ops[opn] = "w" .. k .. "=nil"
+				} else {
+					ops[opn] = "w" .. k .. "=" .. v
+				}
+				backing[k] = v
+			},
+		})
+
+		removed := table.remove(proxy, 2)
+		r1 := backing[1]
+		r2 := backing[2]
+		r3 := backing[3]
+		r4 := backing[4]
+	`)
+	if got := interp.GetGlobal("removed").Str(); got != "b" {
+		t.Fatalf("removed = %q, want b", got)
+	}
+	if got := interp.GetGlobal("r1").Str(); got != "a" {
+		t.Fatalf("r1 = %q, want a", got)
+	}
+	if got := interp.GetGlobal("r2").Str(); got != "c" {
+		t.Fatalf("r2 = %q, want c", got)
+	}
+	if got := interp.GetGlobal("r3").Str(); got != "d" {
+		t.Fatalf("r3 = %q, want d", got)
+	}
+	if got := interp.GetGlobal("r4"); !got.IsNil() {
+		t.Fatalf("r4 = %v, want nil", got)
+	}
+	if got := interp.GetGlobal("reads").Int(); got != 3 {
+		t.Fatalf("reads = %d, want 3", got)
+	}
+	if got := interp.GetGlobal("writes").Int(); got != 3 {
+		t.Fatalf("writes = %d, want 3", got)
+	}
+	ops := interp.GetGlobal("ops").Table()
+	wantOps := []string{"r2", "r3", "w2=c", "r4", "w3=d", "w4=nil"}
+	for i, want := range wantOps {
+		if got := ops.RawGet(IntValue(int64(i + 1))).Str(); got != want {
+			t.Fatalf("ops[%d] = %q, want %q", i+1, got, want)
+		}
+	}
+}
+
 func TestRawTableMoveRejectsNonTableDestination(t *testing.T) {
 	lib := buildTableLib()
 	moveFn := lib.RawGet(StringValue("move")).GoFunction()

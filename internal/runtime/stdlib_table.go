@@ -30,6 +30,14 @@ type TableSortTryPlainArraySort func(Value, int64) bool
 type TableMoveGet func(Value, Value) (Value, error)
 type TableMoveSet func(Value, Value, Value) error
 type TableMoveTryPlainArrayMove func(src, dst Value, first, last, target int64) bool
+type TableInsertLen func(Value) (int64, error)
+type TableInsertGet func(Value, Value) (Value, error)
+type TableInsertSet func(Value, Value, Value) error
+type TableInsertTryPlainArrayInsert func(Value, int64, Value, int64) bool
+type TableRemoveLen func(Value) (int64, error)
+type TableRemoveGet func(Value, Value) (Value, error)
+type TableRemoveSet func(Value, Value, Value) error
+type TableRemoveTryPlainArrayRemove func(Value, int64, int64) (Value, bool)
 
 // BuildTableSortFunction builds table.sort around caller-provided table access
 // and comparison hooks. VM/interpreter callers pass metamethod-aware hooks;
@@ -242,6 +250,142 @@ func rawTableMoveFunction() *GoFunction {
 	)
 }
 
+// BuildTableInsertFunction builds table.insert around caller-provided table
+// access hooks. Raw callers pass RawGet/RawSet; interpreter callers pass
+// metamethod-aware hooks.
+func BuildTableInsertFunction(tableLen TableInsertLen, tableGet TableInsertGet, tableSet TableInsertSet, tryPlain TableInsertTryPlainArrayInsert) *GoFunction {
+	return &GoFunction{
+		Name: "table.insert",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+			}
+			if len(args) != 2 && len(args) != 3 {
+				return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
+			}
+
+			t := args[0]
+			length, err := tableLen(t)
+			if err != nil {
+				return nil, err
+			}
+
+			pos := length + 1
+			value := args[1]
+			if len(args) == 3 {
+				pos = toInt(args[1])
+				if pos < 1 || pos > length+1 {
+					return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+				}
+				value = args[2]
+			}
+
+			if tryPlain != nil && tryPlain(t, pos, value, length) {
+				return nil, nil
+			}
+			for i := length; i >= pos; i-- {
+				v, err := tableGet(t, IntValue(i))
+				if err != nil {
+					return nil, err
+				}
+				if err := tableSet(t, IntValue(i+1), v); err != nil {
+					return nil, err
+				}
+			}
+			return nil, tableSet(t, IntValue(pos), value)
+		},
+	}
+}
+
+func rawTableInsertFunction() *GoFunction {
+	return BuildTableInsertFunction(
+		func(t Value) (int64, error) {
+			return int64(t.Table().Length()), nil
+		},
+		func(t Value, key Value) (Value, error) {
+			return t.Table().RawGet(key), nil
+		},
+		func(t Value, key Value, val Value) error {
+			t.Table().RawSet(key, val)
+			return nil
+		},
+		func(t Value, pos int64, val Value, length int64) bool {
+			return t.Table().TryPlainArrayInsertKnownLength(pos, val, length)
+		},
+	)
+}
+
+// BuildTableRemoveFunction builds table.remove around caller-provided table
+// access hooks. Raw callers pass RawGet/RawSet; interpreter callers pass
+// metamethod-aware hooks.
+func BuildTableRemoveFunction(tableLen TableRemoveLen, tableGet TableRemoveGet, tableSet TableRemoveSet, tryPlain TableRemoveTryPlainArrayRemove) *GoFunction {
+	return &GoFunction{
+		Name: "table.remove",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
+			}
+
+			t := args[0]
+			length, err := tableLen(t)
+			if err != nil {
+				return nil, err
+			}
+			pos := length
+			if len(args) >= 2 {
+				pos = toInt(args[1])
+			}
+			if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
+				return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+			}
+			if pos == length+1 {
+				return []Value{NilValue()}, nil
+			}
+
+			if tryPlain != nil {
+				if removed, ok := tryPlain(t, pos, length); ok {
+					return []Value{removed}, nil
+				}
+			}
+			removed, err := tableGet(t, IntValue(pos))
+			if err != nil {
+				return nil, err
+			}
+			for i := pos; i < length; i++ {
+				v, err := tableGet(t, IntValue(i+1))
+				if err != nil {
+					return nil, err
+				}
+				if err := tableSet(t, IntValue(i), v); err != nil {
+					return nil, err
+				}
+			}
+			if err := tableSet(t, IntValue(length), NilValue()); err != nil {
+				return nil, err
+			}
+			return []Value{removed}, nil
+		},
+	}
+}
+
+func rawTableRemoveFunction() *GoFunction {
+	return BuildTableRemoveFunction(
+		func(t Value) (int64, error) {
+			return int64(t.Table().Length()), nil
+		},
+		func(t Value, key Value) (Value, error) {
+			return t.Table().RawGet(key), nil
+		},
+		func(t Value, key Value, val Value) error {
+			t.Table().RawSet(key, val)
+			return nil
+		},
+		func(t Value, pos int64, length int64) (Value, bool) {
+			return t.Table().TryPlainArrayRemoveKnownLength(pos, length)
+		},
+	)
+}
+
 // buildTableLib creates the "table" standard library table.
 func buildTableLib() *Table {
 	t := NewTable()
@@ -253,64 +397,8 @@ func buildTableLib() *Table {
 		}))
 	}
 
-	// table.insert(t, [pos,] value)
-	set("insert", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
-		}
-		if len(args) != 2 && len(args) != 3 {
-			return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
-		}
-		tbl := args[0].Table()
-		length := int64(tbl.Length())
-
-		if len(args) == 2 {
-			// Append at end
-			tbl.RawSet(IntValue(length+1), args[1])
-			return nil, nil
-		}
-		// Insert at position
-		pos := toInt(args[1])
-		if pos < 1 || pos > length+1 {
-			return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
-		}
-		value := args[2]
-		// Shift elements right
-		for i := length; i >= pos; i-- {
-			tbl.RawSet(IntValue(i+1), tbl.RawGet(IntValue(i)))
-		}
-		tbl.RawSet(IntValue(pos), value)
-		return nil, nil
-	})
-
-	// table.remove(t [, pos]) -> removed value
-	set("remove", func(args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
-		}
-		tbl := args[0].Table()
-		length := int64(tbl.Length())
-		pos := length // default: remove last element
-		if len(args) >= 2 {
-			pos = toInt(args[1])
-		}
-		if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
-			return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
-		}
-		if pos == length+1 {
-			return []Value{NilValue()}, nil
-		}
-
-		removed := tbl.RawGet(IntValue(pos))
-
-		// Shift elements left
-		for i := pos; i < length; i++ {
-			tbl.RawSet(IntValue(i), tbl.RawGet(IntValue(i+1)))
-		}
-		tbl.RawSet(IntValue(length), NilValue())
-
-		return []Value{removed}, nil
-	})
+	t.RawSet(StringValue("insert"), FunctionValue(rawTableInsertFunction()))
+	t.RawSet(StringValue("remove"), FunctionValue(rawTableRemoveFunction()))
 
 	// table.concat(t [, sep [, i [, j]]]) -> string
 	set("concat", func(args []Value) ([]Value, error) {
@@ -680,80 +768,29 @@ func buildTableSortWithInterp(interp *Interpreter, tblLib *Table) {
 }
 
 func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {
-	tblLib.RawSet(StringValue("insert"), FunctionValue(&GoFunction{
-		Name: "table.insert",
-		Fn: func(args []Value) ([]Value, error) {
-			if len(args) < 1 || !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument #1 to 'table.insert' (table expected)")
+	tblLib.RawSet(StringValue("insert"), FunctionValue(BuildTableInsertFunction(
+		interp.tableLenInt,
+		interp.tableGet,
+		interp.tableSet,
+		func(t Value, pos int64, val Value, length int64) bool {
+			if tbl := t.Table(); tbl != nil && tbl.TryPlainArrayInsertKnownLength(pos, val, length) {
+				return true
 			}
-			if len(args) != 2 && len(args) != 3 {
-				return nil, fmt.Errorf("wrong number of arguments to 'table.insert'")
-			}
-			t := args[0]
-			length, err := interp.tableLenInt(t)
-			if err != nil {
-				return nil, err
-			}
-			if len(args) == 2 {
-				return nil, interp.tableSet(t, IntValue(int64(length+1)), args[1])
-			}
-			pos := toInt(args[1])
-			if pos < 1 || pos > int64(length)+1 {
-				return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
-			}
-			for i := int64(length); i >= pos; i-- {
-				v, err := interp.tableGet(t, IntValue(i))
-				if err != nil {
-					return nil, err
-				}
-				if err := interp.tableSet(t, IntValue(i+1), v); err != nil {
-					return nil, err
-				}
-			}
-			return nil, interp.tableSet(t, IntValue(pos), args[2])
+			return false
 		},
-	}))
+	)))
 
-	tblLib.RawSet(StringValue("remove"), FunctionValue(&GoFunction{
-		Name: "table.remove",
-		Fn: func(args []Value) ([]Value, error) {
-			if len(args) < 1 || !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument #1 to 'table.remove' (table expected)")
+	tblLib.RawSet(StringValue("remove"), FunctionValue(BuildTableRemoveFunction(
+		interp.tableLenInt,
+		interp.tableGet,
+		interp.tableSet,
+		func(t Value, pos int64, length int64) (Value, bool) {
+			if tbl := t.Table(); tbl != nil {
+				return tbl.TryPlainArrayRemoveKnownLength(pos, length)
 			}
-			t := args[0]
-			length, err := interp.tableLenInt(t)
-			if err != nil {
-				return nil, err
-			}
-			pos := int64(length)
-			if len(args) >= 2 {
-				pos = toInt(args[1])
-			}
-			if pos < 0 || pos > int64(length)+1 || (pos == 0 && length > 0) {
-				return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
-			}
-			if pos == int64(length)+1 {
-				return []Value{NilValue()}, nil
-			}
-			removed, err := interp.tableGet(t, IntValue(pos))
-			if err != nil {
-				return nil, err
-			}
-			for i := pos; i < int64(length); i++ {
-				v, err := interp.tableGet(t, IntValue(i+1))
-				if err != nil {
-					return nil, err
-				}
-				if err := interp.tableSet(t, IntValue(i), v); err != nil {
-					return nil, err
-				}
-			}
-			if err := interp.tableSet(t, IntValue(int64(length)), NilValue()); err != nil {
-				return nil, err
-			}
-			return []Value{removed}, nil
+			return NilValue(), false
 		},
-	}))
+	)))
 
 	tableUnpack := func(name string, args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
