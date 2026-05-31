@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"fmt"
-	"math"
-	"strings"
+
+	stdcolor "github.com/never-labs/gscript/internal/stdlib/data/color"
 )
 
 // --------------------------------------------------------------------------
@@ -23,16 +23,6 @@ func newColorMeta() *Table {
 			toFloat(tbl.RawGet(StringValue("a")))
 	}
 
-	clamp01 := func(v float64) float64 {
-		if v < 0 {
-			return 0
-		}
-		if v > 1 {
-			return 1
-		}
-		return v
-	}
-
 	// __add: component-wise add (clamped to 1)
 	mt.RawSet(StringValue("__add"), FunctionValue(&GoFunction{
 		Name: "color.__add",
@@ -42,12 +32,10 @@ func newColorMeta() *Table {
 			}
 			r1, g1, b1, a1 := getRGBA(args[0])
 			r2, g2, b2, a2 := getRGBA(args[1])
-			return []Value{makeColorValue(
-				clamp01(r1+r2),
-				clamp01(g1+g2),
-				clamp01(b1+b2),
-				clamp01(a1+a2),
-			)}, nil
+			return []Value{makeColorRGBA(stdcolor.Add(
+				stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
+				stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
+			))}, nil
 		},
 	}))
 
@@ -62,18 +50,21 @@ func newColorMeta() *Table {
 			if a.IsTable() && (b.IsNumber() || b.IsInt()) {
 				r, g, bl, al := getRGBA(a)
 				s := toFloat(b)
-				return []Value{makeColorValue(r*s, g*s, bl*s, al)}, nil
+				return []Value{makeColorRGBA(stdcolor.Scale(stdcolor.RGBA{R: r, G: g, B: bl, A: al}, s))}, nil
 			}
 			if (a.IsNumber() || a.IsInt()) && b.IsTable() {
 				s := toFloat(a)
 				r, g, bl, al := getRGBA(b)
-				return []Value{makeColorValue(s*r, s*g, s*bl, al)}, nil
+				return []Value{makeColorRGBA(stdcolor.Scale(stdcolor.RGBA{R: r, G: g, B: bl, A: al}, s))}, nil
 			}
 			// Component-wise multiply of two colors
 			if a.IsTable() && b.IsTable() {
 				r1, g1, b1, a1 := getRGBA(a)
 				r2, g2, b2, a2 := getRGBA(b)
-				return []Value{makeColorValue(r1*r2, g1*g2, b1*b2, a1*a2)}, nil
+				return []Value{makeColorRGBA(stdcolor.Mul(
+					stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
+					stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
+				))}, nil
 			}
 			return nil, fmt.Errorf("color.__mul: unsupported operand types")
 		},
@@ -100,11 +91,15 @@ func newColorMeta() *Table {
 // --------------------------------------------------------------------------
 
 func makeColorValue(r, g, b, a float64) Value {
+	return makeColorRGBA(stdcolor.RGBA{R: r, G: g, B: b, A: a})
+}
+
+func makeColorRGBA(c stdcolor.RGBA) Value {
 	t := NewTable()
-	t.RawSet(StringValue("r"), FloatValue(r))
-	t.RawSet(StringValue("g"), FloatValue(g))
-	t.RawSet(StringValue("b"), FloatValue(b))
-	t.RawSet(StringValue("a"), FloatValue(a))
+	t.RawSet(StringValue("r"), FloatValue(c.R))
+	t.RawSet(StringValue("g"), FloatValue(c.G))
+	t.RawSet(StringValue("b"), FloatValue(c.B))
+	t.RawSet(StringValue("a"), FloatValue(c.A))
 	t.RawSet(StringValue("_type"), StringValue("color"))
 	t.SetMetatable(colorMeta)
 	return TableValue(t)
@@ -116,145 +111,6 @@ func isColorValue(v Value) bool {
 	}
 	ty := v.Table().RawGet(StringValue("_type"))
 	return ty.IsString() && ty.Str() == "color"
-}
-
-// --------------------------------------------------------------------------
-// HSV/HSL conversion helpers
-// --------------------------------------------------------------------------
-
-func hsvToRGB(h, s, v float64) (float64, float64, float64) {
-	h = math.Mod(h, 360)
-	if h < 0 {
-		h += 360
-	}
-	c := v * s
-	x := c * (1 - math.Abs(math.Mod(h/60, 2)-1))
-	m := v - c
-
-	var r, g, b float64
-	switch {
-	case h < 60:
-		r, g, b = c, x, 0
-	case h < 120:
-		r, g, b = x, c, 0
-	case h < 180:
-		r, g, b = 0, c, x
-	case h < 240:
-		r, g, b = 0, x, c
-	case h < 300:
-		r, g, b = x, 0, c
-	default:
-		r, g, b = c, 0, x
-	}
-	return r + m, g + m, b + m
-}
-
-func rgbToHSV(r, g, b float64) (float64, float64, float64) {
-	max := math.Max(r, math.Max(g, b))
-	min := math.Min(r, math.Min(g, b))
-	delta := max - min
-
-	var h float64
-	if delta == 0 {
-		h = 0
-	} else if max == r {
-		h = 60 * math.Mod((g-b)/delta, 6)
-	} else if max == g {
-		h = 60 * ((b-r)/delta + 2)
-	} else {
-		h = 60 * ((r-g)/delta + 4)
-	}
-	if h < 0 {
-		h += 360
-	}
-
-	var s float64
-	if max != 0 {
-		s = delta / max
-	}
-
-	return h, s, max
-}
-
-func hslToRGB(h, s, l float64) (float64, float64, float64) {
-	h = math.Mod(h, 360)
-	if h < 0 {
-		h += 360
-	}
-	c := (1 - math.Abs(2*l-1)) * s
-	x := c * (1 - math.Abs(math.Mod(h/60, 2)-1))
-	m := l - c/2
-
-	var r, g, b float64
-	switch {
-	case h < 60:
-		r, g, b = c, x, 0
-	case h < 120:
-		r, g, b = x, c, 0
-	case h < 180:
-		r, g, b = 0, c, x
-	case h < 240:
-		r, g, b = 0, x, c
-	case h < 300:
-		r, g, b = x, 0, c
-	default:
-		r, g, b = c, 0, x
-	}
-	return r + m, g + m, b + m
-}
-
-func rgbToHSL(r, g, b float64) (float64, float64, float64) {
-	max := math.Max(r, math.Max(g, b))
-	min := math.Min(r, math.Min(g, b))
-	l := (max + min) / 2
-	delta := max - min
-
-	if delta == 0 {
-		return 0, 0, l
-	}
-
-	var s float64
-	if l <= 0.5 {
-		s = delta / (max + min)
-	} else {
-		s = delta / (2 - max - min)
-	}
-
-	var h float64
-	if max == r {
-		h = 60 * math.Mod((g-b)/delta, 6)
-	} else if max == g {
-		h = 60 * ((b-r)/delta + 2)
-	} else {
-		h = 60 * ((r-g)/delta + 4)
-	}
-	if h < 0 {
-		h += 360
-	}
-
-	return h, s, l
-}
-
-// parseHexByte parses a two-character hex string into a byte value.
-func parseHexByte(s string) (uint8, bool) {
-	if len(s) != 2 {
-		return 0, false
-	}
-	var val uint8
-	for _, c := range s {
-		val <<= 4
-		switch {
-		case c >= '0' && c <= '9':
-			val |= uint8(c - '0')
-		case c >= 'a' && c <= 'f':
-			val |= uint8(c-'a') + 10
-		case c >= 'A' && c <= 'F':
-			val |= uint8(c-'A') + 10
-		default:
-			return 0, false
-		}
-	}
-	return val, true
 }
 
 // --------------------------------------------------------------------------
@@ -305,10 +161,7 @@ func buildColorLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'color.rgb': expected 3 arguments")
 		}
-		r := toFloat(args[0]) / 255.0
-		g := toFloat(args[1]) / 255.0
-		b := toFloat(args[2]) / 255.0
-		return []Value{makeColorValue(r, g, b, 1.0)}, nil
+		return []Value{makeColorRGBA(stdcolor.FromRGB(toFloat(args[0]), toFloat(args[1]), toFloat(args[2])))}, nil
 	})
 
 	// color.rgba(r, g, b, a) -- r,g,b,a in [0, 255]
@@ -316,11 +169,7 @@ func buildColorLib() *Table {
 		if len(args) < 4 {
 			return nil, fmt.Errorf("bad argument to 'color.rgba': expected 4 arguments")
 		}
-		r := toFloat(args[0]) / 255.0
-		g := toFloat(args[1]) / 255.0
-		b := toFloat(args[2]) / 255.0
-		a := toFloat(args[3]) / 255.0
-		return []Value{makeColorValue(r, g, b, a)}, nil
+		return []Value{makeColorRGBA(stdcolor.FromRGBA(toFloat(args[0]), toFloat(args[1]), toFloat(args[2]), toFloat(args[3])))}, nil
 	})
 
 	// color.fromHex(hexStr) -- parses "#RGB", "#RRGGBB", "#RRGGBBAA"
@@ -328,48 +177,11 @@ func buildColorLib() *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return []Value{NilValue(), StringValue("bad argument to 'color.fromHex': expected string")}, nil
 		}
-		hex := args[0].Str()
-		hex = strings.TrimPrefix(hex, "#")
-
-		var r, g, b, a uint8
-		a = 255
-
-		switch len(hex) {
-		case 3: // RGB
-			rb, ok1 := parseHexByte(string(hex[0]) + string(hex[0]))
-			gb, ok2 := parseHexByte(string(hex[1]) + string(hex[1]))
-			bb, ok3 := parseHexByte(string(hex[2]) + string(hex[2]))
-			if !ok1 || !ok2 || !ok3 {
-				return []Value{NilValue(), StringValue("invalid hex color: " + args[0].Str())}, nil
-			}
-			r, g, b = rb, gb, bb
-		case 6: // RRGGBB
-			rb, ok1 := parseHexByte(hex[0:2])
-			gb, ok2 := parseHexByte(hex[2:4])
-			bb, ok3 := parseHexByte(hex[4:6])
-			if !ok1 || !ok2 || !ok3 {
-				return []Value{NilValue(), StringValue("invalid hex color: " + args[0].Str())}, nil
-			}
-			r, g, b = rb, gb, bb
-		case 8: // RRGGBBAA
-			rb, ok1 := parseHexByte(hex[0:2])
-			gb, ok2 := parseHexByte(hex[2:4])
-			bb, ok3 := parseHexByte(hex[4:6])
-			ab, ok4 := parseHexByte(hex[6:8])
-			if !ok1 || !ok2 || !ok3 || !ok4 {
-				return []Value{NilValue(), StringValue("invalid hex color: " + args[0].Str())}, nil
-			}
-			r, g, b, a = rb, gb, bb, ab
-		default:
-			return []Value{NilValue(), StringValue("invalid hex color format: " + args[0].Str())}, nil
+		c, err := stdcolor.FromHex(args[0].Str())
+		if err != nil {
+			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
-
-		return []Value{makeColorValue(
-			float64(r)/255.0,
-			float64(g)/255.0,
-			float64(b)/255.0,
-			float64(a)/255.0,
-		)}, nil
+		return []Value{makeColorRGBA(c)}, nil
 	})
 
 	// color.toHex(c) -> "#RRGGBB"
@@ -378,11 +190,7 @@ func buildColorLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'color.toHex'")
 		}
 		r, g, b, _ := getRGBA(args[0])
-		ri := uint8(math.Round(r * 255))
-		gi := uint8(math.Round(g * 255))
-		bi := uint8(math.Round(b * 255))
-		hex := fmt.Sprintf("#%02X%02X%02X", ri, gi, bi)
-		return []Value{StringValue(hex)}, nil
+		return []Value{StringValue(stdcolor.ToHex(stdcolor.RGBA{R: r, G: g, B: b, A: 1}))}, nil
 	})
 
 	// ----------------------------------------------------------------
@@ -397,8 +205,7 @@ func buildColorLib() *Table {
 		h := toFloat(args[0])
 		s := toFloat(args[1])
 		v := toFloat(args[2])
-		r, g, b := hsvToRGB(h, s, v)
-		return []Value{makeColorValue(r, g, b, 1.0)}, nil
+		return []Value{makeColorRGBA(stdcolor.FromHSV(h, s, v))}, nil
 	})
 
 	// color.toHSV(c) -> h, s, v
@@ -407,7 +214,7 @@ func buildColorLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'color.toHSV'")
 		}
 		r, g, b, _ := getRGBA(args[0])
-		h, s, v := rgbToHSV(r, g, b)
+		h, s, v := stdcolor.ToHSV(stdcolor.RGBA{R: r, G: g, B: b, A: 1})
 		return []Value{FloatValue(h), FloatValue(s), FloatValue(v)}, nil
 	})
 
@@ -423,8 +230,7 @@ func buildColorLib() *Table {
 		h := toFloat(args[0])
 		s := toFloat(args[1])
 		l := toFloat(args[2])
-		r, g, b := hslToRGB(h, s, l)
-		return []Value{makeColorValue(r, g, b, 1.0)}, nil
+		return []Value{makeColorRGBA(stdcolor.FromHSL(h, s, l))}, nil
 	})
 
 	// color.toHSL(c) -> h, s, l
@@ -433,7 +239,7 @@ func buildColorLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'color.toHSL'")
 		}
 		r, g, b, _ := getRGBA(args[0])
-		h, s, l := rgbToHSL(r, g, b)
+		h, s, l := stdcolor.ToHSL(stdcolor.RGBA{R: r, G: g, B: b, A: 1})
 		return []Value{FloatValue(h), FloatValue(s), FloatValue(l)}, nil
 	})
 
@@ -449,12 +255,11 @@ func buildColorLib() *Table {
 		r1, g1, b1, a1 := getRGBA(args[0])
 		r2, g2, b2, a2 := getRGBA(args[1])
 		t := toFloat(args[2])
-		return []Value{makeColorValue(
-			r1+(r2-r1)*t,
-			g1+(g2-g1)*t,
-			b1+(b2-b1)*t,
-			a1+(a2-a1)*t,
-		)}, nil
+		return []Value{makeColorRGBA(stdcolor.Lerp(
+			stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
+			stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
+			t,
+		))}, nil
 	})
 
 	// color.mix -- alias for lerp
@@ -465,12 +270,11 @@ func buildColorLib() *Table {
 		r1, g1, b1, a1 := getRGBA(args[0])
 		r2, g2, b2, a2 := getRGBA(args[1])
 		t := toFloat(args[2])
-		return []Value{makeColorValue(
-			r1+(r2-r1)*t,
-			g1+(g2-g1)*t,
-			b1+(b2-b1)*t,
-			a1+(a2-a1)*t,
-		)}, nil
+		return []Value{makeColorRGBA(stdcolor.Lerp(
+			stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
+			stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
+			t,
+		))}, nil
 	})
 
 	// color.darken(c, amount) -- reduce brightness by amount (0-1)
@@ -480,8 +284,7 @@ func buildColorLib() *Table {
 		}
 		r, g, b, a := getRGBA(args[0])
 		amount := toFloat(args[1])
-		factor := 1.0 - amount
-		return []Value{makeColorValue(r*factor, g*factor, b*factor, a)}, nil
+		return []Value{makeColorRGBA(stdcolor.Darken(stdcolor.RGBA{R: r, G: g, B: b, A: a}, amount))}, nil
 	})
 
 	// color.lighten(c, amount) -- increase brightness
@@ -491,12 +294,7 @@ func buildColorLib() *Table {
 		}
 		r, g, b, a := getRGBA(args[0])
 		amount := toFloat(args[1])
-		return []Value{makeColorValue(
-			r+(1-r)*amount,
-			g+(1-g)*amount,
-			b+(1-b)*amount,
-			a,
-		)}, nil
+		return []Value{makeColorRGBA(stdcolor.Lighten(stdcolor.RGBA{R: r, G: g, B: b, A: a}, amount))}, nil
 	})
 
 	// color.alpha(c, a) -- same color with new alpha
@@ -506,7 +304,7 @@ func buildColorLib() *Table {
 		}
 		r, g, b, _ := getRGBA(args[0])
 		newA := toFloat(args[1])
-		return []Value{makeColorValue(r, g, b, newA)}, nil
+		return []Value{makeColorRGBA(stdcolor.WithAlpha(stdcolor.RGBA{R: r, G: g, B: b, A: 1}, newA))}, nil
 	})
 
 	// color.withAlpha -- alias for alpha
@@ -516,7 +314,7 @@ func buildColorLib() *Table {
 		}
 		r, g, b, _ := getRGBA(args[0])
 		newA := toFloat(args[1])
-		return []Value{makeColorValue(r, g, b, newA)}, nil
+		return []Value{makeColorRGBA(stdcolor.WithAlpha(stdcolor.RGBA{R: r, G: g, B: b, A: 1}, newA))}, nil
 	})
 
 	// color.invert(c)
@@ -525,7 +323,7 @@ func buildColorLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'color.invert'")
 		}
 		r, g, b, a := getRGBA(args[0])
-		return []Value{makeColorValue(1-r, 1-g, 1-b, a)}, nil
+		return []Value{makeColorRGBA(stdcolor.Invert(stdcolor.RGBA{R: r, G: g, B: b, A: a}))}, nil
 	})
 
 	// color.grayscale(c) -- using luminance weights
@@ -534,8 +332,7 @@ func buildColorLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'color.grayscale'")
 		}
 		r, g, b, a := getRGBA(args[0])
-		lum := 0.2126*r + 0.7152*g + 0.0722*b
-		return []Value{makeColorValue(lum, lum, lum, a)}, nil
+		return []Value{makeColorRGBA(stdcolor.Grayscale(stdcolor.RGBA{R: r, G: g, B: b, A: a}))}, nil
 	})
 
 	// color.isColor(v)
