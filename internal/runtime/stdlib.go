@@ -4,8 +4,21 @@ import (
 	"context"
 )
 
-// InstallStdlib registers all standard-library tables as globals.
+// InstallRuntimeStdlib registers runtime-owned standard-library tables as
+// globals. stdlibrt/install calls this before installing modules that have
+// migrated out of runtime, so this method must not register migrated modules.
+func (interp *Interpreter) InstallRuntimeStdlib() {
+	interp.installStdlib(false)
+}
+
+// InstallStdlib registers all legacy runtime standard-library tables as
+// globals. Newer embedding entry points should prefer runtime.NewCore plus
+// stdlibrt/install.Install so migrated modules are installed from stdlibrt.
 func (interp *Interpreter) InstallStdlib() {
+	interp.installStdlib(true)
+}
+
+func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	std := newStdlibInstallContext(interp)
 
 	// String library
@@ -26,14 +39,13 @@ func (interp *Interpreter) InstallStdlib() {
 	// Math library
 	std.RegisterTable("math", buildMathLib())
 
-	// IO library
-	std.RegisterTable("io", buildIOLib(interp))
-
-	// OS library
-	std.RegisterTable("os", buildOSLib())
-
-	// HTTP server library
-	std.RegisterTable("http", httpLib(interp))
+	if includeMigratedHostIO {
+		// Historical direct-runtime install path. Public embedding now installs
+		// these from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("io", buildIOLib(interp))
+		std.RegisterTable("os", buildOSLib())
+		std.RegisterTable("http", httpLib(interp))
+	}
 
 	// Raylib game library (window, drawing, input, audio)
 	std.RegisterTable("rl", rlLib(interp))
@@ -41,12 +53,15 @@ func (interp *Interpreter) InstallStdlib() {
 	// --- Encoding / Crypto ---
 	std.RegisterTable("json", buildJSONLib())
 
-	// --- File system & paths ---
-	std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))
+	if includeMigratedHostIO {
+		std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))
+	}
 
 	// --- Time & networking ---
 	std.RegisterTable("time", buildTimeLib())
-	std.RegisterTable("net", buildNetLib(interp))
+	if includeMigratedHostIO {
+		std.RegisterTable("net", buildNetLib(interp))
+	}
 
 	// --- System ---
 	std.RegisterTable("process", buildProcessLib(interp))
