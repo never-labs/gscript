@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import re
 import subprocess
 import sys
@@ -82,3 +83,15 @@ def build_gscript(root: Path, out: Path, failure_message: str | None = None) -> 
 
 def markdown_row(cells: list[object]) -> str:
     return "| " + " | ".join(str(cell) for cell in cells) + " |"
+
+
+def gscript_mode_command(mode: str, gscript_bin: Path, script: Path) -> tuple[list[str], dict[str, str]]:
+    env = os.environ.copy()
+    if mode == "vm":
+        return [str(gscript_bin), "-vm", str(script)], env
+    if mode == "default":
+        return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
+    if mode == "no_filter":
+        env["GSCRIPT_TIER2_NO_FILTER"] = "1"
+        return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
+    raise ValueError(f"unknown mode: {mode}")

@@ -88,6 +88,30 @@ class BenchmarkOutputTest(unittest.TestCase):
 
         print_.assert_called_once_with("compiler output", file=output.sys.stderr)
 
+    def test_gscript_mode_command_formats_vm_mode(self):
+        cmd, env = output.gscript_mode_command("vm", Path("/bin/gscript"), Path("/bench/main.gs"))
+
+        self.assertEqual(cmd, ["/bin/gscript", "-vm", "/bench/main.gs"])
+        self.assertIsInstance(env, dict)
+        self.assertNotIn("GSCRIPT_TIER2_NO_FILTER", env)
+
+    def test_gscript_mode_command_formats_jit_mode(self):
+        cmd, env = output.gscript_mode_command("default", Path("/bin/gscript"), Path("/bench/main.gs"))
+
+        self.assertEqual(cmd, ["/bin/gscript", "-jit", "-jit-stats", "-exit-stats", "/bench/main.gs"])
+        self.assertIsInstance(env, dict)
+        self.assertNotIn("GSCRIPT_TIER2_NO_FILTER", env)
+
+    def test_gscript_mode_command_formats_no_filter_mode(self):
+        cmd, env = output.gscript_mode_command("no_filter", Path("/bin/gscript"), Path("/bench/main.gs"))
+
+        self.assertEqual(cmd, ["/bin/gscript", "-jit", "-jit-stats", "-exit-stats", "/bench/main.gs"])
+        self.assertEqual(env["GSCRIPT_TIER2_NO_FILTER"], "1")
+
+    def test_gscript_mode_command_rejects_unknown_mode(self):
+        with self.assertRaisesRegex(ValueError, "unknown mode: bad"):
+            output.gscript_mode_command("bad", Path("/bin/gscript"), Path("/bench/main.gs"))
+
 
 if __name__ == "__main__":
     unittest.main()

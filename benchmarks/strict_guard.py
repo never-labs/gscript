@@ -13,7 +13,6 @@ import argparse
 import hashlib
 import json
 import math
-import os
 import platform
 import re
 import shutil
@@ -429,15 +428,8 @@ def mode_command(
     if not spec.gscript.exists():
         return None, None, "missing"
 
-    env = os.environ.copy()
-    if mode == "vm":
-        return [str(gscript_bin), "-vm", str(spec.gscript)], env, None
-    if mode == "default":
-        return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(spec.gscript)], env, None
-    if mode == "no_filter":
-        env["GSCRIPT_TIER2_NO_FILTER"] = "1"
-        return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(spec.gscript)], env, None
-    raise ValueError(f"unknown mode: {mode}")
+    cmd, env = benchmark_output.gscript_mode_command(mode, gscript_bin, spec.gscript)
+    return cmd, env, None
 
 
 def run_mode(
