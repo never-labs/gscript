@@ -1,9 +1,21 @@
-package runtime
+package modules
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/never-labs/gscript/internal/runtime"
+)
+
+func contextInterp(t *testing.T, src string) *runtime.Interpreter {
+	t.Helper()
+	interp := runtime.New()
+	installTestModule(interp, "context", runtime.TableValue(BuildContext()))
+	execOnInterp(t, interp, src)
+	return interp
+}
 
 func TestContextWithCancel(t *testing.T) {
-	interp := runSyncTestScript(t, `
+	interp := contextInterp(t, `
 ctx, cancel := context.withCancel()
 cancel()
 result := "none"
@@ -20,7 +32,7 @@ case <-time.after(0.01):
 }
 
 func TestContextWithTimeout(t *testing.T) {
-	interp := runSyncTestScript(t, `
+	interp := contextInterp(t, `
 ctx, cancel := context.withTimeout(0.001)
 _ = cancel
 result := "none"
@@ -37,7 +49,7 @@ case <-time.after(0.05):
 }
 
 func TestContextSleepCompletes(t *testing.T) {
-	interp := runSyncTestScript(t, `
+	interp := contextInterp(t, `
 ctx := context.background()
 ok, err := time.sleep(ctx, 0.001)
 `)
@@ -50,7 +62,7 @@ ok, err := time.sleep(ctx, 0.001)
 }
 
 func TestContextSleepCancelled(t *testing.T) {
-	interp := runSyncTestScript(t, `
+	interp := contextInterp(t, `
 ctx, cancel := context.withTimeout(0.001)
 _ = cancel
 t0 := time.now()

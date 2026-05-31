@@ -67,9 +67,9 @@ func BuildSyncLibWithTaskLauncher(call ScriptFunctionCaller, launch SyncTaskLaun
 
 func syncGroupFromArgs(call ScriptFunctionCaller, launch SyncTaskLauncher, args []Value) ([]Value, error) {
 	if len(args) == 0 || args[0].IsNil() {
-		state := newScriptContextState()
-		ctx := TableValue(newScriptContextTable(state))
-		cancel := scriptContextCancelValue(state)
+		state := NewScriptContextState()
+		ctx := TableValue(NewScriptContextTable(state))
+		cancel := ScriptContextCancelValue(state)
 		return []Value{TableValue(newScriptTaskGroupTable(call, launch, ctx, cancel))}, nil
 	}
 	if !args[0].IsTable() {

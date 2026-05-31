@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
@@ -74,9 +75,12 @@ func TestProcessRun(t *testing.T) {
 func TestProcessRunContextCancelled(t *testing.T) {
 	interp := New()
 	interp.InstallStdlib()
+	state := NewScriptContextState()
+	time.AfterFunc(10*time.Millisecond, func() {
+		state.Cancel(StringValue("deadline exceeded"))
+	})
+	interp.SetGlobal("ctx", TableValue(NewScriptContextTable(state)))
 	execOnInterp(t, interp, `
-ctx, cancel := context.withTimeout(0.01)
-_ = cancel
 result := process.run(ctx, {"sh", "-c", "sleep 1; echo late"})
 `)
 

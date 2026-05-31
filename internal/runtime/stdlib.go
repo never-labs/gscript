@@ -98,10 +98,5 @@ func (interp *Interpreter) InstallStdlib() {
 
 	std.RegisterTable("utf8", buildUTF8Lib(interp))
 
-	std.RegisterTable("context", buildContextLib())
-
-	// --- Logging ---
-	std.RegisterTable("log", buildLogLib())
-
 	std.InstallPackage(interp.scriptDir)
 }

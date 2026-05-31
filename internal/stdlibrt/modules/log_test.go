@@ -1,19 +1,14 @@
-package runtime
+package modules
 
 import (
 	"strings"
 	"testing"
 )
 
-// logInterp creates an interpreter with the log library registered.
 func logInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "log", buildLogLib())
+	return runWithLib(t, src, "log", BuildLog())
 }
-
-// ==================================================================
-// log level constants
-// ==================================================================
 
 func TestLogLevelConstants(t *testing.T) {
 	interp := logInterp(t, `
@@ -40,10 +35,6 @@ func TestLogLevelConstants(t *testing.T) {
 	}
 }
 
-// ==================================================================
-// log.info / log.history tests
-// ==================================================================
-
 func TestLogInfo(t *testing.T) {
 	interp := logInterp(t, `
 		log.info("hello", "world")
@@ -62,10 +53,6 @@ func TestLogInfo(t *testing.T) {
 		t.Errorf("expected 'hello world' in message, got: %s", msg)
 	}
 }
-
-// ==================================================================
-// log level filtering tests
-// ==================================================================
 
 func TestLogLevelFiltering(t *testing.T) {
 	interp := logInterp(t, `
@@ -93,10 +80,6 @@ func TestLogDebugLevel(t *testing.T) {
 	}
 }
 
-// ==================================================================
-// log.setPrefix tests
-// ==================================================================
-
 func TestLogPrefix(t *testing.T) {
 	interp := logInterp(t, `
 		log.setPrefix("[MyApp]")
@@ -110,10 +93,6 @@ func TestLogPrefix(t *testing.T) {
 	}
 }
 
-// ==================================================================
-// log.setTimestamp / log.setShowLevel tests
-// ==================================================================
-
 func TestLogNoTimestamp(t *testing.T) {
 	interp := logInterp(t, `
 		log.setTimestamp(false)
@@ -122,7 +101,6 @@ func TestLogNoTimestamp(t *testing.T) {
 		msg := h[1]
 	`)
 	msg := interp.GetGlobal("msg").Str()
-	// Without timestamp, message should start with [INFO]
 	if !strings.HasPrefix(msg, "[INFO]") {
 		t.Errorf("expected message to start with [INFO], got: %s", msg)
 	}
@@ -142,10 +120,6 @@ func TestLogNoLevel(t *testing.T) {
 	}
 }
 
-// ==================================================================
-// log.getLevel tests
-// ==================================================================
-
 func TestLogGetLevel(t *testing.T) {
 	interp := logInterp(t, `
 		log.setLevel(log.ERROR)
@@ -155,10 +129,6 @@ func TestLogGetLevel(t *testing.T) {
 		t.Errorf("expected ERROR(3), got %d", interp.GetGlobal("result").Int())
 	}
 }
-
-// ==================================================================
-// log.clear tests
-// ==================================================================
 
 func TestLogClear(t *testing.T) {
 	interp := logInterp(t, `
@@ -171,10 +141,6 @@ func TestLogClear(t *testing.T) {
 		t.Errorf("expected 0 after clear, got %d", interp.GetGlobal("count").Int())
 	}
 }
-
-// ==================================================================
-// log.format tests
-// ==================================================================
 
 func TestLogFormat(t *testing.T) {
 	interp := logInterp(t, `
@@ -190,10 +156,6 @@ func TestLogFormat(t *testing.T) {
 	}
 }
 
-// ==================================================================
-// log.fatal tests
-// ==================================================================
-
 func TestLogFatal(t *testing.T) {
 	interp := logInterp(t, `
 		log.fatal("critical failure")
@@ -205,10 +167,6 @@ func TestLogFatal(t *testing.T) {
 		t.Errorf("expected [FATAL], got: %s", msg)
 	}
 }
-
-// ==================================================================
-// log with multiple args
-// ==================================================================
 
 func TestLogMultipleArgs(t *testing.T) {
 	interp := logInterp(t, `
