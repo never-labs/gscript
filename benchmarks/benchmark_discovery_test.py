@@ -19,8 +19,29 @@ class FakeSpec:
 class BenchmarkDiscoveryTest(unittest.TestCase):
     def test_group_choices_includes_canonical_and_legacy_group_names(self):
         self.assertEqual(
+            discovery.group_choices(discovery.GROUPS),
+            [
+                "numeric",
+                "recursion",
+                "table",
+                "calls",
+                "string",
+                "concurrency",
+                "data",
+                "app",
+                "control",
+                "suite",
+                "extended",
+                "variants",
+                "official",
+                "data_oriented",
+            ],
+        )
+
+    def test_group_choices_omits_aliases_outside_allowed_groups(self):
+        self.assertEqual(
             discovery.group_choices(["numeric", "data"]),
-            ["numeric", "data", "suite", "extended", "variants", "official", "data_oriented"],
+            ["numeric", "data", "data_oriented"],
         )
 
     def test_domain_specs_prefers_default_order_then_sorted_extras_and_luajit_refs(self):

@@ -191,7 +191,13 @@ def canonical_group(group: str) -> list[str]:
 
 
 def group_choices(allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[str]:
-    return [*allowed_groups, *LEGACY_GROUP_ALIASES.keys()]
+    allowed = set(allowed_groups)
+    aliases = [
+        alias
+        for alias, canonical_names in LEGACY_GROUP_ALIASES.items()
+        if all(canonical in allowed for canonical in canonical_names)
+    ]
+    return [*allowed_groups, *aliases]
 
 
 def canonical_selector(selector: str) -> str:
