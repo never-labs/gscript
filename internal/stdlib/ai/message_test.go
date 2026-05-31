@@ -20,3 +20,15 @@ func TestDefaultTurnStatus(t *testing.T) {
 		t.Fatalf("final status = %q", got)
 	}
 }
+
+func TestToolMessageShapes(t *testing.T) {
+	call := NewAssistantCallMessage()
+	if call.Role != RoleAssistant || call.ToolCallKey != "tool_call" {
+		t.Fatalf("assistant call shape = %+v", call)
+	}
+
+	result := NewToolResultMessage()
+	if result.Role != RoleTool || result.ToolUseIDKey != "tool_use_id" || result.ValueKey != "value" || result.ErrorKey != "error" {
+		t.Fatalf("tool result shape = %+v", result)
+	}
+}

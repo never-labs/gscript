@@ -16,30 +16,19 @@ func BuildLLMMessageLib() *Table {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'msg.assistant_call' (table expected)")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue(ai.RoleAssistant))
-		msg.RawSetString("tool_call", args[0])
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmAssistantCallMessageTable(args[0]))}, nil
 	})
 	setLLMFunction(t, "msg", "tool_result", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'msg.tool_result'")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue(ai.RoleTool))
-		msg.RawSetString("tool_use_id", args[0])
-		msg.RawSetString("value", args[1])
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmToolResultMessageTable(args[0], args[1]))}, nil
 	})
 	setLLMFunction(t, "msg", "tool_error", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'msg.tool_error'")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue(ai.RoleTool))
-		msg.RawSetString("tool_use_id", args[0])
-		msg.RawSetString("error", StringValue(args[1].Str()))
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmToolErrorMessageTable(args[0], args[1].Str()))}, nil
 	})
 	return t
 }
@@ -73,6 +62,32 @@ func llmMessageTable(role, text string) *Table {
 	msg := NewTable()
 	msg.RawSetString("role", StringValue(spec.Role))
 	msg.RawSetString("text", StringValue(spec.Text))
+	return msg
+}
+
+func llmAssistantCallMessageTable(toolCall Value) *Table {
+	spec := ai.NewAssistantCallMessage()
+	msg := NewTable()
+	msg.RawSetString("role", StringValue(spec.Role))
+	msg.RawSetString(spec.ToolCallKey, toolCall)
+	return msg
+}
+
+func llmToolResultMessageTable(toolUseID, value Value) *Table {
+	spec := ai.NewToolResultMessage()
+	msg := NewTable()
+	msg.RawSetString("role", StringValue(spec.Role))
+	msg.RawSetString(spec.ToolUseIDKey, toolUseID)
+	msg.RawSetString(spec.ValueKey, value)
+	return msg
+}
+
+func llmToolErrorMessageTable(toolUseID Value, message string) *Table {
+	spec := ai.NewToolResultMessage()
+	msg := NewTable()
+	msg.RawSetString("role", StringValue(spec.Role))
+	msg.RawSetString(spec.ToolUseIDKey, toolUseID)
+	msg.RawSetString(spec.ErrorKey, StringValue(message))
 	return msg
 }
 

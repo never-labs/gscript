@@ -151,59 +151,37 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.assistantCall' (table expected)")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue("assistant"))
-		msg.RawSetString("tool_call", args[0])
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmAssistantCallMessageTable(args[0]))}, nil
 	})
 	set("assistant_call", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'llm.assistant_call' (table expected)")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue("assistant"))
-		msg.RawSetString("tool_call", args[0])
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmAssistantCallMessageTable(args[0]))}, nil
 	})
 	set("toolResult", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'llm.toolResult'")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue("tool"))
-		msg.RawSetString("tool_use_id", args[0])
-		msg.RawSetString("value", args[1])
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmToolResultMessageTable(args[0], args[1]))}, nil
 	})
 	set("tool_result", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'llm.tool_result'")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue("tool"))
-		msg.RawSetString("tool_use_id", args[0])
-		msg.RawSetString("value", args[1])
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmToolResultMessageTable(args[0], args[1]))}, nil
 	})
 	set("toolError", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'llm.toolError'")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue("tool"))
-		msg.RawSetString("tool_use_id", args[0])
-		msg.RawSetString("error", StringValue(args[1].Str()))
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmToolErrorMessageTable(args[0], args[1].Str()))}, nil
 	})
 	set("tool_error", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'llm.tool_error'")
 		}
-		msg := NewTable()
-		msg.RawSetString("role", StringValue("tool"))
-		msg.RawSetString("tool_use_id", args[0])
-		msg.RawSetString("error", StringValue(args[1].Str()))
-		return []Value{TableValue(msg)}, nil
+		return []Value{TableValue(llmToolErrorMessageTable(args[0], args[1].Str()))}, nil
 	})
 
 	set("tool", func(args []Value) ([]Value, error) {
