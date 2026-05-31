@@ -15,6 +15,7 @@ import (
 	"image/color"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+	rlstd "github.com/never-labs/gscript/internal/stdlib/data/rl"
 )
 
 // ---------------------------------------------------------------------------
@@ -39,15 +40,6 @@ func rlColorToValue(c color.RGBA) Value {
 	t.RawSet(StringValue("g"), IntValue(int64(c.G)))
 	t.RawSet(StringValue("b"), IntValue(int64(c.B)))
 	t.RawSet(StringValue("a"), IntValue(int64(c.A)))
-	return TableValue(t)
-}
-
-func rlMakeColorValue(r, g, b, a uint8) Value {
-	t := NewTable()
-	t.RawSet(StringValue("r"), IntValue(int64(r)))
-	t.RawSet(StringValue("g"), IntValue(int64(g)))
-	t.RawSet(StringValue("b"), IntValue(int64(b)))
-	t.RawSet(StringValue("a"), IntValue(int64(a)))
 	return TableValue(t)
 }
 
@@ -172,20 +164,31 @@ func rlGetMusic(v Value) (rl.Music, bool) {
 
 func rlCamera2DFromValue(v Value) rl.Camera2D {
 	if !v.IsTable() {
-		return rl.Camera2D{Zoom: 1.0}
+		return rlCamera2DFromShape(rlstd.DefaultCamera2DShape())
 	}
 	t := v.Table()
+	return rlCamera2DFromShape(rlstd.Camera2DShape{
+		OffsetX:  toFloat(t.RawGet(StringValue("offsetX"))),
+		OffsetY:  toFloat(t.RawGet(StringValue("offsetY"))),
+		TargetX:  toFloat(t.RawGet(StringValue("targetX"))),
+		TargetY:  toFloat(t.RawGet(StringValue("targetY"))),
+		Rotation: toFloat(t.RawGet(StringValue("rotation"))),
+		Zoom:     toFloat(t.RawGet(StringValue("zoom"))),
+	})
+}
+
+func rlCamera2DFromShape(shape rlstd.Camera2DShape) rl.Camera2D {
 	return rl.Camera2D{
 		Offset: rl.Vector2{
-			X: float32(toFloat(t.RawGet(StringValue("offsetX")))),
-			Y: float32(toFloat(t.RawGet(StringValue("offsetY")))),
+			X: float32(shape.OffsetX),
+			Y: float32(shape.OffsetY),
 		},
 		Target: rl.Vector2{
-			X: float32(toFloat(t.RawGet(StringValue("targetX")))),
-			Y: float32(toFloat(t.RawGet(StringValue("targetY")))),
+			X: float32(shape.TargetX),
+			Y: float32(shape.TargetY),
 		},
-		Rotation: float32(toFloat(t.RawGet(StringValue("rotation")))),
-		Zoom:     float32(toFloat(t.RawGet(StringValue("zoom")))),
+		Rotation: float32(shape.Rotation),
+		Zoom:     float32(shape.Zoom),
 	}
 }
 
@@ -206,32 +209,9 @@ func rlLib(interp *Interpreter) *Table {
 	// ===================================================================
 	// Color constants
 	// ===================================================================
-	t.RawSet(StringValue("LIGHTGRAY"), rlMakeColorValue(200, 200, 200, 255))
-	t.RawSet(StringValue("GRAY"), rlMakeColorValue(130, 130, 130, 255))
-	t.RawSet(StringValue("DARKGRAY"), rlMakeColorValue(80, 80, 80, 255))
-	t.RawSet(StringValue("YELLOW"), rlMakeColorValue(253, 249, 0, 255))
-	t.RawSet(StringValue("GOLD"), rlMakeColorValue(255, 203, 0, 255))
-	t.RawSet(StringValue("ORANGE"), rlMakeColorValue(255, 161, 0, 255))
-	t.RawSet(StringValue("PINK"), rlMakeColorValue(255, 109, 194, 255))
-	t.RawSet(StringValue("RED"), rlMakeColorValue(230, 41, 55, 255))
-	t.RawSet(StringValue("MAROON"), rlMakeColorValue(190, 33, 55, 255))
-	t.RawSet(StringValue("GREEN"), rlMakeColorValue(0, 228, 48, 255))
-	t.RawSet(StringValue("LIME"), rlMakeColorValue(0, 158, 47, 255))
-	t.RawSet(StringValue("DARKGREEN"), rlMakeColorValue(0, 117, 44, 255))
-	t.RawSet(StringValue("SKYBLUE"), rlMakeColorValue(102, 191, 255, 255))
-	t.RawSet(StringValue("BLUE"), rlMakeColorValue(0, 121, 241, 255))
-	t.RawSet(StringValue("DARKBLUE"), rlMakeColorValue(0, 82, 172, 255))
-	t.RawSet(StringValue("PURPLE"), rlMakeColorValue(200, 122, 255, 255))
-	t.RawSet(StringValue("VIOLET"), rlMakeColorValue(135, 60, 190, 255))
-	t.RawSet(StringValue("DARKPURPLE"), rlMakeColorValue(112, 31, 126, 255))
-	t.RawSet(StringValue("BEIGE"), rlMakeColorValue(211, 176, 131, 255))
-	t.RawSet(StringValue("BROWN"), rlMakeColorValue(127, 106, 79, 255))
-	t.RawSet(StringValue("DARKBROWN"), rlMakeColorValue(76, 63, 47, 255))
-	t.RawSet(StringValue("WHITE"), rlMakeColorValue(255, 255, 255, 255))
-	t.RawSet(StringValue("BLACK"), rlMakeColorValue(0, 0, 0, 255))
-	t.RawSet(StringValue("BLANK"), rlMakeColorValue(0, 0, 0, 0))
-	t.RawSet(StringValue("MAGENTA"), rlMakeColorValue(255, 0, 255, 255))
-	t.RawSet(StringValue("RAYWHITE"), rlMakeColorValue(245, 245, 245, 255))
+	for _, named := range rlstd.NamedColors() {
+		t.RawSet(StringValue(named.Name), rlColorToValue(named.Color))
+	}
 
 	// ===================================================================
 	// Key constants
