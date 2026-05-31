@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	basestring "github.com/never-labs/gscript/internal/stdlib/base/string"
+	stringpattern "github.com/never-labs/gscript/internal/stdlib/base/stringpattern"
 )
 
 const (
@@ -487,7 +488,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 				if !ok {
 					return NilValue(), NilValue(), 1, nil
 				}
-				nextStart = simpleNextPatternSearchStart(searchStr, m.start, m.end)
+				nextStart = stringpattern.NextSearchStart(searchStr, m.start, m.end)
 				if m.ncap == 0 {
 					return StringValue(searchStr[m.start:m.end]), NilValue(), 1, nil
 				}
@@ -504,7 +505,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 					if !ok {
 						return []Value{NilValue()}, nil
 					}
-					nextStart = simpleNextPatternSearchStart(searchStr, m.start, m.end)
+					nextStart = stringpattern.NextSearchStart(searchStr, m.start, m.end)
 					return simpleMatchValues(searchStr, m), nil
 				},
 			}

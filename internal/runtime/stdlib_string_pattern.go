@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	stringpattern "github.com/never-labs/gscript/internal/stdlib/base/stringpattern"
 	"regexp"
 	"strconv"
 	"strings"
@@ -423,23 +424,23 @@ func (p *simpleLuaPattern) findNextTwoDigitRuns(s string, start int) (simpleLuaP
 		}
 		pos := search + idx
 		digits1Start := pos + len(f.prefix)
-		digits1End := scanASCIIDigits(s, digits1Start)
-		if digits1End == digits1Start || !hasStringAt(s, digits1End, f.middle) {
+		digits1End := stringpattern.ScanASCIIDigits(s, digits1Start)
+		if digits1End == digits1Start || !stringpattern.HasStringAt(s, digits1End, f.middle) {
 			search = pos + 1
 			continue
 		}
 		tagStart := digits1End + len(f.middle)
-		if tagStart+2 > len(s) || !isASCIIDigit(s[tagStart]) || !isASCIIDigit(s[tagStart+1]) {
+		if tagStart+2 > len(s) || !stringpattern.IsASCIIDigit(s[tagStart]) || !stringpattern.IsASCIIDigit(s[tagStart+1]) {
 			search = pos + 1
 			continue
 		}
 		suffixStart := tagStart + 2
-		if !hasStringAt(s, suffixStart, f.suffix) {
+		if !stringpattern.HasStringAt(s, suffixStart, f.suffix) {
 			search = pos + 1
 			continue
 		}
 		digits2Start := suffixStart + len(f.suffix)
-		digits2End := scanASCIIDigits(s, digits2Start)
+		digits2End := stringpattern.ScanASCIIDigits(s, digits2Start)
 		if digits2End == digits2Start {
 			search = pos + 1
 			continue
@@ -461,21 +462,6 @@ func (p *simpleLuaPattern) findNextTwoDigitRuns(s string, start int) (simpleLuaP
 	return simpleLuaPatternMatch{}, false
 }
 
-func scanASCIIDigits(s string, pos int) int {
-	for pos < len(s) && isASCIIDigit(s[pos]) {
-		pos++
-	}
-	return pos
-}
-
-func isASCIIDigit(b byte) bool {
-	return b >= '0' && b <= '9'
-}
-
-func hasStringAt(s string, pos int, needle string) bool {
-	return pos <= len(s) && len(needle) <= len(s)-pos && s[pos:pos+len(needle)] == needle
-}
-
 func (p *simpleLuaPattern) matchAt(s string, pos int) (simpleLuaPatternMatch, bool) {
 	m := simpleLuaPatternMatch{start: pos}
 	capStack := [4]int{}
@@ -487,15 +473,13 @@ func (p *simpleLuaPattern) matchAt(s string, pos int) (simpleLuaPatternMatch, bo
 			}
 			pos += len(op.text)
 		case simpleLuaPatternDigit:
-			if pos >= len(s) || s[pos] < '0' || s[pos] > '9' {
+			if pos >= len(s) || !stringpattern.IsASCIIDigit(s[pos]) {
 				return simpleLuaPatternMatch{}, false
 			}
 			pos++
 		case simpleLuaPatternDigitPlus:
 			start := pos
-			for pos < len(s) && s[pos] >= '0' && s[pos] <= '9' {
-				pos++
-			}
+			pos = stringpattern.ScanASCIIDigits(s, pos)
 			if pos == start {
 				return simpleLuaPatternMatch{}, false
 			}
@@ -522,16 +506,6 @@ func simpleMatchValues(s string, m simpleLuaPatternMatch) []Value {
 		out = append(out, StringValue(s[m.caps[i][0]:m.caps[i][1]]))
 	}
 	return out
-}
-
-func simpleNextPatternSearchStart(s string, start, end int) int {
-	if end != start {
-		return end
-	}
-	if end >= len(s) {
-		return len(s) + 1
-	}
-	return end + 1
 }
 
 type luaPatternFrontier struct {
@@ -1235,7 +1209,7 @@ func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Val
 			break
 		}
 		if m.start < last {
-			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 			continue
 		}
 		replacement, err := callSimpleReplacementFunction(s, m, fn, caller)
@@ -1246,7 +1220,7 @@ func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Val
 		b.WriteString(replacement)
 		last = m.end
 		(*count)++
-		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 	}
 	if *count == 0 {
 		return s, nil
@@ -1269,14 +1243,14 @@ func replaceSimpleLuaPatternString(s string, pattern *simpleLuaPattern, repl str
 			break
 		}
 		if m.start < last {
-			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 			continue
 		}
 		b.WriteString(s[last:m.start])
 		b.WriteString(expandSimpleLuaReplacement(s, m, repl))
 		last = m.end
 		(*count)++
-		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 	}
 	if *count == 0 {
 		return s
@@ -1299,7 +1273,7 @@ func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Tab
 			break
 		}
 		if m.start < last {
-			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 			continue
 		}
 		key := simpleReplacementTableKey(s, m)
@@ -1316,7 +1290,7 @@ func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Tab
 		b.WriteString(replacement)
 		last = m.end
 		(*count)++
-		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 	}
 	if *count == 0 {
 		return s, nil
@@ -1339,14 +1313,14 @@ func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string
 			break
 		}
 		if m.start < last {
-			nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 			continue
 		}
 		b.WriteString(s[last:m.start])
 		b.WriteString(repl)
 		last = m.end
 		(*count)++
-		nextStart = simpleNextPatternSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
 	}
 	if *count == 0 {
 		return s
