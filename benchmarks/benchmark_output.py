@@ -85,6 +85,15 @@ def markdown_row(cells: list[object]) -> str:
     return "| " + " | ".join(str(cell) for cell in cells) + " |"
 
 
+def markdown_section(title: str, header: str | None = None, separator: str | None = None) -> list[str]:
+    lines = ["", f"## {title}", ""]
+    if header is not None:
+        lines.append(header)
+        if separator is not None:
+            lines.append(separator)
+    return lines
+
+
 def gscript_mode_command(mode: str, gscript_bin: Path, script: Path) -> tuple[list[str], dict[str, str]]:
     env = os.environ.copy()
     if mode == "vm":

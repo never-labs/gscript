@@ -628,20 +628,18 @@ def markdown_summary(results: Iterable[BenchmarkResult], modes: list[str], args:
         )
 
     suspicious = suspicious_kernel_wins(rows, args)
-    lines.extend(["", "## Suspicious Kernel Wins", ""])
+    lines.extend(benchmark_output.markdown_section("Suspicious Kernel Wins"))
     if suspicious:
         lines.extend(suspicious)
     else:
         lines.append("_No baseline-only win crossed the suspicion thresholds._")
 
     lines.extend(
-        [
-            "",
-            "## Measurements",
-            "",
+        benchmark_output.markdown_section(
+            "Measurements",
             "| Benchmark | Mode | Status | Source | Repeat | N | Median | Min | Max | Stdev | MAD | CV | Checksum | T2 a/e/f | Exits | Note |",
             "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|",
-        ]
+        )
     )
     for row in rows:
         for mode in modes:

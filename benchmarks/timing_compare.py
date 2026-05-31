@@ -955,13 +955,11 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
     low_rows = diagnostic_low_resolution_rows(results, modes)
     if low_rows:
         lines.extend(
-            [
-                "",
-                "## Low-Resolution Diagnostics",
-                "",
+            benchmark_output.markdown_section(
+                "Low-Resolution Diagnostics",
                 "| Benchmark | Mode | Subject | Repeat | Script total | Wall total | Recommended scale | Recommended min sample | Recommended repeat | Rerun args |",
                 "|---|---|---|---:|---:|---:|---|---:|---:|---|",
-            ]
+            )
         )
         for row, mode, subject_name, subject, recommendation in low_rows:
             diagnostic = subject.diagnostic
@@ -985,13 +983,11 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
     wall_rows = diagnostic_wall_rows(results, modes)
     if wall_rows:
         lines.extend(
-            [
-                "",
-                "## Wall-Repeat Diagnostics",
-                "",
+            benchmark_output.markdown_section(
+                "Wall-Repeat Diagnostics",
                 "| Benchmark | Mode | Subject | Source | Repeat | Min wall repeat | Scale | Note |",
                 "|---|---|---|---|---:|---:|---|---|",
-            ]
+            )
         )
         for row, mode, subject_name, subject, wall in wall_rows:
             lines.append(
@@ -1010,13 +1006,11 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
             )
 
     lines.extend(
-        [
-            "",
-            "## LuaJIT Gap Ranking",
-            "",
+        benchmark_output.markdown_section(
+            "LuaJIT Gap Ranking",
             "| Rank | Benchmark | Scale | Mode | Current/LuaJIT | Current | LuaJIT | Current CI95 | LuaJIT CI95 | Source |",
             "|---:|---|---|---|---:|---:|---:|---:|---:|---|",
-        ]
+        )
     )
     for idx, (gap, hot_timed, row, mode) in enumerate(luajit_gap_rows(results, modes), 1):
         current = row.modes.get(mode, {}).get("current")

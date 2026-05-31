@@ -28,6 +28,15 @@ class BenchmarkOutputTest(unittest.TestCase):
     def test_markdown_row_formats_cells_without_changing_payloads(self):
         self.assertEqual(output.markdown_row(["a/b", 3, "x | y"]), "| a/b | 3 | x | y |")
 
+    def test_markdown_section_formats_plain_section(self):
+        self.assertEqual(output.markdown_section("Diagnostics"), ["", "## Diagnostics", ""])
+
+    def test_markdown_section_formats_table_header(self):
+        self.assertEqual(
+            output.markdown_section("Measurements", "| A | B |", "|---|---:|"),
+            ["", "## Measurements", "", "| A | B |", "|---|---:|"],
+        )
+
     def test_run_text_command_reports_success(self):
         result = output.run_text_command(
             [sys.executable, "-c", "print('ok')"],
