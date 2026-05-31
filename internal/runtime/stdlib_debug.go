@@ -143,6 +143,81 @@ func (interp *Interpreter) debugStackSnapshot(skip int) []DebugFrame {
 	return frames
 }
 
+func (interp *Interpreter) DebugAccessEnabled() bool {
+	return interp == nil || interp.debugAccess
+}
+
+func (interp *Interpreter) DebugStackSnapshot(skip int) []DebugFrame {
+	if interp == nil {
+		return nil
+	}
+	return interp.debugStackSnapshot(skip)
+}
+
+func (interp *Interpreter) DebugGlobalsSnapshot() *Table {
+	out := NewTable()
+	if interp == nil || interp.globals == nil {
+		return out
+	}
+	for name, uv := range interp.globals.vars {
+		out.RawSetString(name, uv.Get())
+	}
+	return out
+}
+
+func (interp *Interpreter) SetDebugHookValue(hook Value, opts DebugHookOptions) {
+	if interp == nil {
+		return
+	}
+	interp.debugHook = hook
+	interp.debugOpts = opts
+}
+
+func (interp *Interpreter) ClearDebugHookValue() {
+	if interp == nil {
+		return
+	}
+	interp.debugHook = NilValue()
+	interp.debugOpts = DebugHookOptions{}
+}
+
+func (interp *Interpreter) DebugHookValue() (Value, DebugHookOptions) {
+	if interp == nil || interp.debugHook.IsNil() {
+		return NilValue(), DebugHookOptions{}
+	}
+	return interp.debugHook, interp.debugOpts
+}
+
+func (interp *Interpreter) SetDebugSinkValue(sink Value) Value {
+	if interp == nil {
+		return NilValue()
+	}
+	prev := interp.debugSink
+	if sink.IsNil() {
+		interp.debugSink = NilValue()
+	} else {
+		interp.debugSink = sink
+	}
+	if prev.IsNil() {
+		return NilValue()
+	}
+	return prev
+}
+
+func (interp *Interpreter) EmitDebugHook(eventType, kind, name string, data Value) error {
+	if interp == nil {
+		return nil
+	}
+	return interp.emitDebugHook(eventType, kind, name, data)
+}
+
+func (interp *Interpreter) EmitDebugSink(event *Table) error {
+	if interp == nil {
+		return nil
+	}
+	return interp.emitDebugSink(event)
+}
+
 func (interp *Interpreter) emitDebugHook(eventType, kind, name string, data Value) error {
 	if interp.debugBusy {
 		return nil
@@ -319,15 +394,15 @@ func buildDebugLib(interp *Interpreter) *Table {
 	return t
 }
 
-func debugFramesTable(frames []DebugFrame) *Table {
+func DebugFramesTable(frames []DebugFrame) *Table {
 	out := NewTable()
 	for i, frame := range frames {
-		out.RawSet(IntValue(int64(i+1)), TableValue(debugFrameTable(i+1, frame)))
+		out.RawSet(IntValue(int64(i+1)), TableValue(DebugFrameTable(i+1, frame)))
 	}
 	return out
 }
 
-func debugFrameTable(index int, frame DebugFrame) *Table {
+func DebugFrameTable(index int, frame DebugFrame) *Table {
 	out := NewTable()
 	out.RawSetString("index", IntValue(int64(index)))
 	out.RawSetString("name", StringValue(frame.Name))
@@ -342,7 +417,7 @@ func debugFrameTable(index int, frame DebugFrame) *Table {
 	return out
 }
 
-func debugFunctionInfo(fn Value) *Table {
+func DebugFunctionInfo(fn Value) *Table {
 	out := NewTable()
 	out.RawSetString("type", StringValue("function"))
 	if gf := fn.GoFunction(); gf != nil {
@@ -374,6 +449,16 @@ func debugFunctionInfo(fn Value) *Table {
 	return out
 }
 
-func formatDebugTraceback(message string, frames []DebugFrame) string {
+func FormatDebugTraceback(message string, frames []DebugFrame) string {
 	return stddebug.FormatTraceback(message, frames)
+}
+
+func debugFramesTable(frames []DebugFrame) *Table { return DebugFramesTable(frames) }
+
+func debugFrameTable(index int, frame DebugFrame) *Table { return DebugFrameTable(index, frame) }
+
+func debugFunctionInfo(fn Value) *Table { return DebugFunctionInfo(fn) }
+
+func formatDebugTraceback(message string, frames []DebugFrame) string {
+	return FormatDebugTraceback(message, frames)
 }

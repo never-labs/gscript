@@ -35,6 +35,7 @@ func Install(interp *runtime.Interpreter) {
 			Call:                  interp.CallFunction,
 		},
 	})
+	InstallDebugAndTestkit(interp)
 	InstallLLM(interp)
 }
 
@@ -133,6 +134,18 @@ func InstallLLM(interp *runtime.Interpreter) {
 			}
 		},
 	})
+}
+
+func InstallDebugAndTestkit(interp *runtime.Interpreter) {
+	if interp == nil {
+		return
+	}
+	installer := interpreterInstaller{interp: interp}
+	installer.RegisterTable("debug", modules.BuildDebug(interp))
+	installer.RegisterTable("testkit", modules.BuildTestkit(modules.TestkitOptions{
+		Runtime: interp,
+		Call:    interp.CallFunction,
+	}))
 }
 
 type interpreterInstaller struct {

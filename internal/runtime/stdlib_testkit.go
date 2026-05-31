@@ -109,6 +109,17 @@ func buildTestkitLib(interp *Interpreter) *Table {
 	return t
 }
 
+func (interp *Interpreter) TestkitAccessEnabled() bool {
+	return interp == nil || interp.testkitAccess
+}
+
+func (interp *Interpreter) TestkitMemorySnapshot() *Table {
+	if interp == nil {
+		return NewTable()
+	}
+	return interp.testkitMemorySnapshot()
+}
+
 func (interp *Interpreter) testkitMemorySnapshot() *Table {
 	var stats goruntime.MemStats
 	goruntime.ReadMemStats(&stats)
@@ -125,7 +136,7 @@ func (interp *Interpreter) testkitMemorySnapshot() *Table {
 	return t
 }
 
-func testkitMemoryDiff(before, after *Table) *Table {
+func TestkitMemoryDiff(before, after *Table) *Table {
 	out := NewTable()
 	for _, key := range []string{"allocBytes", "sysBytes", "heapObjects", "numGC", "rootLog"} {
 		out.RawSetString(key, IntValue(testkitTableInt(after, key)-testkitTableInt(before, key)))
@@ -138,7 +149,7 @@ func testkitMemoryDiff(before, after *Table) *Table {
 	return out
 }
 
-func testkitValueInfo(v Value) *Table {
+func TestkitValueInfo(v Value) *Table {
 	out := NewTable()
 	out.RawSetString("type", StringValue(v.TypeName()))
 	out.RawSetString("text", StringValue(v.String()))
@@ -170,7 +181,7 @@ func testkitValueInfo(v Value) *Table {
 	return out
 }
 
-func testkitArray(values []Value) *Table {
+func TestkitArray(values []Value) *Table {
 	t := NewTable()
 	for i, v := range values {
 		t.RawSet(IntValue(int64(i+1)), v)
@@ -178,7 +189,7 @@ func testkitArray(values []Value) *Table {
 	return t
 }
 
-func testkitOptionalInt(t *Table, key string) (int64, bool) {
+func TestkitOptionalInt(t *Table, key string) (int64, bool) {
 	v := t.RawGetString(key)
 	if v.IsNil() {
 		return 0, false
@@ -189,7 +200,7 @@ func testkitOptionalInt(t *Table, key string) (int64, bool) {
 	return toInt(v), true
 }
 
-func testkitTableInt(t *Table, key string) int64 {
+func TestkitTableInt(t *Table, key string) int64 {
 	v := t.RawGetString(key)
 	if !v.IsNumber() {
 		return 0
@@ -197,7 +208,7 @@ func testkitTableInt(t *Table, key string) int64 {
 	return toInt(v)
 }
 
-func testkitTableNumber(t *Table, key string) float64 {
+func TestkitTableNumber(t *Table, key string) float64 {
 	v := t.RawGetString(key)
 	if !v.IsNumber() {
 		return 0
@@ -205,7 +216,7 @@ func testkitTableNumber(t *Table, key string) float64 {
 	return v.Number()
 }
 
-func testkitIdentity(v Value) string {
+func TestkitIdentity(v Value) string {
 	switch {
 	case v.IsFunction():
 		return fmt.Sprintf("function:%x", v.Raw())
@@ -217,3 +228,19 @@ func testkitIdentity(v Value) string {
 		return fmt.Sprintf("%s:%x", v.TypeName(), v.Raw())
 	}
 }
+
+func testkitMemoryDiff(before, after *Table) *Table { return TestkitMemoryDiff(before, after) }
+
+func testkitValueInfo(v Value) *Table { return TestkitValueInfo(v) }
+
+func testkitArray(values []Value) *Table { return TestkitArray(values) }
+
+func testkitOptionalInt(t *Table, key string) (int64, bool) {
+	return TestkitOptionalInt(t, key)
+}
+
+func testkitTableInt(t *Table, key string) int64 { return TestkitTableInt(t, key) }
+
+func testkitTableNumber(t *Table, key string) float64 { return TestkitTableNumber(t, key) }
+
+func testkitIdentity(v Value) string { return TestkitIdentity(v) }
