@@ -2,8 +2,9 @@ package runtime
 
 import (
 	"fmt"
-	"strings"
 	"unsafe"
+
+	basestring "github.com/never-labs/gscript/internal/stdlib/base/string"
 )
 
 // stdlib_string_split.go holds string.split and its split-projection helpers
@@ -29,40 +30,14 @@ func stringSplit2Value(sv, sepv Value) (Value, error) {
 }
 
 func stringSplitStrings(s, sep string) Value {
+	capacity := 8
 	if sep == "" {
-		tbl := NewSequentialArrayTable(len(s))
-		for i := 0; i < len(s); i++ {
-			tbl.array[i+1] = StringValue(string(s[i]))
-		}
-		return TableValue(tbl)
+		capacity = len(s)
 	}
-
-	tbl := NewAppendArrayTable(8)
-	if len(sep) == 1 {
-		sepByte := sep[0]
-		start := 0
-		for i := 0; i < len(s); i++ {
-			if s[i] != sepByte {
-				continue
-			}
-			arenaAppendValue(DefaultHeap, &tbl.array, StringValue(s[start:i]))
-			start = i + 1
-		}
-		arenaAppendValue(DefaultHeap, &tbl.array, StringValue(s[start:]))
-		return TableValue(tbl)
-	}
-
-	start := 0
-	for {
-		next := strings.Index(s[start:], sep)
-		if next < 0 {
-			arenaAppendValue(DefaultHeap, &tbl.array, StringValue(s[start:]))
-			break
-		}
-		end := start + next
-		arenaAppendValue(DefaultHeap, &tbl.array, StringValue(s[start:end]))
-		start = end + len(sep)
-	}
+	tbl := NewAppendArrayTable(capacity)
+	basestring.SplitEach(s, sep, func(part string) {
+		arenaAppendValue(DefaultHeap, &tbl.array, StringValue(part))
+	})
 	return TableValue(tbl)
 }
 
@@ -120,93 +95,13 @@ func StringSplitProjectSubToNumber(sv, sepv Value, index, start, end int64, hasE
 }
 
 func stringSplitProjectSlice(s, sep string, index int64) (string, bool) {
-	if sep == "" {
-		i := int(index) - 1
-		if i < 0 || i >= len(s) {
-			return "", false
-		}
-		return string(s[i]), true
-	}
-
-	token := int64(1)
-	start := 0
-	if len(sep) == 1 {
-		sepByte := sep[0]
-		for i := 0; i < len(s); i++ {
-			if s[i] != sepByte {
-				continue
-			}
-			if token == index {
-				return s[start:i], true
-			}
-			token++
-			start = i + 1
-		}
-		if token == index {
-			return s[start:], true
-		}
-		return "", false
-	}
-
-	for {
-		next := strings.Index(s[start:], sep)
-		if next < 0 {
-			if token == index {
-				return s[start:], true
-			}
-			return "", false
-		}
-		end := start + next
-		if token == index {
-			return s[start:end], true
-		}
-		token++
-		start = end + len(sep)
-	}
+	return basestring.SplitProject(s, sep, index)
 }
 
 func stringSplitProjectStrings(s, sep string, index int64) Value {
-	if sep == "" {
-		i := int(index) - 1
-		if i < 0 || i >= len(s) {
-			return NilValue()
-		}
-		return StringValue(string(s[i]))
-	}
-
-	token := int64(1)
-	start := 0
-	if len(sep) == 1 {
-		sepByte := sep[0]
-		for i := 0; i < len(s); i++ {
-			if s[i] != sepByte {
-				continue
-			}
-			if token == index {
-				return StringValue(s[start:i])
-			}
-			token++
-			start = i + 1
-		}
-		if token == index {
-			return StringValue(s[start:])
-		}
+	token, ok := stringSplitProjectSlice(s, sep, index)
+	if !ok {
 		return NilValue()
 	}
-
-	for {
-		next := strings.Index(s[start:], sep)
-		if next < 0 {
-			if token == index {
-				return StringValue(s[start:])
-			}
-			return NilValue()
-		}
-		end := start + next
-		if token == index {
-			return StringValue(s[start:end])
-		}
-		token++
-		start = end + len(sep)
-	}
+	return StringValue(token)
 }

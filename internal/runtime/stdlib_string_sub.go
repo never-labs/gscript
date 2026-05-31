@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"unsafe"
+
+	basestring "github.com/never-labs/gscript/internal/stdlib/base/string"
 )
 
 // stdlib_string_sub.go holds the string.sub / string.byte fast-path value
@@ -19,77 +21,27 @@ func stringSubValue(args []Value) (Value, error) {
 	if !args[0].IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	s := args[0].Str()
-	slen := len(s)
-
-	i := int(toInt(args[1]))
-	j := slen
+	j := int64(0)
+	hasEnd := false
 	if len(args) >= 3 {
-		j = int(toInt(args[2]))
+		j = toInt(args[2])
+		hasEnd = true
 	}
-
-	// Convert Lua 1-based indexes to Go byte offsets.
-	if i < 0 {
-		i = slen + i + 1
-	}
-	if i < 1 {
-		i = 1
-	}
-	if j < 0 {
-		j = slen + j + 1
-	}
-	if j > slen {
-		j = slen
-	}
-	if i > j {
-		return StringValue(""), nil
-	}
-	return StringValue(s[i-1 : j]), nil
+	return StringValue(basestring.LuaSub(args[0].Str(), toInt(args[1]), j, hasEnd)), nil
 }
 
 func stringSub2Value(sv, iv Value) (Value, error) {
 	if !sv.IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	s := sv.Str()
-	slen := len(s)
-	i := int(toInt(iv))
-	if i < 0 {
-		i = slen + i + 1
-	}
-	if i < 1 {
-		i = 1
-	}
-	if i > slen {
-		return StringValue(""), nil
-	}
-	return StringValue(s[i-1:]), nil
+	return StringValue(basestring.LuaSub(sv.Str(), toInt(iv), 0, false)), nil
 }
 
 func stringSub3Value(sv, iv, jv Value) (Value, error) {
 	if !sv.IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	s := sv.Str()
-	slen := len(s)
-	i := int(toInt(iv))
-	j := int(toInt(jv))
-	if i < 0 {
-		i = slen + i + 1
-	}
-	if i < 1 {
-		i = 1
-	}
-	if j < 0 {
-		j = slen + j + 1
-	}
-	if j > slen {
-		j = slen
-	}
-	if i > j {
-		return StringValue(""), nil
-	}
-	return StringValue(s[i-1 : j]), nil
+	return StringValue(basestring.LuaSub(sv.Str(), toInt(iv), toInt(jv), true)), nil
 }
 
 func stringByte1Value(sv Value) (Value, error) {
@@ -123,28 +75,7 @@ func StdStringSubIdentityPtr() unsafe.Pointer {
 }
 
 func stringSubRaw(s string, start, end int64, hasEnd bool) string {
-	slen := len(s)
-	i := int(start)
-	j := slen
-	if hasEnd {
-		j = int(end)
-	}
-	if i < 0 {
-		i = slen + i + 1
-	}
-	if i < 1 {
-		i = 1
-	}
-	if j < 0 {
-		j = slen + j + 1
-	}
-	if j > slen {
-		j = slen
-	}
-	if i > j {
-		return ""
-	}
-	return s[i-1 : j]
+	return basestring.LuaSub(s, start, end, hasEnd)
 }
 
 func stringToNumberRaw(raw string) (Value, bool) {
