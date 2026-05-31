@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+
+	pathlib "github.com/never-labs/gscript/internal/stdlib/base/path"
 )
 
 // buildPathLib creates the "path" standard library table.
@@ -18,8 +18,8 @@ func buildPathLib() *Table {
 	}
 
 	// Constants
-	t.RawSet(StringValue("separator"), StringValue(string(os.PathSeparator)))
-	t.RawSet(StringValue("listSeparator"), StringValue(string(os.PathListSeparator)))
+	t.RawSet(StringValue("separator"), StringValue(pathlib.Separator()))
+	t.RawSet(StringValue("listSeparator"), StringValue(pathlib.ListSeparator()))
 
 	// path.join(...) -> string
 	set("join", func(args []Value) ([]Value, error) {
@@ -27,7 +27,7 @@ func buildPathLib() *Table {
 		for _, a := range args {
 			parts = append(parts, a.Str())
 		}
-		return []Value{StringValue(filepath.Join(parts...))}, nil
+		return []Value{StringValue(pathlib.Join(parts...))}, nil
 	})
 
 	// path.dir(p) -> string
@@ -35,7 +35,7 @@ func buildPathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'path.dir' (string expected)")
 		}
-		return []Value{StringValue(filepath.Dir(args[0].Str()))}, nil
+		return []Value{StringValue(pathlib.Dir(args[0].Str()))}, nil
 	})
 
 	// path.base(p) -> string
@@ -43,7 +43,7 @@ func buildPathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'path.base' (string expected)")
 		}
-		return []Value{StringValue(filepath.Base(args[0].Str()))}, nil
+		return []Value{StringValue(pathlib.Base(args[0].Str()))}, nil
 	})
 
 	// path.ext(p) -> string
@@ -51,7 +51,7 @@ func buildPathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'path.ext' (string expected)")
 		}
-		return []Value{StringValue(filepath.Ext(args[0].Str()))}, nil
+		return []Value{StringValue(pathlib.Ext(args[0].Str()))}, nil
 	})
 
 	// path.abs(p) -> string or nil, errMsg
@@ -59,7 +59,7 @@ func buildPathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'path.abs' (string expected)")
 		}
-		abs, err := filepath.Abs(args[0].Str())
+		abs, err := pathlib.Abs(args[0].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
@@ -71,7 +71,7 @@ func buildPathLib() *Table {
 			if len(args) < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'path.%s' (string expected)", name)
 			}
-			return []Value{BoolValue(filepath.IsAbs(args[0].Str()))}, nil
+			return []Value{BoolValue(pathlib.IsAbs(args[0].Str()))}, nil
 		})
 	}
 
@@ -86,7 +86,7 @@ func buildPathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'path.clean' (string expected)")
 		}
-		return []Value{StringValue(filepath.Clean(args[0].Str()))}, nil
+		return []Value{StringValue(pathlib.Clean(args[0].Str()))}, nil
 	})
 
 	// path.split(p) -> dir, file
@@ -94,7 +94,7 @@ func buildPathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'path.split' (string expected)")
 		}
-		dir, file := filepath.Split(args[0].Str())
+		dir, file := pathlib.Split(args[0].Str())
 		return []Value{StringValue(dir), StringValue(file)}, nil
 	})
 
@@ -103,7 +103,7 @@ func buildPathLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'path.match' (pattern and name expected)")
 		}
-		matched, err := filepath.Match(args[0].Str(), args[1].Str())
+		matched, err := pathlib.Match(args[0].Str(), args[1].Str())
 		if err != nil {
 			return []Value{BoolValue(false), StringValue(err.Error())}, nil
 		}
@@ -115,7 +115,7 @@ func buildPathLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'path.rel' (basepath and targpath expected)")
 		}
-		rel, err := filepath.Rel(args[0].Str(), args[1].Str())
+		rel, err := pathlib.Rel(args[0].Str(), args[1].Str())
 		if err != nil {
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
