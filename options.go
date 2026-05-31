@@ -11,7 +11,7 @@ const (
 	LibOS                             // os.*
 	LibCoroutine                      // coroutine (built-in, always available)
 	LibHTTP                           // http.* (server)
-	LibGL                             // gl.* (OpenGL)
+	LibRL                             // rl.* (raylib)
 	LibJSON                           // json.*
 	LibBase64                         // base64.*
 	LibHash                           // hash.*
@@ -46,11 +46,9 @@ const (
 	LibSoA                            // soa.* structure-of-arrays
 	LibLLM                            // llm.* native model/tool integration
 
-	LibRL = LibGL // compatibility alias for the registered rl.* module
-
 	// LibAll includes every library (default).
 	LibAll = LibString | LibTable | LibMath | LibIO | LibOS | LibCoroutine |
-		LibHTTP | LibGL | LibJSON | LibBase64 | LibHash |
+		LibHTTP | LibRL | LibJSON | LibBase64 | LibHash |
 		LibFS | LibPath | LibTime | LibNet |
 		LibVec | LibColor | LibRegexp | LibUTF8 | LibBit32 |
 		LibBinary | LibBits | LibBytes | LibCSV | LibURL | LibUUID |
@@ -75,9 +73,9 @@ const (
 		LibCompress | LibCrypto | LibContainer | LibLog | LibArray | LibSoA |
 		LibLLM
 
-	// LibGame is a preset for game development (no I/O, includes GL/vec/color).
+	// LibGame is a preset for game development (no I/O, includes rl/vec/color).
 	LibGame = LibString | LibTable | LibMath | LibCoroutine |
-		LibGL | LibVec | LibColor | LibJSON | LibBit32 | LibBits |
+		LibRL | LibVec | LibColor | LibJSON | LibBit32 | LibBits |
 		LibTime | LibRand | LibArray | LibSoA
 )
 
