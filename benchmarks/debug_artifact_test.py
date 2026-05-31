@@ -18,7 +18,7 @@ class DebugArtifactTest(unittest.TestCase):
                     {
                         "results": [
                             {
-                                "group": "suite",
+                                "group": "recursion",
                                 "benchmark": "fib",
                                 "modes": {
                                     "default": {

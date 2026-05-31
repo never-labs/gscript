@@ -8,11 +8,11 @@ import diagnose
 
 
 class DiagnoseSelectorTest(unittest.TestCase):
-    def test_groups_for_args_accepts_compatibility_group_and_selector_aliases(self):
+    def test_groups_for_args_accepts_domain_groups_and_selectors(self):
         args = argparse.Namespace(
             all_groups=False,
-            group=["data_oriented"],
-            bench=["extended/goroutine_sleep", "official/events_metamethod_hot"],
+            group=["data"],
+            bench=["concurrency/goroutine_sleep", "table/events_metamethod"],
         )
 
         self.assertEqual(diagnose.groups_for_args(args), ["data", "concurrency", "table"])

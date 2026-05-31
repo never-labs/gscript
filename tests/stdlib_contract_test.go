@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/stdlibmeta"
+	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 func TestStdlibContractDocumentsRuntimeModules(t *testing.T) {
@@ -27,7 +27,7 @@ func readStdlibModuleNames(t *testing.T) []string {
 	t.Helper()
 
 	seen := map[string]bool{}
-	names := stdlibmeta.ModuleNames()
+	names := catalog.ModuleNames()
 	for _, name := range names {
 		if seen[name] {
 			t.Fatalf("runtime stdlib registry has duplicate module %q", name)

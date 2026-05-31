@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/never-labs/gscript/internal/stdlibmeta"
+	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 type cliCapabilities struct {
@@ -113,7 +113,7 @@ func runCapabilitiesCommand(args []string, outw, errw io.Writer) int {
 }
 
 func buildCapabilities() cliCapabilities {
-	modules := stdlibmeta.ModuleNames()
+	modules := catalog.ModuleNames()
 	sort.Strings(modules)
 	return cliCapabilities{
 		SchemaVersion: 1,
@@ -217,11 +217,11 @@ func buildCapabilities() cliCapabilities {
 }
 
 func buildStdlibLayerCapabilities() []cliStdlibLayer {
-	layerNames := stdlibmeta.Layers()
+	layerNames := catalog.Layers()
 	layers := make([]cliStdlibLayer, 0, len(layerNames))
 	for _, name := range layerNames {
 		modules := make([]cliStdlibModule, 0)
-		for _, module := range stdlibmeta.ModulesForLayer(name) {
+		for _, module := range catalog.ModulesForLayer(name) {
 			modules = append(modules, cliStdlibModule{
 				Name:         module.Name,
 				Capabilities: append([]string(nil), module.Capabilities...),

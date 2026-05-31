@@ -11,11 +11,11 @@ import (
 	"strings"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibmeta"
+	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {
-	for _, name := range stdlibmeta.ModuleNames() {
+	for _, name := range catalog.ModuleNames() {
 		if allowed[name] {
 			continue
 		}

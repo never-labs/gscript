@@ -1,4 +1,4 @@
-package stdlibmeta
+package catalog
 
 import (
 	"reflect"

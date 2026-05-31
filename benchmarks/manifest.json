@@ -877,12 +877,6 @@
       ]
     }
   ],
-  "time_source_hints": {
-    "script_time_line": "Benchmark prints a final Time: ...s line; harness may repeat or fall back to wall time when script timing is too small."
-  },
-  "scale_profiles": {
-    "hot": "Recommended temporary parameter overrides for selected low-resolution or hot-loop timing comparisons."
-  },
   "groups": [
     "numeric",
     "recursion",
@@ -892,109 +886,15 @@
     "concurrency",
     "data",
     "app",
-    "control"
+    "control",
+    "precision"
   ],
-  "path_roles": {
-    "benchmark_domains": [
-      "benchmarks/numeric",
-      "benchmarks/recursion",
-      "benchmarks/table",
-      "benchmarks/calls",
-      "benchmarks/string",
-      "benchmarks/concurrency",
-      "benchmarks/data",
-      "benchmarks/app",
-      "benchmarks/control"
-    ],
-    "reference_domains": [
-      "benchmarks/lua_ref"
-    ],
-    "history": [
-      "benchmarks/data/history"
-    ],
-    "tool_scripts": [
-      "benchmarks/audit_guard.py",
-      "benchmarks/conformance_perf_coverage.py",
-      "benchmarks/coverage_guard.sh",
-      "benchmarks/debug_artifact.py",
-      "benchmarks/diagnose.py",
-      "benchmarks/diagnose_tier2.sh",
-      "benchmarks/jit_addr_map.py",
-      "benchmarks/perf_submit_guard.py",
-      "benchmarks/plot_history.sh",
-      "benchmarks/profile_exits.py",
-      "benchmarks/rank_luajit_gaps.py",
-      "benchmarks/regression_guard.py",
-      "benchmarks/regression_guard.sh",
-      "benchmarks/set_baseline.sh",
-      "benchmarks/strict_guard.py",
-      "benchmarks/strict_guard.sh",
-      "benchmarks/timing_compare.py",
-      "benchmarks/triage.py",
-      "benchmarks/validate_lua_refs.py"
-    ],
-    "historical_reference": [
-      "benchmarks/lua_ref/historical"
-    ],
-    "go_reference_libraries": [
-      "benchmarks/data_oriented"
-    ],
-    "go_commands": [
-      "benchmarks/cmd/data_oriented_bench"
-    ]
+  "time_source_hints": {
+    "script_time_line": "Benchmark prints a final Time: ...s line; harness may repeat or fall back to wall time when script timing is too small."
   },
-  "compatibility": {
-    "compatibility_group_aliases": {
-      "suite": [
-        "numeric",
-        "recursion",
-        "table",
-        "calls",
-        "string",
-        "control"
-      ],
-      "extended": [
-        "app",
-        "table",
-        "string",
-        "concurrency"
-      ],
-      "variants": [
-        "recursion",
-        "calls",
-        "numeric",
-        "table"
-      ],
-      "official": [
-        "calls",
-        "control",
-        "table",
-        "string",
-        "app"
-      ],
-      "data_oriented": [
-        "data"
-      ]
-    },
-    "forwarded_commands": [
-      {
-        "previous_path": "benchmarks/data_oriented/cmd/data_oriented_bench",
-        "canonical_path": "benchmarks/cmd/data_oriented_bench",
-        "status": "compatible_forwarder"
-      }
-    ]
+  "scale_profiles": {
+    "hot": "Recommended temporary parameter overrides for selected low-resolution or hot-loop timing comparisons."
   },
-  "auxiliary_benchmark_sets": [
-    {
-      "id": "data_oriented_go_reference",
-      "kind": "go_reference_microbenchmarks",
-      "library_path": "benchmarks/data_oriented",
-      "canonical_command": "benchmarks/cmd/data_oriented_bench",
-      "compatibility_command": "benchmarks/data_oriented/cmd/data_oriented_bench",
-      "migration_status": "not_moved_import_path_is_public_to_repo",
-      "notes": "Go package path remains stable; canonical runner moved to benchmarks/cmd with compatibility command forwarding."
-    }
-  ],
   "benchmarks": [
     {
       "id": "numeric/fannkuch",

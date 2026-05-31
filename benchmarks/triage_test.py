@@ -8,32 +8,32 @@ import triage
 
 
 class TriageSelectorTest(unittest.TestCase):
-    def test_bench_script_path_accepts_timing_compare_compatibility_aliases(self):
+    def test_bench_script_path_accepts_domain_selectors(self):
         root = Path(__file__).resolve().parents[1]
 
         self.assertEqual(
-            triage.bench_id_to_path(root, "data_oriented/soa_dot"),
+            triage.bench_id_to_path(root, "data/soa_dot"),
             ("data", "soa_dot", root / "benchmarks" / "data" / "soa_dot.gs"),
         )
         self.assertEqual(
-            triage.bench_id_to_path(root, "extended/goroutine_sleep"),
+            triage.bench_id_to_path(root, "concurrency/goroutine_sleep"),
             ("concurrency", "goroutine_sleep", root / "benchmarks" / "concurrency" / "goroutine_sleep.gs"),
         )
         self.assertEqual(
-            triage.bench_id_to_path(root, "official/events_metamethod_hot"),
+            triage.bench_id_to_path(root, "table/events_metamethod"),
             ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
         )
 
-    def test_groups_for_benches_uses_shared_compatibility_selector_resolution(self):
+    def test_groups_for_benches_uses_shared_domain_selector_resolution(self):
         root = Path(__file__).resolve().parents[1]
 
         self.assertEqual(
             triage.groups_for_benches(
                 root,
                 [
-                    "official/events_metamethod_hot",
-                    "extended/goroutine_sleep",
-                    "data_oriented/soa_dot",
+                    "table/events_metamethod",
+                    "concurrency/goroutine_sleep",
+                    "data/soa_dot",
                 ],
             ),
             ["table", "concurrency", "data"],

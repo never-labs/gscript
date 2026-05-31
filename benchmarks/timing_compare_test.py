@@ -34,27 +34,27 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
         specs = timing.discover_specs(root, timing.GROUPS)
         self.assertEqual({spec.benchmark_id for spec in specs}, expected)
 
-    def test_select_specs_accepts_compatibility_group_selector_aliases(self):
+    def test_select_specs_accepts_domain_group_selectors(self):
         root = Path(__file__).resolve().parents[1]
         specs = timing.discover_specs(root, timing.GROUPS)
 
         self.assertEqual(
-            [spec.benchmark_id for spec in timing.select_specs(specs, ["data_oriented/soa_dot"])],
+            [spec.benchmark_id for spec in timing.select_specs(specs, ["data/soa_dot"])],
             ["data/soa_dot"],
         )
         self.assertEqual(
-            [spec.benchmark_id for spec in timing.select_specs(specs, ["extended/goroutine_sleep"])],
+            [spec.benchmark_id for spec in timing.select_specs(specs, ["concurrency/goroutine_sleep"])],
             ["concurrency/goroutine_sleep"],
         )
         self.assertEqual(
-            [spec.benchmark_id for spec in timing.select_specs(specs, ["official/events_metamethod_hot"])],
+            [spec.benchmark_id for spec in timing.select_specs(specs, ["table/events_metamethod"])],
             ["table/events_metamethod"],
         )
 
-    def test_scale_overrides_accept_compatibility_group_selector_aliases(self):
+    def test_scale_overrides_accept_domain_group_selectors(self):
         root = Path(__file__).resolve().parents[1]
-        specs = timing.select_specs(timing.discover_specs(root, timing.GROUPS), ["extended/goroutine_sleep"])
-        overrides = timing.parse_scale_overrides(["extended/goroutine_sleep:N=10"])
+        specs = timing.select_specs(timing.discover_specs(root, timing.GROUPS), ["concurrency/goroutine_sleep"])
+        overrides = timing.parse_scale_overrides(["concurrency/goroutine_sleep:N=10"])
 
         timing.validate_scale_selectors(specs, overrides)
         self.assertEqual(timing.scale_overrides_for(specs[0], overrides), overrides)

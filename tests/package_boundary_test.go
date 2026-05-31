@@ -15,7 +15,7 @@ func TestInternalPackageBoundaries(t *testing.T) {
 	root := findRepoRoot(t)
 	cmd := exec.Command("go", "list", "-json",
 		"./internal/runtime",
-		"./internal/stdlibmeta",
+		"./internal/stdlib/catalog",
 		"./internal/jit",
 		"./internal/vm",
 		"./internal/methodjit",
@@ -44,7 +44,7 @@ func TestInternalPackageBoundaries(t *testing.T) {
 		return modulePath + "/internal/" + suffix
 	}
 
-	assertNoImports(t, pkgs[internal("stdlibmeta")], internal("runtime"), internal("jit"), internal("vm"), internal("methodjit"))
+	assertNoImports(t, pkgs[internal("stdlib/catalog")], internal("runtime"), internal("jit"), internal("vm"), internal("methodjit"))
 	assertNoImports(t, pkgs[internal("runtime")], internal("jit"), internal("vm"), internal("methodjit"))
 	assertNoImports(t, pkgs[internal("jit")], internal("vm"), internal("methodjit"))
 	assertNoImports(t, pkgs[internal("vm")], internal("methodjit"))

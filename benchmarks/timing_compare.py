@@ -30,8 +30,6 @@ import benchmark_output
 
 DEFAULT_ORDER = discovery.DEFAULT_ORDER
 GROUPS = discovery.GROUPS
-COMPATIBILITY_GROUP_ALIASES = discovery.COMPATIBILITY_GROUP_ALIASES
-COMPATIBILITY_BENCH_ALIASES = discovery.COMPATIBILITY_BENCH_ALIASES
 MODES = ["default", "vm", "no_filter"]
 TIME_SOURCES = ["auto", "script", "wall"]
 

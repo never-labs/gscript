@@ -106,7 +106,7 @@ def normalize_result_list(results: list[Any], source: str) -> list[dict[str, Any
     for item in results:
         if not isinstance(item, dict):
             continue
-        group = item.get("group") or "suite"
+        group = item.get("group") or "unknown"
         benchmark = item.get("benchmark") or item.get("name")
         if not benchmark:
             continue
@@ -134,7 +134,7 @@ def normalize_previous_schema_result_map(results: dict[str, Any], source: str) -
             rows.append(
                 {
                     "source": source,
-                    "group": "suite",
+                    "group": "unknown",
                     "benchmark": str(benchmark),
                     "mode": "default" if mode == "jit" else str(mode),
                     "subject": "current",

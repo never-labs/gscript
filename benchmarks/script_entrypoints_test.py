@@ -24,11 +24,11 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         diag = (ROOT / "scripts" / "diag.sh").read_text()
         self.assertIn("import benchmark_discovery as discovery", diag)
         self.assertIn("discovery.GROUPS", diag)
-        self.assertIn("discovery.canonical_group(selector)", diag)
+        self.assertIn("selector in discovery.GROUPS", diag)
         self.assertIn("discovery.resolve_script_path(root, selector)", diag)
         self.assertNotIn("domain_list_for()", diag)
-        for alias in discovery.COMPATIBILITY_GROUP_ALIASES:
-            self.assertNotIn(f"{alias}) printf", diag)
+        for alias in ("suite", "extended", "variants", "official", "data_oriented"):
+            self.assertNotIn(f"{alias})", diag)
 
     def test_benchmark_shell_wrappers_exec_matching_python(self):
         for stem in ("regression_guard", "strict_guard"):

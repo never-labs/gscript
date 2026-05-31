@@ -22,7 +22,6 @@
 #   bash scripts/diag.sh all                  — dump every domain benchmark
 #   bash scripts/diag.sh numeric              — dump numeric/ only
 #   bash scripts/diag.sh table                — dump table/ only
-#   bash scripts/diag.sh suite                — compatibility alias for numeric/recursion/table/calls/string/control
 #   bash scripts/diag.sh <benchmark>          — dump a single benchmark.
 #                                                Forms accepted:
 #                                                  sieve, sieve.gs
@@ -40,7 +39,7 @@ cd "$(dirname "$0")/.."
 BENCHMARK=""
 for arg in "$@"; do
     case "$arg" in
-        all|numeric|recursion|table|calls|string|concurrency|data|app|control|suite|extended|variants|official|data_oriented) BENCHMARK="$arg" ;;
+        all|numeric|recursion|table|calls|string|concurrency|data|app|control|precision) BENCHMARK="$arg" ;;
         *) BENCHMARK="$arg" ;;
     esac
 done
@@ -54,8 +53,7 @@ DIAG_ROOT="diag"
 mkdir -p "$DIAG_ROOT"
 
 # Resolve benchmark list. Each entry is "<domain>/<file>.gs", relative to
-# benchmarks/. Keep selector compatibility in benchmark_discovery.py so the
-# shell entrypoint does not grow a second source of truth for compatibility aliases.
+# benchmarks/.
 BENCHES=()
 while IFS= read -r bench; do
     [ -n "$bench" ] || continue
@@ -76,9 +74,8 @@ try:
             print(spec.gscript.relative_to(root / "benchmarks"))
         raise SystemExit(0)
 
-    expanded = discovery.canonical_group(selector)
-    if expanded != [selector] or selector in discovery.GROUPS:
-        specs = discovery.discover_benchmarks(root, expanded)
+    if selector in discovery.GROUPS:
+        specs = discovery.discover_benchmarks(root, [selector])
         for spec in specs:
             print(spec.gscript.relative_to(root / "benchmarks"))
         raise SystemExit(0)

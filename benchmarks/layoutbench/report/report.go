@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	dataoriented "github.com/never-labs/gscript/benchmarks/data_oriented"
+	layoutbench "github.com/never-labs/gscript/benchmarks/layoutbench"
 )
 
 type Report struct {
@@ -37,11 +37,11 @@ type Result struct {
 }
 
 func RunCLI(args []string, stdout io.Writer, stderr io.Writer) int {
-	fs := flag.NewFlagSet("data_oriented_bench", flag.ContinueOnError)
+	fs := flag.NewFlagSet("layout_bench", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	particles := fs.Int("particles", dataoriented.DefaultParticles, "particle count")
-	steps := fs.Int("steps", dataoriented.DefaultSteps, "integration steps per repeat")
-	vectors := fs.Int("vectors", dataoriented.DefaultVectors, "vector count")
+	particles := fs.Int("particles", layoutbench.DefaultParticles, "particle count")
+	steps := fs.Int("steps", layoutbench.DefaultSteps, "integration steps per repeat")
+	vectors := fs.Int("vectors", layoutbench.DefaultVectors, "vector count")
 	repeats := fs.Int("repeats", 5, "measured repeats per benchmark cell")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -64,7 +64,7 @@ func RunCLI(args []string, stdout io.Writer, stderr io.Writer) int {
 
 func Build(particles, steps, vectors, repeats int) Report {
 	return Report{
-		Schema:         "gscript.data_oriented_benchmark.v1",
+		Schema:         "gscript.layout_benchmark.v1",
 		GeneratedAtUTC: time.Now().UTC().Format(time.RFC3339),
 		GoVersion:      runtime.Version(),
 		GOOS:           runtime.GOOS,
@@ -82,11 +82,11 @@ func Build(particles, steps, vectors, repeats int) Report {
 }
 
 func measureParticleAoS(n, steps, repeats int) Result {
-	ps := dataoriented.NewParticlesAoS(n)
+	ps := layoutbench.NewParticlesAoS(n)
 	var checksum float64
 	start := time.Now()
 	for i := 0; i < repeats; i++ {
-		checksum = dataoriented.IntegrateAoS(ps, steps, 0.016)
+		checksum = layoutbench.IntegrateAoS(ps, steps, 0.016)
 	}
 	seconds := time.Since(start).Seconds()
 	items := float64(n * steps * repeats)
@@ -94,11 +94,11 @@ func measureParticleAoS(n, steps, repeats int) Result {
 }
 
 func measureParticleSoA(n, steps, repeats int) Result {
-	ps := dataoriented.NewParticlesSoA(n)
+	ps := layoutbench.NewParticlesSoA(n)
 	var checksum float64
 	start := time.Now()
 	for i := 0; i < repeats; i++ {
-		checksum = dataoriented.IntegrateSoA(ps, steps, 0.016)
+		checksum = layoutbench.IntegrateSoA(ps, steps, 0.016)
 	}
 	seconds := time.Since(start).Seconds()
 	items := float64(n * steps * repeats)
@@ -106,11 +106,11 @@ func measureParticleSoA(n, steps, repeats int) Result {
 }
 
 func measureParticleSubsetXAoS(n, steps, repeats int) Result {
-	ps := dataoriented.NewParticlesAoS(n)
+	ps := layoutbench.NewParticlesAoS(n)
 	var checksum float64
 	start := time.Now()
 	for i := 0; i < repeats; i++ {
-		checksum = dataoriented.IntegrateXAoS(ps, steps, 0.016)
+		checksum = layoutbench.IntegrateXAoS(ps, steps, 0.016)
 	}
 	seconds := time.Since(start).Seconds()
 	items := float64(n * steps * repeats)
@@ -118,11 +118,11 @@ func measureParticleSubsetXAoS(n, steps, repeats int) Result {
 }
 
 func measureParticleSubsetXSoA(n, steps, repeats int) Result {
-	ps := dataoriented.NewParticlesSoA(n)
+	ps := layoutbench.NewParticlesSoA(n)
 	var checksum float64
 	start := time.Now()
 	for i := 0; i < repeats; i++ {
-		checksum = dataoriented.IntegrateXSoA(ps, steps, 0.016)
+		checksum = layoutbench.IntegrateXSoA(ps, steps, 0.016)
 	}
 	seconds := time.Since(start).Seconds()
 	items := float64(n * steps * repeats)
@@ -130,11 +130,11 @@ func measureParticleSubsetXSoA(n, steps, repeats int) Result {
 }
 
 func measureNormalizeAoS(n, repeats int) Result {
-	vs := dataoriented.NewVec3AoS(n)
+	vs := layoutbench.NewVec3AoS(n)
 	var checksum float64
 	start := time.Now()
 	for i := 0; i < repeats; i++ {
-		checksum = dataoriented.NormalizeAoS(vs)
+		checksum = layoutbench.NormalizeAoS(vs)
 	}
 	seconds := time.Since(start).Seconds()
 	items := float64(n * repeats)
@@ -142,11 +142,11 @@ func measureNormalizeAoS(n, repeats int) Result {
 }
 
 func measureNormalizeSoA(n, repeats int) Result {
-	vs := dataoriented.NewVec3SoA(n)
+	vs := layoutbench.NewVec3SoA(n)
 	var checksum float64
 	start := time.Now()
 	for i := 0; i < repeats; i++ {
-		checksum = dataoriented.NormalizeSoA(vs)
+		checksum = layoutbench.NormalizeSoA(vs)
 	}
 	seconds := time.Since(start).Seconds()
 	items := float64(n * repeats)

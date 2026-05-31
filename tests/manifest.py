@@ -16,10 +16,18 @@ EXCLUDED_DIRS = {
     "__pycache__",
     "lua_ref",
 }
-EXCLUDED_BENCHMARK_DIRS = {
-    "official_hot",
-    "variants",
-}
+BENCHMARK_DOMAINS = (
+    "numeric",
+    "recursion",
+    "table",
+    "calls",
+    "string",
+    "concurrency",
+    "data",
+    "app",
+    "control",
+    "precision",
+)
 
 
 def repo_rel(path: Path) -> str:
@@ -69,7 +77,7 @@ def iter_gscript_cases(root_name: str) -> list[Path]:
         rel_parts = path.relative_to(base).parts
         if any(part in EXCLUDED_DIRS for part in rel_parts):
             continue
-        if root_name == "benchmarks" and rel_parts[0] in EXCLUDED_BENCHMARK_DIRS:
+        if root_name == "benchmarks" and rel_parts[0] not in BENCHMARK_DOMAINS:
             continue
         paths.append(path)
     return paths
@@ -109,10 +117,11 @@ def generated_manifest(root_name: str) -> dict[str, Any]:
     }
     if root_name == "benchmarks":
         manifest["schema_version"] = 2
+        manifest["groups"] = list(BENCHMARK_DOMAINS)
         existing_path = ROOT / "benchmarks" / "manifest.json"
         if existing_path.exists():
             existing = json.loads(existing_path.read_text())
-            for key in ("time_source_hints", "scale_profiles", "groups", "benchmarks"):
+            for key in ("time_source_hints", "scale_profiles", "benchmarks"):
                 if key in existing:
                     manifest[key] = existing[key]
     return manifest

@@ -24,7 +24,7 @@ go run ./cmd/gscript ci smoke --list
 ```go
 package main
 
-import gs "github.com/Never-Labs/gscript/gscript"
+import gs "github.com/never-labs/gscript"
 
 func main() {
 	vm := gs.New(gs.WithLibs(gs.LibSafe))

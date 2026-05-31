@@ -23,14 +23,14 @@ class ManifestTest(unittest.TestCase):
         self.assertEqual(manifest.tags_for("benchmarks", "numeric", "benchmarks/lua_ref/numeric/matmul.lua"), ["numeric", "benchmark", "lua_ref"])
         self.assertEqual(manifest.status_for("benchmarks"), "active")
 
-    def test_iter_gscript_cases_excludes_benchmark_helper_dirs(self):
+    def test_iter_gscript_cases_includes_only_benchmark_domains(self):
         original_root = manifest.ROOT
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             for rel in (
                 "benchmarks/numeric/keep.gs",
                 "benchmarks/lua_ref/numeric/skip.gs",
-                "benchmarks/variants/skip.gs",
+                "benchmarks/not_a_domain/skip.gs",
                 "benchmarks/__pycache__/skip.gs",
             ):
                 path = root / rel

@@ -163,8 +163,8 @@ class StrictGuardReportTest(unittest.TestCase):
         self.assertEqual(sg.repeat_for(overrides, "default", "sieve"), 8)
         self.assertIsNone(sg.repeat_for(overrides, "vm", "sieve"))
 
-    def test_repeat_overrides_accept_compatibility_group_selector_aliases(self):
-        overrides = sg.parse_repeat_overrides(["data_oriented/soa_dot=5", "default/extended/goroutine_sleep=7"])
+    def test_repeat_overrides_accept_domain_group_selectors(self):
+        overrides = sg.parse_repeat_overrides(["data/soa_dot=5", "default/concurrency/goroutine_sleep=7"])
 
         self.assertEqual(sg.repeat_for(overrides, "vm", "soa_dot", "data/soa_dot"), 5)
         self.assertEqual(sg.repeat_for(overrides, "default", "goroutine_sleep", "concurrency/goroutine_sleep"), 7)
@@ -185,34 +185,27 @@ class StrictGuardReportTest(unittest.TestCase):
         specs = sg.discover_specs(root, sg.ALL_GROUPS)
         self.assertEqual({spec.benchmark_id for spec in specs}, expected)
 
-    def test_select_specs_accepts_compatibility_group_selector_aliases(self):
+    def test_select_specs_accepts_domain_group_selectors(self):
         root = Path(__file__).resolve().parents[1]
         specs = sg.discover_specs(root, sg.ALL_GROUPS)
 
         self.assertEqual(
-            [spec.benchmark_id for spec in sg.select_specs(specs, ["data_oriented/soa_dot"])],
+            [spec.benchmark_id for spec in sg.select_specs(specs, ["data/soa_dot"])],
             ["data/soa_dot"],
         )
         self.assertEqual(
-            [spec.benchmark_id for spec in sg.select_specs(specs, ["extended/goroutine_sleep"])],
+            [spec.benchmark_id for spec in sg.select_specs(specs, ["concurrency/goroutine_sleep"])],
             ["concurrency/goroutine_sleep"],
         )
         self.assertEqual(
-            [spec.benchmark_id for spec in sg.select_specs(specs, ["official/events_metamethod_hot"])],
+            [spec.benchmark_id for spec in sg.select_specs(specs, ["table/events_metamethod"])],
             ["table/events_metamethod"],
         )
 
-    def test_discovery_supports_historical_official_group_alias(self):
+    def test_discovery_rejects_historical_official_group_alias(self):
         root = Path(__file__).resolve().parents[1]
-        specs = sg.discover_specs(root, ["official"])
-        ids = {spec.benchmark_id for spec in specs}
-        self.assertIn("calls/calls_vararg_coroutine", ids)
-        self.assertIn("table/events_metamethod", ids)
-        for spec in specs:
-            self.assertIn(spec.group, {"calls", "control", "table", "string", "app"})
-            self.assertNotIn("official_hot", str(spec.gscript))
-            if spec.luajit is not None:
-                self.assertIn("benchmarks/lua_ref", str(spec.luajit))
+        with self.assertRaisesRegex(SystemExit, "unknown benchmark group: official"):
+            sg.discover_specs(root, ["official"])
 
 
 if __name__ == "__main__":

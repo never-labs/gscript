@@ -1,6 +1,6 @@
-// Package stdlibmeta describes the public standard-library surface without
+// Package catalog describes the public standard-library surface without
 // depending on runtime values or module constructors.
-package stdlibmeta
+package catalog
 
 const (
 	LayerBase   = "base"

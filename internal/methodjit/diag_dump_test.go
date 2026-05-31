@@ -48,9 +48,9 @@ type diagProtoStats struct {
 //
 // DIAG_BENCH formats accepted:
 //
-//	"sieve.gs"                       — bare basename: defaults to suite/
-//	"extended/json_table_walk.gs"    — explicit subdirectory under benchmarks/
-//	"variants/ack_nested_shifted.gs" — likewise
+//	"sieve.gs"                       — bare basename: searched by file name
+//	"table/json_table_walk.gs"       — explicit subdirectory under benchmarks/
+//	"recursion/ack_nested_shifted.gs" — likewise
 func TestDiagDump(t *testing.T) {
 	benchFile := os.Getenv("DIAG_BENCH")
 	if benchFile == "" {
@@ -63,7 +63,20 @@ func TestDiagDump(t *testing.T) {
 
 	relPath := benchFile
 	if !strings.Contains(relPath, "/") {
-		relPath = "suite/" + relPath
+		matches, err := filepath.Glob("../../benchmarks/*/" + relPath)
+		if err != nil {
+			t.Fatalf("resolve %s: %v", relPath, err)
+		}
+		var benchmarkMatches []string
+		benchmarkMatches = append(benchmarkMatches, matches...)
+		if len(benchmarkMatches) != 1 {
+			t.Fatalf("resolve bare benchmark %s: got %d matches %v", relPath, len(benchmarkMatches), benchmarkMatches)
+		}
+		rel, err := filepath.Rel("../../benchmarks", benchmarkMatches[0])
+		if err != nil {
+			t.Fatalf("relative benchmark path %s: %v", benchmarkMatches[0], err)
+		}
+		relPath = rel
 	}
 	src, err := os.ReadFile("../../benchmarks/" + relPath)
 	if err != nil {

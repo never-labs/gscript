@@ -3,7 +3,7 @@ package runtime
 import (
 	"context"
 
-	"github.com/never-labs/gscript/internal/stdlibmeta"
+	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 // registerStdlib registers all standard library tables as globals.
@@ -150,7 +150,7 @@ func (interp *Interpreter) registerStdlib() {
 func (interp *Interpreter) registerPackageLib() {
 	pkg := NewTable()
 	loaded := NewTable()
-	for _, module := range stdlibmeta.Modules() {
+	for _, module := range catalog.Modules() {
 		name := module.Name
 		if v, ok := interp.globals.Get(name); ok && v.IsTable() {
 			interp.modules[name] = v

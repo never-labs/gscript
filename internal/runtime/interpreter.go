@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/never-labs/gscript/internal/stdlibmeta"
+	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructor New /
@@ -124,7 +124,7 @@ func (interp *Interpreter) ReplaceGlobals(globals map[string]Value) {
 
 // RestrictStdlib removes standard-library globals not present in allowed.
 func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
-	for _, module := range stdlibmeta.Modules() {
+	for _, module := range catalog.Modules() {
 		name := module.Name
 		if allowed[name] {
 			continue
@@ -271,7 +271,7 @@ func (interp *Interpreter) refreshFSLib() {
 }
 
 func (interp *Interpreter) builtinModule(name string) (Value, bool) {
-	for _, module := range stdlibmeta.Modules() {
+	for _, module := range catalog.Modules() {
 		if name != module.Name {
 			continue
 		}

@@ -1,4 +1,4 @@
-package dataoriented
+package layoutbench
 
 import "testing"
 

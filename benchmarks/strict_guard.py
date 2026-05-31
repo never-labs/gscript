@@ -31,8 +31,6 @@ DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_ORDER = discovery.DEFAULT_ORDER
 DEFAULT_GROUPS = discovery.GROUPS
 ALL_GROUPS = DEFAULT_GROUPS
-COMPATIBILITY_GROUP_ALIASES = discovery.COMPATIBILITY_GROUP_ALIASES
-COMPATIBILITY_BENCH_ALIASES = discovery.COMPATIBILITY_BENCH_ALIASES
 
 LOGICAL_TIME_BENCHMARKS = {
     "control/defer_protected",
@@ -120,7 +118,7 @@ class ModeResult:
 @dataclass
 class BenchmarkResult:
     benchmark: str
-    group: str = "suite"
+    group: str = "unknown"
     base: str | None = None
     modes: dict[str, ModeResult] = field(default_factory=dict)
 
