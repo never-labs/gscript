@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"errors"
 	"fmt"
 	goruntime "runtime"
 )
@@ -88,30 +87,9 @@ func buildTestkitLib(interp *Interpreter) *Table {
 		}
 		return []Value{BoolValue(args[0].Equal(args[1]))}, nil
 	})
-	set("protect", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
-		}
-		if !args[0].IsFunction() {
-			return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
-		}
-		results, err := interp.callFunction(args[0], args[1:])
-		out := NewTable()
-		if err != nil {
-			out.RawSetString("ok", BoolValue(false))
-			var luaErr *LuaError
-			if errors.As(err, &luaErr) {
-				out.RawSetString("error", luaErr.Value)
-			} else {
-				out.RawSetString("error", StringValue(err.Error()))
-			}
-			return []Value{TableValue(out)}, nil
-		}
-		out.RawSetString("ok", BoolValue(true))
-		out.RawSetString("values", TableValue(testkitArray(results)))
-		out.RawSetString("n", IntValue(int64(len(results))))
-		return []Value{TableValue(out)}, nil
-	})
+	t.RawSetString("protect", FunctionValue(BuildTestkitProtectFunction(interp.callFunction, func() bool {
+		return interp == nil || interp.testkitAccess
+	})))
 	set("functionInfo", func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsFunction() {
 			return nil, fmt.Errorf("bad argument #1 to 'testkit.functionInfo' (function expected)")

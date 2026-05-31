@@ -4,7 +4,6 @@ package vm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -45,8 +44,8 @@ func (vm *VM) setPackageLoaded(name string, val runtime.Value) {
 // calls can invoke ordinary VM closures.
 
 func (vm *VM) RegisterProtectedCallLib() {
-	vm.SetGlobal("pcall", runtime.FunctionValue(vm.newPCallFunction()))
-	vm.SetGlobal("xpcall", runtime.FunctionValue(vm.newXPCallFunction()))
+	vm.SetGlobal("pcall", runtime.FunctionValue(runtime.BuildPCallFunction(vm.callValue)))
+	vm.SetGlobal("xpcall", runtime.FunctionValue(runtime.BuildXPCallFunction(vm.callValue)))
 }
 
 // RegisterTestkitLib installs VM-aware testkit helpers for APIs that need to
@@ -59,35 +58,9 @@ func (vm *VM) RegisterTestkitLib() {
 		return
 	}
 	lib := val.Table()
-	lib.RawSetString("protect", runtime.FunctionValue(&runtime.GoFunction{
-		Name: "testkit.protect",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if !vm.testkitAccess {
-				return nil, fmt.Errorf("testkit access disabled")
-			}
-			if len(args) < 1 {
-				return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
-			}
-			if !args[0].IsFunction() {
-				return nil, fmt.Errorf("bad argument #1 to 'testkit.protect' (function expected)")
-			}
-			results, err := vm.callValue(args[0], args[1:])
-			out := runtime.NewTable()
-			if err != nil {
-				out.RawSetString("ok", runtime.BoolValue(false))
-				out.RawSetString("error", protectedErrorValue(err))
-				return []runtime.Value{runtime.TableValue(out)}, nil
-			}
-			values := runtime.NewTable()
-			for i, result := range results {
-				values.RawSet(runtime.IntValue(int64(i+1)), result)
-			}
-			out.RawSetString("ok", runtime.BoolValue(true))
-			out.RawSetString("values", runtime.TableValue(values))
-			out.RawSetString("n", runtime.IntValue(int64(len(results))))
-			return []runtime.Value{runtime.TableValue(out)}, nil
-		},
-	}))
+	lib.RawSetString("protect", runtime.FunctionValue(runtime.BuildTestkitProtectFunction(vm.callValue, func() bool {
+		return vm.testkitAccess
+	})))
 	lib.RawSetString("functionInfo", runtime.FunctionValue(&runtime.GoFunction{
 		Name: "testkit.functionInfo",
 		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
@@ -136,51 +109,7 @@ func (vm *VM) RegisterTestkitLib() {
 // metamethods implemented as VM closures can be invoked correctly.
 
 func (vm *VM) RegisterToStringLib() {
-	vm.SetGlobal("tostring", runtime.FunctionValue(&runtime.GoFunction{
-		Name: "tostring",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) == 0 {
-				return nil, fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
-			}
-			if args[0].IsInt() {
-				if v, ok := runtime.CachedIntStringValue(args[0].Int()); ok {
-					return []runtime.Value{v}, nil
-				}
-			}
-			s, err := vm.luaToString(args[0])
-			if err != nil {
-				return nil, err
-			}
-			return []runtime.Value{runtime.StringValue(s)}, nil
-		},
-		FastArg1: func(arg runtime.Value) (runtime.Value, error) {
-			if arg.IsInt() {
-				if v, ok := runtime.CachedIntStringValue(arg.Int()); ok {
-					return v, nil
-				}
-			}
-			s, err := vm.luaToString(arg)
-			if err != nil {
-				return runtime.NilValue(), err
-			}
-			return runtime.StringValue(s), nil
-		},
-		Fast1: func(args []runtime.Value) (runtime.Value, error) {
-			if len(args) == 0 {
-				return runtime.NilValue(), fmt.Errorf("bad argument #1 to 'tostring' (value expected)")
-			}
-			if args[0].IsInt() {
-				if v, ok := runtime.CachedIntStringValue(args[0].Int()); ok {
-					return v, nil
-				}
-			}
-			s, err := vm.luaToString(args[0])
-			if err != nil {
-				return runtime.NilValue(), err
-			}
-			return runtime.StringValue(s), nil
-		},
-	}))
+	vm.SetGlobal("tostring", runtime.FunctionValue(runtime.BuildToStringFunction(vm.callValue)))
 }
 
 // RegisterTypeLib installs a VM-aware type builtin that returns VM-owned,
@@ -188,93 +117,19 @@ func (vm *VM) RegisterToStringLib() {
 // ordinary global override semantics through the normal GETGLOBAL guard.
 
 func (vm *VM) RegisterTypeLib() {
-	vm.SetGlobal("type", runtime.FunctionValue(vm.newTypeFunction()))
-}
-
-func (vm *VM) newTypeFunction() *runtime.GoFunction {
-	return &runtime.GoFunction{
-		Name: "type",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) == 0 {
-				return nil, fmt.Errorf("bad argument #1 to 'type' (value expected)")
-			}
-			return []runtime.Value{vm.typeNameValue(args[0])}, nil
-		},
-		FastArg1: func(arg runtime.Value) (runtime.Value, error) {
-			return vm.typeNameValue(arg), nil
-		},
-		NativeKind: runtime.NativeKindStdType,
-		NativeData: runtime.StdTypeIdentityPtr(),
-	}
-}
-
-func (vm *VM) luaToString(v runtime.Value) (string, error) {
-	if v.IsTable() {
-		if mt := v.Table().GetMetatable(); mt != nil {
-			if mm := mt.RawGetString("__tostring"); !mm.IsNil() {
-				results, err := vm.callValue(mm, []runtime.Value{v})
-				if err != nil {
-					return "", err
-				}
-				if len(results) == 0 || !results[0].IsString() {
-					return "", fmt.Errorf("'__tostring' must return a string")
-				}
-				return results[0].Str(), nil
-			}
-			if name := mt.RawGetString("__name"); name.IsString() {
-				return name.Str() + ": " + strings.TrimPrefix(v.String(), "table: "), nil
-			}
-		}
-	}
-	return v.String(), nil
-}
-
-func protectedErrorValue(err error) runtime.Value {
-	var luaErr *runtime.LuaError
-	if errors.As(err, &luaErr) {
-		return luaErr.Value
-	}
-	return runtime.StringValue(err.Error())
+	vm.SetGlobal("type", runtime.FunctionValue(runtime.BuildTypeFunction(vm.typeNameValue)))
 }
 
 func (vm *VM) newPCallFunction() *runtime.GoFunction {
-	return &runtime.GoFunction{
-		Name: "pcall",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) == 0 {
-				return nil, fmt.Errorf("bad argument #1 to 'pcall' (value expected)")
-			}
-			results, err := vm.callValue(args[0], args[1:])
-			if err != nil {
-				return []runtime.Value{runtime.BoolValue(false), protectedErrorValue(err)}, nil
-			}
-			return append([]runtime.Value{runtime.BoolValue(true)}, results...), nil
-		},
-	}
+	return runtime.BuildPCallFunction(vm.callValue)
 }
 
 func (vm *VM) newXPCallFunction() *runtime.GoFunction {
-	return &runtime.GoFunction{
-		Name: "xpcall",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			if len(args) < 2 {
-				return nil, fmt.Errorf("bad argument #%d to 'xpcall' (value expected)", len(args)+1)
-			}
-			results, err := vm.callValue(args[0], args[2:])
-			if err == nil {
-				return append([]runtime.Value{runtime.BoolValue(true)}, results...), nil
-			}
-			handlerResults, handlerErr := vm.callValue(args[1], []runtime.Value{protectedErrorValue(err)})
-			if handlerErr != nil {
-				return []runtime.Value{runtime.BoolValue(false), protectedErrorValue(handlerErr)}, nil
-			}
-			msg := runtime.NilValue()
-			if len(handlerResults) > 0 {
-				msg = handlerResults[0]
-			}
-			return []runtime.Value{runtime.BoolValue(false), msg}, nil
-		},
-	}
+	return runtime.BuildXPCallFunction(vm.callValue)
+}
+
+func (vm *VM) newTypeFunction() *runtime.GoFunction {
+	return runtime.BuildTypeFunction(vm.typeNameValue)
 }
 
 // RegisterPairsLib installs a VM-aware pairs builtin so __pairs metamethods
