@@ -53,124 +53,58 @@ fi
 DIAG_ROOT="diag"
 mkdir -p "$DIAG_ROOT"
 
-# Discover which top-level benchmark domain dirs actually exist.
-DOMAIN_DIRS=()
-for d in numeric recursion table calls string concurrency data app control; do
-    if [ -d "benchmarks/$d" ]; then
-        DOMAIN_DIRS+=("$d")
-    fi
-done
-
-domain_list_for() {
-    case "$1" in
-        all) printf '%s\n' "${DOMAIN_DIRS[@]}" ;;
-        suite) printf '%s\n' numeric recursion table calls string control ;;
-        extended) printf '%s\n' app table string concurrency ;;
-        variants) printf '%s\n' recursion calls numeric table ;;
-        official) printf '%s\n' calls control table string app ;;
-        data_oriented) printf '%s\n' data ;;
-        *) printf '%s\n' "$1" ;;
-    esac
-}
-
 # Resolve benchmark list. Each entry is "<domain>/<file>.gs", relative to
-# benchmarks/. macOS bash 3.2 compatible (no mapfile, no associative arrays).
+# benchmarks/. Keep selector compatibility in benchmark_discovery.py so the
+# shell entrypoint does not grow a second source of truth for legacy aliases.
 BENCHES=()
-collect_dir() {
-    local sub="$1"
-    if [ ! -d "benchmarks/$sub" ]; then
-        return
-    fi
-    local f
-    for f in "benchmarks/$sub"/*.gs; do
-        [ -f "$f" ] || continue
-        BENCHES+=("$sub/$(basename "$f")")
-    done
-}
+while IFS= read -r bench; do
+    [ -n "$bench" ] || continue
+    BENCHES+=("$bench")
+done < <(python3 - "$BENCHMARK" <<'PY'
+import sys
+from pathlib import Path
 
-case "$BENCHMARK" in
-    all)
-        for d in "${DOMAIN_DIRS[@]}"; do
-            collect_dir "$d"
-        done
-        # Wipe everything inside diag/ — both the new nested layout and any legacy
-        # flat dirs from prior runs — so a renamed/removed source can't leave a
-        # stale stats.json behind. summary.md is regenerated at the end.
-        find "$DIAG_ROOT" -mindepth 1 -maxdepth 1 ! -name summary.md -exec rm -rf {} +
-        ;;
-    numeric|recursion|table|calls|string|concurrency|data|app|control|suite|extended|variants|official|data_oriented)
-        while IFS= read -r d; do
-            [ -n "$d" ] || continue
-            if [ ! -d "benchmarks/$d" ]; then
-                echo "No such benchmark domain: benchmarks/$d" >&2
-                exit 2
-            fi
-            collect_dir "$d"
-            rm -rf "$DIAG_ROOT/$d"
-        done <<EOF
-$(domain_list_for "$BENCHMARK")
-EOF
-        ;;
-    *)
-        # Single benchmark. Accept: name | name.gs | domain/name | domain/name.gs.
-        rel=""
-        if [[ "$BENCHMARK" == */* ]]; then
-            rel="$BENCHMARK"
-            case "$rel" in
-                suite/*)
-                    name="${rel#suite/}"
-                    for d in numeric recursion table calls string control; do
-                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
-                    done
-                    ;;
-                extended/*)
-                    name="${rel#extended/}"
-                    for d in app table string concurrency; do
-                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
-                    done
-                    ;;
-                variants/*)
-                    name="${rel#variants/}"
-                    [ "$name" = "closure_accumulator_variant" ] && name="closure_accumulator"
-                    [ "$name" = "matmul_row_variant" ] && name="matmul_row"
-                    for d in recursion calls numeric table; do
-                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
-                    done
-                    ;;
-                official/*)
-                    name="${rel#official/}"
-                    name="${name%_hot}"
-                    for d in calls control table string app; do
-                        if [ -f "benchmarks/$d/${name%.gs}.gs" ]; then rel="$d/${name%.gs}.gs"; break; fi
-                    done
-                    ;;
-                data_oriented/*)
-                    name="${rel#data_oriented/}"
-                    name="${name%_hot}"
-                    rel="data/${name%.gs}.gs"
-                    ;;
-            esac
-            [[ "$rel" != *.gs ]] && rel="${rel}.gs"
-            if [ ! -f "benchmarks/$rel" ]; then
-                echo "No such benchmark: benchmarks/$rel" >&2
-                exit 2
-            fi
-        else
-            base="${BENCHMARK%.gs}"
-            for d in "${DOMAIN_DIRS[@]}"; do
-                if [ -f "benchmarks/$d/$base.gs" ]; then
-                    rel="$d/$base.gs"
-                    break
-                fi
-            done
-            if [ -z "$rel" ]; then
-                echo "No such domain benchmark: $BENCHMARK" >&2
-                exit 2
-            fi
-        fi
-        BENCHES=("$rel")
-        ;;
-esac
+root = Path.cwd()
+sys.path.insert(0, str(root / "benchmarks"))
+import benchmark_discovery as discovery
+
+selector = sys.argv[1]
+try:
+    if selector == "all":
+        specs = discovery.discover_benchmarks(root, discovery.GROUPS)
+        for spec in specs:
+            print(spec.gscript.relative_to(root / "benchmarks"))
+        raise SystemExit(0)
+
+    expanded = discovery.canonical_group(selector)
+    if expanded != [selector] or selector in discovery.GROUPS:
+        specs = discovery.discover_benchmarks(root, expanded)
+        for spec in specs:
+            print(spec.gscript.relative_to(root / "benchmarks"))
+        raise SystemExit(0)
+
+    path = discovery.resolve_script_path(root, selector)
+    if path is None:
+        raise SystemExit(f"No such domain benchmark: {selector}")
+    print(path.relative_to(root / "benchmarks"))
+except SystemExit:
+    raise
+except Exception as exc:
+    raise SystemExit(str(exc))
+PY
+)
+
+if [ ${#BENCHES[@]} -eq 0 ]; then
+    echo "No benchmarks selected: $BENCHMARK" >&2
+    exit 2
+fi
+
+if [ "$BENCHMARK" = "all" ]; then
+    # Wipe everything inside diag/ — both the new nested layout and any legacy
+    # flat dirs from prior runs — so a renamed/removed source can't leave a
+    # stale stats.json behind. summary.md is regenerated at the end.
+    find "$DIAG_ROOT" -mindepth 1 -maxdepth 1 ! -name summary.md -exec rm -rf {} +
+fi
 
 echo "=== scripts/diag.sh ==="
 echo "Benchmarks: ${#BENCHES[@]}"

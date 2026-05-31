@@ -1,4 +1,3 @@
-import re
 import unittest
 from pathlib import Path
 
@@ -9,30 +8,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ScriptEntrypointConsistencyTest(unittest.TestCase):
-    def test_diag_shell_domains_match_shared_discovery(self):
+    def test_diag_shell_uses_shared_discovery(self):
         diag = (ROOT / "scripts" / "diag.sh").read_text()
-        match = re.search(r"for d in ([^;]+); do\s+if \[ -d \"benchmarks/\$d\" \]", diag)
-        self.assertIsNotNone(match)
-
-        shell_domains = match.group(1).split()
-        self.assertEqual(shell_domains, discovery.GROUPS)
-
-    def test_diag_shell_legacy_group_aliases_match_shared_discovery(self):
-        diag = (ROOT / "scripts" / "diag.sh").read_text()
-        cases = dict(
-            re.findall(
-                r"^\s+([a-z_]+)\) printf '%s\\n' ([^;]+) ;;$",
-                diag,
-                re.MULTILINE,
-            )
-        )
-        shell_aliases = {
-            name: groups.split()
-            for name, groups in cases.items()
-            if name in discovery.LEGACY_GROUP_ALIASES
-        }
-
-        self.assertEqual(shell_aliases, discovery.LEGACY_GROUP_ALIASES)
+        self.assertIn("import benchmark_discovery as discovery", diag)
+        self.assertIn("discovery.GROUPS", diag)
+        self.assertIn("discovery.canonical_group(selector)", diag)
+        self.assertIn("discovery.resolve_script_path(root, selector)", diag)
+        self.assertNotIn("domain_list_for()", diag)
+        for alias in discovery.LEGACY_GROUP_ALIASES:
+            self.assertNotIn(f"{alias}) printf", diag)
 
     def test_benchmark_shell_wrappers_exec_matching_python(self):
         for stem in ("regression_guard", "strict_guard"):
