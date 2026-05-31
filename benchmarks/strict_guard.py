@@ -660,8 +660,7 @@ def markdown_summary(results: Iterable[BenchmarkResult], modes: list[str], args:
             if result and result.status not in {"ok", "partial", "skipped"}:
                 notes.append(f"{mode}:{result.status}")
         lines.append(
-            "| "
-            + " | ".join(
+            benchmark_output.markdown_row(
                 [
                     f"{row.group}/{row.benchmark}",
                     fmt_ratio(ratio(vm, default)),
@@ -669,7 +668,6 @@ def markdown_summary(results: Iterable[BenchmarkResult], modes: list[str], args:
                     ", ".join(notes) or "-",
                 ]
             )
-            + " |"
         )
 
     suspicious = suspicious_kernel_wins(rows, args)
@@ -703,8 +701,7 @@ def markdown_summary(results: Iterable[BenchmarkResult], modes: list[str], args:
             if result.checksum_status == "mismatch":
                 checksum = "MISMATCH"
             lines.append(
-                "| "
-                + " | ".join(
+                benchmark_output.markdown_row(
                     [
                         f"{row.group}/{row.benchmark}",
                         mode,
@@ -724,7 +721,6 @@ def markdown_summary(results: Iterable[BenchmarkResult], modes: list[str], args:
                         "; ".join(notes) or "-",
                     ]
                 )
-                + " |"
             )
     return "\n".join(lines) + "\n"
 

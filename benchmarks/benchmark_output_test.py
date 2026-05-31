@@ -22,6 +22,9 @@ class BenchmarkOutputTest(unittest.TestCase):
         self.assertEqual(output.text_output("ok"), "ok")
         self.assertEqual(output.text_output(b"bad:\xff"), "bad:\ufffd")
 
+    def test_markdown_row_formats_cells_without_changing_payloads(self):
+        self.assertEqual(output.markdown_row(["a/b", 3, "x | y"]), "| a/b | 3 | x | y |")
+
 
 if __name__ == "__main__":
     unittest.main()

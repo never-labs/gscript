@@ -524,8 +524,7 @@ def render_summary(rows: list[DiagnosticRow]) -> str:
             if value:
                 runtime_bits.append(f"tier2_{key}={value}")
         lines.append(
-            "| "
-            + " | ".join(
+            benchmark_output.markdown_row(
                 [
                     f"{row.group}/{row.benchmark}",
                     "-" if row.time_seconds is None else f"{row.time_seconds:.3f}s",
@@ -546,7 +545,6 @@ def render_summary(rows: list[DiagnosticRow]) -> str:
                     f"`{row.artifact_dir}`",
                 ]
             )
-            + " |"
         )
     return "\n".join(lines) + "\n"
 

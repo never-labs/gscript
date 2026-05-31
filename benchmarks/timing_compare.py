@@ -964,8 +964,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
             head_s = seconds(head)
             lj_s = seconds(luajit)
             lines.append(
-                "| "
-                + " | ".join(
+                benchmark_output.markdown_row(
                     [
                         f"{row.group}/{row.benchmark}",
                         fmt_scale(row.scale),
@@ -984,8 +983,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                         result_note(current),
                     ]
                 )
-            + " |"
-        )
+            )
 
     low_rows = diagnostic_low_resolution_rows(results, modes)
     if low_rows:
@@ -1001,8 +999,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
         for row, mode, subject_name, subject, recommendation in low_rows:
             diagnostic = subject.diagnostic
             lines.append(
-                "| "
-                + " | ".join(
+                benchmark_output.markdown_row(
                     [
                         f"{row.group}/{row.benchmark}",
                         mode,
@@ -1016,7 +1013,6 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                         str(recommendation.get("rerun_args", "-")),
                     ]
                 )
-                + " |"
             )
 
     wall_rows = diagnostic_wall_rows(results, modes)
@@ -1032,8 +1028,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
         )
         for row, mode, subject_name, subject, wall in wall_rows:
             lines.append(
-                "| "
-                + " | ".join(
+                benchmark_output.markdown_row(
                     [
                         f"{row.group}/{row.benchmark}",
                         mode,
@@ -1045,7 +1040,6 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                         str(wall.get("recommendation", "-")),
                     ]
                 )
-                + " |"
             )
 
     lines.extend(
@@ -1061,8 +1055,7 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
         current = row.modes.get(mode, {}).get("current")
         luajit = row.modes.get(mode, {}).get("luajit")
         lines.append(
-            "| "
-            + " | ".join(
+            benchmark_output.markdown_row(
                 [
                     str(idx),
                     f"{row.group}/{row.benchmark}",
@@ -1076,7 +1069,6 @@ def markdown(results: list[BenchmarkResult], modes: list[str], args: argparse.Na
                     source_pair(current, luajit) + ("" if hot_timed else " (wall-timed)"),
                 ]
             )
-            + " |"
         )
     return "\n".join(lines) + "\n"
 

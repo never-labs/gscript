@@ -28,3 +28,7 @@ def text_output(output: str | bytes | None) -> str:
     if isinstance(output, bytes):
         return output.decode(errors="replace")
     return output
+
+
+def markdown_row(cells: list[object]) -> str:
+    return "| " + " | ".join(str(cell) for cell in cells) + " |"
