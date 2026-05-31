@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	hostfs "github.com/never-labs/gscript/internal/stdlib/host/fs"
 )
@@ -15,33 +14,7 @@ func (interp *Interpreter) resolveFilesystemPath(path string) (string, error) {
 }
 
 func resolveSandboxPath(root, path string) (string, error) {
-	if root == "" {
-		return path, nil
-	}
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return "", err
-	}
-	absRoot = filepath.Clean(absRoot)
-	var candidate string
-	if filepath.IsAbs(path) {
-		candidate = filepath.Clean(path)
-	} else {
-		candidate = filepath.Clean(filepath.Join(absRoot, path))
-	}
-	absCandidate, err := filepath.Abs(candidate)
-	if err != nil {
-		return "", err
-	}
-	absCandidate = filepath.Clean(absCandidate)
-	if absCandidate == absRoot {
-		return absCandidate, nil
-	}
-	prefix := absRoot + string(os.PathSeparator)
-	if strings.HasPrefix(absCandidate, prefix) {
-		return absCandidate, nil
-	}
-	return "", fmt.Errorf("filesystem access denied: path escapes root")
+	return hostfs.ResolveSandboxPath(root, path)
 }
 
 // SetFilesystemCapabilities controls script-side filesystem read and write
