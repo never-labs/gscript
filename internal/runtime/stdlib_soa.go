@@ -990,11 +990,14 @@ func (c *soaIndicesWhereCache) value(soaValue, maskValue Value) (Value, error) {
 	}
 	s := soaValue.SoA()
 	mask := maskValue.DenseArray()
-	if mask == nil || mask.DType() != DenseArrayBool {
+	if mask == nil {
 		return NilValue(), fmt.Errorf("soa indicesWhere mask must be a bool dense array")
 	}
-	maskVersion := mask.Version()
-	if c.soa == s && c.mask == mask && c.maskVersion == maskVersion && c.result != nil && c.result.Version() == c.resultVersion {
+	maskMeta, err := stdsoa.RequireBoolMask(mask.DType().String(), mask.Version(), "soa indicesWhere")
+	if err != nil {
+		return NilValue(), err
+	}
+	if c.soa == s && c.mask == mask && c.maskVersion == maskMeta.Version && c.result != nil && c.result.Version() == c.resultVersion {
 		return DenseArrayValue(c.result), nil
 	}
 	out, err := s.IndicesWhere(mask)
@@ -1003,7 +1006,7 @@ func (c *soaIndicesWhereCache) value(soaValue, maskValue Value) (Value, error) {
 	}
 	c.soa = s
 	c.mask = mask
-	c.maskVersion = maskVersion
+	c.maskVersion = maskMeta.Version
 	c.result = out
 	c.resultVersion = out.Version()
 	return DenseArrayValue(out), nil
@@ -1023,13 +1026,10 @@ type soaMaskCache struct {
 
 type soaMaskCacheEntry struct {
 	soa           *SoA
-	leftName      string
-	op            string
 	rhs           Value
 	left          *DenseArray
 	right         *DenseArray
-	leftVersion   uint64
-	rightVersion  uint64
+	query         stdsoa.MaskQuery
 	result        *DenseArray
 	resultVersion uint64
 }
@@ -1052,30 +1052,32 @@ func (c *soaMaskCache) value(soaValue, columnValue, opValue, rhsValue Value) (Va
 		return NilValue(), fmt.Errorf("soa column %q not found", leftName)
 	}
 	var right *DenseArray
+	rhsIsColumn := false
+	rhsColumn := ""
 	if rhsValue.IsString() {
 		var ok bool
-		right, ok = s.Column(rhsValue.Str())
+		rhsColumn = rhsValue.Str()
+		right, ok = s.Column(rhsColumn)
 		if !ok {
 			return NilValue(), fmt.Errorf("soa column %q not found", rhsValue.Str())
 		}
+		rhsIsColumn = true
 	} else if rhsValue.IsDenseArray() {
 		right = rhsValue.DenseArray()
 	}
-	leftVersion := left.Version()
-	rightVersion := uint64(0)
+	leftMeta := stdsoa.NewDenseArrayMeta(left.DType().String(), left.Version())
+	rightMeta := stdsoa.NoDenseArrayMeta()
 	if right != nil {
-		rightVersion = right.Version()
+		rightMeta = stdsoa.NewDenseArrayMeta(right.DType().String(), right.Version())
 	}
+	query := stdsoa.NewMaskQuery(leftName, op, leftMeta, rhsIsColumn, rhsColumn, rightMeta)
 	for i := range c.rows {
 		row := &c.rows[i]
 		if row.soa == s &&
 			row.left == left &&
 			row.right == right &&
-			row.leftName == leftName &&
-			row.op == op &&
+			row.query == query &&
 			row.rhs == rhsValue &&
-			row.leftVersion == leftVersion &&
-			row.rightVersion == rightVersion &&
 			row.result != nil &&
 			row.result.Version() == row.resultVersion {
 			return DenseArrayValue(row.result), nil
@@ -1088,13 +1090,10 @@ func (c *soaMaskCache) value(soaValue, columnValue, opValue, rhsValue Value) (Va
 	row := &c.rows[c.next%len(c.rows)]
 	c.next++
 	row.soa = s
-	row.leftName = leftName
-	row.op = op
 	row.rhs = rhsValue
 	row.left = left
 	row.right = right
-	row.leftVersion = leftVersion
-	row.rightVersion = rightVersion
+	row.query = query
 	row.result = out
 	row.resultVersion = out.Version()
 	return DenseArrayValue(out), nil
