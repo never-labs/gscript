@@ -104,24 +104,45 @@ func TestRootPackageGoDocHidesRawRuntimeValues(t *testing.T) {
 	}
 }
 
-func TestRootPackageLLMProviderImplementationsStayOutOfRoot(t *testing.T) {
+func TestRootPackageLLMTypesStayFacadeAliases(t *testing.T) {
 	files := parseRootPackageFiles(t)
 
 	for filename, file := range files {
 		imports := importAliases(file)
 		ast.Inspect(file, func(node ast.Node) bool {
 			spec, ok := node.(*ast.TypeSpec)
-			if !ok || !ast.IsExported(spec.Name.Name) || !strings.Contains(spec.Name.Name, "LLMProvider") {
+			if !ok || !ast.IsExported(spec.Name.Name) || !strings.Contains(spec.Name.Name, "LLM") {
 				return true
 			}
 			if isTypeAliasToLLMSubpackage(spec, imports) {
 				return true
 			}
-			if _, ok := spec.Type.(*ast.StructType); ok {
-				t.Fatalf("%s defines root LLM provider implementation %s; add provider implementations under github.com/never-labs/gscript/llm/... and keep root as a facade", filepath.Base(filename), spec.Name.Name)
-			}
+			t.Fatalf("%s defines root LLM type %s; put concrete LLM provider/replay/trace/helper types under github.com/never-labs/gscript/llm/... and keep root as a facade alias", filepath.Base(filename), spec.Name.Name)
 			return true
 		})
+	}
+}
+
+func TestRootPackageLLMFacadeDoesNotReimplementHostedHelpers(t *testing.T) {
+	files := parseRootPackageFiles(t)
+
+	for filename, file := range files {
+		if !strings.HasPrefix(filepath.Base(filename), "llm") {
+			continue
+		}
+		for _, importPath := range importAliases(file) {
+			switch importPath {
+			case "bufio",
+				"bytes",
+				"encoding/json",
+				"io",
+				"net/http",
+				"os",
+				"os/exec",
+				"time":
+				t.Fatalf("%s imports %s; root LLM files should stay facade-only and delegate implementation to github.com/never-labs/gscript/llm/...", filepath.Base(filename), importPath)
+			}
+		}
 	}
 }
 
