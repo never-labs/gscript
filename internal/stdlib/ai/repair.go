@@ -27,3 +27,16 @@ func StructuredOutputRepairPrompt(customPrompt, previousText, validationMessage,
 	b.WriteString(previousText)
 	return b.String()
 }
+
+// OutputRepairRetries applies the public retry default for structured output
+// repair. Explicit negative counts are clamped to zero; enabling repair without
+// a retry count gives one repair attempt.
+func OutputRepairRetries(retries int64, repairEnabled bool) int {
+	if retries < 0 {
+		retries = 0
+	}
+	if retries == 0 && repairEnabled {
+		return 1
+	}
+	return int(retries)
+}

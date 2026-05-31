@@ -567,14 +567,7 @@ func llmOutputRepairRetries(opts *Table) int {
 	if opts == nil {
 		return 0
 	}
-	retries := int(toInt(opts.RawGetString("output_retries")))
-	if retries < 0 {
-		retries = 0
-	}
-	if retries == 0 && opts.RawGetString("output_repair").Truthy() {
-		retries = 1
-	}
-	return retries
+	return stdlibai.OutputRepairRetries(toInt(opts.RawGetString("output_retries")), opts.RawGetString("output_repair").Truthy())
 }
 
 func llmStructuredOutputRepairHistory(opts *Table, history []Value, previousText string, validationErr Value) []Value {

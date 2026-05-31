@@ -30,3 +30,21 @@ func TestStructuredOutputRepairPromptDefault(t *testing.T) {
 		t.Fatalf("empty optional fields should be omitted: %q", got)
 	}
 }
+
+func TestOutputRepairRetries(t *testing.T) {
+	tests := []struct {
+		retries int64
+		enabled bool
+		want    int
+	}{
+		{retries: 3, enabled: false, want: 3},
+		{retries: 0, enabled: true, want: 1},
+		{retries: 0, enabled: false, want: 0},
+		{retries: -2, enabled: true, want: 1},
+	}
+	for _, tt := range tests {
+		if got := OutputRepairRetries(tt.retries, tt.enabled); got != tt.want {
+			t.Fatalf("OutputRepairRetries(%d, %v) = %d, want %d", tt.retries, tt.enabled, got, tt.want)
+		}
+	}
+}
