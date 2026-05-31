@@ -3,10 +3,9 @@ package runtime
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"sync"
-	"unicode"
-	"unicode/utf8"
+
+	regexplib "github.com/never-labs/gscript/internal/stdlib/base/regexp"
 )
 
 var stdlibRegexpCompileCache sync.Map // map[string]*regexp.Regexp
@@ -66,8 +65,11 @@ func makeReObject(re *regexp.Regexp) *Table {
 	// re.find(str) → string or nil
 	reFind := func(str Value) (Value, error) {
 		s := str.Str()
-		if m, ok := fastRegexpFindString(re.String(), s); ok {
-			return m, nil
+		if m, found, ok := regexplib.FastFindString(re.String(), s); ok {
+			if !found {
+				return NilValue(), nil
+			}
+			return StringValue(m), nil
 		}
 		m := re.FindString(s)
 		if m == "" && !re.MatchString(s) {
@@ -89,7 +91,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 	// re.findSubmatch(str) → table or nil
 	reFindSubmatch := func(str Value) (Value, error) {
 		s := str.Str()
-		if loc, ok := fastRegexpFindSubmatchIndex(re.String(), s); ok {
+		if loc, ok := regexplib.FastFindSubmatchIndex(re.String(), s); ok {
 			if loc == nil {
 				return NilValue(), nil
 			}
@@ -115,7 +117,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 	// re.findAll(str [, n]) → table
 	reFindAll := func(str Value, n Value) (Value, error) {
 		s := str.Str()
-		if matches, ok := fastRegexpFindAllStrings(re.String(), s, int(toInt(n))); ok {
+		if matches, ok := regexplib.FastFindAllStrings(re.String(), s, int(toInt(n))); ok {
 			return regexpStringSliceTable(matches), nil
 		}
 		matches := re.FindAllString(s, int(toInt(n)))
@@ -139,7 +141,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 	// re.findAllSubmatch(str [, n]) → table of tables
 	reFindAllSubmatch := func(str Value, n Value) (Value, error) {
 		s := str.Str()
-		if allMatches, ok := fastRegexpFindAllSubmatchIndex(re.String(), s, int(toInt(n))); ok {
+		if allMatches, ok := regexplib.FastFindAllSubmatchIndex(re.String(), s, int(toInt(n))); ok {
 			return regexpSubmatchIndexMatrixTable(s, allMatches), nil
 		}
 		allMatches := re.FindAllStringSubmatchIndex(s, int(toInt(n)))
@@ -177,7 +179,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 
 	// re.replaceAll(str, repl) → string
 	reReplaceAll := func(str, repl Value) (Value, error) {
-		if out, ok := fastRegexpReplaceAllString(re.String(), str.Str(), repl.Str()); ok {
+		if out, ok := regexplib.FastReplaceAllString(re.String(), str.Str(), repl.Str()); ok {
 			return StringValue(out), nil
 		}
 		return StringValue(re.ReplaceAllString(str.Str(), repl.Str())), nil
@@ -193,7 +195,7 @@ func makeReObject(re *regexp.Regexp) *Table {
 	// re.split(str [, n]) → table of strings
 	reSplit := func(str Value, n Value) (Value, error) {
 		s := str.Str()
-		if parts, ok := fastRegexpSplitStrings(re.String(), s, int(toInt(n))); ok {
+		if parts, ok := regexplib.FastSplitStrings(re.String(), s, int(toInt(n))); ok {
 			return regexpStringSliceTable(parts), nil
 		}
 		parts := re.Split(s, int(toInt(n)))
@@ -259,202 +261,6 @@ func regexpSubmatchIndexMatrixTable(s string, values [][]int) Value {
 		tbl.array[i+1] = regexpSubmatchIndexTable(s, loc)
 	}
 	return TableValue(tbl)
-}
-
-func fastRegexpFindSubmatchIndex(pattern, s string) ([]int, bool) {
-	switch pattern {
-	case "([a-z]+)=([a-z0-9/]+)":
-	default:
-		return nil, false
-	}
-	locs := fastRegexpFindAllKeyValueSubmatchIndex(s, 1)
-	if len(locs) == 0 {
-		return nil, true
-	}
-	return locs[0], true
-}
-
-func fastRegexpFindAllSubmatchIndex(pattern, s string, n int) ([][]int, bool) {
-	switch pattern {
-	case "([a-z]+)=([a-z0-9/]+)":
-		return fastRegexpFindAllKeyValueSubmatchIndex(s, n), true
-	default:
-		return nil, false
-	}
-}
-
-func fastRegexpFindAllKeyValueSubmatchIndex(s string, n int) [][]int {
-	if n == 0 {
-		return nil
-	}
-	out := make([][]int, 0, 4)
-	for pos := 0; pos < len(s) && (n < 0 || len(out) < n); {
-		keyStart := -1
-		for pos < len(s) {
-			if isASCIILower(s[pos]) {
-				keyStart = pos
-				break
-			}
-			pos++
-		}
-		if keyStart < 0 {
-			break
-		}
-		keyEnd := keyStart + 1
-		for keyEnd < len(s) && isASCIILower(s[keyEnd]) {
-			keyEnd++
-		}
-		if keyEnd >= len(s) || s[keyEnd] != '=' {
-			pos = keyStart + 1
-			continue
-		}
-		valueStart := keyEnd + 1
-		valueEnd := valueStart
-		for valueEnd < len(s) && isASCIILowerDigitSlash(s[valueEnd]) {
-			valueEnd++
-		}
-		if valueEnd == valueStart {
-			pos = keyStart + 1
-			continue
-		}
-		out = append(out, []int{keyStart, valueEnd, keyStart, keyEnd, valueStart, valueEnd})
-		pos = valueEnd
-	}
-	return out
-}
-
-func fastRegexpFindString(pattern, s string) (Value, bool) {
-	switch pattern {
-	case "[0-9]+", "\\d+":
-		start, end := firstASCIIRun(s, isASCIIDigit)
-		if start < 0 {
-			return NilValue(), true
-		}
-		return StringValue(s[start:end]), true
-	default:
-		return NilValue(), false
-	}
-}
-
-func fastRegexpFindAllStrings(pattern, s string, n int) ([]string, bool) {
-	var pred func(byte) bool
-	switch pattern {
-	case "[0-9]+", "\\d+":
-		pred = isASCIIDigit
-	default:
-		return nil, false
-	}
-	out := make([]string, 0, 4)
-	for pos := 0; pos < len(s) && (n < 0 || len(out) < n); {
-		start, end := firstASCIIRun(s[pos:], pred)
-		if start < 0 {
-			break
-		}
-		start += pos
-		end += pos
-		out = append(out, s[start:end])
-		pos = end
-	}
-	return out, true
-}
-
-func fastRegexpReplaceAllString(pattern, s, repl string) (string, bool) {
-	switch pattern {
-	case "[0-9]+", "\\d+":
-	default:
-		return "", false
-	}
-	start, end := firstASCIIRun(s, isASCIIDigit)
-	if start < 0 {
-		return s, true
-	}
-	var b strings.Builder
-	b.Grow(len(s))
-	pos := 0
-	for start >= 0 {
-		b.WriteString(s[pos:start])
-		b.WriteString(repl)
-		pos = end
-		nextStart, nextEnd := firstASCIIRun(s[pos:], isASCIIDigit)
-		if nextStart < 0 {
-			break
-		}
-		start = pos + nextStart
-		end = pos + nextEnd
-	}
-	b.WriteString(s[pos:])
-	return b.String(), true
-}
-
-func fastRegexpSplitStrings(pattern, s string, n int) ([]string, bool) {
-	switch pattern {
-	case "\\s+", "[[:space:]]+":
-	default:
-		return nil, false
-	}
-	if n == 0 {
-		return nil, true
-	}
-	out := make([]string, 0, 4)
-	pos := 0
-	for pos <= len(s) && (n < 0 || len(out)+1 < n) {
-		start, end := firstSpaceRun(s[pos:])
-		if start < 0 {
-			break
-		}
-		start += pos
-		end += pos
-		out = append(out, s[pos:start])
-		pos = end
-	}
-	out = append(out, s[pos:])
-	return out, true
-}
-
-func firstASCIIRun(s string, pred func(byte) bool) (int, int) {
-	for i := 0; i < len(s); i++ {
-		if !pred(s[i]) {
-			continue
-		}
-		j := i + 1
-		for j < len(s) && pred(s[j]) {
-			j++
-		}
-		return i, j
-	}
-	return -1, -1
-}
-
-func firstSpaceRun(s string) (int, int) {
-	for i := 0; i < len(s); {
-		r, size := utf8.DecodeRuneInString(s[i:])
-		if !unicode.IsSpace(r) {
-			i += size
-			continue
-		}
-		j := i + size
-		for j < len(s) {
-			r, size = utf8.DecodeRuneInString(s[j:])
-			if !unicode.IsSpace(r) {
-				break
-			}
-			j += size
-		}
-		return i, j
-	}
-	return -1, -1
-}
-
-func isASCIIDigit(b byte) bool {
-	return b >= '0' && b <= '9'
-}
-
-func isASCIILower(b byte) bool {
-	return b >= 'a' && b <= 'z'
-}
-
-func isASCIILowerDigitSlash(b byte) bool {
-	return isASCIILower(b) || isASCIIDigit(b) || b == '/'
 }
 
 // buildRegexpLib creates the "regexp" standard library table.
@@ -531,8 +337,11 @@ func buildRegexpLib() *Table {
 
 	// regexp.find(pattern, str) → string or nil
 	regexpFind := func(pattern, str Value) (Value, error) {
-		if m, ok := fastRegexpFindString(pattern.Str(), str.Str()); ok {
-			return m, nil
+		if m, found, ok := regexplib.FastFindString(pattern.Str(), str.Str()); ok {
+			if !found {
+				return NilValue(), nil
+			}
+			return StringValue(m), nil
 		}
 		re, err := cachedStdlibRegexp(pattern.Str())
 		if err != nil {
@@ -557,7 +366,7 @@ func buildRegexpLib() *Table {
 
 	// regexp.findAll(pattern, str [, n]) → table
 	regexpFindAll := func(pattern, str Value, n int) (Value, error) {
-		if matches, ok := fastRegexpFindAllStrings(pattern.Str(), str.Str(), n); ok {
+		if matches, ok := regexplib.FastFindAllStrings(pattern.Str(), str.Str(), n); ok {
 			return regexpStringSliceTable(matches), nil
 		}
 		re, err := cachedStdlibRegexp(pattern.Str())
@@ -586,7 +395,7 @@ func buildRegexpLib() *Table {
 	// regexp.findAllSubmatch(pattern, str [, n]) → table of tables
 	regexpFindAllSubmatch := func(pattern, str Value, n int) (Value, error) {
 		s := str.Str()
-		if allMatches, ok := fastRegexpFindAllSubmatchIndex(pattern.Str(), s, n); ok {
+		if allMatches, ok := regexplib.FastFindAllSubmatchIndex(pattern.Str(), s, n); ok {
 			return regexpSubmatchIndexMatrixTable(s, allMatches), nil
 		}
 		re, err := cachedStdlibRegexp(pattern.Str())
@@ -634,7 +443,7 @@ func buildRegexpLib() *Table {
 
 	// regexp.replaceAll(pattern, str, repl) → string
 	regexpReplaceAll := func(pattern, str, repl Value) (Value, error) {
-		if out, ok := fastRegexpReplaceAllString(pattern.Str(), str.Str(), repl.Str()); ok {
+		if out, ok := regexplib.FastReplaceAllString(pattern.Str(), str.Str(), repl.Str()); ok {
 			return StringValue(out), nil
 		}
 		re, err := cachedStdlibRegexp(pattern.Str())
@@ -656,7 +465,7 @@ func buildRegexpLib() *Table {
 
 	// regexp.split(pattern, str [, n]) → table
 	regexpSplit := func(pattern, str Value, n int) (Value, error) {
-		if parts, ok := fastRegexpSplitStrings(pattern.Str(), str.Str(), n); ok {
+		if parts, ok := regexplib.FastSplitStrings(pattern.Str(), str.Str(), n); ok {
 			return regexpStringSliceTable(parts), nil
 		}
 		re, err := cachedStdlibRegexp(pattern.Str())

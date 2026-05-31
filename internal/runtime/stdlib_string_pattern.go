@@ -468,6 +468,10 @@ func scanASCIIDigits(s string, pos int) int {
 	return pos
 }
 
+func isASCIIDigit(b byte) bool {
+	return b >= '0' && b <= '9'
+}
+
 func hasStringAt(s string, pos int, needle string) bool {
 	return pos <= len(s) && len(needle) <= len(s)-pos && s[pos:pos+len(needle)] == needle
 }
