@@ -659,89 +659,72 @@ func (g llmBudgetGroup) beforeToolCall() Value {
 }
 
 func newLLMBudget() *llmBudget {
-	return &llmBudget{
-		maxTokens: -1,
-		maxTurns:  -1,
-		maxCalls:  -1,
-		maxMoney:  -1,
-		maxTime:   -1,
-	}
+	return llmBudgetFromLimits(stdlibai.DefaultBudgetLimits())
 }
 
 func llmBudgetFromOptions(opts *Table) *llmBudget {
-	b := newLLMBudget()
-	if v := opts.RawGetString("budget_tokens"); !v.IsNil() {
-		b.maxTokens = toInt(v)
+	limits := stdlibai.DefaultBudgetLimits()
+	if v := opts.RawGetString(stdlibai.OptionBudgetTokens); !v.IsNil() {
+		limits.MaxTokens = toInt(v)
 	}
-	if v := opts.RawGetString("budget_turns"); !v.IsNil() {
-		b.maxTurns = toInt(v)
+	if v := opts.RawGetString(stdlibai.OptionBudgetTurns); !v.IsNil() {
+		limits.MaxTurns = toInt(v)
 	}
-	if v := opts.RawGetString("budget_calls"); !v.IsNil() {
-		b.maxCalls = toInt(v)
+	if v := opts.RawGetString(stdlibai.OptionBudgetCalls); !v.IsNil() {
+		limits.MaxCalls = toInt(v)
 	}
-	if v := opts.RawGetString("budget_money"); !v.IsNil() {
-		b.maxMoney = toFloat(v)
+	if v := opts.RawGetString(stdlibai.OptionBudgetMoney); !v.IsNil() {
+		limits.MaxMoney = toFloat(v)
 	}
-	if v := opts.RawGetString("budget_time"); !v.IsNil() {
-		b.maxTime = llmBudgetDuration(v)
+	if v := opts.RawGetString(stdlibai.OptionBudgetTime); !v.IsNil() {
+		limits.MaxTimeSeconds = toFloat(v)
 	}
-	if t := opts.RawGetString("budget"); t.IsTable() {
-		llmApplyBudgetConfig(b, t.Table())
+	if t := opts.RawGetString(stdlibai.BudgetKey); t.IsTable() {
+		llmApplyBudgetConfig(&limits, t.Table())
 	}
-	llmNormalizeBudget(b)
-	return b
+	return llmBudgetFromLimits(limits)
 }
 
 func llmBudgetFromConfig(config *Table) *llmBudget {
-	b := newLLMBudget()
-	llmApplyBudgetConfig(b, config)
-	llmNormalizeBudget(b)
-	return b
+	limits := stdlibai.DefaultBudgetLimits()
+	llmApplyBudgetConfig(&limits, config)
+	return llmBudgetFromLimits(limits)
 }
 
-func llmApplyBudgetConfig(b *llmBudget, config *Table) {
-	if b == nil || config == nil {
+func llmApplyBudgetConfig(limits *stdlibai.BudgetLimits, config *Table) {
+	if limits == nil || config == nil {
 		return
 	}
-	if v := config.RawGetString("tokens"); !v.IsNil() {
-		b.maxTokens = toInt(v)
+	if v := config.RawGetString(stdlibai.BudgetTokens); !v.IsNil() {
+		limits.MaxTokens = toInt(v)
 	}
-	if v := config.RawGetString("turns"); !v.IsNil() {
-		b.maxTurns = toInt(v)
+	if v := config.RawGetString(stdlibai.BudgetTurns); !v.IsNil() {
+		limits.MaxTurns = toInt(v)
 	}
-	if v := config.RawGetString("calls"); !v.IsNil() {
-		b.maxCalls = toInt(v)
+	if v := config.RawGetString(stdlibai.BudgetCalls); !v.IsNil() {
+		limits.MaxCalls = toInt(v)
 	}
-	if v := config.RawGetString("money"); !v.IsNil() {
-		b.maxMoney = toFloat(v)
+	if v := config.RawGetString(stdlibai.BudgetMoney); !v.IsNil() {
+		limits.MaxMoney = toFloat(v)
 	}
-	if v := config.RawGetString("time"); !v.IsNil() {
-		b.maxTime = llmBudgetDuration(v)
+	if v := config.RawGetString(stdlibai.BudgetTime); !v.IsNil() {
+		limits.MaxTimeSeconds = toFloat(v)
 	}
 }
 
-func llmNormalizeBudget(b *llmBudget) {
-	if b == nil {
-		return
-	}
-	if b.maxTokens < 0 {
-		b.maxTokens = -1
-	}
-	if b.maxTurns < 0 {
-		b.maxTurns = -1
-	}
-	if b.maxCalls < 0 {
-		b.maxCalls = -1
-	}
-	if b.maxMoney < 0 {
-		b.maxMoney = -1
-	}
-	if b.maxTime < 0 {
-		b.maxTime = -1
+func llmBudgetFromLimits(limits stdlibai.BudgetLimits) *llmBudget {
+	limits = stdlibai.NormalizeBudgetLimits(limits)
+	b := &llmBudget{
+		maxTokens: limits.MaxTokens,
+		maxTurns:  limits.MaxTurns,
+		maxCalls:  limits.MaxCalls,
+		maxMoney:  limits.MaxMoney,
+		maxTime:   llmBudgetDurationSeconds(limits.MaxTimeSeconds),
 	}
 	if b.maxTime >= 0 {
 		b.started = time.Now()
 	}
+	return b
 }
 
 func (b *llmBudget) beforeTurn() Value {
@@ -825,8 +808,7 @@ func (b *llmBudget) beforeWork() Value {
 	return NilValue()
 }
 
-func llmBudgetDuration(v Value) time.Duration {
-	secs := toFloat(v)
+func llmBudgetDurationSeconds(secs float64) time.Duration {
 	if secs < 0 {
 		return -1
 	}
