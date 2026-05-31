@@ -3,13 +3,12 @@ package runtime
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/never-labs/gscript/internal/stdlib/host/filemode"
+	hostio "github.com/never-labs/gscript/internal/stdlib/host/io"
 )
 
 const (
@@ -232,13 +231,7 @@ func resolveIOPath(interp *Interpreter, path string, read, write bool) (string, 
 	if interp == nil {
 		return path, nil
 	}
-	if read && !interp.filesystemRead {
-		return "", fmt.Errorf("filesystem read access disabled")
-	}
-	if write && !interp.filesystemWrite {
-		return "", fmt.Errorf("filesystem write access disabled")
-	}
-	return resolveSandboxPath(interp.filesystemRoot, path)
+	return hostio.ResolvePath(interp.filesystemRoot, path, interp.filesystemRead, interp.filesystemWrite, read, write)
 }
 
 func inputOutputTarget(interp *Interpreter, v Value, stringMode int) (*gscriptFileHandle, error) {
@@ -327,16 +320,9 @@ func (h *gscriptFileHandle) seek(whence string, offset int64) (int64, error) {
 	if h.closed {
 		return 0, fmt.Errorf("file is closed")
 	}
-	var base int
-	switch whence {
-	case "set":
-		base = io.SeekStart
-	case "cur":
-		base = io.SeekCurrent
-	case "end":
-		base = io.SeekEnd
-	default:
-		return 0, fmt.Errorf("invalid whence: %s", whence)
+	base, err := hostio.SeekWhence(whence)
+	if err != nil {
+		return 0, err
 	}
 	pos, err := h.file.Seek(offset, base)
 	if err != nil {
@@ -371,70 +357,29 @@ func (h *gscriptFileHandle) read(args []Value, start int) ([]Value, error) {
 func (h *gscriptFileHandle) readOne(format Value) (Value, error) {
 	if format.IsNumber() {
 		n := int(toInt(format))
-		if n < 0 {
-			return NilValue(), fmt.Errorf("invalid read count: %d", n)
-		}
-		if n == 0 {
-			if _, err := h.reader.Peek(1); err == io.EOF {
-				return NilValue(), nil
-			} else if err != nil {
-				return NilValue(), err
-			}
-			return StringValue(""), nil
-		}
-		buf := make([]byte, n)
-		read, err := io.ReadFull(h.reader, buf)
-		if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
-			return NilValue(), err
-		}
-		if read == 0 && err == io.EOF {
-			return NilValue(), nil
-		}
-		return StringValue(string(buf[:read])), nil
+		return ioReadResultValue(hostio.ReadOne(h.reader, hostio.CountFormat(n)))
 	}
 	if !format.IsString() {
 		return NilValue(), fmt.Errorf("invalid read format")
 	}
-	switch fmtStr := format.Str(); fmtStr {
-	case "*l", "l":
-		line, err := h.reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return NilValue(), err
-		}
-		if len(line) == 0 && err == io.EOF {
-			return NilValue(), nil
-		}
-		return StringValue(strings.TrimRight(line, "\n\r")), nil
-	case "*L", "L":
-		line, err := h.reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return NilValue(), err
-		}
-		if len(line) == 0 && err == io.EOF {
-			return NilValue(), nil
-		}
-		return StringValue(line), nil
-	case "*a", "a":
-		data, err := io.ReadAll(h.reader)
-		if err != nil {
-			return NilValue(), err
-		}
-		return StringValue(string(data)), nil
-	case "*n", "n":
-		line, err := h.reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return NilValue(), err
-		}
-		line = strings.TrimSpace(line)
-		if i, err := strconv.ParseInt(line, 10, 64); err == nil {
-			return IntValue(i), nil
-		}
-		if f, err := strconv.ParseFloat(line, 64); err == nil {
-			return FloatValue(f), nil
-		}
+	return ioReadResultValue(hostio.ReadOne(h.reader, hostio.StringFormat(format.Str())))
+}
+
+func ioReadResultValue(result hostio.ReadResult, err error) (Value, error) {
+	if err != nil {
+		return NilValue(), err
+	}
+	switch result.Kind {
+	case hostio.ReadNil:
 		return NilValue(), nil
+	case hostio.ReadString:
+		return StringValue(result.String), nil
+	case hostio.ReadInt:
+		return IntValue(result.Int), nil
+	case hostio.ReadFloat:
+		return FloatValue(result.Float), nil
 	default:
-		return NilValue(), fmt.Errorf("invalid format: %s", fmtStr)
+		return NilValue(), fmt.Errorf("invalid read result")
 	}
 }
 
