@@ -6,6 +6,49 @@ import (
 	gs "github.com/never-labs/gscript/gscript"
 )
 
+func TestLLMTurnRequestProviderOptions(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+result, err := llm.turn({
+    model: "mock-fast",
+    messages: {llm.user("hello")},
+    force_tool: "lookup",
+    max_tokens: 16,
+    temperature: 0.25,
+    top_p: 0.9,
+    response_format: {type: "json_object"},
+    stream: true,
+    stop: {"END", "\n\n"},
+    metadata: {trace_id: "abc", route: "test"},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if provider.last.Model != "mock-fast" || provider.last.MaxTokens != 16 || !provider.last.Stream {
+		t.Fatalf("request = %#v", provider.last)
+	}
+	if provider.last.ForceTool != "lookup" {
+		t.Fatalf("force_tool = %#v", provider.last.ForceTool)
+	}
+	if provider.last.Temperature == nil || *provider.last.Temperature != 0.25 {
+		t.Fatalf("temperature = %#v", provider.last.Temperature)
+	}
+	if provider.last.TopP == nil || *provider.last.TopP != 0.9 {
+		t.Fatalf("top_p = %#v", provider.last.TopP)
+	}
+	format, _ := provider.last.ResponseFormat.(map[string]any)
+	if format["type"] != "json_object" {
+		t.Fatalf("response_format = %#v", provider.last.ResponseFormat)
+	}
+	if len(provider.last.Stop) != 2 || provider.last.Stop[0] != "END" || provider.last.Stop[1] != "\n\n" {
+		t.Fatalf("stop = %#v", provider.last.Stop)
+	}
+	if provider.last.Metadata["trace_id"] != "abc" || provider.last.Metadata["route"] != "test" {
+		t.Fatalf("metadata = %#v", provider.last.Metadata)
+	}
+}
+
 func TestLLMToolMetadata(t *testing.T) {
 	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
@@ -93,5 +136,43 @@ missing_tool := missing_err.tool
 		if got != want {
 			t.Fatalf("%s = %#v, want %#v", name, got, want)
 		}
+	}
+}
+
+func TestLoopRequestProviderOptions(t *testing.T) {
+	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
+	if err := vm.Exec(`
+lookup := llm.tool("lookup", func(name) {
+    return "docs:" .. name, nil
+}, {params: {"name"}})
+result, err := loop.react({
+    user: "hello",
+    model: "mock-fast",
+    tools: {lookup},
+    force_tool: lookup,
+    max_tokens: 32,
+    stream: true,
+    stop: {"DONE"},
+    metadata: {trace_id: "loop-1"},
+})
+`); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if len(provider.requests) != 1 {
+		t.Fatalf("requests = %d", len(provider.requests))
+	}
+	req := provider.requests[0]
+	if req.Model != "mock-fast" || req.MaxTokens != 32 || !req.Stream {
+		t.Fatalf("request = %#v", req)
+	}
+	if req.ForceTool != "lookup" {
+		t.Fatalf("force_tool = %#v", req.ForceTool)
+	}
+	if len(req.Stop) != 1 || req.Stop[0] != "DONE" {
+		t.Fatalf("stop = %#v", req.Stop)
+	}
+	if req.Metadata["trace_id"] != "loop-1" {
+		t.Fatalf("metadata = %#v", req.Metadata)
 	}
 }
