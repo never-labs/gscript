@@ -45,10 +45,6 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	std.RegisterTable("string", strLib)
 	interp.SetStringLibrary(strLib)
 
-	std.RegisterTable("time", buildTimeLib())
-	std.RegisterTable("debug", buildDebugLib(interp))
-	std.RegisterTable("testkit", buildTestkitLib(interp))
-
 	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider
 	}, func() LLMProviderFactory {

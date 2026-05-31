@@ -1,20 +1,31 @@
-package runtime
+package modules
 
-import "testing"
+import (
+	"testing"
 
-func TestTestkitMemorySnapshotDiffAndCheck(t *testing.T) {
-	interp := NewCore()
-	testkitModule := TableValue(buildTestkitLib(interp))
-	interp.SetGlobal("testkit", testkitModule)
-	interp.SetModule("testkit", testkitModule)
+	"github.com/never-labs/gscript/internal/runtime"
+)
 
-	execBinaryIOTest(t, interp, `
-		before := testkit.snapshot()
-		collectgarbage("collect")
-		after := testkit.memory()
-		diff := testkit.diff(before, after)
-		ok, report := testkit.checkMemory(before, {maxAllocBytesGrowth: 1 << 62, maxHeapObjectsGrowth: 1 << 62, collect: true})
-	`)
+func testkitInterp(t *testing.T, src string) *runtime.Interpreter {
+	t.Helper()
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	installTestModule(interp, "testkit", runtime.TableValue(BuildTestkit(TestkitOptions{
+		Runtime: interp,
+		Call:    interp.CallFunction,
+	})))
+	execOnInterp(t, interp, src)
+	return interp
+}
+
+func TestTestkitModuleMemorySnapshotDiffAndCheck(t *testing.T) {
+	interp := testkitInterp(t, `
+before := testkit.snapshot()
+collectgarbage("collect")
+after := testkit.memory()
+diff := testkit.diff(before, after)
+ok, report := testkit.checkMemory(before, {maxAllocBytesGrowth: 1 << 62, maxHeapObjectsGrowth: 1 << 62, collect: true})
+`)
 
 	if got := interp.GetGlobal("before").Table().RawGetString("allocBytes"); !got.IsNumber() {
 		t.Fatalf("before.allocBytes = %v, want number", got)
@@ -30,25 +41,20 @@ func TestTestkitMemorySnapshotDiffAndCheck(t *testing.T) {
 	}
 }
 
-func TestTestkitValueAndFunctionInspectors(t *testing.T) {
-	interp := NewCore()
-	testkitModule := TableValue(buildTestkitLib(interp))
-	interp.SetGlobal("testkit", testkitModule)
-	interp.SetModule("testkit", testkitModule)
-
-	execBinaryIOTest(t, interp, `
-		func sample(a, b, ...) {
-			return a + b, "done"
-		}
-		numberInfo := testkit.value(42)
-		tableInfo := testkit.value({1, 2, 3})
-		fnInfo := testkit.functionInfo(sample)
-		valueInfo := testkit.value(sample)
-		sameSample := testkit.sameFunction(sample, sample)
-		sameMixed := testkit.sameFunction(sample, print)
-		isNumber := testkit.typeOf(1.5)
-		rawEqual := testkit.equal(sample, sample)
-	`)
+func TestTestkitModuleValueAndFunctionInspectors(t *testing.T) {
+	interp := testkitInterp(t, `
+func sample(a, b, ...) {
+	return a + b, "done"
+}
+numberInfo := testkit.value(42)
+tableInfo := testkit.value({1, 2, 3})
+fnInfo := testkit.functionInfo(sample)
+valueInfo := testkit.value(sample)
+sameSample := testkit.sameFunction(sample, sample)
+sameMixed := testkit.sameFunction(sample, print)
+isNumber := testkit.typeOf(1.5)
+rawEqual := testkit.equal(sample, sample)
+`)
 
 	if got := interp.GetGlobal("numberInfo").Table().RawGetString("numberKind").Str(); got != "int" {
 		t.Fatalf("numberKind = %q, want int", got)
@@ -76,28 +82,23 @@ func TestTestkitValueAndFunctionInspectors(t *testing.T) {
 	}
 }
 
-func TestTestkitProtect(t *testing.T) {
-	interp := NewCore()
-	testkitModule := TableValue(buildTestkitLib(interp))
-	interp.SetGlobal("testkit", testkitModule)
-	interp.SetModule("testkit", testkitModule)
-
-	execBinaryIOTest(t, interp, `
-		func ok(a, b) {
-			return a + b, "ok"
-		}
-		func fail() {
-			error({code: "boom"})
-		}
-		good := testkit.protect(ok, 2, 3)
-		bad := testkit.protect(fail)
-	`)
+func TestTestkitModuleProtect(t *testing.T) {
+	interp := testkitInterp(t, `
+func ok(a, b) {
+	return a + b, "ok"
+}
+func fail() {
+	error({code: "boom"})
+}
+good := testkit.protect(ok, 2, 3)
+bad := testkit.protect(fail)
+`)
 
 	good := interp.GetGlobal("good").Table()
 	if !good.RawGetString("ok").Bool() {
 		t.Fatalf("good.ok = false, want true")
 	}
-	if got := good.RawGetString("values").Table().RawGet(IntValue(1)).Int(); got != 5 {
+	if got := good.RawGetString("values").Table().RawGet(runtime.IntValue(1)).Int(); got != 5 {
 		t.Fatalf("good.values[1] = %d, want 5", got)
 	}
 	bad := interp.GetGlobal("bad").Table()

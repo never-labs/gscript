@@ -1,13 +1,33 @@
-package runtime
+package runtime_test
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/never-labs/gscript/internal/lexer"
+	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
+	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
 )
 
+func execRuntimeTestProgram(t *testing.T, interp *runtime.Interpreter, src string) {
+	t.Helper()
+	tokens, err := lexer.New(src).Tokenize()
+	if err != nil {
+		t.Fatalf("lexer error: %v", err)
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if err := interp.Exec(prog); err != nil {
+		t.Fatalf("exec error: %v", err)
+	}
+}
+
 func TestCompileStringSourceNameInSyntaxDiagnostics(t *testing.T) {
-	interp := NewCore()
-	_, err := interp.CompileString("value := @", WithScriptSourceName("host/generated.gs"))
+	interp := runtime.NewCore()
+	_, err := interp.CompileString("value := @", runtime.WithScriptSourceName("host/generated.gs"))
 	if err == nil {
 		t.Fatal("CompileString succeeded, want syntax error")
 	}
@@ -20,15 +40,10 @@ func TestCompileStringSourceNameInSyntaxDiagnostics(t *testing.T) {
 }
 
 func TestScriptCompileSourceNameInDebugFramesAndRuntimeDiagnostics(t *testing.T) {
-	interp := NewCore()
-	scriptModule := TableValue(buildScriptLib(interp))
-	interp.SetGlobal("script", scriptModule)
-	interp.SetModule("script", scriptModule)
-	debugModule := TableValue(buildDebugLib(interp))
-	interp.SetGlobal("debug", debugModule)
-	interp.SetModule("debug", debugModule)
+	interp := runtime.NewCore()
+	stdlibinstall.Install(interp)
 
-	execBinaryIOTest(t, interp, `
+	execRuntimeTestProgram(t, interp, `
 		fn := script.compile("func inner() {\n  info := debug.info(0)\n  trace := debug.traceback(\"boom\")\n  return info.sourceName, info.line, info.column, trace\n}\nreturn inner()", {sourceName: "virtual/generated.gs"})
 		sourceName, line, column, trace := fn()
 
@@ -63,9 +78,10 @@ func TestScriptCompileSourceNameInDebugFramesAndRuntimeDiagnostics(t *testing.T)
 }
 
 func TestLoadSourceNameInReturnedSyntaxError(t *testing.T) {
-	interp := NewCore()
+	interp := runtime.NewCore()
+	stdlibinstall.Install(interp)
 
-	execBinaryIOTest(t, interp, `
+	execRuntimeTestProgram(t, interp, `
 		fn, compileErr := load("func broken( {", "virtual/syntax.gs")
 	`)
 
