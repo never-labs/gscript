@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript/gscript"
+	gs "github.com/never-labs/gscript"
 )
 
 // TestJIT_ColdCodeSplitting_FnCalls verifies that inline call loops produce

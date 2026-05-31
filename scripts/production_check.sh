@@ -231,7 +231,7 @@ add_release_smoke() {
 
 build_quick_plan() {
     add_go_test "Core Go packages" \
-        "go test ./gscript ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
+        "go test . ./cmd/gscript ./internal/lexer ./internal/parser ./internal/runtime ./internal/vm -count=1"
     add_go_test "Feature Matrix and Integration" \
         "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
     add_go_test "Release Matrix Metadata" \

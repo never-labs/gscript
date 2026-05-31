@@ -5,7 +5,7 @@ package tests_test
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript/gscript"
+	gs "github.com/never-labs/gscript"
 )
 
 // TestJIT_SideExit_TableOps tests that table operations cause JIT side-exits

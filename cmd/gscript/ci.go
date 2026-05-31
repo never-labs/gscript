@@ -67,7 +67,7 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 	switch profile {
 	case "smoke":
 		return []ciCommand{
-			{Name: "Go smoke tests", Args: []string{"go", "test", "./cmd/gscript", "./gscript", "./internal/runtime", "./internal/vm", "-count=1"}},
+			{Name: "Go smoke tests", Args: []string{"go", "test", "./cmd/gscript", ".", "./internal/runtime", "./internal/vm", "-count=1"}},
 			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
 			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/gscript", "check", "--no-test", "--no-docs", ciSmokeScriptPath}},

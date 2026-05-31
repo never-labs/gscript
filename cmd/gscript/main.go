@@ -16,5 +16,5 @@ func main() {
 		}
 	}
 
-	os.Exit(runLegacyCommand(os.Stdout, os.Stderr))
+	os.Exit(runDefaultCommand(os.Stdout, os.Stderr))
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	gscript "github.com/never-labs/gscript/gscript"
+	gscript "github.com/never-labs/gscript"
 )
 
 func runEvalCommand(args []string, outw, errw io.Writer) int {

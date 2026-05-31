@@ -123,7 +123,7 @@ Current translated passing cases: 441.
 | `events_rawget_more2` | `events.lua` | Extra-argument behavior for `rawset` and `rawget` while preserving the first value/key semantics. |
 | `events_rawlen` | `events.lua` | `rawlen` for tables and strings, bypassing `__len`. |
 | `events_rawlen_more2` | `events.lua` | Additional raw length checks for `__len` tables, strings, long strings, and invalid arguments. |
-| `gc_collectgarbage_modes` | `gc.lua`, `gengc.lua` | `collectgarbage` incremental/generational mode switching and invalid legacy tuning options. |
+| `gc_collectgarbage_modes` | `gc.lua`, `gengc.lua` | `collectgarbage` incremental/generational mode switching and invalid previous-schema tuning options. |
 | `gc_collectgarbage_more2` | `gc.lua` | Additional `collectgarbage` running-state, explicit collection, and mode transition return values. |
 | `gc_collectgarbage_protocol` | `gc.lua`, `gengc.lua` | `collectgarbage` collect/count/step/stop/restart/isrunning protocol basics. |
 | `gc_basic_more` | `gc.lua` | Basic `collectgarbage` running state, count, stop/restart, step result type, and explicit collection. |

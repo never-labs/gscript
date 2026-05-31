@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gscript "github.com/never-labs/gscript/gscript"
+	gscript "github.com/never-labs/gscript"
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/runtime"

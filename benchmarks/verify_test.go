@@ -3,7 +3,7 @@ package benchmarks
 import (
 	"testing"
 
-	gs "github.com/never-labs/gscript/gscript"
+	gs "github.com/never-labs/gscript"
 	lua "github.com/yuin/gopher-lua"
 	"go.starlark.net/starlark"
 )

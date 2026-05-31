@@ -14,7 +14,7 @@ import (
 
 func TestGScriptPackageBoundary(t *testing.T) {
 	root := repoRootForBoundaryTest(t)
-	cmd := exec.Command("go", "list", "-json", "./gscript", "./cmd/gscript")
+	cmd := exec.Command("go", "list", "-json", ".", "./cmd/gscript")
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -34,7 +34,7 @@ func TestGScriptPackageBoundary(t *testing.T) {
 		pkgs[pkg.ImportPath] = pkg
 	}
 
-	publicPkg := pkgs["github.com/never-labs/gscript/gscript"]
+	publicPkg := pkgs["github.com/never-labs/gscript"]
 	if publicPkg.ImportPath == "" {
 		t.Fatalf("go list did not include public gscript package; got packages %v", packageKeys(pkgs))
 	}
@@ -53,7 +53,7 @@ func TestGScriptPackageBoundary(t *testing.T) {
 			t.Fatalf("public gscript package imports CLI-only package %q", cliOnlyImport)
 		}
 	}
-	if !slices.Contains(cliPkg.Imports, "github.com/never-labs/gscript/gscript") {
+	if !slices.Contains(cliPkg.Imports, "github.com/never-labs/gscript") {
 		t.Fatalf("cmd/gscript should depend on the public embedding API")
 	}
 }

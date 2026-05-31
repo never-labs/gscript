@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	gs "github.com/never-labs/gscript/gscript"
+	gs "github.com/never-labs/gscript"
 )
 
 // captureOutput creates a VM with the given options and a print capture function.

@@ -28,7 +28,7 @@ their documented output in sync.
   model backend, message constructors, tool descriptors, and script-side tool
   dispatch through the `llm.react` helper.
 
-Package-level examples in `../../gscript/example_test.go` exercise the same
+Package-level examples in `../../example_test.go` exercise the same
 public surface from the `gscript` package documentation.
 
 ## Running
@@ -36,5 +36,5 @@ public surface from the `gscript` package documentation.
 From the repository root:
 
 ```sh
-go test ./examples/embedding ./gscript
+go test ./examples/embedding .
 ```

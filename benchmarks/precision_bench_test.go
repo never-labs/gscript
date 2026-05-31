@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	gs "github.com/never-labs/gscript/gscript"
+	gs "github.com/never-labs/gscript"
 )
 
 var precisionBenchSink []interface{}
