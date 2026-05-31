@@ -1,3 +1,4 @@
+import argparse
 import tempfile
 import unittest
 from dataclasses import dataclass
@@ -85,6 +86,27 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             discovery.selector_matches_spec("official/events_metamethod_hot", FakeSpec("table", "events_metamethod"))
         )
         self.assertFalse(discovery.selector_matches_spec("suite/matmul", FakeSpec("table", "sort")))
+
+    def test_parse_selector_count_overrides_accepts_modes_and_legacy_aliases(self):
+        overrides = discovery.parse_selector_count_overrides(
+            ["fib=4", "suite/matmul=6", "vm/official/events_metamethod_hot=8"],
+            ["vm", "default"],
+            "--repeat",
+        )
+
+        self.assertEqual(discovery.selector_count_override(overrides, "default", "fib"), 4)
+        self.assertEqual(discovery.selector_count_override(overrides, "default", "matmul", "numeric/matmul"), 6)
+        self.assertEqual(
+            discovery.selector_count_override(overrides, "vm", "events_metamethod", "table/events_metamethod"),
+            8,
+        )
+        self.assertIsNone(discovery.selector_count_override(overrides, "default", "events_metamethod"))
+
+    def test_parse_selector_count_overrides_rejects_bad_counts(self):
+        with self.assertRaises(argparse.ArgumentTypeError):
+            discovery.parse_selector_count_overrides(["fib=0"], ["vm"], "--repeat")
+        with self.assertRaises(argparse.ArgumentTypeError):
+            discovery.parse_selector_count_overrides(["fib=nope"], ["vm"], "--repeat")
 
     def test_resolve_script_path_accepts_variant_and_hot_suffixes(self):
         with tempfile.TemporaryDirectory() as td:

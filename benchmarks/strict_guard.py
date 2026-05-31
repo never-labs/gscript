@@ -532,28 +532,7 @@ def build_gscript(root: Path, out: Path) -> None:
 
 
 def parse_repeat_overrides(values: list[str] | None) -> dict[tuple[str | None, str], int]:
-    overrides: dict[tuple[str | None, str], int] = {}
-    for value in values or []:
-        if "=" not in value:
-            raise argparse.ArgumentTypeError("--repeat entries must be BENCH=N, GROUP/BENCH=N, or MODE/BENCH=N")
-        key, raw_count = value.split("=", 1)
-        try:
-            count = int(raw_count)
-        except ValueError as exc:
-            raise argparse.ArgumentTypeError(f"invalid repeat count in {value!r}") from exc
-        if count <= 0:
-            raise argparse.ArgumentTypeError("repeat count must be > 0")
-        if "/" in key:
-            head, tail = key.split("/", 1)
-            if head in DEFAULT_MODES:
-                for selector in selector_candidates(tail):
-                    overrides[(head, selector)] = count
-            else:
-                for selector in selector_candidates(key):
-                    overrides[(None, selector)] = count
-        else:
-            overrides[(None, key)] = count
-    return overrides
+    return discovery.parse_selector_count_overrides(values, DEFAULT_MODES, "--repeat")
 
 
 def repeat_for(
@@ -562,16 +541,7 @@ def repeat_for(
     bench: str,
     benchmark_id: str | None = None,
 ) -> int | None:
-    selectors = [bench]
-    if benchmark_id:
-        selectors.insert(0, benchmark_id)
-    for selector in selectors:
-        if value := overrides.get((mode, selector)):
-            return value
-    for selector in selectors:
-        if value := overrides.get((None, selector)):
-            return value
-    return None
+    return discovery.selector_count_override(overrides, mode, bench, benchmark_id)
 
 
 def fmt_seconds(value: float | None) -> str:
@@ -599,11 +569,6 @@ def ratio(numer: float | None, denom: float | None) -> float | None:
 
 
 canonical_group = discovery.canonical_group
-canonical_selector = discovery.canonical_selector
-selector_candidates = discovery.selector_candidates
-canonical_groups = discovery.canonical_groups
-
-
 def domain_specs(root: Path, group: str) -> list[BenchmarkSpec]:
     return [
         BenchmarkSpec(spec.group, spec.name, spec.gscript, spec.luajit, spec.base)

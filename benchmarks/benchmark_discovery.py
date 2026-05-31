@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TypeVar
@@ -246,6 +247,56 @@ def spec_selector_set(spec: SelectableSpec) -> set[str]:
 
 def selector_matches_spec(selector: str, spec: SelectableSpec) -> bool:
     return selector_matches(selector, spec_selector_set(spec))
+
+
+def parse_selector_count_overrides(
+    values: list[str] | None,
+    modes: list[str] | tuple[str, ...],
+    option_name: str,
+) -> dict[tuple[str | None, str], int]:
+    overrides: dict[tuple[str | None, str], int] = {}
+    modes_set = set(modes)
+    for value in values or []:
+        if "=" not in value:
+            raise argparse.ArgumentTypeError(
+                f"{option_name} entries must be BENCH=N, GROUP/BENCH=N, or MODE/BENCH=N"
+            )
+        key, raw_count = value.split("=", 1)
+        try:
+            count = int(raw_count)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"invalid count in {value!r}") from exc
+        if count <= 0:
+            raise argparse.ArgumentTypeError("count must be > 0")
+        if "/" in key:
+            head, tail = key.split("/", 1)
+            if head in modes_set:
+                for selector in selector_candidates(tail):
+                    overrides[(head, selector)] = count
+            else:
+                for selector in selector_candidates(key):
+                    overrides[(None, selector)] = count
+        else:
+            overrides[(None, key)] = count
+    return overrides
+
+
+def selector_count_override(
+    overrides: dict[tuple[str | None, str], int],
+    mode: str,
+    name: str,
+    benchmark_id: str | None = None,
+) -> int | None:
+    selectors = [name]
+    if benchmark_id:
+        selectors.insert(0, benchmark_id)
+    for selector in selectors:
+        if value := overrides.get((mode, selector)):
+            return value
+    for selector in selectors:
+        if value := overrides.get((None, selector)):
+            return value
+    return None
 
 
 def canonical_groups(groups: list[str], allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[str]:
