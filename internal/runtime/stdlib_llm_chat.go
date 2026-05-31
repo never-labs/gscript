@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	stdlibai "github.com/never-labs/gscript/internal/stdlib/ai"
 )
 
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage
@@ -678,10 +680,7 @@ func llmTableString(tbl *Table, key string) string {
 }
 
 func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) (LLMTurnResult, Value) {
-	model := src.RawGetString("plan_model").Str()
-	if model == "" {
-		model = opts.RawGetString("model").Str()
-	}
+	model := stdlibai.SelectPlanModel(src.RawGetString("plan_model").Str(), opts.RawGetString("model").Str())
 	messages := llmPlanMessages(opts.RawGetString("messages"))
 	req := LLMTurnRequest{
 		Model:          model,
@@ -708,7 +707,7 @@ func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, ma
 
 func llmPlanMessages(messages Value) Value {
 	t := NewAppendArrayTable(2)
-	t.RawSet(IntValue(1), TableValue(llmMessageTable("system", "Create a concise execution plan. Do not call tools.")))
+	t.RawSet(IntValue(1), TableValue(llmMessageTable("system", stdlibai.PlanPrompt())))
 	if messages.IsTable() {
 		for _, msg := range llmMessageValuesFromTable(messages.Table()) {
 			t.RawSet(IntValue(int64(t.Length()+1)), msg)
@@ -718,7 +717,8 @@ func llmPlanMessages(messages Value) Value {
 }
 
 func llmInjectPlan(opts *Table, plan string) {
-	if plan == "" {
+	text, ok := stdlibai.ExecutionPlanMessage(plan)
+	if !ok {
 		return
 	}
 	messages := opts.RawGetString("messages")
@@ -726,7 +726,7 @@ func llmInjectPlan(opts *Table, plan string) {
 		return
 	}
 	merged := NewAppendArrayTable(messages.Table().Length() + 1)
-	merged.RawSet(IntValue(1), TableValue(llmMessageTable("system", "Execution plan:\n"+plan)))
+	merged.RawSet(IntValue(1), TableValue(llmMessageTable("system", text)))
 	for _, msg := range llmMessageValuesFromTable(messages.Table()) {
 		merged.RawSet(IntValue(int64(merged.Length()+1)), msg)
 	}
@@ -737,22 +737,13 @@ func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Cont
 	if result.RawGetString("status").Str() != "done" {
 		return NilValue()
 	}
-	maxIters := toInt(src.RawGetString("max_iters"))
-	if maxIters <= 0 {
-		maxIters = 1
-	}
-	model := src.RawGetString("reflect_model").Str()
-	if model == "" {
-		model = src.RawGetString("model").Str()
-	}
+	maxIters := stdlibai.ReflectIterations(toInt(src.RawGetString("max_iters")))
+	model := stdlibai.SelectReflectModel(src.RawGetString("reflect_model").Str(), src.RawGetString("model").Str())
 	reflections := NewAppendArrayTable(int(maxIters))
 	text := result.RawGetString("text").Str()
 	for i := int64(0); i < maxIters; i++ {
 		messages := NewAppendArrayTable(2)
-		prompt := src.RawGetString("reflect_prompt").Str()
-		if prompt == "" {
-			prompt = "Review the answer. If it can be improved, return the improved final answer only."
-		}
+		prompt := stdlibai.ReflectPrompt(src.RawGetString("reflect_prompt").Str())
 		messages.RawSet(IntValue(1), TableValue(llmMessageTable("system", prompt)))
 		messages.RawSet(IntValue(2), TableValue(llmMessageTable("user", text)))
 		req := LLMTurnRequest{
