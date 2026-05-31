@@ -13,6 +13,14 @@ type RGBA struct {
 	A float64
 }
 
+func New(r, g, b, a float64) RGBA {
+	return RGBA{R: r, G: g, B: b, A: a}
+}
+
+func Equal(a, b RGBA) bool {
+	return a.R == b.R && a.G == b.G && a.B == b.B && a.A == b.A
+}
+
 func Clamp01(v float64) float64 {
 	if v < 0 {
 		return 0

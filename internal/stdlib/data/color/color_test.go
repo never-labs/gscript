@@ -42,6 +42,16 @@ func TestHexRoundTrip(t *testing.T) {
 	}
 }
 
+func TestNewAndEqual(t *testing.T) {
+	c := New(0.1, 0.2, 0.3, 0.4)
+	if !Equal(c, RGBA{R: 0.1, G: 0.2, B: 0.3, A: 0.4}) {
+		t.Fatalf("New/Equal = %#v", c)
+	}
+	if Equal(c, WithAlpha(c, 0.5)) {
+		t.Fatalf("Equal ignored alpha")
+	}
+}
+
 func TestHSVAndHSL(t *testing.T) {
 	red := FromHSV(0, 1, 1)
 	if !close(red.R, 1) || !close(red.G, 0) || !close(red.B, 0) || !close(red.A, 1) {

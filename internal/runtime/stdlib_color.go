@@ -15,14 +15,6 @@ var colorMeta *Table
 func newColorMeta() *Table {
 	mt := NewTable()
 
-	getRGBA := func(v Value) (float64, float64, float64, float64) {
-		tbl := v.Table()
-		return toFloat(tbl.RawGet(StringValue("r"))),
-			toFloat(tbl.RawGet(StringValue("g"))),
-			toFloat(tbl.RawGet(StringValue("b"))),
-			toFloat(tbl.RawGet(StringValue("a")))
-	}
-
 	// __add: component-wise add (clamped to 1)
 	mt.RawSet(StringValue("__add"), FunctionValue(&GoFunction{
 		Name: "color.__add",
@@ -30,12 +22,7 @@ func newColorMeta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("color.__add requires 2 arguments")
 			}
-			r1, g1, b1, a1 := getRGBA(args[0])
-			r2, g2, b2, a2 := getRGBA(args[1])
-			return []Value{makeColorRGBA(stdcolor.Add(
-				stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
-				stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
-			))}, nil
+			return []Value{makeColorRGBA(stdcolor.Add(colorRGBA(args[0]), colorRGBA(args[1])))}, nil
 		},
 	}))
 
@@ -48,23 +35,16 @@ func newColorMeta() *Table {
 			}
 			a, b := args[0], args[1]
 			if a.IsTable() && (b.IsNumber() || b.IsInt()) {
-				r, g, bl, al := getRGBA(a)
 				s := toFloat(b)
-				return []Value{makeColorRGBA(stdcolor.Scale(stdcolor.RGBA{R: r, G: g, B: bl, A: al}, s))}, nil
+				return []Value{makeColorRGBA(stdcolor.Scale(colorRGBA(a), s))}, nil
 			}
 			if (a.IsNumber() || a.IsInt()) && b.IsTable() {
 				s := toFloat(a)
-				r, g, bl, al := getRGBA(b)
-				return []Value{makeColorRGBA(stdcolor.Scale(stdcolor.RGBA{R: r, G: g, B: bl, A: al}, s))}, nil
+				return []Value{makeColorRGBA(stdcolor.Scale(colorRGBA(b), s))}, nil
 			}
 			// Component-wise multiply of two colors
 			if a.IsTable() && b.IsTable() {
-				r1, g1, b1, a1 := getRGBA(a)
-				r2, g2, b2, a2 := getRGBA(b)
-				return []Value{makeColorRGBA(stdcolor.Mul(
-					stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
-					stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
-				))}, nil
+				return []Value{makeColorRGBA(stdcolor.Mul(colorRGBA(a), colorRGBA(b)))}, nil
 			}
 			return nil, fmt.Errorf("color.__mul: unsupported operand types")
 		},
@@ -77,9 +57,7 @@ func newColorMeta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("color.__eq requires 2 arguments")
 			}
-			r1, g1, b1, a1 := getRGBA(args[0])
-			r2, g2, b2, a2 := getRGBA(args[1])
-			return []Value{BoolValue(r1 == r2 && g1 == g2 && b1 == b2 && a1 == a2)}, nil
+			return []Value{BoolValue(stdcolor.Equal(colorRGBA(args[0]), colorRGBA(args[1])))}, nil
 		},
 	}))
 
@@ -91,7 +69,7 @@ func newColorMeta() *Table {
 // --------------------------------------------------------------------------
 
 func makeColorValue(r, g, b, a float64) Value {
-	return makeColorRGBA(stdcolor.RGBA{R: r, G: g, B: b, A: a})
+	return makeColorRGBA(stdcolor.New(r, g, b, a))
 }
 
 func makeColorRGBA(c stdcolor.RGBA) Value {
@@ -113,6 +91,16 @@ func isColorValue(v Value) bool {
 	return ty.IsString() && ty.Str() == "color"
 }
 
+func colorRGBA(v Value) stdcolor.RGBA {
+	tbl := v.Table()
+	return stdcolor.New(
+		toFloat(tbl.RawGet(StringValue("r"))),
+		toFloat(tbl.RawGet(StringValue("g"))),
+		toFloat(tbl.RawGet(StringValue("b"))),
+		toFloat(tbl.RawGet(StringValue("a"))),
+	)
+}
+
 // --------------------------------------------------------------------------
 // buildColorLib creates the "color" standard library table.
 // --------------------------------------------------------------------------
@@ -127,14 +115,6 @@ func buildColorLib() *Table {
 			Name: "color." + name,
 			Fn:   fn,
 		}))
-	}
-
-	getRGBA := func(v Value) (float64, float64, float64, float64) {
-		tbl := v.Table()
-		return toFloat(tbl.RawGet(StringValue("r"))),
-			toFloat(tbl.RawGet(StringValue("g"))),
-			toFloat(tbl.RawGet(StringValue("b"))),
-			toFloat(tbl.RawGet(StringValue("a")))
 	}
 
 	// ----------------------------------------------------------------
@@ -189,8 +169,7 @@ func buildColorLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'color.toHex'")
 		}
-		r, g, b, _ := getRGBA(args[0])
-		return []Value{StringValue(stdcolor.ToHex(stdcolor.RGBA{R: r, G: g, B: b, A: 1}))}, nil
+		return []Value{StringValue(stdcolor.ToHex(stdcolor.WithAlpha(colorRGBA(args[0]), 1)))}, nil
 	})
 
 	// ----------------------------------------------------------------
@@ -213,8 +192,7 @@ func buildColorLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'color.toHSV'")
 		}
-		r, g, b, _ := getRGBA(args[0])
-		h, s, v := stdcolor.ToHSV(stdcolor.RGBA{R: r, G: g, B: b, A: 1})
+		h, s, v := stdcolor.ToHSV(stdcolor.WithAlpha(colorRGBA(args[0]), 1))
 		return []Value{FloatValue(h), FloatValue(s), FloatValue(v)}, nil
 	})
 
@@ -238,8 +216,7 @@ func buildColorLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'color.toHSL'")
 		}
-		r, g, b, _ := getRGBA(args[0])
-		h, s, l := stdcolor.ToHSL(stdcolor.RGBA{R: r, G: g, B: b, A: 1})
+		h, s, l := stdcolor.ToHSL(stdcolor.WithAlpha(colorRGBA(args[0]), 1))
 		return []Value{FloatValue(h), FloatValue(s), FloatValue(l)}, nil
 	})
 
@@ -252,14 +229,8 @@ func buildColorLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'color.lerp'")
 		}
-		r1, g1, b1, a1 := getRGBA(args[0])
-		r2, g2, b2, a2 := getRGBA(args[1])
 		t := toFloat(args[2])
-		return []Value{makeColorRGBA(stdcolor.Lerp(
-			stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
-			stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
-			t,
-		))}, nil
+		return []Value{makeColorRGBA(stdcolor.Lerp(colorRGBA(args[0]), colorRGBA(args[1]), t))}, nil
 	})
 
 	// color.mix -- alias for lerp
@@ -267,14 +238,8 @@ func buildColorLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'color.mix'")
 		}
-		r1, g1, b1, a1 := getRGBA(args[0])
-		r2, g2, b2, a2 := getRGBA(args[1])
 		t := toFloat(args[2])
-		return []Value{makeColorRGBA(stdcolor.Lerp(
-			stdcolor.RGBA{R: r1, G: g1, B: b1, A: a1},
-			stdcolor.RGBA{R: r2, G: g2, B: b2, A: a2},
-			t,
-		))}, nil
+		return []Value{makeColorRGBA(stdcolor.Lerp(colorRGBA(args[0]), colorRGBA(args[1]), t))}, nil
 	})
 
 	// color.darken(c, amount) -- reduce brightness by amount (0-1)
@@ -282,9 +247,8 @@ func buildColorLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'color.darken'")
 		}
-		r, g, b, a := getRGBA(args[0])
 		amount := toFloat(args[1])
-		return []Value{makeColorRGBA(stdcolor.Darken(stdcolor.RGBA{R: r, G: g, B: b, A: a}, amount))}, nil
+		return []Value{makeColorRGBA(stdcolor.Darken(colorRGBA(args[0]), amount))}, nil
 	})
 
 	// color.lighten(c, amount) -- increase brightness
@@ -292,9 +256,8 @@ func buildColorLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'color.lighten'")
 		}
-		r, g, b, a := getRGBA(args[0])
 		amount := toFloat(args[1])
-		return []Value{makeColorRGBA(stdcolor.Lighten(stdcolor.RGBA{R: r, G: g, B: b, A: a}, amount))}, nil
+		return []Value{makeColorRGBA(stdcolor.Lighten(colorRGBA(args[0]), amount))}, nil
 	})
 
 	// color.alpha(c, a) -- same color with new alpha
@@ -302,9 +265,8 @@ func buildColorLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'color.alpha'")
 		}
-		r, g, b, _ := getRGBA(args[0])
 		newA := toFloat(args[1])
-		return []Value{makeColorRGBA(stdcolor.WithAlpha(stdcolor.RGBA{R: r, G: g, B: b, A: 1}, newA))}, nil
+		return []Value{makeColorRGBA(stdcolor.WithAlpha(colorRGBA(args[0]), newA))}, nil
 	})
 
 	// color.withAlpha -- alias for alpha
@@ -312,9 +274,8 @@ func buildColorLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'color.withAlpha'")
 		}
-		r, g, b, _ := getRGBA(args[0])
 		newA := toFloat(args[1])
-		return []Value{makeColorRGBA(stdcolor.WithAlpha(stdcolor.RGBA{R: r, G: g, B: b, A: 1}, newA))}, nil
+		return []Value{makeColorRGBA(stdcolor.WithAlpha(colorRGBA(args[0]), newA))}, nil
 	})
 
 	// color.invert(c)
@@ -322,8 +283,7 @@ func buildColorLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'color.invert'")
 		}
-		r, g, b, a := getRGBA(args[0])
-		return []Value{makeColorRGBA(stdcolor.Invert(stdcolor.RGBA{R: r, G: g, B: b, A: a}))}, nil
+		return []Value{makeColorRGBA(stdcolor.Invert(colorRGBA(args[0])))}, nil
 	})
 
 	// color.grayscale(c) -- using luminance weights
@@ -331,8 +291,7 @@ func buildColorLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'color.grayscale'")
 		}
-		r, g, b, a := getRGBA(args[0])
-		return []Value{makeColorRGBA(stdcolor.Grayscale(stdcolor.RGBA{R: r, G: g, B: b, A: a}))}, nil
+		return []Value{makeColorRGBA(stdcolor.Grayscale(colorRGBA(args[0])))}, nil
 	})
 
 	// color.isColor(v)
