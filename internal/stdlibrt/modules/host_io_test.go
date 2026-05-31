@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 )
 
 func TestBuildFSWithPolicyReadGate(t *testing.T) {
-	lib := BuildFSWithPolicy(HostOptions{
+	lib := BuildFSWithPolicy(host.Options{
 		FilesystemRead:  func() bool { return false },
 		FilesystemWrite: func() bool { return true },
 	})
@@ -20,7 +21,7 @@ func TestBuildFSWithPolicyReadGate(t *testing.T) {
 }
 
 func TestBuildNetWithPolicyNetworkGate(t *testing.T) {
-	lib := BuildNet(HostOptions{
+	lib := BuildNet(host.Options{
 		NetworkAllowed: func() bool { return false },
 	})
 	fn := lib.RawGetString("get").GoFunction()
@@ -32,7 +33,7 @@ func TestBuildNetWithPolicyNetworkGate(t *testing.T) {
 
 func TestBuildOSWithPolicyEnvironmentAllowlist(t *testing.T) {
 	t.Setenv("GSCRIPT_STDLIBRT_HOST_IO_ALLOWED", "yes")
-	lib := BuildOSWithPolicy(HostOptions{
+	lib := BuildOSWithPolicy(host.Options{
 		EnvironmentRead: func() bool { return true },
 		EnvironmentAllowed: func(name string) bool {
 			return name == "GSCRIPT_STDLIBRT_HOST_IO_ALLOWED"

@@ -10,10 +10,11 @@ import (
 
 	"github.com/never-labs/gscript/internal/outputlimit"
 	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 )
 
 // BuildProcessWithPolicy creates the "process" standard library table.
-func BuildProcessWithPolicy(host HostOptions) *Table {
+func BuildProcessWithPolicy(opts host.Options) *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -27,7 +28,7 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'process.run'")
 		}
-		if !hostBool(host.ProcessExecution, true) {
+		if !host.Bool(opts.ProcessExecution, true) {
 			return nil, fmt.Errorf("process execution access disabled")
 		}
 
@@ -67,32 +68,32 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 
 		optsIndex := argOffset + 1
 		if len(args) > optsIndex && args[optsIndex].IsTable() {
-			opts := args[optsIndex].Table()
-			if v := opts.RawGetString("stdin"); v.IsString() {
+			runOpts := args[optsIndex].Table()
+			if v := runOpts.RawGetString("stdin"); v.IsString() {
 				stdinStr = v.Str()
 			}
-			if v := opts.RawGetString("dir"); v.IsString() {
+			if v := runOpts.RawGetString("dir"); v.IsString() {
 				dir = v.Str()
-				if hostString(host.FilesystemRoot) != "" && host.ResolveFilesystemPath != nil {
-					resolved, err := host.ResolveFilesystemPath(dir)
+				if host.String(opts.FilesystemRoot) != "" && opts.ResolveFilesystemPath != nil {
+					resolved, err := opts.ResolveFilesystemPath(dir)
 					if err != nil {
 						return nil, err
 					}
 					dir = resolved
 				}
 			}
-			if v := opts.RawGetString("timeout"); v.IsNumber() {
+			if v := runOpts.RawGetString("timeout"); v.IsNumber() {
 				timeout = time.Duration(toFloat(v) * float64(time.Second))
 			}
-			if v := opts.RawGetString("env"); v.IsTable() {
-				if !hostBool(host.EnvironmentWrite, true) {
+			if v := runOpts.RawGetString("env"); v.IsTable() {
+				if !host.Bool(opts.EnvironmentWrite, true) {
 					return nil, fmt.Errorf("environment write access disabled")
 				}
 				envTbl := v.Table()
 				k, val, ok := envTbl.Next(NilValue())
 				for ok {
 					name := k.String()
-					if host.EnvironmentAllowed != nil && !host.EnvironmentAllowed(name) {
+					if opts.EnvironmentAllowed != nil && !opts.EnvironmentAllowed(name) {
 						return nil, fmt.Errorf("environment variable not allowed: %s", name)
 					}
 					envVars = append(envVars, name+"="+val.String())
@@ -123,7 +124,7 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		}
 
 		cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(host.MaxHostResult))
+		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(opts.MaxHostResult))
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		if stdinStr != "" {
@@ -179,7 +180,7 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.exec' (string expected)")
 		}
-		if !hostBool(host.ProcessExecution, true) {
+		if !host.Bool(opts.ProcessExecution, true) {
 			return nil, fmt.Errorf("process execution access disabled")
 		}
 		cmdArgs := make([]string, len(args))
@@ -187,7 +188,7 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 			cmdArgs[i] = a.String()
 		}
 		cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
-		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(host.MaxHostResult))
+		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(opts.MaxHostResult))
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 		err := cmd.Run()
@@ -204,11 +205,11 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.shell' (string expected)")
 		}
-		if !hostBool(host.ProcessShell, true) {
+		if !host.Bool(opts.ProcessShell, true) {
 			return nil, fmt.Errorf("process shell access disabled")
 		}
 		cmd := exec.Command("/bin/sh", "-c", args[0].Str())
-		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(host.MaxHostResult))
+		stdout, stderr := outputlimit.NewBuffers(hostResultLimit(opts.MaxHostResult))
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
 
@@ -239,7 +240,7 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.which' (string expected)")
 		}
-		if !hostBool(host.ProcessExecution, true) {
+		if !host.Bool(opts.ProcessExecution, true) {
 			return nil, fmt.Errorf("process execution access disabled")
 		}
 		path, err := exec.LookPath(args[0].Str())
@@ -254,13 +255,13 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 	})
 
 	set("env", func(args []Value) ([]Value, error) {
-		if !hostBool(host.EnvironmentRead, true) {
+		if !host.Bool(opts.EnvironmentRead, true) {
 			return nil, fmt.Errorf("environment read access disabled")
 		}
 		tbl := NewTable()
 		for _, e := range os.Environ() {
 			parts := strings.SplitN(e, "=", 2)
-			if len(parts) == 2 && (host.EnvironmentAllowed == nil || host.EnvironmentAllowed(parts[0])) {
+			if len(parts) == 2 && (opts.EnvironmentAllowed == nil || opts.EnvironmentAllowed(parts[0])) {
 				tbl.RawSetString(parts[0], StringValue(parts[1]))
 			}
 		}
@@ -270,8 +271,8 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 	set("args", func(args []Value) ([]Value, error) {
 		tbl := NewTable()
 		argv := os.Args
-		if host.Args != nil {
-			if hostArgs := host.Args(); len(hostArgs) > 0 {
+		if opts.Args != nil {
+			if hostArgs := opts.Args(); len(hostArgs) > 0 {
 				argv = hostArgs
 			}
 		}
@@ -283,8 +284,8 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 
 	set("entry", func(args []Value) ([]Value, error) {
 		tbl := NewTable()
-		if host.Args != nil {
-			if argv := host.Args(); len(argv) > 0 {
+		if opts.Args != nil {
+			if argv := opts.Args(); len(argv) > 0 {
 				tbl.RawSetString("file", StringValue(argv[0]))
 			} else {
 				tbl.RawSetString("file", NilValue())
@@ -292,7 +293,7 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		} else {
 			tbl.RawSetString("file", NilValue())
 		}
-		tbl.RawSetString("dir", StringValue(hostString(host.ScriptDir)))
+		tbl.RawSetString("dir", StringValue(host.String(opts.ScriptDir)))
 		argsFn := t.RawGetString("args").GoFunction()
 		argVals, err := argsFn.Fn(nil)
 		if err != nil {
@@ -308,14 +309,14 @@ func BuildProcessWithPolicy(host HostOptions) *Table {
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'process.setArgs' (string expected)")
 		}
-		if host.SetArgs == nil {
+		if opts.SetArgs == nil {
 			return nil, fmt.Errorf("process.setArgs requires an interpreter-backed process library")
 		}
 		argv := make([]string, 0, len(args)-1)
 		for _, arg := range args[1:] {
 			argv = append(argv, arg.String())
 		}
-		host.SetArgs(args[0].Str(), argv)
+		opts.SetArgs(args[0].Str(), argv)
 		return nil, nil
 	})
 

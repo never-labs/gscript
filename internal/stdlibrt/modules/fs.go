@@ -8,6 +8,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/hostpath"
 	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 )
 
 func resolveSandboxPath(root, path string) (string, error) {
@@ -20,18 +21,18 @@ func BuildFS(roots ...string) *Table {
 	if len(roots) > 0 {
 		root = roots[0]
 	}
-	return BuildFSWithPolicy(HostOptions{
+	return BuildFSWithPolicy(host.Options{
 		FilesystemRoot:  func() string { return root },
 		FilesystemRead:  func() bool { return true },
 		FilesystemWrite: func() bool { return true },
 	})
 }
 
-func BuildFSWithPolicy(opts HostOptions) *Table {
+func BuildFSWithPolicy(opts host.Options) *Table {
 	t := markStdlibrtModule(NewTable())
-	root := func() string { return hostString(opts.FilesystemRoot) }
-	read := func() bool { return hostBool(opts.FilesystemRead, true) }
-	write := func() bool { return hostBool(opts.FilesystemWrite, true) }
+	root := func() string { return host.String(opts.FilesystemRoot) }
+	read := func() bool { return host.Bool(opts.FilesystemRead, true) }
+	write := func() bool { return host.Bool(opts.FilesystemWrite, true) }
 	maxReadBytes := func() int64 {
 		if opts.MaxFSReadBytes == nil {
 			return 0

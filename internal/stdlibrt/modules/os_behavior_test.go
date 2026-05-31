@@ -7,6 +7,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 )
 
 func execOSProgram(t *testing.T, interp *Interpreter, src string) error {
@@ -33,7 +34,7 @@ func callOSFunction(t *testing.T, lib *Table, name string, args ...Value) ([]Val
 
 func newCoreWithOSModule() *Interpreter {
 	interp := New()
-	osModule := TableValue(BuildOSWithPolicy(HostOptions{
+	osModule := TableValue(BuildOSWithPolicy(host.Options{
 		EnvironmentRead:  interp.EnvironmentReadEnabled,
 		EnvironmentWrite: interp.EnvironmentWriteEnabled,
 		EnvironmentAllowed: func(name string) bool {

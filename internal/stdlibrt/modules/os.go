@@ -2,22 +2,24 @@ package modules
 
 import (
 	"fmt"
-	"github.com/never-labs/gscript/internal/runtime"
-	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/never-labs/gscript/internal/runtime"
+	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 )
 
 // startTime is used by os.clock() to measure CPU time (approximated as wall time).
 var startTime = time.Now()
 
 func BuildOS() *Table {
-	return BuildOSWithPolicy(HostOptions{})
+	return BuildOSWithPolicy(host.Options{})
 }
 
 func BuildOSWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) *Table {
-	return BuildOSWithPolicy(HostOptions{
+	return BuildOSWithPolicy(host.Options{
 		EnvironmentRead:  func() bool { return envRead },
 		EnvironmentWrite: func() bool { return envWrite },
 		EnvironmentAllowed: func(name string) bool {
@@ -27,12 +29,12 @@ func BuildOSWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) 
 	})
 }
 
-func BuildOSWithPolicy(opts HostOptions) *Table {
+func BuildOSWithPolicy(opts host.Options) *Table {
 	t := markStdlibrtModule(NewTable())
-	envRead := func() bool { return hostBool(opts.EnvironmentRead, true) }
-	envWrite := func() bool { return hostBool(opts.EnvironmentWrite, true) }
-	fsRoot := func() string { return hostString(opts.FilesystemRoot) }
-	fsWrite := func() bool { return hostBool(opts.FilesystemWrite, true) }
+	envRead := func() bool { return host.Bool(opts.EnvironmentRead, true) }
+	envWrite := func() bool { return host.Bool(opts.EnvironmentWrite, true) }
+	fsRoot := func() string { return host.String(opts.FilesystemRoot) }
+	fsWrite := func() bool { return host.Bool(opts.FilesystemWrite, true) }
 	envAllowed := func(name string) bool {
 		if opts.EnvironmentAllowed == nil {
 			return true

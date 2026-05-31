@@ -1,11 +1,15 @@
 package modules
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
+)
 
 func TestHTTPLibRegistered(t *testing.T) {
 	interp := runWithLib(t, `
 		result := type(http)
-	`, "http", BuildHTTP(HostOptions{}))
+	`, "http", BuildHTTP(host.Options{}))
 	v := interp.GetGlobal("result")
 	if v.Str() != "table" {
 		t.Errorf("expected http to be 'table', got %s", v.Str())
@@ -17,7 +21,7 @@ func TestHTTPLibFunctions(t *testing.T) {
 		a := type(http.listen)
 		b := type(http.get)
 		c := type(http.newRouter)
-	`, "http", BuildHTTP(HostOptions{}))
+	`, "http", BuildHTTP(host.Options{}))
 	if interp.GetGlobal("a").Str() != "function" {
 		t.Errorf("expected http.listen to be 'function', got %s", interp.GetGlobal("a").Str())
 	}
@@ -37,7 +41,7 @@ func TestHTTPNewRouter(t *testing.T) {
 		has_post := type(router.post)
 		has_any := type(router.any)
 		has_listen := type(router.listen)
-	`, "http", BuildHTTP(HostOptions{}))
+	`, "http", BuildHTTP(host.Options{}))
 	if interp.GetGlobal("result").Str() != "table" {
 		t.Errorf("expected router to be 'table', got %s", interp.GetGlobal("result").Str())
 	}
@@ -60,7 +64,7 @@ func TestHTTPRouterChaining(t *testing.T) {
 		router := http.newRouter()
 		r2 := router.get("/test", func(req, res) {})
 		same := r2 == router
-	`, "http", BuildHTTP(HostOptions{}))
+	`, "http", BuildHTTP(host.Options{}))
 	if !interp.GetGlobal("same").Truthy() {
 		t.Errorf("expected router.get to return the same router for chaining")
 	}

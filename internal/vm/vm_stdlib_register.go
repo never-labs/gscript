@@ -11,6 +11,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
@@ -70,7 +71,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 		ScriptCaller: vm.callValue,
 		Less:         vm.valueLessThan,
 		SkipTable:    true,
-		Host: modules.HostOptions{
+		Host: host.Options{
 			SkipHostIO:     true,
 			NetworkAllowed: func() bool { return vm.networkAccess },
 			MaxHostResult:  func() int64 { return vm.maxHostResult },

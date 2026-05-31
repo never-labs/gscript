@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/never-labs/gscript/internal/runtime"
+	"github.com/never-labs/gscript/internal/stdlibrt/host"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
 
@@ -15,7 +16,7 @@ func Install(interp *runtime.Interpreter) {
 	interp.InstallRuntimeStdlib()
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
 		ScriptCaller: interp.CallFunction,
-		Host: modules.HostOptions{
+		Host: host.Options{
 			NetworkAllowed:        interp.NetworkAccessEnabled,
 			FilesystemRoot:        interp.FilesystemRoot,
 			FilesystemRead:        interp.FilesystemReadEnabled,
@@ -49,7 +50,7 @@ func Install(interp *runtime.Interpreter) {
 type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
 	Less         modules.ValueLessFunc
-	Host         modules.HostOptions
+	Host         host.Options
 	Table        modules.TableOptions
 	SkipTable    bool
 }
