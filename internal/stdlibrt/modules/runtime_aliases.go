@@ -51,6 +51,7 @@ var (
 	CheckProjectedHostStringBytes = runtime.CheckProjectedHostStringBytes
 	CheckHostResultBytes          = runtime.CheckHostResultBytes
 	ClassifyLLMProviderError      = runtime.ClassifyLLMProviderError
+	ConcatOperandString           = runtime.ConcatOperandString
 	ContextCancelledValue         = runtime.ContextCancelledValue
 	DenseArrayBool                = runtime.DenseArrayBool
 	DenseArrayF64                 = runtime.DenseArrayF64

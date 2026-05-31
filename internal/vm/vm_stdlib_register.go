@@ -190,7 +190,7 @@ func (vm *VM) RegisterTableSortLib() {
 }
 
 func (vm *VM) newTableSortFunction() *runtime.GoFunction {
-	return runtime.BuildTableSortFunction(
+	return modules.BuildTableSortFunction(
 		vm.callValue,
 		vm.valueLessThan,
 		vm.tableLenInt,
@@ -213,7 +213,7 @@ func (vm *VM) RegisterTableHigherOrderLib() {
 	if !ok || !tblVal.IsTable() {
 		return
 	}
-	runtime.BuildTableHigherOrderLibWithCaller(vm.callValue, tblVal.Table())
+	modules.BuildTableHigherOrderLibWithCaller(vm.callValue, tblVal.Table())
 }
 
 // RegisterSortCallbackLib installs VM-aware sort namespace helpers whose
@@ -689,9 +689,9 @@ func (vm *VM) RegisterStringLib() {
 	std := vm.newStdlibInstallContext()
 	var strLib *runtime.Table
 	if existing, ok := vm.globals["string"]; ok && existing.IsTable() {
-		strLib = runtime.RefreshStringLibWithCaller(existing.Table(), vm.callValue, func() int64 { return vm.maxHostResult })
+		strLib = modules.RefreshString(existing.Table(), vm.callValue, func() int64 { return vm.maxHostResult })
 	} else {
-		strLib = runtime.BuildStringLibWithCaller(vm.callValue, func() int64 { return vm.maxHostResult })
+		strLib = modules.BuildString(vm.callValue, func() int64 { return vm.maxHostResult })
 	}
 	std.RegisterTable("string", strLib)
 	meta := runtime.NewTable()
