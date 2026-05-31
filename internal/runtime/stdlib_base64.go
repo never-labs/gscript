@@ -20,112 +20,58 @@ func buildBase64Lib(interps ...*Interpreter) *Table {
 		return interp.maxHostResult
 	}
 
-	setFastArg1 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
-			Name:     "base64." + name,
-			Fn:       fn,
-			FastArg1: fast,
-		}))
-	}
-	setFastArg1Ret2 := func(name string, fn func([]Value) ([]Value, error), fast func(Value) (Value, Value, int, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
-			Name:         "base64." + name,
-			Fn:           fn,
-			FastArg1Ret2: fast,
-		}))
-	}
-
-	// base64.encode(str) -> standard base64 encoded string
-	base64Encode := func(arg Value) (Value, error) {
-		if !arg.IsString() {
-			return NilValue(), fmt.Errorf("bad argument #1 to 'base64.encode' (string expected)")
-		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.EncodedLen(StringLen(arg))); err != nil {
-			return NilValue(), err
-		}
-		return StringValue(base64lib.Encode(arg.Str())), nil
-	}
-	setFastArg1("encode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'base64.encode'")
-		}
-		v, err := base64Encode(args[0])
-		return []Value{v}, err
-	}, base64Encode)
-
-	// base64.decode(str) -> decoded string, or nil, "error message"
-	base64Decode := func(arg Value) (Value, Value, int, error) {
-		if !arg.IsString() {
-			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.decode' (string expected)")
-		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.DecodedLen(StringLen(arg))); err != nil {
-			return NilValue(), NilValue(), 0, err
-		}
-		decoded, err := base64lib.Decode(arg.Str())
-		if err != nil {
-			return NilValue(), StringValue(err.Error()), 2, nil
-		}
-		return StringValue(decoded), NilValue(), 1, nil
-	}
-	setFastArg1Ret2("decode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'base64.decode'")
-		}
-		r0, r1, n, err := base64Decode(args[0])
-		if err != nil {
-			return nil, err
-		}
-		if n == 1 {
-			return []Value{r0}, nil
-		}
-		return []Value{r0, r1}, nil
-	}, base64Decode)
-
-	// base64.urlEncode(str) -> URL-safe base64 encoded string (no padding)
-	base64URLEncode := func(arg Value) (Value, error) {
-		if !arg.IsString() {
-			return NilValue(), fmt.Errorf("bad argument #1 to 'base64.urlEncode' (string expected)")
-		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.URLEncodedLen(StringLen(arg))); err != nil {
-			return NilValue(), err
-		}
-		return StringValue(base64lib.URLEncode(arg.Str())), nil
-	}
-	setFastArg1("urlEncode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'base64.urlEncode'")
-		}
-		v, err := base64URLEncode(args[0])
-		return []Value{v}, err
-	}, base64URLEncode)
-
-	// base64.urlDecode(str) -> decoded string, or nil, "error message"
-	base64URLDecode := func(arg Value) (Value, Value, int, error) {
-		if !arg.IsString() {
-			return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.urlDecode' (string expected)")
-		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.URLDecodedLen(StringLen(arg))); err != nil {
-			return NilValue(), NilValue(), 0, err
-		}
-		decoded, err := base64lib.URLDecode(arg.Str())
-		if err != nil {
-			return NilValue(), StringValue(err.Error()), 2, nil
-		}
-		return StringValue(decoded), NilValue(), 1, nil
-	}
-	setFastArg1Ret2("urlDecode", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'base64.urlDecode'")
-		}
-		r0, r1, n, err := base64URLDecode(args[0])
-		if err != nil {
-			return nil, err
-		}
-		if n == 1 {
-			return []Value{r0}, nil
-		}
-		return []Value{r0, r1}, nil
-	}, base64URLDecode)
-
+	installBase64GeneratedBindings(t, maxHostResult)
 	return t
+}
+
+// base64.encode(str) -> standard base64 encoded string
+func base64EncodeValue(maxHostResult func() int64, arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'base64.encode' (string expected)")
+	}
+	if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.EncodedLen(StringLen(arg))); err != nil {
+		return NilValue(), err
+	}
+	return StringValue(base64lib.Encode(arg.Str())), nil
+}
+
+// base64.decode(str) -> decoded string, or nil, "error message"
+func base64DecodeValue(maxHostResult func() int64, arg Value) (Value, Value, int, error) {
+	if !arg.IsString() {
+		return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.decode' (string expected)")
+	}
+	if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.DecodedLen(StringLen(arg))); err != nil {
+		return NilValue(), NilValue(), 0, err
+	}
+	decoded, err := base64lib.Decode(arg.Str())
+	if err != nil {
+		return NilValue(), StringValue(err.Error()), 2, nil
+	}
+	return StringValue(decoded), NilValue(), 1, nil
+}
+
+// base64.urlEncode(str) -> URL-safe base64 encoded string (no padding)
+func base64URLEncodeValue(maxHostResult func() int64, arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'base64.urlEncode' (string expected)")
+	}
+	if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.URLEncodedLen(StringLen(arg))); err != nil {
+		return NilValue(), err
+	}
+	return StringValue(base64lib.URLEncode(arg.Str())), nil
+}
+
+// base64.urlDecode(str) -> decoded string, or nil, "error message"
+func base64URLDecodeValue(maxHostResult func() int64, arg Value) (Value, Value, int, error) {
+	if !arg.IsString() {
+		return NilValue(), NilValue(), 0, fmt.Errorf("bad argument #1 to 'base64.urlDecode' (string expected)")
+	}
+	if err := CheckProjectedHostStringBytes(maxHostResult(), base64lib.URLDecodedLen(StringLen(arg))); err != nil {
+		return NilValue(), NilValue(), 0, err
+	}
+	decoded, err := base64lib.URLDecode(arg.Str())
+	if err != nil {
+		return NilValue(), StringValue(err.Error()), 2, nil
+	}
+	return StringValue(decoded), NilValue(), 1, nil
 }

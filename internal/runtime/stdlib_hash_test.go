@@ -167,3 +167,35 @@ func TestHashHMACSHA256DifferentKeys(t *testing.T) {
 		t.Errorf("different keys should produce different HMACs")
 	}
 }
+
+func TestHashGeneratedBindingsExposeFastPath(t *testing.T) {
+	lib := buildHashLib()
+
+	md5 := lib.RawGetString("md5").GoFunction()
+	if md5 == nil || md5.FastArg1 == nil {
+		t.Fatalf("hash.md5 missing generated FastArg1: %#v", md5)
+	}
+	fast, err := md5.FastArg1(StringValue("hello"))
+	if err != nil {
+		t.Fatalf("FastArg1 md5 failed: %v", err)
+	}
+	fallback, err := md5.Fn([]Value{StringValue("hello")})
+	if err != nil {
+		t.Fatalf("Fn md5 failed: %v", err)
+	}
+	if len(fallback) != 1 || fallback[0].Str() != fast.Str() {
+		t.Fatalf("md5 fallback mismatch: fast=%v fallback=%v", fast, fallback)
+	}
+
+	hmac := lib.RawGetString("hmacSHA256").GoFunction()
+	if hmac == nil || hmac.FastArg1 != nil {
+		t.Fatalf("hash.hmacSHA256 should use generated fallback only: %#v", hmac)
+	}
+	got, err := hmac.Fn([]Value{StringValue("key"), StringValue("hello")})
+	if err != nil {
+		t.Fatalf("Fn hmacSHA256 failed: %v", err)
+	}
+	if len(got) != 1 || got[0].Str() != "9307b3b915efb5171ff14d8cb55fbcc798c6c0ef1456d66ded1a6aa723a58b7b" {
+		t.Fatalf("unexpected hmacSHA256 result: %v", got)
+	}
+}

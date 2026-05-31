@@ -116,3 +116,49 @@ func TestBase64URLRoundtrip(t *testing.T) {
 		t.Errorf("expected URL roundtrip to match, got %v", v)
 	}
 }
+
+func TestBase64GeneratedBindingsExposeFastPathsAndFallbacks(t *testing.T) {
+	lib := buildBase64Lib()
+
+	encode := lib.RawGetString("encode").GoFunction()
+	if encode == nil || encode.FastArg1 == nil {
+		t.Fatalf("base64.encode missing FastArg1: %#v", encode)
+	}
+	fastEncoded, err := encode.FastArg1(StringValue("hello"))
+	if err != nil {
+		t.Fatalf("FastArg1 encode failed: %v", err)
+	}
+	fallbackEncoded, err := encode.Fn([]Value{StringValue("hello")})
+	if err != nil {
+		t.Fatalf("Fn encode failed: %v", err)
+	}
+	if len(fallbackEncoded) != 1 || fallbackEncoded[0].Str() != fastEncoded.Str() {
+		t.Fatalf("encode fallback mismatch: fast=%v fallback=%v", fastEncoded, fallbackEncoded)
+	}
+
+	decode := lib.RawGetString("decode").GoFunction()
+	if decode == nil || decode.FastArg1Ret2 == nil {
+		t.Fatalf("base64.decode missing FastArg1Ret2: %#v", decode)
+	}
+	r0, _, n, err := decode.FastArg1Ret2(StringValue("aGVsbG8="))
+	if err != nil {
+		t.Fatalf("FastArg1Ret2 decode failed: %v", err)
+	}
+	if n != 1 || r0.Str() != "hello" {
+		t.Fatalf("unexpected fast decode result: r0=%v n=%d", r0, n)
+	}
+	fallbackDecoded, err := decode.Fn([]Value{StringValue("aGVsbG8=")})
+	if err != nil {
+		t.Fatalf("Fn decode failed: %v", err)
+	}
+	if len(fallbackDecoded) != 1 || fallbackDecoded[0].Str() != "hello" {
+		t.Fatalf("decode fallback mismatch: %v", fallbackDecoded)
+	}
+	fallbackDecoded, err = decode.Fn([]Value{StringValue("!!!invalid!!!")})
+	if err != nil {
+		t.Fatalf("Fn decode invalid returned hard error: %v", err)
+	}
+	if len(fallbackDecoded) != 2 || !fallbackDecoded[0].IsNil() || !fallbackDecoded[1].IsString() {
+		t.Fatalf("decode fallback should return nil,error values, got %v", fallbackDecoded)
+	}
+}

@@ -9,82 +9,51 @@ import (
 // buildHashLib creates the "hash" standard library table.
 func buildHashLib() *Table {
 	t := NewTable()
-
-	set := func(name string, fn func([]Value) ([]Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{
-			Name: "hash." + name,
-			Fn:   fn,
-		}))
-	}
-
-	// hash.md5(str) -> lowercase hex string (32 chars)
-	set("md5", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.md5'")
-		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.md5' (string expected)")
-		}
-		return []Value{StringValue(basehash.MD5(args[0].Str()))}, nil
-	})
-
-	// hash.sha1(str) -> lowercase hex string (40 chars)
-	set("sha1", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.sha1'")
-		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.sha1' (string expected)")
-		}
-		return []Value{StringValue(basehash.SHA1(args[0].Str()))}, nil
-	})
-
-	// hash.sha256(str) -> lowercase hex string (64 chars)
-	set("sha256", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.sha256'")
-		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.sha256' (string expected)")
-		}
-		return []Value{StringValue(basehash.SHA256(args[0].Str()))}, nil
-	})
-
-	// hash.sha512(str) -> lowercase hex string (128 chars)
-	set("sha512", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.sha512'")
-		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.sha512' (string expected)")
-		}
-		return []Value{StringValue(basehash.SHA512(args[0].Str()))}, nil
-	})
-
-	// hash.crc32(str) -> integer (CRC32 checksum)
-	set("crc32", func(args []Value) ([]Value, error) {
-		if len(args) < 1 {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.crc32'")
-		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.crc32' (string expected)")
-		}
-		return []Value{IntValue(int64(basehash.CRC32(args[0].Str())))}, nil
-	})
-
-	// hash.hmacSHA256(key, message) -> lowercase hex string
-	set("hmacSHA256", func(args []Value) ([]Value, error) {
-		if len(args) < 2 {
-			return nil, fmt.Errorf("bad arguments to 'hash.hmacSHA256' (key and message expected)")
-		}
-		if !args[0].IsString() {
-			return nil, fmt.Errorf("bad argument #1 to 'hash.hmacSHA256' (string expected)")
-		}
-		if !args[1].IsString() {
-			return nil, fmt.Errorf("bad argument #2 to 'hash.hmacSHA256' (string expected)")
-		}
-		return []Value{StringValue(basehash.HMACSHA256(args[0].Str(), args[1].Str()))}, nil
-	})
-
+	installHashGeneratedBindings(t)
 	return t
+}
+
+func hashMD5Value(arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'hash.md5' (string expected)")
+	}
+	return StringValue(basehash.MD5(arg.Str())), nil
+}
+
+func hashSHA1Value(arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'hash.sha1' (string expected)")
+	}
+	return StringValue(basehash.SHA1(arg.Str())), nil
+}
+
+func hashSHA256Value(arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'hash.sha256' (string expected)")
+	}
+	return StringValue(basehash.SHA256(arg.Str())), nil
+}
+
+func hashSHA512Value(arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'hash.sha512' (string expected)")
+	}
+	return StringValue(basehash.SHA512(arg.Str())), nil
+}
+
+func hashCRC32Value(arg Value) (Value, error) {
+	if !arg.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'hash.crc32' (string expected)")
+	}
+	return IntValue(int64(basehash.CRC32(arg.Str()))), nil
+}
+
+func hashHMACSHA256Value(key, message Value) (Value, error) {
+	if !key.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #1 to 'hash.hmacSHA256' (string expected)")
+	}
+	if !message.IsString() {
+		return NilValue(), fmt.Errorf("bad argument #2 to 'hash.hmacSHA256' (string expected)")
+	}
+	return StringValue(basehash.HMACSHA256(key.Str(), message.Str())), nil
 }
