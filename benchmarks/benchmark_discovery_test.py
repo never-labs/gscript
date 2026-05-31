@@ -73,6 +73,12 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
 
         self.assertEqual(discovery.select_specs(specs, ["official/events_metamethod_hot"]), specs)
 
+    def test_spec_selectors_includes_short_and_canonical_names(self):
+        self.assertEqual(
+            discovery.spec_selectors([FakeSpec("numeric", "matmul"), FakeSpec("calls", "closure_accumulator")]),
+            {"matmul", "numeric/matmul", "closure_accumulator", "calls/closure_accumulator"},
+        )
+
     def test_resolve_script_path_accepts_variant_and_hot_suffixes(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

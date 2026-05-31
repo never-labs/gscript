@@ -232,6 +232,14 @@ def selector_matches(selector: str, allowed: set[str]) -> bool:
     return any(candidate in allowed for candidate in selector_candidates(selector))
 
 
+def spec_selectors(specs: Iterable[SelectableSpec]) -> set[str]:
+    selectors: set[str] = set()
+    for spec in specs:
+        selectors.add(spec.name)
+        selectors.add(spec.benchmark_id)
+    return selectors
+
+
 def canonical_groups(groups: list[str], allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[str]:
     allowed = set(allowed_groups)
     out: list[str] = []
