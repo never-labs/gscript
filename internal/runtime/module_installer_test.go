@@ -88,7 +88,7 @@ func TestRuntimeNewIsCoreOnly(t *testing.T) {
 func TestExplicitInstallStdlibOmitsMigratedHostIOTables(t *testing.T) {
 	interp := NewCore()
 	interp.InstallStdlib()
-	for _, name := range []string{"fs", "http", "io", "net", "os"} {
+	for _, name := range []string{"fs", "http", "io", "net", "os", "table"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
 			t.Fatalf("%s global = %v, want nil before stdlibrt install", name, got)
 		}

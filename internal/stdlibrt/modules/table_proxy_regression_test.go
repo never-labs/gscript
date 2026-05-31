@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"strings"
@@ -248,7 +248,7 @@ func TestRuntimeTableRemoveProxyThroughMetamethods(t *testing.T) {
 }
 
 func TestRawTableMoveRejectsNonTableDestination(t *testing.T) {
-	lib := buildTableLib()
+	lib := BuildTable()
 	moveFn := lib.RawGet(StringValue("move")).GoFunction()
 	if moveFn == nil {
 		t.Fatal("raw table.move is not a Go function")
@@ -270,7 +270,7 @@ func TestRawTableMoveRejectsNonTableDestination(t *testing.T) {
 	}
 }
 
-func TestRuntimeTableConcatProxyCurrentlyBypassesMetamethods(t *testing.T) {
+func TestRuntimeTableConcatProxyThroughMetamethods(t *testing.T) {
 	interp := runProgram(t, `
 		backing := {[1]: "a", [2]: "b", [3]: "c"}
 		reads := 0
@@ -283,11 +283,11 @@ func TestRuntimeTableConcatProxyCurrentlyBypassesMetamethods(t *testing.T) {
 		})
 		joined := table.concat(proxy, ":")
 	`)
-	if got := interp.GetGlobal("joined").Str(); got != "" {
-		t.Fatalf("joined = %q, want current raw concat result", got)
+	if got := interp.GetGlobal("joined").Str(); got != "a:b:c" {
+		t.Fatalf("joined = %q, want a:b:c", got)
 	}
-	if got := interp.GetGlobal("reads").Int(); got != 0 {
-		t.Fatalf("reads = %d, want current concat to bypass __index", got)
+	if got := interp.GetGlobal("reads").Int(); got != 3 {
+		t.Fatalf("reads = %d, want concat to read through __index", got)
 	}
 }
 

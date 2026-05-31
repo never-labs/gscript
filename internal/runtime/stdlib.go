@@ -7,9 +7,9 @@ func (interp *Interpreter) InstallRuntimeStdlib() {
 	interp.installStdlib(false)
 }
 
-// InstallStdlib registers the standard-library tables that are still owned by
-// runtime. Newer embedding entry points should prefer runtime.NewCore plus
-// stdlibrt/install.Install so external modules are installed from stdlibrt.
+// InstallStdlib registers compatibility standard-library tables that are still
+// owned by runtime. Embeddings that need the full public stdlib should use
+// runtime.NewCore plus stdlibrt/install.Install.
 func (interp *Interpreter) InstallStdlib() {
 	interp.installStdlib(true)
 }
@@ -27,16 +27,10 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	std.InstallPackage(interp.scriptDir)
 }
 
-// installRuntimeOwnedStdlib registers the few stdlib surfaces that have not yet
-// moved behind stdlibrt/modules. Public embedding goes through stdlibrt/install,
-// so newly extracted modules should not be added here.
+// installRuntimeOwnedStdlib registers compatibility stdlib surfaces that have
+// not yet been removed from runtime.InstallStdlib. Public embedding goes
+// through stdlibrt/install, so migrated modules should not be added here.
 func (interp *Interpreter) installRuntimeOwnedStdlib(std StdlibInstaller) {
-	tblLib := buildTableLib()
-	buildTableProxyWithInterp(interp, tblLib)
-	buildTableSortWithInterp(interp, tblLib)
-	buildTableHigherOrderWithInterp(interp, tblLib)
-	std.RegisterTable("table", tblLib)
-
 	strLib := BuildStringLibWithCaller(interp.callFunction, func() int64 { return interp.maxHostResult })
 	std.RegisterTable("string", strLib)
 	interp.SetStringLibrary(strLib)

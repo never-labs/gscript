@@ -227,14 +227,14 @@ func TestPcallPreservesState(t *testing.T) {
 	interp := runProgram(t, `
 		t := {1, 2, 3}
 		func modify() {
-			table.insert(t, 4)
+			t[#t + 1] = 4
 			error("oops")
-			table.insert(t, 5)
+			t[#t + 1] = 5
 		}
 		pcall(modify)
 		result := #t
 	`)
-	// table.insert(t, 4) executes, then error, so #t = 4
+	// The append assignment executes, then error, so #t = 4.
 	result := interp.GetGlobal("result")
 	if result.Int() != 4 {
 		t.Errorf("expected 4, got %v", result)

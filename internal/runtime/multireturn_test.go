@@ -155,20 +155,11 @@ func TestExplicitSpreadInNestedCall(t *testing.T) {
 	}
 }
 
-func TestExplicitTableSpreadInNestedCall(t *testing.T) {
-	v := getGlobal(t, `
-		func join(a, b, c, d) { return a .. b .. c .. d }
-		result := join("a", table.spread({"b", "c"}), "d")
-	`, "result")
-	if !v.IsString() || v.Str() != "abcd" {
-		t.Errorf("expected abcd, got %v", v)
-	}
-}
-
 func TestExplicitSpreadInTableConstructor(t *testing.T) {
 	interp := runProgram(t, `
 		func pair() { return 2, 3 }
-		t := {1, spread(pair()), 4, table.spread({5, 6})}
+		func suffix() { return 5, 6 }
+		t := {1, spread(pair()), 4, spread(suffix())}
 	`)
 	tbl := interp.GetGlobal("t").Table()
 	for i, want := range []int64{1, 2, 3, 4, 5, 6} {

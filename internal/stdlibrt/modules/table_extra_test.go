@@ -1,11 +1,6 @@
-package runtime
+package modules
 
-import (
-	"testing"
-
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-)
+import "testing"
 
 func TestTableKeys(t *testing.T) {
 	interp := runProgram(t, `
@@ -215,31 +210,8 @@ func TestTableToArray(t *testing.T) {
 	}
 }
 
-// runOnInterp parses and executes src on a pre-created interpreter.
-func runOnInterp(t *testing.T, interp *Interpreter, src string) {
-	t.Helper()
-	tokens, err := lexer.New(src).Tokenize()
-	if err != nil {
-		t.Fatalf("lexer error: %v", err)
-	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if err := interp.Exec(prog); err != nil {
-		t.Fatalf("exec error: %v", err)
-	}
-}
-
 func TestTableFilter(t *testing.T) {
-	interp := NewCore()
-	tblLib := buildTableLib()
-	buildTableHigherOrderWithInterp(interp, tblLib)
-	tableModule := TableValue(tblLib)
-	interp.SetGlobal("table", tableModule)
-	interp.SetModule("table", tableModule)
-
-	runOnInterp(t, interp, `
+	interp := runProgram(t, `
 		t := {1, 2, 3, 4, 5, 6}
 		result := table.filter(t, func(v) { return v > 3 })
 	`)
@@ -254,14 +226,7 @@ func TestTableFilter(t *testing.T) {
 }
 
 func TestTableMap(t *testing.T) {
-	interp := NewCore()
-	tblLib := buildTableLib()
-	buildTableHigherOrderWithInterp(interp, tblLib)
-	tableModule := TableValue(tblLib)
-	interp.SetGlobal("table", tableModule)
-	interp.SetModule("table", tableModule)
-
-	runOnInterp(t, interp, `
+	interp := runProgram(t, `
 		t := {1, 2, 3}
 		result := table.map(t, func(v) { return v * 2 })
 	`)
@@ -282,14 +247,7 @@ func TestTableMap(t *testing.T) {
 }
 
 func TestTableReduce(t *testing.T) {
-	interp := NewCore()
-	tblLib := buildTableLib()
-	buildTableHigherOrderWithInterp(interp, tblLib)
-	tableModule := TableValue(tblLib)
-	interp.SetGlobal("table", tableModule)
-	interp.SetModule("table", tableModule)
-
-	runOnInterp(t, interp, `
+	interp := runProgram(t, `
 		t := {1, 2, 3, 4, 5}
 		result := table.reduce(t, func(acc, v) { return acc + v }, 0)
 	`)

@@ -327,7 +327,7 @@ func TestLuaPatternFrontierCompatibility(t *testing.T) {
 		replacedWhole, wholeCount := string.gsub("a b", "%f[%w]%w", "%1%0")
 		words := {}
 		for w := range string.gmatch("a-b c", "%f[%w]%w+%f[%W]") {
-			table.insert(words, w)
+			words[#words + 1] = w
 		}
 	`)
 	if got := interp.GetGlobal("first").Str(); got != "abc" {

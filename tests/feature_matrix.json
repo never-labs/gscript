@@ -231,7 +231,7 @@
       "spec_sections": ["Tables, Arrays, And Metatables", "Numbers, Strings, And Stdlib"],
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "not_applicable", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["internal/runtime/stdlib_table_extra_test.go", "internal/stdlibrt/modules/sort_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlibrt/modules/table_extra_test.go", "internal/stdlibrt/modules/sort_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/sort_pack_unpack.gs", "tests/language/sort_table_move.gs"]},

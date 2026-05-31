@@ -31,6 +31,11 @@ func runProgramExpectError(t *testing.T, src string) error {
 	return interp.Exec(prog)
 }
 
+func getGlobal(t *testing.T, src string, name string) runtime.Value {
+	t.Helper()
+	return runProgram(t, src).GetGlobal(name)
+}
+
 func runWithLib(t *testing.T, src string, libName string, lib *runtime.Table) *runtime.Interpreter {
 	t.Helper()
 	interp := runtime.NewCore()

@@ -260,7 +260,7 @@ func TestClosureFilter(t *testing.T) {
 			result := {}
 			for i := 1; i <= #t; i++ {
 				if pred(t[i]) {
-					table.insert(result, t[i])
+					result[#result + 1] = t[i]
 				}
 			}
 			return result
@@ -303,7 +303,7 @@ func TestClosureCapturesTableRef(t *testing.T) {
 		func makeAppender() {
 			items := {}
 			add := func(val) {
-				table.insert(items, val)
+				items[#items + 1] = val
 			}
 			getAll := func() {
 				return items
