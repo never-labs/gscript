@@ -6,11 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/never-labs/gscript/internal/hostpath"
 	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
 )
 
 func resolveSandboxPath(root, path string) (string, error) {
-	return hostfs.ResolveSandboxPath(root, path)
+	return hostpath.ResolveSandboxPath(root, path)
 }
 
 // BuildFS creates the "fs" standard library table.

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
+	"github.com/never-labs/gscript/internal/hostpath"
 )
 
 type ReadFormat struct {
@@ -47,7 +47,7 @@ func ResolvePath(root, path string, readEnabled, writeEnabled, read, write bool)
 	if write && !writeEnabled {
 		return "", fmt.Errorf("filesystem write access disabled")
 	}
-	return hostfs.ResolveSandboxPath(root, path)
+	return hostpath.ResolveSandboxPath(root, path)
 }
 
 func SeekWhence(whence string) (int, error) {

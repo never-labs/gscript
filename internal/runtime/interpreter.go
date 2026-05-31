@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync/atomic"
 
-	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
+	"github.com/never-labs/gscript/internal/hostpath"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructors, and
@@ -313,7 +313,7 @@ func (interp *Interpreter) ResolveFilesystemPath(path string) (string, error) {
 }
 
 func (interp *Interpreter) resolveFilesystemPath(path string) (string, error) {
-	return hostfs.ResolveSandboxPath(interp.filesystemRoot, path)
+	return hostpath.ResolveSandboxPath(interp.filesystemRoot, path)
 }
 
 func (interp *Interpreter) FilesystemReadEnabled() bool {
