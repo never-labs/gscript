@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"encoding/json"
@@ -153,7 +153,7 @@ func TestHTTPResponseStatus(t *testing.T) {
 
 func TestHTTPEndToEnd(t *testing.T) {
 	// Create an interpreter and use http library to handle a request
-	interp := NewCore()
+	interp := New()
 
 	// Get the buildResponseTable and buildRequestTable via a real handler
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +191,7 @@ func TestHTTPEndToEnd(t *testing.T) {
 
 func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 	// Test that the interpreter can call a GScript handler function
-	interp := NewCore()
+	interp := New()
 
 	// Create a GScript handler function as a GoFunction for simplicity
 	handlerFn := FunctionValue(&GoFunction{
@@ -216,7 +216,7 @@ func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 			t.Fatal(err)
 		}
 		res := buildResponseTable(w, r)
-		interp.callFunction(handlerFn, []Value{req, res})
+		_, _ = interp.CallFunction(handlerFn, []Value{req, res})
 	}))
 	defer server.Close()
 
@@ -233,8 +233,8 @@ func TestHTTPEndToEndWithInterpreter(t *testing.T) {
 }
 
 func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
-	interp := NewCore()
-	httpModule := TableValue(httpLib(interp))
+	interp := New()
+	httpModule := TableValue(BuildHTTP(HostOptions{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
 	interp.SetGlobal("http", httpModule)
 	interp.SetModule("http", httpModule)
 	src := `
@@ -283,8 +283,8 @@ func TestHTTPListenBackgroundHandleRoundTrip(t *testing.T) {
 }
 
 func TestHTTPRouterBackgroundShutdown(t *testing.T) {
-	interp := NewCore()
-	httpModule := TableValue(httpLib(interp))
+	interp := New()
+	httpModule := TableValue(BuildHTTP(HostOptions{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
 	interp.SetGlobal("http", httpModule)
 	interp.SetModule("http", httpModule)
 	src := `
@@ -329,8 +329,8 @@ func TestHTTPListenBackgroundPortConflictFailsSynchronously(t *testing.T) {
 	}
 	defer ln.Close()
 
-	interp := NewCore()
-	httpModule := TableValue(httpLib(interp))
+	interp := New()
+	httpModule := TableValue(BuildHTTP(HostOptions{Call: interp.CallFunction, NetworkAllowed: interp.NetworkAccessEnabled, MaxHostResult: interp.MaxHostResultBytes}))
 	interp.SetGlobal("http", httpModule)
 	interp.SetModule("http", httpModule)
 	src := fmt.Sprintf(`

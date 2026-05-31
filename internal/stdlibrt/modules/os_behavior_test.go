@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"os"
@@ -31,10 +31,26 @@ func callOSFunction(t *testing.T, lib *Table, name string, args ...Value) ([]Val
 	return fn.GoFunction().Fn(args)
 }
 
+func newCoreWithOSModule() *Interpreter {
+	interp := New()
+	osModule := TableValue(BuildOSWithPolicy(HostOptions{
+		EnvironmentRead:  interp.EnvironmentReadEnabled,
+		EnvironmentWrite: interp.EnvironmentWriteEnabled,
+		EnvironmentAllowed: func(name string) bool {
+			return interp.EnvironmentAllowed(name)
+		},
+		FilesystemRoot:  interp.FilesystemRoot,
+		FilesystemWrite: interp.FilesystemWriteEnabled,
+	}))
+	interp.SetGlobal("os", osModule)
+	interp.SetModule("os", osModule)
+	return interp
+}
+
 func TestOSEnvironReturnsEnvironmentTable(t *testing.T) {
 	t.Setenv("GSCRIPT_OS_ENVIRON_TEST", "present")
 
-	results, err := callOSFunction(t, buildOSLib(), "environ")
+	results, err := callOSFunction(t, BuildOS(), "environ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +65,7 @@ func TestOSEnvironReturnsEnvironmentTable(t *testing.T) {
 
 func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
 	t.Setenv("GSCRIPT_OS_READ_DISABLED_TEST", "secret")
-	interp := newCoreWithTableModule("os", buildOSLib())
+	interp := newCoreWithOSModule()
 	interp.SetEnvironmentCapabilities(false, true)
 
 	for _, tc := range []struct {
@@ -77,7 +93,7 @@ func TestOSEnvironmentReadCapabilityRequired(t *testing.T) {
 
 func TestOSEnvironmentWriteCapabilityRequired(t *testing.T) {
 	t.Setenv("GSCRIPT_OS_WRITE_DISABLED_TEST", "visible")
-	interp := newCoreWithTableModule("os", buildOSLib())
+	interp := newCoreWithOSModule()
 	interp.SetEnvironmentCapabilities(true, false)
 
 	if err := execOSProgram(t, interp, `x := os.getenv("GSCRIPT_OS_WRITE_DISABLED_TEST")`); err != nil {

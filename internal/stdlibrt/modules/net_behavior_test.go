@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 // netInterp creates an interpreter with the net library manually registered.
 func netInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "net", buildNetLib())
+	return runWithLib(t, src, "net", BuildNet(HostOptions{}))
 }
 
 // ==================================================================

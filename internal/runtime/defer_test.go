@@ -1,9 +1,6 @@
 package runtime
 
-import (
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
 func TestDeferRunsFunctionScopeLIFO(t *testing.T) {
 	interp := NewCore()
@@ -34,23 +31,18 @@ func TestDeferRunsFunctionScopeLIFO(t *testing.T) {
 
 func TestDeferRunsOnErrorAndSupportsMethods(t *testing.T) {
 	interp := NewCore()
-	ioModule := TableValue(buildIOLib(interp))
-	interp.SetGlobal("io", ioModule)
-	interp.SetModule("io", ioModule)
-	path := filepath.Join(t.TempDir(), "defer.txt")
-	interp.SetGlobal("file", StringValue(path))
 
 	execBinaryIOTest(t, interp, `
+		closed := false
+		obj := {}
+		obj.close = func(self) {
+			closed = true
+		}
 		func writeThenFail() {
-			f := io.open(file, "w+")
-			defer f:close()
-			assert(f:write("closed"))
+			defer obj:close()
 			error("boom")
 		}
 		ok, err := pcall(writeThenFail)
-		f := io.open(file, "r")
-		text := f:read("a")
-		f:close()
 	`)
 
 	if interp.GetGlobal("ok").Truthy() {
@@ -59,36 +51,23 @@ func TestDeferRunsOnErrorAndSupportsMethods(t *testing.T) {
 	if got := interp.GetGlobal("err").Str(); got != "boom" {
 		t.Fatalf("err = %q, want boom", got)
 	}
-	if got := interp.GetGlobal("text").Str(); got != "closed" {
-		t.Fatalf("text = %q, want closed", got)
+	if !interp.GetGlobal("closed").Truthy() {
+		t.Fatalf("deferred method did not run")
 	}
 }
 
 func TestDeferRunsAtTopLevelScriptExit(t *testing.T) {
 	interp := NewCore()
-	ioModule := TableValue(buildIOLib(interp))
-	interp.SetGlobal("io", ioModule)
-	interp.SetModule("io", ioModule)
-	path := filepath.Join(t.TempDir(), "top.txt")
-	interp.SetGlobal("file", StringValue(path))
 
 	execBinaryIOTest(t, interp, `
-		f := io.open(file, "w+")
-		defer f:close()
-		assert(f:write("top"))
+		top := ""
+		func record(s) {
+			top = top .. s
+		}
+		defer record("done")
 	`)
 
-	check := NewCore()
-	checkIOModule := TableValue(buildIOLib(check))
-	check.SetGlobal("io", checkIOModule)
-	check.SetModule("io", checkIOModule)
-	check.SetGlobal("file", StringValue(path))
-	execBinaryIOTest(t, check, `
-		f := io.open(file, "r")
-		text := f:read("a")
-		f:close()
-	`)
-	if got := check.GetGlobal("text").Str(); got != "top" {
-		t.Fatalf("text = %q, want top", got)
+	if got := interp.GetGlobal("top").Str(); got != "done" {
+		t.Fatalf("top = %q, want done", got)
 	}
 }

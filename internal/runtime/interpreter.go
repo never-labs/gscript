@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
+	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
 )
 
 // Core tree-walking interpreter: the Interpreter type, its constructors, and
@@ -249,6 +250,40 @@ func (interp *Interpreter) ProcessShellEnabled() bool {
 	return interp == nil || interp.processShell
 }
 
+// SetEnvironmentCapabilities controls script-side environment variable read
+// and write access independently.
+func (interp *Interpreter) SetEnvironmentCapabilities(read, write bool) {
+	interp.environmentRead = read
+	interp.environmentWrite = write
+}
+
+func (interp *Interpreter) EnvironmentReadEnabled() bool {
+	return interp == nil || interp.environmentRead
+}
+
+func (interp *Interpreter) EnvironmentWriteEnabled() bool {
+	return interp == nil || interp.environmentWrite
+}
+
+func (interp *Interpreter) EnvironmentAllowed(name string) bool {
+	return interp == nil || interp.allowedEnv == nil || interp.allowedEnv[name]
+}
+
+// SetEnvironmentAllowlist restricts script-side environment APIs to the named
+// variables. A nil slice allows all environment variables; an empty non-nil
+// slice allows none.
+func (interp *Interpreter) SetEnvironmentAllowlist(names []string) {
+	if names == nil {
+		interp.allowedEnv = nil
+		return
+	}
+	allowed := make(map[string]bool, len(names))
+	for _, name := range names {
+		allowed[name] = true
+	}
+	interp.allowedEnv = allowed
+}
+
 func (interp *Interpreter) FilesystemRoot() string {
 	if interp == nil {
 		return ""
@@ -261,6 +296,10 @@ func (interp *Interpreter) ResolveFilesystemPath(path string) (string, error) {
 		return path, nil
 	}
 	return interp.resolveFilesystemPath(path)
+}
+
+func (interp *Interpreter) resolveFilesystemPath(path string) (string, error) {
+	return hostfs.ResolveSandboxPath(interp.filesystemRoot, path)
 }
 
 func (interp *Interpreter) FilesystemReadEnabled() bool {
@@ -278,9 +317,6 @@ func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 	interp.filesystemRead = enabled
 	interp.filesystemWrite = enabled
 	if enabled {
-		interp.refreshFSLib()
-		interp.refreshOSLib()
-		interp.refreshIOLib()
 		return
 	}
 	interp.globals.Delete("fs")
@@ -288,33 +324,29 @@ func (interp *Interpreter) SetFilesystemEnabled(enabled bool) {
 	interp.markPackageLoaded("fs", NilValue())
 	interp.globals.Delete("dofile")
 	interp.globals.Delete("loadfile")
-	interp.refreshOSLib()
-	interp.refreshIOLib()
+}
+
+// SetFilesystemCapabilities controls script-side filesystem read and write
+// access independently.
+func (interp *Interpreter) SetFilesystemCapabilities(read, write bool) {
+	if !read && !write {
+		interp.SetFilesystemEnabled(false)
+		return
+	}
+	interp.filesystemEnabled = true
+	interp.filesystemRead = read
+	interp.filesystemWrite = write
+	if !read {
+		interp.globals.Delete("dofile")
+		interp.globals.Delete("loadfile")
+	}
 }
 
 // SetFilesystemRoot confines script-side file paths to root when root is not
-// empty. It refreshes fs in place so existing package.loaded.fs references see
-// the same policy.
+// empty. stdlibrt host modules read the current root through HostOptions, so
+// existing module tables observe policy changes without being rebuilt.
 func (interp *Interpreter) SetFilesystemRoot(root string) {
 	interp.filesystemRoot = root
-	interp.refreshFSLib()
-	interp.refreshOSLib()
-	interp.refreshIOLib()
-}
-
-func (interp *Interpreter) refreshFSLib() {
-	if !interp.filesystemEnabled {
-		return
-	}
-	if v, ok := interp.globals.Get("fs"); ok && v.IsTable() {
-		if v.Table().RawGetString("__stdlibrt_module").Truthy() {
-			return
-		}
-		fs := TableValue(buildFSLibWithCapabilities(interp.filesystemRoot, interp.filesystemRead, interp.filesystemWrite, interp.maxFSReadBytes, interp.maxFSWriteBytes))
-		interp.globals.Define("fs", fs)
-		interp.modules["fs"] = fs
-		interp.markPackageLoaded("fs", fs)
-	}
 }
 
 func (interp *Interpreter) builtinModule(name string) (Value, bool) {
@@ -482,7 +514,6 @@ func (interp *Interpreter) SetMaxModuleDepth(max int64) {
 // fs.copy. A non-positive value disables the limit.
 func (interp *Interpreter) SetMaxFilesystemReadBytes(max int64) {
 	interp.maxFSReadBytes = max
-	interp.refreshFSLib()
 }
 
 func (interp *Interpreter) MaxFilesystemReadBytes() int64 {
@@ -496,7 +527,6 @@ func (interp *Interpreter) MaxFilesystemReadBytes() int64 {
 // fs.appendfile, and fs.copy. A non-positive value disables the limit.
 func (interp *Interpreter) SetMaxFilesystemWriteBytes(max int64) {
 	interp.maxFSWriteBytes = max
-	interp.refreshFSLib()
 }
 
 func (interp *Interpreter) MaxFilesystemWriteBytes() int64 {

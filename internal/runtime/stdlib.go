@@ -45,24 +45,7 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	std.RegisterTable("string", strLib)
 	interp.SetStringLibrary(strLib)
 
-	std.RegisterTable("io", buildIOLib(interp))
-	std.RegisterTable("os", buildOSLibWithPolicy(
-		interp.environmentRead,
-		interp.environmentWrite,
-		interp.allowedEnv,
-		interp.filesystemRoot,
-		interp.filesystemWrite,
-	))
-	std.RegisterTable("http", httpLib(interp))
-	std.RegisterTable("fs", buildFSLibWithCapabilities(
-		interp.filesystemRoot,
-		interp.filesystemRead,
-		interp.filesystemWrite,
-		interp.maxFSReadBytes,
-		interp.maxFSWriteBytes,
-	))
 	std.RegisterTable("time", buildTimeLib())
-	std.RegisterTable("net", buildNetLib(interp))
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 

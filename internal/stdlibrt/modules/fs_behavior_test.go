@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -41,12 +41,12 @@ func runWithFSPathCaps(t *testing.T, src string, read, write bool) (*Interpreter
 		os.RemoveAll(tmpDir)
 		t.Fatalf("parse error: %v", err)
 	}
-	interp := NewCore()
-	fsModule := TableValue(buildFSLibWithCapabilities("", read, write, 0, 0))
+	interp := New()
+	fsModule := TableValue(BuildFSWithPolicy(HostOptions{FilesystemRoot: func() string { return "" }, FilesystemRead: func() bool { return read }, FilesystemWrite: func() bool { return write }}))
 	interp.SetGlobal("fs", fsModule)
 	interp.SetModule("fs", fsModule)
 	// Provide the temp dir as a global for tests to use
-	interp.globals.Define("tmpDir", StringValue(tmpDir))
+	interp.SetGlobal("tmpDir", StringValue(tmpDir))
 	if err := interp.Exec(prog); err != nil {
 		return interp, tmpDir, err
 	}

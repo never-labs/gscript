@@ -259,7 +259,7 @@
       "spec_sections": ["Numbers, Strings, And Stdlib", "Modules, Loading, And Scope", "Intentional Differences From Lua"],
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "not_applicable", "refs": []},
-      "interpreter": {"status": "covered", "refs": ["internal/stdlibrt/modules/json_test.go", "internal/runtime/stdlib_fs_test.go", "internal/runtime/stdlib_net_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/stdlibrt/modules/json_test.go", "internal/stdlibrt/modules/fs_behavior_test.go", "internal/stdlibrt/modules/net_behavior_test.go"]},
       "tier1": {"status": "semantic_only", "refs": []},
       "tier2": {"status": "semantic_only", "refs": []},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/json_go_host_more.gs", "tests/language/fs_path_glob_cwd_more.gs"]},
