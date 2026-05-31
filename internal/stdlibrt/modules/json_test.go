@@ -5,6 +5,8 @@ import (
 	"math"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func jsonInterp(t *testing.T, src string) *Interpreter {
@@ -228,19 +230,19 @@ func TestJSONMappingBoundaries(t *testing.T) {
 			"neg": FloatValue(math.Inf(-1)),
 			"nan": FloatValue(math.NaN()),
 		} {
-			if got := jsonValueToGo(value); got != nil {
+			if got := runtime.JSONValueToGo(value); got != nil {
 				t.Fatalf("%s maps to %#v, want nil", name, got)
 			}
 		}
 	})
 	t.Run("safe boxed JSON integer remains int", func(t *testing.T) {
-		got := jsonGoToValue(json.Number("140737488355327"))
+		got := runtime.JSONGoToValue(json.Number("140737488355327"))
 		if !got.IsInt() || got.Int() != 140737488355327 {
 			t.Fatalf("decoded max boxed int = %v (%s), want int", got, got.TypeName())
 		}
 	})
 	t.Run("integer outside boxed range falls back to float", func(t *testing.T) {
-		got := jsonGoToValue(json.Number("140737488355328"))
+		got := runtime.JSONGoToValue(json.Number("140737488355328"))
 		if !got.IsFloat() {
 			t.Fatalf("decoded out-of-range integer = %v (%s), want float", got, got.TypeName())
 		}

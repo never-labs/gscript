@@ -925,7 +925,7 @@ func llmStructuredOutputValue(opts *Table, text string) (Value, Value) {
 		}
 		return NilValue(), llmErrorValue("validation", "structured output is not valid JSON: "+err.Error())
 	}
-	value := jsonGoToGScript(data)
+	value := JSONGoToValue(data)
 	if !value.IsTable() {
 		return NilValue(), llmErrorValue("validation", "structured output JSON must decode to a table")
 	}

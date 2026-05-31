@@ -387,7 +387,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			if err := dec.Decode(&raw); err != nil {
 				return []Value{BoolValue(false), StringValue("value is not valid JSON: " + err.Error())}, nil
 			}
-			value = jsonGoToGScript(raw)
+			value = JSONGoToValue(raw)
 		}
 		if !schema.IsTable() {
 			return []Value{BoolValue(false), StringValue("schema must be a table example")}, nil
