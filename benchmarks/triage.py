@@ -24,6 +24,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import benchmark_discovery as discovery
 import timing_compare as timing_harness
 
 
@@ -105,31 +106,7 @@ def bench_id_to_path(root: Path, bench: str) -> tuple[str, str, Path] | None:
 
 
 def bench_script_path(root: Path, bench: str) -> Path | None:
-    candidates = timing_harness.selector_candidates(bench) if "/" in bench else [bench]
-    for candidate in candidates:
-        if "/" in candidate:
-            group, name = candidate.split("/", 1)
-            groups = [group]
-        else:
-            name = candidate
-            groups = list(BENCHMARK_GROUPS)
-        for group in groups:
-            path = root / "benchmarks" / group / f"{name}.gs"
-            if path.exists():
-                return path
-        variant_name = name.removesuffix("_variant")
-        if variant_name != name:
-            for group in groups:
-                path = root / "benchmarks" / group / f"{variant_name}.gs"
-                if path.exists():
-                    return path
-        hot_name = name.removesuffix("_hot")
-        if hot_name != name:
-            for group in groups:
-                path = root / "benchmarks" / group / f"{hot_name}.gs"
-                if path.exists():
-                    return path
-    return None
+    return discovery.resolve_script_path(root, bench, BENCHMARK_GROUPS)
 
 
 def bench_group(root: Path, bench: str) -> str | None:
