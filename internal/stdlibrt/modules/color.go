@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -102,10 +102,10 @@ func colorRGBA(v Value) stdcolor.RGBA {
 }
 
 // --------------------------------------------------------------------------
-// buildColorLib creates the "color" standard library table.
+// BuildColor creates the "color" standard library table.
 // --------------------------------------------------------------------------
 
-func buildColorLib() *Table {
+func BuildColor() *Table {
 	colorMeta = newColorMeta()
 
 	t := NewTable()

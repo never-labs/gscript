@@ -92,20 +92,12 @@ func (interp *Interpreter) InstallStdlib() {
 		}
 	}))
 
-	// --- Game math ---
-	std.RegisterTable("color", buildColorLib())
-
 	// --- Numeric matrix (R42 DenseMatrix Phase 1) ---
 	std.RegisterTable("matrix", buildMatrixLib())
 	std.RegisterTable("soa", buildSoALib())
 
 	std.RegisterTable("utf8", buildUTF8Lib(interp))
 
-	// --- Sorting utilities ---
-	std.RegisterTable("sort", buildSortLib(interp))
-
-	// --- Container data structures ---
-	std.RegisterTable("container", buildContainerLib(interp))
 	std.RegisterTable("context", buildContextLib())
 
 	// --- Logging ---

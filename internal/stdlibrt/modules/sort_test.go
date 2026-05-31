@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -8,18 +8,10 @@ import (
 func sortInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
 	interp := New()
-	interp.globals.Define("sort", TableValue(buildSortLib(interp)))
-	tokens, err := lexerNew(src)
-	if err != nil {
-		t.Fatalf("lexer error: %v", err)
-	}
-	prog, err := parserNew(tokens)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if err := interp.Exec(prog); err != nil {
-		t.Fatalf("exec error: %v", err)
-	}
+	sortLib := BuildSortLibWithCaller(interp.CallFunction)
+	interp.SetGlobal("sort", TableValue(sortLib))
+	interp.SetModule("sort", TableValue(sortLib))
+	execOnInterp(t, interp, src)
 	return interp
 }
 

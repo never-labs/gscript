@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -388,11 +388,4 @@ func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less ValueLessFunc
 	})
 
 	return t
-}
-
-// buildSortLib creates the "sort" standard library table.
-// Provides sorting utilities, binary search, partitioning, and order checks.
-// Inspired by Odin's sort package and Go's slices package.
-func buildSortLib(interp *Interpreter) *Table {
-	return BuildSortLibWithCaller(interp.callFunction)
 }

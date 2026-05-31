@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"container/heap"
@@ -7,10 +7,10 @@ import (
 	containerdata "github.com/never-labs/gscript/internal/stdlib/container"
 )
 
-// buildContainerLib creates the "container" standard library table.
+// BuildContainer creates the "container" standard library table.
 // Provides set, queue (deque), and priority queue data structures.
 // Inspired by Odin's container package (queue, priority_queue, etc.).
-func buildContainerLib(interp *Interpreter) *Table {
+func BuildContainer() *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {

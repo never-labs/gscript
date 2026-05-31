@@ -12,6 +12,7 @@ import (
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
 	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
+	"github.com/never-labs/gscript/internal/stdlibrt/modules"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {
@@ -65,6 +66,9 @@ func (ctx *vmStdlibInstallContext) RegisterAlias(name string, value runtime.Valu
 func (vm *VM) RegisterStdlibRuntimeModules() {
 	stdlibinstall.InstallModules(vm.newStdlibInstallContext(), func() int64 {
 		return vm.maxHostResult
+	}, stdlibinstall.ModuleOptions{
+		ScriptCaller: vm.callValue,
+		Less:         vm.valueLessThan,
 	})
 }
 
@@ -213,7 +217,7 @@ func (vm *VM) RegisterSortCallbackLib() {
 	if !ok || !sortVal.IsTable() {
 		return
 	}
-	built := runtime.BuildSortLibWithCallerAndLess(vm.callValue, vm.valueLessThan)
+	built := modules.BuildSortLibWithCallerAndLess(vm.callValue, vm.valueLessThan)
 	dst := sortVal.Table()
 	for _, name := range []string{"by", "byKey", "partition", "min", "max"} {
 		dst.RawSetString(name, built.RawGetString(name))

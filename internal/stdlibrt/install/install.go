@@ -14,18 +14,29 @@ func Install(interp *runtime.Interpreter) {
 		return
 	}
 	interp.InstallStdlib()
-	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
+		ScriptCaller: interp.CallFunction,
+	})
+}
+
+type ModuleOptions struct {
+	ScriptCaller runtime.ScriptFunctionCaller
+	Less         modules.ValueLessFunc
 }
 
 // InstallModules registers stdlibrt-owned modules on a runtime-compatible
 // installer. VM and tree-walker entry points use this to avoid separate module
 // construction paths while the broader stdlib continues to migrate.
-func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int64) {
+func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int64, options ...ModuleOptions) {
 	if installer == nil {
 		return
 	}
 	if maxHostResult == nil {
 		maxHostResult = func() int64 { return 0 }
+	}
+	var opts ModuleOptions
+	if len(options) > 0 {
+		opts = options[0]
 	}
 	installer.RegisterTable("array", modules.BuildArray())
 	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
@@ -33,7 +44,9 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("bits", modules.BuildBits())
 	installer.RegisterTable("bit32", modules.BuildBit32())
 	installer.RegisterTable("bytes", modules.BuildBytes(maxHostResult))
+	installer.RegisterTable("color", modules.BuildColor())
 	installer.RegisterTable("compress", modules.BuildCompress(maxHostResult))
+	installer.RegisterTable("container", modules.BuildContainer())
 	installer.RegisterTable("crypto", modules.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", modules.BuildCSV(maxHostResult))
 	installer.RegisterTable("encoding", modules.BuildEncoding(maxHostResult))
@@ -41,6 +54,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("path", modules.BuildPath())
 	installer.RegisterTable("rand", modules.BuildRand())
 	installer.RegisterTable("regexp", modules.BuildRegexp())
+	installer.RegisterTable("sort", modules.BuildSortLibWithCallerAndLess(opts.ScriptCaller, opts.Less))
 	installer.RegisterTable("url", modules.BuildURL(maxHostResult))
 	installer.RegisterTable("uuid", modules.BuildUUID())
 	installer.RegisterTable("vec", modules.BuildVec())

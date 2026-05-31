@@ -3,12 +3,13 @@ package modules
 import "github.com/never-labs/gscript/internal/runtime"
 
 type (
-	DenseArray      = runtime.DenseArray
-	DenseArrayDType = runtime.DenseArrayDType
-	Interpreter     = runtime.Interpreter
-	GoFunction      = runtime.GoFunction
-	Table           = runtime.Table
-	Value           = runtime.Value
+	DenseArray           = runtime.DenseArray
+	DenseArrayDType      = runtime.DenseArrayDType
+	Interpreter          = runtime.Interpreter
+	GoFunction           = runtime.GoFunction
+	ScriptFunctionCaller = runtime.ScriptFunctionCaller
+	Table                = runtime.Table
+	Value                = runtime.Value
 )
 
 const (
