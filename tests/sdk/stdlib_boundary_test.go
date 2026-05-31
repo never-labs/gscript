@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
@@ -90,6 +92,39 @@ func TestRuntimeDoesNotImportStdlibImplementations(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestInternalStdlibDirsRepresentCatalogModules(t *testing.T) {
+	stdlibRoot := filepath.Join(repoRoot(t), "internal", "stdlib")
+	moduleNames := map[string]bool{}
+	for _, module := range catalog.Modules() {
+		moduleNames[module.Name] = true
+	}
+	dirToModule := map[string]string{
+		"catalog": "catalog",
+		"utf8x":   "utf8",
+	}
+
+	entries, err := os.ReadDir(stdlibRoot)
+	if err != nil {
+		t.Fatalf("read internal/stdlib: %v", err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dir := entry.Name()
+		if dir == "catalog" {
+			continue
+		}
+		module := dir
+		if mapped := dirToModule[dir]; mapped != "" {
+			module = mapped
+		}
+		if !moduleNames[module] {
+			t.Fatalf("internal/stdlib/%s is not a catalog stdlib module; shared substrates belong in neutral internal packages", dir)
+		}
+	}
 }
 
 func hasGoFile(t *testing.T, dir string) bool {
