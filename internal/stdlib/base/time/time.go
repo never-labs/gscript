@@ -1,6 +1,9 @@
 package time
 
-import "strings"
+import (
+	"strings"
+	gotime "time"
+)
 
 var strftimeReplacements = []struct {
 	from string
@@ -28,4 +31,57 @@ func LayoutFromStrftime(layout string) string {
 		result = strings.ReplaceAll(result, r.from, r.to)
 	}
 	return result
+}
+
+// LuaDateFormat formats t using the Lua os.date directive subset supported by
+// the runtime stdlib.
+func LuaDateFormat(format string, t gotime.Time) string {
+	result := format
+	replacements := map[string]string{
+		"%Y": "2006",
+		"%y": "06",
+		"%m": "01",
+		"%d": "02",
+		"%H": "15",
+		"%M": "04",
+		"%S": "05",
+		"%A": "Monday",
+		"%a": "Mon",
+		"%B": "January",
+		"%b": "Jan",
+		"%p": "PM",
+		"%c": "Mon Jan  2 15:04:05 2006",
+		"%X": "15:04:05",
+		"%x": "01/02/06",
+		"%%": "%",
+	}
+	for lua, goFmt := range replacements {
+		if goFmt == "%" {
+			continue
+		}
+		for {
+			idx := findLuaFormatSpec(result, lua)
+			if idx < 0 {
+				break
+			}
+			result = result[:idx] + t.Format(goFmt) + result[idx+len(lua):]
+		}
+	}
+	for {
+		idx := findLuaFormatSpec(result, "%%")
+		if idx < 0 {
+			break
+		}
+		result = result[:idx] + "%" + result[idx+2:]
+	}
+	return result
+}
+
+func findLuaFormatSpec(s, spec string) int {
+	for i := 0; i <= len(s)-len(spec); i++ {
+		if s[i:i+len(spec)] == spec {
+			return i
+		}
+	}
+	return -1
 }

@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	stdtime "github.com/never-labs/gscript/internal/stdlib/base/time"
 	"os"
 	"strings"
 	"time"
@@ -137,7 +138,7 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 			tm = time.Now()
 		}
 
-		result := luaDateFormat(format, tm)
+		result := stdtime.LuaDateFormat(format, tm)
 		return []Value{StringValue(result)}, nil
 	})
 
@@ -316,60 +317,4 @@ func buildOSLibWithPolicy(envRead, envWrite bool, allowedEnv map[string]bool, fs
 	}, osExpand)
 
 	return t
-}
-
-// luaDateFormat converts a Lua-style date format to a Go time string.
-func luaDateFormat(format string, t time.Time) string {
-	// Replace Lua format specifiers with Go equivalents
-	result := format
-	replacements := map[string]string{
-		"%Y": "2006",
-		"%y": "06",
-		"%m": "01",
-		"%d": "02",
-		"%H": "15",
-		"%M": "04",
-		"%S": "05",
-		"%A": "Monday",
-		"%a": "Mon",
-		"%B": "January",
-		"%b": "Jan",
-		"%p": "PM",
-		"%c": "Mon Jan  2 15:04:05 2006",
-		"%X": "15:04:05",
-		"%x": "01/02/06",
-		"%%": "%",
-	}
-	for lua, goFmt := range replacements {
-		if goFmt == "%" {
-			// Handle %% separately to avoid double replacement
-			continue
-		}
-		for {
-			idx := findLuaFormatSpec(result, lua)
-			if idx < 0 {
-				break
-			}
-			result = result[:idx] + t.Format(goFmt) + result[idx+len(lua):]
-		}
-	}
-	// Handle %% last
-	for {
-		idx := findLuaFormatSpec(result, "%%")
-		if idx < 0 {
-			break
-		}
-		result = result[:idx] + "%" + result[idx+2:]
-	}
-	return result
-}
-
-// findLuaFormatSpec finds the index of a Lua format specifier in a string.
-func findLuaFormatSpec(s, spec string) int {
-	for i := 0; i <= len(s)-len(spec); i++ {
-		if s[i:i+len(spec)] == spec {
-			return i
-		}
-	}
-	return -1
 }

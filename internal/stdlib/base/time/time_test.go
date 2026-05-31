@@ -1,6 +1,9 @@
 package time
 
-import "testing"
+import (
+	"testing"
+	gotime "time"
+)
 
 func TestLayoutFromStrftimePassesGoLayoutThrough(t *testing.T) {
 	layout := "2006-01-02T15:04:05Z07:00"
@@ -22,5 +25,14 @@ func TestLayoutFromStrftimeLeavesUnknownDirectives(t *testing.T) {
 	want := "2006/%j"
 	if got != want {
 		t.Fatalf("LayoutFromStrftime unknown directive = %q, want %q", got, want)
+	}
+}
+
+func TestLuaDateFormatConvertsRuntimeDirectives(t *testing.T) {
+	tm := gotime.Date(2026, gotime.May, 31, 23, 4, 5, 0, gotime.UTC)
+	got := LuaDateFormat("%Y-%m-%d %H:%M:%S %a %b %%", tm)
+	want := "2026-05-31 23:04:05 Sun May %"
+	if got != want {
+		t.Fatalf("LuaDateFormat = %q, want %q", got, want)
 	}
 }
