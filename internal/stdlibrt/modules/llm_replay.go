@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 

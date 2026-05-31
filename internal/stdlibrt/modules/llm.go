@@ -16,16 +16,11 @@ type LLMOptions struct {
 }
 
 // InstallLLM registers the public LLM-facing standard-library bindings.
-//
-// The implementation deliberately reuses the runtime builders while the LLM
-// adapter logic still lives in internal/runtime. This keeps the public binding
-// layout in stdlibrt without forking provider, message, history, chat, or loop
-// behavior.
 func InstallLLM(installer runtime.StdlibInstaller, opts LLMOptions) {
 	if installer == nil {
 		return
 	}
-	llmLib := runtime.BuildLLMLib(
+	llmLib := BuildLLMLib(
 		opts.Call,
 		opts.Provider,
 		opts.ProviderFactory,
@@ -35,10 +30,10 @@ func InstallLLM(installer runtime.StdlibInstaller, opts LLMOptions) {
 	)
 	installer.RegisterTable("llm", llmLib)
 	installer.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
-	installer.RegisterTable("msg", runtime.BuildLLMMessageLib())
-	installer.RegisterTable("history", runtime.BuildLLMHistoryLib())
-	installer.RegisterTable("chat", runtime.BuildChatLib())
-	installer.RegisterTable("loop", runtime.BuildLLMLoopLib(
+	installer.RegisterTable("msg", BuildLLMMessageLib())
+	installer.RegisterTable("history", BuildLLMHistoryLib())
+	installer.RegisterTable("chat", BuildChatLib())
+	installer.RegisterTable("loop", BuildLLMLoopLib(
 		opts.Call,
 		opts.Provider,
 		opts.MaxHostResult,

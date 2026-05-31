@@ -5,6 +5,10 @@ func contextDoneAndErr(v Value) (*Channel, Value, bool) {
 }
 
 func contextCancelledValue(done *Channel, errFn Value) (Value, bool) {
+	return ContextCancelledValue(done, errFn)
+}
+
+func ContextCancelledValue(done *Channel, errFn Value) (Value, bool) {
 	select {
 	case _, ok := <-done.ch:
 		if !ok {

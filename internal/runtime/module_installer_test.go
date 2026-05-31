@@ -50,7 +50,7 @@ func TestStdlibInstallerModuleAliasAndPackageLoadedSemantics(t *testing.T) {
 func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 	interp := NewCore()
 	interp.InstallStdlib()
-	for _, name := range []string{"string", "llm"} {
+	for _, name := range []string{"string"} {
 		global := interp.GetGlobal(name)
 		if !global.IsTable() {
 			t.Fatalf("%s global is not a table", name)
@@ -67,6 +67,9 @@ func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 	}
 	if _, ok := interp.modules["toolof"]; ok {
 		t.Fatal("toolof alias was inserted into require cache")
+	}
+	if got := interp.GetGlobal("llm"); !got.IsNil() {
+		t.Fatalf("llm global = %v, want nil before stdlibrt install", got)
 	}
 }
 

@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"context"
@@ -839,7 +839,7 @@ type llmCancel struct {
 func llmCancelFromOptions(opts *Table, host context.Context) llmCancel {
 	c := llmCancel{host: host}
 	for _, key := range []string{"ctx", "context", "cancel"} {
-		if done, errFn, ok := contextDoneAndErr(opts.RawGetString(key)); ok {
+		if done, errFn, ok := ScriptContextDoneAndErr(opts.RawGetString(key)); ok {
 			c.done = done
 			c.err = errFn
 			break
@@ -855,7 +855,7 @@ func (c llmCancel) check() Value {
 		}
 	}
 	if c.done != nil {
-		if reason, cancelled := contextCancelledValue(c.done, c.err); cancelled {
+		if reason, cancelled := ContextCancelledValue(c.done, c.err); cancelled {
 			if reason.IsNil() {
 				reason = StringValue("cancelled")
 			}

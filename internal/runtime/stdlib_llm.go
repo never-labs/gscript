@@ -4,17 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
-	"sync"
 )
-
-type llmAgentMetadata struct {
-	Name        string
-	Params      []string
-	Output      Value
-	Description string
-}
-
-var llmAgentMetadataByFunction sync.Map // map[*GoFunction]llmAgentMetadata
 
 // LLMProvider is the host boundary behind llm.turn. Implementations may call a
 // remote API, a local model, or a test double; the runtime only sees this small

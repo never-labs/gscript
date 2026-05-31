@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -128,7 +128,7 @@ func llmMessageValuesFromTable(t *Table) []Value {
 func llmTableFromValues(values []Value) Value {
 	t := NewSequentialArrayTable(len(values))
 	for i, v := range values {
-		t.array[i+1] = v
+		t.RawSet(IntValue(int64(i+1)), v)
 	}
 	return TableValue(t)
 }
@@ -220,7 +220,7 @@ func llmResultValue(res LLMTurnResult) Value {
 	t.RawSetString("reason", StringValue(res.Reason))
 	calls := NewSequentialArrayTable(len(res.Calls))
 	for i, call := range res.Calls {
-		calls.array[i+1] = llmToolCallValue(call)
+		calls.RawSet(IntValue(int64(i+1)), llmToolCallValue(call))
 	}
 	t.RawSetString("calls", TableValue(calls))
 	usage := NewTable()
@@ -341,7 +341,7 @@ func llmValueFromAny(v any) Value {
 	case []any:
 		t := NewSequentialArrayTable(len(x))
 		for i, v := range x {
-			t.array[i+1] = llmValueFromAny(v)
+			t.RawSet(IntValue(int64(i+1)), llmValueFromAny(v))
 		}
 		return TableValue(t)
 	default:

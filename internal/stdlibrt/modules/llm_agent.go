@@ -1,6 +1,18 @@
-package runtime
+package modules
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
+
+type llmAgentMetadata struct {
+	Name        string
+	Params      []string
+	Output      Value
+	Description string
+}
+
+var llmAgentMetadataByFunction sync.Map // map[*GoFunction]llmAgentMetadata
 
 func llmAgentMetadataForValue(v Value) (llmAgentMetadata, bool) {
 	if gf := v.GoFunction(); gf != nil {
@@ -26,7 +38,7 @@ func llmFunctionParamNames(v Value) []string {
 func llmStringArrayValue(items []string) Value {
 	t := NewSequentialArrayTable(len(items))
 	for i, item := range items {
-		t.array[i+1] = StringValue(item)
+		t.RawSet(IntValue(int64(i+1)), StringValue(item))
 	}
 	return TableValue(t)
 }
@@ -162,7 +174,7 @@ func llmNormalizeToolsValue(call ScriptFunctionCaller, v Value) Value {
 		if llmIsAgentValue(entry) {
 			entry = TableValue(llmAgentFunctionToToolTable(call, entry))
 		}
-		out.array[i] = entry
+		out.RawSet(IntValue(int64(i)), entry)
 	}
 	return TableValue(out)
 }
