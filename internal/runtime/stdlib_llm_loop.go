@@ -587,29 +587,14 @@ func llmStructuredOutputRepairHistory(opts *Table, history []Value, previousText
 func llmStructuredOutputRepairPrompt(opts *Table, previousText string, validationErr Value) string {
 	prompt := ""
 	if repair := opts.RawGetString("output_repair"); repair.IsString() {
-		prompt = strings.TrimSpace(repair.Str())
-	}
-	if prompt == "" {
-		prompt = "Return only a JSON object that matches the requested output shape."
+		prompt = repair.Str()
 	}
 	message := ""
 	if validationErr.IsTable() {
 		message = validationErr.Table().RawGetString("message").Str()
 	}
 	shape := llmStructuredOutputShapeJSON(opts)
-	var b strings.Builder
-	b.WriteString(prompt)
-	if message != "" {
-		b.WriteString("\nValidation error: ")
-		b.WriteString(message)
-	}
-	if shape != "" {
-		b.WriteString("\nOutput shape example: ")
-		b.WriteString(shape)
-	}
-	b.WriteString("\nPrevious response:\n")
-	b.WriteString(previousText)
-	return b.String()
+	return stdlibai.StructuredOutputRepairPrompt(prompt, previousText, message, shape)
 }
 
 func llmStructuredOutputShapeJSON(opts *Table) string {
