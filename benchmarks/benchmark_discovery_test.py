@@ -61,6 +61,18 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 root / "benchmarks" / "calls" / "closure_accumulator.gs",
             )
 
+    def test_resolve_script_identity_returns_canonical_group_name_and_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "benchmarks" / "table").mkdir(parents=True)
+            (root / "benchmarks" / "table" / "events_metamethod.gs").write_text("-- test\n")
+
+            self.assertEqual(
+                discovery.resolve_script_identity(root, "official/events_metamethod_hot"),
+                ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
+            )
+            self.assertIsNone(discovery.resolve_script_identity(root, "official/missing_hot"))
+
     def test_groups_for_selectors_includes_legacy_selector_domains(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

@@ -322,3 +322,13 @@ def resolve_script_path(root: Path, bench: str, groups: list[str] | tuple[str, .
                 if path.exists():
                     return path
     return None
+
+
+def resolve_script_identity(root: Path, bench: str, groups: list[str] | tuple[str, ...] = GROUPS) -> tuple[str, str, Path] | None:
+    path = resolve_script_path(root, bench, groups)
+    if path is None:
+        return None
+    group = path.parent.name
+    if group not in groups:
+        return None
+    return group, path.stem, path

@@ -98,11 +98,7 @@ BENCHMARK_GROUPS = tuple(timing_harness.GROUPS)
 
 
 def bench_id_to_path(root: Path, bench: str) -> tuple[str, str, Path] | None:
-    path = bench_script_path(root, bench)
-    if path is None:
-        return None
-    group = path.parent.name
-    return group, path.stem, path
+    return discovery.resolve_script_identity(root, bench, BENCHMARK_GROUPS)
 
 
 def bench_script_path(root: Path, bench: str) -> Path | None:
@@ -110,13 +106,10 @@ def bench_script_path(root: Path, bench: str) -> Path | None:
 
 
 def bench_group(root: Path, bench: str) -> str | None:
-    path = bench_script_path(root, bench)
-    if path is None:
+    identity = bench_id_to_path(root, bench)
+    if identity is None:
         return None
-    parent = path.parent.name
-    if parent in BENCHMARK_GROUPS:
-        return parent
-    return None
+    return identity[0]
 
 
 def timing_rows(timing_json: Path) -> list[dict]:
