@@ -234,13 +234,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			j = toInt(args[2])
 			hasEnd = true
 		}
-		start, end, ok := basestring.LuaByteRange(s, i, j, hasEnd)
+		bytes, ok := basestring.LuaBytes(s, i, j, hasEnd)
 		if !ok {
 			return []Value{NilValue()}, nil
 		}
-		var result []Value
-		for k := start; k <= end; k++ {
-			result = append(result, IntValue(int64(s[k])))
+		result := make([]Value, 0, len(bytes))
+		for _, b := range bytes {
+			result = append(result, IntValue(int64(b)))
 		}
 		return result, nil
 	})
@@ -285,16 +285,10 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			plain = args[3].Truthy()
 		}
 
-		if init < 0 {
-			init = len(s) + init + 1
-		}
-		if init < 1 {
-			init = 1
-		}
-		if init > len(s)+1 {
+		init, searchStr, ok := basestring.LuaSearchStart(s, int64(init))
+		if !ok {
 			return []Value{NilValue()}, nil
 		}
-		searchStr := s[init-1:]
 
 		if plain {
 			idx := strings.Index(searchStr, pattern)
@@ -370,16 +364,10 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) >= 3 {
 			init = int(toInt(args[2]))
 		}
-		if init < 0 {
-			init = len(s) + init + 1
-		}
-		if init < 1 {
-			init = 1
-		}
-		if init > len(s)+1 {
+		_, searchStr, ok := basestring.LuaSearchStart(s, int64(init))
+		if !ok {
 			return []Value{NilValue()}, nil
 		}
-		searchStr := s[init-1:]
 
 		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
 			loc := findBalancedRange(searchStr, open, close, 0)
@@ -438,13 +426,8 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) >= 3 {
 			init = int(toInt(args[2]))
 		}
-		if init < 0 {
-			init = len(s) + init + 1
-		}
-		if init < 1 {
-			init = 1
-		}
-		if init > len(s)+1 {
+		init, searchStr, ok := basestring.LuaSearchStart(s, int64(init))
+		if !ok {
 			iter := &GoFunction{
 				Name: "gmatch_iterator",
 				Fn: func(_ []Value) ([]Value, error) {
@@ -453,7 +436,6 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			}
 			return []Value{FunctionValue(iter)}, nil
 		}
-		searchStr := s[init-1:]
 
 		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
 			allMatches := findAllBalancedRanges(searchStr, open, close)
@@ -955,14 +937,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		for i := 0; i < length; i++ {
 			parts[i] = tbl.RawGet(IntValue(int64(i + 1))).String()
 		}
-		total := 0
-		for _, part := range parts {
-			total += len(part)
-		}
-		if length > 1 {
-			total += len(sep) * (length - 1)
-		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), total); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), basestring.JoinProjectedLen(parts, sep)); err != nil {
 			return nil, err
 		}
 		return []Value{StringValue(basestring.Join(parts, sep))}, nil

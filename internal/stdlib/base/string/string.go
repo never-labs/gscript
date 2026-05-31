@@ -52,6 +52,17 @@ func ReplaceAll(s, old, new string) string { return strings.ReplaceAll(s, old, n
 
 func Join(parts []string, sep string) string { return strings.Join(parts, sep) }
 
+func JoinProjectedLen(parts []string, sep string) int {
+	total := 0
+	for _, part := range parts {
+		total += len(part)
+	}
+	if len(parts) > 1 {
+		total += len(sep) * (len(parts) - 1)
+	}
+	return total
+}
+
 func Title(s string) string {
 	prev := ' '
 	result := make([]rune, 0, len(s))
@@ -158,6 +169,18 @@ func LuaByteAt(s string, index int64) (byte, bool) {
 	return s[start], true
 }
 
+func LuaBytes(s string, start, end int64, hasEnd bool) ([]byte, bool) {
+	i, j, ok := LuaByteRange(s, start, end, hasEnd)
+	if !ok {
+		return nil, false
+	}
+	buf := make([]byte, 0, j-i+1)
+	for k := i; k <= j; k++ {
+		buf = append(buf, s[k])
+	}
+	return buf, true
+}
+
 func CharBytes(values []int64) ([]byte, bool) {
 	buf := make([]byte, 0, len(values))
 	for _, n := range values {
@@ -167,6 +190,20 @@ func CharBytes(values []int64) ([]byte, bool) {
 		buf = append(buf, byte(n))
 	}
 	return buf, true
+}
+
+func LuaSearchStart(s string, init int64) (int, string, bool) {
+	start := int(init)
+	if start < 0 {
+		start = len(s) + start + 1
+	}
+	if start < 1 {
+		start = 1
+	}
+	if start > len(s)+1 {
+		return 0, "", false
+	}
+	return start, s[start-1:], true
 }
 
 func Split(s, sep string) []string {

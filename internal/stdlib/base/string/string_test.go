@@ -112,6 +112,42 @@ func TestLuaByteAt(t *testing.T) {
 	}
 }
 
+func TestLuaBytes(t *testing.T) {
+	buf, ok := LuaBytes("abcd", 2, -1, true)
+	if !ok || string(buf) != "bcd" {
+		t.Fatalf("LuaBytes = %q,%v, want bcd,true", string(buf), ok)
+	}
+	if _, ok := LuaBytes("abc", 4, 4, false); ok {
+		t.Fatalf("LuaBytes accepted empty range")
+	}
+}
+
+func TestLuaSearchStart(t *testing.T) {
+	tests := []struct {
+		name       string
+		s          string
+		init       int64
+		wantStart  int
+		wantSearch string
+		wantOK     bool
+	}{
+		{name: "default", s: "abcdef", init: 1, wantStart: 1, wantSearch: "abcdef", wantOK: true},
+		{name: "middle", s: "abcdef", init: 3, wantStart: 3, wantSearch: "cdef", wantOK: true},
+		{name: "negative", s: "abcdef", init: -2, wantStart: 5, wantSearch: "ef", wantOK: true},
+		{name: "clamped low", s: "abcdef", init: -99, wantStart: 1, wantSearch: "abcdef", wantOK: true},
+		{name: "end plus one", s: "abcdef", init: 7, wantStart: 7, wantSearch: "", wantOK: true},
+		{name: "past end", s: "abcdef", init: 8, wantOK: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, search, ok := LuaSearchStart(tt.s, tt.init)
+			if start != tt.wantStart || search != tt.wantSearch || ok != tt.wantOK {
+				t.Fatalf("LuaSearchStart = (%d, %q, %v), want (%d, %q, %v)", start, search, ok, tt.wantStart, tt.wantSearch, tt.wantOK)
+			}
+		})
+	}
+}
+
 func TestCharBytes(t *testing.T) {
 	buf, ok := CharBytes([]int64{65, 66, 67})
 	if !ok || string(buf) != "ABC" {
@@ -147,6 +183,18 @@ func TestSplitHelpers(t *testing.T) {
 	}
 	if _, ok := SplitProject("a,b", ",", 3); ok {
 		t.Fatal("SplitProject out of range returned ok")
+	}
+}
+
+func TestJoinProjectedLen(t *testing.T) {
+	if got := JoinProjectedLen([]string{"a", "bb", "ccc"}, "::"); got != len("a::bb::ccc") {
+		t.Fatalf("JoinProjectedLen = %d", got)
+	}
+	if got := JoinProjectedLen([]string{"single"}, "::"); got != len("single") {
+		t.Fatalf("JoinProjectedLen single = %d", got)
+	}
+	if got := JoinProjectedLen(nil, "::"); got != 0 {
+		t.Fatalf("JoinProjectedLen nil = %d", got)
 	}
 }
 
