@@ -3,6 +3,8 @@ package runtime
 import (
 	"container/heap"
 	"fmt"
+
+	containerdata "github.com/never-labs/gscript/internal/stdlib/data/container"
 )
 
 // buildContainerLib creates the "container" standard library table.
@@ -177,8 +179,9 @@ func buildContainerLib(interp *Interpreter) *Table {
 	// container.queueNew() -> new empty queue
 	set("queueNew", func(args []Value) ([]Value, error) {
 		q := NewTable()
-		q.RawSet(StringValue("_head"), IntValue(1))
-		q.RawSet(StringValue("_tail"), IntValue(0))
+		bounds := containerdata.NewQueueBounds()
+		q.RawSet(StringValue("_head"), IntValue(bounds.Head))
+		q.RawSet(StringValue("_tail"), IntValue(bounds.Tail))
 		q.RawSet(StringValue("_data"), TableValue(NewTable()))
 		return []Value{TableValue(q)}, nil
 	})
@@ -189,10 +192,10 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad arguments to 'container.queuePush'")
 		}
 		q := args[0].Table()
-		tail := q.RawGet(StringValue("_tail")).Int() + 1
+		tail, index := containerdata.PushBackIndex(q.RawGet(StringValue("_tail")).Int())
 		q.RawSet(StringValue("_tail"), IntValue(tail))
 		data := q.RawGet(StringValue("_data")).Table()
-		data.RawSet(IntValue(tail), args[1])
+		data.RawSet(IntValue(index), args[1])
 		return nil, nil
 	})
 
@@ -202,15 +205,14 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'container.queuePop'")
 		}
 		q := args[0].Table()
-		head := q.RawGet(StringValue("_head")).Int()
-		tail := q.RawGet(StringValue("_tail")).Int()
-		if head > tail {
+		bounds, head, ok := queueBounds(q).PopFront()
+		if !ok {
 			return []Value{NilValue()}, nil
 		}
 		data := q.RawGet(StringValue("_data")).Table()
 		val := data.RawGet(IntValue(head))
 		data.RawSet(IntValue(head), NilValue())
-		q.RawSet(StringValue("_head"), IntValue(head+1))
+		setQueueHead(q, bounds.Head)
 		return []Value{val}, nil
 	})
 
@@ -220,13 +222,12 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'container.queuePeek'")
 		}
 		q := args[0].Table()
-		head := q.RawGet(StringValue("_head")).Int()
-		tail := q.RawGet(StringValue("_tail")).Int()
-		if head > tail {
+		bounds := queueBounds(q)
+		if bounds.Empty() {
 			return []Value{NilValue()}, nil
 		}
 		data := q.RawGet(StringValue("_data")).Table()
-		return []Value{data.RawGet(IntValue(head))}, nil
+		return []Value{data.RawGet(IntValue(bounds.Head))}, nil
 	})
 
 	// container.queuePushFront(q, value) -> push to front of queue
@@ -235,10 +236,10 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad arguments to 'container.queuePushFront'")
 		}
 		q := args[0].Table()
-		head := q.RawGet(StringValue("_head")).Int() - 1
+		head, index := containerdata.PushFrontIndex(q.RawGet(StringValue("_head")).Int())
 		q.RawSet(StringValue("_head"), IntValue(head))
 		data := q.RawGet(StringValue("_data")).Table()
-		data.RawSet(IntValue(head), args[1])
+		data.RawSet(IntValue(index), args[1])
 		return nil, nil
 	})
 
@@ -248,15 +249,14 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'container.queuePopBack'")
 		}
 		q := args[0].Table()
-		head := q.RawGet(StringValue("_head")).Int()
-		tail := q.RawGet(StringValue("_tail")).Int()
-		if head > tail {
+		bounds, tail, ok := queueBounds(q).PopBack()
+		if !ok {
 			return []Value{NilValue()}, nil
 		}
 		data := q.RawGet(StringValue("_data")).Table()
 		val := data.RawGet(IntValue(tail))
 		data.RawSet(IntValue(tail), NilValue())
-		q.RawSet(StringValue("_tail"), IntValue(tail-1))
+		setQueueTail(q, bounds.Tail)
 		return []Value{val}, nil
 	})
 
@@ -266,13 +266,7 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'container.queueSize'")
 		}
 		q := args[0].Table()
-		head := q.RawGet(StringValue("_head")).Int()
-		tail := q.RawGet(StringValue("_tail")).Int()
-		size := tail - head + 1
-		if size < 0 {
-			size = 0
-		}
-		return []Value{IntValue(size)}, nil
+		return []Value{IntValue(queueBounds(q).Size())}, nil
 	})
 
 	// container.queueEmpty(q) -> bool
@@ -281,9 +275,7 @@ func buildContainerLib(interp *Interpreter) *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'container.queueEmpty'")
 		}
 		q := args[0].Table()
-		head := q.RawGet(StringValue("_head")).Int()
-		tail := q.RawGet(StringValue("_tail")).Int()
-		return []Value{BoolValue(head > tail)}, nil
+		return []Value{BoolValue(queueBounds(q).Empty())}, nil
 	})
 
 	// ---------------------------------------------------------------
@@ -292,7 +284,7 @@ func buildContainerLib(interp *Interpreter) *Table {
 
 	// container.heapNew() -> new empty min-heap (as a table wrapping Go heap)
 	set("heapNew", func(args []Value) ([]Value, error) {
-		h := &valueHeap{}
+		h := newValueHeap()
 		heap.Init(h)
 		wrapper := NewTable()
 		wrapper.RawSet(StringValue("_heap"), FunctionValue(&GoFunction{
@@ -333,7 +325,7 @@ func buildContainerLib(interp *Interpreter) *Table {
 				if h.Len() == 0 {
 					return []Value{NilValue()}, nil
 				}
-				return []Value{(*h)[0]}, nil
+				return []Value{h.items.Items[0]}, nil
 			},
 		}
 
@@ -437,20 +429,39 @@ func buildContainerLib(interp *Interpreter) *Table {
 	return t
 }
 
-// valueHeap implements heap.Interface for min-heap of Values.
-type valueHeap []Value
+func queueBounds(q *Table) containerdata.QueueBounds {
+	return containerdata.QueueBounds{
+		Head: q.RawGet(StringValue("_head")).Int(),
+		Tail: q.RawGet(StringValue("_tail")).Int(),
+	}
+}
 
-func (h valueHeap) Len() int { return len(h) }
-func (h valueHeap) Less(i, j int) bool {
-	less, ok := h[i].LessThan(h[j])
-	return ok && less
+func setQueueHead(q *Table, head int64) {
+	q.RawSet(StringValue("_head"), IntValue(head))
 }
-func (h valueHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
-func (h *valueHeap) Push(x interface{}) { *h = append(*h, x.(Value)) }
-func (h *valueHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	v := old[n-1]
-	*h = old[:n-1]
-	return v
+
+func setQueueTail(q *Table, tail int64) {
+	q.RawSet(StringValue("_tail"), IntValue(tail))
 }
+
+// valueHeap adapts runtime.Value ordering to the data/container heap helper.
+type valueHeap struct {
+	items containerdata.ItemHeap[Value]
+}
+
+func newValueHeap() *valueHeap {
+	return &valueHeap{
+		items: containerdata.ItemHeap[Value]{
+			LessFunc: func(left, right Value) bool {
+				less, ok := left.LessThan(right)
+				return ok && less
+			},
+		},
+	}
+}
+
+func (h *valueHeap) Len() int           { return h.items.Len() }
+func (h *valueHeap) Less(i, j int) bool { return h.items.Less(i, j) }
+func (h *valueHeap) Swap(i, j int)      { h.items.Swap(i, j) }
+func (h *valueHeap) Push(x interface{}) { h.items.Push(x) }
+func (h *valueHeap) Pop() interface{}   { return h.items.Pop() }
