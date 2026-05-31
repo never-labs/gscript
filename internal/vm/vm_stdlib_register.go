@@ -10,6 +10,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
+	tablelib "github.com/never-labs/gscript/internal/stdlib/data/table"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {
@@ -398,7 +399,7 @@ func (vm *VM) RegisterTableProxyLib() {
 		if len(args) >= 3 {
 			j = vmToInt(args[2])
 		}
-		count, err := runtime.CheckTableUnpackRange(name, i, j)
+		count, err := tablelib.CheckUnpackRange(name, i, j)
 		if err != nil {
 			return nil, err
 		}

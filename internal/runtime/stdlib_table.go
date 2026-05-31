@@ -4,22 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	tablelib "github.com/never-labs/gscript/internal/stdlib/data/table"
 )
-
-// TableUnpackMaxResults is the explicit GScript host boundary for
-// table.unpack/table.spread multi-return expansion.
-const TableUnpackMaxResults = 1_000_000
-
-func CheckTableUnpackRange(name string, i, j int64) (int, error) {
-	if j < i {
-		return 0, nil
-	}
-	count := uint64(j) - uint64(i) + 1
-	if count > TableUnpackMaxResults {
-		return 0, fmt.Errorf("too many results to table.%s (limit %d)", name, TableUnpackMaxResults)
-	}
-	return int(count), nil
-}
 
 type TableSortCaller func(Value, []Value) ([]Value, error)
 type TableSortLess func(Value, Value) (bool, error)
@@ -410,7 +397,7 @@ func BuildTableUnpackFunction(name string, tableLen TableUnpackLen, tableGet Tab
 			if len(args) >= 3 {
 				j = toInt(args[2])
 			}
-			count, err := CheckTableUnpackRange(name, i, j)
+			count, err := tablelib.CheckUnpackRange(name, i, j)
 			if err != nil {
 				return nil, err
 			}
