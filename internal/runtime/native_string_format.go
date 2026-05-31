@@ -10,11 +10,9 @@ import (
 	"unsafe"
 )
 
-// stdlib_string_format.go holds string.format: the public fast-arity value
-// entry points, the simple-format compiled-program cache, and the numeric
-// coercion helpers used by formatting.
-//
-// Pure code movement from stdlib_string.go; no behavior change.
+// native_string_format.go holds runtime-owned native string.format helpers:
+// fast-arity value entry points, the simple-format compiled-program cache, and
+// the numeric coercion helpers used by VM/JIT paths.
 
 func stringFormatValue(args []Value) (Value, error) {
 	if len(args) < 1 || !args[0].IsString() {
@@ -143,8 +141,8 @@ func luaQuoteLiteral(v Value) (string, error) {
 	}
 }
 
-// StringFormatValue applies the stdlib string.format implementation to a
-// pre-built argument slice. It is used by JIT op-exit paths after guarding the
+// StringFormatValue applies the runtime-native string.format implementation to
+// a pre-built argument slice. It is used by JIT op-exit paths after guarding the
 // callee identity.
 func StringFormatValue(args []Value) (Value, error) {
 	return stringFormatValue(args)
@@ -234,9 +232,9 @@ func stringFormat5Value(format, arg0, arg1, arg2, arg3 Value) (Value, error) {
 	return stringFormatValue(args[:])
 }
 
-// IsStdStringFormatFunction reports whether v is the stdlib string.format
-// GoFunction installed by buildStringLib. This is intentionally an identity
-// style guard for JIT fast paths: scripts cannot create GoFunction values.
+// IsStdStringFormatFunction reports whether v is the runtime-native
+// string.format GoFunction installed by BuildStringLibWithCaller. The legacy
+// StdString name is retained for VM/JIT API compatibility.
 func IsStdStringFormatFunction(v Value) bool {
 	gf := v.GoFunction()
 	return gf != nil &&

@@ -10,6 +10,9 @@ import (
 )
 
 const (
+	// NativeKindStdString* names are retained as stable VM/JIT identity tags for
+	// the runtime-owned native string substrate. The stdlibrt string module is
+	// assembled in internal/stdlibrt/modules/string.go.
 	NativeKindStdStringFormat  uint8 = 2
 	NativeKindStdStringSplit   uint8 = 100
 	NativeKindStdStringSub     uint8 = 101
@@ -72,8 +75,9 @@ type NativeStringFormatIntCacheEntry struct {
 var nativeStringFormatIntCache [NativeStringFormatIntCacheSize]NativeStringFormatIntCacheEntry
 
 // StdStringFormatIdentityPtr returns the process-wide identity token attached
-// to stdlib string.format GoFunctions. JIT guards compare this token instead
-// of trusting mutable function names or the presence of FastArg2.
+// to the runtime-native string.format GoFunction. The legacy StdString name is
+// part of the VM/JIT API; guards compare this token instead of trusting mutable
+// function names or the presence of FastArg2.
 func StdStringFormatIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdStringFormatIdentity)
 }
@@ -84,9 +88,11 @@ func NativeStringFormatIntCachePtr() unsafe.Pointer {
 	return unsafe.Pointer(&nativeStringFormatIntCache[0])
 }
 
-// BuildStringLibWithCaller creates the "string" standard library table using
-// caller for function-valued replacements. A nil caller still supports native
-// GoFunction callbacks.
+// BuildStringLibWithCaller creates the runtime-owned native string substrate
+// using caller for execution-engine callbacks such as function-valued gsub
+// replacements. It is retained for existing runtime callers and for identities
+// consumed by VM/JIT guards; the stdlibrt "string" module is assembled in
+// internal/stdlibrt/modules/string.go.
 func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...func() int64) *Table {
 	t := NewTable()
 	maxHostResult := func() int64 {
@@ -1023,8 +1029,9 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 	return t
 }
 
-// RefreshStringLibWithCaller updates an existing string library table in place,
-// preserving module identity for require/package.loaded users.
+// RefreshStringLibWithCaller refreshes the runtime-native string substrate in
+// place for existing runtime callers. The stdlibrt module refresh path lives in
+// internal/stdlibrt/modules/string.go.
 func RefreshStringLibWithCaller(t *Table, caller ScriptFunctionCaller, maxHostResults ...func() int64) *Table {
 	if t == nil {
 		return BuildStringLibWithCaller(caller, maxHostResults...)
@@ -1036,7 +1043,8 @@ func RefreshStringLibWithCaller(t *Table, caller ScriptFunctionCaller, maxHostRe
 	return t
 }
 
-// buildStringLib creates the "string" standard library table and returns it.
+// buildStringLib returns the runtime-native string substrate used by the
+// built-in runtime stdlib installation path.
 func buildStringLib() *Table {
 	return BuildStringLibWithCaller(nil)
 }

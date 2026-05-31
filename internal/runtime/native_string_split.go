@@ -7,10 +7,8 @@ import (
 	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 )
 
-// stdlib_string_split.go holds string.split and its split-projection helpers
-// (whole-table split plus single-token projection fast paths).
-//
-// Pure code movement from stdlib_string.go; no behavior change.
+// native_string_split.go holds runtime-owned native string.split helpers:
+// whole-table split plus single-token projection fast paths used by VM/JIT.
 
 func stringSplitValue(args []Value) (Value, error) {
 	if len(args) < 2 {

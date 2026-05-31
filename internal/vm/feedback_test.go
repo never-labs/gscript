@@ -559,7 +559,7 @@ func TestCallSiteFeedback_StdStringFormatStable(t *testing.T) {
 		t.Fatalf("callsite arity nArgs=%d flags=%02x", cf.NArgs, cf.Flags)
 	}
 	if cf.Flags&CallSiteCalleePolymorphic != 0 {
-		t.Fatalf("stdlib string.format callsite should be monomorphic, flags=%02x", cf.Flags)
+		t.Fatalf("runtime-native string.format callsite should be monomorphic, flags=%02x", cf.Flags)
 	}
 	if kind, data, ok := cf.StableCalleeNativeIdentity(); !ok || kind != runtime.NativeKindStdStringFormat || data != uintptr(runtime.StdStringFormatIdentityPtr()) {
 		t.Fatalf("callee identity kind=%d data=%#x ok=%v", kind, data, ok)

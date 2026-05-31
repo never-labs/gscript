@@ -9,12 +9,10 @@ import (
 	"unsafe"
 )
 
-// stdlib_string_pattern.go holds the Lua-pattern engine and the
-// find/match/gmatch/gsub helpers: pattern compilation/caching, the simple
+// native_string_pattern.go holds runtime-owned native Lua-pattern helpers for
+// string.find/match/gmatch/gsub: pattern compilation/caching, the simple
 // pattern matcher, the regex-backed program, balanced-pattern matching, and
-// the gsub replacement expanders.
-//
-// Pure code movement from stdlib_string.go; no behavior change.
+// the gsub replacement expanders used by VM/JIT paths.
 
 func StdStringFindIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdStringFindIdentity)

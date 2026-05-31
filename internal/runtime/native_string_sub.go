@@ -7,10 +7,9 @@ import (
 	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 )
 
-// stdlib_string_sub.go holds the string.sub / string.byte fast-path value
-// helpers and the raw substring / string-to-number primitives they share.
-//
-// Pure code movement from stdlib_string.go; no behavior change.
+// native_string_sub.go holds runtime-owned native string.sub / string.byte
+// fast-path value helpers and the raw substring / string-to-number primitives
+// shared by VM/JIT paths.
 
 func stringSubValue(args []Value) (Value, error) {
 	if len(args) < 2 {

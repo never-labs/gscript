@@ -144,7 +144,7 @@ func TestStdStringFormatIdentityGuardRejectsLookalikeGoFunction(t *testing.T) {
 	lib := buildStringLib()
 	std := lib.RawGetString("format")
 	if !IsStdStringFormatFunction(std) {
-		t.Fatal("stdlib string.format was not recognized")
+		t.Fatal("runtime-native string.format was not recognized")
 	}
 
 	lookalike := FunctionValue(&GoFunction{
@@ -152,7 +152,7 @@ func TestStdStringFormatIdentityGuardRejectsLookalikeGoFunction(t *testing.T) {
 		FastArg2: stringFormat2Value,
 	})
 	if IsStdStringFormatFunction(lookalike) {
-		t.Fatal("lookalike GoFunction passed stdlib string.format identity guard")
+		t.Fatal("lookalike GoFunction passed runtime-native string.format identity guard")
 	}
 }
 

@@ -10,10 +10,10 @@ import (
 // BuildString creates the "string" standard-library module.
 //
 // Most pure string helpers are assembled in stdlibrt. The runtime-owned
-// entries below are intentionally reused as GoFunction objects because VM/JIT
-// guards, Lua pattern caches, simple-format caches, split projections, and
-// function-valued gsub replacements still depend on runtime-native identities
-// and execution-engine callbacks.
+// native string substrate entries below are intentionally reused as GoFunction
+// objects because VM/JIT guards, Lua pattern caches, simple-format caches,
+// split projections, and function-valued gsub replacements still depend on
+// runtime-native identities and execution-engine callbacks.
 func BuildString(caller ScriptFunctionCaller, maxHostResult func() int64) *Table {
 	t := NewTable()
 	max := func() int64 { return hostResultLimit(maxHostResult) }
