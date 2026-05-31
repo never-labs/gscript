@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	hostfs "github.com/never-labs/gscript/internal/stdlib/host/fs"
+	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
 )
 
 type ReadFormat struct {

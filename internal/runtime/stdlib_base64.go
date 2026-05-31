@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	base64lib "github.com/never-labs/gscript/internal/stdlib/base/base64"
+	base64lib "github.com/never-labs/gscript/internal/stdlib/base64"
 )
 
 // buildBase64Lib creates the "base64" standard library table.

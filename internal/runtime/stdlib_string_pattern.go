@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"fmt"
-	stringpattern "github.com/never-labs/gscript/internal/stdlib/base/stringpattern"
+	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,8 +64,8 @@ func FastStringFindRet2(sv, pv, initv, plainv Value, nArgs, rawC int) (Value, Va
 		return IntValue(int64(start)), IntValue(int64(end)), 2, true, nil
 	}
 
-	if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
-		loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
+	if balanced, open, close := stdlibstring.ParseStandaloneBalancedPattern(pattern); balanced {
+		loc := stdlibstring.FindBalancedRange(searchStr, open, close, 0)
 		if loc == nil {
 			return NilValue(), NilValue(), 1, true, nil
 		}
@@ -121,8 +121,8 @@ func FastStringMatchRet2(sv, pv, initv Value, nArgs, rawC int) (Value, Value, in
 	}
 	searchStr := s[init-1:]
 
-	if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
-		loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
+	if balanced, open, close := stdlibstring.ParseStandaloneBalancedPattern(pattern); balanced {
+		loc := stdlibstring.FindBalancedRange(searchStr, open, close, 0)
 		if loc == nil {
 			return NilValue(), NilValue(), 1, true, nil
 		}
@@ -202,23 +202,23 @@ const (
 )
 
 type simpleLuaPatternCacheEntry struct {
-	pattern *stringpattern.SimplePattern
+	pattern *stdlibstring.SimplePattern
 	ok      bool
 }
 
-func cachedSimpleLuaPattern(pattern string) (*stringpattern.SimplePattern, bool) {
+func cachedSimpleLuaPattern(pattern string) (*stdlibstring.SimplePattern, bool) {
 	if cached, ok := simpleLuaPatternCache.Load(pattern); ok {
 		entry := cached.(simpleLuaPatternCacheEntry)
 		return entry.pattern, entry.ok
 	}
-	compiled, ok := stringpattern.CompileSimplePattern(pattern)
+	compiled, ok := stdlibstring.CompileSimplePattern(pattern)
 	entry := simpleLuaPatternCacheEntry{pattern: compiled, ok: ok}
 	actual, _ := simpleLuaPatternCache.LoadOrStore(pattern, entry)
 	entry = actual.(simpleLuaPatternCacheEntry)
 	return entry.pattern, entry.ok
 }
 
-func simpleMatchValues(s string, m stringpattern.SimplePatternMatch) []Value {
+func simpleMatchValues(s string, m stdlibstring.SimplePatternMatch) []Value {
 	if m.NCapture == 0 {
 		return []Value{StringValue(s[m.Start:m.End])}
 	}
@@ -754,7 +754,7 @@ func replaceBalancedPattern(s string, open, close byte, maxRepl int, count *int,
 		if maxRepl >= 0 && *count >= maxRepl {
 			break
 		}
-		loc := stringpattern.FindBalancedRange(s, open, close, next)
+		loc := stdlibstring.FindBalancedRange(s, open, close, next)
 		if loc == nil {
 			break
 		}
@@ -861,7 +861,7 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, prog luaPatternProgram,
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternFunction(s string, pattern *stringpattern.SimplePattern, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
+func replaceSimpleLuaPatternFunction(s string, pattern *stdlibstring.SimplePattern, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
 	if pattern == nil {
 		return s, nil
 	}
@@ -875,7 +875,7 @@ func replaceSimpleLuaPatternFunction(s string, pattern *stringpattern.SimplePatt
 			break
 		}
 		if m.Start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+			nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
 		replacement, err := callSimpleReplacementFunction(s, m, fn, caller)
@@ -886,7 +886,7 @@ func replaceSimpleLuaPatternFunction(s string, pattern *stringpattern.SimplePatt
 		b.WriteString(replacement)
 		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+		nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s, nil
@@ -895,7 +895,7 @@ func replaceSimpleLuaPatternFunction(s string, pattern *stringpattern.SimplePatt
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternString(s string, pattern *stringpattern.SimplePattern, repl string, maxRepl int, count *int) string {
+func replaceSimpleLuaPatternString(s string, pattern *stdlibstring.SimplePattern, repl string, maxRepl int, count *int) string {
 	if pattern == nil {
 		return s
 	}
@@ -909,14 +909,14 @@ func replaceSimpleLuaPatternString(s string, pattern *stringpattern.SimplePatter
 			break
 		}
 		if m.Start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+			nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
 		b.WriteString(s[last:m.Start])
 		b.WriteString(expandSimpleLuaReplacement(s, m, repl))
 		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+		nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s
@@ -925,7 +925,7 @@ func replaceSimpleLuaPatternString(s string, pattern *stringpattern.SimplePatter
 	return b.String()
 }
 
-func replaceSimpleLuaPatternTable(s string, pattern *stringpattern.SimplePattern, repl *Table, maxRepl int, count *int) (string, error) {
+func replaceSimpleLuaPatternTable(s string, pattern *stdlibstring.SimplePattern, repl *Table, maxRepl int, count *int) (string, error) {
 	if pattern == nil {
 		return s, nil
 	}
@@ -939,7 +939,7 @@ func replaceSimpleLuaPatternTable(s string, pattern *stringpattern.SimplePattern
 			break
 		}
 		if m.Start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+			nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
 		key := simpleReplacementTableKey(s, m)
@@ -956,7 +956,7 @@ func replaceSimpleLuaPatternTable(s string, pattern *stringpattern.SimplePattern
 		b.WriteString(replacement)
 		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+		nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s, nil
@@ -965,7 +965,7 @@ func replaceSimpleLuaPatternTable(s string, pattern *stringpattern.SimplePattern
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternRaw(s string, pattern *stringpattern.SimplePattern, repl string, maxRepl int, count *int) string {
+func replaceSimpleLuaPatternRaw(s string, pattern *stdlibstring.SimplePattern, repl string, maxRepl int, count *int) string {
 	if pattern == nil {
 		return s
 	}
@@ -979,14 +979,14 @@ func replaceSimpleLuaPatternRaw(s string, pattern *stringpattern.SimplePattern, 
 			break
 		}
 		if m.Start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+			nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
 		b.WriteString(s[last:m.Start])
 		b.WriteString(repl)
 		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
+		nextStart = stdlibstring.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s
@@ -995,7 +995,7 @@ func replaceSimpleLuaPatternRaw(s string, pattern *stringpattern.SimplePattern, 
 	return b.String()
 }
 
-func callSimpleReplacementFunction(s string, m stringpattern.SimplePatternMatch, fn Value, caller ScriptFunctionCaller) (string, error) {
+func callSimpleReplacementFunction(s string, m stdlibstring.SimplePatternMatch, fn Value, caller ScriptFunctionCaller) (string, error) {
 	args := simpleReplacementFunctionArgsStack(s, m)
 	results, err := callGScriptFunction(fn, args, caller)
 	if err != nil {
@@ -1015,7 +1015,7 @@ func callSimpleReplacementFunction(s string, m stringpattern.SimplePatternMatch,
 	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
 }
 
-func simpleReplacementFunctionArgsStack(s string, m stringpattern.SimplePatternMatch) []Value {
+func simpleReplacementFunctionArgsStack(s string, m stdlibstring.SimplePatternMatch) []Value {
 	var args [4]Value
 	if m.NCapture == 0 {
 		args[0] = StringValue(s[m.Start:m.End])
@@ -1031,7 +1031,7 @@ func simpleReplacementFunctionArgsStack(s string, m stringpattern.SimplePatternM
 	return args[:n]
 }
 
-func simpleReplacementFunctionArgs(s string, m stringpattern.SimplePatternMatch) []Value {
+func simpleReplacementFunctionArgs(s string, m stdlibstring.SimplePatternMatch) []Value {
 	if m.NCapture == 0 {
 		return []Value{StringValue(s[m.Start:m.End])}
 	}
@@ -1042,14 +1042,14 @@ func simpleReplacementFunctionArgs(s string, m stringpattern.SimplePatternMatch)
 	return args
 }
 
-func simpleReplacementTableKey(s string, m stringpattern.SimplePatternMatch) Value {
+func simpleReplacementTableKey(s string, m stdlibstring.SimplePatternMatch) Value {
 	if m.NCapture == 0 {
 		return StringValue(s[m.Start:m.End])
 	}
 	return StringValue(s[m.Captures[0][0]:m.Captures[0][1]])
 }
 
-func expandSimpleLuaReplacement(s string, m stringpattern.SimplePatternMatch, repl string) string {
+func expandSimpleLuaReplacement(s string, m stdlibstring.SimplePatternMatch, repl string) string {
 	var b strings.Builder
 	for i := 0; i < len(repl); i++ {
 		if repl[i] != '%' || i+1 >= len(repl) {

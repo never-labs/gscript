@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unsafe"
 
-	basestring "github.com/never-labs/gscript/internal/stdlib/base/string"
+	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 )
 
 // stdlib_string_sub.go holds the string.sub / string.byte fast-path value
@@ -27,21 +27,21 @@ func stringSubValue(args []Value) (Value, error) {
 		j = toInt(args[2])
 		hasEnd = true
 	}
-	return StringValue(basestring.LuaSub(args[0].Str(), toInt(args[1]), j, hasEnd)), nil
+	return StringValue(stdlibstring.LuaSub(args[0].Str(), toInt(args[1]), j, hasEnd)), nil
 }
 
 func stringSub2Value(sv, iv Value) (Value, error) {
 	if !sv.IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	return StringValue(basestring.LuaSub(sv.Str(), toInt(iv), 0, false)), nil
+	return StringValue(stdlibstring.LuaSub(sv.Str(), toInt(iv), 0, false)), nil
 }
 
 func stringSub3Value(sv, iv, jv Value) (Value, error) {
 	if !sv.IsString() {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.sub' (string expected)")
 	}
-	return StringValue(basestring.LuaSub(sv.Str(), toInt(iv), toInt(jv), true)), nil
+	return StringValue(stdlibstring.LuaSub(sv.Str(), toInt(iv), toInt(jv), true)), nil
 }
 
 func stringByte1Value(sv Value) (Value, error) {
@@ -49,7 +49,7 @@ func stringByte1Value(sv Value) (Value, error) {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
 	}
 	s := sv.Str()
-	b, ok := basestring.LuaByteAt(s, 1)
+	b, ok := stdlibstring.LuaByteAt(s, 1)
 	if !ok {
 		return NilValue(), nil
 	}
@@ -61,7 +61,7 @@ func stringByte2Value(sv, iv Value) (Value, error) {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
 	}
 	s := sv.Str()
-	b, ok := basestring.LuaByteAt(s, toInt(iv))
+	b, ok := stdlibstring.LuaByteAt(s, toInt(iv))
 	if !ok {
 		return NilValue(), nil
 	}
@@ -73,7 +73,7 @@ func StdStringSubIdentityPtr() unsafe.Pointer {
 }
 
 func stringSubRaw(s string, start, end int64, hasEnd bool) string {
-	return basestring.LuaSub(s, start, end, hasEnd)
+	return stdlibstring.LuaSub(s, start, end, hasEnd)
 }
 
 func stringToNumberRaw(raw string) (Value, bool) {

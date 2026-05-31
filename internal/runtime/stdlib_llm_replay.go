@@ -1,9 +1,9 @@
 package runtime
 
-import "github.com/never-labs/gscript/internal/stdlib/ai"
+import stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 
 func llmSnapshotToken() (string, error) {
-	return ai.SnapshotToken()
+	return stdlibllm.SnapshotToken()
 }
 
 func llmIsSnapshotStore(v Value) bool {

@@ -1,4 +1,4 @@
-package stringformat
+package stringlib
 
 type CompileStatus uint8
 

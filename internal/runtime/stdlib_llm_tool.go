@@ -1,6 +1,6 @@
 package runtime
 
-import "github.com/never-labs/gscript/internal/stdlib/ai"
+import stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 
 func llmToolsFromValue(v Value) []LLMTool {
 	if !v.IsTable() {
@@ -41,14 +41,14 @@ func llmToolCallFromTable(t *Table) LLMToolCall {
 
 func llmToolCapsValue(tools *Table) Value {
 	caps := NewTable()
-	for _, cap := range ai.ToolCapabilities(llmToolSummaries(tools)) {
+	for _, cap := range stdlibllm.ToolCapabilities(llmToolSummaries(tools)) {
 		caps.RawSet(IntValue(int64(caps.Length()+1)), StringValue(cap))
 	}
 	return TableValue(caps)
 }
 
 func llmCheckToolCaps(tools, caps *Table) Value {
-	missing := ai.CheckToolCapabilities(llmToolSummaries(tools), llmStringSliceFromValue(TableValue(caps)))
+	missing := stdlibllm.CheckToolCapabilities(llmToolSummaries(tools), llmStringSliceFromValue(TableValue(caps)))
 	if missing == nil {
 		return NilValue()
 	}
@@ -59,18 +59,18 @@ func llmCheckToolCaps(tools, caps *Table) Value {
 	return err
 }
 
-func llmToolSummaries(tools *Table) []ai.ToolSummary {
+func llmToolSummaries(tools *Table) []stdlibllm.ToolSummary {
 	if tools == nil {
 		return nil
 	}
-	out := make([]ai.ToolSummary, 0, tools.Length())
+	out := make([]stdlibllm.ToolSummary, 0, tools.Length())
 	for i := 1; i <= tools.Length(); i++ {
 		tv := tools.RawGet(IntValue(int64(i)))
 		if !tv.IsTable() {
 			continue
 		}
 		tool := tv.Table()
-		out = append(out, ai.ToolSummary{
+		out = append(out, stdlibllm.ToolSummary{
 			Name:     tool.RawGetString("name").Str(),
 			Requires: llmStringSliceFromValue(tool.RawGetString("requires")),
 		})

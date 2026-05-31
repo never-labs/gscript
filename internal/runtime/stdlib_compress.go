@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	basecompress "github.com/never-labs/gscript/internal/stdlib/base/compress"
+	basecompress "github.com/never-labs/gscript/internal/stdlib/compress"
 )
 
 // buildCompressLib creates the "compress" standard library table.

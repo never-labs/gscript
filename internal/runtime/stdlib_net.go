@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	hosthttp "github.com/never-labs/gscript/internal/stdlib/host/http"
+	hosthttp "github.com/never-labs/gscript/internal/stdlib/http"
 )
 
 // buildNetLib creates the "net" standard library table for HTTP client operations.

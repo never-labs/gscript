@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/never-labs/gscript/internal/stdlib/host/outputlimit"
+	"github.com/never-labs/gscript/internal/stdlib/outputlimit"
 )
 
 // ProcessExitError is returned by process.exit so hosts can choose whether

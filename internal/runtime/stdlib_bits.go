@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	basebits "github.com/never-labs/gscript/internal/stdlib/base/bits"
+	basebits "github.com/never-labs/gscript/internal/stdlib/bits"
 )
 
 // buildBitsLib creates the GScript-native "bits" standard library.

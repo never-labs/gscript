@@ -1,4 +1,4 @@
-package stringpattern
+package stringlib
 
 import "strings"
 

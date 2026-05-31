@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 
-	stdbytes "github.com/never-labs/gscript/internal/stdlib/data/bytes"
+	stdbytes "github.com/never-labs/gscript/internal/stdlib/bytes"
 )
 
 // buildBytesLib creates the "bytes" standard library table.

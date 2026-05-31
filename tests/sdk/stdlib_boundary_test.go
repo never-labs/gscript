@@ -13,17 +13,17 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 	root := repoRoot(t)
 	stdlibRoot := filepath.Join(root, "internal", "stdlib")
 
-	for _, domain := range []string{"ai", "base", "catalog", "data"} {
-		dir := filepath.Join(stdlibRoot, domain)
+	for _, module := range []string{"catalog", "llm", "string", "table", "soa", "fs", "http"} {
+		dir := filepath.Join(stdlibRoot, module)
 		info, err := os.Stat(dir)
 		if err != nil {
-			t.Fatalf("internal/stdlib domain %q missing: %v", domain, err)
+			t.Fatalf("internal/stdlib module %q missing: %v", module, err)
 		}
 		if !info.IsDir() {
-			t.Fatalf("internal/stdlib domain %q is not a directory", domain)
+			t.Fatalf("internal/stdlib module %q is not a directory", module)
 		}
 		if !hasGoFile(t, dir) {
-			t.Fatalf("internal/stdlib domain %q has no Go implementation files", domain)
+			t.Fatalf("internal/stdlib module %q has no Go implementation files", module)
 		}
 	}
 

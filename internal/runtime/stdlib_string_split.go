@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	basestring "github.com/never-labs/gscript/internal/stdlib/base/string"
+	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 )
 
 // stdlib_string_split.go holds string.split and its split-projection helpers
@@ -35,7 +35,7 @@ func stringSplitStrings(s, sep string) Value {
 		capacity = len(s)
 	}
 	tbl := NewAppendArrayTable(capacity)
-	basestring.SplitEach(s, sep, func(part string) {
+	stdlibstring.SplitEach(s, sep, func(part string) {
 		arenaAppendValue(DefaultHeap, &tbl.array, StringValue(part))
 	})
 	return TableValue(tbl)
@@ -95,7 +95,7 @@ func StringSplitProjectSubToNumber(sv, sepv Value, index, start, end int64, hasE
 }
 
 func stringSplitProjectSlice(s, sep string, index int64) (string, bool) {
-	return basestring.SplitProject(s, sep, index)
+	return stdlibstring.SplitProject(s, sep, index)
 }
 
 func stringSplitProjectStrings(s, sep string, index int64) Value {

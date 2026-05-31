@@ -1,4 +1,4 @@
-package ai
+package llm
 
 // HistoryMessage is the runtime-independent shape used by conversation
 // history helpers. Runtime adapters populate Fields from script table keys.

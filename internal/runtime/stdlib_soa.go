@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	stdsoa "github.com/never-labs/gscript/internal/stdlib/data/soa"
+	stdsoa "github.com/never-labs/gscript/internal/stdlib/soa"
 )
 
 // buildSoALib creates the "soa" data-oriented structure-of-arrays library.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	stdlibsync "github.com/never-labs/gscript/internal/stdlib/host/sync"
+	stdlibsync "github.com/never-labs/gscript/internal/stdlib/sync"
 )
 
 type scriptWaitGroup struct {

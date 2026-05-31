@@ -2,8 +2,7 @@ package runtime
 
 import (
 	"fmt"
-
-	"github.com/never-labs/gscript/internal/stdlib/ai"
+	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 )
 
 // BuildLLMMessageLib creates the spec-facing "msg" helper table. It is kept
@@ -37,19 +36,19 @@ func registerLLMMessageConstructors(t *Table, module string) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to '%s.system'", module)
 		}
-		return []Value{TableValue(llmMessageTable(ai.RoleSystem, args[0].Str()))}, nil
+		return []Value{TableValue(llmMessageTable(stdlibllm.RoleSystem, args[0].Str()))}, nil
 	})
 	setLLMFunction(t, module, "user", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to '%s.user'", module)
 		}
-		return []Value{TableValue(llmMessageTable(ai.RoleUser, args[0].Str()))}, nil
+		return []Value{TableValue(llmMessageTable(stdlibllm.RoleUser, args[0].Str()))}, nil
 	})
 	setLLMFunction(t, module, "assistant", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to '%s.assistant'", module)
 		}
-		return []Value{TableValue(llmMessageTable(ai.RoleAssistant, args[0].Str()))}, nil
+		return []Value{TableValue(llmMessageTable(stdlibllm.RoleAssistant, args[0].Str()))}, nil
 	})
 }
 
@@ -58,7 +57,7 @@ func setLLMFunction(t *Table, module, name string, fn func([]Value) ([]Value, er
 }
 
 func llmMessageTable(role, text string) *Table {
-	spec := ai.NewTextMessage(role, text)
+	spec := stdlibllm.NewTextMessage(role, text)
 	msg := NewTable()
 	msg.RawSetString("role", StringValue(spec.Role))
 	msg.RawSetString("text", StringValue(spec.Text))
@@ -66,7 +65,7 @@ func llmMessageTable(role, text string) *Table {
 }
 
 func llmAssistantCallMessageTable(toolCall Value) *Table {
-	spec := ai.NewAssistantCallMessage()
+	spec := stdlibllm.NewAssistantCallMessage()
 	msg := NewTable()
 	msg.RawSetString("role", StringValue(spec.Role))
 	msg.RawSetString(spec.ToolCallKey, toolCall)
@@ -74,7 +73,7 @@ func llmAssistantCallMessageTable(toolCall Value) *Table {
 }
 
 func llmToolResultMessageTable(toolUseID, value Value) *Table {
-	spec := ai.NewToolResultMessage()
+	spec := stdlibllm.NewToolResultMessage()
 	msg := NewTable()
 	msg.RawSetString("role", StringValue(spec.Role))
 	msg.RawSetString(spec.ToolUseIDKey, toolUseID)
@@ -83,7 +82,7 @@ func llmToolResultMessageTable(toolUseID, value Value) *Table {
 }
 
 func llmToolErrorMessageTable(toolUseID Value, message string) *Table {
-	spec := ai.NewToolResultMessage()
+	spec := stdlibllm.NewToolResultMessage()
 	msg := NewTable()
 	msg.RawSetString("role", StringValue(spec.Role))
 	msg.RawSetString(spec.ToolUseIDKey, toolUseID)
@@ -214,7 +213,7 @@ func llmForceToolFromValue(v Value) string {
 }
 
 func llmResultValue(res LLMTurnResult) Value {
-	res.Status = ai.DefaultTurnStatus(res.Status, len(res.Calls))
+	res.Status = stdlibllm.DefaultTurnStatus(res.Status, len(res.Calls))
 	t := NewTable()
 	t.RawSetString("status", StringValue(res.Status))
 	t.RawSetString("text", StringValue(res.Text))
@@ -234,7 +233,7 @@ func llmResultValue(res LLMTurnResult) Value {
 }
 
 func llmResultStatus(res LLMTurnResult) string {
-	return ai.DefaultTurnStatus(res.Status, len(res.Calls))
+	return stdlibllm.DefaultTurnStatus(res.Status, len(res.Calls))
 }
 
 func llmToolCallValue(call LLMToolCall) Value {
@@ -265,14 +264,14 @@ func llmProviderErrorValue(err error) Value {
 
 func llmAssistantCallMessage(callValue Value) Value {
 	t := NewTable()
-	t.RawSetString("role", StringValue(ai.RoleAssistant))
+	t.RawSetString("role", StringValue(stdlibllm.RoleAssistant))
 	t.RawSetString("tool_call", callValue)
 	return TableValue(t)
 }
 
 func llmToolResultMessage(id string, value Value) Value {
 	t := NewTable()
-	t.RawSetString("role", StringValue(ai.RoleTool))
+	t.RawSetString("role", StringValue(stdlibllm.RoleTool))
 	t.RawSetString("tool_use_id", StringValue(id))
 	t.RawSetString("value", value)
 	return TableValue(t)
@@ -280,7 +279,7 @@ func llmToolResultMessage(id string, value Value) Value {
 
 func llmToolErrorMessage(id, message string) Value {
 	t := NewTable()
-	t.RawSetString("role", StringValue(ai.RoleTool))
+	t.RawSetString("role", StringValue(stdlibllm.RoleTool))
 	t.RawSetString("tool_use_id", StringValue(id))
 	t.RawSetString("error", StringValue(message))
 	return TableValue(t)

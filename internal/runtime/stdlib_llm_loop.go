@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	stdlibai "github.com/never-labs/gscript/internal/stdlib/ai"
+	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 )
 
 func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
@@ -42,10 +42,10 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		traces[0](event)
 	}
 	set := func(name string, fn func([]Value) ([]Value, error)) {
-		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: stdlibai.LoopFunctionLabel("loop", name), Fn: fn}))
+		t.RawSet(StringValue(name), FunctionValue(&GoFunction{Name: stdlibllm.LoopFunctionLabel("loop", name), Fn: fn}))
 	}
 
-	set(stdlibai.LoopNameReact, func(args []Value) ([]Value, error) {
+	set(stdlibllm.LoopNameReact, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.react' (table expected)")
 		}
@@ -71,7 +71,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		})
 	})
 
-	set(stdlibai.LoopNameSimple, func(args []Value) ([]Value, error) {
+	set(stdlibllm.LoopNameSimple, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.simple' (table expected)")
 		}
@@ -83,7 +83,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "provider", Message: "llm provider not configured"})
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
-		opts, err := llmLoopOptions(args[0].Table(), stdlibai.DefaultSimpleMaxSteps)
+		opts, err := llmLoopOptions(args[0].Table(), stdlibllm.DefaultSimpleMaxSteps)
 		if err != nil {
 			trace(LLMTraceEvent{Type: "react_error", ErrorKind: "validation", Message: err.Error()})
 			return []Value{NilValue(), llmErrorValue("validation", err.Error())}, nil
@@ -91,7 +91,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		return llmReact(opts, p, call, currentContext(), hostLimit(), trace, nil)
 	})
 
-	set(stdlibai.LoopNamePlanExecute, func(args []Value) ([]Value, error) {
+	set(stdlibllm.LoopNamePlanExecute, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.plan_execute' (table expected)")
 		}
@@ -130,7 +130,7 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 		return result, nil
 	})
 
-	set(stdlibai.LoopNameReflect, func(args []Value) ([]Value, error) {
+	set(stdlibllm.LoopNameReflect, func(args []Value) ([]Value, error) {
 		if len(args) < 1 || !args[0].IsTable() {
 			return nil, fmt.Errorf("bad argument #1 to 'loop.reflect' (table expected)")
 		}
@@ -254,10 +254,10 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 	opts := NewTable()
 	messages := src.RawGetString("messages")
 	user := src.RawGetString("user")
-	plan, err := stdlibai.NormalizeLoopOptions(stdlibai.LoopOptionInput{
+	plan, err := stdlibllm.NormalizeLoopOptions(stdlibllm.LoopOptionInput{
 		HasMessages:         messages.IsTable(),
 		HasUser:             !user.IsNil(),
-		HasMaxSteps:         !src.RawGetString(stdlibai.OptionKeyMaxSteps).IsNil(),
+		HasMaxSteps:         !src.RawGetString(stdlibllm.OptionKeyMaxSteps).IsNil(),
 		HasResponseFormat:   !src.RawGetString("response_format").IsNil(),
 		HasStructuredOutput: src.RawGetString("output").IsTable(),
 		DefaultMaxSteps:     defaultMaxSteps,
@@ -275,13 +275,13 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		messages.RawSet(IntValue(int64(messages.Length()+1)), TableValue(llmMessageTable("user", user.Str())))
 		opts.RawSetString("messages", TableValue(messages))
 	}
-	for _, key := range stdlibai.LoopOptionKeys {
+	for _, key := range stdlibllm.LoopOptionKeys {
 		if v := src.RawGetString(key); !v.IsNil() {
 			opts.RawSetString(key, v)
 		}
 	}
 	if plan.SetDefaultMaxSteps {
-		opts.RawSetString(stdlibai.OptionKeyMaxSteps, IntValue(plan.DefaultMaxSteps))
+		opts.RawSetString(stdlibllm.OptionKeyMaxSteps, IntValue(plan.DefaultMaxSteps))
 	}
 	if plan.SetJSONResponseFormat {
 		opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
@@ -313,8 +313,8 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 		tools = NewTable()
 	}
 	history := llmMessageValuesFromTable(messagesValue.Table())
-	controls := stdlibai.NormalizeReactControls(
-		toInt(opts.RawGetString(stdlibai.OptionKeyMaxSteps)),
+	controls := stdlibllm.NormalizeReactControls(
+		toInt(opts.RawGetString(stdlibllm.OptionKeyMaxSteps)),
 		toInt(opts.RawGetString("max_tool_retries")),
 		toInt(opts.RawGetString("max_history_tokens")),
 	)
@@ -364,8 +364,8 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 		}
 		budgets.chargeTurn(res.Usage)
 		switch res.Status {
-		case "", stdlibai.TurnStatusFinalAnswer:
-			result := llmReactResultValue(stdlibai.ReactDoneResult(res.Text), turnValue, history)
+		case "", stdlibllm.TurnStatusFinalAnswer:
+			result := llmReactResultValue(stdlibllm.ReactDoneResult(res.Text), turnValue, history)
 			if value, errValue := llmStructuredOutputValue(opts, res.Text); !errValue.IsNil() {
 				repairedValue, repairedTurn, repairedText, repairErr, repaired := llmRepairStructuredOutput(opts, provider, ctx, maxHostResult, trace, budgets, cancel, model, toolsValue, history, res.Text, errValue, int64(step))
 				if !repairErr.IsNil() {
@@ -373,9 +373,9 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 					return []Value{NilValue(), repairErr}, nil
 				}
 				if repaired {
-					result = llmReactResultValue(stdlibai.ReactDoneResult(repairedText), repairedTurn, history)
+					result = llmReactResultValue(stdlibllm.ReactDoneResult(repairedText), repairedTurn, history)
 					result.Table().RawSetString("value", repairedValue)
-					llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: stdlibai.ReactStatusDone})
+					llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusDone})
 					return []Value{result, NilValue()}, nil
 				}
 				llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(errValue), Message: errValue.Table().RawGetString("message").Str()})
@@ -383,12 +383,12 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 			} else if !value.IsNil() {
 				result.Table().RawSetString("value", value)
 			}
-			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: stdlibai.ReactStatusDone})
+			llmTrace(trace, LLMTraceEvent{Type: "react_done", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusDone})
 			return []Value{result, NilValue()}, nil
-		case stdlibai.TurnStatusStop:
-			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusStopped, Message: res.Reason})
-			return []Value{llmReactResultValue(stdlibai.ReactStoppedResult(res.Reason), turnValue, history), NilValue()}, nil
-		case stdlibai.TurnStatusToolCalls:
+		case stdlibllm.TurnStatusStop:
+			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusStopped, Message: res.Reason})
+			return []Value{llmReactResultValue(stdlibllm.ReactStoppedResult(res.Reason), turnValue, history), NilValue()}, nil
+		case stdlibllm.TurnStatusToolCalls:
 			for i := range res.Calls {
 				callValue := llmToolCallValue(res.Calls[i])
 				llmTrace(trace, LLMTraceEvent{Type: "tool_call", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
@@ -397,7 +397,7 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 						llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: "internal", Message: err.Error()})
 						return []Value{NilValue(), llmErrorValue("internal", err.Error())}, nil
 					}
-					llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+					llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 					return []Value{pending, NilValue()}, nil
 				}
 				history = append(history, llmAssistantCallMessage(callValue))
@@ -411,15 +411,15 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 				}
 				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, controls.MaxToolRetries, trace, int64(step), res.Calls[i])
 				if !err.IsNil() {
-					if llmErrorKind(err) == stdlibai.ReactStatusPending {
+					if llmErrorKind(err) == stdlibllm.ReactStatusPending {
 						pendingPayload := err.Table().RawGetString("pending")
-						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 						if pendingPayload.IsTable() {
 							pendingPayload.Table().RawSetString("history", llmTableFromValues(history))
 							return []Value{pendingPayload, NilValue()}, nil
 						}
 						pending := NewTable()
-						pending.RawSetString("status", StringValue(stdlibai.ReactStatusPending))
+						pending.RawSetString("status", StringValue(stdlibllm.ReactStatusPending))
 						pending.RawSetString("history", llmTableFromValues(history))
 						return []Value{TableValue(pending), NilValue()}, nil
 					}
@@ -427,15 +427,15 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 					return []Value{NilValue(), err}, nil
 				}
 				if len(dispatchResult) >= 2 && !dispatchResult[1].IsNil() {
-					if llmErrorKind(dispatchResult[1]) == stdlibai.ReactStatusPending {
+					if llmErrorKind(dispatchResult[1]) == stdlibllm.ReactStatusPending {
 						pendingPayload := dispatchResult[1].Table().RawGetString("pending")
-						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
+						llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusPending, Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID})
 						if pendingPayload.IsTable() {
 							pendingPayload.Table().RawSetString("history", llmTableFromValues(history))
 							return []Value{pendingPayload, NilValue()}, nil
 						}
 						pending := NewTable()
-						pending.RawSetString("status", StringValue(stdlibai.ReactStatusPending))
+						pending.RawSetString("status", StringValue(stdlibllm.ReactStatusPending))
 						pending.RawSetString("history", llmTableFromValues(history))
 						return []Value{TableValue(pending), NilValue()}, nil
 					}
@@ -452,12 +452,12 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 				}
 			}
 		default:
-			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibai.ReactStatusStopped, Message: res.Status})
-			return []Value{llmReactResultValue(stdlibai.ReactStoppedResult(res.Status), turnValue, history), NilValue()}, nil
+			llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(step), Status: stdlibllm.ReactStatusStopped, Message: res.Status})
+			return []Value{llmReactResultValue(stdlibllm.ReactStoppedResult(res.Status), turnValue, history), NilValue()}, nil
 		}
 	}
-	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(controls.MaxSteps), Status: stdlibai.ReactStatusStopped, Message: stdlibai.StopReasonMaxSteps})
-	return []Value{llmReactResultValue(stdlibai.ReactStoppedResult(stdlibai.StopReasonMaxSteps), NilValue(), history), NilValue()}, nil
+	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(controls.MaxSteps), Status: stdlibllm.ReactStatusStopped, Message: stdlibllm.StopReasonMaxSteps})
+	return []Value{llmReactResultValue(stdlibllm.ReactStoppedResult(stdlibllm.StopReasonMaxSteps), NilValue(), history), NilValue()}, nil
 }
 
 func llmTrace(trace func(LLMTraceEvent), event LLMTraceEvent) {
@@ -498,7 +498,7 @@ func llmMaybePauseForApproval(hitl *llmHITL, call ScriptFunctionCaller, history,
 	}
 
 	result := NewTable()
-	result.RawSetString("status", StringValue(stdlibai.ReactStatusPending))
+	result.RawSetString("status", StringValue(stdlibllm.ReactStatusPending))
 	result.RawSetString("token", StringValue(token))
 	result.RawSetString("payload", pending)
 	result.RawSetString("pending", pending)
@@ -548,7 +548,7 @@ func llmRepairStructuredOutput(opts *Table, provider LLMProvider, ctx context.Co
 			return NilValue(), NilValue(), "", llmErrorValue("internal", err.Error()), true
 		}
 		budgets.chargeTurn(res.Usage)
-		if !stdlibai.IsFinalAnswerStatus(llmResultStatus(res)) {
+		if !stdlibllm.IsFinalAnswerStatus(llmResultStatus(res)) {
 			lastErr = llmErrorValue("validation", "structured output repair did not return a final answer")
 			previousText = res.Text
 			continue
@@ -567,7 +567,7 @@ func llmOutputRepairRetries(opts *Table) int {
 	if opts == nil {
 		return 0
 	}
-	return stdlibai.OutputRepairRetries(toInt(opts.RawGetString("output_retries")), opts.RawGetString("output_repair").Truthy())
+	return stdlibllm.OutputRepairRetries(toInt(opts.RawGetString("output_retries")), opts.RawGetString("output_repair").Truthy())
 }
 
 func llmStructuredOutputRepairHistory(opts *Table, history []Value, previousText string, validationErr Value) []Value {
@@ -587,7 +587,7 @@ func llmStructuredOutputRepairPrompt(opts *Table, previousText string, validatio
 		message = validationErr.Table().RawGetString("message").Str()
 	}
 	shape := llmStructuredOutputShapeJSON(opts)
-	return stdlibai.StructuredOutputRepairPrompt(prompt, previousText, message, shape)
+	return stdlibllm.StructuredOutputRepairPrompt(prompt, previousText, message, shape)
 }
 
 func llmStructuredOutputShapeJSON(opts *Table) string {
@@ -659,61 +659,61 @@ func (g llmBudgetGroup) beforeToolCall() Value {
 }
 
 func newLLMBudget() *llmBudget {
-	return llmBudgetFromLimits(stdlibai.DefaultBudgetLimits())
+	return llmBudgetFromLimits(stdlibllm.DefaultBudgetLimits())
 }
 
 func llmBudgetFromOptions(opts *Table) *llmBudget {
-	limits := stdlibai.DefaultBudgetLimits()
-	if v := opts.RawGetString(stdlibai.OptionBudgetTokens); !v.IsNil() {
+	limits := stdlibllm.DefaultBudgetLimits()
+	if v := opts.RawGetString(stdlibllm.OptionBudgetTokens); !v.IsNil() {
 		limits.MaxTokens = toInt(v)
 	}
-	if v := opts.RawGetString(stdlibai.OptionBudgetTurns); !v.IsNil() {
+	if v := opts.RawGetString(stdlibllm.OptionBudgetTurns); !v.IsNil() {
 		limits.MaxTurns = toInt(v)
 	}
-	if v := opts.RawGetString(stdlibai.OptionBudgetCalls); !v.IsNil() {
+	if v := opts.RawGetString(stdlibllm.OptionBudgetCalls); !v.IsNil() {
 		limits.MaxCalls = toInt(v)
 	}
-	if v := opts.RawGetString(stdlibai.OptionBudgetMoney); !v.IsNil() {
+	if v := opts.RawGetString(stdlibllm.OptionBudgetMoney); !v.IsNil() {
 		limits.MaxMoney = toFloat(v)
 	}
-	if v := opts.RawGetString(stdlibai.OptionBudgetTime); !v.IsNil() {
+	if v := opts.RawGetString(stdlibllm.OptionBudgetTime); !v.IsNil() {
 		limits.MaxTimeSeconds = toFloat(v)
 	}
-	if t := opts.RawGetString(stdlibai.BudgetKey); t.IsTable() {
+	if t := opts.RawGetString(stdlibllm.BudgetKey); t.IsTable() {
 		llmApplyBudgetConfig(&limits, t.Table())
 	}
 	return llmBudgetFromLimits(limits)
 }
 
 func llmBudgetFromConfig(config *Table) *llmBudget {
-	limits := stdlibai.DefaultBudgetLimits()
+	limits := stdlibllm.DefaultBudgetLimits()
 	llmApplyBudgetConfig(&limits, config)
 	return llmBudgetFromLimits(limits)
 }
 
-func llmApplyBudgetConfig(limits *stdlibai.BudgetLimits, config *Table) {
+func llmApplyBudgetConfig(limits *stdlibllm.BudgetLimits, config *Table) {
 	if limits == nil || config == nil {
 		return
 	}
-	if v := config.RawGetString(stdlibai.BudgetTokens); !v.IsNil() {
+	if v := config.RawGetString(stdlibllm.BudgetTokens); !v.IsNil() {
 		limits.MaxTokens = toInt(v)
 	}
-	if v := config.RawGetString(stdlibai.BudgetTurns); !v.IsNil() {
+	if v := config.RawGetString(stdlibllm.BudgetTurns); !v.IsNil() {
 		limits.MaxTurns = toInt(v)
 	}
-	if v := config.RawGetString(stdlibai.BudgetCalls); !v.IsNil() {
+	if v := config.RawGetString(stdlibllm.BudgetCalls); !v.IsNil() {
 		limits.MaxCalls = toInt(v)
 	}
-	if v := config.RawGetString(stdlibai.BudgetMoney); !v.IsNil() {
+	if v := config.RawGetString(stdlibllm.BudgetMoney); !v.IsNil() {
 		limits.MaxMoney = toFloat(v)
 	}
-	if v := config.RawGetString(stdlibai.BudgetTime); !v.IsNil() {
+	if v := config.RawGetString(stdlibllm.BudgetTime); !v.IsNil() {
 		limits.MaxTimeSeconds = toFloat(v)
 	}
 }
 
-func llmBudgetFromLimits(limits stdlibai.BudgetLimits) *llmBudget {
-	limits = stdlibai.NormalizeBudgetLimits(limits)
+func llmBudgetFromLimits(limits stdlibllm.BudgetLimits) *llmBudget {
+	limits = stdlibllm.NormalizeBudgetLimits(limits)
 	b := &llmBudget{
 		maxTokens: limits.MaxTokens,
 		maxTurns:  limits.MaxTurns,
@@ -816,7 +816,7 @@ func llmBudgetDurationSeconds(secs float64) time.Duration {
 }
 
 func llmBudgetError(dimension string, limit, used int64) Value {
-	shape := stdlibai.BudgetExceededError(dimension, limit, used)
+	shape := stdlibllm.BudgetExceededError(dimension, limit, used)
 	t := NewTable()
 	t.RawSetString("kind", StringValue(shape.Kind))
 	t.RawSetString("dimension", StringValue(shape.Dimension))
@@ -866,7 +866,7 @@ func (c llmCancel) check() Value {
 }
 
 func llmCancelError(reason string) Value {
-	shape := stdlibai.CancelledError(reason)
+	shape := stdlibllm.CancelledError(reason)
 	t := NewTable()
 	t.RawSetString("kind", StringValue(shape.Kind))
 	t.RawSetString("message", StringValue(shape.Message))
@@ -898,7 +898,7 @@ func llmTransientToolError(kind string) bool {
 	}
 }
 
-func llmReactResultValue(shape stdlibai.ReactResultShape, turn Value, history []Value) Value {
+func llmReactResultValue(shape stdlibllm.ReactResultShape, turn Value, history []Value) Value {
 	t := NewTable()
 	t.RawSetString("status", StringValue(shape.Status))
 	t.RawSetString("text", StringValue(shape.Text))

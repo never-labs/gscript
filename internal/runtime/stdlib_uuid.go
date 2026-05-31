@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	uuidlib "github.com/never-labs/gscript/internal/stdlib/base/uuid"
+	uuidlib "github.com/never-labs/gscript/internal/stdlib/uuid"
 )
 
 // buildUUIDLib adapts the low-coupling uuid stdlib implementation to runtime values.

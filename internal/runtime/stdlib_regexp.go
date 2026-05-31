@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	regexplib "github.com/never-labs/gscript/internal/stdlib/base/regexp"
+	regexplib "github.com/never-labs/gscript/internal/stdlib/regexp"
 )
 
 func cachedStdlibRegexp(pattern string) (*regexp.Regexp, error) {

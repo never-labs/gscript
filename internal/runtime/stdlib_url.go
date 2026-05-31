@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	urllib "github.com/never-labs/gscript/internal/stdlib/base/url"
+	urllib "github.com/never-labs/gscript/internal/stdlib/url"
 )
 
 // buildURLLib creates the "url" standard library table.

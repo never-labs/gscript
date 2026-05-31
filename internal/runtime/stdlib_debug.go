@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"runtime"
 
-	stddebug "github.com/never-labs/gscript/internal/stdlib/base/debug"
+	stddebug "github.com/never-labs/gscript/internal/stdlib/debug"
 )
 
 // DebugFrame describes one active runtime call in GScript-shaped terms.

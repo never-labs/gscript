@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"fmt"
-	utf8x "github.com/never-labs/gscript/internal/stdlib/base/utf8x"
+	utf8x "github.com/never-labs/gscript/internal/stdlib/utf8x"
 	"unicode"
 	"unicode/utf8"
 )

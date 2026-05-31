@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	pathlib "github.com/never-labs/gscript/internal/stdlib/base/path"
+	pathlib "github.com/never-labs/gscript/internal/stdlib/path"
 )
 
 // buildPathLib creates the "path" standard library table.

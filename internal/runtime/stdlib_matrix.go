@@ -14,7 +14,7 @@ package runtime
 import (
 	"fmt"
 
-	stdmatrix "github.com/never-labs/gscript/internal/stdlib/data/matrix"
+	stdmatrix "github.com/never-labs/gscript/internal/stdlib/matrix"
 )
 
 // buildMatrixLib creates the "matrix" standard library table.

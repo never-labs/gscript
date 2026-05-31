@@ -6,8 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	basemath "github.com/never-labs/gscript/internal/stdlib/base/math"
-	baserand "github.com/never-labs/gscript/internal/stdlib/base/rand"
+	basemath "github.com/never-labs/gscript/internal/stdlib/math"
+	baserand "github.com/never-labs/gscript/internal/stdlib/rand"
 )
 
 // buildMathLib creates the "math" standard library table.

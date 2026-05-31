@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"time"
 
-	stdrand "github.com/never-labs/gscript/internal/stdlib/base/rand"
+	stdrand "github.com/never-labs/gscript/internal/stdlib/rand"
 )
 
 // buildRandLib creates the "rand" standard library table.

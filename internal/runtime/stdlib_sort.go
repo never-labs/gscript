@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	stdsort "github.com/never-labs/gscript/internal/stdlib/data/sort"
+	stdsort "github.com/never-labs/gscript/internal/stdlib/sort"
 )
 
 type ValueLessFunc func(Value, Value) (bool, error)

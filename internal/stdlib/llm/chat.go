@@ -1,4 +1,4 @@
-package ai
+package llm
 
 const (
 	defaultPlanPrompt    = "Create a concise execution plan. Do not call tools."

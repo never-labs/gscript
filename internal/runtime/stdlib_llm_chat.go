@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	stdlibai "github.com/never-labs/gscript/internal/stdlib/ai"
+	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 )
 
 // BuildLLMLib creates the "llm" standard library table. It is the first-stage
@@ -291,7 +291,7 @@ func BuildLLMLib(call ScriptFunctionCaller, provider func() LLMProvider, provide
 			return []Value{NilValue(), llmErrorValue("provider", "llm provider not configured")}, nil
 		}
 		if opts.RawGetString("messages").IsNil() {
-			normalized, err := llmLoopOptions(opts, stdlibai.DefaultSimpleMaxSteps)
+			normalized, err := llmLoopOptions(opts, stdlibllm.DefaultSimpleMaxSteps)
 			if err != nil {
 				agentConfigMu.RUnlock()
 				trace(LLMTraceEvent{Type: "turn_error", ErrorKind: "validation", Message: err.Error()})
@@ -680,7 +680,7 @@ func llmTableString(tbl *Table, key string) string {
 }
 
 func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) (LLMTurnResult, Value) {
-	model := stdlibai.SelectPlanModel(src.RawGetString("plan_model").Str(), opts.RawGetString("model").Str())
+	model := stdlibllm.SelectPlanModel(src.RawGetString("plan_model").Str(), opts.RawGetString("model").Str())
 	messages := llmPlanMessages(opts.RawGetString("messages"))
 	req := LLMTurnRequest{
 		Model:          model,
@@ -707,7 +707,7 @@ func llmPlanTurn(src, opts *Table, provider LLMProvider, ctx context.Context, ma
 
 func llmPlanMessages(messages Value) Value {
 	t := NewAppendArrayTable(2)
-	t.RawSet(IntValue(1), TableValue(llmMessageTable("system", stdlibai.PlanPrompt())))
+	t.RawSet(IntValue(1), TableValue(llmMessageTable("system", stdlibllm.PlanPrompt())))
 	if messages.IsTable() {
 		for _, msg := range llmMessageValuesFromTable(messages.Table()) {
 			t.RawSet(IntValue(int64(t.Length()+1)), msg)
@@ -717,7 +717,7 @@ func llmPlanMessages(messages Value) Value {
 }
 
 func llmInjectPlan(opts *Table, plan string) {
-	text, ok := stdlibai.ExecutionPlanMessage(plan)
+	text, ok := stdlibllm.ExecutionPlanMessage(plan)
 	if !ok {
 		return
 	}
@@ -734,16 +734,16 @@ func llmInjectPlan(opts *Table, plan string) {
 }
 
 func llmReflectResult(src, result *Table, provider LLMProvider, ctx context.Context, maxHostResult int64, trace func(LLMTraceEvent)) Value {
-	if result.RawGetString("status").Str() != stdlibai.ReactStatusDone {
+	if result.RawGetString("status").Str() != stdlibllm.ReactStatusDone {
 		return NilValue()
 	}
-	maxIters := stdlibai.ReflectIterations(toInt(src.RawGetString("max_iters")))
-	model := stdlibai.SelectReflectModel(src.RawGetString("reflect_model").Str(), src.RawGetString("model").Str())
+	maxIters := stdlibllm.ReflectIterations(toInt(src.RawGetString("max_iters")))
+	model := stdlibllm.SelectReflectModel(src.RawGetString("reflect_model").Str(), src.RawGetString("model").Str())
 	reflections := NewAppendArrayTable(int(maxIters))
 	text := result.RawGetString("text").Str()
 	for i := int64(0); i < maxIters; i++ {
 		messages := NewAppendArrayTable(2)
-		prompt := stdlibai.ReflectPrompt(src.RawGetString("reflect_prompt").Str())
+		prompt := stdlibllm.ReflectPrompt(src.RawGetString("reflect_prompt").Str())
 		messages.RawSet(IntValue(1), TableValue(llmMessageTable("system", prompt)))
 		messages.RawSet(IntValue(2), TableValue(llmMessageTable("user", text)))
 		req := LLMTurnRequest{

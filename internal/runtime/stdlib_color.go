@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	stdcolor "github.com/never-labs/gscript/internal/stdlib/data/color"
+	stdcolor "github.com/never-labs/gscript/internal/stdlib/color"
 )
 
 // --------------------------------------------------------------------------

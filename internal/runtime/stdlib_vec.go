@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	stdvec "github.com/never-labs/gscript/internal/stdlib/data/vec"
+	stdvec "github.com/never-labs/gscript/internal/stdlib/vec"
 )
 
 // --------------------------------------------------------------------------

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	hostfs "github.com/never-labs/gscript/internal/stdlib/host/fs"
+	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
 )
 
 func (interp *Interpreter) resolveFilesystemPath(path string) (string, error) {

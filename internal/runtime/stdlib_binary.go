@@ -7,7 +7,7 @@ import (
 	"math"
 	"strings"
 
-	binfmt "github.com/never-labs/gscript/internal/stdlib/data/binary"
+	binfmt "github.com/never-labs/gscript/internal/stdlib/binary"
 )
 
 // buildBinaryLib creates the "binary" standard library table.

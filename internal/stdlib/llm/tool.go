@@ -1,4 +1,4 @@
-package ai
+package llm
 
 // ToolSummary is the runtime-independent shape used by AI tool capability
 // checks. Runtime adapters populate it from script-visible tool tables.

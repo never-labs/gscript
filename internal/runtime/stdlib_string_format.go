@@ -2,14 +2,12 @@ package runtime
 
 import (
 	"fmt"
+	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"unsafe"
-
-	stringlib "github.com/never-labs/gscript/internal/stdlib/base/string"
-	stringformat "github.com/never-labs/gscript/internal/stdlib/base/stringformat"
 )
 
 // stdlib_string_format.go holds string.format: the public fast-arity value
@@ -51,7 +49,7 @@ func stringFormatValue(args []Value) (Value, error) {
 			continue
 		}
 
-		token, ok := stringformat.ScanToken(formatStr, i-1)
+		token, ok := stdlibstring.ScanToken(formatStr, i-1)
 		if !ok {
 			return NilValue(), fmt.Errorf("invalid format string")
 		}
@@ -68,7 +66,7 @@ func stringFormatValue(args []Value) (Value, error) {
 		switch spec {
 		case 'd', 'i', 'u':
 			n := toInt(arg)
-			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stdlibstring.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, string(spec), "d", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
@@ -76,19 +74,19 @@ func stringFormatValue(args []Value) (Value, error) {
 			buf.WriteString(fmt.Sprintf(fmtSpec, toFloat(arg)))
 		case 'x':
 			n := toInt(arg)
-			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stdlibstring.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, "x", "x", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
 		case 'X':
 			n := toInt(arg)
-			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stdlibstring.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, "X", "X", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
 		case 'o':
 			n := toInt(arg)
-			if !stringlib.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
+			if !stdlibstring.WriteFastIntegerFormat(&buf, fmtSpec, spec, n) {
 				goFmt := strings.Replace(fmtSpec, "o", "o", 1)
 				buf.WriteString(fmt.Sprintf(goFmt, n))
 			}
@@ -131,15 +129,15 @@ func luaPointerString(v Value) string {
 func luaQuoteLiteral(v Value) (string, error) {
 	switch v.Type() {
 	case TypeNil:
-		return stringlib.LuaQuoteNil(), nil
+		return stdlibstring.LuaQuoteNil(), nil
 	case TypeBool:
-		return stringlib.LuaQuoteBool(v.Bool()), nil
+		return stdlibstring.LuaQuoteBool(v.Bool()), nil
 	case TypeInt:
-		return stringlib.LuaQuoteInt(v.Int()), nil
+		return stdlibstring.LuaQuoteInt(v.Int()), nil
 	case TypeFloat:
-		return stringlib.LuaQuoteFloat(v.Float()), nil
+		return stdlibstring.LuaQuoteFloat(v.Float()), nil
 	case TypeString:
-		return stringlib.LuaQuoteString(v.Str()), nil
+		return stdlibstring.LuaQuoteString(v.Str()), nil
 	default:
 		return "", fmt.Errorf("bad argument to 'string.format' (value has no literal form)")
 	}
@@ -264,7 +262,7 @@ func StringFormatSingleInt(pattern string, n int64) (Value, bool, error) {
 
 type simpleFormatProgram struct {
 	formatStr string
-	parts     []stringformat.Part
+	parts     []stdlibstring.Part
 	minArgs   int
 	litBytes  int
 	singleInt bool
@@ -368,9 +366,9 @@ func simpleFormatFastSlot(s string) uint64 {
 }
 
 func compileSimpleFormat(formatStr string) (*simpleFormatProgram, bool, error) {
-	prog, status := stringformat.CompileSimple(formatStr)
+	prog, status := stdlibstring.CompileSimple(formatStr)
 	switch status {
-	case stringformat.CompileOK:
+	case stdlibstring.CompileOK:
 		return &simpleFormatProgram{
 			formatStr: formatStr,
 			parts:     prog.Parts,
@@ -378,9 +376,9 @@ func compileSimpleFormat(formatStr string) (*simpleFormatProgram, bool, error) {
 			litBytes:  prog.LitBytes,
 			singleInt: prog.SingleInt,
 		}, true, nil
-	case stringformat.CompileErrEndsWithPercent:
+	case stdlibstring.CompileErrEndsWithPercent:
 		return nil, false, fmt.Errorf("invalid format string (ends with %%)")
-	case stringformat.CompileErrInvalid:
+	case stdlibstring.CompileErrInvalid:
 		return nil, false, fmt.Errorf("invalid format string")
 	default:
 		return nil, false, nil
@@ -590,7 +588,7 @@ func (p *simpleFormatProgram) formatSingleInt(n int64) string {
 	return buf.String()
 }
 
-func writeCompiledFloatFormat(buf *strings.Builder, part stringformat.Part, f float64) {
+func writeCompiledFloatFormat(buf *strings.Builder, part stdlibstring.Part, f float64) {
 	var scratch [128]byte
 	digits := strconv.AppendFloat(scratch[:0], f, 'f', part.Prec, 64)
 	if part.Width <= len(digits) {
@@ -603,8 +601,8 @@ func writeCompiledFloatFormat(buf *strings.Builder, part stringformat.Part, f fl
 	buf.Write(digits)
 }
 
-func writeCompiledIntegerFormat(buf *strings.Builder, part stringformat.Part, n int64) {
-	stringlib.WritePaddedInteger(buf, part.Verb, part.Pad, part.Width, n)
+func writeCompiledIntegerFormat(buf *strings.Builder, part stdlibstring.Part, n int64) {
+	stdlibstring.WritePaddedInteger(buf, part.Verb, part.Pad, part.Width, n)
 }
 
 func scanSimpleFormatCacheRoots(visitor func(unsafe.Pointer), seen map[uintptr]struct{}) {

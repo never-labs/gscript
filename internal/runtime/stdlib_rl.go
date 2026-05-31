@@ -15,7 +15,7 @@ import (
 	"image/color"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
-	rlstd "github.com/never-labs/gscript/internal/stdlib/data/rl"
+	rlstd "github.com/never-labs/gscript/internal/stdlib/rl"
 )
 
 // ---------------------------------------------------------------------------

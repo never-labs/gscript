@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	tablelib "github.com/never-labs/gscript/internal/stdlib/data/table"
+	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
 )
 
 type TableSortCaller func(Value, []Value) ([]Value, error)

@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	stdcsv "github.com/never-labs/gscript/internal/stdlib/data/csv"
+	stdcsv "github.com/never-labs/gscript/internal/stdlib/csv"
 )
 
 // buildCSVLib creates the "csv" standard library table.

@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	basehash "github.com/never-labs/gscript/internal/stdlib/base/hash"
+	basehash "github.com/never-labs/gscript/internal/stdlib/hash"
 )
 
 // buildHashLib creates the "hash" standard library table.

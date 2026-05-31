@@ -1,4 +1,4 @@
-package stringpattern
+package stringlib
 
 // ScanASCIIDigits returns the first byte offset at or after pos that is not an
 // ASCII decimal digit. Negative positions are treated as zero.

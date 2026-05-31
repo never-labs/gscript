@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 
-	containerdata "github.com/never-labs/gscript/internal/stdlib/data/container"
+	containerdata "github.com/never-labs/gscript/internal/stdlib/container"
 )
 
 // buildContainerLib creates the "container" standard library table.

@@ -10,7 +10,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
-	tablelib "github.com/never-labs/gscript/internal/stdlib/data/table"
+	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {

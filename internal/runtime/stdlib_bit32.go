@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	bit32lib "github.com/never-labs/gscript/internal/stdlib/base/bit32"
+	bit32lib "github.com/never-labs/gscript/internal/stdlib/bit32"
 )
 
 // buildBit32Lib creates the "bit32" standard library table.

@@ -2,13 +2,11 @@ package runtime
 
 import (
 	"fmt"
+	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
 	"regexp"
 	"strings"
 	"sync"
 	"unsafe"
-
-	basestring "github.com/never-labs/gscript/internal/stdlib/base/string"
-	stringpattern "github.com/never-labs/gscript/internal/stdlib/base/stringpattern"
 )
 
 const (
@@ -169,7 +167,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'string.upper' (string expected)")
 		}
-		return []Value{StringValue(basestring.Upper(args[0].Str()))}, nil
+		return []Value{StringValue(stdlibstring.Upper(args[0].Str()))}, nil
 	})
 
 	// string.lower(s) -> string
@@ -177,7 +175,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'string.lower' (string expected)")
 		}
-		return []Value{StringValue(basestring.Lower(args[0].Str()))}, nil
+		return []Value{StringValue(stdlibstring.Lower(args[0].Str()))}, nil
 	})
 
 	// string.rep(s, n [, sep]) -> string
@@ -201,12 +199,12 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			if err := CheckProjectedRepeatedStringBytes(maxHostResult(), len(s), n, 0); err != nil {
 				return nil, err
 			}
-			return []Value{StringValue(basestring.Repeat(s, n))}, nil
+			return []Value{StringValue(stdlibstring.Repeat(s, n))}, nil
 		}
 		if err := CheckProjectedRepeatedStringBytes(maxHostResult(), len(s), n, len(sep)); err != nil {
 			return nil, err
 		}
-		return []Value{StringValue(basestring.RepeatJoin(s, n, sep))}, nil
+		return []Value{StringValue(stdlibstring.RepeatJoin(s, n, sep))}, nil
 	})
 
 	// string.reverse(s) -> string
@@ -214,7 +212,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'string.reverse' (string expected)")
 		}
-		return []Value{StringValue(basestring.Reverse(args[0].Str()))}, nil
+		return []Value{StringValue(stdlibstring.Reverse(args[0].Str()))}, nil
 	})
 
 	// string.byte(s [, i [, j]]) -> int...
@@ -234,7 +232,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			j = toInt(args[2])
 			hasEnd = true
 		}
-		bytes, ok := basestring.LuaBytes(s, i, j, hasEnd)
+		bytes, ok := stdlibstring.LuaBytes(s, i, j, hasEnd)
 		if !ok {
 			return []Value{NilValue()}, nil
 		}
@@ -259,7 +257,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		for _, arg := range args {
 			values = append(values, toInt(arg))
 		}
-		buf, ok := basestring.CharBytes(values)
+		buf, ok := stdlibstring.CharBytes(values)
 		if !ok {
 			return nil, fmt.Errorf("bad argument to 'string.char' (value out of range)")
 		}
@@ -285,7 +283,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			plain = args[3].Truthy()
 		}
 
-		init, searchStr, ok := basestring.LuaSearchStart(s, int64(init))
+		init, searchStr, ok := stdlibstring.LuaSearchStart(s, int64(init))
 		if !ok {
 			return []Value{NilValue()}, nil
 		}
@@ -301,8 +299,8 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		}
 
 		// Pattern matching
-		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
-			loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
+		if balanced, open, close := stdlibstring.ParseStandaloneBalancedPattern(pattern); balanced {
+			loc := stdlibstring.FindBalancedRange(searchStr, open, close, 0)
 			if loc == nil {
 				return []Value{NilValue()}, nil
 			}
@@ -364,13 +362,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) >= 3 {
 			init = int(toInt(args[2]))
 		}
-		_, searchStr, ok := basestring.LuaSearchStart(s, int64(init))
+		_, searchStr, ok := stdlibstring.LuaSearchStart(s, int64(init))
 		if !ok {
 			return []Value{NilValue()}, nil
 		}
 
-		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
-			loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
+		if balanced, open, close := stdlibstring.ParseStandaloneBalancedPattern(pattern); balanced {
+			loc := stdlibstring.FindBalancedRange(searchStr, open, close, 0)
 			if loc == nil {
 				return []Value{NilValue()}, nil
 			}
@@ -426,7 +424,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) >= 3 {
 			init = int(toInt(args[2]))
 		}
-		init, searchStr, ok := basestring.LuaSearchStart(s, int64(init))
+		init, searchStr, ok := stdlibstring.LuaSearchStart(s, int64(init))
 		if !ok {
 			iter := &GoFunction{
 				Name: "gmatch_iterator",
@@ -437,8 +435,8 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			return []Value{FunctionValue(iter)}, nil
 		}
 
-		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
-			allMatches := stringpattern.FindAllBalancedRanges(searchStr, open, close)
+		if balanced, open, close := stdlibstring.ParseStandaloneBalancedPattern(pattern); balanced {
+			allMatches := stdlibstring.FindAllBalancedRanges(searchStr, open, close)
 			idx := 0
 			next := func() (Value, Value, int, error) {
 				if idx >= len(allMatches) {
@@ -470,7 +468,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 				if !ok {
 					return NilValue(), NilValue(), 1, nil
 				}
-				nextStart = stringpattern.NextSearchStart(searchStr, m.Start, m.End)
+				nextStart = stdlibstring.NextSearchStart(searchStr, m.Start, m.End)
 				if m.NCapture == 0 {
 					return StringValue(searchStr[m.Start:m.End]), NilValue(), 1, nil
 				}
@@ -487,7 +485,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 					if !ok {
 						return []Value{NilValue()}, nil
 					}
-					nextStart = stringpattern.NextSearchStart(searchStr, m.Start, m.End)
+					nextStart = stdlibstring.NextSearchStart(searchStr, m.Start, m.End)
 					return simpleMatchValues(searchStr, m), nil
 				},
 			}
@@ -592,7 +590,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			maxRepl = int(toInt(args[3]))
 		}
 
-		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
+		if balanced, open, close := stdlibstring.ParseStandaloneBalancedPattern(pattern); balanced {
 			count := 0
 			var result string
 			if repl.IsString() {
@@ -723,21 +721,21 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		}
 		s := args[0].Str()
 		if len(args) >= 2 && args[1].IsString() {
-			return []Value{StringValue(basestring.Trim(s, args[1].Str()))}, nil
+			return []Value{StringValue(stdlibstring.Trim(s, args[1].Str()))}, nil
 		}
-		return []Value{StringValue(basestring.TrimSpace(s))}, nil
+		return []Value{StringValue(stdlibstring.TrimSpace(s))}, nil
 	}
 	stringTrim1 := func(a Value) (Value, error) {
 		if !a.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'string.trim' (string expected)")
 		}
-		return StringValue(basestring.TrimSpace(a.Str())), nil
+		return StringValue(stdlibstring.TrimSpace(a.Str())), nil
 	}
 	stringTrim2 := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.trim' (string expected)")
 		}
-		return StringValue(basestring.Trim(a.Str(), b.Str())), nil
+		return StringValue(stdlibstring.Trim(a.Str(), b.Str())), nil
 	}
 	// string.trim(s [, cutset]) -- trim leading/trailing whitespace (or chars in cutset)
 	setFastArg2("trim", stringTrim, func(args []Value) (Value, error) {
@@ -759,21 +757,21 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		}
 		s := args[0].Str()
 		if len(args) >= 2 && args[1].IsString() {
-			return []Value{StringValue(basestring.TrimLeft(s, args[1].Str()))}, nil
+			return []Value{StringValue(stdlibstring.TrimLeft(s, args[1].Str()))}, nil
 		}
-		return []Value{StringValue(basestring.TrimLeftSpace(s))}, nil
+		return []Value{StringValue(stdlibstring.TrimLeftSpace(s))}, nil
 	}
 	stringTrimLeft1 := func(a Value) (Value, error) {
 		if !a.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'string.trimLeft' (string expected)")
 		}
-		return StringValue(basestring.TrimLeftSpace(a.Str())), nil
+		return StringValue(stdlibstring.TrimLeftSpace(a.Str())), nil
 	}
 	stringTrimLeft2 := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.trimLeft' (string expected)")
 		}
-		return StringValue(basestring.TrimLeft(a.Str(), b.Str())), nil
+		return StringValue(stdlibstring.TrimLeft(a.Str(), b.Str())), nil
 	}
 	// string.trimLeft(s [, cutset])
 	setFastArg2("trimLeft", stringTrimLeft, func(args []Value) (Value, error) {
@@ -795,21 +793,21 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		}
 		s := args[0].Str()
 		if len(args) >= 2 && args[1].IsString() {
-			return []Value{StringValue(basestring.TrimRight(s, args[1].Str()))}, nil
+			return []Value{StringValue(stdlibstring.TrimRight(s, args[1].Str()))}, nil
 		}
-		return []Value{StringValue(basestring.TrimRightSpace(s))}, nil
+		return []Value{StringValue(stdlibstring.TrimRightSpace(s))}, nil
 	}
 	stringTrimRight1 := func(a Value) (Value, error) {
 		if !a.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'string.trimRight' (string expected)")
 		}
-		return StringValue(basestring.TrimRightSpace(a.Str())), nil
+		return StringValue(stdlibstring.TrimRightSpace(a.Str())), nil
 	}
 	stringTrimRight2 := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.trimRight' (string expected)")
 		}
-		return StringValue(basestring.TrimRight(a.Str(), b.Str())), nil
+		return StringValue(stdlibstring.TrimRight(a.Str(), b.Str())), nil
 	}
 	// string.trimRight(s [, cutset])
 	setFastArg2("trimRight", stringTrimRight, func(args []Value) (Value, error) {
@@ -829,13 +827,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'string.hasPrefix' (string expected)")
 		}
-		return []Value{BoolValue(basestring.HasPrefix(args[0].Str(), args[1].Str()))}, nil
+		return []Value{BoolValue(stdlibstring.HasPrefix(args[0].Str(), args[1].Str()))}, nil
 	}
 	stringHasPrefixFast := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.hasPrefix' (string expected)")
 		}
-		return BoolValue(basestring.HasPrefix(a.Str(), b.Str())), nil
+		return BoolValue(stdlibstring.HasPrefix(a.Str(), b.Str())), nil
 	}
 	// string.hasPrefix(s, prefix) -> bool
 	setFastArg2("hasPrefix", stringHasPrefix, func(args []Value) (Value, error) {
@@ -849,13 +847,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'string.hasSuffix' (string expected)")
 		}
-		return []Value{BoolValue(basestring.HasSuffix(args[0].Str(), args[1].Str()))}, nil
+		return []Value{BoolValue(stdlibstring.HasSuffix(args[0].Str(), args[1].Str()))}, nil
 	}
 	stringHasSuffixFast := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.hasSuffix' (string expected)")
 		}
-		return BoolValue(basestring.HasSuffix(a.Str(), b.Str())), nil
+		return BoolValue(stdlibstring.HasSuffix(a.Str(), b.Str())), nil
 	}
 	// string.hasSuffix(s, suffix) -> bool
 	setFastArg2("hasSuffix", stringHasSuffix, func(args []Value) (Value, error) {
@@ -869,13 +867,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'string.contains' (string expected)")
 		}
-		return []Value{BoolValue(basestring.Contains(args[0].Str(), args[1].Str()))}, nil
+		return []Value{BoolValue(stdlibstring.Contains(args[0].Str(), args[1].Str()))}, nil
 	}
 	stringContainsFast := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.contains' (string expected)")
 		}
-		return BoolValue(basestring.Contains(a.Str(), b.Str())), nil
+		return BoolValue(stdlibstring.Contains(a.Str(), b.Str())), nil
 	}
 	// string.contains(s, substr) -> bool
 	setFastArg2("contains", stringContains, func(args []Value) (Value, error) {
@@ -889,13 +887,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument to 'string.count' (string expected)")
 		}
-		return []Value{IntValue(int64(basestring.Count(args[0].Str(), args[1].Str())))}, nil
+		return []Value{IntValue(int64(stdlibstring.Count(args[0].Str(), args[1].Str())))}, nil
 	}
 	stringCountFast := func(a, b Value) (Value, error) {
 		if !a.IsString() || !b.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.count' (string expected)")
 		}
-		return IntValue(int64(basestring.Count(a.Str(), b.Str()))), nil
+		return IntValue(int64(stdlibstring.Count(a.Str(), b.Str()))), nil
 	}
 	// string.count(s, substr) -> int
 	setFastArg2("count", stringCount, func(args []Value) (Value, error) {
@@ -909,13 +907,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 3 || !args[0].IsString() || !args[1].IsString() || !args[2].IsString() {
 			return nil, fmt.Errorf("bad argument to 'string.replaceAll' (string expected)")
 		}
-		return []Value{StringValue(basestring.ReplaceAll(args[0].Str(), args[1].Str(), args[2].Str()))}, nil
+		return []Value{StringValue(stdlibstring.ReplaceAll(args[0].Str(), args[1].Str(), args[2].Str()))}, nil
 	}
 	stringReplaceAll3 := func(a, b, c Value) (Value, error) {
 		if !a.IsString() || !b.IsString() || !c.IsString() {
 			return NilValue(), fmt.Errorf("bad argument to 'string.replaceAll' (string expected)")
 		}
-		return StringValue(basestring.ReplaceAll(a.Str(), b.Str(), c.Str())), nil
+		return StringValue(stdlibstring.ReplaceAll(a.Str(), b.Str(), c.Str())), nil
 	}
 	// string.replaceAll(s, old, new) -- plain string replace all
 	setFastArg23("replaceAll", stringReplaceAll, func(args []Value) (Value, error) {
@@ -937,10 +935,10 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		for i := 0; i < length; i++ {
 			parts[i] = tbl.RawGet(IntValue(int64(i + 1))).String()
 		}
-		if err := CheckProjectedHostStringBytes(maxHostResult(), basestring.JoinProjectedLen(parts, sep)); err != nil {
+		if err := CheckProjectedHostStringBytes(maxHostResult(), stdlibstring.JoinProjectedLen(parts, sep)); err != nil {
 			return nil, err
 		}
-		return []Value{StringValue(basestring.Join(parts, sep))}, nil
+		return []Value{StringValue(stdlibstring.Join(parts, sep))}, nil
 	})
 
 	// string.title(s) -- capitalize first letter of each word
@@ -948,7 +946,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'string.title' (string expected)")
 		}
-		return []Value{StringValue(basestring.Title(args[0].Str()))}, nil
+		return []Value{StringValue(stdlibstring.Title(args[0].Str()))}, nil
 	})
 
 	// string.padLeft(s, n [, char]) -- pad with char (default space) on left to width n
@@ -970,7 +968,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 				return nil, err
 			}
 		}
-		return []Value{StringValue(basestring.PadLeft(s, n, pad))}, nil
+		return []Value{StringValue(stdlibstring.PadLeft(s, n, pad))}, nil
 	})
 
 	// string.padRight(s, n [, char]) -- pad on right
@@ -992,7 +990,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 				return nil, err
 			}
 		}
-		return []Value{StringValue(basestring.PadRight(s, n, pad))}, nil
+		return []Value{StringValue(stdlibstring.PadRight(s, n, pad))}, nil
 	})
 
 	// string.repeat(s, n) -- alias for string.rep
@@ -1011,7 +1009,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if err := CheckProjectedRepeatedStringBytes(maxHostResult(), len(s), n, 0); err != nil {
 			return nil, err
 		}
-		return []Value{StringValue(basestring.Repeat(s, n))}, nil
+		return []Value{StringValue(stdlibstring.Repeat(s, n))}, nil
 	})
 
 	// string.isNumeric(s) -> bool
@@ -1019,7 +1017,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if len(args) < 1 || !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'string.isNumeric' (string expected)")
 		}
-		return []Value{BoolValue(basestring.IsNumeric(args[0].Str()))}, nil
+		return []Value{BoolValue(stdlibstring.IsNumeric(args[0].Str()))}, nil
 	})
 
 	return t

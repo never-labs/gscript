@@ -1,4 +1,4 @@
-package stringformat
+package stringlib
 
 import "testing"
 

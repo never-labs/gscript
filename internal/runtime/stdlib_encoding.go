@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	stdencoding "github.com/never-labs/gscript/internal/stdlib/base/encoding"
+	stdencoding "github.com/never-labs/gscript/internal/stdlib/encoding"
 )
 
 // buildEncodingLib creates the "encoding" standard library table.

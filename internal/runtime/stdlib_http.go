@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sync"
 
-	hosthttp "github.com/never-labs/gscript/internal/stdlib/host/http"
-	hostnet "github.com/never-labs/gscript/internal/stdlib/host/net"
+	hosthttp "github.com/never-labs/gscript/internal/stdlib/http"
+	hostnet "github.com/never-labs/gscript/internal/stdlib/net"
 )
 
 func httpLib(interp *Interpreter) *Table {

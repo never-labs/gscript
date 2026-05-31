@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	stdtime "github.com/never-labs/gscript/internal/stdlib/base/time"
+	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
 )
 
 var timeTableCtor = NewSmallTableCtorN([]string{

@@ -3,7 +3,7 @@ package runtime
 import (
 	"fmt"
 
-	stdlibai "github.com/never-labs/gscript/internal/stdlib/ai"
+	stdlibllm "github.com/never-labs/gscript/internal/stdlib/llm"
 )
 
 // BuildLLMHistoryLib creates the "history" stdlib table with helpers for
@@ -34,7 +34,7 @@ func BuildLLMHistoryLib() *Table {
 			if !m.IsTable() {
 				continue
 			}
-			if !stdlibai.MatchHistoryMessage(llmHistoryMessageSummary(m.Table()), filters) {
+			if !stdlibllm.MatchHistoryMessage(llmHistoryMessageSummary(m.Table()), filters) {
 				continue
 			}
 			if !yield(i, m) {
@@ -107,9 +107,9 @@ func BuildLLMHistoryLib() *Table {
 	return t
 }
 
-func llmHistoryMessageSummary(msg *Table) stdlibai.HistoryMessage {
+func llmHistoryMessageSummary(msg *Table) stdlibllm.HistoryMessage {
 	if msg == nil {
-		return stdlibai.HistoryMessage{}
+		return stdlibllm.HistoryMessage{}
 	}
 	fields := make(map[string]string)
 	for _, key := range msg.PairsKeysSnapshot() {
@@ -122,7 +122,7 @@ func llmHistoryMessageSummary(msg *Table) stdlibai.HistoryMessage {
 	if call := msg.RawGetString("tool_call"); call.IsTable() {
 		tool = call.Table().RawGetString("tool").Str()
 	}
-	return stdlibai.HistoryMessage{
+	return stdlibllm.HistoryMessage{
 		Role:      msg.RawGetString("role").Str(),
 		Tool:      tool,
 		ToolUseID: msg.RawGetString("tool_use_id").Str(),
@@ -131,8 +131,8 @@ func llmHistoryMessageSummary(msg *Table) stdlibai.HistoryMessage {
 	}
 }
 
-func llmHistoryFilters(opts *Table) map[string]stdlibai.HistoryFilterValue {
-	out := make(map[string]stdlibai.HistoryFilterValue)
+func llmHistoryFilters(opts *Table) map[string]stdlibllm.HistoryFilterValue {
+	out := make(map[string]stdlibllm.HistoryFilterValue)
 	if opts == nil {
 		return out
 	}
@@ -141,7 +141,7 @@ func llmHistoryFilters(opts *Table) map[string]stdlibai.HistoryFilterValue {
 			continue
 		}
 		want := opts.RawGet(key)
-		out[key.Str()] = stdlibai.HistoryFilterValue{
+		out[key.Str()] = stdlibllm.HistoryFilterValue{
 			String: want.Str(),
 			Truthy: want.Truthy(),
 		}

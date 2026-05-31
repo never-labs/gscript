@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"fmt"
-	stdtime "github.com/never-labs/gscript/internal/stdlib/base/time"
+	stdtime "github.com/never-labs/gscript/internal/stdlib/time"
 	"os"
 	"strings"
 	"time"
