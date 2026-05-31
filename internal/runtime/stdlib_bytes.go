@@ -170,16 +170,9 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("bad argument to 'buffer.readString'")
 			}
-			from := int(toInt(args[0])) - 1 // convert to 0-based
-			to := int(toInt(args[1]))       // 1-based inclusive, so to becomes exclusive in Go
 			data := buf.Bytes()
-			if from < 0 {
-				from = 0
-			}
-			if to > len(data) {
-				to = len(data)
-			}
-			if from >= to {
+			from, to, ok := stdbytes.ClampReadRange(len(data), int(toInt(args[0])), int(toInt(args[1])))
+			if !ok {
 				return []Value{StringValue("")}, nil
 			}
 			if err := CheckProjectedHostStringBytes(maxHostResult(), to-from); err != nil {
@@ -193,9 +186,9 @@ func buildBytesLib(interps ...*Interpreter) *Table {
 			if len(args) < 1 {
 				return nil, fmt.Errorf("bad argument #1 to 'buffer.readByte'")
 			}
-			pos := int(toInt(args[0])) - 1 // convert to 0-based
 			data := buf.Bytes()
-			if pos < 0 || pos >= len(data) {
+			pos, ok := stdbytes.ByteIndex(len(data), int(toInt(args[0])))
+			if !ok {
 				return []Value{NilValue()}, nil
 			}
 			return []Value{IntValue(int64(data[pos]))}, nil

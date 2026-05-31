@@ -55,3 +55,20 @@ func RepeatLen(s string, n int) (int, error) {
 	}
 	return len(s) * n, nil
 }
+
+func ClampReadRange(length, fromOneBased, toOneBasedInclusive int) (int, int, bool) {
+	from := fromOneBased - 1
+	to := toOneBasedInclusive
+	if from < 0 {
+		from = 0
+	}
+	if to > length {
+		to = length
+	}
+	return from, to, from < to
+}
+
+func ByteIndex(length, posOneBased int) (int, bool) {
+	pos := posOneBased - 1
+	return pos, pos >= 0 && pos < length
+}

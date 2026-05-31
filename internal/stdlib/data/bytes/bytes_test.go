@@ -38,3 +38,26 @@ func TestHexCompareRepeat(t *testing.T) {
 		t.Fatalf("Repeat = %q, want ababab", repeated)
 	}
 }
+
+func TestClampReadRange(t *testing.T) {
+	from, to, ok := ClampReadRange(5, -2, 9)
+	if from != 0 || to != 5 || !ok {
+		t.Fatalf("ClampReadRange = %d, %d, %v; want 0, 5, true", from, to, ok)
+	}
+	from, to, ok = ClampReadRange(5, 4, 2)
+	if from != 3 || to != 2 || ok {
+		t.Fatalf("ClampReadRange empty = %d, %d, %v; want 3, 2, false", from, to, ok)
+	}
+}
+
+func TestByteIndex(t *testing.T) {
+	if pos, ok := ByteIndex(3, 2); pos != 1 || !ok {
+		t.Fatalf("ByteIndex valid = %d, %v; want 1, true", pos, ok)
+	}
+	if _, ok := ByteIndex(3, 0); ok {
+		t.Fatalf("ByteIndex accepted zero position")
+	}
+	if _, ok := ByteIndex(3, 4); ok {
+		t.Fatalf("ByteIndex accepted out-of-range position")
+	}
+}
