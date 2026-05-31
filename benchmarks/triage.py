@@ -112,6 +112,10 @@ def bench_group(root: Path, bench: str) -> str | None:
     return identity[0]
 
 
+def groups_for_benches(root: Path, benches: list[str]) -> list[str]:
+    return discovery.groups_for_selectors(root, [], benches, BENCHMARK_GROUPS)
+
+
 def timing_rows(timing_json: Path) -> list[dict]:
     data = json.loads(timing_json.read_text())
     rows: list[dict] = []
@@ -877,8 +881,7 @@ def main() -> int:
     ]
     for mode in args.mode or ["default"]:
         cmd += ["--mode", mode]
-    selected_groups = sorted({group for bench in args.bench if (group := bench_group(root, bench))})
-    for group in selected_groups:
+    for group in groups_for_benches(root, args.bench):
         cmd += ["--group", group]
     for bench in args.bench:
         cmd += ["--bench", bench]

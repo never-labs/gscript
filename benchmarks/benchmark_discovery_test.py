@@ -122,6 +122,22 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 ["data", "concurrency", "table"],
             )
 
+    def test_groups_for_selectors_can_start_from_only_selectors(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for group, name in (("table", "events_metamethod"), ("data", "soa_dot")):
+                (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
+                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+
+            self.assertEqual(
+                discovery.groups_for_selectors(
+                    root,
+                    [],
+                    ["official/events_metamethod_hot", "data_oriented/soa_dot"],
+                ),
+                ["table", "data"],
+            )
+
     def test_groups_for_selectors_ignores_selectors_outside_allowed_groups(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

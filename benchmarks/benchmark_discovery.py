@@ -285,7 +285,7 @@ def groups_for_selectors(
     selectors: list[str] | tuple[str, ...] | None,
     allowed_groups: list[str] | tuple[str, ...] = GROUPS,
 ) -> list[str]:
-    out = canonical_groups(list(groups or allowed_groups), allowed_groups)
+    out = canonical_groups(list(allowed_groups if groups is None else groups), allowed_groups)
     for selector in selectors or []:
         identity = resolve_script_identity(root, selector, allowed_groups)
         if identity is None:

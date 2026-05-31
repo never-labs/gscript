@@ -23,6 +23,21 @@ class TriageSelectorTest(unittest.TestCase):
             ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
         )
 
+    def test_groups_for_benches_uses_shared_legacy_selector_resolution(self):
+        root = Path(__file__).resolve().parents[1]
+
+        self.assertEqual(
+            triage.groups_for_benches(
+                root,
+                [
+                    "official/events_metamethod_hot",
+                    "extended/goroutine_sleep",
+                    "data_oriented/soa_dot",
+                ],
+            ),
+            ["table", "concurrency", "data"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
