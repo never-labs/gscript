@@ -5,19 +5,10 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strconv"
 	"strings"
+
+	binfmt "github.com/never-labs/gscript/internal/stdlib/data/binary"
 )
-
-type binaryField struct {
-	kind  string
-	count int
-}
-
-type binaryFormat struct {
-	order  binary.ByteOrder
-	fields []binaryField
-}
 
 // buildBinaryLib creates the "binary" standard library table.
 func buildBinaryLib(interps ...*Interpreter) *Table {
@@ -64,16 +55,16 @@ func binaryPackValues(apiName string, args []Value, maxHostResult int64) ([]Valu
 	if len(args) < 1 || !args[0].IsString() {
 		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
 	}
-	format, err := parseBinaryFormat(args[0].Str())
+	format, err := binfmt.Parse(args[0].Str())
 	if err != nil {
 		return nil, err
 	}
-	if len(args)-1 != len(format.fields) {
-		return nil, fmt.Errorf("%s: got %d values for %d fields", apiName, len(args)-1, len(format.fields))
+	if len(args)-1 != len(format.Fields) {
+		return nil, fmt.Errorf("%s: got %d values for %d fields", apiName, len(args)-1, len(format.Fields))
 	}
 	buf := newHostResultBuffer(maxHostResult)
-	for i, field := range format.fields {
-		if err := packBinaryField(buf, format.order, field, args[i+1]); err != nil {
+	for i, field := range format.Fields {
+		if err := packBinaryField(buf, format.Order, field, args[i+1]); err != nil {
 			return nil, fmt.Errorf("%s", strings.Replace(err.Error(), "binary.pack", apiName, 1))
 		}
 	}
@@ -84,7 +75,7 @@ func binaryUnpackValues(apiName string, args []Value) ([]Value, error) {
 	if len(args) < 2 || !args[0].IsString() || !args[1].IsString() {
 		return nil, fmt.Errorf("bad argument to '%s' (format and data strings expected)", apiName)
 	}
-	format, err := parseBinaryFormat(args[0].Str())
+	format, err := binfmt.Parse(args[0].Str())
 	if err != nil {
 		return nil, err
 	}
@@ -97,9 +88,9 @@ func binaryUnpackValues(apiName string, args []Value) ([]Value, error) {
 	}
 	data := []byte(args[1].Str())
 	pos := offset - 1
-	results := make([]Value, 0, len(format.fields)+1)
-	for _, field := range format.fields {
-		v, next, err := unpackBinaryField(data, pos, format.order, field)
+	results := make([]Value, 0, len(format.Fields)+1)
+	for _, field := range format.Fields {
+		v, next, err := unpackBinaryField(data, pos, format.Order, field)
 		if err != nil {
 			return []Value{NilValue(), StringValue(strings.Replace(err.Error(), "binary.unpack", apiName, 1))}, nil
 		}
@@ -114,13 +105,13 @@ func binarySizeValues(apiName string, args []Value) ([]Value, error) {
 	if len(args) < 1 || !args[0].IsString() {
 		return nil, fmt.Errorf("bad argument #1 to '%s' (format string expected)", apiName)
 	}
-	format, err := parseBinaryFormat(args[0].Str())
+	format, err := binfmt.Parse(args[0].Str())
 	if err != nil {
 		return nil, err
 	}
 	total := 0
-	for _, field := range format.fields {
-		n, fixed := binaryFieldSize(field)
+	for _, field := range format.Fields {
+		n, fixed := binfmt.FieldSize(field)
 		if !fixed {
 			return []Value{NilValue(), StringValue(apiName + ": variable-size field in format")}, nil
 		}
@@ -129,103 +120,8 @@ func binarySizeValues(apiName string, args []Value) ([]Value, error) {
 	return []Value{IntValue(int64(total))}, nil
 }
 
-func parseBinaryFormat(format string) (binaryFormat, error) {
-	result := binaryFormat{order: binary.LittleEndian}
-	tokens := strings.FieldsFunc(format, func(r rune) bool {
-		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == ','
-	})
-	for _, token := range tokens {
-		if token == "" {
-			continue
-		}
-		if strings.HasPrefix(token, "<") || strings.HasPrefix(token, ">") {
-			if token[0] == '<' {
-				result.order = binary.LittleEndian
-			} else {
-				result.order = binary.BigEndian
-			}
-			token = token[1:]
-			if token == "" {
-				continue
-			}
-		}
-		if strings.Contains(token, ":") {
-			parts := strings.SplitN(token, ":", 2)
-			if setBinaryOrder(&result, parts[0]) {
-				token = parts[1]
-			}
-		}
-		if setBinaryOrder(&result, token) {
-			continue
-		}
-		field, err := parseBinaryField(token)
-		if err != nil {
-			return result, err
-		}
-		result.fields = append(result.fields, field)
-	}
-	return result, nil
-}
-
-func setBinaryOrder(format *binaryFormat, token string) bool {
-	switch strings.ToLower(token) {
-	case "le", "little", "littleendian":
-		format.order = binary.LittleEndian
-		return true
-	case "be", "big", "bigendian":
-		format.order = binary.BigEndian
-		return true
-	default:
-		return false
-	}
-}
-
-func parseBinaryField(token string) (binaryField, error) {
-	field := binaryField{kind: strings.ToLower(token), count: -1}
-	if strings.Contains(field.kind, ":") {
-		parts := strings.SplitN(field.kind, ":", 2)
-		field.kind = parts[0]
-		n, err := strconv.Atoi(parts[1])
-		if err != nil || n < 0 {
-			return field, fmt.Errorf("binary: invalid field size %q", parts[1])
-		}
-		field.count = n
-	}
-	switch field.kind {
-	case "i8", "int8", "u8", "uint8",
-		"i16", "int16", "u16", "uint16",
-		"i32", "int32", "u32", "uint32",
-		"i64", "int64", "u64", "uint64",
-		"f32", "float32", "f64", "float64",
-		"string", "str", "bytes":
-		return field, nil
-	default:
-		return field, fmt.Errorf("binary: unknown field type %q", token)
-	}
-}
-
-func binaryFieldSize(field binaryField) (int, bool) {
-	switch field.kind {
-	case "i8", "int8", "u8", "uint8":
-		return 1, true
-	case "i16", "int16", "u16", "uint16":
-		return 2, true
-	case "i32", "int32", "u32", "uint32", "f32", "float32":
-		return 4, true
-	case "i64", "int64", "u64", "uint64", "f64", "float64":
-		return 8, true
-	case "string", "str", "bytes":
-		if field.count >= 0 {
-			return field.count, true
-		}
-		return 0, false
-	default:
-		return 0, false
-	}
-}
-
-func packBinaryField(buf io.Writer, order binary.ByteOrder, field binaryField, value Value) error {
-	switch field.kind {
+func packBinaryField(buf io.Writer, order binary.ByteOrder, field binfmt.Field, value Value) error {
+	switch field.Kind {
 	case "i8", "int8":
 		n, err := requireSigned(value, -128, 127)
 		if err != nil {
@@ -306,12 +202,12 @@ func packBinaryField(buf io.Writer, order binary.ByteOrder, field binaryField, v
 		return err
 	case "string", "str", "bytes":
 		if !value.IsString() {
-			return fmt.Errorf("binary.pack: string expected for %s", field.kind)
+			return fmt.Errorf("binary.pack: string expected for %s", field.Kind)
 		}
 		data := []byte(value.Str())
-		if field.count >= 0 {
-			if len(data) != field.count {
-				return fmt.Errorf("binary.pack: %s:%d got %d bytes", field.kind, field.count, len(data))
+		if field.Count >= 0 {
+			if len(data) != field.Count {
+				return fmt.Errorf("binary.pack: %s:%d got %d bytes", field.Kind, field.Count, len(data))
 			}
 			_, err := buf.Write(data)
 			return err
@@ -327,18 +223,18 @@ func packBinaryField(buf io.Writer, order binary.ByteOrder, field binaryField, v
 		_, err := buf.Write(data)
 		return err
 	default:
-		return fmt.Errorf("binary: unknown field type %q", field.kind)
+		return fmt.Errorf("binary: unknown field type %q", field.Kind)
 	}
 }
 
-func unpackBinaryField(data []byte, pos int, order binary.ByteOrder, field binaryField) (Value, int, error) {
-	need, fixed := binaryFieldSize(field)
+func unpackBinaryField(data []byte, pos int, order binary.ByteOrder, field binfmt.Field) (Value, int, error) {
+	need, fixed := binfmt.FieldSize(field)
 	if fixed {
 		if pos < 0 || pos+need > len(data) {
 			return NilValue(), pos, fmt.Errorf("binary.unpack: data too short")
 		}
 	}
-	switch field.kind {
+	switch field.Kind {
 	case "i8", "int8":
 		return IntValue(int64(int8(data[pos]))), pos + 1, nil
 	case "u8", "uint8":
@@ -364,8 +260,8 @@ func unpackBinaryField(data []byte, pos int, order binary.ByteOrder, field binar
 	case "f64", "float64":
 		return FloatValue(math.Float64frombits(order.Uint64(data[pos:]))), pos + 8, nil
 	case "string", "str", "bytes":
-		if field.count >= 0 {
-			return StringValue(string(data[pos : pos+field.count])), pos + field.count, nil
+		if field.Count >= 0 {
+			return StringValue(string(data[pos : pos+field.Count])), pos + field.Count, nil
 		}
 		if pos+4 > len(data) {
 			return NilValue(), pos, fmt.Errorf("binary.unpack: data too short")
@@ -377,7 +273,7 @@ func unpackBinaryField(data []byte, pos int, order binary.ByteOrder, field binar
 		}
 		return StringValue(string(data[pos : pos+n])), pos + n, nil
 	default:
-		return NilValue(), pos, fmt.Errorf("binary: unknown field type %q", field.kind)
+		return NilValue(), pos, fmt.Errorf("binary: unknown field type %q", field.Kind)
 	}
 }
 
