@@ -91,7 +91,7 @@ func TestRuntimeNewKeepsLegacyMigratedHostIOTables(t *testing.T) {
 func TestInstallRuntimeStdlibOmitsMigratedHostIOTables(t *testing.T) {
 	interp := NewCore()
 	interp.InstallRuntimeStdlib()
-	for _, name := range []string{"fs", "http", "io", "net", "os"} {
+	for _, name := range []string{"fs", "http", "io", "net", "os", "string"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
 			t.Fatalf("%s global = %v, want nil before stdlibrt install", name, got)
 		}

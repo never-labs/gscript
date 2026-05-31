@@ -100,6 +100,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("sync", modules.BuildSync(modules.SyncOptions{
 		Call: opts.ScriptCaller,
 	}))
+	installer.RegisterTable("string", modules.BuildString(opts.ScriptCaller, maxHostResult))
 	installer.RegisterTable("time", modules.BuildTime())
 	installer.RegisterTable("url", modules.BuildURL(maxHostResult))
 	installer.RegisterTable("utf8", modules.BuildUTF8(maxHostResult))
@@ -147,6 +148,9 @@ func (installer interpreterInstaller) RegisterModule(name string, module runtime
 }
 
 func (installer interpreterInstaller) RegisterTable(name string, table *runtime.Table) {
+	if name == "string" && installer.interp != nil {
+		installer.interp.SetStringLibrary(table)
+	}
 	installer.RegisterModule(name, runtime.TableValue(table))
 }
 

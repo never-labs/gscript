@@ -14,7 +14,9 @@ func newBinaryModulesInterp() *runtime.Interpreter {
 
 func newStringPackAliasInterp() *runtime.Interpreter {
 	interp := runtime.NewCore()
-	interp.InstallRuntimeStdlib()
+	stringLib := BuildString(interp.CallFunction, interp.MaxHostResultBytes)
+	interp.SetStringLibrary(stringLib)
+	installTestModule(interp, "string", runtime.TableValue(stringLib))
 	installTestModule(interp, "bytes", runtime.TableValue(BuildBytes(interp.MaxHostResultBytes)))
 	return interp
 }

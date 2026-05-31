@@ -21,14 +21,6 @@ func (interp *Interpreter) InstallStdlib() {
 func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	std := newStdlibInstallContext(interp)
 
-	// String library
-	strLib := BuildStringLibWithCaller(interp.callFunction, func() int64 { return interp.maxHostResult })
-	std.RegisterTable("string", strLib)
-
-	// Set up string metatable so "hello":upper() works
-	interp.stringMeta = NewTable()
-	interp.stringMeta.RawSet(StringValue("__index"), TableValue(strLib))
-
 	// Table library (sort + higher-order functions need interp)
 	tblLib := buildTableLib()
 	buildTableProxyWithInterp(interp, tblLib)
@@ -52,6 +44,10 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 // direct runtime.Interpreter.InstallStdlib callers. Public embedding goes
 // through stdlibrt/install, so new migrated modules should not be added here.
 func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
+	strLib := BuildStringLibWithCaller(interp.callFunction, func() int64 { return interp.maxHostResult })
+	std.RegisterTable("string", strLib)
+	interp.SetStringLibrary(strLib)
+
 	std.RegisterTable("math", buildMathLib())
 	std.RegisterTable("rl", rlLib(interp))
 	std.RegisterTable("io", buildIOLib(interp))

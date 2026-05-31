@@ -106,3 +106,29 @@ func TestInstallModulesRegistersSyncFromStdlibrt(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallModulesRegistersStringFromStdlibrt(t *testing.T) {
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	if got := interp.GetGlobal("string"); !got.IsNil() {
+		t.Fatalf("InstallRuntimeStdlib registered migrated string module: %v", got)
+	}
+	if got := interp.StringMeta(); got != nil {
+		t.Fatalf("InstallRuntimeStdlib installed string metatable: %v", got)
+	}
+
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
+		ScriptCaller: interp.CallFunction,
+	})
+	stringLib := interp.GetGlobal("string")
+	if !stringLib.IsTable() {
+		t.Fatalf("string global is not a table: %v", stringLib)
+	}
+	if got := interp.StringMeta(); got == nil {
+		t.Fatal("string metatable was not bound after stdlibrt install")
+	}
+	upper := stringLib.Table().RawGetString("upper")
+	if !upper.IsFunction() {
+		t.Fatalf("string.upper is not a function: %v", upper)
+	}
+}

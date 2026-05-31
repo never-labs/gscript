@@ -110,6 +110,17 @@ func (interp *Interpreter) StringMeta() *Table {
 	return interp.stringMeta
 }
 
+// SetStringLibrary binds lib as the method table for string values.
+func (interp *Interpreter) SetStringLibrary(lib *Table) {
+	if lib == nil {
+		interp.stringMeta = nil
+		return
+	}
+	meta := NewTable()
+	meta.RawSet(StringValue("__index"), TableValue(lib))
+	interp.stringMeta = meta
+}
+
 // ExportGlobals returns a flat map of all global variables.
 // Used by the VM to share stdlib/builtins from the tree-walker.
 func (interp *Interpreter) ExportGlobals() map[string]Value {
