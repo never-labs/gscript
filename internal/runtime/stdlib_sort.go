@@ -3,6 +3,8 @@ package runtime
 import (
 	"fmt"
 	"sort"
+
+	stdsort "github.com/never-labs/gscript/internal/stdlib/data/sort"
 )
 
 type ValueLessFunc func(Value, Value) (bool, error)
@@ -65,8 +67,10 @@ func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less ValueLessFunc
 		tbl := args[0].Table()
 		elems := extractArray(tbl)
 		sort.SliceStable(elems, func(a, b int) bool {
-			less, ok := elems[a].LessThan(elems[b])
-			return ok && less
+			return stdsort.Ascending.Less(a, b, func(left, right int) bool {
+				less, ok := elems[left].LessThan(elems[right])
+				return ok && less
+			})
 		})
 		writeBack(tbl, elems)
 		return []Value{args[0]}, nil
@@ -80,8 +84,10 @@ func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less ValueLessFunc
 		tbl := args[0].Table()
 		elems := extractArray(tbl)
 		sort.SliceStable(elems, func(a, b int) bool {
-			less, ok := elems[b].LessThan(elems[a])
-			return ok && less
+			return stdsort.Descending.Less(a, b, func(left, right int) bool {
+				less, ok := elems[left].LessThan(elems[right])
+				return ok && less
+			})
 		})
 		writeBack(tbl, elems)
 		return []Value{args[0]}, nil
@@ -192,12 +198,12 @@ func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less ValueLessFunc
 		}
 		tbl := args[0].Table()
 		length := tbl.Length()
-		for i, j := 1, length; i < j; i, j = i+1, j-1 {
+		stdsort.ReversePairs(length, func(i, j int) {
 			vi := tbl.RawGet(IntValue(int64(i)))
 			vj := tbl.RawGet(IntValue(int64(j)))
 			tbl.RawSet(IntValue(int64(i)), vj)
 			tbl.RawSet(IntValue(int64(j)), vi)
-		}
+		})
 		return []Value{args[0]}, nil
 	})
 
@@ -211,20 +217,15 @@ func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less ValueLessFunc
 		target := args[1]
 		length := tbl.Length()
 
-		// Binary search
-		lo, hi := 1, length
-		for lo <= hi {
-			mid := lo + (hi-lo)/2
+		if index, ok := stdsort.BinarySearch1Based(length, func(mid int) (bool, bool) {
 			midVal := tbl.RawGet(IntValue(int64(mid)))
 			if midVal.Equal(target) {
-				return []Value{IntValue(int64(mid))}, nil
+				return true, false
 			}
 			less, ok := midVal.LessThan(target)
-			if ok && less {
-				lo = mid + 1
-			} else {
-				hi = mid - 1
-			}
+			return false, ok && less
+		}); ok {
+			return []Value{IntValue(int64(index))}, nil
 		}
 		return []Value{NilValue()}, nil
 	})
