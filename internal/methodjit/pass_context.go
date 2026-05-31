@@ -1,6 +1,5 @@
 // pass_context.go defines the domain-scoped PassContext: the execution-level
-// counterpart to the test-time read/write contract. A pass migrated to the ctx
-// form receives a PassContext whose domain accessors are gated by the set of
+// counterpart to the test-time read/write contract. A ctx-form pass receives a PassContext whose domain accessors are gated by the set of
 // fact domains the module declared (Requires ∪ Provides ∪ Updates ∪
 // OptionalReads). With enforcement enabled (tests), reaching an undeclared
 // domain panics; in production enforcement is off and the
@@ -15,7 +14,7 @@ package methodjit
 // passContextEnforce gates execution-level domain isolation. It is false in
 // production builds so a PassContext is a thin delegating wrapper with no
 // allow-set checks. Tests set it true (see pass_context_test.go) to assert that
-// a migrated pass only touches the domains it declared.
+// a ctx-form pass only touches the domains it declared.
 var passContextEnforce bool
 
 // PassContext is the domain-scoped handle a ctx-form optimization pass uses to

@@ -383,8 +383,7 @@ type CtxPassFunc func(*PassContext) (*Function, error)
 // tier2PassModuleWithCtx builds a module whose pass runs through a PassContext.
 // The allowed-domain set is derived from the module's declared facts plus its
 // read-contract hints; enforcement follows the package passContextEnforce flag
-// (off in production, on under tests). The compatibility Run path is left nil so this
-// shares no code with the unmigrated PassFunc modules.
+// (off in production, on under tests). The compatibility Run path is left nil so ctx-form passes have a single execution path.
 func tier2PassModuleWithCtx(name string, phase Tier2OptimizerPhase, requires, provides []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
 	allowed := allowedDomainsForModule(requires, provides, nil)
 	return Tier2OptimizerModule{

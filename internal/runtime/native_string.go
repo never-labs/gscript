@@ -75,9 +75,9 @@ type NativeStringFormatIntCacheEntry struct {
 var nativeStringFormatIntCache [NativeStringFormatIntCacheSize]NativeStringFormatIntCacheEntry
 
 // StdStringFormatIdentityPtr returns the process-wide identity token attached
-// to the runtime-native string.format GoFunction. The legacy StdString name is
-// part of the VM/JIT API; guards compare this token instead of trusting mutable
-// function names or the presence of FastArg2.
+// to the runtime-native string.format GoFunction. The StdString API prefix is part of the stable VM/JIT contract; guards
+// compare this token instead of trusting mutable function names or the
+// presence of FastArg2.
 func StdStringFormatIdentityPtr() unsafe.Pointer {
 	return unsafe.Pointer(&stdStringFormatIdentity)
 }

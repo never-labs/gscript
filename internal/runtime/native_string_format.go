@@ -233,8 +233,7 @@ func stringFormat5Value(format, arg0, arg1, arg2, arg3 Value) (Value, error) {
 }
 
 // IsStdStringFormatFunction reports whether v is the runtime-native
-// string.format GoFunction installed by BuildStringLibWithCaller. The legacy
-// StdString name is retained for VM/JIT API compatibility.
+// string.format GoFunction installed by BuildStringLibWithCaller. The StdString API prefix is retained for the VM/JIT contract.
 func IsStdStringFormatFunction(v Value) bool {
 	gf := v.GoFunction()
 	return gf != nil &&

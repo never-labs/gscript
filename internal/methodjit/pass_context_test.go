@@ -11,8 +11,7 @@ import (
 )
 
 // TestPassContext_RangeAnalysisCorpusEnforced drives the real Tier 2 pipeline
-// over the benchmark corpus with passContextEnforce=true. The migrated
-// RangeAnalysis (ctx form) reaches analysis only through its PassContext, whose
+// over the benchmark corpus with passContextEnforce=true. RangeAnalysis runs in ctx form reaches analysis only through its PassContext, whose
 // allow-set covers exactly the numeric domain it declares. If RangeAnalysis
 // touched any undeclared domain, its accessor would panic; this test asserts no
 // such panic occurs across the whole corpus, proving the execution-level domain

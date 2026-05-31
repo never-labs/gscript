@@ -19,7 +19,7 @@ func (info FileInfo) IsFile() bool {
 	return !info.IsDir
 }
 
-// FormatPerm formats permission bits in the legacy fs.stat shape.
+// FormatPerm formats permission bits in the stable fs.stat result shape.
 func FormatPerm(mode os.FileMode) string {
 	return fmt.Sprintf("0%o", mode.Perm())
 }
