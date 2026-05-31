@@ -66,3 +66,21 @@ func TestInstallModulesRegistersProcessFromStdlibrt(t *testing.T) {
 		t.Fatalf("process.run is not a function: %v", run)
 	}
 }
+
+func TestInstallModulesRegistersSOAFromStdlibrt(t *testing.T) {
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	if got := interp.GetGlobal("soa"); !got.IsNil() {
+		t.Fatalf("InstallRuntimeStdlib registered migrated soa module: %v", got)
+	}
+
+	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
+	soaLib := interp.GetGlobal("soa")
+	if !soaLib.IsTable() {
+		t.Fatalf("soa global is not a table: %v", soaLib)
+	}
+	lenFn := soaLib.Table().RawGetString("len").GoFunction()
+	if lenFn == nil || lenFn.FastArg1 == nil {
+		t.Fatalf("soa.len missing fast path after stdlibrt install: %#v", lenFn)
+	}
+}

@@ -6,8 +6,8 @@ import (
 	stdsoa "github.com/never-labs/gscript/internal/stdlib/soa"
 )
 
-// buildSoALib creates the "soa" data-oriented structure-of-arrays library.
-func buildSoALib() *Table {
+// BuildSoALib creates the "soa" data-oriented structure-of-arrays library.
+func BuildSoALib() *Table {
 	t := NewTable()
 	affineManyTerms := &soaAffineManyTermCache{}
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -699,6 +699,10 @@ func buildSoALib() *Table {
 	}, maskCache.value)
 
 	return t
+}
+
+func buildSoALib() *Table {
+	return BuildSoALib()
 }
 
 func requireSoAArg(name string, args []Value, index int) (*SoA, error) {
