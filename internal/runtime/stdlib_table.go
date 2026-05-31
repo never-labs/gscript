@@ -192,28 +192,28 @@ func BuildTableMoveFunction(tableGet TableMoveGet, tableSet TableMoveSet, tryPla
 				dst = args[4]
 			}
 
-			if e >= f {
-				if tryPlain != nil && tryPlain(src, dst, f, e, tPos) {
+			plan := tablelib.PlanMove(f, e, tPos, src.Table() == dst.Table())
+			if plan.Count > 0 {
+				if tryPlain != nil && tryPlain(src, dst, plan.First, plan.Last, plan.Target) {
 					return []Value{dst}, nil
 				}
-				count := e - f + 1
-				if tPos <= f || src.Table() != dst.Table() {
-					for i := int64(0); i < count; i++ {
-						v, err := tableGet(src, IntValue(f+i))
+				if plan.Forward {
+					for i := int64(0); i < plan.Count; i++ {
+						v, err := tableGet(src, IntValue(plan.First+i))
 						if err != nil {
 							return nil, err
 						}
-						if err := tableSet(dst, IntValue(tPos+i), v); err != nil {
+						if err := tableSet(dst, IntValue(plan.Target+i), v); err != nil {
 							return nil, err
 						}
 					}
 				} else {
-					for i := count - 1; i >= 0; i-- {
-						v, err := tableGet(src, IntValue(f+i))
+					for i := plan.Count - 1; i >= 0; i-- {
+						v, err := tableGet(src, IntValue(plan.First+i))
 						if err != nil {
 							return nil, err
 						}
-						if err := tableSet(dst, IntValue(tPos+i), v); err != nil {
+						if err := tableSet(dst, IntValue(plan.Target+i), v); err != nil {
 							return nil, err
 						}
 					}
@@ -259,14 +259,16 @@ func BuildTableInsertFunction(tableLen TableInsertLen, tableGet TableInsertGet, 
 				return nil, err
 			}
 
-			pos := length + 1
 			value := args[1]
+			hasPos := len(args) == 3
+			posValue := int64(0)
 			if len(args) == 3 {
-				pos = toInt(args[1])
-				if pos < 1 || pos > length+1 {
-					return nil, fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
-				}
+				posValue = toInt(args[1])
 				value = args[2]
+			}
+			pos, err := tablelib.InsertPosition(length, posValue, hasPos)
+			if err != nil {
+				return nil, err
 			}
 
 			if tryPlain != nil && tryPlain(t, pos, value, length) {
@@ -320,14 +322,15 @@ func BuildTableRemoveFunction(tableLen TableRemoveLen, tableGet TableRemoveGet, 
 			if err != nil {
 				return nil, err
 			}
-			pos := length
+			posValue := int64(0)
 			if len(args) >= 2 {
-				pos = toInt(args[1])
+				posValue = toInt(args[1])
 			}
-			if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
-				return nil, fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+			pos, end, err := tablelib.RemovePosition(length, posValue, len(args) >= 2)
+			if err != nil {
+				return nil, err
 			}
-			if pos == length+1 {
+			if end {
 				return []Value{NilValue()}, nil
 			}
 

@@ -230,18 +230,19 @@ func (vm *VM) RegisterTableProxyLib() {
 		if err != nil {
 			return err
 		}
-		if !hasPos {
-			if t.Table().TryPlainArrayInsertKnownLength(int64(length+1), value, int64(length)) {
-				return nil
-			}
-			return vm.tableSet(t, runtime.IntValue(length+1), value)
+		posInput := int64(0)
+		if hasPos {
+			posInput = vmToInt(posValue)
 		}
-		pos := vmToInt(posValue)
-		if pos < 1 || pos > length+1 {
-			return fmt.Errorf("bad argument #2 to 'table.insert' (position out of bounds)")
+		pos, err := tablelib.InsertPosition(length, posInput, hasPos)
+		if err != nil {
+			return err
 		}
 		if t.Table().TryPlainArrayInsertKnownLength(pos, value, int64(length)) {
 			return nil
+		}
+		if !hasPos {
+			return vm.tableSet(t, runtime.IntValue(pos), value)
 		}
 		for i := length; i >= pos; i-- {
 			v, err := vm.tableGet(t, runtime.IntValue(i))
@@ -262,14 +263,15 @@ func (vm *VM) RegisterTableProxyLib() {
 		if err != nil {
 			return runtime.NilValue(), err
 		}
-		pos := length
+		posInput := int64(0)
 		if hasPos {
-			pos = vmToInt(posValue)
+			posInput = vmToInt(posValue)
 		}
-		if pos < 0 || pos > length+1 || (pos == 0 && length > 0) {
-			return runtime.NilValue(), fmt.Errorf("bad argument #2 to 'table.remove' (position out of bounds)")
+		pos, end, err := tablelib.RemovePosition(length, posInput, hasPos)
+		if err != nil {
+			return runtime.NilValue(), err
 		}
-		if pos == length+1 {
+		if end {
 			return runtime.NilValue(), nil
 		}
 		if removed, ok := t.Table().TryPlainArrayRemoveKnownLength(pos, int64(length)); ok {
@@ -433,31 +435,31 @@ func (vm *VM) RegisterTableProxyLib() {
 			}
 			dst = dstArg
 		}
-		if e >= f {
-			if dst.Table().TryPlainArrayMove(src.Table(), f, e, tPos) {
+		plan := tablelib.PlanMove(f, e, tPos, src.Table() == dst.Table())
+		if plan.Count > 0 {
+			if dst.Table().TryPlainArrayMove(src.Table(), plan.First, plan.Last, plan.Target) {
 				return dst, nil
 			}
-			if handled, result, err := vm.tryForwardingProxyTableMove(src, dst, f, e, tPos); handled || err != nil {
+			if handled, result, err := vm.tryForwardingProxyTableMove(src, dst, plan.First, plan.Last, plan.Target); handled || err != nil {
 				return result, err
 			}
-			count := e - f + 1
-			if tPos <= f || src.Table() != dst.Table() {
-				for i := int64(0); i < count; i++ {
-					v, err := vm.tableGet(src, runtime.IntValue(f+i))
+			if plan.Forward {
+				for i := int64(0); i < plan.Count; i++ {
+					v, err := vm.tableGet(src, runtime.IntValue(plan.First+i))
 					if err != nil {
 						return runtime.NilValue(), err
 					}
-					if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
+					if err := vm.tableSet(dst, runtime.IntValue(plan.Target+i), v); err != nil {
 						return runtime.NilValue(), err
 					}
 				}
 			} else {
-				for i := count - 1; i >= 0; i-- {
-					v, err := vm.tableGet(src, runtime.IntValue(f+i))
+				for i := plan.Count - 1; i >= 0; i-- {
+					v, err := vm.tableGet(src, runtime.IntValue(plan.First+i))
 					if err != nil {
 						return runtime.NilValue(), err
 					}
-					if err := vm.tableSet(dst, runtime.IntValue(tPos+i), v); err != nil {
+					if err := vm.tableSet(dst, runtime.IntValue(plan.Target+i), v); err != nil {
 						return runtime.NilValue(), err
 					}
 				}
