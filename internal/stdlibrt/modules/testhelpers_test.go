@@ -44,6 +44,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "base64", runtime.TableValue(BuildBase64(interp.MaxHostResultBytes)))
 	installTestModule(interp, "bits", runtime.TableValue(BuildBits()))
 	installTestModule(interp, "compress", runtime.TableValue(BuildCompress(interp.MaxHostResultBytes)))
+	installTestModule(interp, "crypto", runtime.TableValue(BuildCrypto(interp.MaxHostResultBytes)))
 	installTestModule(interp, "csv", runtime.TableValue(BuildCSV(interp.MaxHostResultBytes)))
 	installTestModule(interp, "encoding", runtime.TableValue(BuildEncoding(interp.MaxHostResultBytes)))
 	installTestModule(interp, "hash", runtime.TableValue(BuildHash()))

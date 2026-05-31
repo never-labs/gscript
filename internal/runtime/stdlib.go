@@ -113,9 +113,6 @@ func (interp *Interpreter) InstallStdlib() {
 	// --- Sorting utilities ---
 	std.RegisterTable("sort", buildSortLib(interp))
 
-	// --- Cryptography ---
-	std.RegisterTable("crypto", buildCryptoLib(interp))
-
 	// --- Container data structures ---
 	std.RegisterTable("container", buildContainerLib(interp))
 	std.RegisterTable("context", buildContextLib())

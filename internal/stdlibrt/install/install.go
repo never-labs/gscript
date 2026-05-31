@@ -30,6 +30,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
 	installer.RegisterTable("bits", modules.BuildBits())
 	installer.RegisterTable("compress", modules.BuildCompress(maxHostResult))
+	installer.RegisterTable("crypto", modules.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", modules.BuildCSV(maxHostResult))
 	installer.RegisterTable("encoding", modules.BuildEncoding(maxHostResult))
 	installer.RegisterTable("hash", modules.BuildHash())

@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"crypto/aes"
@@ -9,21 +9,11 @@ import (
 	"io"
 )
 
-// buildCryptoLib creates the "crypto" standard library table.
+// BuildCrypto creates the "crypto" standard library table.
 // Provides AES encryption/decryption (GCM mode) and secure random generation.
 // Inspired by Odin's crypto package (aes, chacha20, etc.).
-func buildCryptoLib(interps ...*Interpreter) *Table {
+func BuildCrypto(maxHostResult func() int64) *Table {
 	t := NewTable()
-	var interp *Interpreter
-	if len(interps) > 0 {
-		interp = interps[0]
-	}
-	maxHostResult := func() int64 {
-		if interp == nil {
-			return 0
-		}
-		return interp.maxHostResult
-	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSet(StringValue(name), FunctionValue(&GoFunction{

@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 // cryptoInterp creates an interpreter with the crypto library registered.
 func cryptoInterp(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithLib(t, src, "crypto", buildCryptoLib())
+	return runWithLib(t, src, "crypto", BuildCrypto(func() int64 { return 0 }))
 }
 
 // ==================================================================
