@@ -784,9 +784,12 @@ func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {
 	}))
 }
 
-// buildTableHigherOrderWithInterp adds filter, map, reduce to the table library.
-// These need the interpreter to call GScript closures.
-func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
+// BuildTableHigherOrderLibWithCaller installs the callback-based table helpers
+// into tblLib. The caller is supplied by the active execution engine.
+func BuildTableHigherOrderLibWithCaller(call ScriptFunctionCaller, tblLib *Table) *Table {
+	if call == nil || tblLib == nil {
+		return tblLib
+	}
 	// table.filter(t, f) -- return new array of values where f(v, k) is truthy
 	tblLib.RawSet(StringValue("filter"), FunctionValue(&GoFunction{
 		Name: "table.filter",
@@ -801,7 +804,7 @@ func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
 			length := tbl.Length()
 			for i := int64(1); i <= int64(length); i++ {
 				v := tbl.RawGet(IntValue(i))
-				results, err := interp.callFunction(fn, []Value{v, IntValue(i)})
+				results, err := call(fn, []Value{v, IntValue(i)})
 				if err != nil {
 					return nil, err
 				}
@@ -827,7 +830,7 @@ func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
 			length := tbl.Length()
 			for i := int64(1); i <= int64(length); i++ {
 				v := tbl.RawGet(IntValue(i))
-				results, err := interp.callFunction(fn, []Value{v, IntValue(i)})
+				results, err := call(fn, []Value{v, IntValue(i)})
 				if err != nil {
 					return nil, err
 				}
@@ -854,7 +857,7 @@ func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
 			length := tbl.Length()
 			for i := int64(1); i <= int64(length); i++ {
 				v := tbl.RawGet(IntValue(i))
-				results, err := interp.callFunction(fn, []Value{acc, v})
+				results, err := call(fn, []Value{acc, v})
 				if err != nil {
 					return nil, err
 				}
@@ -879,7 +882,7 @@ func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
 			length := arr.Length()
 			for i := int64(1); i <= int64(length); i++ {
 				v := arr.RawGet(IntValue(i))
-				keys, err := interp.callFunction(keyFn, []Value{v})
+				keys, err := call(keyFn, []Value{v})
 				if err != nil {
 					return nil, err
 				}
@@ -890,4 +893,11 @@ func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
 			return []Value{TableValue(result)}, nil
 		},
 	}))
+	return tblLib
+}
+
+// buildTableHigherOrderWithInterp adds filter, map, reduce to the table library.
+// These need the interpreter to call GScript closures.
+func buildTableHigherOrderWithInterp(interp *Interpreter, tblLib *Table) {
+	BuildTableHigherOrderLibWithCaller(interp.callFunction, tblLib)
 }

@@ -5,10 +5,32 @@ import (
 	"sort"
 )
 
-// buildSortLib creates the "sort" standard library table.
-// Provides sorting utilities, binary search, partitioning, and order checks.
-// Inspired by Odin's sort package and Go's slices package.
-func buildSortLib(interp *Interpreter) *Table {
+type ValueLessFunc func(Value, Value) (bool, error)
+
+func defaultValueLess(a, b Value) (bool, error) {
+	less, ok := a.LessThan(b)
+	return ok && less, nil
+}
+
+// BuildSortLibWithCaller creates the "sort" standard library table using the
+// active execution engine for callback invocations.
+func BuildSortLibWithCaller(call ScriptFunctionCaller) *Table {
+	return BuildSortLibWithCallerAndLess(call, nil)
+}
+
+// BuildSortLibWithCallerAndLess is like BuildSortLibWithCaller, but lets an
+// execution engine provide its own less-than semantics for callback-produced
+// keys.
+func BuildSortLibWithCallerAndLess(call ScriptFunctionCaller, less ValueLessFunc) *Table {
+	if less == nil {
+		less = defaultValueLess
+	}
+	callScript := func(fn Value, args []Value) ([]Value, error) {
+		if call == nil {
+			return nil, fmt.Errorf("script function caller is required")
+		}
+		return call(fn, args)
+	}
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -78,7 +100,7 @@ func buildSortLib(interp *Interpreter) *Table {
 			if sortErr != nil {
 				return false
 			}
-			results, err := interp.callFunction(comp, []Value{elems[a], elems[b]})
+			results, err := callScript(comp, []Value{elems[a], elems[b]})
 			if err != nil {
 				sortErr = err
 				return false
@@ -111,7 +133,7 @@ func buildSortLib(interp *Interpreter) *Table {
 
 		// Pre-compute keys
 		for i, elem := range elems {
-			results, err := interp.callFunction(keyFn, []Value{elem})
+			results, err := callScript(keyFn, []Value{elem})
 			if err != nil {
 				return nil, err
 			}
@@ -128,8 +150,12 @@ func buildSortLib(interp *Interpreter) *Table {
 			if sortErr != nil {
 				return false
 			}
-			less, ok := pairs[a].key.LessThan(pairs[b].key)
-			return ok && less
+			isLess, err := less(pairs[a].key, pairs[b].key)
+			if err != nil {
+				sortErr = err
+				return false
+			}
+			return isLess
 		})
 		if sortErr != nil {
 			return nil, sortErr
@@ -247,7 +273,7 @@ func buildSortLib(interp *Interpreter) *Table {
 
 		for i := 1; i <= length; i++ {
 			v := tbl.RawGet(IntValue(int64(i)))
-			results, err := interp.callFunction(pred, []Value{v})
+			results, err := callScript(pred, []Value{v})
 			if err != nil {
 				return nil, err
 			}
@@ -278,7 +304,7 @@ func buildSortLib(interp *Interpreter) *Table {
 		best := tbl.RawGet(IntValue(1))
 		bestKey := best
 		if hasKeyFn {
-			results, err := interp.callFunction(args[1], []Value{best})
+			results, err := callScript(args[1], []Value{best})
 			if err != nil {
 				return nil, err
 			}
@@ -291,7 +317,7 @@ func buildSortLib(interp *Interpreter) *Table {
 			v := tbl.RawGet(IntValue(int64(i)))
 			vKey := v
 			if hasKeyFn {
-				results, err := interp.callFunction(args[1], []Value{v})
+				results, err := callScript(args[1], []Value{v})
 				if err != nil {
 					return nil, err
 				}
@@ -299,8 +325,11 @@ func buildSortLib(interp *Interpreter) *Table {
 					vKey = results[0]
 				}
 			}
-			less, ok := vKey.LessThan(bestKey)
-			if ok && less {
+			isLess, err := less(vKey, bestKey)
+			if err != nil {
+				return nil, err
+			}
+			if isLess {
 				best = v
 				bestKey = vKey
 			}
@@ -324,7 +353,7 @@ func buildSortLib(interp *Interpreter) *Table {
 		best := tbl.RawGet(IntValue(1))
 		bestKey := best
 		if hasKeyFn {
-			results, err := interp.callFunction(args[1], []Value{best})
+			results, err := callScript(args[1], []Value{best})
 			if err != nil {
 				return nil, err
 			}
@@ -337,7 +366,7 @@ func buildSortLib(interp *Interpreter) *Table {
 			v := tbl.RawGet(IntValue(int64(i)))
 			vKey := v
 			if hasKeyFn {
-				results, err := interp.callFunction(args[1], []Value{v})
+				results, err := callScript(args[1], []Value{v})
 				if err != nil {
 					return nil, err
 				}
@@ -345,8 +374,11 @@ func buildSortLib(interp *Interpreter) *Table {
 					vKey = results[0]
 				}
 			}
-			less, ok := bestKey.LessThan(vKey)
-			if ok && less {
+			isLess, err := less(bestKey, vKey)
+			if err != nil {
+				return nil, err
+			}
+			if isLess {
 				best = v
 				bestKey = vKey
 			}
@@ -355,4 +387,11 @@ func buildSortLib(interp *Interpreter) *Table {
 	})
 
 	return t
+}
+
+// buildSortLib creates the "sort" standard library table.
+// Provides sorting utilities, binary search, partitioning, and order checks.
+// Inspired by Odin's sort package and Go's slices package.
+func buildSortLib(interp *Interpreter) *Table {
+	return BuildSortLibWithCaller(interp.callFunction)
 }
