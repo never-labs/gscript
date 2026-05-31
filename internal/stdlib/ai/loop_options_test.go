@@ -72,3 +72,15 @@ func TestNormalizeLoopOptionsKeepsResponseFormat(t *testing.T) {
 		t.Fatalf("did not expect JSON response format default")
 	}
 }
+
+func TestNormalizeReactControls(t *testing.T) {
+	got := NormalizeReactControls(0, -3, -4)
+	if got.MaxSteps != 8 || got.MaxToolRetries != 0 || got.MaxHistoryTokens != 0 {
+		t.Fatalf("NormalizeReactControls defaults = %+v", got)
+	}
+
+	got = NormalizeReactControls(3, 2, 128)
+	if got.MaxSteps != 3 || got.MaxToolRetries != 2 || got.MaxHistoryTokens != 128 {
+		t.Fatalf("NormalizeReactControls explicit = %+v", got)
+	}
+}

@@ -313,22 +313,15 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 		tools = NewTable()
 	}
 	history := llmMessageValuesFromTable(messagesValue.Table())
-	maxSteps := int(toInt(opts.RawGetString("max_steps")))
-	if maxSteps <= 0 {
-		maxSteps = 8
-	}
+	controls := stdlibai.NormalizeReactControls(
+		toInt(opts.RawGetString("max_steps")),
+		toInt(opts.RawGetString("max_tool_retries")),
+		toInt(opts.RawGetString("max_history_tokens")),
+	)
 	model := opts.RawGetString("model").Str()
-	maxToolRetries := int(toInt(opts.RawGetString("max_tool_retries")))
-	if maxToolRetries < 0 {
-		maxToolRetries = 0
-	}
-	maxHistoryTokens := toInt(opts.RawGetString("max_history_tokens"))
-	if maxHistoryTokens < 0 {
-		maxHistoryTokens = 0
-	}
 	budgets := ambient.with(llmBudgetFromOptions(opts))
 	cancel := llmCancelFromOptions(opts, ctx)
-	for step := 0; step < maxSteps; step++ {
+	for step := 0; step < controls.MaxSteps; step++ {
 		if err := cancel.check(); !err.IsNil() {
 			llmTrace(trace, LLMTraceEvent{Type: "react_error", ErrorKind: llmErrorKind(err), Message: err.Table().RawGetString("message").Str()})
 			return []Value{NilValue(), err}, nil
@@ -338,8 +331,8 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 			return []Value{NilValue(), err}, nil
 		}
 		requestHistory := history
-		if maxHistoryTokens > 0 {
-			requestHistory = chatWindow(llmTableFromValues(history).Table(), maxHistoryTokens)
+		if controls.MaxHistoryTokens > 0 {
+			requestHistory = chatWindow(llmTableFromValues(history).Table(), controls.MaxHistoryTokens)
 		}
 		req := LLMTurnRequest{
 			Model:          model,
@@ -416,7 +409,7 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 					llmTrace(trace, LLMTraceEvent{Type: "tool_fatal", Step: int64(step), Tool: res.Calls[i].Tool, CallID: res.Calls[i].ID, ErrorKind: llmErrorKind(err)})
 					return []Value{NilValue(), err}, nil
 				}
-				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, maxToolRetries, trace, int64(step), res.Calls[i])
+				dispatchResult, err := llmDispatchWithRetry(call, callValue.Table(), tools, controls.MaxToolRetries, trace, int64(step), res.Calls[i])
 				if !err.IsNil() {
 					if llmErrorKind(err) == "pending" {
 						pendingPayload := err.Table().RawGetString("pending")
@@ -463,7 +456,7 @@ func llmReact(opts *Table, provider LLMProvider, call ScriptFunctionCaller, ctx 
 			return []Value{llmReactResultValue("stopped", "", res.Status, turnValue, history), NilValue()}, nil
 		}
 	}
-	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(maxSteps), Status: "stopped", Message: "max_steps"})
+	llmTrace(trace, LLMTraceEvent{Type: "react_stopped", Model: model, Step: int64(controls.MaxSteps), Status: "stopped", Message: "max_steps"})
 	return []Value{llmReactResultValue("stopped", "", "max_steps", NilValue(), history), NilValue()}, nil
 }
 

@@ -52,6 +52,13 @@ type LoopOptionPlan struct {
 	SetJSONResponseFormat bool
 }
 
+// ReactControls are the normalized loop controls used by built-in agent loops.
+type ReactControls struct {
+	MaxSteps         int
+	MaxToolRetries   int
+	MaxHistoryTokens int64
+}
+
 // NormalizeLoopOptions applies the public loop option defaults without
 // depending on runtime Value/Table internals.
 func NormalizeLoopOptions(input LoopOptionInput) (LoopOptionPlan, error) {
@@ -69,4 +76,23 @@ func NormalizeLoopOptions(input LoopOptionInput) (LoopOptionPlan, error) {
 		plan.SetJSONResponseFormat = true
 	}
 	return plan, nil
+}
+
+// NormalizeReactControls applies runtime-independent defaults and clamps for
+// the hot react loop. Value/Table decoding remains in the runtime adapter.
+func NormalizeReactControls(maxSteps, maxToolRetries, maxHistoryTokens int64) ReactControls {
+	if maxSteps <= 0 {
+		maxSteps = 8
+	}
+	if maxToolRetries < 0 {
+		maxToolRetries = 0
+	}
+	if maxHistoryTokens < 0 {
+		maxHistoryTokens = 0
+	}
+	return ReactControls{
+		MaxSteps:         int(maxSteps),
+		MaxToolRetries:   int(maxToolRetries),
+		MaxHistoryTokens: maxHistoryTokens,
+	}
 }
