@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/never-labs/gscript/internal/outputlimit"
 	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlib/outputlimit"
 )
 
 // BuildProcessWithPolicy creates the "process" standard library table.
