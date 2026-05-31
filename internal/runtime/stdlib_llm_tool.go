@@ -1,5 +1,7 @@
 package runtime
 
+import "github.com/never-labs/gscript/internal/stdlib/ai"
+
 func llmToolsFromValue(v Value) []LLMTool {
 	if !v.IsTable() {
 		return nil
@@ -39,59 +41,41 @@ func llmToolCallFromTable(t *Table) LLMToolCall {
 
 func llmToolCapsValue(tools *Table) Value {
 	caps := NewTable()
-	seen := map[string]bool{}
-	if tools == nil {
-		return TableValue(caps)
-	}
-	for i := 1; i <= tools.Length(); i++ {
-		tv := tools.RawGet(IntValue(int64(i)))
-		if !tv.IsTable() {
-			continue
-		}
-		for _, cap := range llmStringSliceFromValue(tv.Table().RawGetString("requires")) {
-			if cap == "" || seen[cap] {
-				continue
-			}
-			seen[cap] = true
-			caps.RawSet(IntValue(int64(caps.Length()+1)), StringValue(cap))
-		}
+	for _, cap := range ai.ToolCapabilities(llmToolSummaries(tools)) {
+		caps.RawSet(IntValue(int64(caps.Length()+1)), StringValue(cap))
 	}
 	return TableValue(caps)
 }
 
 func llmCheckToolCaps(tools, caps *Table) Value {
-	allowed := map[string]bool{}
-	for _, cap := range llmStringSliceFromValue(TableValue(caps)) {
-		allowed[cap] = true
-	}
-	if allowed["all"] || allowed["cap.all"] || allowed["*"] {
+	missing := ai.CheckToolCapabilities(llmToolSummaries(tools), llmStringSliceFromValue(TableValue(caps)))
+	if missing == nil {
 		return NilValue()
 	}
-	if allowed["none"] || allowed["cap.none"] {
-		allowed = map[string]bool{}
-	}
+	err := llmErrorValue("capability", "missing capability: "+missing.Capability)
+	et := err.Table()
+	et.RawSetString("capability", StringValue(missing.Capability))
+	et.RawSetString("tool", StringValue(missing.Tool))
+	return err
+}
+
+func llmToolSummaries(tools *Table) []ai.ToolSummary {
 	if tools == nil {
-		return NilValue()
+		return nil
 	}
+	out := make([]ai.ToolSummary, 0, tools.Length())
 	for i := 1; i <= tools.Length(); i++ {
 		tv := tools.RawGet(IntValue(int64(i)))
 		if !tv.IsTable() {
 			continue
 		}
 		tool := tv.Table()
-		toolName := tool.RawGetString("name").Str()
-		for _, cap := range llmStringSliceFromValue(tool.RawGetString("requires")) {
-			if cap == "" || cap == "none" || cap == "cap.none" || allowed[cap] {
-				continue
-			}
-			err := llmErrorValue("capability", "missing capability: "+cap)
-			et := err.Table()
-			et.RawSetString("capability", StringValue(cap))
-			et.RawSetString("tool", StringValue(toolName))
-			return err
-		}
+		out = append(out, ai.ToolSummary{
+			Name:     tool.RawGetString("name").Str(),
+			Requires: llmStringSliceFromValue(tool.RawGetString("requires")),
+		})
 	}
-	return NilValue()
+	return out
 }
 
 func llmDispatch(call ScriptFunctionCaller, callTable, tools *Table) ([]Value, error) {
