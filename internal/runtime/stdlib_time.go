@@ -2,8 +2,9 @@ package runtime
 
 import (
 	"fmt"
-	"strings"
 	"time"
+
+	stdtime "github.com/never-labs/gscript/internal/stdlib/base/time"
 )
 
 var timeTableCtor = NewSmallTableCtorN([]string{
@@ -111,36 +112,6 @@ func contextErrValue(errFn Value) Value {
 		return StringValue("cancelled")
 	}
 	return vals[0]
-}
-
-// strftimeToGo converts strftime-style format specifiers to Go layout strings.
-func strftimeToGo(layout string) string {
-	// Check if it contains strftime-style % directives
-	if !strings.Contains(layout, "%") {
-		return layout // assume it's already a Go layout
-	}
-
-	replacements := []struct {
-		from string
-		to   string
-	}{
-		{"%Y", "2006"},
-		{"%m", "01"},
-		{"%d", "02"},
-		{"%H", "15"},
-		{"%M", "04"},
-		{"%S", "05"},
-		{"%A", "Monday"},
-		{"%B", "January"},
-		{"%Z", "MST"},
-		{"%%", "%"},
-	}
-
-	result := layout
-	for _, r := range replacements {
-		result = strings.ReplaceAll(result, r.from, r.to)
-	}
-	return result
 }
 
 // buildTimeLib creates the "time" standard library table.
@@ -285,7 +256,7 @@ func buildTimeLib() *Table {
 		if err != nil {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'time.format': %v", err)
 		}
-		layout := strftimeToGo(layoutVal.Str())
+		layout := stdtime.LayoutFromStrftime(layoutVal.Str())
 		return StringValue(goTime.Format(layout)), nil
 	}
 	setFastArg2("format", func(args []Value) ([]Value, error) {
@@ -302,7 +273,7 @@ func buildTimeLib() *Table {
 	// time.parse(str, layout) -> time table, nil | nil, errMsg
 	timeParse := func(strVal, layoutVal Value) (Value, Value, int, error) {
 		str := strVal.Str()
-		layout := strftimeToGo(layoutVal.Str())
+		layout := stdtime.LayoutFromStrftime(layoutVal.Str())
 		goTime, err := time.Parse(layout, str)
 		if err != nil {
 			return NilValue(), StringValue(err.Error()), 2, nil
