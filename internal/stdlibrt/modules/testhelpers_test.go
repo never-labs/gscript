@@ -55,6 +55,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "csv", runtime.TableValue(BuildCSV(interp.MaxHostResultBytes)))
 	installTestModule(interp, "encoding", runtime.TableValue(BuildEncoding(interp.MaxHostResultBytes)))
 	installTestModule(interp, "hash", runtime.TableValue(BuildHash()))
+	installTestModule(interp, "json", runtime.TableValue(BuildJSON()))
 	installTestModule(interp, "log", runtime.TableValue(BuildLog()))
 	installTestModule(interp, "math", runtime.TableValue(BuildMath()))
 	installTestModule(interp, "matrix", runtime.TableValue(BuildMatrix()))

@@ -53,8 +53,11 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	// Raylib game library (window, drawing, input, audio)
 	std.RegisterTable("rl", rlLib(interp))
 
-	// --- Encoding / Crypto ---
-	std.RegisterTable("json", buildJSONLib())
+	if includeMigratedHostIO {
+		// Historical direct-runtime install path. Public embedding now installs
+		// json from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("json", buildJSONLib())
+	}
 
 	if includeMigratedHostIO {
 		std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))

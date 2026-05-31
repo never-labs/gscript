@@ -77,6 +77,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 		installer.RegisterTable("os", modules.BuildOSWithPolicy(hostOpts))
 	}
 	installer.RegisterTable("hash", modules.BuildHash())
+	installer.RegisterTable("json", modules.BuildJSON())
 	installer.RegisterTable("log", modules.BuildLog())
 	installer.RegisterTable("matrix", modules.BuildMatrix())
 	installer.RegisterTable("math", modules.BuildMath())
