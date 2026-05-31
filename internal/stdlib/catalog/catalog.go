@@ -5,7 +5,7 @@ package catalog
 const (
 	LayerBase   = "base"
 	LayerHost   = "host"
-	LayerAI     = "ai"
+	LayerLLM    = "llm"
 	LayerData   = "data"
 	LayerVendor = "vendor"
 	LayerCompat = "compat"
@@ -27,8 +27,8 @@ var modules = []ModuleInfo{
 	{Name: "bit32", Layer: LayerCompat, SafeDefault: true},
 	{Name: "bits", Layer: LayerBase, SafeDefault: true},
 	{Name: "bytes", Layer: LayerBase, SafeDefault: true},
-	{Name: "chat", Layer: LayerAI, Capabilities: []string{"llm.turn"}},
-	{Name: "color", Layer: LayerData, SafeDefault: true},
+	{Name: "chat", Layer: LayerLLM, Capabilities: []string{"llm.turn"}},
+	{Name: "color", Layer: LayerBase, SafeDefault: true},
 	{Name: "compress", Layer: LayerBase, SafeDefault: true},
 	{Name: "container", Layer: LayerBase, SafeDefault: true},
 	{Name: "context", Layer: LayerBase, SafeDefault: true},
@@ -38,16 +38,16 @@ var modules = []ModuleInfo{
 	{Name: "encoding", Layer: LayerBase, SafeDefault: true},
 	{Name: "fs", Layer: LayerHost, Capabilities: []string{"fs.read", "fs.write"}},
 	{Name: "hash", Layer: LayerBase, SafeDefault: true},
-	{Name: "history", Layer: LayerAI},
+	{Name: "history", Layer: LayerLLM},
 	{Name: "http", Layer: LayerHost, Capabilities: []string{"net.listen"}},
 	{Name: "io", Layer: LayerHost, Capabilities: []string{"io"}},
 	{Name: "json", Layer: LayerBase, SafeDefault: true},
-	{Name: "llm", Layer: LayerAI, Capabilities: []string{"llm.turn"}},
+	{Name: "llm", Layer: LayerLLM, Capabilities: []string{"llm.turn"}},
 	{Name: "log", Layer: LayerHost, Capabilities: []string{"io.write"}},
-	{Name: "loop", Layer: LayerAI, Capabilities: []string{"llm.turn"}},
+	{Name: "loop", Layer: LayerLLM, Capabilities: []string{"llm.turn"}},
 	{Name: "math", Layer: LayerBase, SafeDefault: true},
 	{Name: "matrix", Layer: LayerData, SafeDefault: true},
-	{Name: "msg", Layer: LayerAI},
+	{Name: "msg", Layer: LayerLLM},
 	{Name: "net", Layer: LayerHost, Capabilities: []string{"net.http"}},
 	{Name: "os", Layer: LayerHost, Capabilities: []string{"env.read", "env.write"}},
 	{Name: "path", Layer: LayerBase, SafeDefault: true},
@@ -72,7 +72,7 @@ var modules = []ModuleInfo{
 var layerOrder = []string{
 	LayerBase,
 	LayerHost,
-	LayerAI,
+	LayerLLM,
 	LayerData,
 	LayerVendor,
 	LayerCompat,

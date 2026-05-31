@@ -35,13 +35,13 @@ func TestCapabilitiesJSON(t *testing.T) {
 	if len(caps.StdlibModules) == 0 {
 		t.Fatal("stdlib_modules is empty")
 	}
-	for _, want := range []string{"base", "host", "ai", "data", "vendor", "compat"} {
+	for _, want := range []string{"base", "host", "llm", "data", "vendor", "compat"} {
 		if !capabilitiesHaveStdlibLayer(caps.StdlibLayers, want) {
 			t.Fatalf("stdlib_layers = %#v, want layer %q", caps.StdlibLayers, want)
 		}
 	}
-	if !capabilitiesHaveStdlibModule(caps.StdlibLayers, "ai", "llm") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "host", "fs") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "data", "soa") {
-		t.Fatalf("stdlib_layers = %#v, want ai/llm, host/fs, and data/soa", caps.StdlibLayers)
+	if !capabilitiesHaveStdlibModule(caps.StdlibLayers, "llm", "llm") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "host", "fs") || !capabilitiesHaveStdlibModule(caps.StdlibLayers, "data", "soa") {
+		t.Fatalf("stdlib_layers = %#v, want llm/llm, host/fs, and data/soa", caps.StdlibLayers)
 	}
 	for _, want := range []string{"agent", "tool", "turn", "messages_bare_expr", "direct_agent_tools", "toolof"} {
 		if !caps.LLM.Enabled || !containsString(caps.LLM.Syntax, want) {
