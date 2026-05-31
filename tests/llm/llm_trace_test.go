@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMTraceSinkReceivesTurnAndReactEvents(t *testing.T) {
@@ -16,23 +17,23 @@ func TestLLMTraceSinkReceivesTurnAndReactEvents(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
-				{Status: "final_answer", Text: "turn", Usage: gs.LLMTurnUsage{InputTokens: 1, OutputTokens: 2}},
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{Status: "final_answer", Text: "turn", Usage: llm.TurnUsage{InputTokens: 1, OutputTokens: 2}},
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
 						Args: map[string]any{"name": "gscript"},
 					}},
 				},
-				{Status: "final_answer", Text: "done", Usage: gs.LLMTurnUsage{InputTokens: 3, OutputTokens: 4}},
+				{Status: "final_answer", Text: "done", Usage: llm.TurnUsage{InputTokens: 3, OutputTokens: 4}},
 			}}
-			var events []gs.LLMTraceEvent
+			var events []llm.TraceEvent
 			opts := append([]gs.Option{
 				gs.WithLibs(gs.LibString | gs.LibLLM),
 				gs.WithLLMProvider(provider),
-				gs.WithLLMTrace(func(event gs.LLMTraceEvent) {
+				gs.WithLLMTrace(func(event llm.TraceEvent) {
 					events = append(events, event)
 				}),
 			}, tc.opts...)
@@ -77,12 +78,12 @@ react_result, react_err := llm.react({
 }
 
 func TestLLMTraceRecorderHelper(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+	provider := &mockLLMProvider{res: llm.TurnResult{
 		Status: "final_answer",
 		Text:   "done",
-		Usage:  gs.LLMTurnUsage{InputTokens: 1, OutputTokens: 2},
+		Usage:  llm.TurnUsage{InputTokens: 1, OutputTokens: 2},
 	}}
-	recorder := gs.NewLLMTraceRecorder(gs.LLMTraceEvent{Type: "seed"})
+	recorder := llm.NewTraceRecorder(llm.TraceEvent{Type: "seed"})
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),
 		gs.WithLLMProvider(provider),

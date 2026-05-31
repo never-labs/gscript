@@ -3,24 +3,24 @@ package gscript_test
 import (
 	"context"
 
-	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 type mockLLMProvider struct {
-	last     gs.LLMTurnRequest
-	requests []gs.LLMTurnRequest
-	res      gs.LLMTurnResult
+	last     llm.TurnRequest
+	requests []llm.TurnRequest
+	res      llm.TurnResult
 	err      error
 }
 
-func (p *mockLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+func (p *mockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
 	p.last = req
 	p.requests = append(p.requests, req)
 	if p.err != nil {
-		return gs.LLMTurnResult{}, p.err
+		return llm.TurnResult{}, p.err
 	}
 	if p.res.Status != "" || p.res.Text != "" || len(p.res.Calls) > 0 {
 		return p.res, nil
 	}
-	return gs.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
+	return llm.TurnResult{Status: "final_answer", Text: "ok"}, nil
 }

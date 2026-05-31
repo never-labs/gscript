@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLoopHelpers(t *testing.T) {
@@ -16,11 +17,11 @@ func TestLoopHelpers(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "simple"},
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
 						Args: map[string]any{"name": "gscript"},
@@ -180,10 +181,10 @@ func TestLoopSnapshotTraceEvents(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var events []gs.LLMTraceEvent
+			var events []llm.TraceEvent
 			opts := append([]gs.Option{
 				gs.WithLibs(gs.LibString | gs.LibLLM),
-				gs.WithLLMTrace(func(event gs.LLMTraceEvent) {
+				gs.WithLLMTrace(func(event llm.TraceEvent) {
 					events = append(events, event)
 				}),
 			}, tc.opts...)
@@ -244,9 +245,9 @@ func TestLoopReactApproveWhenPauses(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{
+			provider := &mockLLMProvider{res: llm.TurnResult{
 				Status: "tool_calls",
-				Calls: []gs.LLMToolCall{{
+				Calls: []llm.ToolCall{{
 					ID:   "call_1",
 					Tool: "refund",
 					Args: map[string]any{"amount": int64(150)},
@@ -301,11 +302,11 @@ func TestLoopPlanExecute(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "1. lookup docs\n2. answer"},
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
 						Args: map[string]any{"name": "gscript"},
@@ -366,7 +367,7 @@ func TestLoopReflect(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "draft"},
 				{Status: "final_answer", Text: "refined"},
 			}}

@@ -2,6 +2,7 @@ package gscript_test
 
 import (
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 	"testing"
 )
 
@@ -14,7 +15,7 @@ func TestLLMDirectTurnResponseFormatProviderRequest(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -101,7 +102,7 @@ func TestLLMAgentOutputStructuredValue(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -156,7 +157,7 @@ func TestLLMAgentOutputKeepsExplicitResponseFormat(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"ok":true}`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"ok":true}`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -200,7 +201,7 @@ func TestLLMCustomFlowDoesNotAutoValidateOutput(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `not json`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `not json`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`

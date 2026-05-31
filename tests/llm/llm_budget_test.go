@@ -2,6 +2,7 @@ package gscript_test
 
 import (
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 	"testing"
 )
 
@@ -14,7 +15,7 @@ func TestLLMStandaloneBudgetLimitsDirectTurns(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "one"},
 				{Status: "final_answer", Text: "two"},
 			}}
@@ -57,8 +58,8 @@ func TestLLMStandaloneBudgetNestedIntersectionUsesOuterTokens(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
-				{Status: "final_answer", Text: "one", Usage: gs.LLMTurnUsage{InputTokens: 2, OutputTokens: 3}},
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{Status: "final_answer", Text: "one", Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3}},
 				{Status: "final_answer", Text: "two"},
 			}}
 			opts := append([]gs.Option{
@@ -102,10 +103,10 @@ func TestLLMStandaloneBudgetLimitsToolCallsAndTime(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_1",
 						Tool: "lookup",
 						Args: map[string]any{"query": "gscript"},

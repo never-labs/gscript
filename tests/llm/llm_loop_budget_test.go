@@ -4,18 +4,19 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLoopBudgets(t *testing.T) {
-	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+	provider := &mockLLMProvider{results: []llm.TurnResult{
 		{
 			Status: "tool_calls",
-			Calls: []gs.LLMToolCall{{
+			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
 				Args: map[string]any{"name": "gscript"},
 			}},
-			Usage: gs.LLMTurnUsage{InputTokens: 2, OutputTokens: 3},
+			Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3},
 		},
 		{Status: "final_answer", Text: "done"},
 	}}
@@ -44,9 +45,9 @@ err_dimension := err.dimension
 }
 
 func TestLoopToolCallBudget(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+	provider := &mockLLMProvider{res: llm.TurnResult{
 		Status: "tool_calls",
-		Calls: []gs.LLMToolCall{
+		Calls: []llm.ToolCall{
 			{ID: "call_1", Tool: "lookup", Args: map[string]any{"name": "a"}},
 			{ID: "call_2", Tool: "lookup", Args: map[string]any{"name": "b"}},
 		},
@@ -75,7 +76,7 @@ err_dimension := err.dimension
 }
 
 func TestLoopTimeBudget(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
 	if err := vm.Exec(`
 result, err := loop.react({
@@ -98,7 +99,7 @@ err_message := err.message
 }
 
 func TestLoopScriptContextCancellation(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
 	if err := vm.Exec(`
 ctx, cancel := context.withCancel()

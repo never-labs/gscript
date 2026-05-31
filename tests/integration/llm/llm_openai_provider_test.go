@@ -12,6 +12,8 @@ import (
 	"time"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/gscript/llm/openai"
 )
 
 func float64Ptr(v float64) *float64 {
@@ -50,20 +52,20 @@ func TestOpenAICompatibleLLMProvider(t *testing.T) {
 }`)
 	}))
 	defer server.Close()
-	provider := gs.OpenAICompatibleLLMProvider{
+	provider := openai.Provider{
 		Endpoint: server.URL,
 		APIKey:   "test-key",
 		Model:    "fallback-model",
 		Client:   server.Client(),
 		Headers:  map[string]string{"X-Test": "ok"},
 	}
-	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+	res, err := provider.Turn(context.Background(), llm.TurnRequest{
 		Model: "mock-fast",
-		Messages: []gs.LLMMessage{
+		Messages: []llm.Message{
 			{Role: "system", Text: "short"},
 			{Role: "user", Text: "find docs"},
 		},
-		Tools: []gs.LLMTool{{
+		Tools: []llm.Tool{{
 			Name:        "lookup",
 			Description: "lookup docs",
 			Params:      []string{"name"},
@@ -124,14 +126,14 @@ func TestOpenAICompatibleLLMProviderRetriesTransientStatus(t *testing.T) {
 		fmt.Fprint(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`)
 	}))
 	defer server.Close()
-	provider := gs.OpenAICompatibleLLMProvider{
+	provider := openai.Provider{
 		Endpoint:    server.URL,
 		Model:       "mock-fast",
 		Client:      server.Client(),
 		MaxAttempts: 2,
 	}
-	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
-		Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+	res, err := provider.Turn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{{Role: "user", Text: "hello"}},
 	})
 	if err != nil {
 		t.Fatalf("Turn: %v", err)
@@ -146,15 +148,15 @@ func TestOpenAICompatibleLLMProviderTypedStatusError(t *testing.T) {
 		http.Error(w, "bad request", http.StatusBadRequest)
 	}))
 	defer server.Close()
-	provider := gs.OpenAICompatibleLLMProvider{
+	provider := openai.Provider{
 		Endpoint: server.URL,
 		Model:    "mock-fast",
 		Client:   server.Client(),
 	}
-	_, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
-		Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+	_, err := provider.Turn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{{Role: "user", Text: "hello"}},
 	})
-	var statusErr *gs.OpenAICompatibleLLMError
+	var statusErr *openai.Error
 	if !errors.As(err, &statusErr) {
 		t.Fatalf("err = %T %v, want OpenAICompatibleLLMError", err, err)
 	}
@@ -169,14 +171,14 @@ func TestOpenAICompatibleLLMProviderTimeout(t *testing.T) {
 		fmt.Fprint(w, `{}`)
 	}))
 	defer server.Close()
-	provider := gs.OpenAICompatibleLLMProvider{
+	provider := openai.Provider{
 		Endpoint: server.URL,
 		Model:    "mock-fast",
 		Client:   server.Client(),
 		Timeout:  1 * time.Millisecond,
 	}
-	_, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
-		Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+	_, err := provider.Turn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{{Role: "user", Text: "hello"}},
 	})
 	if err == nil {
 		t.Fatal("Turn succeeded, want timeout")

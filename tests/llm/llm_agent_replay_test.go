@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMAgentTurnScenarioRecordReplay(t *testing.T) {
@@ -48,11 +49,11 @@ out, err := reviewer("recording")
 draft_text := out.draft
 final_text := out.final
 `
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
-				{Status: "final_answer", Text: "draft pass", Usage: gs.LLMTurnUsage{InputTokens: 2, OutputTokens: 3}},
-				{Status: "final_answer", Text: "final pass", Usage: gs.LLMTurnUsage{InputTokens: 4, OutputTokens: 5}},
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{Status: "final_answer", Text: "draft pass", Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3}},
+				{Status: "final_answer", Text: "final pass", Usage: llm.TurnUsage{InputTokens: 4, OutputTokens: 5}},
 			}}
-			recorder := gs.NewLLMRecorder()
+			recorder := llm.NewRecorder()
 			recordOpts := append([]gs.Option{
 				gs.WithLibs(gs.LibString | gs.LibLLM),
 				gs.WithLLMProvider(provider),

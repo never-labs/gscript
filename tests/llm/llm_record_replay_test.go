@@ -7,19 +7,20 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMRecorderAndReplay(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+	provider := &mockLLMProvider{res: llm.TurnResult{
 		Status: "final_answer",
 		Text:   "recorded",
-		Usage:  gs.LLMTurnUsage{InputTokens: 5, OutputTokens: 6},
+		Usage:  llm.TurnUsage{InputTokens: 5, OutputTokens: 6},
 	}}
-	var records []gs.LLMRecord
+	var records []llm.Record
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),
 		gs.WithLLMProvider(provider),
-		gs.WithLLMRecorder(func(record gs.LLMRecord) {
+		gs.WithLLMRecorder(func(record llm.Record) {
 			records = append(records, record)
 		}),
 	)
@@ -59,11 +60,11 @@ usage := result.usage.output_tokens
 }
 
 func TestLLMRecorderHelper(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+	provider := &mockLLMProvider{res: llm.TurnResult{
 		Status: "final_answer",
 		Text:   "recorded",
 	}}
-	recorder := gs.NewLLMRecorder()
+	recorder := llm.NewRecorder()
 	vm := gs.New(
 		gs.WithLibs(gs.LibString|gs.LibLLM),
 		gs.WithLLMProvider(provider),
@@ -89,11 +90,11 @@ result, err := llm.turn({
 	if err := recorder.Save(path); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	loaded, err := gs.LoadLLMRecorder(path)
+	loaded, err := llm.LoadRecorder(path)
 	if err != nil {
 		t.Fatalf("LoadLLMRecorder: %v", err)
 	}
-	replay := gs.NewLLMReplayProvider(loaded.Records())
+	replay := llm.NewReplayProvider(loaded.Records())
 	res, err := replay.Turn(context.Background(), recorder.Records()[0].Request)
 	if err != nil || res.Text != "recorded" {
 		t.Fatalf("Turn res=%#v err=%v", res, err)
@@ -105,12 +106,12 @@ result, err := llm.turn({
 }
 
 func TestLLMReplayRejectsMismatchedRequest(t *testing.T) {
-	records := []gs.LLMRecord{{
-		Request: gs.LLMTurnRequest{
+	records := []llm.Record{{
+		Request: llm.TurnRequest{
 			Model:    "mock-fast",
-			Messages: []gs.LLMMessage{{Role: "user", Text: "expected"}},
+			Messages: []llm.Message{{Role: "user", Text: "expected"}},
 		},
-		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+		Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
 	}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMReplay(records))
 	if err := vm.Exec(`
@@ -129,18 +130,18 @@ kind := err.kind
 }
 
 func TestLLMReplayTypedErrors(t *testing.T) {
-	replay := gs.NewLLMReplayProvider([]gs.LLMRecord{{
-		Request: gs.LLMTurnRequest{
+	replay := llm.NewReplayProvider([]llm.Record{{
+		Request: llm.TurnRequest{
 			Model:    "mock-fast",
-			Messages: []gs.LLMMessage{{Role: "user", Text: "expected"}},
+			Messages: []llm.Message{{Role: "user", Text: "expected"}},
 		},
-		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+		Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
 	}})
-	_, err := replay.Turn(context.Background(), gs.LLMTurnRequest{
+	_, err := replay.Turn(context.Background(), llm.TurnRequest{
 		Model:    "mock-fast",
-		Messages: []gs.LLMMessage{{Role: "user", Text: "actual"}},
+		Messages: []llm.Message{{Role: "user", Text: "actual"}},
 	})
-	var mismatch *gs.LLMReplayMismatchError
+	var mismatch *llm.ReplayMismatchError
 	if !errors.As(err, &mismatch) {
 		t.Fatalf("err = %T %v, want LLMReplayMismatchError", err, err)
 	}
@@ -152,23 +153,23 @@ func TestLLMReplayTypedErrors(t *testing.T) {
 		t.Fatalf("remaining = %d, want 0", replay.Remaining())
 	}
 
-	empty := gs.NewLLMReplayProvider(nil)
-	_, err = empty.Turn(context.Background(), gs.LLMTurnRequest{})
-	var exhausted *gs.LLMReplayExhaustedError
+	empty := llm.NewReplayProvider(nil)
+	_, err = empty.Turn(context.Background(), llm.TurnRequest{})
+	var exhausted *llm.ReplayExhaustedError
 	if !errors.As(err, &exhausted) || exhausted.Turn != 0 {
 		t.Fatalf("err = %T %v, exhausted=%#v", err, err, exhausted)
 	}
 }
 
 func TestLLMReplayProviderStateHelpers(t *testing.T) {
-	record := gs.LLMRecord{
-		Request: gs.LLMTurnRequest{
+	record := llm.Record{
+		Request: llm.TurnRequest{
 			Model:    "mock-fast",
-			Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
 		},
-		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+		Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
 	}
-	replay := gs.NewLLMReplayProvider([]gs.LLMRecord{record})
+	replay := llm.NewReplayProvider([]llm.Record{record})
 	if replay.Consumed() != 0 || replay.Remaining() != 1 {
 		t.Fatalf("initial consumed=%d remaining=%d", replay.Consumed(), replay.Remaining())
 	}
@@ -195,10 +196,10 @@ func TestLLMReplayProviderStateHelpers(t *testing.T) {
 }
 
 func TestLLMRecordJSONRoundTrip(t *testing.T) {
-	records := []gs.LLMRecord{{
-		Request: gs.LLMTurnRequest{
+	records := []llm.Record{{
+		Request: llm.TurnRequest{
 			Model: "mock-fast",
-			Messages: []gs.LLMMessage{{
+			Messages: []llm.Message{{
 				Role: "user",
 				Text: "hello",
 				Value: map[string]any{
@@ -206,7 +207,7 @@ func TestLLMRecordJSONRoundTrip(t *testing.T) {
 					"tags":  []any{"a", int64(2)},
 				},
 			}},
-			Tools: []gs.LLMTool{{
+			Tools: []llm.Tool{{
 				Name:     "lookup",
 				Params:   []string{"name"},
 				Requires: []string{"docs.read"},
@@ -217,24 +218,24 @@ func TestLLMRecordJSONRoundTrip(t *testing.T) {
 			}},
 			Metadata: map[string]string{"trace_id": "abc"},
 		},
-		Result: gs.LLMTurnResult{
+		Result: llm.TurnResult{
 			Status: "tool_calls",
-			Calls: []gs.LLMToolCall{{
+			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
 				Args: map[string]any{"name": "gscript", "limit": int64(3)},
 			}},
 		},
 	}}
-	data, err := gs.MarshalLLMRecords(records)
+	data, err := llm.MarshalRecords(records)
 	if err != nil {
 		t.Fatalf("MarshalLLMRecords: %v", err)
 	}
-	decoded, err := gs.UnmarshalLLMRecords(data)
+	decoded, err := llm.UnmarshalRecords(data)
 	if err != nil {
 		t.Fatalf("UnmarshalLLMRecords: %v", err)
 	}
-	replay := gs.NewLLMReplayProvider(decoded)
+	replay := llm.NewReplayProvider(decoded)
 	res, err := replay.Turn(context.Background(), records[0].Request)
 	if err != nil {
 		t.Fatalf("Turn: %v", err)
@@ -246,21 +247,21 @@ func TestLLMRecordJSONRoundTrip(t *testing.T) {
 
 func TestLLMRecordFileRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "records.json")
-	records := []gs.LLMRecord{{
-		Request: gs.LLMTurnRequest{
+	records := []llm.Record{{
+		Request: llm.TurnRequest{
 			Model:    "mock-fast",
-			Messages: []gs.LLMMessage{{Role: "user", Text: "hello"}},
+			Messages: []llm.Message{{Role: "user", Text: "hello"}},
 		},
-		Result: gs.LLMTurnResult{Status: "final_answer", Text: "ok"},
+		Result: llm.TurnResult{Status: "final_answer", Text: "ok"},
 	}}
-	if err := gs.SaveLLMRecords(path, records); err != nil {
+	if err := llm.SaveRecords(path, records); err != nil {
 		t.Fatalf("SaveLLMRecords: %v", err)
 	}
-	decoded, err := gs.LoadLLMRecords(path)
+	decoded, err := llm.LoadRecords(path)
 	if err != nil {
 		t.Fatalf("LoadLLMRecords: %v", err)
 	}
-	replay := gs.NewLLMReplayProvider(decoded)
+	replay := llm.NewReplayProvider(decoded)
 	res, err := replay.Turn(context.Background(), records[0].Request)
 	if err != nil || res.Text != "ok" {
 		t.Fatalf("Turn res=%#v err=%v", res, err)

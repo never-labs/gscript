@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMAgentOutputValidationError(t *testing.T) {
@@ -16,7 +17,7 @@ func TestLLMAgentOutputValidationError(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `not json`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `not json`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -59,7 +60,7 @@ func TestLLMAgentOutputValidationMissingField(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada"}`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"name":"Ada"}`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -106,7 +107,7 @@ func TestLLMAgentOutputValidationTypeMismatch(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","score":"high","ok":true,"meta":{}}`}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: `{"name":"Ada","score":"high","ok":true,"meta":{}}`}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`

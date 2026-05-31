@@ -9,6 +9,8 @@ import (
 	"time"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/gscript/llm/anthropic"
 )
 
 const defaultGLMAnthropicCompatibleBaseURL = "https://open.bigmodel.cn/api/anthropic"
@@ -61,7 +63,7 @@ func assertLLMSmokeText(t *testing.T, got, want string) {
 // used by the local glm_cc wrapper, without invoking the wrapper itself.
 func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 	cfg := glmAnthropicCompatibleSmokeConfig(t)
-	provider := gs.AnthropicCompatibleLLMProvider{
+	provider := anthropic.Provider{
 		Endpoint:     cfg.Endpoint,
 		APIKey:       cfg.APIKey,
 		Model:        cfg.Model,
@@ -75,8 +77,8 @@ func TestGLMAnthropicCompatibleLLMIntegration(t *testing.T) {
 	fmt.Printf("endpoint=%s\n", cfg.Endpoint)
 	fmt.Printf("model=%s\n", cfg.Model)
 	fmt.Printf("user=%q\n", prompt)
-	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
-		Messages: []gs.LLMMessage{
+	res, err := provider.Turn(context.Background(), llm.TurnRequest{
+		Messages: []llm.Message{
 			{Role: "system", Text: "You are a concise smoke-test assistant. Return plain text only."},
 			{Role: "user", Text: prompt},
 		},

@@ -9,27 +9,28 @@ import (
 	"strings"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 type exampleLLMProvider struct{}
 
-func (exampleLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+func (exampleLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
 	for _, msg := range req.Messages {
 		if msg.Role == "tool" && msg.Value != nil {
-			return gs.LLMTurnResult{Status: "final_answer", Text: fmt.Sprint(msg.Value)}, nil
+			return llm.TurnResult{Status: "final_answer", Text: fmt.Sprint(msg.Value)}, nil
 		}
 	}
 	if len(req.Tools) > 0 {
-		return gs.LLMTurnResult{
+		return llm.TurnResult{
 			Status: "tool_calls",
-			Calls: []gs.LLMToolCall{{
+			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: req.Tools[0].Name,
 				Args: map[string]any{"name": "gscript"},
 			}},
 		}, nil
 	}
-	return gs.LLMTurnResult{Status: "final_answer", Text: "hello"}, nil
+	return llm.TurnResult{Status: "final_answer", Text: "hello"}, nil
 }
 
 func Example_compileRun() {

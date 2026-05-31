@@ -8,6 +8,8 @@ import (
 	"time"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/gscript/llm/anthropic"
 )
 
 // TestAnthropicCompatibleLLMIntegration is a gated real-provider smoke test.
@@ -23,7 +25,7 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 	if endpoint == "" || apiKey == "" || model == "" {
 		t.Skip("set GSCRIPT_ANTHROPIC_COMPAT_BASE_URL, GSCRIPT_ANTHROPIC_COMPAT_API_KEY, and GSCRIPT_ANTHROPIC_COMPAT_MODEL")
 	}
-	provider := gs.AnthropicCompatibleLLMProvider{
+	provider := anthropic.Provider{
 		Endpoint:     endpoint,
 		APIKey:       apiKey,
 		Model:        model,
@@ -63,8 +65,8 @@ func TestAnthropicCompatibleLLMIntegration(t *testing.T) {
 			fmt.Printf("case=%s\n", tc.name)
 			fmt.Printf("system=%q\n", tc.system)
 			fmt.Printf("user=%q\n", tc.user)
-			res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
-				Messages: []gs.LLMMessage{
+			res, err := provider.Turn(context.Background(), llm.TurnRequest{
+				Messages: []llm.Message{
 					{Role: "system", Text: tc.system},
 					{Role: "user", Text: tc.user},
 				},

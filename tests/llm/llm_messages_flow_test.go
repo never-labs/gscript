@@ -2,6 +2,7 @@ package gscript_test
 
 import (
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 	"strings"
 	"testing"
 )
@@ -15,7 +16,7 @@ func TestLLMNamedAgentFlowAndDirectTurnSugar(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "flow-ok"},
 				{Status: "final_answer", Text: "turn-sugar-ok"},
 			}}
@@ -107,7 +108,7 @@ func TestLLMMessagesBlockAllowsMixedMessageItems(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "ok"}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "ok"}}
 			opts := append([]gs.Option{
 				gs.WithLibs(gs.LibString | gs.LibLLM),
 				gs.WithLLMProvider(provider),
@@ -226,8 +227,8 @@ func TestLLMFlowAgentUsesStdlibAgentAmbientConfig(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
-				{Status: "final_answer", Text: "one", Usage: gs.LLMTurnUsage{InputTokens: 2, OutputTokens: 3}},
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{Status: "final_answer", Text: "one", Usage: llm.TurnUsage{InputTokens: 2, OutputTokens: 3}},
 				{Status: "final_answer", Text: "two"},
 			}}
 			opts := append([]gs.Option{

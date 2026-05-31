@@ -7,21 +7,22 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 type mockLLMProvider struct {
-	last     gs.LLMTurnRequest
-	requests []gs.LLMTurnRequest
-	res      gs.LLMTurnResult
-	results  []gs.LLMTurnResult
+	last     llm.TurnRequest
+	requests []llm.TurnRequest
+	res      llm.TurnResult
+	results  []llm.TurnResult
 	err      error
 }
 
-func (p *mockLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+func (p *mockLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
 	p.last = req
 	p.requests = append(p.requests, req)
 	if p.err != nil {
-		return gs.LLMTurnResult{}, p.err
+		return llm.TurnResult{}, p.err
 	}
 	if len(p.results) > 0 {
 		res := p.results[0]
@@ -31,7 +32,7 @@ func (p *mockLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLM
 	if p.res.Status != "" || p.res.Text != "" || len(p.res.Calls) > 0 {
 		return p.res, nil
 	}
-	return gs.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
+	return llm.TurnResult{Status: "final_answer", Text: "ok"}, nil
 }
 
 func TestLLMTurnWithMockProvider(t *testing.T) {
@@ -43,14 +44,14 @@ func TestLLMTurnWithMockProvider(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{
+			provider := &mockLLMProvider{res: llm.TurnResult{
 				Status: "tool_calls",
-				Calls: []gs.LLMToolCall{{
+				Calls: []llm.ToolCall{{
 					ID:   "call_1",
 					Tool: "lookup",
 					Args: map[string]any{"query": "gscript"},
 				}},
-				Usage: gs.LLMTurnUsage{InputTokens: 3, OutputTokens: 4},
+				Usage: llm.TurnUsage{InputTokens: 3, OutputTokens: 4},
 			}}
 			opts := append([]gs.Option{
 				gs.WithLibs(gs.LibString | gs.LibLLM),
@@ -129,7 +130,7 @@ func TestLLMMessageHelpers(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{
+			provider := &mockLLMProvider{res: llm.TurnResult{
 				Status: "final_answer",
 				Text:   "ok",
 			}}

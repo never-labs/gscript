@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
@@ -25,7 +26,7 @@ func TestLLMDirectTurnMessagesReachProviderInVMJIT(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "ok"}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "ok"}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -67,7 +68,7 @@ func TestLLMAgentScenarioSimpleDefaultsQuestionAnswer(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "Paris"}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "Paris"}}
 			vm := gs.New(llmScenarioOptions(provider, tc.opts...)...)
 
 			if err := vm.Exec(`
@@ -126,10 +127,10 @@ func TestLLMAgentScenarioReactToolAutoDispatch(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_lookup_1",
 						Tool: "lookup",
 						Args: map[string]any{"topic": "gscript"},
@@ -200,10 +201,10 @@ func TestLLMAgentScenarioComplexFlowCustomTurns(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_lookup_2",
 						Tool: "lookup",
 						Args: map[string]any{"topic": "agents"},

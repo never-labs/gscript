@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMTurnRequestProviderOptions(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
 	if err := vm.Exec(`
 result, err := llm.turn({
@@ -50,7 +51,7 @@ result, err := llm.turn({
 }
 
 func TestLLMToolMetadata(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {
@@ -140,7 +141,7 @@ missing_tool := missing_err.tool
 }
 
 func TestLoopRequestProviderOptions(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "done"}}
+	provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "done"}}
 	vm := gs.New(gs.WithLibs(gs.LibString|gs.LibLLM), gs.WithLLMProvider(provider))
 	if err := vm.Exec(`
 lookup := llm.tool("lookup", func(name) {

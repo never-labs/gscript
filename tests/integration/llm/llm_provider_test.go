@@ -11,6 +11,9 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/gscript/llm/anthropic"
+	"github.com/never-labs/gscript/llm/openai"
 )
 
 func TestLLMCommandProvider(t *testing.T) {
@@ -66,19 +69,19 @@ func TestAnthropicCompatibleLLMProvider(t *testing.T) {
 }`)
 	}))
 	defer server.Close()
-	provider := gs.AnthropicCompatibleLLMProvider{
+	provider := anthropic.Provider{
 		Endpoint: server.URL,
 		APIKey:   "test-key",
 		Model:    "fallback-model",
 		Client:   server.Client(),
 	}
-	res, err := provider.Turn(context.Background(), gs.LLMTurnRequest{
+	res, err := provider.Turn(context.Background(), llm.TurnRequest{
 		Model: "claude-test",
-		Messages: []gs.LLMMessage{
+		Messages: []llm.Message{
 			{Role: "system", Text: "short"},
 			{Role: "user", Text: "find docs"},
 		},
-		Tools: []gs.LLMTool{{
+		Tools: []llm.Tool{{
 			Name:        "lookup",
 			Description: "lookup docs",
 			Params:      []string{"name"},
@@ -119,17 +122,17 @@ func TestClassifyLLMProviderError(t *testing.T) {
 		want string
 	}{
 		{name: "nil", err: nil, want: ""},
-		{name: "openai auth", err: &gs.OpenAICompatibleLLMError{StatusCode: http.StatusUnauthorized}, want: gs.LLMProviderErrorAuth},
-		{name: "anthropic rate limit", err: &gs.AnthropicCompatibleLLMError{StatusCode: http.StatusTooManyRequests, Retryable: true}, want: gs.LLMProviderErrorRateLimit},
-		{name: "retryable status", err: &gs.OpenAICompatibleLLMError{StatusCode: http.StatusBadGateway, Retryable: true}, want: gs.LLMProviderErrorNetwork},
-		{name: "request status", err: &gs.AnthropicCompatibleLLMError{StatusCode: http.StatusUnprocessableEntity}, want: gs.LLMProviderErrorRequest},
-		{name: "context", err: context.DeadlineExceeded, want: gs.LLMProviderErrorNetwork},
-		{name: "net", err: &net.DNSError{Err: "no such host", Name: "provider.test"}, want: gs.LLMProviderErrorNetwork},
-		{name: "generic", err: errors.New("provider rejected request"), want: gs.LLMProviderErrorProvider},
+		{name: "openai auth", err: &openai.Error{StatusCode: http.StatusUnauthorized}, want: llm.ProviderErrorAuth},
+		{name: "anthropic rate limit", err: &anthropic.Error{StatusCode: http.StatusTooManyRequests, Retryable: true}, want: llm.ProviderErrorRateLimit},
+		{name: "retryable status", err: &openai.Error{StatusCode: http.StatusBadGateway, Retryable: true}, want: llm.ProviderErrorNetwork},
+		{name: "request status", err: &anthropic.Error{StatusCode: http.StatusUnprocessableEntity}, want: llm.ProviderErrorRequest},
+		{name: "context", err: context.DeadlineExceeded, want: llm.ProviderErrorNetwork},
+		{name: "net", err: &net.DNSError{Err: "no such host", Name: "provider.test"}, want: llm.ProviderErrorNetwork},
+		{name: "generic", err: errors.New("provider rejected request"), want: llm.ProviderErrorProvider},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := gs.ClassifyLLMProviderError(tc.err); got != tc.want {
+			if got := llm.ClassifyProviderError(tc.err); got != tc.want {
 				t.Fatalf("ClassifyLLMProviderError(%T) = %q, want %q", tc.err, got, tc.want)
 			}
 		})
@@ -145,7 +148,7 @@ func TestLLMModelsProviderConfigPreservesHostProvider(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			provider := &mockLLMProvider{res: gs.LLMTurnResult{Status: "final_answer", Text: "host"}}
+			provider := &mockLLMProvider{res: llm.TurnResult{Status: "final_answer", Text: "host"}}
 			opts := append([]gs.Option{
 				gs.WithLibs(gs.LibString | gs.LibLLM),
 				gs.WithLLMProvider(provider),

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMSyntaxExecutesThroughLLMStdlib(t *testing.T) {
@@ -15,7 +16,7 @@ func TestLLMSyntaxExecutesThroughLLMStdlib(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "agent-ok"},
 				{Status: "final_answer", Text: "turn-ok"},
 			}}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
@@ -15,10 +16,10 @@ func TestLLMAgentScenarioAgentAsToolStructuredHandoff(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_delegate_1",
 						Tool: "delegate_research",
 						Args: map[string]any{"topic": "agent handoff"},
@@ -148,10 +149,10 @@ func TestLLMAgentScenarioToolofRuntimeAgentAsTool(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_delegate_toolof_1",
 						Tool: "delegate_research",
 						Args: map[string]any{"topic": "toolof"},
@@ -266,10 +267,10 @@ func TestLLMAgentScenarioDirectAgentInToolsList(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_direct_agent_1",
 						Tool: "extract_research",
 						Args: map[string]any{"topic": "direct tools"},

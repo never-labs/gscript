@@ -5,15 +5,16 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 type sdkSmokeLLMProvider struct {
-	last gs.LLMTurnRequest
+	last llm.TurnRequest
 }
 
-func (p *sdkSmokeLLMProvider) Turn(_ context.Context, req gs.LLMTurnRequest) (gs.LLMTurnResult, error) {
+func (p *sdkSmokeLLMProvider) Turn(_ context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
 	p.last = req
-	return gs.LLMTurnResult{Status: "final_answer", Text: "sdk smoke"}, nil
+	return llm.TurnResult{Status: "final_answer", Text: "sdk smoke"}, nil
 }
 
 func TestWithLLMProviderSDKSmoke(t *testing.T) {

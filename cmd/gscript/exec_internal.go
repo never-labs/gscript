@@ -13,6 +13,9 @@ import (
 	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/runtime"
 	bytecodevm "github.com/never-labs/gscript/internal/vm"
+	"github.com/never-labs/gscript/llm"
+	"github.com/never-labs/gscript/llm/anthropic"
+	"github.com/never-labs/gscript/llm/openai"
 )
 
 func processExit(err error) (*runtime.ProcessExitError, bool) {
@@ -56,13 +59,13 @@ func cliDefaultLLMProviderFactory(cfg runtime.LLMProviderConfig) (runtime.LLMPro
 	protocol := strings.ToLower(strings.ReplaceAll(cfg.Protocol, "_", "-"))
 	switch protocol {
 	case "openai", "openai-compatible", "openai-compat", "chat-completions":
-		return cliLLMProviderAdapter{provider: gscript.OpenAICompatibleLLMProvider{
+		return cliLLMProviderAdapter{provider: openai.Provider{
 			Endpoint: cliOpenAIChatCompletionsEndpoint(cfg.BaseURL),
 			APIKey:   cfg.APIKey,
 			Model:    cfg.ProviderModel,
 		}}, nil
 	case "anthropic", "anthropic-compatible", "anthropic-compat", "messages":
-		return cliLLMProviderAdapter{provider: gscript.AnthropicCompatibleLLMProvider{
+		return cliLLMProviderAdapter{provider: anthropic.Provider{
 			Endpoint: cfg.BaseURL,
 			APIKey:   cfg.APIKey,
 			Model:    cfg.ProviderModel,
@@ -76,7 +79,7 @@ func cliDefaultLLMProviderFactory(cfg runtime.LLMProviderConfig) (runtime.LLMPro
 }
 
 type cliLLMProviderAdapter struct {
-	provider gscript.LLMProvider
+	provider llm.Provider
 }
 
 func (a cliLLMProviderAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
@@ -84,8 +87,8 @@ func (a cliLLMProviderAdapter) Turn(ctx context.Context, req runtime.LLMTurnRequ
 	return cliRuntimeLLMTurnResult(res), err
 }
 
-func cliPublicLLMTurnRequest(req runtime.LLMTurnRequest) gscript.LLMTurnRequest {
-	out := gscript.LLMTurnRequest{
+func cliPublicLLMTurnRequest(req runtime.LLMTurnRequest) llm.TurnRequest {
+	out := llm.TurnRequest{
 		Model:          req.Model,
 		ForceTool:      req.ForceTool,
 		MaxTokens:      req.MaxTokens,
@@ -97,13 +100,13 @@ func cliPublicLLMTurnRequest(req runtime.LLMTurnRequest) gscript.LLMTurnRequest 
 		Metadata:       cloneStringMap(req.Metadata),
 	}
 	if len(req.Messages) > 0 {
-		out.Messages = make([]gscript.LLMMessage, len(req.Messages))
+		out.Messages = make([]llm.Message, len(req.Messages))
 		for i := range req.Messages {
 			out.Messages[i] = cliPublicLLMMessage(req.Messages[i])
 		}
 	}
 	if len(req.Tools) > 0 {
-		out.Tools = make([]gscript.LLMTool, len(req.Tools))
+		out.Tools = make([]llm.Tool, len(req.Tools))
 		for i := range req.Tools {
 			out.Tools[i] = cliPublicLLMTool(req.Tools[i])
 		}
@@ -111,8 +114,8 @@ func cliPublicLLMTurnRequest(req runtime.LLMTurnRequest) gscript.LLMTurnRequest 
 	return out
 }
 
-func cliPublicLLMMessage(msg runtime.LLMMessage) gscript.LLMMessage {
-	out := gscript.LLMMessage{
+func cliPublicLLMMessage(msg runtime.LLMMessage) llm.Message {
+	out := llm.Message{
 		Role:      msg.Role,
 		Text:      msg.Text,
 		ToolUseID: msg.ToolUseID,
@@ -126,8 +129,8 @@ func cliPublicLLMMessage(msg runtime.LLMMessage) gscript.LLMMessage {
 	return out
 }
 
-func cliPublicLLMTool(tool runtime.LLMTool) gscript.LLMTool {
-	return gscript.LLMTool{
+func cliPublicLLMTool(tool runtime.LLMTool) llm.Tool {
+	return llm.Tool{
 		Name:        tool.Name,
 		Description: tool.Description,
 		Params:      append([]string(nil), tool.Params...),
@@ -136,15 +139,15 @@ func cliPublicLLMTool(tool runtime.LLMTool) gscript.LLMTool {
 	}
 }
 
-func cliPublicLLMToolCall(call runtime.LLMToolCall) gscript.LLMToolCall {
-	return gscript.LLMToolCall{
+func cliPublicLLMToolCall(call runtime.LLMToolCall) llm.ToolCall {
+	return llm.ToolCall{
 		ID:   call.ID,
 		Tool: call.Tool,
 		Args: cloneAnyMap(call.Args),
 	}
 }
 
-func cliRuntimeLLMTurnResult(res gscript.LLMTurnResult) runtime.LLMTurnResult {
+func cliRuntimeLLMTurnResult(res llm.TurnResult) runtime.LLMTurnResult {
 	out := runtime.LLMTurnResult{
 		Status: res.Status,
 		Text:   res.Text,

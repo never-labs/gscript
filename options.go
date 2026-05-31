@@ -1,5 +1,7 @@
 package gscript
 
+import "github.com/never-labs/gscript/llm"
+
 // LibFlags controls which standard libraries are loaded.
 type LibFlags uint64
 
@@ -126,10 +128,10 @@ type vmOptions struct {
 	maxFSReadBytes     int64
 	maxFSWriteBytes    int64
 	printFunc          func(args ...interface{})
-	llmProvider        LLMProvider
-	llmProviderFactory LLMProviderFactory
-	llmTraceSink       LLMTraceSink
-	llmRecordSink      LLMRecordSink
+	llmProvider        llm.Provider
+	llmProviderFactory llm.ProviderFactory
+	llmTraceSink       llm.TraceSink
+	llmRecordSink      llm.RecordSink
 	goImports          map[string]any
 	argScript          string
 	args               []string

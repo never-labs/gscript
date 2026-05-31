@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMReactDispatchLoop(t *testing.T) {
-	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+	provider := &mockLLMProvider{results: []llm.TurnResult{
 		{
 			Status: "tool_calls",
-			Calls: []gs.LLMToolCall{{
+			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
 				Args: map[string]any{"name": "gscript"},
@@ -49,10 +50,10 @@ history_len := #result.history
 }
 
 func TestLLMReactCanWindowHistory(t *testing.T) {
-	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+	provider := &mockLLMProvider{results: []llm.TurnResult{
 		{
 			Status: "tool_calls",
-			Calls: []gs.LLMToolCall{{
+			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
 				Args: map[string]any{"name": "gscript"},
@@ -89,10 +90,10 @@ status := result.status
 }
 
 func TestLLMReactRetriesTransientToolErrors(t *testing.T) {
-	provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+	provider := &mockLLMProvider{results: []llm.TurnResult{
 		{
 			Status: "tool_calls",
-			Calls: []gs.LLMToolCall{{
+			Calls: []llm.ToolCall{{
 				ID:   "call_1",
 				Tool: "lookup",
 				Args: map[string]any{"name": "gscript"},
@@ -131,9 +132,9 @@ status := result.status
 }
 
 func TestLLMReactFatalToolErrorPropagates(t *testing.T) {
-	provider := &mockLLMProvider{res: gs.LLMTurnResult{
+	provider := &mockLLMProvider{res: llm.TurnResult{
 		Status: "tool_calls",
-		Calls: []gs.LLMToolCall{{
+		Calls: []llm.ToolCall{{
 			ID:   "call_1",
 			Tool: "lookup",
 			Args: map[string]any{"name": "gscript"},

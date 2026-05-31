@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
 func TestLLMAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
@@ -16,11 +17,11 @@ func TestLLMAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			provider := &mockLLMProvider{results: []gs.LLMTurnResult{
+			provider := &mockLLMProvider{results: []llm.TurnResult{
 				{Status: "final_answer", Text: "Checkout incidents are owned by payments on-call."},
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_metrics_1",
 						Tool: "get_metrics",
 						Args: map[string]any{"service": "checkout"},
@@ -29,7 +30,7 @@ func TestLLMAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 				{Status: "final_answer", Text: "Checkout latency is elevated; page payments on-call."},
 				{
 					Status: "tool_calls",
-					Calls: []gs.LLMToolCall{{
+					Calls: []llm.ToolCall{{
 						ID:   "call_runbook_1",
 						Tool: "search_runbook",
 						Args: map[string]any{

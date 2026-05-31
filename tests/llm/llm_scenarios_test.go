@@ -6,9 +6,10 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
+	"github.com/never-labs/gscript/llm"
 )
 
-func llmScenarioOptions(provider gs.LLMProvider, opts ...gs.Option) []gs.Option {
+func llmScenarioOptions(provider llm.Provider, opts ...gs.Option) []gs.Option {
 	base := []gs.Option{
 		gs.WithLibs(gs.LibString | gs.LibLLM),
 		gs.WithLLMProvider(provider),
