@@ -55,6 +55,9 @@ DEFAULT_ORDER = [
 DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_GROUPS = ["numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control"]
 ALL_GROUPS = DEFAULT_GROUPS
+
+# Current benchmark IDs are domain-based. These aliases keep older
+# suite/extended/variants/official/data_oriented CLI selectors working.
 LEGACY_GROUP_ALIASES = {
     "suite": ["numeric", "recursion", "table", "calls", "string", "control"],
     "extended": ["app", "table", "string", "concurrency"],

@@ -48,6 +48,21 @@ func runPublicScriptFile(filename string, args []string, opts cliRunOptions) err
 	return vm.ExecFile(filename)
 }
 
+func canUsePublicRunPath(opts cliRunOptions) bool {
+	return !opts.ShowJITStats &&
+		opts.JIT.TimelinePath == "" &&
+		opts.JIT.WarmDumpDir == "" &&
+		!opts.JIT.ShowExitStats &&
+		!opts.JIT.ShowExitStatsJSON &&
+		!opts.JIT.ShowTier2PerfStats &&
+		!opts.JIT.ShowTier2PerfStatsJSON &&
+		!opts.JIT.ShowTier2SpecStateJSON &&
+		!opts.JIT.ShowTier2SpecWorklistJSON &&
+		!opts.JIT.ShowCoroutineStats &&
+		!opts.JIT.ShowPathStats &&
+		!opts.JIT.ShowPathStatsJSON
+}
+
 func publicRunOptions(opts cliRunOptions, script string, args []string) []gscript.Option {
 	gsOpts := []gscript.Option{gscript.WithArgs(script, args...)}
 	if opts.UseJIT {

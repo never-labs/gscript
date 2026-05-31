@@ -22,7 +22,7 @@
 #   bash scripts/diag.sh all                  — dump every domain benchmark
 #   bash scripts/diag.sh numeric              — dump numeric/ only
 #   bash scripts/diag.sh table                — dump table/ only
-#   bash scripts/diag.sh suite                — compatibility alias for legacy suite domains
+#   bash scripts/diag.sh suite                — legacy alias for numeric/recursion/table/calls/string/control
 #   bash scripts/diag.sh <benchmark>          — dump a single benchmark.
 #                                                Forms accepted:
 #                                                  sieve, sieve.gs
@@ -32,7 +32,7 @@
 #                                                Bare basenames are searched in
 #                                                the domain order below.
 #
-# Runtime: ~3 seconds per benchmark, ~2 minutes for the full all-suite dump.
+# Runtime: ~3 seconds per benchmark, ~2 minutes for the full all-domain dump.
 
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -73,7 +73,7 @@ domain_list_for() {
     esac
 }
 
-# Resolve benchmark list. Each entry is "<suite>/<file>.gs", relative to
+# Resolve benchmark list. Each entry is "<domain>/<file>.gs", relative to
 # benchmarks/. macOS bash 3.2 compatible (no mapfile, no associative arrays).
 BENCHES=()
 collect_dir() {

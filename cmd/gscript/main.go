@@ -220,13 +220,26 @@ func main() {
 		return
 	}
 
-	interp := runtime.New()
-	installCLILLMProviderFactory(interp)
-
 	if *eval != "" {
+		if canUsePublicRunPath(runOpts) {
+			vm := gscript.New(publicRunOptions(runOpts, "<eval>", flag.Args())...)
+			prog, err := gscript.Compile(*eval, gscript.WithSourceName("<eval>"))
+			if err == nil {
+				err = vm.Run(prog)
+			}
+			if err != nil {
+				if code, ok := processExitCode(err); ok {
+					os.Exit(code)
+				}
+				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+		interp := runtime.New()
+		installCLILLMProviderFactory(interp)
 		interp.SetArgs("<eval>", flag.Args())
-		// Execute string
-		if err := runString(interp, *eval); err != nil {
+		if err := runStringVM(interp, *eval, runOpts.UseJIT, runOpts.ShowJITStats, runOpts.JIT); err != nil {
 			if code, ok := processExitCode(err); ok {
 				os.Exit(code)
 			}
@@ -238,6 +251,8 @@ func main() {
 
 	if len(args) == 0 {
 		// REPL mode
+		interp := runtime.New()
+		installCLILLMProviderFactory(interp)
 		interp.SetArgs("<repl>", nil)
 		runREPL(interp)
 		return
@@ -245,7 +260,15 @@ func main() {
 
 	// Execute file
 	filename := args[0]
-	if err := runScriptFile(interp, filename, args[1:], runOpts); err != nil {
+	var err error
+	if canUsePublicRunPath(runOpts) {
+		err = runPublicScriptFile(filename, args[1:], runOpts)
+	} else {
+		interp := runtime.New()
+		installCLILLMProviderFactory(interp)
+		err = runScriptFile(interp, filename, args[1:], runOpts)
+	}
+	if err != nil {
 		if code, ok := processExitCode(err); ok {
 			os.Exit(code)
 		}
@@ -1163,6 +1186,8 @@ func runTestsDetailed(path string, opts cliRunOptions, errw io.Writer, text bool
 		updateGolden := goldenMode == "update"
 		if compareGolden || updateGolden {
 			stdout, runErr = runScriptFileCapturingStdout(filename, opts)
+		} else if canUsePublicRunPath(opts) {
+			runErr = runPublicScriptFile(filename, nil, opts)
 		} else {
 			interp := runtime.New()
 			runErr = runScriptFile(interp, filename, nil, opts)
@@ -1260,6 +1285,10 @@ func runScriptFileCapturingStdout(filename string, opts cliRunOptions) ([]byte, 
 		defer func() {
 			os.Stdout = oldStdout
 		}()
+		if canUsePublicRunPath(opts) {
+			runErr = runPublicScriptFile(filename, nil, opts)
+			return
+		}
 		interp := runtime.New()
 		runErr = runScriptFile(interp, filename, nil, opts)
 	}()
