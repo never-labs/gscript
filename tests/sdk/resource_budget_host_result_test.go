@@ -109,6 +109,10 @@ func TestWithMaxHostResultBytesPreflightsEncodingStdlibResults(t *testing.T) {
 			for _, src := range []string{
 				`value := base64.encode("1234")`,
 				`value := base64.decode("MTIzNDU=")`,
+				`value := base64.urlEncode("1234")`,
+				`value := base64.urlDecode("MTIzNDU")`,
+				`value, err := base64.decode("!!!!!!!!")`,
+				`value, err := base64.urlDecode("!!!!!!!!")`,
 				`value := encoding.hexEncode("123")`,
 				`value := encoding.base32Encode("1234")`,
 			} {
