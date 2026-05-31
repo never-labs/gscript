@@ -8,6 +8,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/llmbridge"
 	"github.com/never-labs/gscript/internal/runtime"
+	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
 	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
@@ -59,7 +60,7 @@ func (vm *VM) Reset() {
 
 func newVM(o vmOptions) *VM {
 	interp := runtime.NewCore()
-	interp.InstallStdlib()
+	stdlibinstall.Install(interp)
 	allowedStdlib := stdlibAllowedNames(o.libs)
 	interp.RestrictStdlib(allowedStdlib)
 	interp.SetModuleLoading(o.capabilities&CapModuleLoading != 0)
