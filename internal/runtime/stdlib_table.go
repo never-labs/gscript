@@ -38,6 +38,8 @@ type TableRemoveLen func(Value) (int64, error)
 type TableRemoveGet func(Value, Value) (Value, error)
 type TableRemoveSet func(Value, Value, Value) error
 type TableRemoveTryPlainArrayRemove func(Value, int64, int64) (Value, bool)
+type TableUnpackLen func(Value) (int64, error)
+type TableUnpackGet func(Value, Value) (Value, error)
 
 // BuildTableSortFunction builds table.sort around caller-provided table access
 // and comparison hooks. VM/interpreter callers pass metamethod-aware hooks;
@@ -386,6 +388,57 @@ func rawTableRemoveFunction() *GoFunction {
 	)
 }
 
+// BuildTableUnpackFunction builds table.unpack/table.spread around
+// caller-provided table access hooks. Raw callers pass RawGet/Length;
+// interpreter callers pass metamethod-aware hooks.
+func BuildTableUnpackFunction(name string, tableLen TableUnpackLen, tableGet TableUnpackGet) *GoFunction {
+	return &GoFunction{
+		Name: "table." + name,
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 1 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
+			}
+			t := args[0]
+			i := int64(1)
+			j, err := tableLen(t)
+			if err != nil {
+				return nil, err
+			}
+			if len(args) >= 2 {
+				i = toInt(args[1])
+			}
+			if len(args) >= 3 {
+				j = toInt(args[2])
+			}
+			count, err := CheckTableUnpackRange(name, i, j)
+			if err != nil {
+				return nil, err
+			}
+			result := make([]Value, 0, count)
+			for k := i; k <= j; k++ {
+				v, err := tableGet(t, IntValue(k))
+				if err != nil {
+					return nil, err
+				}
+				result = append(result, v)
+			}
+			return result, nil
+		},
+	}
+}
+
+func rawTableUnpackFunction(name string) *GoFunction {
+	return BuildTableUnpackFunction(
+		name,
+		func(t Value) (int64, error) {
+			return int64(t.Table().Length()), nil
+		},
+		func(t Value, key Value) (Value, error) {
+			return t.Table().RawGet(key), nil
+		},
+	)
+}
+
 // buildTableLib creates the "table" standard library table.
 func buildTableLib() *Table {
 	t := NewTable()
@@ -436,32 +489,8 @@ func buildTableLib() *Table {
 
 	t.RawSet(StringValue("sort"), FunctionValue(rawTableSortFunction()))
 
-	// table.unpack(t [, i [, j]]) -> values
-	tableUnpack := func(name string, args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
-		}
-		tbl := args[0].Table()
-		i := int64(1)
-		j := int64(tbl.Length())
-		if len(args) >= 2 {
-			i = toInt(args[1])
-		}
-		if len(args) >= 3 {
-			j = toInt(args[2])
-		}
-		count, err := CheckTableUnpackRange(name, i, j)
-		if err != nil {
-			return nil, err
-		}
-		result := make([]Value, 0, count)
-		for k := i; k <= j; k++ {
-			result = append(result, tbl.RawGet(IntValue(k)))
-		}
-		return result, nil
-	}
-	set("unpack", func(args []Value) ([]Value, error) { return tableUnpack("unpack", args) })
-	set("spread", func(args []Value) ([]Value, error) { return tableUnpack("spread", args) })
+	t.RawSet(StringValue("unpack"), FunctionValue(rawTableUnpackFunction("unpack")))
+	t.RawSet(StringValue("spread"), FunctionValue(rawTableUnpackFunction("spread")))
 
 	t.RawSet(StringValue("move"), FunctionValue(rawTableMoveFunction()))
 
@@ -792,42 +821,8 @@ func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {
 		},
 	)))
 
-	tableUnpack := func(name string, args []Value) ([]Value, error) {
-		if len(args) < 1 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument #1 to 'table.%s' (table expected)", name)
-		}
-		t := args[0]
-		i := int64(1)
-		j, err := interp.tableLenInt(t)
-		if err != nil {
-			return nil, err
-		}
-		if len(args) >= 2 {
-			i = toInt(args[1])
-		}
-		if len(args) >= 3 {
-			j = toInt(args[2])
-		}
-		count, err := CheckTableUnpackRange(name, i, j)
-		if err != nil {
-			return nil, err
-		}
-		result := make([]Value, 0, count)
-		for k := i; k <= j; k++ {
-			v, err := interp.tableGet(t, IntValue(k))
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, v)
-		}
-		return result, nil
-	}
-	tblLib.RawSet(StringValue("unpack"), FunctionValue(&GoFunction{Name: "table.unpack", Fn: func(args []Value) ([]Value, error) {
-		return tableUnpack("unpack", args)
-	}}))
-	tblLib.RawSet(StringValue("spread"), FunctionValue(&GoFunction{Name: "table.spread", Fn: func(args []Value) ([]Value, error) {
-		return tableUnpack("spread", args)
-	}}))
+	tblLib.RawSet(StringValue("unpack"), FunctionValue(BuildTableUnpackFunction("unpack", interp.tableLenInt, interp.tableGet)))
+	tblLib.RawSet(StringValue("spread"), FunctionValue(BuildTableUnpackFunction("spread", interp.tableLenInt, interp.tableGet)))
 
 	tblLib.RawSet(StringValue("move"), FunctionValue(BuildTableMoveFunction(
 		func(t Value, key Value) (Value, error) {

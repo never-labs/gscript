@@ -75,6 +75,47 @@ func TestRuntimeTableProxyMoveUnpackThroughMetamethods(t *testing.T) {
 	}
 }
 
+func TestRuntimeTableSpreadProxyThroughMetamethods(t *testing.T) {
+	interp := runProgram(t, `
+		backing := {[1]: "x", [2]: "y", [3]: "z"}
+		ops := {}
+		opn := 0
+		lens := 0
+		reads := 0
+		proxy := setmetatable({}, {
+			__len: func() {
+				lens = lens + 1
+				return 3
+			},
+			__index: func(_, k) {
+				reads = reads + 1
+				opn = opn + 1
+				ops[opn] = "r" .. k
+				return backing[k]
+			},
+		})
+
+		func join(a, b, c, d, e) { return a .. b .. c .. d .. e }
+		result := join("a", table.spread(proxy), "b")
+	`)
+	if got := interp.GetGlobal("result").Str(); got != "axyzb" {
+		t.Fatalf("result = %q, want axyzb", got)
+	}
+	if got := interp.GetGlobal("lens").Int(); got != 1 {
+		t.Fatalf("lens = %d, want 1", got)
+	}
+	if got := interp.GetGlobal("reads").Int(); got != 3 {
+		t.Fatalf("reads = %d, want 3", got)
+	}
+	ops := interp.GetGlobal("ops").Table()
+	wantOps := []string{"r1", "r2", "r3"}
+	for i, want := range wantOps {
+		if got := ops.RawGet(IntValue(int64(i + 1))).Str(); got != want {
+			t.Fatalf("ops[%d] = %q, want %q", i+1, got, want)
+		}
+	}
+}
+
 func TestRuntimeTableMoveRejectsNonTableDestination(t *testing.T) {
 	err := runProgramExpectError(t, `
 		table.move({1, 2, 3}, 1, 2, 1, "not-a-table")
