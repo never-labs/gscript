@@ -39,6 +39,7 @@ var (
 	NewDenseArrayF64              = runtime.NewDenseArrayF64
 	NewDenseArrayI64              = runtime.NewDenseArrayI64
 	NewDenseArrayOfLen            = runtime.NewDenseArrayOfLen
+	NewDenseMatrix                = runtime.NewDenseMatrix
 	NewSequentialArrayTable       = runtime.NewSequentialArrayTable
 	NewTable                      = runtime.NewTable
 	NewTableSized                 = runtime.NewTableSized

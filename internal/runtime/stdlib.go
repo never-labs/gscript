@@ -107,8 +107,11 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 		}
 	}))
 
-	// --- Numeric matrix (R42 DenseMatrix Phase 1) ---
-	std.RegisterTable("matrix", buildMatrixLib())
+	if includeMigratedHostIO {
+		// Historical direct-runtime install path. Public embedding now installs
+		// matrix from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("matrix", buildMatrixLib())
+	}
 	std.RegisterTable("soa", buildSoALib())
 
 	std.RegisterTable("utf8", buildUTF8Lib(interp))

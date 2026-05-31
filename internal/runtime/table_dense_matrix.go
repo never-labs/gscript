@@ -233,6 +233,15 @@ func NewDenseMatrix(rows, cols int) *Table {
 	return outer
 }
 
+// DenseMatrixBacking exposes the logical DenseMatrix shape and flat backing to
+// stdlib adapters without exposing the table's physical array storage.
+func (t *Table) DenseMatrixBacking() (backing []float64, rows, stride int, ok bool) {
+	if t == nil || t.dmStride <= 0 || t.dmMeta == nil {
+		return nil, 0, 0, false
+	}
+	return t.dmMeta.backing, len(t.array), int(t.dmStride), true
+}
+
 // DenseFloatMatrixForNumericSpecialization exposes a DenseMatrix flat backing to
 // guarded whole-call specializations. The view is valid only when ordinary t[i][j]
 // indexing for the requested rectangle is known to hit the dense backing
