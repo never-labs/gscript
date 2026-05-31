@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"fmt"
+
+	"github.com/never-labs/gscript/internal/stdlib/ai"
 )
 
 // BuildLLMMessageLib creates the spec-facing "msg" helper table. It is kept
@@ -15,7 +17,7 @@ func BuildLLMMessageLib() *Table {
 			return nil, fmt.Errorf("bad argument #1 to 'msg.assistant_call' (table expected)")
 		}
 		msg := NewTable()
-		msg.RawSetString("role", StringValue("assistant"))
+		msg.RawSetString("role", StringValue(ai.RoleAssistant))
 		msg.RawSetString("tool_call", args[0])
 		return []Value{TableValue(msg)}, nil
 	})
@@ -24,7 +26,7 @@ func BuildLLMMessageLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'msg.tool_result'")
 		}
 		msg := NewTable()
-		msg.RawSetString("role", StringValue("tool"))
+		msg.RawSetString("role", StringValue(ai.RoleTool))
 		msg.RawSetString("tool_use_id", args[0])
 		msg.RawSetString("value", args[1])
 		return []Value{TableValue(msg)}, nil
@@ -34,7 +36,7 @@ func BuildLLMMessageLib() *Table {
 			return nil, fmt.Errorf("bad argument to 'msg.tool_error'")
 		}
 		msg := NewTable()
-		msg.RawSetString("role", StringValue("tool"))
+		msg.RawSetString("role", StringValue(ai.RoleTool))
 		msg.RawSetString("tool_use_id", args[0])
 		msg.RawSetString("error", StringValue(args[1].Str()))
 		return []Value{TableValue(msg)}, nil
@@ -46,19 +48,19 @@ func registerLLMMessageConstructors(t *Table, module string) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to '%s.system'", module)
 		}
-		return []Value{TableValue(llmMessageTable("system", args[0].Str()))}, nil
+		return []Value{TableValue(llmMessageTable(ai.RoleSystem, args[0].Str()))}, nil
 	})
 	setLLMFunction(t, module, "user", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to '%s.user'", module)
 		}
-		return []Value{TableValue(llmMessageTable("user", args[0].Str()))}, nil
+		return []Value{TableValue(llmMessageTable(ai.RoleUser, args[0].Str()))}, nil
 	})
 	setLLMFunction(t, module, "assistant", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to '%s.assistant'", module)
 		}
-		return []Value{TableValue(llmMessageTable("assistant", args[0].Str()))}, nil
+		return []Value{TableValue(llmMessageTable(ai.RoleAssistant, args[0].Str()))}, nil
 	})
 }
 
@@ -67,9 +69,10 @@ func setLLMFunction(t *Table, module, name string, fn func([]Value) ([]Value, er
 }
 
 func llmMessageTable(role, text string) *Table {
+	spec := ai.NewTextMessage(role, text)
 	msg := NewTable()
-	msg.RawSetString("role", StringValue(role))
-	msg.RawSetString("text", StringValue(text))
+	msg.RawSetString("role", StringValue(spec.Role))
+	msg.RawSetString("text", StringValue(spec.Text))
 	return msg
 }
 
@@ -196,13 +199,7 @@ func llmForceToolFromValue(v Value) string {
 }
 
 func llmResultValue(res LLMTurnResult) Value {
-	if res.Status == "" {
-		if len(res.Calls) > 0 {
-			res.Status = "tool_calls"
-		} else {
-			res.Status = "final_answer"
-		}
-	}
+	res.Status = ai.DefaultTurnStatus(res.Status, len(res.Calls))
 	t := NewTable()
 	t.RawSetString("status", StringValue(res.Status))
 	t.RawSetString("text", StringValue(res.Text))
@@ -222,13 +219,7 @@ func llmResultValue(res LLMTurnResult) Value {
 }
 
 func llmResultStatus(res LLMTurnResult) string {
-	if res.Status != "" {
-		return res.Status
-	}
-	if len(res.Calls) > 0 {
-		return "tool_calls"
-	}
-	return "final_answer"
+	return ai.DefaultTurnStatus(res.Status, len(res.Calls))
 }
 
 func llmToolCallValue(call LLMToolCall) Value {
@@ -259,14 +250,14 @@ func llmProviderErrorValue(err error) Value {
 
 func llmAssistantCallMessage(callValue Value) Value {
 	t := NewTable()
-	t.RawSetString("role", StringValue("assistant"))
+	t.RawSetString("role", StringValue(ai.RoleAssistant))
 	t.RawSetString("tool_call", callValue)
 	return TableValue(t)
 }
 
 func llmToolResultMessage(id string, value Value) Value {
 	t := NewTable()
-	t.RawSetString("role", StringValue("tool"))
+	t.RawSetString("role", StringValue(ai.RoleTool))
 	t.RawSetString("tool_use_id", StringValue(id))
 	t.RawSetString("value", value)
 	return TableValue(t)
@@ -274,7 +265,7 @@ func llmToolResultMessage(id string, value Value) Value {
 
 func llmToolErrorMessage(id, message string) Value {
 	t := NewTable()
-	t.RawSetString("role", StringValue("tool"))
+	t.RawSetString("role", StringValue(ai.RoleTool))
 	t.RawSetString("tool_use_id", StringValue(id))
 	t.RawSetString("error", StringValue(message))
 	return TableValue(t)
