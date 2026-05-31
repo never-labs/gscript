@@ -11,7 +11,7 @@ func TestInstallDebugAndTestkitFromStdlibrt(t *testing.T) {
 	interp.InstallRuntimeStdlib()
 	for _, name := range []string{"debug", "testkit"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
-			t.Fatalf("InstallRuntimeStdlib registered migrated %s module: %v", name, got)
+			t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned %s module: %v", name, got)
 		}
 	}
 

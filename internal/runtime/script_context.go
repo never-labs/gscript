@@ -65,8 +65,8 @@ func ScriptContextCancelValue(state *ScriptContextState) Value {
 }
 
 // ScriptContextDoneAndErr returns the context done channel and err function for
-// a script context table. It is intentionally narrow so migrated stdlibrt
-// modules can use context cancellation without owning context/channel internals.
+// a script context table. It is intentionally narrow so stdlibrt
+// modules can use context cancellation without depending on context/channel internals.
 func ScriptContextDoneAndErr(v Value) (*Channel, Value, bool) {
 	if !v.IsTable() {
 		return nil, NilValue(), false

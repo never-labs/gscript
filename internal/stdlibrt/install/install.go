@@ -55,8 +55,8 @@ type ModuleOptions struct {
 }
 
 // InstallModules registers stdlibrt-owned modules on a runtime-compatible
-// installer. VM and tree-walker entry points use this to avoid separate module
-// construction paths while the broader stdlib continues to migrate.
+// installer. VM and tree-walker entry points use this shared module plan so
+// the public standard library has one registration path.
 func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int64, options ...ModuleOptions) {
 	if installer == nil {
 		return

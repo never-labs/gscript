@@ -1,8 +1,8 @@
 package runtime
 
-// InstallRuntimeStdlib registers runtime-owned standard-library tables as
-// globals. stdlibrt/install calls this before installing modules that have
-// migrated out of runtime, so this method must not register migrated modules.
+// InstallRuntimeStdlib registers only the runtime-owned compatibility surface.
+// stdlibrt/install composes the full public standard library on top of this
+// core, so this method must not register stdlibrt-owned modules.
 func (interp *Interpreter) InstallRuntimeStdlib() {
 	interp.installStdlib()
 }

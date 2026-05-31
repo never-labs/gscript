@@ -11,7 +11,7 @@ func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("math"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated math module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned math module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
@@ -33,7 +33,7 @@ func TestInstallModulesRegistersTimeFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("time"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated time module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned time module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
@@ -52,7 +52,7 @@ func TestInstallModulesRegistersProcessFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("process"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated process module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned process module: %v", got)
 	}
 
 	Install(interp)
@@ -72,7 +72,7 @@ func TestInstallModulesRegistersSOAFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("soa"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated soa module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned soa module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
@@ -90,7 +90,7 @@ func TestInstallModulesRegistersSyncFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("sync"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated sync module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned sync module: %v", got)
 	}
 
 	Install(interp)
@@ -112,7 +112,7 @@ func TestInstallModulesRegistersStringFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("string"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated string module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned string module: %v", got)
 	}
 	if got := interp.StringMeta(); got != nil {
 		t.Fatalf("InstallRuntimeStdlib installed string metatable: %v", got)
@@ -138,7 +138,7 @@ func TestInstallModulesRegistersTableFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("table"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated table module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned table module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{

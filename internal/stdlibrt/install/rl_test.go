@@ -13,7 +13,7 @@ func TestInstallModulesRegistersRLFromStdlibrt(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("rl"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered migrated rl module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlibrt-owned rl module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
