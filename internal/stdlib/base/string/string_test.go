@@ -78,6 +78,50 @@ func TestLuaSub(t *testing.T) {
 	}
 }
 
+func TestLuaByteRange(t *testing.T) {
+	tests := []struct {
+		name       string
+		s          string
+		start, end int64
+		hasEnd     bool
+		wantStart  int
+		wantEnd    int
+		wantOK     bool
+	}{
+		{name: "single default", s: "abc", start: 2, wantStart: 1, wantEnd: 1, wantOK: true},
+		{name: "negative", s: "abc", start: -2, wantStart: 1, wantEnd: 1, wantOK: true},
+		{name: "clamped range", s: "abc", start: -9, end: 9, hasEnd: true, wantStart: 0, wantEnd: 2, wantOK: true},
+		{name: "empty", s: "abc", start: 4, wantOK: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			start, end, ok := LuaByteRange(tt.s, tt.start, tt.end, tt.hasEnd)
+			if start != tt.wantStart || end != tt.wantEnd || ok != tt.wantOK {
+				t.Fatalf("LuaByteRange = (%d, %d, %v), want (%d, %d, %v)", start, end, ok, tt.wantStart, tt.wantEnd, tt.wantOK)
+			}
+		})
+	}
+}
+
+func TestLuaByteAt(t *testing.T) {
+	if b, ok := LuaByteAt("abc", -1); !ok || b != 'c' {
+		t.Fatalf("LuaByteAt negative = (%q, %v), want c,true", b, ok)
+	}
+	if _, ok := LuaByteAt("", 1); ok {
+		t.Fatalf("LuaByteAt empty string succeeded")
+	}
+}
+
+func TestCharBytes(t *testing.T) {
+	buf, ok := CharBytes([]int64{65, 66, 67})
+	if !ok || string(buf) != "ABC" {
+		t.Fatalf("CharBytes = %q,%v, want ABC,true", string(buf), ok)
+	}
+	if _, ok := CharBytes([]int64{256}); ok {
+		t.Fatalf("CharBytes accepted out-of-range byte")
+	}
+}
+
 func TestSplitHelpers(t *testing.T) {
 	if got := Split("a,b,,c", ","); !sameStrings(got, []string{"a", "b", "", "c"}) {
 		t.Fatalf("Split comma = %#v", got)

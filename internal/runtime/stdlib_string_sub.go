@@ -49,10 +49,11 @@ func stringByte1Value(sv Value) (Value, error) {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
 	}
 	s := sv.Str()
-	if len(s) == 0 {
+	b, ok := basestring.LuaByteAt(s, 1)
+	if !ok {
 		return NilValue(), nil
 	}
-	return IntValue(int64(s[0])), nil
+	return IntValue(int64(b)), nil
 }
 
 func stringByte2Value(sv, iv Value) (Value, error) {
@@ -60,14 +61,11 @@ func stringByte2Value(sv, iv Value) (Value, error) {
 		return NilValue(), fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
 	}
 	s := sv.Str()
-	i := int(toInt(iv))
-	if i < 0 {
-		i = len(s) + i + 1
-	}
-	if i < 1 || i > len(s) {
+	b, ok := basestring.LuaByteAt(s, toInt(iv))
+	if !ok {
 		return NilValue(), nil
 	}
-	return IntValue(int64(s[i-1])), nil
+	return IntValue(int64(b)), nil
 }
 
 func StdStringSubIdentityPtr() unsafe.Pointer {

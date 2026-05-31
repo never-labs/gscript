@@ -123,6 +123,52 @@ func LuaSub(s string, start, end int64, hasEnd bool) string {
 	return s[i-1 : j]
 }
 
+// LuaByteRange converts Lua's 1-based inclusive byte range into zero-based
+// inclusive indexes. The bool is false when the normalized range is empty.
+func LuaByteRange(s string, start, end int64, hasEnd bool) (int, int, bool) {
+	slen := len(s)
+	i := int(start)
+	j := i
+	if hasEnd {
+		j = int(end)
+	}
+	if i < 0 {
+		i = slen + i + 1
+	}
+	if j < 0 {
+		j = slen + j + 1
+	}
+	if i < 1 {
+		i = 1
+	}
+	if j > slen {
+		j = slen
+	}
+	if i > j {
+		return 0, 0, false
+	}
+	return i - 1, j - 1, true
+}
+
+func LuaByteAt(s string, index int64) (byte, bool) {
+	start, _, ok := LuaByteRange(s, index, index, false)
+	if !ok || start >= len(s) {
+		return 0, false
+	}
+	return s[start], true
+}
+
+func CharBytes(values []int64) ([]byte, bool) {
+	buf := make([]byte, 0, len(values))
+	for _, n := range values {
+		if n < 0 || n > 255 {
+			return nil, false
+		}
+		buf = append(buf, byte(n))
+	}
+	return buf, true
+}
+
 func Split(s, sep string) []string {
 	parts := make([]string, 0, 8)
 	SplitEach(s, sep, func(part string) {

@@ -222,33 +222,24 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			return nil, fmt.Errorf("bad argument #1 to 'string.byte' (string expected)")
 		}
 		s := args[0].Str()
-		i := 1
+		i := int64(1)
 		j := i
+		hasEnd := false
 		if len(args) >= 2 {
-			i = int(toInt(args[1]))
+			i = toInt(args[1])
 			j = i
 		}
 		if len(args) >= 3 {
-			j = int(toInt(args[2]))
+			j = toInt(args[2])
+			hasEnd = true
 		}
-		if i < 0 {
-			i = len(s) + i + 1
-		}
-		if j < 0 {
-			j = len(s) + j + 1
-		}
-		if i < 1 {
-			i = 1
-		}
-		if j > len(s) {
-			j = len(s)
+		start, end, ok := basestring.LuaByteRange(s, i, j, hasEnd)
+		if !ok {
+			return []Value{NilValue()}, nil
 		}
 		var result []Value
-		for k := i; k <= j; k++ {
-			result = append(result, IntValue(int64(s[k-1])))
-		}
-		if len(result) == 0 {
-			return []Value{NilValue()}, nil
+		for k := start; k <= end; k++ {
+			result = append(result, IntValue(int64(s[k])))
 		}
 		return result, nil
 	})
@@ -263,13 +254,13 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if err := CheckProjectedHostStringBytes(maxHostResult(), len(args)); err != nil {
 			return nil, err
 		}
-		buf := make([]byte, 0, len(args))
-		for _, a := range args {
-			n := int(toInt(a))
-			if n < 0 || n > 255 {
-				return nil, fmt.Errorf("bad argument to 'string.char' (value out of range)")
-			}
-			buf = append(buf, byte(n))
+		values := make([]int64, 0, len(args))
+		for _, arg := range args {
+			values = append(values, toInt(arg))
+		}
+		buf, ok := basestring.CharBytes(values)
+		if !ok {
+			return nil, fmt.Errorf("bad argument to 'string.char' (value out of range)")
 		}
 		return []Value{StringValue(string(buf))}, nil
 	})
