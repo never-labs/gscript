@@ -246,12 +246,15 @@ build_quick_plan() {
 build_full_plan() {
     add_go_test "Correctness" \
         "go test ./... -count=1"
-    add_go_test "Feature Matrix" \
-        "go test ./tests -run 'TestFeatureMatrix|TestIntegration' -count=1"
-    add_go_test "Language Conformance Surface" \
-        "go test ./tests -run LanguageConformance -count=1"
-    add_go_test "Release Matrix Metadata" \
-        "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+    if have_cmd go; then
+        add_skip "Feature Matrix" "covered by Correctness (go test ./... -count=1)"
+        add_skip "Language Conformance Surface" "covered by Correctness (go test ./... -count=1)"
+        add_skip "Release Matrix Metadata" "covered by Correctness (go test ./... -count=1)"
+    else
+        add_skip "Feature Matrix" "missing go"
+        add_skip "Language Conformance Surface" "missing go"
+        add_skip "Release Matrix Metadata" "missing go"
+    fi
     add_manifest_coverage
     add_module_path_gate
     add_documentation_references

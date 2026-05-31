@@ -38,6 +38,8 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         gate = (ROOT / "scripts" / "performance_gate.sh").read_text()
         self.assertIn("python3 benchmarks/timing_compare.py", gate)
         self.assertIn("python3 benchmarks/strict_guard.py", gate)
+        self.assertIn("--quick-phase-smoke", gate)
+        self.assertIn('PROFILE="quick_phase_smoke"', gate)
 
     def test_python_benchmark_entrypoints_share_discovery_groups(self):
         expected = tuple(discovery.GROUPS)
@@ -54,6 +56,18 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
                 self.assertIn(expected, text)
                 self.assertNotIn("github.com/gscript/gscript", text)
                 self.assertNotIn("github.com/Never-Labs/gscript", text)
+
+    def test_production_check_full_plan_avoids_go_test_duplicates(self):
+        text = (ROOT / "scripts" / "production_check.sh").read_text()
+        full_plan = text.split("build_full_plan() {", 1)[1].split("\n}", 1)[0]
+
+        self.assertIn('add_go_test "Correctness"', full_plan)
+        self.assertIn('add_skip "Feature Matrix" "covered by Correctness', full_plan)
+        self.assertIn('add_skip "Language Conformance Surface" "covered by Correctness', full_plan)
+        self.assertIn('add_skip "Release Matrix Metadata" "covered by Correctness', full_plan)
+        self.assertNotIn('add_go_test "Feature Matrix"', full_plan)
+        self.assertNotIn('add_go_test "Language Conformance Surface"', full_plan)
+        self.assertNotIn('add_go_test "Release Matrix Metadata"', full_plan)
 
     def test_scripts_have_valid_type_specific_syntax(self):
         scripts = sorted(path for path in (ROOT / "scripts").iterdir() if path.is_file())

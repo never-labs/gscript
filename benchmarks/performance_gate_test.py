@@ -60,6 +60,11 @@ class PerformanceGateValidationTest(unittest.TestCase):
         self.assertIn("Performance gate current/HEAD ranking", proc.stdout)
         self.assertIn("Performance gate passed.", proc.stdout)
 
+    def test_quick_phase_smoke_is_explicit_parseable_profile(self):
+        proc = run_validate(timing_payload(1.05, 1.00), "--quick-phase-smoke")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("Performance gate passed.", proc.stdout)
+
     def test_validate_only_rejects_obvious_regression(self):
         proc = run_validate(timing_payload(1.20, 1.00), "--threshold", "0.10")
         self.assertEqual(proc.returncode, 1, proc.stdout)
