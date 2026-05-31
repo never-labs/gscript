@@ -240,6 +240,14 @@ def spec_selectors(specs: Iterable[SelectableSpec]) -> set[str]:
     return selectors
 
 
+def spec_selector_set(spec: SelectableSpec) -> set[str]:
+    return spec_selectors([spec])
+
+
+def selector_matches_spec(selector: str, spec: SelectableSpec) -> bool:
+    return selector_matches(selector, spec_selector_set(spec))
+
+
 def canonical_groups(groups: list[str], allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[str]:
     allowed = set(allowed_groups)
     out: list[str] = []
@@ -294,6 +302,18 @@ def groups_for_selectors(
         if group not in out:
             out.append(group)
     return out
+
+
+def groups_for_selection(
+    root: Path,
+    groups: list[str] | tuple[str, ...] | None,
+    selectors: list[str] | tuple[str, ...] | None,
+    all_groups: bool,
+    allowed_groups: list[str] | tuple[str, ...] = GROUPS,
+) -> list[str]:
+    if all_groups:
+        return list(allowed_groups)
+    return groups_for_selectors(root, groups, selectors, allowed_groups)
 
 
 def select_specs(specs: list[SpecT], selectors: list[str] | None) -> list[SpecT]:

@@ -596,10 +596,8 @@ def positive_int(value: str) -> int:
 
 
 def groups_for_args(args: argparse.Namespace) -> list[str]:
-    if args.all_groups:
-        return list(timing.GROUPS)
     root = Path(__file__).resolve().parents[1]
-    return discovery.groups_for_selectors(root, args.group, args.bench, timing.GROUPS)
+    return discovery.groups_for_selection(root, args.group, args.bench, args.all_groups, timing.GROUPS)
 
 
 def main() -> int:

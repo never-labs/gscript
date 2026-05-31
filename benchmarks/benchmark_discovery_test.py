@@ -79,6 +79,13 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             {"matmul", "numeric/matmul", "closure_accumulator", "calls/closure_accumulator"},
         )
 
+    def test_selector_matches_spec_accepts_legacy_aliases(self):
+        self.assertTrue(discovery.selector_matches_spec("suite/matmul", FakeSpec("numeric", "matmul")))
+        self.assertTrue(
+            discovery.selector_matches_spec("official/events_metamethod_hot", FakeSpec("table", "events_metamethod"))
+        )
+        self.assertFalse(discovery.selector_matches_spec("suite/matmul", FakeSpec("table", "sort")))
+
     def test_resolve_script_path_accepts_variant_and_hot_suffixes(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -153,6 +160,20 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                     allowed_groups=["data"],
                 ),
                 ["data"],
+            )
+
+    def test_groups_for_selection_handles_all_groups_flag(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.assertEqual(
+                discovery.groups_for_selection(
+                    root,
+                    ["data_oriented"],
+                    ["official/events_metamethod_hot"],
+                    True,
+                    allowed_groups=["data", "table"],
+                ),
+                ["data", "table"],
             )
 
 

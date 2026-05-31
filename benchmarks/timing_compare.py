@@ -595,8 +595,11 @@ def parse_scale_overrides(values: list[str] | None) -> list[ScaleOverride]:
 
 
 def scale_overrides_for(spec: BenchmarkSpec, overrides: list[ScaleOverride]) -> list[ScaleOverride]:
-    selectors = discovery.spec_selectors([spec])
-    return [override for override in overrides if override.selector is None or selector_matches(override.selector, selectors)]
+    return [
+        override
+        for override in overrides
+        if override.selector is None or discovery.selector_matches_spec(override.selector, spec)
+    ]
 
 
 def validate_scale_selectors(specs: list[BenchmarkSpec], overrides: list[ScaleOverride]) -> None:
