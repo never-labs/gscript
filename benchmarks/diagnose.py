@@ -21,6 +21,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import benchmark_discovery as discovery
 import timing_compare as timing
 
 
@@ -600,14 +601,12 @@ def groups_for_args(args: argparse.Namespace) -> list[str]:
     root = Path(__file__).resolve().parents[1]
     groups = timing.canonical_groups(list(args.group or timing.GROUPS))
     for selector in args.bench or []:
-        if "/" not in selector:
+        path = discovery.resolve_script_path(root, selector, timing.GROUPS)
+        if path is None:
             continue
-        for candidate in timing.selector_candidates(selector):
-            if "/" not in candidate:
-                continue
-            group, _name = candidate.split("/", 1)
-            if group in timing.GROUPS and (root / "benchmarks" / group / f"{_name}.gs").exists() and group not in groups:
-                groups.append(group)
+        group = path.parent.name
+        if group in timing.GROUPS and group not in groups:
+            groups.append(group)
     return groups
 
 

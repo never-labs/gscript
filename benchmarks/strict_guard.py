@@ -598,20 +598,10 @@ def ratio(numer: float | None, denom: float | None) -> float | None:
     return numer / denom
 
 
-def canonical_group(group: str) -> list[str]:
-    return discovery.canonical_group(group)
-
-
-def canonical_selector(selector: str) -> str:
-    return discovery.canonical_selector(selector)
-
-
-def selector_candidates(selector: str) -> list[str]:
-    return discovery.selector_candidates(selector)
-
-
-def canonical_groups(groups: list[str]) -> list[str]:
-    return discovery.canonical_groups(groups, ALL_GROUPS)
+canonical_group = discovery.canonical_group
+canonical_selector = discovery.canonical_selector
+selector_candidates = discovery.selector_candidates
+canonical_groups = discovery.canonical_groups
 
 
 def domain_specs(root: Path, group: str) -> list[BenchmarkSpec]:

@@ -555,24 +555,11 @@ def subject_diagnostic(
     return diagnostic
 
 
-def canonical_group(group: str) -> list[str]:
-    return discovery.canonical_group(group)
-
-
-def canonical_selector(selector: str) -> str:
-    return discovery.canonical_selector(selector)
-
-
-def selector_candidates(selector: str) -> list[str]:
-    return discovery.selector_candidates(selector)
-
-
-def selector_matches(selector: str, allowed: set[str]) -> bool:
-    return discovery.selector_matches(selector, allowed)
-
-
-def canonical_groups(groups: list[str]) -> list[str]:
-    return discovery.canonical_groups(groups, GROUPS)
+canonical_group = discovery.canonical_group
+canonical_selector = discovery.canonical_selector
+selector_candidates = discovery.selector_candidates
+selector_matches = discovery.selector_matches
+canonical_groups = discovery.canonical_groups
 
 
 def discover_specs(root: Path, groups: list[str]) -> list[BenchmarkSpec]:
