@@ -3,6 +3,8 @@ package runtime
 import (
 	"fmt"
 	"sync"
+
+	stdlibsync "github.com/never-labs/gscript/internal/stdlib/host/sync"
 )
 
 type scriptWaitGroup struct {
@@ -10,13 +12,11 @@ type scriptWaitGroup struct {
 }
 
 type scriptTaskGroup struct {
-	wg       sync.WaitGroup
-	mu       sync.Mutex
-	firstErr error
-	errCount int
-	ctx      Value
-	cancel   Value
-	call     ScriptFunctionCaller
+	wg     sync.WaitGroup
+	errs   stdlibsync.TaskErrors
+	ctx    Value
+	cancel Value
+	call   ScriptFunctionCaller
 }
 
 type scriptOnce struct {
@@ -141,13 +141,7 @@ func stripMethodSelf(args []Value) []Value {
 }
 
 func waitGroupAdd(state *scriptWaitGroup, delta int) (err error) {
-	defer func() {
-		if recover() != nil {
-			err = fmt.Errorf("sync.waitgroup: invalid counter state")
-		}
-	}()
-	state.wg.Add(delta)
-	return nil
+	return stdlibsync.AddWaitGroup(&state.wg, delta)
 }
 
 func newScriptTaskGroupTable(call ScriptFunctionCaller, launch SyncTaskLauncher, ctx, cancel Value) *Table {
@@ -207,32 +201,17 @@ func newScriptTaskGroupTable(call ScriptFunctionCaller, launch SyncTaskLauncher,
 }
 
 func (g *scriptTaskGroup) record(err error) {
-	if err == nil {
-		return
-	}
-	shouldCancel := false
-	g.mu.Lock()
-	if g.firstErr == nil {
-		g.firstErr = err
-		shouldCancel = true
-	}
-	g.errCount++
-	g.mu.Unlock()
-	if shouldCancel {
+	if g.errs.Record(err) {
 		g.cancelGroup()
 	}
 }
 
 func (g *scriptTaskGroup) error() error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.firstErr
+	return g.errs.Error()
 }
 
 func (g *scriptTaskGroup) errorCount() int {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.errCount
+	return g.errs.Count()
 }
 
 func (g *scriptTaskGroup) cancelGroup() {
