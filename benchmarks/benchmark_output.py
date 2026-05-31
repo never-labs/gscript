@@ -20,3 +20,11 @@ def parse_counter(pattern: re.Pattern[str], output: str) -> int:
 def output_tail(output: str, limit: int = 8) -> str:
     lines = [line for line in output.strip().splitlines() if line.strip()]
     return "\n".join(lines[-limit:])
+
+
+def text_output(output: str | bytes | None) -> str:
+    if output is None:
+        return ""
+    if isinstance(output, bytes):
+        return output.decode(errors="replace")
+    return output

@@ -17,6 +17,11 @@ class BenchmarkOutputTest(unittest.TestCase):
     def test_output_tail_keeps_nonempty_lines(self):
         self.assertEqual(output.output_tail("\na\n\nb\nc\n", 2), "b\nc")
 
+    def test_text_output_normalizes_subprocess_payloads(self):
+        self.assertEqual(output.text_output(None), "")
+        self.assertEqual(output.text_output("ok"), "ok")
+        self.assertEqual(output.text_output(b"bad:\xff"), "bad:\ufffd")
+
 
 if __name__ == "__main__":
     unittest.main()

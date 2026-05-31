@@ -239,9 +239,7 @@ def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None)
         wall = time.perf_counter() - started
     except subprocess.TimeoutExpired as exc:
         wall = time.perf_counter() - started
-        output = exc.stdout or ""
-        if isinstance(output, bytes):
-            output = output.decode(errors="replace")
+        output = benchmark_output.text_output(exc.stdout)
         run = parse_command_run(output + f"\nTIMEOUT after {timeout}s", "timeout")
         run.wall_seconds = wall
         return run

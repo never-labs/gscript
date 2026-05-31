@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Iterable
 
 import benchmark_discovery as discovery
+import benchmark_output
 
 
 DEFAULT_BENCHMARKS = [
@@ -54,7 +55,6 @@ DEFAULT_BENCHMARKS = [
 BENCHMARK_GROUPS = tuple(discovery.GROUPS)
 
 
-TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 T2_ATTEMPTED_RE = re.compile(r"^\s*Tier 2 attempted:\s*([0-9]+)\b", re.MULTILINE)
 T2_ENTERED_RE = re.compile(r"^\s*Tier 2 entered:\s*([0-9]+)\s+functions\b", re.MULTILINE)
 T2_FAILED_RE = re.compile(r"^\s*Tier 2 failed:\s*([0-9]+)\s+functions\b", re.MULTILINE)
@@ -115,11 +115,7 @@ CSV_COLUMNS = [
 ]
 
 
-def parse_time(output: str) -> float | None:
-    match = TIME_RE.search(output)
-    if not match:
-        return None
-    return float(match.group(1))
+parse_time = benchmark_output.parse_time
 
 
 def parse_seconds(value: object) -> float | None:
@@ -142,20 +138,15 @@ def parse_seconds(value: object) -> float | None:
         return None
 
 
-def parse_counter(pattern: re.Pattern[str], output: str) -> int:
-    match = pattern.search(output)
-    if not match:
-        return 0
-    return int(match.group(1))
+parse_counter = benchmark_output.parse_counter
 
 
 def parse_sample(output: str, status: str, exit_code: int | None = None) -> RunSample:
-    lines = [line for line in output.strip().splitlines() if line.strip()]
     return RunSample(
         status=status,
         seconds=parse_time(output) if status == "ok" else None,
         exit_code=exit_code,
-        output_tail="\n".join(lines[-8:]),
+        output_tail=benchmark_output.output_tail(output),
         t2_attempted=parse_counter(T2_ATTEMPTED_RE, output),
         t2_entered=parse_counter(T2_ENTERED_RE, output),
         t2_failed=parse_counter(T2_FAILED_RE, output),
@@ -196,9 +187,7 @@ def run_command(cmd: list[str], timeout: int, env: dict[str, str] | None = None)
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        output = exc.stdout or ""
-        if isinstance(output, bytes):
-            output = output.decode(errors="replace")
+        output = benchmark_output.text_output(exc.stdout)
         return parse_sample(output + f"\nTIMEOUT after {timeout}s", "timeout")
 
     if proc.returncode != 0:
