@@ -261,6 +261,23 @@ def discover_benchmarks(root: Path, groups: list[str]) -> list[DiscoveredBenchma
     return specs
 
 
+def groups_for_selectors(
+    root: Path,
+    groups: list[str] | tuple[str, ...] | None,
+    selectors: list[str] | tuple[str, ...] | None,
+    allowed_groups: list[str] | tuple[str, ...] = GROUPS,
+) -> list[str]:
+    out = canonical_groups(list(groups or allowed_groups), allowed_groups)
+    for selector in selectors or []:
+        path = resolve_script_path(root, selector, allowed_groups)
+        if path is None:
+            continue
+        group = path.parent.name
+        if group in allowed_groups and group not in out:
+            out.append(group)
+    return out
+
+
 def select_specs(specs: list[SpecT], selectors: list[str] | None) -> list[SpecT]:
     if not selectors:
         return specs

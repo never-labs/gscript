@@ -61,6 +61,22 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 root / "benchmarks" / "calls" / "closure_accumulator.gs",
             )
 
+    def test_groups_for_selectors_includes_legacy_selector_domains(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for group, name in (("concurrency", "goroutine_sleep"), ("table", "events_metamethod")):
+                (root / "benchmarks" / group).mkdir(parents=True, exist_ok=True)
+                (root / "benchmarks" / group / f"{name}.gs").write_text("-- test\n")
+
+            self.assertEqual(
+                discovery.groups_for_selectors(
+                    root,
+                    ["data_oriented"],
+                    ["extended/goroutine_sleep", "official/events_metamethod_hot"],
+                ),
+                ["data", "concurrency", "table"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
