@@ -699,48 +699,29 @@ func (vm *VM) RegisterStringLib() {
 }
 
 func (vm *VM) RegisterLLMLib() {
-	std := vm.newStdlibInstallContext()
-	llmLib := runtime.TableValue(runtime.BuildLLMLib(vm.callValue, func() runtime.LLMProvider {
-		return vm.llmProvider
-	}, func() runtime.LLMProviderFactory {
-		return vm.llmProviderFactory
-	}, func() int64 {
-		return vm.maxHostResult
-	}, func() context.Context {
-		if vm.ctx == nil {
-			return context.Background()
-		}
-		return vm.ctx
-	}, func(event runtime.LLMTraceEvent) {
-		if vm.llmTraceSink != nil {
-			vm.llmTraceSink(event)
-		}
-	}))
-	std.RegisterModule("llm", llmLib)
-	if llmTable := llmLib.Table(); llmTable != nil {
-		std.RegisterAlias("toolof", llmTable.RawGetString("toolof"))
-	}
-	msgLib := runtime.TableValue(runtime.BuildLLMMessageLib())
-	std.RegisterModule("msg", msgLib)
-	historyLib := runtime.TableValue(runtime.BuildLLMHistoryLib())
-	std.RegisterModule("history", historyLib)
-	chatLib := runtime.TableValue(runtime.BuildChatLib())
-	std.RegisterModule("chat", chatLib)
-	loopLib := runtime.TableValue(runtime.BuildLLMLoopLib(vm.callValue, func() runtime.LLMProvider {
-		return vm.llmProvider
-	}, func() int64 {
-		return vm.maxHostResult
-	}, func() context.Context {
-		if vm.ctx == nil {
-			return context.Background()
-		}
-		return vm.ctx
-	}, func(event runtime.LLMTraceEvent) {
-		if vm.llmTraceSink != nil {
-			vm.llmTraceSink(event)
-		}
-	}))
-	std.RegisterModule("loop", loopLib)
+	modules.InstallLLM(vm.newStdlibInstallContext(), modules.LLMOptions{
+		Call: vm.callValue,
+		Provider: func() runtime.LLMProvider {
+			return vm.llmProvider
+		},
+		ProviderFactory: func() runtime.LLMProviderFactory {
+			return vm.llmProviderFactory
+		},
+		MaxHostResult: func() int64 {
+			return vm.maxHostResult
+		},
+		Context: func() context.Context {
+			if vm.ctx == nil {
+				return context.Background()
+			}
+			return vm.ctx
+		},
+		Trace: func(event runtime.LLMTraceEvent) {
+			if vm.llmTraceSink != nil {
+				vm.llmTraceSink(event)
+			}
+		},
+	})
 }
 
 func (vm *VM) RegisterHTTPLib() {
