@@ -17,6 +17,38 @@ func TestStringTrim(t *testing.T) {
 	}
 }
 
+func TestStringPureBaseAdapters(t *testing.T) {
+	interp := runProgram(t, `
+		upper := string.upper("héllo")
+		lower := string.lower("HÉLLO")
+		reverse := string.reverse("ab界")
+		repeated := string.rep("ha", 3, "-")
+		replaced := string.replaceAll("a-b-a", "a", "x")
+		titled := string.title("hello world")
+		left := string.padLeft("go", 5, "0")
+		right := string.padRight("go", 5, "ab")
+		numeric := string.isNumeric(" 3.14 ")
+	`)
+	checks := map[string]string{
+		"upper":    "HÉLLO",
+		"lower":    "héllo",
+		"reverse":  "界ba",
+		"repeated": "ha-ha-ha",
+		"replaced": "x-b-x",
+		"titled":   "Hello World",
+		"left":     "000go",
+		"right":    "goaba",
+	}
+	for name, want := range checks {
+		if got := interp.GetGlobal(name).Str(); got != want {
+			t.Fatalf("%s = %q, want %q", name, got, want)
+		}
+	}
+	if !interp.GetGlobal("numeric").Bool() {
+		t.Fatal("numeric = false, want true")
+	}
+}
+
 func TestStringTrimLeft(t *testing.T) {
 	interp := runProgram(t, `
 		a := string.trimLeft("  hello  ")

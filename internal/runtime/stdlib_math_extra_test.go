@@ -22,6 +22,39 @@ func TestMathClamp(t *testing.T) {
 	}
 }
 
+func TestMathPureBaseAdapters(t *testing.T) {
+	interp := runProgram(t, `
+		abs := math.abs(-5)
+		floor := math.floor(3.7)
+		ceil := math.ceil(3.2)
+		floordiv := math.floorDiv(-7, 3)
+		fmod := math.fmod(7.5, 2.0)
+		trunc := math.trunc(-3.7)
+		integer := math.tointeger(5.0)
+	`)
+	if interp.GetGlobal("abs").Int() != 5 {
+		t.Fatalf("abs = %v, want 5", interp.GetGlobal("abs"))
+	}
+	if interp.GetGlobal("floor").Int() != 3 {
+		t.Fatalf("floor = %v, want 3", interp.GetGlobal("floor"))
+	}
+	if interp.GetGlobal("ceil").Int() != 4 {
+		t.Fatalf("ceil = %v, want 4", interp.GetGlobal("ceil"))
+	}
+	if interp.GetGlobal("floordiv").Int() != -3 {
+		t.Fatalf("floordiv = %v, want -3", interp.GetGlobal("floordiv"))
+	}
+	if math.Abs(interp.GetGlobal("fmod").Number()-1.5) > 1e-12 {
+		t.Fatalf("fmod = %v, want 1.5", interp.GetGlobal("fmod"))
+	}
+	if interp.GetGlobal("trunc").Int() != -3 {
+		t.Fatalf("trunc = %v, want -3", interp.GetGlobal("trunc"))
+	}
+	if interp.GetGlobal("integer").Int() != 5 {
+		t.Fatalf("integer = %v, want 5", interp.GetGlobal("integer"))
+	}
+}
+
 func TestMathClamp_float(t *testing.T) {
 	interp := runProgram(t, `
 		a := math.clamp(1.5, 0.0, 1.0)

@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/rand"
 	"time"
+
+	basemath "github.com/never-labs/gscript/internal/stdlib/base/math"
 )
 
 // buildMathLib creates the "math" standard library table.
@@ -428,19 +430,7 @@ func buildMathLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'math.clamp' (3 arguments expected)")
 		}
-		x := toFloat(args[0])
-		mn := toFloat(args[1])
-		mx := toFloat(args[2])
-		if x < mn {
-			x = mn
-		} else if x > mx {
-			x = mx
-		}
-		// If all args are ints, return int
-		if args[0].IsInt() && args[1].IsInt() && args[2].IsInt() {
-			return []Value{IntValue(int64(x))}, nil
-		}
-		return []Value{FloatValue(x)}, nil
+		return []Value{mathNumberValue(basemath.Clamp(valueMathNumber(args[0]), valueMathNumber(args[1]), valueMathNumber(args[2])))}, nil
 	})
 
 	// math.lerp(a, b, t) -- linear interpolation: a + (b-a)*t
@@ -448,10 +438,7 @@ func buildMathLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'math.lerp' (3 arguments expected)")
 		}
-		a := toFloat(args[0])
-		b := toFloat(args[1])
-		t := toFloat(args[2])
-		return []Value{FloatValue(a + (b-a)*t)}, nil
+		return []Value{FloatValue(basemath.Lerp(valueMathNumber(args[0]), valueMathNumber(args[1]), valueMathNumber(args[2])))}, nil
 	})
 
 	// math.sign(x) -- -1, 0, or 1
@@ -459,13 +446,7 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.sign'")
 		}
-		x := toFloat(args[0])
-		if x > 0 {
-			return []Value{IntValue(1)}, nil
-		} else if x < 0 {
-			return []Value{IntValue(-1)}, nil
-		}
-		return []Value{IntValue(0)}, nil
+		return []Value{IntValue(basemath.Sign(valueMathNumber(args[0])))}, nil
 	})
 
 	// math.round(x [, n]) -- round to n decimal places (n=0 rounds to integer)
@@ -473,16 +454,11 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.round'")
 		}
-		x := toFloat(args[0])
 		n := int64(0)
 		if len(args) >= 2 {
 			n = toInt(args[1])
 		}
-		if n == 0 {
-			return []Value{IntValue(int64(math.Round(x)))}, nil
-		}
-		factor := math.Pow(10, float64(n))
-		return []Value{FloatValue(math.Round(x*factor) / factor)}, nil
+		return []Value{mathNumberValue(basemath.Round(valueMathNumber(args[0]), n))}, nil
 	})
 
 	// math.trunc(x) -- truncate toward zero
@@ -490,10 +466,7 @@ func buildMathLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument #1 to 'math.trunc'")
 		}
-		if args[0].IsInt() {
-			return []Value{args[0]}, nil
-		}
-		return []Value{IntValue(int64(math.Trunc(toFloat(args[0]))))}, nil
+		return []Value{mathNumberValue(basemath.Trunc(valueMathNumber(args[0])))}, nil
 	})
 
 	// math.hypot(x, y) -- sqrt(x*x + y*y)
@@ -524,27 +497,11 @@ func buildMathLib() *Table {
 }
 
 func mathFmodValue(a, b Value) (Value, error) {
-	if a.IsInt() && b.IsInt() {
-		bi := b.Int()
-		if bi == 0 {
-			return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
-		}
-		return IntValue(a.Int() % bi), nil
-	}
-	if a.IsFloat() && b.IsFloat() {
-		bf := b.Float()
-		if bf == 0 {
-			return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
-		}
-		return FloatValue(math.Mod(a.Float(), bf)), nil
-	}
-	if b.IsInt() && b.Int() == 0 {
+	v, ok := basemath.Fmod(valueMathNumber(a), valueMathNumber(b))
+	if !ok {
 		return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
 	}
-	if b.IsFloat() && b.Float() == 0 {
-		return NilValue(), fmt.Errorf("bad argument #2 to 'math.fmod' (zero)")
-	}
-	return FloatValue(math.Mod(toFloat(a), toFloat(b))), nil
+	return mathNumberValue(v), nil
 }
 
 func mathToIntegerValue(v Value) Value {
@@ -552,14 +509,7 @@ func mathToIntegerValue(v Value) Value {
 }
 
 func mathAbsValue(arg Value) Value {
-	if arg.IsInt() {
-		v := arg.Int()
-		if v < 0 {
-			v = -v
-		}
-		return IntValue(v)
-	}
-	return FloatValue(math.Abs(toFloat(arg)))
+	return mathNumberValue(basemath.Abs(valueMathNumber(arg)))
 }
 
 func mathMaxValue(args []Value) Value {
@@ -607,53 +557,40 @@ func ToIntegerValue(v Value) Value {
 		}
 		v = n
 	}
-	if v.IsFloat() {
-		f := v.Float()
-		if floatIsInt(f) {
-			return IntValue(int64(f))
+	if v.IsInt() || v.IsFloat() {
+		if n, ok := basemath.ToInteger(valueMathNumber(v)); ok {
+			return IntValue(n)
 		}
 	}
 	return NilValue()
 }
 
 func mathFloorValue(arg Value) Value {
-	if arg.IsInt() {
-		return arg
-	}
-	f := math.Floor(toFloat(arg))
-	if math.IsInf(f, 0) || math.IsNaN(f) || f < -(1<<47) || f > (1<<47)-1 {
-		return FloatValue(f)
-	}
-	return IntValue(int64(f))
+	return mathNumberValue(basemath.Floor(valueMathNumber(arg)))
 }
 
 func mathFloorDivValue(a, b Value) (Value, error) {
-	if (b.IsInt() && b.Int() == 0) || (!b.IsInt() && toFloat(b) == 0) {
+	v, ok := basemath.FloorDiv(valueMathNumber(a), valueMathNumber(b))
+	if !ok {
 		return NilValue(), fmt.Errorf("bad argument #2 to 'math.floorDiv' (zero)")
 	}
-	if a.IsInt() && b.IsInt() {
-		ai := a.Int()
-		bi := b.Int()
-		if ai == math.MinInt64 && bi == -1 {
-			return FloatValue(math.Floor(float64(ai) / float64(bi))), nil
-		}
-		q := ai / bi
-		r := ai % bi
-		if r != 0 && ((r < 0) != (bi < 0)) {
-			q--
-		}
-		return IntValue(q), nil
-	}
-	return mathFloorValue(FloatValue(toFloat(a) / toFloat(b))), nil
+	return mathNumberValue(v), nil
 }
 
 func mathCeilValue(arg Value) Value {
-	if arg.IsInt() {
-		return arg
+	return mathNumberValue(basemath.Ceil(valueMathNumber(arg)))
+}
+
+func valueMathNumber(v Value) basemath.Number {
+	if v.IsInt() {
+		return basemath.Int(v.Int())
 	}
-	f := math.Ceil(toFloat(arg))
-	if math.IsInf(f, 0) || math.IsNaN(f) || f < -(1<<47) || f > (1<<47)-1 {
-		return FloatValue(f)
+	return basemath.Float(toFloat(v))
+}
+
+func mathNumberValue(n basemath.Number) Value {
+	if n.IsInt {
+		return IntValue(n.Int)
 	}
-	return IntValue(int64(f))
+	return FloatValue(n.Float)
 }
