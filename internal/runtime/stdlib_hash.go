@@ -1,14 +1,9 @@
 package runtime
 
 import (
-	"crypto/hmac"
-	"crypto/md5"
-	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
-	"hash/crc32"
+
+	basehash "github.com/never-labs/gscript/internal/stdlib/base/hash"
 )
 
 // buildHashLib creates the "hash" standard library table.
@@ -30,8 +25,7 @@ func buildHashLib() *Table {
 		if !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'hash.md5' (string expected)")
 		}
-		h := md5.Sum([]byte(args[0].Str()))
-		return []Value{StringValue(hex.EncodeToString(h[:]))}, nil
+		return []Value{StringValue(basehash.MD5(args[0].Str()))}, nil
 	})
 
 	// hash.sha1(str) -> lowercase hex string (40 chars)
@@ -42,8 +36,7 @@ func buildHashLib() *Table {
 		if !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'hash.sha1' (string expected)")
 		}
-		h := sha1.Sum([]byte(args[0].Str()))
-		return []Value{StringValue(hex.EncodeToString(h[:]))}, nil
+		return []Value{StringValue(basehash.SHA1(args[0].Str()))}, nil
 	})
 
 	// hash.sha256(str) -> lowercase hex string (64 chars)
@@ -54,8 +47,7 @@ func buildHashLib() *Table {
 		if !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'hash.sha256' (string expected)")
 		}
-		h := sha256.Sum256([]byte(args[0].Str()))
-		return []Value{StringValue(hex.EncodeToString(h[:]))}, nil
+		return []Value{StringValue(basehash.SHA256(args[0].Str()))}, nil
 	})
 
 	// hash.sha512(str) -> lowercase hex string (128 chars)
@@ -66,8 +58,7 @@ func buildHashLib() *Table {
 		if !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'hash.sha512' (string expected)")
 		}
-		h := sha512.Sum512([]byte(args[0].Str()))
-		return []Value{StringValue(hex.EncodeToString(h[:]))}, nil
+		return []Value{StringValue(basehash.SHA512(args[0].Str()))}, nil
 	})
 
 	// hash.crc32(str) -> integer (CRC32 checksum)
@@ -78,8 +69,7 @@ func buildHashLib() *Table {
 		if !args[0].IsString() {
 			return nil, fmt.Errorf("bad argument #1 to 'hash.crc32' (string expected)")
 		}
-		checksum := crc32.ChecksumIEEE([]byte(args[0].Str()))
-		return []Value{IntValue(int64(checksum))}, nil
+		return []Value{IntValue(int64(basehash.CRC32(args[0].Str())))}, nil
 	})
 
 	// hash.hmacSHA256(key, message) -> lowercase hex string
@@ -93,10 +83,7 @@ func buildHashLib() *Table {
 		if !args[1].IsString() {
 			return nil, fmt.Errorf("bad argument #2 to 'hash.hmacSHA256' (string expected)")
 		}
-		mac := hmac.New(sha256.New, []byte(args[0].Str()))
-		mac.Write([]byte(args[1].Str()))
-		result := mac.Sum(nil)
-		return []Value{StringValue(hex.EncodeToString(result))}, nil
+		return []Value{StringValue(basehash.HMACSHA256(args[0].Str(), args[1].Str()))}, nil
 	})
 
 	return t

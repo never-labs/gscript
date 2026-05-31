@@ -48,6 +48,37 @@ result := strings.upper("hello")
 	}
 }
 
+func TestStdlibUUIDRequirePackageLoadedIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []gs.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []gs.Option{gs.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			vm := gs.New(tc.opts...)
+			if err := vm.Exec(`
+mod := require("uuid")
+sameGlobal := mod == uuid
+sameLoaded := package.loaded["uuid"] == mod
+result := type(mod.v4())
+`); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := vm.Get("sameGlobal"); err != nil || got != true {
+				t.Fatalf("sameGlobal = %v, %v; want true, nil", got, err)
+			}
+			if got, err := vm.Get("sameLoaded"); err != nil || got != true {
+				t.Fatalf("sameLoaded = %v, %v; want true, nil", got, err)
+			}
+			if got, err := vm.Get("result"); err != nil || got != "string" {
+				t.Fatalf("result = %v, %v; want string, nil", got, err)
+			}
+		})
+	}
+}
+
 func TestWithGoImportsRequireAllowlist(t *testing.T) {
 	for _, tc := range []struct {
 		name string

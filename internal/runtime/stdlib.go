@@ -2,16 +2,16 @@ package runtime
 
 import (
 	"context"
-
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
 )
 
 // registerStdlib registers all standard library tables as globals.
 // This is called from New() after registerBuiltins().
 func (interp *Interpreter) registerStdlib() {
+	std := newStdlibInstallContext(interp)
+
 	// String library
 	strLib := BuildStringLibWithCaller(interp.callFunction, func() int64 { return interp.maxHostResult })
-	interp.globals.Define("string", TableValue(strLib))
+	std.RegisterTable("string", strLib)
 
 	// Set up string metatable so "hello":upper() works
 	interp.stringMeta = NewTable()
@@ -22,47 +22,47 @@ func (interp *Interpreter) registerStdlib() {
 	buildTableProxyWithInterp(interp, tblLib)
 	buildTableSortWithInterp(interp, tblLib)
 	buildTableHigherOrderWithInterp(interp, tblLib)
-	interp.globals.Define("table", TableValue(tblLib))
+	std.RegisterTable("table", tblLib)
 
 	// Math library
-	interp.globals.Define("math", TableValue(buildMathLib()))
+	std.RegisterTable("math", buildMathLib())
 
 	// IO library
-	interp.globals.Define("io", TableValue(buildIOLib(interp)))
+	std.RegisterTable("io", buildIOLib(interp))
 
 	// OS library
-	interp.globals.Define("os", TableValue(buildOSLib()))
+	std.RegisterTable("os", buildOSLib())
 
 	// HTTP server library
-	interp.globals.Define("http", TableValue(httpLib(interp)))
+	std.RegisterTable("http", httpLib(interp))
 
 	// Raylib game library (window, drawing, input, audio)
-	interp.globals.Define("rl", TableValue(rlLib(interp)))
+	std.RegisterTable("rl", rlLib(interp))
 
 	// --- Encoding / Crypto ---
-	interp.globals.Define("array", TableValue(buildArrayLib()))
-	interp.globals.Define("json", TableValue(buildJSONLib()))
-	interp.globals.Define("base64", TableValue(buildBase64Lib(interp)))
-	interp.globals.Define("hash", TableValue(buildHashLib()))
+	std.RegisterTable("array", buildArrayLib())
+	std.RegisterTable("json", buildJSONLib())
+	std.RegisterTable("base64", buildBase64Lib(interp))
+	std.RegisterTable("hash", buildHashLib())
 
 	// --- File system & paths ---
-	interp.globals.Define("fs", TableValue(buildFSLib(interp.filesystemRoot)))
-	interp.globals.Define("path", TableValue(buildPathLib()))
+	std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))
+	std.RegisterTable("path", buildPathLib())
 
 	// --- Time & networking ---
-	interp.globals.Define("time", TableValue(buildTimeLib()))
-	interp.globals.Define("net", TableValue(buildNetLib(interp)))
+	std.RegisterTable("time", buildTimeLib())
+	std.RegisterTable("net", buildNetLib(interp))
 
 	// --- System ---
-	interp.globals.Define("process", TableValue(buildProcessLib(interp)))
-	interp.globals.Define("script", TableValue(buildScriptLib(interp)))
-	interp.globals.Define("sync", TableValue(BuildSyncLibWithCaller(interp.callFunction)))
-	interp.globals.Define("debug", TableValue(buildDebugLib(interp)))
-	interp.globals.Define("testkit", TableValue(buildTestkitLib(interp)))
+	std.RegisterTable("process", buildProcessLib(interp))
+	std.RegisterTable("script", buildScriptLib(interp))
+	std.RegisterTable("sync", BuildSyncLibWithCaller(interp.callFunction))
+	std.RegisterTable("debug", buildDebugLib(interp))
+	std.RegisterTable("testkit", buildTestkitLib(interp))
 
 	// --- Data formats ---
-	interp.globals.Define("csv", TableValue(buildCSVLib(interp)))
-	interp.globals.Define("url", TableValue(buildURLLib(interp)))
+	std.RegisterTable("csv", buildCSVLib(interp))
+	std.RegisterTable("url", buildURLLib(interp))
 
 	// --- AI model integration ---
 	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
@@ -81,12 +81,12 @@ func (interp *Interpreter) registerStdlib() {
 			interp.llmTraceSink(event)
 		}
 	})
-	interp.globals.Define("llm", TableValue(llmLib))
-	interp.globals.Define("toolof", llmLib.RawGetString("toolof"))
-	interp.globals.Define("msg", TableValue(BuildLLMMessageLib()))
-	interp.globals.Define("history", TableValue(BuildLLMHistoryLib()))
-	interp.globals.Define("chat", TableValue(BuildChatLib()))
-	interp.globals.Define("loop", TableValue(BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
+	std.RegisterTable("llm", llmLib)
+	std.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
+	std.RegisterTable("msg", BuildLLMMessageLib())
+	std.RegisterTable("history", BuildLLMHistoryLib())
+	std.RegisterTable("chat", BuildChatLib())
+	std.RegisterTable("loop", BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
 		return interp.llmProvider
 	}, func() int64 {
 		return interp.maxHostResult
@@ -99,65 +99,50 @@ func (interp *Interpreter) registerStdlib() {
 		if interp.llmTraceSink != nil {
 			interp.llmTraceSink(event)
 		}
-	})))
+	}))
 
 	// --- Utilities ---
-	interp.globals.Define("uuid", TableValue(buildUUIDLib()))
-	interp.globals.Define("bytes", TableValue(buildBytesLib(interp)))
-	interp.globals.Define("binary", TableValue(buildBinaryLib(interp)))
+	std.RegisterTable("uuid", buildUUIDLib())
+	std.RegisterTable("bytes", buildBytesLib(interp))
+	std.RegisterTable("binary", buildBinaryLib(interp))
 
 	// --- Game math ---
-	interp.globals.Define("vec", TableValue(buildVecLib()))
-	interp.globals.Define("color", TableValue(buildColorLib()))
+	std.RegisterTable("vec", buildVecLib())
+	std.RegisterTable("color", buildColorLib())
 
 	// --- Numeric matrix (R42 DenseMatrix Phase 1) ---
-	interp.globals.Define("matrix", TableValue(buildMatrixLib()))
-	interp.globals.Define("soa", TableValue(buildSoALib()))
+	std.RegisterTable("matrix", buildMatrixLib())
+	std.RegisterTable("soa", buildSoALib())
 
 	// --- Text processing ---
-	interp.globals.Define("regexp", TableValue(buildRegexpLib()))
-	interp.globals.Define("utf8", TableValue(buildUTF8Lib(interp)))
+	std.RegisterTable("regexp", buildRegexpLib())
+	std.RegisterTable("utf8", buildUTF8Lib(interp))
 
 	// --- Low-level ---
-	interp.globals.Define("bit32", TableValue(buildBit32Lib()))
-	interp.globals.Define("bits", TableValue(buildBitsLib()))
+	std.RegisterTable("bit32", buildBit32Lib())
+	std.RegisterTable("bits", buildBitsLib())
 
 	// --- Random number generation ---
-	interp.globals.Define("rand", TableValue(buildRandLib()))
+	std.RegisterTable("rand", buildRandLib())
 
 	// --- Sorting utilities ---
-	interp.globals.Define("sort", TableValue(buildSortLib(interp)))
+	std.RegisterTable("sort", buildSortLib(interp))
 
 	// --- Encoding utilities ---
-	interp.globals.Define("encoding", TableValue(buildEncodingLib(interp)))
+	std.RegisterTable("encoding", buildEncodingLib(interp))
 
 	// --- Compression ---
-	interp.globals.Define("compress", TableValue(buildCompressLib(interp)))
+	std.RegisterTable("compress", buildCompressLib(interp))
 
 	// --- Cryptography ---
-	interp.globals.Define("crypto", TableValue(buildCryptoLib(interp)))
+	std.RegisterTable("crypto", buildCryptoLib(interp))
 
 	// --- Container data structures ---
-	interp.globals.Define("container", TableValue(buildContainerLib(interp)))
-	interp.globals.Define("context", TableValue(buildContextLib()))
+	std.RegisterTable("container", buildContainerLib(interp))
+	std.RegisterTable("context", buildContextLib())
 
 	// --- Logging ---
-	interp.globals.Define("log", TableValue(buildLogLib()))
+	std.RegisterTable("log", buildLogLib())
 
-	interp.registerPackageLib()
-}
-
-func (interp *Interpreter) registerPackageLib() {
-	pkg := NewTable()
-	loaded := NewTable()
-	for _, module := range catalog.Modules() {
-		name := module.Name
-		if v, ok := interp.globals.Get(name); ok && v.IsTable() {
-			interp.modules[name] = v
-			loaded.RawSetString(name, v)
-		}
-	}
-	pkg.RawSetString("loaded", TableValue(loaded))
-	pkg.RawSetString("path", StringValue(interp.scriptDir))
-	interp.globals.Define("package", TableValue(pkg))
+	std.InstallPackage(interp.scriptDir)
 }
