@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -53,6 +54,26 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
                 self.assertIn(expected, text)
                 self.assertNotIn("github.com/gscript/gscript", text)
                 self.assertNotIn("github.com/Never-Labs/gscript", text)
+
+    def test_scripts_have_valid_type_specific_syntax(self):
+        scripts = sorted(path for path in (ROOT / "scripts").iterdir() if path.is_file())
+        self.assertGreater(len(scripts), 0)
+        for script in scripts:
+            with self.subTest(script=script.name):
+                if script.suffix == ".sh":
+                    cmd = ["bash", "-n", str(script)]
+                elif script.suffix == ".py":
+                    cmd = ["python3", "-m", "py_compile", str(script)]
+                else:
+                    self.fail(f"unsupported script entrypoint type: {script.name}")
+                subprocess.run(
+                    cmd,
+                    cwd=ROOT,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
 
 
 if __name__ == "__main__":
