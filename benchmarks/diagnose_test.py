@@ -19,6 +19,42 @@ class DiagnoseSelectorTest(unittest.TestCase):
 
 
 class DiagnoseSummaryTest(unittest.TestCase):
+    def test_diagnostic_summary_helpers_format_missing_values(self):
+        row = diagnose.DiagnosticRow(
+            benchmark="sum",
+            group="math",
+            script="benchmarks/math/sum.gs",
+            status="ok",
+        )
+
+        self.assertEqual(diagnose.diagnostic_time_text(row), "-")
+        self.assertEqual(diagnose.diagnostic_tier2_text(row), "0/0/0")
+        self.assertEqual(diagnose.diagnostic_runtime_text(row), "-")
+        self.assertEqual(diagnose.diagnostic_pprof_text(row), "-")
+
+    def test_diagnostic_summary_helpers_format_present_values(self):
+        row = diagnose.DiagnosticRow(
+            benchmark="events_metamethod",
+            group="table",
+            script="benchmarks/table/events_metamethod.gs",
+            status="ok",
+            time_seconds=0.1254,
+            t2_attempted=5,
+            t2_compiled=4,
+            t2_entered=3,
+            runtime_summary={"native_fallback": 11},
+            tier2_call_summary={"turn": 2},
+            pprof_runs=4,
+            pprof_script_repeat=8,
+            pprof_samples_seconds=0.321,
+            pprof_effective=True,
+        )
+
+        self.assertEqual(diagnose.diagnostic_time_text(row), "0.125s")
+        self.assertEqual(diagnose.diagnostic_tier2_text(row), "5/4/3")
+        self.assertEqual(diagnose.diagnostic_runtime_text(row), "native_fallback=11, tier2_turn=2")
+        self.assertEqual(diagnose.diagnostic_pprof_text(row), "ok 0.321s/4 runs/repeat 8")
+
     def test_diagnostic_markdown_row_formats_runtime_and_profile_bits(self):
         row = diagnose.DiagnosticRow(
             benchmark="events_metamethod",

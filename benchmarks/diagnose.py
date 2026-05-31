@@ -518,6 +518,14 @@ def diagnostic_work_text(row: DiagnosticRow) -> str:
     return f"{row.work_action}/{row.work_target} {row.work_proto} p={row.work_priority} {row.readiness}".strip()
 
 
+def diagnostic_time_text(row: DiagnosticRow) -> str:
+    return "-" if row.time_seconds is None else f"{row.time_seconds:.3f}s"
+
+
+def diagnostic_tier2_text(row: DiagnosticRow) -> str:
+    return f"{row.t2_attempted}/{row.t2_compiled}/{row.t2_entered}"
+
+
 def diagnostic_runtime_bits(row: DiagnosticRow) -> list[str]:
     bits = []
     for key in RUNTIME_SUMMARY_KEYS:
@@ -529,6 +537,10 @@ def diagnostic_runtime_bits(row: DiagnosticRow) -> list[str]:
         if value:
             bits.append(f"tier2_{key}={value}")
     return bits
+
+
+def diagnostic_runtime_text(row: DiagnosticRow) -> str:
+    return ", ".join(diagnostic_runtime_bits(row)) or "-"
 
 
 def diagnostic_pprof_text(row: DiagnosticRow) -> str:
@@ -545,12 +557,12 @@ def diagnostic_markdown_row(row: DiagnosticRow) -> str:
     return benchmark_output.markdown_row(
         [
             f"{row.group}/{row.benchmark}",
-            "-" if row.time_seconds is None else f"{row.time_seconds:.3f}s",
-            f"{row.t2_attempted}/{row.t2_compiled}/{row.t2_entered}",
+            diagnostic_time_text(row),
+            diagnostic_tier2_text(row),
             str(row.exit_total),
             diagnostic_top_exit_text(row),
             diagnostic_work_text(row),
-            ", ".join(diagnostic_runtime_bits(row)) or "-",
+            diagnostic_runtime_text(row),
             diagnostic_pprof_text(row),
             f"`{row.artifact_dir}`",
         ]
