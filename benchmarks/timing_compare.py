@@ -1101,7 +1101,7 @@ def positive_int(value: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
-    parser.add_argument("--group", action="append", choices=[*GROUPS, *LEGACY_GROUP_ALIASES.keys()], help="benchmark group; repeatable")
+    parser.add_argument("--group", action="append", choices=discovery.group_choices(GROUPS), help="benchmark group; repeatable")
     parser.add_argument("--all-groups", action="store_true", help="run all benchmark groups")
     parser.add_argument("--mode", action="append", choices=MODES, help="GScript mode; repeatable")
     parser.add_argument("--runs", type=positive_int, default=5, help="measured samples after calibration")

@@ -17,6 +17,12 @@ class FakeSpec:
 
 
 class BenchmarkDiscoveryTest(unittest.TestCase):
+    def test_group_choices_includes_canonical_and_legacy_group_names(self):
+        self.assertEqual(
+            discovery.group_choices(["numeric", "data"]),
+            ["numeric", "data", "suite", "extended", "variants", "official", "data_oriented"],
+        )
+
     def test_domain_specs_prefers_default_order_then_sorted_extras_and_luajit_refs(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

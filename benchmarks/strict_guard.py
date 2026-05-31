@@ -836,7 +836,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--group",
         action="append",
-        choices=[*ALL_GROUPS, *LEGACY_GROUP_ALIASES.keys()],
+        choices=discovery.group_choices(ALL_GROUPS),
         help="benchmark group to run; repeatable; default is all domain groups",
     )
     parser.add_argument("--mode", action="append", choices=DEFAULT_MODES, help="mode to run; repeatable")

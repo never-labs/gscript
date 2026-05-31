@@ -605,7 +605,7 @@ def groups_for_args(args: argparse.Namespace) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
-    parser.add_argument("--group", action="append", choices=[*timing.GROUPS, *timing.LEGACY_GROUP_ALIASES.keys()], help="benchmark group; repeatable")
+    parser.add_argument("--group", action="append", choices=discovery.group_choices(timing.GROUPS), help="benchmark group; repeatable")
     parser.add_argument("--all-groups", action="store_true", help="diagnose all benchmark groups")
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--timeout", type=positive_int, default=120)

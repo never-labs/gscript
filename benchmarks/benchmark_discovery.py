@@ -190,6 +190,10 @@ def canonical_group(group: str) -> list[str]:
     return LEGACY_GROUP_ALIASES.get(group, [group])
 
 
+def group_choices(allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[str]:
+    return [*allowed_groups, *LEGACY_GROUP_ALIASES.keys()]
+
+
 def canonical_selector(selector: str) -> str:
     if selector in LEGACY_BENCH_ALIASES:
         return LEGACY_BENCH_ALIASES[selector]
