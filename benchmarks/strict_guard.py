@@ -418,18 +418,13 @@ def mode_command(
     gscript_bin: Path,
     luajit_bin: str | None,
 ) -> tuple[list[str] | None, dict[str, str] | None, str | None]:
-    if mode == "luajit":
-        if luajit_bin is None:
-            return None, None, "skipped"
-        if spec.luajit is None or not spec.luajit.exists():
-            return None, None, "missing"
-        return [luajit_bin, str(spec.luajit)], None, None
-
-    if not spec.gscript.exists():
-        return None, None, "missing"
-
-    cmd, env = benchmark_output.gscript_mode_command(mode, gscript_bin, spec.gscript)
-    return cmd, env, None
+    return benchmark_output.benchmark_mode_command(
+        mode,
+        gscript_bin,
+        spec.gscript,
+        luajit_bin=luajit_bin,
+        luajit_script=spec.luajit,
+    )
 
 
 def run_mode(

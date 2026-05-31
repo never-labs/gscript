@@ -95,3 +95,23 @@ def gscript_mode_command(mode: str, gscript_bin: Path, script: Path) -> tuple[li
         env["GSCRIPT_TIER2_NO_FILTER"] = "1"
         return [str(gscript_bin), "-jit", "-jit-stats", "-exit-stats", str(script)], env
     raise ValueError(f"unknown mode: {mode}")
+
+
+def benchmark_mode_command(
+    mode: str,
+    gscript_bin: Path | None,
+    gscript_script: Path | None,
+    luajit_bin: str | None = None,
+    luajit_script: Path | None = None,
+) -> tuple[list[str] | None, dict[str, str] | None, str | None]:
+    if mode == "luajit":
+        if luajit_bin is None:
+            return None, None, "skipped"
+        if luajit_script is None or not luajit_script.exists():
+            return None, None, "missing"
+        return [luajit_bin, str(luajit_script)], None, None
+
+    if gscript_bin is None or gscript_script is None or not gscript_script.exists():
+        return None, None, "missing"
+    cmd, env = gscript_mode_command(mode, gscript_bin, gscript_script)
+    return cmd, env, None

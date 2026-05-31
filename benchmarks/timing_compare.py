@@ -676,17 +676,14 @@ def command_for(
     luajit_bin: str | None,
 ) -> tuple[list[str] | None, dict[str, str] | None, str | None]:
     if subject == "luajit":
-        if luajit_bin is None:
-            return None, None, "skipped"
-        if luajit_path is None or not luajit_path.exists():
-            return None, None, "missing"
-        return [luajit_bin, str(luajit_path)], None, None
-
-    if gscript_path is None or not gscript_path.exists():
-        return None, None, "missing"
-    assert gscript_bin is not None
-    cmd, env = benchmark_output.gscript_mode_command(mode, gscript_bin, gscript_path)
-    return cmd, env, None
+        return benchmark_output.benchmark_mode_command(
+            "luajit",
+            gscript_bin,
+            gscript_path,
+            luajit_bin=luajit_bin,
+            luajit_script=luajit_path,
+        )
+    return benchmark_output.benchmark_mode_command(mode, gscript_bin, gscript_path)
 
 
 def run_subject(

@@ -112,6 +112,69 @@ class BenchmarkOutputTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown mode: bad"):
             output.gscript_mode_command("bad", Path("/bin/gscript"), Path("/bench/main.gs"))
 
+    def test_benchmark_mode_command_formats_luajit_mode(self):
+        with mock.patch("pathlib.Path.exists", return_value=True):
+            cmd, env, unavailable = output.benchmark_mode_command(
+                "luajit",
+                Path("/bin/gscript"),
+                Path("/bench/main.gs"),
+                luajit_bin="/bin/luajit",
+                luajit_script=Path("/bench/main.lua"),
+            )
+
+        self.assertEqual(cmd, ["/bin/luajit", "/bench/main.lua"])
+        self.assertIsNone(env)
+        self.assertIsNone(unavailable)
+
+    def test_benchmark_mode_command_reports_missing_luajit_input(self):
+        cmd, env, unavailable = output.benchmark_mode_command(
+            "luajit",
+            Path("/bin/gscript"),
+            Path("/bench/main.gs"),
+            luajit_bin="/bin/luajit",
+            luajit_script=Path("/missing/main.lua"),
+        )
+
+        self.assertIsNone(cmd)
+        self.assertIsNone(env)
+        self.assertEqual(unavailable, "missing")
+
+    def test_benchmark_mode_command_reports_skipped_luajit_mode(self):
+        cmd, env, unavailable = output.benchmark_mode_command(
+            "luajit",
+            Path("/bin/gscript"),
+            Path("/bench/main.gs"),
+            luajit_bin=None,
+            luajit_script=Path("/bench/main.lua"),
+        )
+
+        self.assertIsNone(cmd)
+        self.assertIsNone(env)
+        self.assertEqual(unavailable, "skipped")
+
+    def test_benchmark_mode_command_formats_gscript_mode(self):
+        with mock.patch("pathlib.Path.exists", return_value=True):
+            cmd, env, unavailable = output.benchmark_mode_command(
+                "default",
+                Path("/bin/gscript"),
+                Path("/bench/main.gs"),
+            )
+
+        self.assertEqual(cmd, ["/bin/gscript", "-jit", "-jit-stats", "-exit-stats", "/bench/main.gs"])
+        self.assertIsInstance(env, dict)
+        self.assertIsNone(unavailable)
+
+    def test_benchmark_mode_command_reports_missing_gscript_input(self):
+        cmd, env, unavailable = output.benchmark_mode_command(
+            "default",
+            Path("/bin/gscript"),
+            Path("/missing/main.gs"),
+        )
+
+        self.assertIsNone(cmd)
+        self.assertIsNone(env)
+        self.assertEqual(unavailable, "missing")
+
 
 if __name__ == "__main__":
     unittest.main()
