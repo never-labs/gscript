@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	stdlibai "github.com/never-labs/gscript/internal/stdlib/ai"
 )
 
 func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, maxHostResult func() int64, ctx func() context.Context, traces ...LLMTraceSink) *Table {
@@ -250,13 +252,22 @@ func BuildLLMLoopLib(call ScriptFunctionCaller, provider func() LLMProvider, max
 }
 func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 	opts := NewTable()
-	if messages := src.RawGetString("messages"); messages.IsTable() {
+	messages := src.RawGetString("messages")
+	user := src.RawGetString("user")
+	plan, err := stdlibai.NormalizeLoopOptions(stdlibai.LoopOptionInput{
+		HasMessages:         messages.IsTable(),
+		HasUser:             !user.IsNil(),
+		HasMaxSteps:         !src.RawGetString("max_steps").IsNil(),
+		HasResponseFormat:   !src.RawGetString("response_format").IsNil(),
+		HasStructuredOutput: src.RawGetString("output").IsTable(),
+		DefaultMaxSteps:     defaultMaxSteps,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !plan.SynthesizeMessages {
 		opts.RawSetString("messages", messages)
 	} else {
-		user := src.RawGetString("user")
-		if user.IsNil() {
-			return nil, fmt.Errorf("loop requires messages or user")
-		}
 		messages := NewAppendArrayTable(2)
 		if system := src.RawGetString("system"); !system.IsNil() {
 			messages.RawSet(IntValue(int64(messages.Length()+1)), TableValue(llmMessageTable("system", system.Str())))
@@ -264,41 +275,15 @@ func llmLoopOptions(src *Table, defaultMaxSteps int64) (*Table, error) {
 		messages.RawSet(IntValue(int64(messages.Length()+1)), TableValue(llmMessageTable("user", user.Str())))
 		opts.RawSetString("messages", TableValue(messages))
 	}
-	for _, key := range []string{
-		"model",
-		"tools",
-		"max_tokens",
-		"temperature",
-		"top_p",
-		"response_format",
-		"stream",
-		"max_steps",
-		"max_tool_retries",
-		"max_history_tokens",
-		"force_tool",
-		"stop",
-		"metadata",
-		"output",
-		"output_repair",
-		"output_retries",
-		"budget",
-		"budget_tokens",
-		"budget_turns",
-		"budget_calls",
-		"budget_money",
-		"budget_time",
-		"ctx",
-		"context",
-		"cancel",
-	} {
+	for _, key := range stdlibai.LoopOptionKeys {
 		if v := src.RawGetString(key); !v.IsNil() {
 			opts.RawSetString(key, v)
 		}
 	}
-	if defaultMaxSteps > 0 && opts.RawGetString("max_steps").IsNil() {
-		opts.RawSetString("max_steps", IntValue(defaultMaxSteps))
+	if plan.SetDefaultMaxSteps {
+		opts.RawSetString("max_steps", IntValue(plan.DefaultMaxSteps))
 	}
-	if opts.RawGetString("response_format").IsNil() && opts.RawGetString("output").IsTable() {
+	if plan.SetJSONResponseFormat {
 		opts.RawSetString("response_format", TableValue(llmJSONResponseFormatTable()))
 	}
 	return opts, nil
