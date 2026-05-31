@@ -27,6 +27,9 @@ type TableSortLen func(Value) (int64, error)
 type TableSortGet func(Value, Value) (Value, error)
 type TableSortSet func(Value, Value, Value) error
 type TableSortTryPlainArraySort func(Value, int64) bool
+type TableMoveGet func(Value, Value) (Value, error)
+type TableMoveSet func(Value, Value, Value) error
+type TableMoveTryPlainArrayMove func(src, dst Value, first, last, target int64) bool
 
 // BuildTableSortFunction builds table.sort around caller-provided table access
 // and comparison hooks. VM/interpreter callers pass metamethod-aware hooks;
@@ -170,6 +173,75 @@ func rawTableSortFunction() *GoFunction {
 	)
 }
 
+// BuildTableMoveFunction builds table.move around caller-provided table access
+// hooks. Raw callers pass RawGet/RawSet; interpreter callers pass
+// metamethod-aware hooks.
+func BuildTableMoveFunction(tableGet TableMoveGet, tableSet TableMoveSet, tryPlain TableMoveTryPlainArrayMove) *GoFunction {
+	return &GoFunction{
+		Name: "table.move",
+		Fn: func(args []Value) ([]Value, error) {
+			if len(args) < 4 || !args[0].IsTable() {
+				return nil, fmt.Errorf("bad argument to 'table.move'")
+			}
+			src := args[0]
+			f := toInt(args[1])
+			e := toInt(args[2])
+			tPos := toInt(args[3])
+			dst := src
+			if len(args) >= 5 {
+				if !args[4].IsTable() {
+					return nil, fmt.Errorf("bad argument to 'table.move'")
+				}
+				dst = args[4]
+			}
+
+			if e >= f {
+				if tryPlain != nil && tryPlain(src, dst, f, e, tPos) {
+					return []Value{dst}, nil
+				}
+				count := e - f + 1
+				if tPos <= f || src.Table() != dst.Table() {
+					for i := int64(0); i < count; i++ {
+						v, err := tableGet(src, IntValue(f+i))
+						if err != nil {
+							return nil, err
+						}
+						if err := tableSet(dst, IntValue(tPos+i), v); err != nil {
+							return nil, err
+						}
+					}
+				} else {
+					for i := count - 1; i >= 0; i-- {
+						v, err := tableGet(src, IntValue(f+i))
+						if err != nil {
+							return nil, err
+						}
+						if err := tableSet(dst, IntValue(tPos+i), v); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+			return []Value{dst}, nil
+		},
+	}
+}
+
+func rawTableMoveFunction() *GoFunction {
+	return BuildTableMoveFunction(
+		func(t Value, key Value) (Value, error) {
+			return t.Table().RawGet(key), nil
+		},
+		func(t Value, key Value, val Value) error {
+			t.Table().RawSet(key, val)
+			return nil
+		},
+		func(src, dst Value, first, last, target int64) bool {
+			return dst.Table().TryPlainArrayMove(src.Table(), first, last, target)
+		},
+	)
+}
+
 // buildTableLib creates the "table" standard library table.
 func buildTableLib() *Table {
 	t := NewTable()
@@ -303,36 +375,7 @@ func buildTableLib() *Table {
 	set("unpack", func(args []Value) ([]Value, error) { return tableUnpack("unpack", args) })
 	set("spread", func(args []Value) ([]Value, error) { return tableUnpack("spread", args) })
 
-	// table.move(a1, f, e, t [, a2]) -> a2
-	set("move", func(args []Value) ([]Value, error) {
-		if len(args) < 4 || !args[0].IsTable() {
-			return nil, fmt.Errorf("bad argument to 'table.move'")
-		}
-		a1 := args[0].Table()
-		f := toInt(args[1])
-		e := toInt(args[2])
-		tPos := toInt(args[3])
-		a2 := a1
-		if len(args) >= 5 && args[4].IsTable() {
-			a2 = args[4].Table()
-		}
-
-		if e >= f {
-			count := e - f + 1
-			// Copy in appropriate direction to avoid overwrites
-			if tPos <= f || a1 != a2 {
-				for i := int64(0); i < count; i++ {
-					a2.RawSet(IntValue(tPos+i), a1.RawGet(IntValue(f+i)))
-				}
-			} else {
-				for i := count - 1; i >= 0; i-- {
-					a2.RawSet(IntValue(tPos+i), a1.RawGet(IntValue(f+i)))
-				}
-			}
-		}
-
-		return []Value{TableValue(a2)}, nil
-	})
+	t.RawSet(StringValue("move"), FunctionValue(rawTableMoveFunction()))
 
 	// table.pack(...) -> table
 	set("pack", func(args []Value) ([]Value, error) {
@@ -749,50 +792,17 @@ func buildTableProxyWithInterp(interp *Interpreter, tblLib *Table) {
 		return tableUnpack("spread", args)
 	}}))
 
-	tblLib.RawSet(StringValue("move"), FunctionValue(&GoFunction{
-		Name: "table.move",
-		Fn: func(args []Value) ([]Value, error) {
-			if len(args) < 4 || !args[0].IsTable() {
-				return nil, fmt.Errorf("bad argument to 'table.move'")
-			}
-			src := args[0]
-			f := toInt(args[1])
-			e := toInt(args[2])
-			tPos := toInt(args[3])
-			dst := src
-			if len(args) >= 5 {
-				if !args[4].IsTable() {
-					return nil, fmt.Errorf("bad argument to 'table.move'")
-				}
-				dst = args[4]
-			}
-			if e >= f {
-				count := e - f + 1
-				if tPos <= f || src.Table() != dst.Table() {
-					for i := int64(0); i < count; i++ {
-						v, err := interp.tableGet(src, IntValue(f+i))
-						if err != nil {
-							return nil, err
-						}
-						if err := interp.tableSet(dst, IntValue(tPos+i), v); err != nil {
-							return nil, err
-						}
-					}
-				} else {
-					for i := count - 1; i >= 0; i-- {
-						v, err := interp.tableGet(src, IntValue(f+i))
-						if err != nil {
-							return nil, err
-						}
-						if err := interp.tableSet(dst, IntValue(tPos+i), v); err != nil {
-							return nil, err
-						}
-					}
-				}
-			}
-			return []Value{dst}, nil
+	tblLib.RawSet(StringValue("move"), FunctionValue(BuildTableMoveFunction(
+		func(t Value, key Value) (Value, error) {
+			return interp.tableGet(t, key)
 		},
-	}))
+		func(t Value, key Value, val Value) error {
+			return interp.tableSet(t, key, val)
+		},
+		func(src, dst Value, first, last, target int64) bool {
+			return dst.Table().TryPlainArrayMove(src.Table(), first, last, target)
+		},
+	)))
 }
 
 // BuildTableHigherOrderLibWithCaller installs the callback-based table helpers
