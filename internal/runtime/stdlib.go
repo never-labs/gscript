@@ -37,105 +37,85 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	std.RegisterTable("table", tblLib)
 
 	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// math from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("math", buildMathLib())
-	}
-
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// these from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("io", buildIOLib(interp))
-		std.RegisterTable("os", buildOSLib())
-		std.RegisterTable("http", httpLib(interp))
+		interp.installLegacyMigratedStdlib(std)
 	}
 
 	// Raylib game library (window, drawing, input, audio)
 	std.RegisterTable("rl", rlLib(interp))
 
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// json from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("json", buildJSONLib())
-	}
-
-	if includeMigratedCompat {
-		std.RegisterTable("fs", buildFSLib(interp.filesystemRoot))
-	}
-
-	// --- Time & networking ---
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// time from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("time", buildTimeLib())
-	}
-	if includeMigratedCompat {
-		std.RegisterTable("net", buildNetLib(interp))
-	}
-
 	// --- System ---
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// process from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("process", buildProcessLib(interp))
-	}
 	std.RegisterTable("script", buildScriptLib(interp))
 	std.RegisterTable("sync", BuildSyncLibWithCaller(interp.callFunction))
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// LLM bindings from stdlibrt/modules through stdlibrt/install.
-		llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
-			return interp.llmProvider
-		}, func() LLMProviderFactory {
-			return interp.llmProviderFactory
-		}, func() int64 {
-			return interp.maxHostResult
-		}, func() context.Context {
-			if interp.ctx == nil {
-				return context.Background()
-			}
-			return interp.ctx
-		}, func(event LLMTraceEvent) {
-			if interp.llmTraceSink != nil {
-				interp.llmTraceSink(event)
-			}
-		})
-		std.RegisterTable("llm", llmLib)
-		std.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
-		std.RegisterTable("msg", BuildLLMMessageLib())
-		std.RegisterTable("history", BuildLLMHistoryLib())
-		std.RegisterTable("chat", BuildChatLib())
-		std.RegisterTable("loop", BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
-			return interp.llmProvider
-		}, func() int64 {
-			return interp.maxHostResult
-		}, func() context.Context {
-			if interp.ctx == nil {
-				return context.Background()
-			}
-			return interp.ctx
-		}, func(event LLMTraceEvent) {
-			if interp.llmTraceSink != nil {
-				interp.llmTraceSink(event)
-			}
-		}))
-	}
-
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// matrix from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("matrix", buildMatrixLib())
-	}
 	std.RegisterTable("soa", buildSoALib())
 
-	if includeMigratedCompat {
-		// Historical direct-runtime install path. Public embedding now installs
-		// utf8 from stdlibrt/modules through stdlibrt/install.
-		std.RegisterTable("utf8", buildUTF8Lib(interp))
-	}
-
 	std.InstallPackage(interp.scriptDir)
+}
+
+// installLegacyMigratedStdlib is the compatibility path for runtime.New and
+// direct runtime.Interpreter.InstallStdlib callers. Public embedding goes
+// through stdlibrt/install, so new migrated modules should not be added here.
+func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
+	std.RegisterTable("math", buildMathLib())
+	std.RegisterTable("io", buildIOLib(interp))
+	std.RegisterTable("os", buildOSLibWithPolicy(
+		interp.environmentRead,
+		interp.environmentWrite,
+		interp.allowedEnv,
+		interp.filesystemRoot,
+		interp.filesystemWrite,
+	))
+	std.RegisterTable("http", httpLib(interp))
+	std.RegisterTable("json", buildJSONLib())
+	std.RegisterTable("fs", buildFSLibWithCapabilities(
+		interp.filesystemRoot,
+		interp.filesystemRead,
+		interp.filesystemWrite,
+		interp.maxFSReadBytes,
+		interp.maxFSWriteBytes,
+	))
+	std.RegisterTable("time", buildTimeLib())
+	std.RegisterTable("net", buildNetLib(interp))
+	std.RegisterTable("process", buildProcessLib(interp))
+
+	llmLib := BuildLLMLib(interp.callFunction, func() LLMProvider {
+		return interp.llmProvider
+	}, func() LLMProviderFactory {
+		return interp.llmProviderFactory
+	}, func() int64 {
+		return interp.maxHostResult
+	}, func() context.Context {
+		if interp.ctx == nil {
+			return context.Background()
+		}
+		return interp.ctx
+	}, func(event LLMTraceEvent) {
+		if interp.llmTraceSink != nil {
+			interp.llmTraceSink(event)
+		}
+	})
+	std.RegisterTable("llm", llmLib)
+	std.RegisterAlias("toolof", llmLib.RawGetString("toolof"))
+	std.RegisterTable("msg", BuildLLMMessageLib())
+	std.RegisterTable("history", BuildLLMHistoryLib())
+	std.RegisterTable("chat", BuildChatLib())
+	std.RegisterTable("loop", BuildLLMLoopLib(interp.callFunction, func() LLMProvider {
+		return interp.llmProvider
+	}, func() int64 {
+		return interp.maxHostResult
+	}, func() context.Context {
+		if interp.ctx == nil {
+			return context.Background()
+		}
+		return interp.ctx
+	}, func(event LLMTraceEvent) {
+		if interp.llmTraceSink != nil {
+			interp.llmTraceSink(event)
+		}
+	}))
+
+	std.RegisterTable("matrix", buildMatrixLib())
+	std.RegisterTable("utf8", buildUTF8Lib(interp))
 }

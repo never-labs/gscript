@@ -21,18 +21,8 @@ func httpLib(interp *Interpreter) *Table {
 	})
 }
 
-func BuildHTTPLibWithCaller(call ScriptFunctionCaller) *Table {
-	return buildHTTPLibWithPolicy(call, nil, nil)
-}
-
-func BuildHTTPLibWithCallerAndNetworkPolicy(call ScriptFunctionCaller, networkAllowed func() bool) *Table {
-	return buildHTTPLibWithPolicy(call, networkAllowed, nil)
-}
-
-func BuildHTTPLibWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
-	return buildHTTPLibWithPolicy(call, networkAllowed, maxHostResult)
-}
-
+// buildHTTPLibWithPolicy is retained only for the direct-runtime legacy
+// install path. Public stdlibrt installs use internal/stdlibrt/modules.
 func buildHTTPLibWithPolicy(call ScriptFunctionCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
 	t := NewTable()
 	var handlerMu sync.Mutex

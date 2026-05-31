@@ -68,3 +68,35 @@ func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 		t.Fatal("toolof alias was inserted into require cache")
 	}
 }
+
+func TestRuntimeNewKeepsLegacyMigratedHostIOTables(t *testing.T) {
+	interp := New()
+	for _, name := range []string{"fs", "http", "io", "net", "os"} {
+		global := interp.GetGlobal(name)
+		if !global.IsTable() {
+			t.Fatalf("%s global is not a table", name)
+		}
+		if global.Table().RawGetString("__stdlibrt_module").Truthy() {
+			t.Fatalf("%s global was installed from stdlibrt; runtime.New must keep legacy direct builders", name)
+		}
+		if got := interp.packageLoaded(name); got != global {
+			t.Fatalf("package.loaded.%s does not match global", name)
+		}
+		if got := interp.modules[name]; got != global {
+			t.Fatalf("require cache %s does not match global", name)
+		}
+	}
+}
+
+func TestInstallRuntimeStdlibOmitsMigratedHostIOTables(t *testing.T) {
+	interp := NewCore()
+	interp.InstallRuntimeStdlib()
+	for _, name := range []string{"fs", "http", "io", "net", "os"} {
+		if got := interp.GetGlobal(name); !got.IsNil() {
+			t.Fatalf("%s global = %v, want nil before stdlibrt install", name, got)
+		}
+		if _, ok := interp.modules[name]; ok {
+			t.Fatalf("%s was inserted into require cache before stdlibrt install", name)
+		}
+	}
+}
