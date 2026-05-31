@@ -17,6 +17,10 @@ type Shape struct {
 	Columns []ColumnShape
 }
 
+func NewColumnShape(name, dtype string, length int, version uint64) ColumnShape {
+	return ColumnShape{Name: name, DType: dtype, Length: length, Version: version}
+}
+
 // NewShape validates and copies SOA metadata before the runtime adapts it to a
 // script table.
 func NewShape(length int, version uint64, columns []ColumnShape) (Shape, error) {
@@ -38,4 +42,19 @@ func NewShape(length int, version uint64, columns []ColumnShape) (Shape, error) 
 		out.Columns[i] = col
 	}
 	return out, nil
+}
+
+// ShapeMetadata preserves the historical runtime behavior: validate when the
+// metadata is well-formed, but still return the raw metadata if a runtime
+// snapshot contains invalid shape fields.
+func ShapeMetadata(length int, version uint64, columns []ColumnShape) Shape {
+	shape, err := NewShape(length, version, columns)
+	if err == nil {
+		return shape
+	}
+	return Shape{
+		Length:  length,
+		Version: version,
+		Columns: append([]ColumnShape(nil), columns...),
+	}
 }

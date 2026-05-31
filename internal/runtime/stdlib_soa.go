@@ -1550,17 +1550,9 @@ func soaShapeTable(s *SoA) *Table {
 	snapshot, _ := s.Snapshot()
 	columns := make([]stdsoa.ColumnShape, 0, len(snapshot.Columns))
 	for _, desc := range snapshot.Columns {
-		columns = append(columns, stdsoa.ColumnShape{
-			Name:    desc.Name,
-			DType:   desc.DType.String(),
-			Length:  desc.Len,
-			Version: desc.Version,
-		})
+		columns = append(columns, stdsoa.NewColumnShape(desc.Name, desc.DType.String(), desc.Len, desc.Version))
 	}
-	shape, err := stdsoa.NewShape(snapshot.Length, snapshot.ShapeVersion, columns)
-	if err != nil {
-		shape = stdsoa.Shape{Length: snapshot.Length, Version: snapshot.ShapeVersion, Columns: columns}
-	}
+	shape := stdsoa.ShapeMetadata(snapshot.Length, snapshot.ShapeVersion, columns)
 	out := NewTable()
 	out.RawSetString("length", IntValue(int64(shape.Length)))
 	out.RawSetString("version", IntValue(int64(shape.Version)))
