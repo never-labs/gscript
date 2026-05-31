@@ -11,7 +11,6 @@ import (
 	"time"
 
 	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func TestExec(t *testing.T) {
@@ -198,28 +197,6 @@ func TestCall(t *testing.T) {
 	// GScript int + int returns int
 	if results[0] != int64(7) {
 		t.Fatalf("expected 7, got %v (%T)", results[0], results[0])
-	}
-}
-
-func TestCallFunctionRoutesBytecodeClosures(t *testing.T) {
-	vm := gs.New(gs.WithVM())
-	if err := vm.Exec(`
-		func add(a, b) {
-			return a + b
-		}
-	`); err != nil {
-		t.Fatal(err)
-	}
-	fn := vm.GetValue("add")
-	if !fn.IsFunction() {
-		t.Fatalf("add = %s, want function", fn.TypeName())
-	}
-	results, err := vm.CallFunction(fn, []runtime.Value{runtime.IntValue(3), runtime.IntValue(4)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(results) != 1 || results[0].Int() != 7 {
-		t.Fatalf("CallFunction results = %v, want 7", results)
 	}
 }
 

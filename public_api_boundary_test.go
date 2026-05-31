@@ -1,7 +1,10 @@
 package gscript_test
 
 import (
+	"os/exec"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -23,6 +26,9 @@ func TestPublicSDKRecommendedAPISignaturesHideInternalRuntime(t *testing.T) {
 		"CallValueContext",
 		"Set",
 		"Get",
+		"GetPublicValue",
+		"SetPublicValue",
+		"CallPublicValue",
 		"RegisterFunc",
 		"RegisterTable",
 		"RegisterModule",
@@ -50,6 +56,36 @@ func TestPublicSDKRecommendedAPISignaturesHideInternalRuntime(t *testing.T) {
 		"String":      gs.String,
 	} {
 		assertNoInternalRuntimeType(t, name, reflect.TypeOf(fn))
+	}
+}
+
+func TestPublicSDKRawRuntimeMethodsAreNotExported(t *testing.T) {
+	vmType := reflect.TypeOf((*gs.VM)(nil))
+	for _, name := range []string{
+		"GetValue",
+		"SetValue",
+		"CallFunction",
+		"Interpreter",
+	} {
+		if _, ok := vmType.MethodByName(name); ok {
+			t.Fatalf("VM.%s should not be exported from the public root SDK", name)
+		}
+	}
+
+}
+
+func TestRootPackageGoDocHidesRawRuntimeValues(t *testing.T) {
+	out := rootGoDoc(t)
+	for _, forbidden := range []string{
+		"runtime.Value",
+		"runtime.Interpreter",
+		"func ToValue",
+		"func MustToValue",
+		"func FromValue",
+	} {
+		if strings.Contains(out, forbidden) {
+			t.Fatalf("root package go doc exposes %q:\n%s", forbidden, out)
+		}
 	}
 }
 
@@ -147,6 +183,22 @@ func TestPublicValueCanCallHostAndScriptBoundaries(t *testing.T) {
 	if got != int64(42) {
 		t.Fatalf("result = %v (%T), want int64(42)", got, got)
 	}
+}
+
+func rootGoDoc(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Dir(file)
+	cmd := exec.Command("go", "doc", ".")
+	cmd.Dir = root
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("go doc .: %v\n%s", err, out)
+	}
+	return string(out)
 }
 
 func assertNoInternalRuntimeType(t *testing.T, name string, typ reflect.Type) {

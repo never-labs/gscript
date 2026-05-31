@@ -7,7 +7,7 @@ import (
 	"github.com/never-labs/gscript/internal/runtime"
 )
 
-// ToValue converts a Go value to a GScript Value using reflection.
+// toValue converts a Go value to an internal GScript value using reflection.
 // Supported types:
 //
 //	nil               -> nil
@@ -20,11 +20,7 @@ import (
 //	map[string]T      -> table (hash)
 //	struct / *struct   -> table (fields + methods via metatable)
 //	func              -> function (reflected, see wrapGoFunc)
-//	runtime.Value     -> passed through as-is
-//
-// Deprecated: use Decode or ToPublicValue to keep internal runtime values out
-// of public embedding code.
-func ToValue(v interface{}) (runtime.Value, error) {
+func toValue(v interface{}) (runtime.Value, error) {
 	if v == nil {
 		return runtime.NilValue(), nil
 	}
@@ -39,18 +35,6 @@ func ToValue(v interface{}) (runtime.Value, error) {
 	}
 
 	return reflectToValue(reflect.ValueOf(v))
-}
-
-// MustToValue is like ToValue but panics on error.
-//
-// Deprecated: use MustDecode or MustToPublicValue to keep internal runtime
-// values out of public embedding code.
-func MustToValue(v interface{}) runtime.Value {
-	rv, err := ToValue(v)
-	if err != nil {
-		panic(fmt.Sprintf("gscript.MustToValue: %v", err))
-	}
-	return rv
 }
 
 func reflectToValue(rv reflect.Value) (runtime.Value, error) {
@@ -134,12 +118,9 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 	return runtime.NilValue(), fmt.Errorf("unsupported Go type: %s", rv.Type())
 }
 
-// FromValue converts a GScript Value to a Go value of the target type.
+// fromValue converts an internal GScript value to a Go value of the target type.
 // If target is nil, uses a default mapping (int64, float64, string, map, etc.)
-//
-// Deprecated: use Value.To, Encode, or FromPublicValue to keep internal runtime
-// values out of public embedding code.
-func FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
+func fromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	if target == nil {
 		return fromValueDefault(val)
 	}
@@ -149,7 +130,7 @@ func FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 
 	// Handle pointer targets
 	if target.Kind() == reflect.Ptr {
-		elem, err := FromValue(val, target.Elem())
+		elem, err := fromValue(val, target.Elem())
 		if err != nil {
 			return reflect.Value{}, err
 		}
@@ -226,7 +207,7 @@ func FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 		slice := reflect.MakeSlice(target, n, n)
 		for i := 1; i <= n; i++ {
 			elem := t.RawGet(runtime.IntValue(int64(i)))
-			goElem, err := FromValue(elem, target.Elem())
+			goElem, err := fromValue(elem, target.Elem())
 			if err != nil {
 				return reflect.Value{}, err
 			}
@@ -246,9 +227,9 @@ func FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 			if !ok {
 				break
 			}
-			goKey, err := FromValue(k, target.Key())
+			goKey, err := fromValue(k, target.Key())
 			if err == nil {
-				goVal, err := FromValue(v, target.Elem())
+				goVal, err := fromValue(v, target.Elem())
 				if err == nil {
 					m.SetMapIndex(goKey, goVal)
 				}
@@ -369,7 +350,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 					} else {
 						gsVal = runtime.NilValue()
 					}
-					rv, err := FromValue(gsVal, elemType)
+					rv, err := fromValue(gsVal, elemType)
 					if err != nil {
 						return nil, fmt.Errorf("arg %d: %v", i+j, err)
 					}
@@ -385,7 +366,7 @@ func wrapGoFunc(fn reflect.Value) (*runtime.GoFunction, error) {
 			} else {
 				gsVal = runtime.NilValue()
 			}
-			rv, err := FromValue(gsVal, argType)
+			rv, err := fromValue(gsVal, argType)
 			if err != nil {
 				return nil, fmt.Errorf("arg %d: %v", i, err)
 			}

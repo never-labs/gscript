@@ -56,14 +56,14 @@ func TestPublicValueZeroValueIsNil(t *testing.T) {
 	}
 }
 
-func TestPublicValueWorksWithOldInterfaceConversion(t *testing.T) {
+func TestPublicValueWorksWithInterfaceConversion(t *testing.T) {
 	public := gs.String("bridge")
-	old, err := gs.ToValue(public)
+	decoded, err := gs.Decode(public)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := old.String(); got != "bridge" {
-		t.Fatalf("ToValue(public).String() = %q, want bridge", got)
+	if got := decoded.String(); got != "bridge" {
+		t.Fatalf("Decode(public).String() = %q, want bridge", got)
 	}
 }
 

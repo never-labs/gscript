@@ -394,7 +394,7 @@ func normalizeGoImportName(name string) string {
 func moduleMembersValue(name string, members Module) (runtime.Value, error) {
 	t := runtime.NewTable()
 	for k, v := range members {
-		gsVal, err := ToValue(v)
+		gsVal, err := toValue(v)
 		if err != nil {
 			return runtime.NilValue(), fmt.Errorf("%s.%s: %v", name, k, err)
 		}
@@ -562,7 +562,7 @@ func (vm *VM) CallValueContext(ctx context.Context, fn interface{}, args ...inte
 	if v, ok := fn.(runtime.Value); ok {
 		gsVal = v
 	} else {
-		v2, err := ToValue(fn)
+		v2, err := toValue(fn)
 		if err != nil {
 			return nil, err
 		}
@@ -581,7 +581,7 @@ func (vm *VM) CallValueContext(ctx context.Context, fn interface{}, args ...inte
 func (vm *VM) callValue(fn runtime.Value, args ...interface{}) ([]interface{}, error) {
 	gsArgs := make([]runtime.Value, len(args))
 	for i, a := range args {
-		v, err := ToValue(a)
+		v, err := toValue(a)
 		if err != nil {
 			return nil, &Error{Kind: ErrRuntime, Message: fmt.Sprintf("arg %d: %v", i, err)}
 		}
@@ -628,7 +628,7 @@ func (vm *VM) installRunContext(ctx context.Context) {
 
 // Set sets a global variable to a Go value (auto-converted).
 func (vm *VM) Set(name string, val interface{}) error {
-	gsVal, err := ToValue(val)
+	gsVal, err := toValue(val)
 	if err != nil {
 		return err
 	}
@@ -654,31 +654,12 @@ func (vm *VM) GetPublicValue(name string) Value {
 	return toPublic(vm.interp.GetGlobal(name))
 }
 
-// GetValue gets a global as a raw runtime.Value.
-//
-// Deprecated: use GetPublicValue to keep internal runtime values out of public
-// embedding code.
-func (vm *VM) GetValue(name string) runtime.Value {
-	return vm.interp.GetGlobal(name)
-}
-
 // SetPublicValue sets a global to a public Value.
 func (vm *VM) SetPublicValue(name string, val Value) {
 	rv := fromPublic(val)
 	vm.interp.SetGlobal(name, rv)
 	if vm.bvm != nil {
 		vm.bvm.SetGlobal(name, rv)
-	}
-}
-
-// SetValue sets a global to a raw runtime.Value.
-//
-// Deprecated: use SetPublicValue to keep internal runtime values out of public
-// embedding code.
-func (vm *VM) SetValue(name string, val runtime.Value) {
-	vm.interp.SetGlobal(name, val)
-	if vm.bvm != nil {
-		vm.bvm.SetGlobal(name, val)
 	}
 }
 
@@ -719,7 +700,7 @@ func (vm *VM) RegisterFunc(name string, fn interface{}) error {
 func (vm *VM) RegisterTable(name string, members map[string]interface{}) error {
 	t := runtime.NewTable()
 	for k, v := range members {
-		gsVal, err := ToValue(v)
+		gsVal, err := toValue(v)
 		if err != nil {
 			return fmt.Errorf("RegisterTable %s.%s: %v", name, k, err)
 		}
@@ -843,25 +824,4 @@ func (vm *VM) CallPublicValue(fn Value, args ...Value) ([]Value, error) {
 		results[i] = toPublic(result)
 	}
 	return results, nil
-}
-
-// CallFunction exposes the interpreter's CallFunction for advanced use.
-// Useful when you have a runtime.Value function and want to call it.
-//
-// Deprecated: use CallPublicValue to keep internal runtime values out of public
-// embedding code.
-func (vm *VM) CallFunction(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
-	if vm.bvm != nil {
-		return vm.bvm.CallValue(fn, args)
-	}
-	return vm.interp.CallFunction(fn, args)
-}
-
-// Interpreter returns the underlying runtime.Interpreter.
-// Use for advanced access; prefer the VM methods when possible.
-//
-// Deprecated: this exposes internal runtime state. Prefer VM methods and public
-// Value APIs.
-func (vm *VM) Interpreter() *runtime.Interpreter {
-	return vm.interp
 }

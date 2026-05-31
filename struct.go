@@ -164,7 +164,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 				return nil, fmt.Errorf("struct %s has no settable field %q", name, fieldName)
 			}
 
-			goFieldVal, err := FromValue(val, f.Type())
+			goFieldVal, err := fromValue(val, f.Type())
 			if err != nil {
 				return nil, fmt.Errorf("setting field %q: %v", fieldName, err)
 			}
@@ -217,7 +217,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 					return results, nil
 				}
 				// Convert struct return to instance table
-				rv, err2 := FromValue(result, typ)
+				rv, err2 := fromValue(result, typ)
 				if err2 != nil {
 					return results, nil
 				}
@@ -244,7 +244,7 @@ func bindStructToInterp(interp *runtime.Interpreter, name string, proto interfac
 					if i >= len(args) {
 						break
 					}
-					goVal, err := FromValue(args[i], f.Type)
+					goVal, err := fromValue(args[i], f.Type)
 					if err != nil {
 						return nil, fmt.Errorf("%s.new field %s: %v", name, f.Name, err)
 					}
@@ -429,7 +429,7 @@ func structToValue(rv reflect.Value) (runtime.Value, error) {
 				return nil, fmt.Errorf("struct %s has no settable field %q", name, fieldName)
 			}
 
-			goFieldVal, err := FromValue(val, f.Type())
+			goFieldVal, err := fromValue(val, f.Type())
 			if err != nil {
 				return nil, fmt.Errorf("setting field %q: %v", fieldName, err)
 			}
@@ -500,7 +500,7 @@ func fromValueStruct(val runtime.Value, target reflect.Type) (reflect.Value, err
 			if gsVal.IsNil() {
 				continue
 			}
-			fv, err := FromValue(gsVal, f.Type)
+			fv, err := fromValue(gsVal, f.Type)
 			if err != nil {
 				continue
 			}

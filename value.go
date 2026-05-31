@@ -60,7 +60,7 @@ func String(v string) Value {
 // Decode converts a Go value into a public GScript value using the existing
 // reflection conversion rules.
 func Decode(v interface{}) (Value, error) {
-	rv, err := ToValue(v)
+	rv, err := toValue(v)
 	if err != nil {
 		return Value{}, err
 	}
@@ -78,7 +78,7 @@ func MustDecode(v interface{}) Value {
 
 // ToPublicValue converts a Go value into a public GScript value.
 //
-// This is the public Value boundary equivalent of the helper ToValue helper.
+// This is the public Value boundary equivalent of the internal conversion helper.
 func ToPublicValue(v interface{}) (Value, error) {
 	return Decode(v)
 }
@@ -91,7 +91,7 @@ func MustToPublicValue(v interface{}) Value {
 // Encode converts a public GScript value back into its default Go
 // representation.
 func Encode(v Value) (interface{}, error) {
-	rv, err := FromValue(fromPublic(v), nil)
+	rv, err := fromValue(fromPublic(v), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func Encode(v Value) (interface{}, error) {
 // FromPublicValue converts a public GScript value to a Go reflect.Value of the
 // target type. If target is nil, it uses the default Go representation.
 func FromPublicValue(v Value, target reflect.Type) (reflect.Value, error) {
-	return FromValue(fromPublic(v), target)
+	return fromValue(fromPublic(v), target)
 }
 
 func toPublic(v runtime.Value) Value {
@@ -203,7 +203,7 @@ func (v *Value) Decode(src interface{}) error {
 	return nil
 }
 
-// To stores the value in target using the existing FromValue conversion rules.
+// To stores the value in target using the existing conversion rules.
 func (v Value) To(target reflect.Type) (reflect.Value, error) {
-	return FromValue(fromPublic(v), target)
+	return fromValue(fromPublic(v), target)
 }
