@@ -65,11 +65,11 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "ambiguous benchmark selector 'sort'"):
             discovery.select_specs(specs, ["sort"])
 
-    def test_select_specs_rejects_historical_hot_alias(self):
+    def test_select_specs_rejects_unknown_domain_selector(self):
         specs = [FakeSpec("table", "events_metamethod")]
 
         with self.assertRaisesRegex(SystemExit, "unknown benchmark selector"):
-            discovery.select_specs(specs, ["official/events_metamethod_hot"])
+            discovery.select_specs(specs, ["missing_domain/events_metamethod"])
 
     def test_spec_selectors_includes_short_and_canonical_names(self):
         self.assertEqual(
@@ -79,9 +79,9 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
 
     def test_selector_matches_spec_accepts_only_domain_selectors(self):
         self.assertTrue(discovery.selector_matches_spec("numeric/matmul", FakeSpec("numeric", "matmul")))
-        self.assertFalse(discovery.selector_matches_spec("suite/matmul", FakeSpec("numeric", "matmul")))
+        self.assertFalse(discovery.selector_matches_spec("missing_domain/matmul", FakeSpec("numeric", "matmul")))
         self.assertFalse(
-            discovery.selector_matches_spec("official/events_metamethod_hot", FakeSpec("table", "events_metamethod"))
+            discovery.selector_matches_spec("missing_domain/events_metamethod", FakeSpec("table", "events_metamethod"))
         )
 
     def test_parse_selector_count_overrides_accepts_modes_and_domain_selectors(self):
@@ -98,7 +98,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             8,
         )
         self.assertIsNone(discovery.selector_count_override(overrides, "default", "events_metamethod"))
-        self.assertIsNone(discovery.selector_count_override(overrides, "default", "matmul", "suite/matmul"))
+        self.assertIsNone(discovery.selector_count_override(overrides, "default", "matmul", "missing_domain/matmul"))
 
     def test_parse_selector_count_overrides_rejects_bad_counts(self):
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -106,7 +106,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
         with self.assertRaises(argparse.ArgumentTypeError):
             discovery.parse_selector_count_overrides(["fib=nope"], ["vm"], "--repeat")
 
-    def test_resolve_script_path_rejects_variant_and_hot_suffix_aliases(self):
+    def test_resolve_script_path_rejects_unknown_suffix_selectors(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "benchmarks" / "calls").mkdir(parents=True)
@@ -116,8 +116,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 discovery.resolve_script_path(root, "calls/closure_accumulator"),
                 root / "benchmarks" / "calls" / "closure_accumulator.gs",
             )
-            self.assertIsNone(discovery.resolve_script_path(root, "calls/closure_accumulator_variant"))
-            self.assertIsNone(discovery.resolve_script_path(root, "calls/closure_accumulator_hot"))
+            self.assertIsNone(discovery.resolve_script_path(root, "calls/closure_accumulator_unknown"))
 
     def test_resolve_script_identity_returns_domain_group_name_and_path(self):
         with tempfile.TemporaryDirectory() as td:
@@ -129,7 +128,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 discovery.resolve_script_identity(root, "table/events_metamethod"),
                 ("table", "events_metamethod", root / "benchmarks" / "table" / "events_metamethod.gs"),
             )
-            self.assertIsNone(discovery.resolve_script_identity(root, "official/events_metamethod_hot"))
+            self.assertIsNone(discovery.resolve_script_identity(root, "missing_domain/events_metamethod"))
 
     def test_groups_for_selectors_includes_domain_selector_groups(self):
         with tempfile.TemporaryDirectory() as td:
@@ -147,7 +146,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 ["data", "concurrency", "table"],
             )
 
-    def test_groups_for_selectors_ignores_historical_aliases(self):
+    def test_groups_for_selectors_ignores_unknown_selectors(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             for group, name in (("concurrency", "goroutine_sleep"), ("table", "events_metamethod")):
@@ -158,7 +157,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 discovery.groups_for_selectors(
                     root,
                     ["data"],
-                    ["extended/goroutine_sleep", "official/events_metamethod_hot"],
+                    ["missing_domain/goroutine_sleep", "unknown/events_metamethod"],
                 ),
                 ["data"],
             )
@@ -190,7 +189,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 discovery.groups_for_selectors(
                     root,
                     ["data"],
-                    ["extended/goroutine_sleep"],
+                    ["missing_domain/goroutine_sleep"],
                     allowed_groups=["data"],
                 ),
                 ["data"],

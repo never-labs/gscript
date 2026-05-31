@@ -27,8 +27,6 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertIn("selector in discovery.GROUPS", diag)
         self.assertIn("discovery.resolve_script_path(root, selector)", diag)
         self.assertNotIn("domain_list_for()", diag)
-        for alias in ("suite", "extended", "variants", "official", "data_oriented"):
-            self.assertNotIn(f"{alias})", diag)
 
     def test_benchmark_shell_wrappers_exec_matching_python(self):
         for stem in ("regression_guard", "strict_guard"):

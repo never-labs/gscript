@@ -202,10 +202,10 @@ class StrictGuardReportTest(unittest.TestCase):
             ["table/events_metamethod"],
         )
 
-    def test_discovery_rejects_historical_official_group_alias(self):
+    def test_discovery_rejects_unknown_group(self):
         root = Path(__file__).resolve().parents[1]
-        with self.assertRaisesRegex(SystemExit, "unknown benchmark group: official"):
-            sg.discover_specs(root, ["official"])
+        with self.assertRaisesRegex(SystemExit, "unknown benchmark group: missing_domain"):
+            sg.discover_specs(root, ["missing_domain"])
 
 
 if __name__ == "__main__":
