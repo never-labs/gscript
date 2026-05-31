@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/never-labs/gscript/internal/llmbridge"
 	"github.com/never-labs/gscript/internal/runtime"
 	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
@@ -100,15 +101,15 @@ func newVM(o vmOptions) *VM {
 		interp.SetMaxFilesystemWriteBytes(o.maxFSWriteBytes)
 		o.useJIT = false
 	}
-	llmProvider := configuredLLMProvider(o)
+	llmProvider := llmbridge.ConfiguredProvider(o.llmProvider, o.llmRecordSink)
 	if llmProvider != nil {
-		interp.SetLLMProvider(llmProviderAdapter{provider: llmProvider})
+		interp.SetLLMProvider(llmbridge.ProviderAdapter(llmProvider))
 	}
-	if llmProviderFactory := configuredLLMProviderFactory(o); llmProviderFactory != nil {
+	if llmProviderFactory := llmbridge.ConfiguredProviderFactory(o.llmProvider, o.llmProviderFactory, o.llmRecordSink); llmProviderFactory != nil {
 		interp.SetLLMProviderFactory(llmProviderFactory)
 	}
 	if o.llmTraceSink != nil {
-		interp.SetLLMTraceSink(llmTraceAdapter(o.llmTraceSink))
+		interp.SetLLMTraceSink(llmbridge.TraceAdapter(o.llmTraceSink))
 	}
 	goImportAllowed := installGoImports(interp, o.goImports)
 
@@ -255,15 +256,15 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm.SetNetworkAccess(vm.opts.networkAccess)
 			bvm.SetDebugAccess(vm.opts.debugAccess)
 			bvm.SetTestkitAccess(vm.opts.testkitAccess)
-			llmProvider := configuredLLMProvider(vm.opts)
+			llmProvider := llmbridge.ConfiguredProvider(vm.opts.llmProvider, vm.opts.llmRecordSink)
 			if llmProvider != nil {
-				bvm.SetLLMProvider(llmProviderAdapter{provider: llmProvider})
+				bvm.SetLLMProvider(llmbridge.ProviderAdapter(llmProvider))
 			}
-			if llmProviderFactory := configuredLLMProviderFactory(vm.opts); llmProviderFactory != nil {
+			if llmProviderFactory := llmbridge.ConfiguredProviderFactory(vm.opts.llmProvider, vm.opts.llmProviderFactory, vm.opts.llmRecordSink); llmProviderFactory != nil {
 				bvm.SetLLMProviderFactory(llmProviderFactory)
 			}
 			if vm.opts.llmTraceSink != nil {
-				bvm.SetLLMTraceSink(llmTraceAdapter(vm.opts.llmTraceSink))
+				bvm.SetLLMTraceSink(llmbridge.TraceAdapter(vm.opts.llmTraceSink))
 			}
 			if vm.opts.useJIT {
 				enableJIT(bvm)
