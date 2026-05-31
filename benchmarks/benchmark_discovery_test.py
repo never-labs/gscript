@@ -77,12 +77,6 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             {"matmul", "numeric/matmul", "closure_accumulator", "calls/closure_accumulator"},
         )
 
-    def test_selector_candidates_keep_selectors_literal(self):
-        self.assertEqual(discovery.selector_candidates("recursion/fib"), ["recursion/fib"])
-        self.assertEqual(discovery.selector_candidates("string/log_tokenize_format"), ["string/log_tokenize_format"])
-        self.assertEqual(discovery.selector_candidates("numeric/matmul_row"), ["numeric/matmul_row"])
-        self.assertEqual(discovery.selector_candidates("numeric/matmul"), ["numeric/matmul"])
-
     def test_selector_matches_spec_accepts_only_domain_selectors(self):
         self.assertTrue(discovery.selector_matches_spec("numeric/matmul", FakeSpec("numeric", "matmul")))
         self.assertFalse(discovery.selector_matches_spec("missing_domain/matmul", FakeSpec("numeric", "matmul")))

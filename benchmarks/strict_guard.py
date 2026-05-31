@@ -556,22 +556,22 @@ def suspicious_kernel_wins(
         if vm_speedup < args.suspicious_vm_speedup or lj_ratio > args.suspicious_luajit_ratio:
             continue
 
-        matching_variants = [r for r in rows if r.base == row.benchmark]
-        if not matching_variants:
+        related_workloads = [r for r in rows if r.base == row.benchmark]
+        if not related_workloads:
             lines.append(
                 f"- `{row.benchmark}`: Default is {fmt_ratio(vm_speedup)} faster than VM and "
-                f"{fmt_ratio(1.0 / lj_ratio)} faster than LuaJIT, with no structural variant in this run."
+                f"{fmt_ratio(1.0 / lj_ratio)} faster than LuaJIT, with no related workload in this run."
             )
             continue
 
-        for variant in matching_variants:
-            v_default = comparable_seconds(variant.modes.get("default"))
-            v_luajit = comparable_seconds(variant.modes.get("luajit"))
-            v_ratio = ratio(v_default, v_luajit)
-            if v_ratio is None:
+        for related in related_workloads:
+            related_default = comparable_seconds(related.modes.get("default"))
+            related_luajit = comparable_seconds(related.modes.get("luajit"))
+            related_ratio = ratio(related_default, related_luajit)
+            if related_ratio is None:
                 lines.append(
-                    f"- `{row.benchmark}`: baseline win lacks a comparable `{variant.benchmark}` "
-                    "LuaJIT variant result."
+                    f"- `{row.benchmark}`: baseline win lacks a comparable `{related.benchmark}` "
+                    "LuaJIT related workload result."
                 )
             elif v_ratio >= args.variant_confirm_ratio:
                 lines.append(

@@ -523,8 +523,6 @@ def subject_diagnostic(
 
 
 canonical_group = discovery.canonical_group
-canonical_selector = discovery.canonical_selector
-selector_candidates = discovery.selector_candidates
 selector_matches = discovery.selector_matches
 canonical_groups = discovery.canonical_groups
 
@@ -554,7 +552,6 @@ def parse_scale_overrides(values: list[str] | None) -> list[ScaleOverride]:
             selector, name = left.split(":", 1)
             if not selector:
                 raise argparse.ArgumentTypeError("--scale selector must not be empty")
-            selector = canonical_selector(selector)
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
             raise argparse.ArgumentTypeError(f"invalid scale variable name: {name!r}")
         overrides.append(ScaleOverride(selector, name, raw_value))

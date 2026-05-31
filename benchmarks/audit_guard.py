@@ -123,7 +123,7 @@ def markdown_report(rows: list[AuditRow], *, low_resolution_cutoff: float = 0.00
             "",
             "- Add or fix LuaJIT references for every unresolved comparison.",
             "- Use high-repeat or ns/op measurement for low-resolution rows before claiming a win.",
-            "- Add renamed and parameter-varied structural variants for benchmarks accelerated by whole-call kernels.",
+            "- Add renamed and parameter-varied related workloads for benchmarks accelerated by whole-call kernels.",
             "- Investigate exit-heavy rows even when wall time is already competitive.",
         ]
     )

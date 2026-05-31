@@ -85,16 +85,8 @@ def group_choices(allowed_groups: list[str] | tuple[str, ...] = GROUPS) -> list[
     return list(allowed_groups)
 
 
-def canonical_selector(selector: str) -> str:
-    return selector
-
-
-def selector_candidates(selector: str) -> list[str]:
-    return [canonical_selector(selector)]
-
-
 def selector_matches(selector: str, allowed: set[str]) -> bool:
-    return any(candidate in allowed for candidate in selector_candidates(selector))
+    return selector in allowed
 
 
 def spec_selectors(specs: Iterable[SelectableSpec]) -> set[str]:
@@ -135,11 +127,9 @@ def parse_selector_count_overrides(
         if "/" in key:
             head, tail = key.split("/", 1)
             if head in modes_set:
-                for selector in selector_candidates(tail):
-                    overrides[(head, selector)] = count
+                overrides[(head, tail)] = count
             else:
-                for selector in selector_candidates(key):
-                    overrides[(None, selector)] = count
+                overrides[(None, key)] = count
         else:
             overrides[(None, key)] = count
     return overrides
@@ -236,13 +226,12 @@ def select_specs(specs: list[SpecT], selectors: list[str] | None) -> list[SpecT]
         return specs
     selected: list[SpecT] = []
     for raw_selector in selectors:
-        candidates = selector_candidates(raw_selector)
-        matches = [spec for spec in specs if spec.benchmark_id in candidates or spec.name in candidates]
+        matches = [spec for spec in specs if spec.benchmark_id == raw_selector or spec.name == raw_selector]
         if not matches:
             raise SystemExit(f"unknown benchmark selector: {raw_selector}")
-        if len(matches) > 1 and "/" not in candidates[0]:
+        if len(matches) > 1 and "/" not in raw_selector:
             ids = ", ".join(spec.benchmark_id for spec in matches)
-            raise SystemExit(f"ambiguous benchmark selector {candidates[0]!r}; use one of: {ids}")
+            raise SystemExit(f"ambiguous benchmark selector {raw_selector!r}; use one of: {ids}")
         for match in matches:
             if match not in selected:
                 selected.append(match)
@@ -250,18 +239,16 @@ def select_specs(specs: list[SpecT], selectors: list[str] | None) -> list[SpecT]
 
 
 def resolve_script_path(root: Path, bench: str, groups: list[str] | tuple[str, ...] = GROUPS) -> Path | None:
-    candidates = selector_candidates(bench) if "/" in bench else [bench]
-    for candidate in candidates:
-        if "/" in candidate:
-            group, name = candidate.split("/", 1)
-            search_groups = [group]
-        else:
-            name = candidate
-            search_groups = list(groups)
-        for group in search_groups:
-            path = root / "benchmarks" / group / f"{name}.gs"
-            if path.exists():
-                return path
+    if "/" in bench:
+        group, name = bench.split("/", 1)
+        search_groups = [group]
+    else:
+        name = bench
+        search_groups = list(groups)
+    for group in search_groups:
+        path = root / "benchmarks" / group / f"{name}.gs"
+        if path.exists():
+            return path
     return None
 
 

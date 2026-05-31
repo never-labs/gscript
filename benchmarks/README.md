@@ -71,6 +71,6 @@ gaps.
 no-filter JIT, and LuaJIT where a reference exists, then checks output stability
 and timing quality.
 
-Historical selectors such as `suite/fib`, `extended/json_table_walk`, and
-`official/events_metamethod_hot` are accepted as aliases, but new scripts and
-reports should use domain IDs.
+Benchmark selectors are domain IDs such as `numeric/matmul` or
+`table/json_table_walk`. Historical selector families are intentionally not
+accepted by the harness.
