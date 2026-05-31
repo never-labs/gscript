@@ -48,7 +48,7 @@ type Tier2ModuleRun struct {
 // failed modules.
 type Tier2ModuleRunCallback func(Tier2ModuleRun)
 
-// Tier2PipelineDiagnostics groups per-run diagnostic hooks. The legacy fields
+// Tier2PipelineDiagnostics groups per-run diagnostic hooks. The compatibility fields
 // on Tier2OptimizerContext remain supported for callers that construct the
 // context directly.
 type Tier2PipelineDiagnostics struct {
@@ -383,7 +383,7 @@ type CtxPassFunc func(*PassContext) (*Function, error)
 // tier2PassModuleWithCtx builds a module whose pass runs through a PassContext.
 // The allowed-domain set is derived from the module's declared facts plus its
 // read-contract hints; enforcement follows the package passContextEnforce flag
-// (off in production, on under tests). The legacy Run path is left nil so this
+// (off in production, on under tests). The compatibility Run path is left nil so this
 // shares no code with the unmigrated PassFunc modules.
 func tier2PassModuleWithCtx(name string, phase Tier2OptimizerPhase, requires, provides []AnalysisFact, pass CtxPassFunc) Tier2OptimizerModule {
 	allowed := allowedDomainsForModule(requires, provides, nil)
@@ -553,7 +553,7 @@ func validateTier2OptimizerPlanShape(plan Tier2OptimizerPlan) error {
 		case module.Run == nil && module.RunWithContext == nil:
 			issues = append(issues, fmt.Sprintf("%s has no optimizer runner", ref))
 		case module.Run != nil && module.RunWithContext != nil:
-			issues = append(issues, fmt.Sprintf("%s has both legacy and context optimizer runners", ref))
+			issues = append(issues, fmt.Sprintf("%s has both compatibility and context optimizer runners", ref))
 		}
 	}
 

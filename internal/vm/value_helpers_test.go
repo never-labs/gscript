@@ -21,7 +21,7 @@ func TestClosureFromValueRecognizesVMClosureValue(t *testing.T) {
 }
 
 func TestClosureFromValueFallsBackToInterfaceValue(t *testing.T) {
-	cl := &Closure{Proto: &FuncProto{Name: "legacy"}}
+	cl := &Closure{Proto: &FuncProto{Name: "compatibility"}}
 	v := runtime.FunctionValue(cl)
 
 	got, ok := closureFromValue(v)

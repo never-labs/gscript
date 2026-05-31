@@ -106,7 +106,7 @@ func TestTier2CallableGateRejectsOPVarargWithoutDeclaration(t *testing.T) {
 		Code:               []uint32{vm.EncodeABC(vm.OP_VARARG, 0, 2, 0), vm.EncodeABC(vm.OP_RETURN, 0, 2, 0)},
 	}
 	if !proto.MethodJITTier1Callable() {
-		t.Fatal("legacy Tier 1 callable boundary should continue allowing this bytecode shape")
+		t.Fatal("compatibility Tier 1 callable boundary should continue allowing this bytecode shape")
 	}
 	if proto.MethodJITTier2Callable() {
 		t.Fatal("OP_VARARG function should not be Tier 2 callable")

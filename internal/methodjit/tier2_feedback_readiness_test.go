@@ -78,7 +78,7 @@ func TestTier2RecompilePolicyRefreshesWhenReadinessImproves(t *testing.T) {
 	}
 	var policy Tier2RecompilePolicy
 	if policy.ShouldRefreshProfile(cf, current) {
-		t.Fatal("legacy profile-only policy should not see readiness improvement without proto context")
+		t.Fatal("compatibility profile-only policy should not see readiness improvement without proto context")
 	}
 	if !policy.ShouldRefreshProfileForProto(proto, cf, current) {
 		t.Fatal("proto-aware policy should refresh when readiness improves")

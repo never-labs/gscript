@@ -379,7 +379,7 @@ func (ec *emitContext) supportsIndexedGlobalSetProtocol(instr *Instr) bool {
 	// native indexed-store fast path was investigated and rejected: the
 	// setglobal_crosstier_test.go safety net (which compares interpreter vs Tier 2
 	// global state) empirically proves it is unsafe. Three distinct hazards:
-	//   A. Dual-storage divergence (globalArray vs legacy globals map). Largely
+	//   A. Dual-storage divergence (globalArray vs compatibility globals map). Largely
 	//      mitigated: in noGlobalLock mode — the only mode the fast path is
 	//      eligible in — the interpreter's OpGetGlobal reads globalArray, and the
 	//      map is reconciled post-call by SyncTier2GlobalMap. (Mid-run readers via

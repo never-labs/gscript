@@ -151,7 +151,7 @@ func TestTier2ProductionModulesUseContextRunner(t *testing.T) {
 			t.Fatalf("production module %s/%s does not use RunWithContext", module.Phase, module.Name)
 		}
 		if module.Run != nil {
-			t.Fatalf("production module %s/%s still uses legacy Run entry", module.Phase, module.Name)
+			t.Fatalf("production module %s/%s still uses compatibility Run entry", module.Phase, module.Name)
 		}
 	}
 }
@@ -351,7 +351,7 @@ func TestValidateTier2OptimizerPlanRejectsMalformedModules(t *testing.T) {
 					},
 				}},
 			},
-			want: "has both legacy and context optimizer runners",
+			want: "has both compatibility and context optimizer runners",
 		},
 		{
 			name: "missing phase",

@@ -72,7 +72,7 @@ func TestSortedSpecDependencyProtosDropsSelfAndOrdersByName(t *testing.T) {
 	}
 }
 
-func TestSortedSpecDependencyProtosAdoptsLegacyDependencies(t *testing.T) {
+func TestSortedSpecDependencyProtosAdoptsCompatibilityDependencies(t *testing.T) {
 	self := &vm.FuncProto{Name: "self"}
 	callee := &vm.FuncProto{Name: "callee"}
 	fn := &Function{

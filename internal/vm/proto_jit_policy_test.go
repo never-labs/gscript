@@ -4,58 +4,58 @@ import "testing"
 
 func TestMethodJITTierCallableVarargBoundary(t *testing.T) {
 	tests := []struct {
-		name        string
-		proto       *FuncProto
-		wantTier1   bool
-		wantTier2   bool
-		wantLegacy  bool
-		tier1Reason string
-		tier2Reason string
+		name              string
+		proto             *FuncProto
+		wantTier1         bool
+		wantTier2         bool
+		wantCompatibility bool
+		tier1Reason       string
+		tier2Reason       string
 	}{
 		{
-			name:        "fixed arity",
-			proto:       &FuncProto{},
-			wantTier1:   true,
-			wantTier2:   true,
-			wantLegacy:  true,
-			tier1Reason: MethodJITCallableReasonFixedArity,
-			tier2Reason: MethodJITCallableReasonFixedArity,
+			name:              "fixed arity",
+			proto:             &FuncProto{},
+			wantTier1:         true,
+			wantTier2:         true,
+			wantCompatibility: true,
+			tier1Reason:       MethodJITCallableReasonFixedArity,
+			tier2Reason:       MethodJITCallableReasonFixedArity,
 		},
 		{
-			name:        "declared vararg unused",
-			proto:       &FuncProto{IsVarArg: true},
-			wantTier1:   true,
-			wantTier2:   true,
-			wantLegacy:  true,
-			tier1Reason: MethodJITCallableReasonDeclaredVarargTier1,
-			tier2Reason: MethodJITCallableReasonDeclaredVarargTier2,
+			name:              "declared vararg unused",
+			proto:             &FuncProto{IsVarArg: true},
+			wantTier1:         true,
+			wantTier2:         true,
+			wantCompatibility: true,
+			tier1Reason:       MethodJITCallableReasonDeclaredVarargTier1,
+			tier2Reason:       MethodJITCallableReasonDeclaredVarargTier2,
 		},
 		{
-			name:        "declared vararg reads varargs",
-			proto:       &FuncProto{IsVarArg: true, UsesVarargBytecode: true},
-			wantTier1:   true,
-			wantTier2:   false,
-			wantLegacy:  true,
-			tier1Reason: MethodJITCallableReasonOPVarargTier1,
-			tier2Reason: MethodJITCallableReasonOPVarargNeedsVMFrame,
+			name:              "declared vararg reads varargs",
+			proto:             &FuncProto{IsVarArg: true, UsesVarargBytecode: true},
+			wantTier1:         true,
+			wantTier2:         false,
+			wantCompatibility: true,
+			tier1Reason:       MethodJITCallableReasonOPVarargTier1,
+			tier2Reason:       MethodJITCallableReasonOPVarargNeedsVMFrame,
 		},
 		{
-			name:        "vararg bytecode without declaration",
-			proto:       &FuncProto{UsesVarargBytecode: true},
-			wantTier1:   true,
-			wantTier2:   false,
-			wantLegacy:  true,
-			tier1Reason: MethodJITCallableReasonOPVarargTier1,
-			tier2Reason: MethodJITCallableReasonOPVarargNeedsVMFrame,
+			name:              "vararg bytecode without declaration",
+			proto:             &FuncProto{UsesVarargBytecode: true},
+			wantTier1:         true,
+			wantTier2:         false,
+			wantCompatibility: true,
+			tier1Reason:       MethodJITCallableReasonOPVarargTier1,
+			tier2Reason:       MethodJITCallableReasonOPVarargNeedsVMFrame,
 		},
 		{
-			name:        "nil",
-			proto:       nil,
-			wantTier1:   false,
-			wantTier2:   false,
-			wantLegacy:  false,
-			tier1Reason: MethodJITCallableReasonNilProto,
-			tier2Reason: MethodJITCallableReasonNilProto,
+			name:              "nil",
+			proto:             nil,
+			wantTier1:         false,
+			wantTier2:         false,
+			wantCompatibility: false,
+			tier1Reason:       MethodJITCallableReasonNilProto,
+			tier2Reason:       MethodJITCallableReasonNilProto,
 		},
 	}
 
@@ -67,8 +67,8 @@ func TestMethodJITTierCallableVarargBoundary(t *testing.T) {
 			if got := tt.proto.MethodJITTier2Callable(); got != tt.wantTier2 {
 				t.Fatalf("MethodJITTier2Callable() = %v, want %v", got, tt.wantTier2)
 			}
-			if got := tt.proto.MethodJITCallable(); got != tt.wantLegacy {
-				t.Fatalf("MethodJITCallable() = %v, want %v", got, tt.wantLegacy)
+			if got := tt.proto.MethodJITCallable(); got != tt.wantCompatibility {
+				t.Fatalf("MethodJITCallable() = %v, want %v", got, tt.wantCompatibility)
 			}
 			tier1 := tt.proto.MethodJITTier1CallableDecision()
 			if tier1.Allowed != tt.wantTier1 || tier1.Reason != tt.tier1Reason || tier1.Tier != MethodJITTier1 {

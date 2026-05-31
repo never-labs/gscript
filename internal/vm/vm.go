@@ -63,7 +63,7 @@ type VM struct {
 	regs                 []runtime.Value          // register file (shared across frames via base offset)
 	frames               []CallFrame              // call stack
 	frameCount           int                      // current number of active frames
-	globals              map[string]runtime.Value // legacy map (kept for interop)
+	globals              map[string]runtime.Value // compatibility map (kept for cross-path interop)
 	globalArray          []runtime.Value          // indexed globals (fast path)
 	globalIndex          map[string]int           // name → index in globalArray
 	globalValueEpoch     []uint64                 // per-index value epoch for named global dependencies
@@ -748,7 +748,7 @@ func (vm *VM) Tier2GlobalArrayState() (uintptr, *uint32, uint32, bool) {
 	return uintptr(unsafe.Pointer(&vm.globalArray[0])), &vm.globalVer, vm.globalVer, true
 }
 
-// SyncTier2GlobalMap mirrors indexed global values back into the legacy globals
+// SyncTier2GlobalMap mirrors indexed global values back into the compatibility globals
 // map for names written natively by Tier 2. VM.GetGlobal reads globalArray, but
 // the map is still part of the VM's public interop surface.
 func (vm *VM) SyncTier2GlobalMap(constants []runtime.Value, indices []int32, constSet map[int]bool) {

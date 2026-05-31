@@ -78,7 +78,7 @@ func MustDecode(v interface{}) Value {
 
 // ToPublicValue converts a Go value into a public GScript value.
 //
-// This is the public Value boundary equivalent of the legacy ToValue helper.
+// This is the public Value boundary equivalent of the helper ToValue helper.
 func ToPublicValue(v interface{}) (Value, error) {
 	return Decode(v)
 }

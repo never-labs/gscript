@@ -11,7 +11,7 @@ import (
 func (tm *TieringManager) installTier2(proto *vm.FuncProto, cf *CompiledFunction) {
 	proto.Tier2Promoted = true
 
-	// Publish the generic DirectEntryPtr only when legacy native callers can
+	// Publish the generic DirectEntryPtr only when compatibility native callers can
 	// recover by replaying the call. Tier 2 callers have an ExitNativeCallExit
 	// resume loop, so they may use the separate Tier2DirectEntryPtr even when
 	// replay from pc=0 would be unsafe.

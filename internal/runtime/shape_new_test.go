@@ -171,8 +171,8 @@ func TestShape_ShapeIDBackwardCompat(t *testing.T) {
 		t.Errorf("ShapeID should match shape ID: %d vs %d", t1.shape.ID, t1.ShapeID())
 	}
 
-	// Legacy shapeID field should also be updated for compatibility
+	// Compatibility shapeID field should also be updated for compatibility
 	if t1.shape.ID != t1.shapeID {
-		t.Errorf("legacy shapeID should match shape ID: %d vs %d", t1.shape.ID, t1.shapeID)
+		t.Errorf("compatibility shapeID should match shape ID: %d vs %d", t1.shape.ID, t1.shapeID)
 	}
 }

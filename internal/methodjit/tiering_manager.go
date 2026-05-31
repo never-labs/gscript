@@ -84,7 +84,7 @@ type TieringManager struct {
 	retBuf             [8]runtime.Value
 	tier2Ctx           ExecContext
 	tier2CtxBusy       bool
-	tier2Threshold     int                           // configurable threshold for testing (legacy fallback)
+	tier2Threshold     int                           // configurable threshold for testing (compatibility fallback)
 	profileCache       map[*vm.FuncProto]FuncProfile // cached function profiles
 
 	// R162: env-var caches evaluated ONCE at construction. Previously

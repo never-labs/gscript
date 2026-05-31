@@ -255,7 +255,7 @@ func TestCallFactsReadHelpersAreNilSafe(t *testing.T) {
 	}
 }
 
-func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testing.T) {
+func TestAnalysisResultCallFactsPreservesDomainMapsWhenCompatibilityFieldsNil(t *testing.T) {
 	a := &AnalysisResult{Call: NewCallFacts()}
 	a.CallFacts().SetCallABIs(map[int]CallABIDescriptor{41: {NumArgs: 5}})
 	a.CallFacts().SetGuardedConstCallFolds(map[int]GuardedConstCallFoldFact{42: {Result: 13}})
@@ -264,16 +264,16 @@ func TestAnalysisResultCallFactsPreservesDomainMapsWhenLegacyFieldsNil(t *testin
 
 	calls := a.CallFacts()
 	if got, ok := calls.CallABI(41); !ok || got.NumArgs != 5 {
-		t.Fatalf("CallFacts lost domain CallABIs with nil legacy field: got %#v ok=%v", got, ok)
+		t.Fatalf("CallFacts lost domain CallABIs with nil compatibility field: got %#v ok=%v", got, ok)
 	}
 	if got, ok := calls.GuardedConstCallFold(42); !ok || got.Result != 13 {
-		t.Fatalf("CallFacts lost domain GuardedConstCallFolds with nil legacy field: got %#v ok=%v", got, ok)
+		t.Fatalf("CallFacts lost domain GuardedConstCallFolds with nil compatibility field: got %#v ok=%v", got, ok)
 	}
 	if !calls.CallSiteNoResultRuntimeSpecialization(43) {
-		t.Fatalf("CallFacts lost domain CallSiteNoResultRuntimeSpecializations with nil legacy field")
+		t.Fatalf("CallFacts lost domain CallSiteNoResultRuntimeSpecializations with nil compatibility field")
 	}
 	if got, ok := calls.CallSiteNoResultRuntimeSpecializationBatch(44); !ok || got.ExitPC != 66 {
-		t.Fatalf("CallFacts lost domain CallSiteNoResultRuntimeSpecializationBatches with nil legacy field: got %#v ok=%v", got, ok)
+		t.Fatalf("CallFacts lost domain CallSiteNoResultRuntimeSpecializationBatches with nil compatibility field: got %#v ok=%v", got, ok)
 	}
 }
 
@@ -312,13 +312,13 @@ func TestAnalysisResultSpeculationFactsPreservesPrePopulatedDomain(t *testing.T)
 
 	spec := a.SpeculationFacts()
 	if !spec.SpecDependencyProto(callee) {
-		t.Fatalf("SpeculationFacts did not adopt legacy SpecDependencyProtos")
+		t.Fatalf("SpeculationFacts did not adopt compatibility SpecDependencyProtos")
 	}
 	if !spec.SuppressedSpecGuardPC(41) {
-		t.Fatalf("SpeculationFacts did not adopt legacy SuppressedSpecGuardPCs")
+		t.Fatalf("SpeculationFacts did not adopt compatibility SuppressedSpecGuardPCs")
 	}
 	if !spec.SpecGuardKindSuppressed(42, "GuardCalleeProto") {
-		t.Fatalf("SpeculationFacts did not adopt legacy SuppressedSpecGuardKinds")
+		t.Fatalf("SpeculationFacts did not adopt compatibility SuppressedSpecGuardKinds")
 	}
 }
 

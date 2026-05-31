@@ -8,10 +8,10 @@ import (
 )
 
 type resultBufferJIT struct {
-	value      runtime.Value
-	err        error
-	sawBuffer  bool
-	usedLegacy bool
+	value               runtime.Value
+	err                 error
+	sawBuffer           bool
+	usedFallbackExecute bool
 }
 
 func (j *resultBufferJIT) TryCompile(proto *FuncProto) interface{} {
@@ -19,7 +19,7 @@ func (j *resultBufferJIT) TryCompile(proto *FuncProto) interface{} {
 }
 
 func (j *resultBufferJIT) Execute(compiled interface{}, regs []runtime.Value, base int, proto *FuncProto) ([]runtime.Value, error) {
-	j.usedLegacy = true
+	j.usedFallbackExecute = true
 	if j.err != nil {
 		return nil, j.err
 	}
@@ -45,8 +45,8 @@ func TestMethodJITReceivesReusableReturnBuffer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if jit.usedLegacy {
-		t.Fatal("VM used legacy MethodJIT Execute path")
+	if jit.usedFallbackExecute {
+		t.Fatal("VM used fallback MethodJIT Execute path")
 	}
 	if !jit.sawBuffer {
 		t.Fatal("MethodJIT did not receive reusable return buffer")

@@ -8,7 +8,7 @@
 // Today Tier 2 routes every SetGlobal through a slow op-exit that calls
 // VM.SetGlobal (internal/vm/vm.go). That path is dual-store and
 // reallocation-safe: it writes BOTH vm.globalArray[idx] (the indexed store
-// read by GetGlobal) AND the legacy vm.globals map, and when a brand-new
+// read by GetGlobal) AND the compatibility vm.globals map, and when a brand-new
 // global name is seen it appends to globalArray. We later intend to enable a
 // native indexed-store fast path that writes globalArray directly. Two hazards
 // must be guarded before that is safe:

@@ -82,7 +82,7 @@ func InlinePassWith(config InlineConfig) PassFunc {
 		config.MaxSize = 30
 	}
 	// MaxRecursion is NOT defaulted here: a zero value is a valid caller
-	// choice meaning "do not inline any recursive callee" (matches legacy
+	// choice meaning "do not inline any recursive callee" (matches the existing compatibility behavior
 	// isRecursive-veto behavior). Callers that want bounded recursive
 	// inlining set this explicitly (e.g., 2 for Tier 2).
 	return func(fn *Function) (*Function, error) {

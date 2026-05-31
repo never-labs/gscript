@@ -337,10 +337,10 @@ func BenchmarkNewTableCacheRefillRoots(b *testing.B) {
 			_ = allocateNewTableWithCache(caches, instrID, arrayHint, hashHint, runtime.ArrayFloat, false)
 		}
 	})
-	b.Run("legacy_per_table_roots", func(b *testing.B) {
+	b.Run("compatibility_per_table_roots", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_ = legacyAllocateNewTableCacheForBenchmark(arrayHint, hashHint, runtime.ArrayFloat)
+			_ = compatibilityAllocateNewTableCacheForBenchmark(arrayHint, hashHint, runtime.ArrayFloat)
 		}
 	})
 }
@@ -361,7 +361,7 @@ func BenchmarkNewTableCacheRootMetadata(b *testing.B) {
 			benchmarkRootSink = entry.Roots
 		}
 	})
-	b.Run("legacy_per_table_roots", func(b *testing.B) {
+	b.Run("compatibility_per_table_roots", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			roots := make([]*runtime.Table, keep)
@@ -375,14 +375,14 @@ func BenchmarkNewTableCacheRootMetadata(b *testing.B) {
 
 var benchmarkRootSink any
 
-type legacyNewTableCacheEntryForBenchmark struct {
+type compatibilityNewTableCacheEntryForBenchmark struct {
 	Values []runtime.Value
 	Roots  []*runtime.Table
 }
 
-func legacyAllocateNewTableCacheForBenchmark(arrayHint, hashHint int, kind runtime.ArrayKind) legacyNewTableCacheEntryForBenchmark {
+func compatibilityAllocateNewTableCacheForBenchmark(arrayHint, hashHint int, kind runtime.ArrayKind) compatibilityNewTableCacheEntryForBenchmark {
 	keep := newTableCacheBatchSizeForHints(int64(arrayHint), hashHint, kind) - 1
-	entry := legacyNewTableCacheEntryForBenchmark{
+	entry := compatibilityNewTableCacheEntryForBenchmark{
 		Values: make([]runtime.Value, keep),
 		Roots:  make([]*runtime.Table, keep),
 	}

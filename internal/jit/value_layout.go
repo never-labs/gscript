@@ -131,7 +131,7 @@ const (
 	DenseMatrixMetaOffParent      = 24
 )
 
-// Legacy compatibility alias for codegen transition.
+// Compatibility alias for codegen transition.
 // With NaN-boxing, there are no sub-field offsets. This equals 0
 // so that `reg*ValueSize + OffsetData` reduces to `reg*ValueSize`.
 const OffsetData = 0

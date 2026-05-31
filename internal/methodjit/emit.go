@@ -580,7 +580,7 @@ type CompiledFunction struct {
 	GlobalIndexByConst []int32
 
 	// NativeSetGlobals is the set of proto constant indices written by native
-	// SetGlobal. The execute loop syncs these array slots back into the legacy
+	// SetGlobal. The execute loop syncs these array slots back into the compatibility
 	// globals map before every exit and on normal return.
 	NativeSetGlobals map[int]bool
 

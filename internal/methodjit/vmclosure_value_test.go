@@ -22,7 +22,7 @@ func TestVMClosureFromValueRecognizesVMClosureValue(t *testing.T) {
 }
 
 func TestVMClosureFromValueFallsBackToInterfaceValue(t *testing.T) {
-	cl := &vm.Closure{Proto: &vm.FuncProto{Name: "jit-legacy"}}
+	cl := &vm.Closure{Proto: &vm.FuncProto{Name: "jit-compatibility"}}
 	v := runtime.FunctionValue(cl)
 
 	got, ok := vmClosureFromValue(v)

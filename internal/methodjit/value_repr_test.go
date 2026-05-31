@@ -4,7 +4,7 @@ package methodjit
 
 import "testing"
 
-func TestValueReprMirrorsLegacyMaps(t *testing.T) {
+func TestValueReprMirrorsCompatibilityMaps(t *testing.T) {
 	ec := &emitContext{
 		valueReprs:      make(map[int]valueRepr),
 		rawIntRegs:      make(map[int]bool),
@@ -37,11 +37,11 @@ func TestValueReprMirrorsLegacyMaps(t *testing.T) {
 		t.Fatalf("boxed repr=%s", got)
 	}
 	if ec.rawIntRegs[1] || ec.rawTablePtrRegs[1] {
-		t.Fatalf("boxed should clear legacy mirrors")
+		t.Fatalf("boxed should clear compatibility mirrors")
 	}
 }
 
-func TestValueReprLatticeIsAuthoritativeOverLegacyMirrors(t *testing.T) {
+func TestValueReprLatticeIsAuthoritativeOverCompatibilityMirrors(t *testing.T) {
 	ec := &emitContext{
 		valueReprs:      make(map[int]valueRepr),
 		rawIntRegs:      make(map[int]bool),
@@ -52,12 +52,12 @@ func TestValueReprLatticeIsAuthoritativeOverLegacyMirrors(t *testing.T) {
 	ec.setValueRepr(2, valueReprRawInt)
 	delete(ec.rawIntRegs, 2)
 	if got := ec.valueReprOf(2); got != valueReprRawInt {
-		t.Fatalf("legacy raw-int mirror delete repr=%s, want raw-int", got)
+		t.Fatalf("compatibility raw-int mirror delete repr=%s, want raw-int", got)
 	}
 
 	ec.rawTablePtrRegs[3] = true
 	if got := ec.valueReprOf(3); got != valueReprBoxed {
-		t.Fatalf("legacy raw-table mirror write repr=%s, want boxed", got)
+		t.Fatalf("compatibility raw-table mirror write repr=%s, want boxed", got)
 	}
 
 	ec.setValueRepr(4, valueReprRawFloat)

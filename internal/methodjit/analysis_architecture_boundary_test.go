@@ -27,7 +27,7 @@ func TestProductionCodeUsesTableShapeFactsBoundary(t *testing.T) {
 		}
 		ast.Inspect(parsed, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || !legacyTableShapeField(sel.Sel.Name) {
+			if !ok || !compatibilityTableShapeField(sel.Sel.Name) {
 				return true
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
@@ -55,7 +55,7 @@ func TestProductionCodeUsesCallFactsBoundary(t *testing.T) {
 		}
 		ast.Inspect(parsed, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || !legacyCallFactField(sel.Sel.Name) {
+			if !ok || !compatibilityCallFactField(sel.Sel.Name) {
 				return true
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
@@ -83,7 +83,7 @@ func TestProductionCodeUsesLoopSpecializationFactsBoundary(t *testing.T) {
 		}
 		ast.Inspect(parsed, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || !legacyLoopSpecializationFactField(sel.Sel.Name) {
+			if !ok || !compatibilityLoopSpecializationFactField(sel.Sel.Name) {
 				return true
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
@@ -111,7 +111,7 @@ func TestProductionCodeUsesNumericFactsBoundary(t *testing.T) {
 		}
 		ast.Inspect(parsed, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || !legacyNumericFactField(sel.Sel.Name) {
+			if !ok || !compatibilityNumericFactField(sel.Sel.Name) {
 				return true
 			}
 			if isSelectorNamed(sel.X, "Analysis") {
@@ -231,7 +231,7 @@ func analysisFactFallbackBoundaryFile(file string) bool {
 		base == "interp.go"
 }
 
-func legacyTableShapeField(name string) bool {
+func compatibilityTableShapeField(name string) bool {
 	switch name {
 	case "FieldPolyShapeFacts", "FieldPolyShapeReceivers", "FieldPolyShapeCatalog", "FieldCallPolyLenFusions":
 		return true
@@ -276,7 +276,7 @@ func analysisFactAccessorName(name string) bool {
 	}
 }
 
-func legacyCallFactField(name string) bool {
+func compatibilityCallFactField(name string) bool {
 	switch name {
 	case "CallABIs":
 		return true
@@ -285,7 +285,7 @@ func legacyCallFactField(name string) bool {
 	}
 }
 
-func legacyLoopSpecializationFactField(name string) bool {
+func compatibilityLoopSpecializationFactField(name string) bool {
 	switch name {
 	case "RecordArrayLoopSpecializations", "TableArrayUpperBoundSafe", "TableArrayLowerBoundSafe", "LoopTableArrayFacts":
 		return true
@@ -294,7 +294,7 @@ func legacyLoopSpecializationFactField(name string) bool {
 	}
 }
 
-func legacyNumericFactField(name string) bool {
+func compatibilityNumericFactField(name string) bool {
 	switch name {
 	case "Int48Safe", "IntModNonZeroDivisor", "IntModNoSignAdjust", "IntRanges", "ProfiledIntRanges", "ProfiledLenRanges", "IntNonNegative":
 		return true
