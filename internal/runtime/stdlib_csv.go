@@ -1,10 +1,9 @@
 package runtime
 
 import (
-	"encoding/csv"
 	"fmt"
-	"io"
-	"strings"
+
+	stdcsv "github.com/never-labs/gscript/internal/stdlib/data/csv"
 )
 
 // buildCSVLib creates the "csv" standard library table.
@@ -36,30 +35,97 @@ func buildCSVLib(interps ...*Interpreter) *Table {
 		}))
 	}
 
-	configureCSVReader := func(r *csv.Reader, optsVal Value) {
+	csvOptions := func(optsVal Value) stdcsv.Options {
+		var opts stdcsv.Options
 		if optsVal.IsTable() {
-			opts := optsVal.Table()
-			if v := opts.RawGet(StringValue("sep")); v.IsString() && len(v.Str()) > 0 {
-				r.Comma = rune(v.Str()[0])
+			optsTbl := optsVal.Table()
+			if v := optsTbl.RawGet(StringValue("sep")); v.IsString() && len(v.Str()) > 0 {
+				opts.Sep = rune(v.Str()[0])
 			}
-			if v := opts.RawGet(StringValue("comment")); v.IsString() && len(v.Str()) > 0 {
-				r.Comment = rune(v.Str()[0])
+			if v := optsTbl.RawGet(StringValue("comment")); v.IsString() && len(v.Str()) > 0 {
+				opts.Comment = rune(v.Str()[0])
 			}
-			if v := opts.RawGet(StringValue("trimSpace")); v.IsBool() {
-				r.TrimLeadingSpace = v.Bool()
+			if v := optsTbl.RawGet(StringValue("trimSpace")); v.IsBool() {
+				opts.TrimSpace = v.Bool()
 			}
-			if v := opts.RawGet(StringValue("lazyQuotes")); v.IsBool() {
-				r.LazyQuotes = v.Bool()
+			if v := optsTbl.RawGet(StringValue("lazyQuotes")); v.IsBool() {
+				opts.LazyQuotes = v.Bool()
 			}
 		}
+		return opts
 	}
-	configureCSVWriter := func(w *csv.Writer, optsVal Value) {
-		if optsVal.IsTable() {
-			opts := optsVal.Table()
-			if v := opts.RawGet(StringValue("sep")); v.IsString() && len(v.Str()) > 0 {
-				w.Comma = rune(v.Str()[0])
+
+	rowsToValue := func(rows [][]string) Value {
+		result := NewAppendArrayTable(len(rows))
+		for i, record := range rows {
+			row := NewSequentialArrayTable(len(record))
+			for j, field := range record {
+				row.RawSetInt(int64(j+1), StringValue(field))
 			}
+			result.RawSetInt(int64(i+1), TableValue(row))
 		}
+		return TableValue(result)
+	}
+
+	headerRowsToValue := func(rows []map[string]string) Value {
+		result := NewAppendArrayTable(len(rows))
+		for i, record := range rows {
+			row := NewTableSized(0, len(record))
+			for header, field := range record {
+				row.RawSetString(header, StringValue(field))
+			}
+			result.RawSetInt(int64(i+1), TableValue(row))
+		}
+		return TableValue(result)
+	}
+
+	rowsFromValue := func(rowsVal Value) [][]string {
+		rows := rowsVal.Table()
+		length := rows.Length()
+		out := make([][]string, 0, length)
+		for i := int64(1); i <= int64(length); i++ {
+			rowVal := rows.RawGet(IntValue(i))
+			if !rowVal.IsTable() {
+				continue
+			}
+			row := rowVal.Table()
+			rowLen := row.Length()
+			record := make([]string, rowLen)
+			for j := int64(1); j <= int64(rowLen); j++ {
+				record[j-1] = row.RawGet(IntValue(j)).String()
+			}
+			out = append(out, record)
+		}
+		return out
+	}
+
+	headersFromValue := func(headersVal Value) []string {
+		headersTbl := headersVal.Table()
+		headersLen := headersTbl.Length()
+		headers := make([]string, headersLen)
+		for i := int64(1); i <= int64(headersLen); i++ {
+			headers[i-1] = headersTbl.RawGet(IntValue(i)).String()
+		}
+		return headers
+	}
+
+	headerRowsFromValue := func(rowsVal Value, headers []string) []map[string]string {
+		rows := rowsVal.Table()
+		length := rows.Length()
+		out := make([]map[string]string, 0, length)
+		for i := int64(1); i <= int64(length); i++ {
+			rowVal := rows.RawGet(IntValue(i))
+			if !rowVal.IsTable() {
+				continue
+			}
+			row := rowVal.Table()
+			record := make(map[string]string, len(headers))
+			for _, h := range headers {
+				record[h] = row.RawGet(StringValue(h)).String()
+			}
+			out = append(out, record)
+		}
+		return out
 	}
 
 	// csv.parse(str [, opts]) -- parse CSV string -> table of rows
@@ -68,28 +134,11 @@ func buildCSVLib(interps ...*Interpreter) *Table {
 		if !dataVal.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'csv.parse' (string expected)")
 		}
-		r := csv.NewReader(strings.NewReader(dataVal.Str()))
-		r.FieldsPerRecord = -1 // variable number of fields
-		configureCSVReader(r, optsVal)
-
-		result := NewAppendArrayTable(8)
-		rowIdx := int64(1)
-		for {
-			record, err := r.Read()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return NilValue(), fmt.Errorf("csv.parse: %v", err)
-			}
-			row := NewSequentialArrayTable(len(record))
-			for i, field := range record {
-				row.RawSetInt(int64(i+1), StringValue(field))
-			}
-			result.RawSetInt(rowIdx, TableValue(row))
-			rowIdx++
+		rows, err := stdcsv.Parse(dataVal.Str(), csvOptions(optsVal))
+		if err != nil {
+			return NilValue(), fmt.Errorf("csv.parse: %v", err)
 		}
-		return TableValue(result), nil
+		return rowsToValue(rows), nil
 	}
 	setFastArg1("parse", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -113,39 +162,11 @@ func buildCSVLib(interps ...*Interpreter) *Table {
 		if !dataVal.IsString() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'csv.parseWithHeaders' (string expected)")
 		}
-		r := csv.NewReader(strings.NewReader(dataVal.Str()))
-		r.FieldsPerRecord = -1
-		configureCSVReader(r, optsVal)
-
-		// Read header row
-		headers, err := r.Read()
+		rows, err := stdcsv.ParseWithHeaders(dataVal.Str(), csvOptions(optsVal))
 		if err != nil {
-			if err == io.EOF {
-				return TableValue(NewEmptyTable()), nil
-			}
 			return NilValue(), fmt.Errorf("csv.parseWithHeaders: %v", err)
 		}
-
-		result := NewAppendArrayTable(8)
-		rowIdx := int64(1)
-		for {
-			record, err := r.Read()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return NilValue(), fmt.Errorf("csv.parseWithHeaders: %v", err)
-			}
-			row := NewTableSized(0, len(headers))
-			for i, field := range record {
-				if i < len(headers) {
-					row.RawSetString(headers[i], StringValue(field))
-				}
-			}
-			result.RawSetInt(rowIdx, TableValue(row))
-			rowIdx++
-		}
-		return TableValue(result), nil
+		return headerRowsToValue(rows), nil
 	}
 	setFastArg1("parseWithHeaders", func(args []Value) ([]Value, error) {
 		if len(args) < 1 {
@@ -170,29 +191,8 @@ func buildCSVLib(interps ...*Interpreter) *Table {
 		if !rowsVal.IsTable() {
 			return NilValue(), fmt.Errorf("bad argument #1 to 'csv.encode' (table expected)")
 		}
-		rows := rowsVal.Table()
 		buf := newHostResultBuffer(maxHostResult())
-		w := csv.NewWriter(buf)
-		configureCSVWriter(w, optsVal)
-
-		length := rows.Length()
-		for i := int64(1); i <= int64(length); i++ {
-			rowVal := rows.RawGet(IntValue(i))
-			if !rowVal.IsTable() {
-				continue
-			}
-			row := rowVal.Table()
-			rowLen := row.Length()
-			record := make([]string, rowLen)
-			for j := int64(1); j <= int64(rowLen); j++ {
-				record[j-1] = row.RawGet(IntValue(j)).String()
-			}
-			if err := w.Write(record); err != nil {
-				return NilValue(), fmt.Errorf("csv.encode: %v", err)
-			}
-		}
-		w.Flush()
-		if err := w.Error(); err != nil {
+		if err := stdcsv.Write(rowsFromValue(rowsVal), csvOptions(optsVal), buf); err != nil {
 			return NilValue(), fmt.Errorf("csv.encode: %v", err)
 		}
 		return StringValue(buf.String()), nil
@@ -219,40 +219,10 @@ func buildCSVLib(interps ...*Interpreter) *Table {
 		if !rowsVal.IsTable() || !headersVal.IsTable() {
 			return NilValue(), fmt.Errorf("bad argument to 'csv.encodeWithHeaders'")
 		}
-		rows := rowsVal.Table()
-		headersTbl := headersVal.Table()
 		buf := newHostResultBuffer(maxHostResult())
-		w := csv.NewWriter(buf)
-		configureCSVWriter(w, optsVal)
-
-		// Write header row
-		headersLen := headersTbl.Length()
-		headerNames := make([]string, headersLen)
-		for i := int64(1); i <= int64(headersLen); i++ {
-			headerNames[i-1] = headersTbl.RawGet(IntValue(i)).String()
-		}
-		if err := w.Write(headerNames); err != nil {
-			return NilValue(), fmt.Errorf("csv.encodeWithHeaders: %v", err)
-		}
-
-		// Write data rows
-		length := rows.Length()
-		for i := int64(1); i <= int64(length); i++ {
-			rowVal := rows.RawGet(IntValue(i))
-			if !rowVal.IsTable() {
-				continue
-			}
-			row := rowVal.Table()
-			record := make([]string, headersLen)
-			for j, h := range headerNames {
-				record[j] = row.RawGet(StringValue(h)).String()
-			}
-			if err := w.Write(record); err != nil {
-				return NilValue(), fmt.Errorf("csv.encodeWithHeaders: %v", err)
-			}
-		}
-		w.Flush()
-		if err := w.Error(); err != nil {
+		headers := headersFromValue(headersVal)
+		rows := headerRowsFromValue(rowsVal, headers)
+		if err := stdcsv.WriteWithHeaders(rows, headers, csvOptions(optsVal), buf); err != nil {
 			return NilValue(), fmt.Errorf("csv.encodeWithHeaders: %v", err)
 		}
 		return StringValue(buf.String()), nil
