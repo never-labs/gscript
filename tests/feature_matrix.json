@@ -301,7 +301,7 @@
       "spec_sections": ["Tables, Arrays, And Metatables", "Numbers, Strings, And Stdlib", "VM, JIT, And Semantic Gates"],
       "parser": {"status": "not_applicable", "refs": []},
       "bytecode": {"status": "partial", "refs": ["internal/vm/matrix_multiply_specialization.go"]},
-      "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/runtime/stdlib_vec_test.go", "internal/runtime/soa_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/runtime/table_dense_matrix_test.go", "internal/stdlibrt/modules/vec_test.go", "internal/runtime/soa_test.go"]},
       "tier1": {"status": "covered", "refs": ["internal/methodjit/pass_intrinsic_matrix_test.go", "internal/methodjit/pass_matrix_rowptr_test.go"]},
       "tier2": {"status": "covered", "refs": ["internal/methodjit/emit_matrix_codegen_test.go", "internal/methodjit/pass_matrix_lower.go"]},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/matrix_host_dense_more.gs", "tests/language/vec_color_geometry_hsl_more.gs"]},

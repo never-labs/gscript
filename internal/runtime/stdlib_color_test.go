@@ -8,7 +8,12 @@ import (
 // runWithColor creates an interpreter with both vec and color libs.
 func runWithColor(t *testing.T, src string) *Interpreter {
 	t.Helper()
-	return runWithVec(t, src) // runWithVec already registers both vec and color
+	return runProgram(t, src)
+}
+
+// floatClose returns true if a and b are within epsilon of each other.
+func floatClose(a, b, eps float64) bool {
+	return math.Abs(a-b) < eps
 }
 
 // ==================================================================

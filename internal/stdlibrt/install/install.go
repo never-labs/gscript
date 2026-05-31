@@ -27,6 +27,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	if maxHostResult == nil {
 		maxHostResult = func() int64 { return 0 }
 	}
+	installer.RegisterTable("array", modules.BuildArray())
 	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
 	installer.RegisterTable("bits", modules.BuildBits())
 	installer.RegisterTable("compress", modules.BuildCompress(maxHostResult))
@@ -39,6 +40,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("regexp", modules.BuildRegexp())
 	installer.RegisterTable("url", modules.BuildURL(maxHostResult))
 	installer.RegisterTable("uuid", modules.BuildUUID())
+	installer.RegisterTable("vec", modules.BuildVec())
 }
 
 type interpreterInstaller struct {

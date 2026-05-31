@@ -39,7 +39,6 @@ func (interp *Interpreter) InstallStdlib() {
 	std.RegisterTable("rl", rlLib(interp))
 
 	// --- Encoding / Crypto ---
-	std.RegisterTable("array", buildArrayLib())
 	std.RegisterTable("json", buildJSONLib())
 
 	// --- File system & paths ---
@@ -98,7 +97,6 @@ func (interp *Interpreter) InstallStdlib() {
 	std.RegisterTable("binary", buildBinaryLib(interp))
 
 	// --- Game math ---
-	std.RegisterTable("vec", buildVecLib())
 	std.RegisterTable("color", buildColorLib())
 
 	// --- Numeric matrix (R42 DenseMatrix Phase 1) ---

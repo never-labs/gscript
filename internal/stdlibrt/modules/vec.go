@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -213,7 +213,7 @@ func newVec3Meta() *Table {
 // Internal helpers to create vec2/vec3 table values
 // --------------------------------------------------------------------------
 
-// Shared metatables (created once per buildVecLib call)
+// Shared metatables (created once per BuildVec call)
 var (
 	vec2Meta *Table
 	vec3Meta *Table
@@ -265,10 +265,10 @@ func isVec3(v Value) bool {
 }
 
 // --------------------------------------------------------------------------
-// buildVecLib creates the "vec" standard library table.
+// BuildVec creates the "vec" standard library table.
 // --------------------------------------------------------------------------
 
-func buildVecLib() *Table {
+func BuildVec() *Table {
 	// Create shared metatables
 	vec2Meta = newVec2Meta()
 	vec3Meta = newVec3Meta()

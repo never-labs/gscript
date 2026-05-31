@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"math"
@@ -6,9 +6,10 @@ import (
 
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
-// runWithVec parses and executes source code with vec and color libs pre-registered.
+// runWithVec parses and executes source code with vec pre-registered.
 func runWithVec(t *testing.T, src string) *Interpreter {
 	t.Helper()
 	tokens, err := lexer.New(src).Tokenize()
@@ -19,9 +20,8 @@ func runWithVec(t *testing.T, src string) *Interpreter {
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
-	interp := New()
-	interp.globals.Define("vec", TableValue(buildVecLib()))
-	interp.globals.Define("color", TableValue(buildColorLib()))
+	interp := runtime.New()
+	interp.SetGlobal("vec", TableValue(BuildVec()))
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)
 	}

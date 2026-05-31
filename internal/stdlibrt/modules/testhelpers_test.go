@@ -41,6 +41,7 @@ func execOnInterp(t *testing.T, interp *runtime.Interpreter, src string) {
 }
 
 func installTestModules(interp *runtime.Interpreter) {
+	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
 	installTestModule(interp, "base64", runtime.TableValue(BuildBase64(interp.MaxHostResultBytes)))
 	installTestModule(interp, "bits", runtime.TableValue(BuildBits()))
 	installTestModule(interp, "compress", runtime.TableValue(BuildCompress(interp.MaxHostResultBytes)))
@@ -53,6 +54,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "regexp", runtime.TableValue(BuildRegexp()))
 	installTestModule(interp, "url", runtime.TableValue(BuildURL(interp.MaxHostResultBytes)))
 	installTestModule(interp, "uuid", runtime.TableValue(BuildUUID()))
+	installTestModule(interp, "vec", runtime.TableValue(BuildVec()))
 }
 
 func installTestModule(interp *runtime.Interpreter, name string, module runtime.Value) {

@@ -1,9 +1,9 @@
-package runtime
+package modules
 
 import "fmt"
 
-// buildArrayLib creates the "array" dense data library.
-func buildArrayLib() *Table {
+// BuildArray creates the "array" dense data library.
+func BuildArray() *Table {
 	t := NewTable()
 	set := func(name string, fn func([]Value) ([]Value, error)) {
 		t.RawSetString(name, FunctionValue(&GoFunction{Name: "array." + name, Fn: fn}))
