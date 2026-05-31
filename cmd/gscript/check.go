@@ -126,15 +126,7 @@ func runManifestCheckRoots(roots []string, outw, errw io.Writer) int {
 	cmd.Stdout = outw
 	cmd.Stderr = errw
 	cmd.Dir = filepath.Dir(filepath.Dir(script))
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
-		}
-		fmt.Fprintf(errw, "gscript check: %v\n", err)
-		return 1
-	}
-	return 0
+	return runExternalCommand(cmd, "gscript check", errw)
 }
 
 func runDocsCheck(outw, errw io.Writer) int {
@@ -147,15 +139,7 @@ func runDocsCheck(outw, errw io.Writer) int {
 	cmd.Stdout = outw
 	cmd.Stderr = errw
 	cmd.Dir = filepath.Dir(filepath.Dir(script))
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
-		}
-		fmt.Fprintf(errw, "gscript check: %v\n", err)
-		return 1
-	}
-	return 0
+	return runExternalCommand(cmd, "gscript check", errw)
 }
 
 func findScriptFromCWD(rel string) (string, error) {

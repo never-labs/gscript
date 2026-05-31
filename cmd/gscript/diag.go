@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -36,15 +35,7 @@ func runDiagCommand(args []string, outw, errw io.Writer) int {
 	cmd.Stdout = outw
 	cmd.Stderr = errw
 	cmd.Dir = filepath.Dir(filepath.Dir(path))
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return exitErr.ExitCode()
-		}
-		fmt.Fprintf(errw, "gscript diag: %v\n", err)
-		return 1
-	}
-	return 0
+	return runExternalCommand(cmd, "gscript diag", errw)
 }
 
 func diagScriptForMode(mode string) (string, error) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -57,13 +56,8 @@ func runCICommand(args []string, outw, errw io.Writer) int {
 		cmd := ciExecCommand(spec.Args[0], spec.Args[1:]...)
 		cmd.Stdout = outw
 		cmd.Stderr = errw
-		if err := cmd.Run(); err != nil {
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				return exitErr.ExitCode()
-			}
-			fmt.Fprintf(errw, "gscript ci: %v\n", err)
-			return 1
+		if code := runExternalCommand(cmd, "gscript ci", errw); code != 0 {
+			return code
 		}
 	}
 	return 0
