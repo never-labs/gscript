@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	gs "github.com/never-labs/gscript"
-	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func TestWithFilesystemFalseRemovesFilesystemGlobals(t *testing.T) {
@@ -210,18 +209,12 @@ func TestFilesystemReadCapabilityControlsBytecodeFileLoadGlobals(t *testing.T) {
 			if err := vm.Exec(`probe := true`); err != nil {
 				t.Fatal(err)
 			}
-			gotFS, err := vm.Get("fs")
-			if err != nil {
-				t.Fatal(err)
-			}
+			gotFS := vm.GetPublicValue("fs")
 			if got := publicAPIType(gotFS); got != tc.wantFS {
 				t.Fatalf("fs type = %v, want %s", got, tc.wantFS)
 			}
 			for _, name := range []string{"dofile", "loadfile"} {
-				got, err := vm.Get(name)
-				if err != nil {
-					t.Fatal(err)
-				}
+				got := vm.GetPublicValue(name)
 				if gotType := publicAPIType(got); gotType != tc.wantFiles {
 					t.Fatalf("%s type = %v, want %s", name, gotType, tc.wantFiles)
 				}
@@ -310,15 +303,19 @@ func TestMaxFilesystemWriteBytesLimitsFSWriteFile(t *testing.T) {
 	}
 }
 
-func publicAPIType(v interface{}) string {
-	if v == nil {
+func publicAPIType(v gs.Value) string {
+	if v.IsNil() {
 		return "nil"
 	}
-	if val, ok := v.(runtime.Value); ok && val.IsFunction() {
+	if v.Kind() == gs.KindFunction {
 		return "function"
 	}
-	if _, ok := v.(map[string]interface{}); ok {
+	if v.Kind() == gs.KindTable {
 		return "table"
 	}
-	return fmt.Sprintf("%T", v)
+	encoded, err := v.Encode()
+	if err != nil {
+		return fmt.Sprintf("%s", v.Kind())
+	}
+	return fmt.Sprintf("%T", encoded)
 }

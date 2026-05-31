@@ -142,10 +142,7 @@ func TestWithFilesystemRootReadOnlyAllowsFileLoadsAndConfinesReads(t *testing.T)
 	if err == nil || !strings.Contains(err.Error(), "filesystem write access disabled") {
 		t.Fatalf("writefile error = %v, want write access disabled", err)
 	}
-	loadfile, err := vm.Get("loadfile")
-	if err != nil {
-		t.Fatal(err)
-	}
+	loadfile := vm.GetPublicValue("loadfile")
 	if got := publicAPIType(loadfile); got != "function" {
 		t.Fatalf("loadfile type = %v, want function", got)
 	}

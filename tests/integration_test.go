@@ -8,39 +8,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/never-labs/gscript/internal/lexer"
-	"github.com/never-labs/gscript/internal/parser"
-	"github.com/never-labs/gscript/internal/runtime"
+	gs "github.com/never-labs/gscript"
 )
 
 // runGScript executes a GScript source string and captures its print output.
 func runGScript(t *testing.T, src string) string {
 	t.Helper()
-	interp := runtime.New()
 	var buf bytes.Buffer
 
-	// Override print to capture output
-	interp.SetGlobal("print", runtime.FunctionValue(&runtime.GoFunction{
-		Name: "print",
-		Fn: func(args []runtime.Value) ([]runtime.Value, error) {
-			parts := make([]string, len(args))
-			for i, a := range args {
-				parts[i] = a.String()
-			}
-			fmt.Fprintln(&buf, strings.Join(parts, "\t"))
-			return nil, nil
-		},
+	vm := gs.New(gs.WithPrint(func(args ...interface{}) {
+		parts := make([]string, len(args))
+		for i, a := range args {
+			parts[i] = fmt.Sprint(a)
+		}
+		fmt.Fprintln(&buf, strings.Join(parts, "\t"))
 	}))
-
-	tokens, err := lexer.New(src).Tokenize()
-	if err != nil {
-		t.Fatalf("lexer error: %v", err)
-	}
-	prog, err := parser.New(tokens).Parse()
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if err := interp.Exec(prog); err != nil {
+	if err := vm.Exec(src); err != nil {
 		t.Fatalf("runtime error: %v", err)
 	}
 	return buf.String()
@@ -289,17 +272,8 @@ func TestExamples(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to read %s: %v", ex, err)
 			}
-			// Just run it and make sure no errors
-			interp := runtime.New()
-			tokens, err := lexer.New(string(src)).Tokenize()
-			if err != nil {
-				t.Fatalf("lexer error: %v", err)
-			}
-			prog, err := parser.New(tokens).Parse()
-			if err != nil {
-				t.Fatalf("parse error: %v", err)
-			}
-			if err := interp.Exec(prog); err != nil {
+			vm := gs.New()
+			if err := vm.Exec(string(src)); err != nil {
 				t.Fatalf("runtime error: %v", err)
 			}
 		})
