@@ -45,7 +45,6 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	std.RegisterTable("string", strLib)
 	interp.SetStringLibrary(strLib)
 
-	std.RegisterTable("rl", rlLib(interp))
 	std.RegisterTable("io", buildIOLib(interp))
 	std.RegisterTable("os", buildOSLibWithPolicy(
 		interp.environmentRead,
@@ -64,7 +63,6 @@ func (interp *Interpreter) installLegacyMigratedStdlib(std StdlibInstaller) {
 	))
 	std.RegisterTable("time", buildTimeLib())
 	std.RegisterTable("net", buildNetLib(interp))
-	std.RegisterTable("soa", buildSoALib())
 	std.RegisterTable("debug", buildDebugLib(interp))
 	std.RegisterTable("testkit", buildTestkitLib(interp))
 

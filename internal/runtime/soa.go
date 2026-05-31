@@ -37,6 +37,8 @@ type SoAAffineTerm struct {
 	Bias  float64
 }
 
+type SoAAffinePlan = soaAffinePlan
+
 type soaAffinePlan struct {
 	dst   *DenseArray
 	src   *DenseArray
@@ -717,6 +719,10 @@ func (s *SoA) AffineMany(terms []SoAAffineTerm) error {
 	return applySoAAffinePlans(plans)
 }
 
+func (s *SoA) AffineManyPlan(terms []SoAAffineTerm) ([]SoAAffinePlan, []string, SoAShapeSnapshot, error) {
+	return s.affineManyPlan(terms)
+}
+
 func (s *SoA) affineManyPlan(terms []SoAAffineTerm) ([]soaAffinePlan, []string, SoAShapeSnapshot, error) {
 	if s == nil {
 		return nil, nil, SoAShapeSnapshot{}, fmt.Errorf("soa is nil")
@@ -775,6 +781,10 @@ func applySoAAffinePlans(plans []soaAffinePlan) error {
 		}
 	}
 	return nil
+}
+
+func ApplySoAAffinePlans(plans []SoAAffinePlan) error {
+	return applySoAAffinePlans(plans)
 }
 
 func denseArrayAffineManyF64(plans []soaAffinePlan) bool {

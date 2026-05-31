@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	stdsoa "github.com/never-labs/gscript/internal/stdlib/soa"
 )
 
-// BuildSoALib creates the "soa" data-oriented structure-of-arrays library.
-func BuildSoALib() *Table {
+// BuildSOA creates the "soa" data-oriented structure-of-arrays library.
+func BuildSOA() *Table {
 	t := NewTable()
 	affineManyTerms := &soaAffineManyTermCache{}
 	set := func(name string, fn func([]Value) ([]Value, error)) {
@@ -701,10 +701,6 @@ func BuildSoALib() *Table {
 	return t
 }
 
-func buildSoALib() *Table {
-	return BuildSoALib()
-}
-
 func requireSoAArg(name string, args []Value, index int) (*SoA, error) {
 	if len(args) <= index || !args[index].IsSoA() {
 		return nil, fmt.Errorf("%s: argument %d must be soa", name, index+1)
@@ -845,7 +841,7 @@ type soaAffineManyTermCache struct {
 	planSoA      *SoA
 	planGuard    SoAShapeSnapshot
 	planWrites   []string
-	plans        []soaAffinePlan
+	plans        []SoAAffinePlan
 }
 
 func (c *soaAffineManyTermCache) terms(tbl *Table) ([]SoAAffineTerm, error) {
@@ -887,9 +883,9 @@ func (c *soaAffineManyTermCache) apply(s *SoA, tbl *Table) error {
 		return err
 	}
 	if c.planSoA == s && len(c.plans) > 0 && s.ValidateSnapshotForWrites(c.planGuard, c.planWrites...) {
-		return applySoAAffinePlans(c.plans)
+		return ApplySoAAffinePlans(c.plans)
 	}
-	plans, writes, guard, err := s.affineManyPlan(terms)
+	plans, writes, guard, err := s.AffineManyPlan(terms)
 	if err != nil {
 		return err
 	}
@@ -897,7 +893,7 @@ func (c *soaAffineManyTermCache) apply(s *SoA, tbl *Table) error {
 	c.planGuard = guard
 	c.planWrites = writes
 	c.plans = plans
-	return applySoAAffinePlans(plans)
+	return ApplySoAAffinePlans(plans)
 }
 
 func (c *soaAffineManyTermCache) clearPlan() {

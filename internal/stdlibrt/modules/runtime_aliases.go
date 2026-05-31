@@ -8,6 +8,10 @@ type (
 	Interpreter          = runtime.Interpreter
 	GoFunction           = runtime.GoFunction
 	ScriptFunctionCaller = runtime.ScriptFunctionCaller
+	SoA                  = runtime.SoA
+	SoAAffinePlan        = runtime.SoAAffinePlan
+	SoAAffineTerm        = runtime.SoAAffineTerm
+	SoAShapeSnapshot     = runtime.SoAShapeSnapshot
 	Table                = runtime.Table
 	Value                = runtime.Value
 )
@@ -19,9 +23,12 @@ const (
 	TypeNil    = runtime.TypeNil
 	TypeString = runtime.TypeString
 	TypeTable  = runtime.TypeTable
+
+	NativeKindStdSoAAffineMany = runtime.NativeKindStdSoAAffineMany
 )
 
 var (
+	ApplySoAAffinePlans           = runtime.ApplySoAAffinePlans
 	BoolValue                     = runtime.BoolValue
 	CheckProjectedHostStringBytes = runtime.CheckProjectedHostStringBytes
 	DenseArrayBool                = runtime.DenseArrayBool
@@ -40,6 +47,7 @@ var (
 	NewDenseArrayI64              = runtime.NewDenseArrayI64
 	NewDenseArrayOfLen            = runtime.NewDenseArrayOfLen
 	NewDenseMatrix                = runtime.NewDenseMatrix
+	NewSoA                        = runtime.NewSoA
 	NewSequentialArrayTable       = runtime.NewSequentialArrayTable
 	NewTable                      = runtime.NewTable
 	NewTableSized                 = runtime.NewTableSized
@@ -47,5 +55,7 @@ var (
 	ReadAllWithHostResultLimit    = runtime.ReadAllWithHostResultLimit
 	StringLen                     = runtime.StringLen
 	StringValue                   = runtime.StringValue
+	SoAValue                      = runtime.SoAValue
+	StdSoAAffineManyIdentityPtr   = runtime.StdSoAAffineManyIdentityPtr
 	TableValue                    = runtime.TableValue
 )
