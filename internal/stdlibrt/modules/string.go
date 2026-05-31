@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
+	stdlibstring "github.com/never-labs/gscript/internal/stringlib"
 )
 
 // BuildString creates the "string" standard-library module.

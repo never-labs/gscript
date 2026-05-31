@@ -13,7 +13,7 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 	root := repoRoot(t)
 	stdlibRoot := filepath.Join(root, "internal", "stdlib")
 
-	for _, module := range []string{"catalog", "llm", "string", "table", "soa", "fs", "http"} {
+	for _, module := range []string{"catalog", "llm", "table", "soa", "fs", "http"} {
 		dir := filepath.Join(stdlibRoot, module)
 		info, err := os.Stat(dir)
 		if err != nil {
@@ -25,6 +25,27 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 		if !hasGoFile(t, dir) {
 			t.Fatalf("internal/stdlib module %q has no Go implementation files", module)
 		}
+	}
+	for _, shared := range []string{"stringlib"} {
+		dir := filepath.Join(root, "internal", shared)
+		info, err := os.Stat(dir)
+		if err != nil {
+			t.Fatalf("internal shared module %q missing: %v", shared, err)
+		}
+		if !info.IsDir() {
+			t.Fatalf("internal shared module %q is not a directory", shared)
+		}
+		if !hasGoFile(t, dir) {
+			t.Fatalf("internal shared module %q has no Go implementation files", shared)
+		}
+		forEachGoFile(t, dir, func(path string) {
+			for _, importPath := range parseImports(t, path) {
+				if importPath == "github.com/never-labs/gscript/internal/runtime" ||
+					strings.HasPrefix(importPath, "github.com/never-labs/gscript/internal/runtime/") {
+					t.Fatalf("%s imports %s; internal shared modules must stay below runtime adapters", relativeToRoot(t, path), importPath)
+				}
+			}
+		})
 	}
 
 	forEachGoFile(t, stdlibRoot, func(path string) {

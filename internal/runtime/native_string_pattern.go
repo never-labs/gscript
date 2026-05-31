@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"fmt"
-	stdlibstring "github.com/never-labs/gscript/internal/stdlib/string"
+	stdlibstring "github.com/never-labs/gscript/internal/stringlib"
 	"regexp"
 	"strconv"
 	"strings"
