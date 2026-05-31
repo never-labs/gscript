@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
+
+	hosthttp "github.com/never-labs/gscript/internal/stdlib/host/http"
 )
 
 // buildNetLib creates the "net" standard library table for HTTP client operations.
@@ -149,14 +150,7 @@ func netDoRequest(interp *Interpreter, method, url, body string, opts Value) ([]
 		bodyReader = strings.NewReader(body)
 	}
 
-	req, err := http.NewRequest(method, url, bodyReader)
-	if err != nil {
-		return []Value{NilValue(), StringValue(err.Error())}, nil
-	}
-
-	// Default timeout
-	timeout := 30 * time.Second
-	followRedirects := true
+	requestOpts := hosthttp.DefaultRequestOptions()
 
 	// Parse opts if provided
 	if opts.IsTable() {
@@ -165,6 +159,7 @@ func netDoRequest(interp *Interpreter, method, url, body string, opts Value) ([]
 		// Headers
 		headersVal := optsTable.RawGet(StringValue("headers"))
 		if headersVal.IsTable() {
+			requestOpts.Headers = make(map[string]string)
 			hdrTable := headersVal.Table()
 			key := NilValue()
 			for {
@@ -173,7 +168,7 @@ func netDoRequest(interp *Interpreter, method, url, body string, opts Value) ([]
 					break
 				}
 				if k.IsString() && v.IsString() {
-					req.Header.Set(k.Str(), v.Str())
+					requestOpts.Headers[k.Str()] = v.Str()
 				}
 				key = k
 			}
@@ -182,28 +177,23 @@ func netDoRequest(interp *Interpreter, method, url, body string, opts Value) ([]
 		// Timeout
 		timeoutVal := optsTable.RawGet(StringValue("timeout"))
 		if timeoutVal.IsFloat() || timeoutVal.IsInt() {
-			timeout = time.Duration(toFloat(timeoutVal) * float64(time.Second))
+			requestOpts.Timeout = time.Duration(toFloat(timeoutVal) * float64(time.Second))
 		}
 
 		// followRedirects
 		followVal := optsTable.RawGet(StringValue("followRedirects"))
 		if followVal.IsBool() {
-			followRedirects = followVal.Bool()
+			requestOpts.FollowRedirects = followVal.Bool()
 		}
 	}
 
-	// Create client
-	client := &http.Client{
-		Timeout: timeout,
-	}
-	if !followRedirects {
-		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
+	req, err := hosthttp.NewRequest(method, url, bodyReader, requestOpts)
+	if err != nil {
+		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
 
 	// Execute request
-	resp, err := client.Do(req)
+	resp, err := hosthttp.NewClient(requestOpts).Do(req)
 	if err != nil {
 		return []Value{NilValue(), StringValue(err.Error())}, nil
 	}
@@ -219,18 +209,19 @@ func netDoRequest(interp *Interpreter, method, url, body string, opts Value) ([]
 		return nil, err
 	}
 	bodyStr := string(bodyBytes)
+	respInfo := hosthttp.ProjectResponse(resp)
 
 	// Build response table
 	result := NewTable()
-	result.RawSet(StringValue("status"), IntValue(int64(resp.StatusCode)))
-	result.RawSet(StringValue("statusText"), StringValue(resp.Status))
+	result.RawSet(StringValue("status"), IntValue(int64(respInfo.StatusCode)))
+	result.RawSet(StringValue("statusText"), StringValue(respInfo.StatusText))
 	result.RawSet(StringValue("body"), StringValue(bodyStr))
-	result.RawSet(StringValue("ok"), BoolValue(resp.StatusCode < 400))
+	result.RawSet(StringValue("ok"), BoolValue(respInfo.OK))
 
 	// Response headers
 	headers := NewTable()
-	for k, v := range resp.Header {
-		headers.RawSet(StringValue(k), StringValue(strings.Join(v, ", ")))
+	for k, v := range respInfo.Headers {
+		headers.RawSet(StringValue(k), StringValue(v))
 	}
 	result.RawSet(StringValue("headers"), TableValue(headers))
 

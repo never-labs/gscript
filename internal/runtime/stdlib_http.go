@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
+
+	hosthttp "github.com/never-labs/gscript/internal/stdlib/host/http"
+	hostnet "github.com/never-labs/gscript/internal/stdlib/host/net"
 )
 
 func httpLib(interp *Interpreter) *Table {
@@ -101,12 +103,13 @@ func buildHTTPLibWithPolicy(call ScriptFunctionCaller, networkAllowed func() boo
 		}
 
 		result := NewTable()
-		result.RawSet(StringValue("status"), IntValue(int64(resp.StatusCode)))
+		respInfo := hosthttp.ProjectResponse(resp)
+		result.RawSet(StringValue("status"), IntValue(int64(respInfo.StatusCode)))
 		result.RawSet(StringValue("body"), StringValue(string(body)))
 		// Headers
 		headers := NewTable()
-		for k, v := range resp.Header {
-			headers.RawSet(StringValue(k), StringValue(strings.Join(v, ", ")))
+		for k, v := range respInfo.Headers {
+			headers.RawSet(StringValue(k), StringValue(v))
 		}
 		result.RawSet(StringValue("headers"), TableValue(headers))
 		return []Value{TableValue(result)}, nil
@@ -124,30 +127,32 @@ func buildHTTPLibWithPolicy(call ScriptFunctionCaller, networkAllowed func() boo
 func buildRequestTable(r *http.Request, maxHostResult int64) (Value, error) {
 	t := NewTable()
 
-	t.RawSet(StringValue("method"), StringValue(r.Method))
-	t.RawSet(StringValue("path"), StringValue(r.URL.Path))
-	t.RawSet(StringValue("url"), StringValue(r.URL.String()))
-
-	// Query params as table
-	query := NewTable()
-	for k, v := range r.URL.Query() {
-		query.RawSet(StringValue(k), StringValue(strings.Join(v, ", ")))
-	}
-	t.RawSet(StringValue("query"), TableValue(query))
-
-	// Headers as table
-	headers := NewTable()
-	for k, v := range r.Header {
-		headers.RawSet(StringValue(k), StringValue(strings.Join(v, ", ")))
-	}
-	t.RawSet(StringValue("headers"), TableValue(headers))
-
 	// Body
 	body, err := ReadAllWithHostResultLimit(r.Body, maxHostResult)
 	if err != nil {
 		return NilValue(), err
 	}
-	t.RawSet(StringValue("body"), StringValue(string(body)))
+	reqInfo := hosthttp.ProjectRequest(r, body)
+
+	t.RawSet(StringValue("method"), StringValue(reqInfo.Method))
+	t.RawSet(StringValue("path"), StringValue(reqInfo.Path))
+	t.RawSet(StringValue("url"), StringValue(reqInfo.URL))
+
+	// Query params as table
+	query := NewTable()
+	for k, v := range reqInfo.Query {
+		query.RawSet(StringValue(k), StringValue(v))
+	}
+	t.RawSet(StringValue("query"), TableValue(query))
+
+	// Headers as table
+	headers := NewTable()
+	for k, v := range reqInfo.Headers {
+		headers.RawSet(StringValue(k), StringValue(v))
+	}
+	t.RawSet(StringValue("headers"), TableValue(headers))
+
+	t.RawSet(StringValue("body"), StringValue(string(reqInfo.Body)))
 
 	// req.param(name) - get query param
 	t.RawSet(StringValue("param"), FunctionValue(&GoFunction{
@@ -457,15 +462,7 @@ func callHTTPHandler(call ScriptFunctionCaller, mu *sync.Mutex, handler Value, r
 }
 
 func httpConnectAddr(addr string) string {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return addr
-	}
-	switch host {
-	case "", "::", "[::]", "0.0.0.0":
-		host = "127.0.0.1"
-	}
-	return net.JoinHostPort(host, port)
+	return hostnet.ConnectAddr(addr)
 }
 
 func (h *httpServerHandle) close() error {
