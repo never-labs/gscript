@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Iterable
 
 import benchmark_discovery as discovery
+import benchmark_output
 
 DEFAULT_MODES = ["vm", "default", "no_filter", "luajit"]
 DEFAULT_ORDER = discovery.DEFAULT_ORDER
@@ -41,7 +42,6 @@ LOGICAL_TIME_BENCHMARKS = {
 
 VARIANT_BASES = discovery.VARIANT_BASES
 
-TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 CHECKSUM_RE = re.compile(r"^\s*checksum\s*[:=]\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 EMBEDDED_TIME_RE = re.compile(r"(:\s*)[0-9]+(?:\.[0-9]+)?s(\s+)")
 T2_ATTEMPTED_RE = re.compile(r"^\s*Tier 2 attempted:\s*([0-9]+)\b", re.MULTILINE)
@@ -127,11 +127,7 @@ class BenchmarkResult:
     modes: dict[str, ModeResult] = field(default_factory=dict)
 
 
-def parse_time(output: str) -> float | None:
-    match = TIME_RE.search(output)
-    if not match:
-        return None
-    return float(match.group(1))
+parse_time = benchmark_output.parse_time
 
 
 def stable_output_lines(output: str) -> list[str]:
@@ -182,16 +178,8 @@ def checksum_text(output: str) -> str:
     return lines[-1] if lines else ""
 
 
-def parse_counter(pattern: re.Pattern[str], output: str) -> int:
-    match = pattern.search(output)
-    if not match:
-        return 0
-    return int(match.group(1))
-
-
-def output_tail(output: str, limit: int = 8) -> str:
-    lines = [line for line in output.strip().splitlines() if line.strip()]
-    return "\n".join(lines[-limit:])
+parse_counter = benchmark_output.parse_counter
+output_tail = benchmark_output.output_tail
 
 
 def parse_command_run(output: str, status: str, exit_code: int | None = None) -> CommandRun:

@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import Any
 
 import benchmark_discovery as discovery
+import benchmark_output
 import timing_compare as timing
 
 
-TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 T2_ATTEMPTED_RE = re.compile(r"^\s*Tier 2 attempted:\s*([0-9]+)\b", re.MULTILINE)
 T2_COMPILED_RE = re.compile(r"^\s*Tier 2 compiled:\s*([0-9]+)", re.MULTILINE)
 T2_ENTERED_RE = re.compile(r"^\s*Tier 2 entered:\s*([0-9]+)\s+functions\b", re.MULTILINE)
@@ -84,14 +84,8 @@ def run(cmd: list[str], cwd: Path, timeout: int) -> subprocess.CompletedProcess[
     )
 
 
-def parse_counter(pattern: re.Pattern[str], text: str) -> int:
-    match = pattern.search(text)
-    return int(match.group(1)) if match else 0
-
-
-def parse_time(text: str) -> float | None:
-    match = TIME_RE.search(text)
-    return float(match.group(1)) if match else None
+parse_counter = benchmark_output.parse_counter
+parse_time = benchmark_output.parse_time
 
 
 def extract_last_json(text: str) -> Any:

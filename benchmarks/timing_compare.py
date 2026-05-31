@@ -27,6 +27,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import benchmark_discovery as discovery
+import benchmark_output
 
 DEFAULT_ORDER = discovery.DEFAULT_ORDER
 GROUPS = discovery.GROUPS
@@ -71,7 +72,6 @@ HOT_SCALE_PROFILE = [
     "data/soa_filter_gather:GATHER_REPS=360",
 ]
 
-TIME_RE = re.compile(r"^Time:\s*([0-9]+(?:\.[0-9]+)?)s\b", re.MULTILINE)
 T2_ATTEMPTED_RE = re.compile(r"^\s*Tier 2 attempted:\s*([0-9]+)\b", re.MULTILINE)
 T2_ENTERED_RE = re.compile(r"^\s*Tier 2 entered:\s*([0-9]+)\s+functions\b", re.MULTILINE)
 T2_FAILED_RE = re.compile(r"^\s*Tier 2 failed:\s*([0-9]+)\s+functions\b", re.MULTILINE)
@@ -165,19 +165,8 @@ class BenchmarkResult:
     modes: dict[str, dict[str, SubjectResult]] = field(default_factory=dict)
 
 
-def parse_time(output: str) -> float | None:
-    match = TIME_RE.search(output)
-    return float(match.group(1)) if match else None
-
-
-def parse_counter(pattern: re.Pattern[str], output: str) -> int:
-    match = pattern.search(output)
-    return int(match.group(1)) if match else 0
-
-
-def tail(output: str, n: int = 8) -> str:
-    lines = [line for line in output.strip().splitlines() if line.strip()]
-    return "\n".join(lines[-n:])
+parse_time = benchmark_output.parse_time
+parse_counter = benchmark_output.parse_counter
 
 
 def parse_run(output: str, status: str, exit_code: int | None, wall_seconds: float) -> CommandRun:
@@ -193,7 +182,7 @@ def parse_run(output: str, status: str, exit_code: int | None, wall_seconds: flo
         t2_entered=parse_counter(T2_ENTERED_RE, output),
         t2_failed=parse_counter(T2_FAILED_RE, output),
         exit_total=parse_counter(EXIT_TOTAL_RE, output),
-        output_tail=tail(output),
+        output_tail=benchmark_output.output_tail(output),
     )
 
 
