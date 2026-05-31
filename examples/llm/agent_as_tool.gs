@@ -1,4 +1,4 @@
-// AI-native agent-as-tool demo.
+// Agent-as-tool demo.
 //
 // This shows a supervisor agent delegating to a specialist agent that is
 // listed *directly* in the supervisor's tools: [...] list. The runtime
@@ -6,7 +6,7 @@
 // the agent's declared parameters and output: shape; the agent's structured
 // result.value is fed back to the supervisor as the tool result.
 //
-// For the explicit `tool wrapper` form, see TestAINativeAgentScenarioAgentAsToolStructuredHandoff.
+// For the explicit `tool wrapper` form, see TestLLMAgentScenarioAgentAsToolStructuredHandoff.
 
 models {
     default: "supervisor"

@@ -1,4 +1,4 @@
-// AI-native incident response demo.
+// LLM agent incident response demo.
 //
 // The workflow is intentionally provider-agnostic: embedders can supply a mock,
 // local, or remote llm provider. The script demonstrates three common agent

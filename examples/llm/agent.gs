@@ -1,6 +1,6 @@
-// Minimal AI-native syntax sample.
+// Minimal LLM and agent syntax sample.
 //
-// This file demonstrates parser/tooling support for the AI-native surface:
+// This file demonstrates parser/tooling support for the LLM surface:
 // models, agent defaults, tool declarations, agents, messages, turns, and
 // budget blocks. Running it requires the LLM stdlib with a host/provider
 // configuration; `gscript fmt` and `gscript lint` can validate it without

@@ -1,4 +1,4 @@
-// Real GLM AI-native multi-turn memory smoke demo.
+// Real GLM LLM multi-turn memory smoke demo.
 //
 // This mirrors the local glm_cc wrapper's configuration without invoking it:
 //   endpoint: https://open.bigmodel.cn/api/anthropic

@@ -1,4 +1,4 @@
-// Real GLM AI-native direct agent-as-tool demo.
+// Real GLM direct agent-as-tool demo.
 //
 // This mirrors the local glm_cc wrapper's environment shape without invoking it:
 //   endpoint: GSCRIPT_GLM_BASE_URL, default https://open.bigmodel.cn/api/anthropic
