@@ -9,12 +9,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+import benchmark_discovery as discovery
 import strict_guard as guard
+
+
+BENCHMARK_GROUPS = tuple(discovery.GROUPS)
 
 
 def lua_refs(root: Path) -> list[str]:
     refs: list[str] = []
-    for group in guard.ALL_GROUPS:
+    for group in BENCHMARK_GROUPS:
         for path in sorted((root / "benchmarks" / "lua_ref" / group).glob("*.lua")):
             refs.append(f"{group}/{path.stem}")
     return refs

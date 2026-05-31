@@ -6,6 +6,7 @@ import benchmark_discovery as discovery
 import conformance_perf_coverage as coverage
 import profile_exits
 import regression_guard
+import validate_lua_refs
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,6 +46,7 @@ class ScriptEntrypointConsistencyTest(unittest.TestCase):
         self.assertEqual(coverage.BENCHMARK_GROUPS, expected)
         self.assertEqual(profile_exits.BENCHMARK_GROUPS, expected)
         self.assertEqual(regression_guard.BENCHMARK_GROUPS, expected)
+        self.assertEqual(validate_lua_refs.BENCHMARK_GROUPS, expected)
 
     def test_release_scripts_gate_current_module_path(self):
         expected = module_path()
