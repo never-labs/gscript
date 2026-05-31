@@ -35,6 +35,19 @@ func TestIntRange(t *testing.T) {
 	}
 }
 
+func TestIntBelow(t *testing.T) {
+	got, err := IntBelow(func(n int64) int64 { return n - 1 }, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 9 {
+		t.Fatalf("IntBelow = %d, want 9", got)
+	}
+	if _, err := IntBelow(func(n int64) int64 { return 0 }, 0); err == nil {
+		t.Fatal("IntBelow accepted non-positive max")
+	}
+}
+
 func TestClampSampleCount(t *testing.T) {
 	got, err := ClampSampleCount(8, 3)
 	if err != nil || got != 3 {

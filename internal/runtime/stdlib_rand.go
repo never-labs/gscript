@@ -208,12 +208,7 @@ func buildRandLib() *Table {
 
 	// rand.uuid() - generate a random UUID v4 string
 	set("uuid", func(args []Value) ([]Value, error) {
-		var uuid [16]byte
-		for i := range uuid {
-			uuid[i] = byte(rng.Intn(256))
-		}
-		stdrand.PrepareUUIDV4(&uuid)
-		return []Value{StringValue(stdrand.FormatUUID(uuid))}, nil
+		return []Value{StringValue(stdrand.UUIDV4(func() byte { return byte(rng.Intn(256)) }))}, nil
 	})
 
 	// rand.bytes(n) - generate n random bytes as a string
