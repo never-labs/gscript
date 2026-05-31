@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "case_count": 68,
   "cases": [
     {
@@ -7,877 +7,1293 @@
       "path": "benchmarks/app/actors_dispatch_mutation.gs",
       "domain": "app",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua"
+      },
       "status": "active",
       "tags": [
         "app",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua"
+        }
+      }
     },
     {
       "id": "app/mixed_inventory_sim",
       "path": "benchmarks/app/mixed_inventory_sim.gs",
       "domain": "app",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/app/mixed_inventory_sim.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/app/mixed_inventory_sim.lua"
+      },
       "status": "active",
       "tags": [
         "app",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/app/mixed_inventory_sim.lua"
+        }
+      }
     },
     {
       "id": "app/stdlib_host",
       "path": "benchmarks/app/stdlib_host.gs",
       "domain": "app",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/app/stdlib_host.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/app/stdlib_host.lua"
+      },
       "status": "active",
       "tags": [
         "app",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/app/stdlib_host.lua"
+        }
+      }
     },
     {
       "id": "calls/call_len_pairs_metamethod",
       "path": "benchmarks/calls/call_len_pairs_metamethod.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua"
+        }
+      }
     },
     {
       "id": "calls/calls_vararg_coroutine",
       "path": "benchmarks/calls/calls_vararg_coroutine.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua"
+        }
+      }
     },
     {
       "id": "calls/closure_accumulator",
       "path": "benchmarks/calls/closure_accumulator.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/closure_accumulator.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/closure_accumulator.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/closure_accumulator.lua"
+        }
+      }
     },
     {
       "id": "calls/closure_bench",
       "path": "benchmarks/calls/closure_bench.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/closure_bench.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/closure_bench.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/closure_bench.lua"
+        }
+      }
     },
     {
       "id": "calls/coroutine_bench",
       "path": "benchmarks/calls/coroutine_bench.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/coroutine_bench.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/coroutine_bench.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/coroutine_bench.lua"
+        }
+      }
     },
     {
       "id": "calls/method_dispatch",
       "path": "benchmarks/calls/method_dispatch.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/method_dispatch.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/method_dispatch.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/method_dispatch.lua"
+        }
+      }
     },
     {
       "id": "calls/object_creation",
       "path": "benchmarks/calls/object_creation.gs",
       "domain": "calls",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/calls/object_creation.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/object_creation.lua"
+      },
       "status": "active",
       "tags": [
         "calls",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/calls/object_creation.lua"
+        }
+      }
     },
     {
       "id": "concurrency/context_cancel",
       "path": "benchmarks/concurrency/context_cancel.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/goroutine_cpu",
       "path": "benchmarks/concurrency/goroutine_cpu.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/goroutine_sleep",
       "path": "benchmarks/concurrency/goroutine_sleep.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/mutex_once",
       "path": "benchmarks/concurrency/mutex_once.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/producer_consumer_pipeline",
       "path": "benchmarks/concurrency/producer_consumer_pipeline.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua"
+      },
       "status": "active",
       "tags": [
         "concurrency",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua"
+        }
+      }
     },
     {
       "id": "concurrency/select_blocking",
       "path": "benchmarks/concurrency/select_blocking.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/select_comma_ok",
       "path": "benchmarks/concurrency/select_comma_ok.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/select_default",
       "path": "benchmarks/concurrency/select_default.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/select_timeout",
       "path": "benchmarks/concurrency/select_timeout.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/sync_group",
       "path": "benchmarks/concurrency/sync_group.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "concurrency/waitgroup",
       "path": "benchmarks/concurrency/waitgroup.gs",
       "domain": "concurrency",
       "kind": "benchmark",
-      "lua_ref": null,
+      "reference": null,
       "status": "active",
       "tags": [
         "concurrency",
         "benchmark"
-      ]
+      ],
+      "compatibility": {}
     },
     {
       "id": "control/defer_protected",
       "path": "benchmarks/control/defer_protected.gs",
       "domain": "control",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/control/defer_protected.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/control/defer_protected.lua"
+      },
       "status": "active",
       "tags": [
         "control",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/control/defer_protected.lua"
+        }
+      }
     },
     {
       "id": "control/sieve",
       "path": "benchmarks/control/sieve.gs",
       "domain": "control",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/control/sieve.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/control/sieve.lua"
+      },
       "status": "active",
       "tags": [
         "control",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/control/sieve.lua"
+        }
+      }
     },
     {
       "id": "data/soa_affine_many",
       "path": "benchmarks/data/soa_affine_many.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_affine_many.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_affine_many.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_affine_many.lua"
+        }
+      }
     },
     {
       "id": "data/soa_clamp",
       "path": "benchmarks/data/soa_clamp.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_clamp.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_clamp.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_clamp.lua"
+        }
+      }
     },
     {
       "id": "data/soa_dot",
       "path": "benchmarks/data/soa_dot.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_dot.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_dot.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_dot.lua"
+        }
+      }
     },
     {
       "id": "data/soa_filter_gather",
       "path": "benchmarks/data/soa_filter_gather.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_filter_gather.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_filter_gather.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_filter_gather.lua"
+        }
+      }
     },
     {
       "id": "data/soa_mask_compare",
       "path": "benchmarks/data/soa_mask_compare.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_mask_compare.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_mask_compare.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_mask_compare.lua"
+        }
+      }
     },
     {
       "id": "data/soa_masked_aggregate",
       "path": "benchmarks/data/soa_masked_aggregate.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_masked_aggregate.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_masked_aggregate.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_masked_aggregate.lua"
+        }
+      }
     },
     {
       "id": "data/soa_reducers",
       "path": "benchmarks/data/soa_reducers.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_reducers.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_reducers.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_reducers.lua"
+        }
+      }
     },
     {
       "id": "data/soa_scan",
       "path": "benchmarks/data/soa_scan.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_scan.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_scan.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_scan.lua"
+        }
+      }
     },
     {
       "id": "data/soa_scatter",
       "path": "benchmarks/data/soa_scatter.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_scatter.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_scatter.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_scatter.lua"
+        }
+      }
     },
     {
       "id": "data/soa_select",
       "path": "benchmarks/data/soa_select.gs",
       "domain": "data",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/data/soa_select.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_select.lua"
+      },
       "status": "active",
       "tags": [
         "data",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/data/soa_select.lua"
+        }
+      }
     },
     {
       "id": "numeric/fannkuch",
       "path": "benchmarks/numeric/fannkuch.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/fannkuch.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/fannkuch.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/fannkuch.lua"
+        }
+      }
     },
     {
       "id": "numeric/mandelbrot",
       "path": "benchmarks/numeric/mandelbrot.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/mandelbrot.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/mandelbrot.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/mandelbrot.lua"
+        }
+      }
     },
     {
       "id": "numeric/math_intensive",
       "path": "benchmarks/numeric/math_intensive.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/math_intensive.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/math_intensive.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/math_intensive.lua"
+        }
+      }
     },
     {
       "id": "numeric/matmul",
       "path": "benchmarks/numeric/matmul.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/matmul.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/matmul.lua"
+        }
+      }
     },
     {
       "id": "numeric/matmul_dense",
       "path": "benchmarks/numeric/matmul_dense.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense.lua"
+        }
+      }
     },
     {
       "id": "numeric/matmul_dense_split2",
       "path": "benchmarks/numeric/matmul_dense_split2.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua"
+        }
+      }
     },
     {
       "id": "numeric/matmul_dense_tb",
       "path": "benchmarks/numeric/matmul_dense_tb.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua"
+        }
+      }
     },
     {
       "id": "numeric/matmul_dense_unroll2",
       "path": "benchmarks/numeric/matmul_dense_unroll2.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua"
+        }
+      }
     },
     {
       "id": "numeric/matmul_row",
       "path": "benchmarks/numeric/matmul_row.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/matmul_row.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_row.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/matmul_row.lua"
+        }
+      }
     },
     {
       "id": "numeric/nbody",
       "path": "benchmarks/numeric/nbody.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/nbody.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/nbody.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/nbody.lua"
+        }
+      }
     },
     {
       "id": "numeric/nbody_dense",
       "path": "benchmarks/numeric/nbody_dense.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/nbody_dense.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/nbody_dense.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/nbody_dense.lua"
+        }
+      }
     },
     {
       "id": "numeric/spectral_norm",
       "path": "benchmarks/numeric/spectral_norm.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/spectral_norm.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/spectral_norm.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/spectral_norm.lua"
+        }
+      }
     },
     {
       "id": "numeric/spectral_norm_dense",
       "path": "benchmarks/numeric/spectral_norm_dense.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua"
+        }
+      }
     },
     {
       "id": "numeric/sum_primes",
       "path": "benchmarks/numeric/sum_primes.gs",
       "domain": "numeric",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/numeric/sum_primes.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/sum_primes.lua"
+      },
       "status": "active",
       "tags": [
         "numeric",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/numeric/sum_primes.lua"
+        }
+      }
     },
     {
       "id": "recursion/ack_nested_shifted",
       "path": "benchmarks/recursion/ack_nested_shifted.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua"
+        }
+      }
     },
     {
       "id": "recursion/ackermann",
       "path": "benchmarks/recursion/ackermann.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/ackermann.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/ackermann.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/ackermann.lua"
+        }
+      }
     },
     {
       "id": "recursion/binary_trees",
       "path": "benchmarks/recursion/binary_trees.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/binary_trees.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/binary_trees.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/binary_trees.lua"
+        }
+      }
     },
     {
       "id": "recursion/fib",
       "path": "benchmarks/recursion/fib.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/fib.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/fib.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/fib.lua"
+        }
+      }
     },
     {
       "id": "recursion/fib_recursive",
       "path": "benchmarks/recursion/fib_recursive.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/fib_recursive.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/fib_recursive.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/fib_recursive.lua"
+        }
+      }
     },
     {
       "id": "recursion/fibonacci_iterative",
       "path": "benchmarks/recursion/fibonacci_iterative.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua"
+        }
+      }
     },
     {
       "id": "recursion/mutual_recursion",
       "path": "benchmarks/recursion/mutual_recursion.gs",
       "domain": "recursion",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/recursion/mutual_recursion.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/mutual_recursion.lua"
+      },
       "status": "active",
       "tags": [
         "recursion",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/recursion/mutual_recursion.lua"
+        }
+      }
     },
     {
       "id": "string/log_tokenize_format",
       "path": "benchmarks/string/log_tokenize_format.gs",
       "domain": "string",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/string/log_tokenize_format.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/log_tokenize_format.lua"
+      },
       "status": "active",
       "tags": [
         "string",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/string/log_tokenize_format.lua"
+        }
+      }
     },
     {
       "id": "string/math_bit_utf8",
       "path": "benchmarks/string/math_bit_utf8.gs",
       "domain": "string",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/string/math_bit_utf8.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/math_bit_utf8.lua"
+      },
       "status": "active",
       "tags": [
         "string",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/string/math_bit_utf8.lua"
+        }
+      }
     },
     {
       "id": "string/regexp_random",
       "path": "benchmarks/string/regexp_random.gs",
       "domain": "string",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/string/regexp_random.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/regexp_random.lua"
+      },
       "status": "active",
       "tags": [
         "string",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/string/regexp_random.lua"
+        }
+      }
     },
     {
       "id": "string/string_bench",
       "path": "benchmarks/string/string_bench.gs",
       "domain": "string",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/string/string_bench.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/string_bench.lua"
+      },
       "status": "active",
       "tags": [
         "string",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/string/string_bench.lua"
+        }
+      }
     },
     {
       "id": "string/strings_patterns",
       "path": "benchmarks/string/strings_patterns.gs",
       "domain": "string",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/string/strings_patterns.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/strings_patterns.lua"
+      },
       "status": "active",
       "tags": [
         "string",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/string/strings_patterns.lua"
+        }
+      }
     },
     {
       "id": "table/events_metamethod",
       "path": "benchmarks/table/events_metamethod.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/events_metamethod.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/events_metamethod.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/events_metamethod.lua"
+        }
+      }
     },
     {
       "id": "table/groupby_nested_agg",
       "path": "benchmarks/table/groupby_nested_agg.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/groupby_nested_agg.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/groupby_nested_agg.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/groupby_nested_agg.lua"
+        }
+      }
     },
     {
       "id": "table/json_table_walk",
       "path": "benchmarks/table/json_table_walk.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/json_table_walk.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/json_table_walk.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/json_table_walk.lua"
+        }
+      }
     },
     {
       "id": "table/nextvar_table",
       "path": "benchmarks/table/nextvar_table.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/nextvar_table.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/nextvar_table.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/nextvar_table.lua"
+        }
+      }
     },
     {
       "id": "table/sort",
       "path": "benchmarks/table/sort.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/sort.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/sort.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/sort.lua"
+        }
+      }
     },
     {
       "id": "table/sort_mixed_numeric",
       "path": "benchmarks/table/sort_mixed_numeric.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/sort_mixed_numeric.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/sort_mixed_numeric.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/sort_mixed_numeric.lua"
+        }
+      }
     },
     {
       "id": "table/table_array_access",
       "path": "benchmarks/table/table_array_access.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/table_array_access.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/table_array_access.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/table_array_access.lua"
+        }
+      }
     },
     {
       "id": "table/table_field_access",
       "path": "benchmarks/table/table_field_access.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/table_field_access.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/table_field_access.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/table_field_access.lua"
+        }
+      }
     },
     {
       "id": "table/table_sort_proxy",
       "path": "benchmarks/table/table_sort_proxy.gs",
       "domain": "table",
       "kind": "benchmark",
-      "lua_ref": "benchmarks/lua_ref/table/table_sort_proxy.lua",
+      "reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/table_sort_proxy.lua"
+      },
       "status": "active",
       "tags": [
         "table",
-        "benchmark",
-        "lua_ref"
-      ]
+        "benchmark"
+      ],
+      "compatibility": {
+        "historical": {
+          "lua_ref": "benchmarks/lua_ref/table/table_sort_proxy.lua"
+        }
+      }
     }
   ],
-  "groups": [
+  "domains": [
     "numeric",
     "recursion",
     "table",
@@ -895,13 +1311,16 @@
   "scale_profiles": {
     "hot": "Recommended temporary parameter overrides for selected low-resolution or hot-loop timing comparisons."
   },
-  "benchmarks": [
+  "workloads": [
     {
       "id": "numeric/fannkuch",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "fannkuch",
-      "gscript_path": "benchmarks/numeric/fannkuch.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/fannkuch.lua",
+      "script": "benchmarks/numeric/fannkuch.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/fannkuch.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -913,10 +1332,13 @@
     },
     {
       "id": "numeric/mandelbrot",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "mandelbrot",
-      "gscript_path": "benchmarks/numeric/mandelbrot.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/mandelbrot.lua",
+      "script": "benchmarks/numeric/mandelbrot.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/mandelbrot.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -928,10 +1350,13 @@
     },
     {
       "id": "numeric/math_intensive",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "math_intensive",
-      "gscript_path": "benchmarks/numeric/math_intensive.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/math_intensive.lua",
+      "script": "benchmarks/numeric/math_intensive.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/math_intensive.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -943,10 +1368,13 @@
     },
     {
       "id": "numeric/matmul",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "matmul",
-      "gscript_path": "benchmarks/numeric/matmul.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/matmul.lua",
+      "script": "benchmarks/numeric/matmul.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -958,10 +1386,13 @@
     },
     {
       "id": "numeric/matmul_dense",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "matmul_dense",
-      "gscript_path": "benchmarks/numeric/matmul_dense.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/matmul_dense.lua",
+      "script": "benchmarks/numeric/matmul_dense.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -973,10 +1404,13 @@
     },
     {
       "id": "numeric/matmul_dense_split2",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "matmul_dense_split2",
-      "gscript_path": "benchmarks/numeric/matmul_dense_split2.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua",
+      "script": "benchmarks/numeric/matmul_dense_split2.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -988,10 +1422,13 @@
     },
     {
       "id": "numeric/matmul_dense_tb",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "matmul_dense_tb",
-      "gscript_path": "benchmarks/numeric/matmul_dense_tb.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua",
+      "script": "benchmarks/numeric/matmul_dense_tb.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1003,10 +1440,13 @@
     },
     {
       "id": "numeric/matmul_dense_unroll2",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "matmul_dense_unroll2",
-      "gscript_path": "benchmarks/numeric/matmul_dense_unroll2.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua",
+      "script": "benchmarks/numeric/matmul_dense_unroll2.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1018,10 +1458,13 @@
     },
     {
       "id": "numeric/matmul_row",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "matmul_row",
-      "gscript_path": "benchmarks/numeric/matmul_row.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/matmul_row.lua",
+      "script": "benchmarks/numeric/matmul_row.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/matmul_row.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1033,10 +1476,13 @@
     },
     {
       "id": "numeric/nbody",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "nbody",
-      "gscript_path": "benchmarks/numeric/nbody.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/nbody.lua",
+      "script": "benchmarks/numeric/nbody.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/nbody.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1048,10 +1494,13 @@
     },
     {
       "id": "numeric/nbody_dense",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "nbody_dense",
-      "gscript_path": "benchmarks/numeric/nbody_dense.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/nbody_dense.lua",
+      "script": "benchmarks/numeric/nbody_dense.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/nbody_dense.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1063,10 +1512,13 @@
     },
     {
       "id": "numeric/spectral_norm",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "spectral_norm",
-      "gscript_path": "benchmarks/numeric/spectral_norm.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/spectral_norm.lua",
+      "script": "benchmarks/numeric/spectral_norm.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/spectral_norm.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1078,10 +1530,13 @@
     },
     {
       "id": "numeric/spectral_norm_dense",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "spectral_norm_dense",
-      "gscript_path": "benchmarks/numeric/spectral_norm_dense.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua",
+      "script": "benchmarks/numeric/spectral_norm_dense.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1093,10 +1548,13 @@
     },
     {
       "id": "numeric/sum_primes",
-      "group": "numeric",
+      "domain": "numeric",
       "name": "sum_primes",
-      "gscript_path": "benchmarks/numeric/sum_primes.gs",
-      "lua_path": "benchmarks/lua_ref/numeric/sum_primes.lua",
+      "script": "benchmarks/numeric/sum_primes.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/numeric/sum_primes.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1108,10 +1566,13 @@
     },
     {
       "id": "recursion/ack_nested_shifted",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "ack_nested_shifted",
-      "gscript_path": "benchmarks/recursion/ack_nested_shifted.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua",
+      "script": "benchmarks/recursion/ack_nested_shifted.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1123,10 +1584,13 @@
     },
     {
       "id": "recursion/ackermann",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "ackermann",
-      "gscript_path": "benchmarks/recursion/ackermann.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/ackermann.lua",
+      "script": "benchmarks/recursion/ackermann.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/ackermann.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1138,10 +1602,13 @@
     },
     {
       "id": "recursion/binary_trees",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "binary_trees",
-      "gscript_path": "benchmarks/recursion/binary_trees.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/binary_trees.lua",
+      "script": "benchmarks/recursion/binary_trees.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/binary_trees.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1153,10 +1620,13 @@
     },
     {
       "id": "recursion/fib",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "fib",
-      "gscript_path": "benchmarks/recursion/fib.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/fib.lua",
+      "script": "benchmarks/recursion/fib.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/fib.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1168,10 +1638,13 @@
     },
     {
       "id": "recursion/fib_recursive",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "fib_recursive",
-      "gscript_path": "benchmarks/recursion/fib_recursive.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/fib_recursive.lua",
+      "script": "benchmarks/recursion/fib_recursive.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/fib_recursive.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1183,10 +1656,13 @@
     },
     {
       "id": "recursion/fibonacci_iterative",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "fibonacci_iterative",
-      "gscript_path": "benchmarks/recursion/fibonacci_iterative.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua",
+      "script": "benchmarks/recursion/fibonacci_iterative.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1198,10 +1674,13 @@
     },
     {
       "id": "recursion/mutual_recursion",
-      "group": "recursion",
+      "domain": "recursion",
       "name": "mutual_recursion",
-      "gscript_path": "benchmarks/recursion/mutual_recursion.gs",
-      "lua_path": "benchmarks/lua_ref/recursion/mutual_recursion.lua",
+      "script": "benchmarks/recursion/mutual_recursion.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/recursion/mutual_recursion.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1213,10 +1692,13 @@
     },
     {
       "id": "table/events_metamethod",
-      "group": "table",
+      "domain": "table",
       "name": "events_metamethod",
-      "gscript_path": "benchmarks/table/events_metamethod.gs",
-      "lua_path": "benchmarks/lua_ref/table/events_metamethod.lua",
+      "script": "benchmarks/table/events_metamethod.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/events_metamethod.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1228,10 +1710,13 @@
     },
     {
       "id": "table/groupby_nested_agg",
-      "group": "table",
+      "domain": "table",
       "name": "groupby_nested_agg",
-      "gscript_path": "benchmarks/table/groupby_nested_agg.gs",
-      "lua_path": "benchmarks/lua_ref/table/groupby_nested_agg.lua",
+      "script": "benchmarks/table/groupby_nested_agg.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/groupby_nested_agg.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1243,10 +1728,13 @@
     },
     {
       "id": "table/json_table_walk",
-      "group": "table",
+      "domain": "table",
       "name": "json_table_walk",
-      "gscript_path": "benchmarks/table/json_table_walk.gs",
-      "lua_path": "benchmarks/lua_ref/table/json_table_walk.lua",
+      "script": "benchmarks/table/json_table_walk.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/json_table_walk.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1258,10 +1746,13 @@
     },
     {
       "id": "table/nextvar_table",
-      "group": "table",
+      "domain": "table",
       "name": "nextvar_table",
-      "gscript_path": "benchmarks/table/nextvar_table.gs",
-      "lua_path": "benchmarks/lua_ref/table/nextvar_table.lua",
+      "script": "benchmarks/table/nextvar_table.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/nextvar_table.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1273,10 +1764,13 @@
     },
     {
       "id": "table/sort",
-      "group": "table",
+      "domain": "table",
       "name": "sort",
-      "gscript_path": "benchmarks/table/sort.gs",
-      "lua_path": "benchmarks/lua_ref/table/sort.lua",
+      "script": "benchmarks/table/sort.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/sort.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1288,10 +1782,13 @@
     },
     {
       "id": "table/sort_mixed_numeric",
-      "group": "table",
+      "domain": "table",
       "name": "sort_mixed_numeric",
-      "gscript_path": "benchmarks/table/sort_mixed_numeric.gs",
-      "lua_path": "benchmarks/lua_ref/table/sort_mixed_numeric.lua",
+      "script": "benchmarks/table/sort_mixed_numeric.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/sort_mixed_numeric.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1303,10 +1800,13 @@
     },
     {
       "id": "table/table_array_access",
-      "group": "table",
+      "domain": "table",
       "name": "table_array_access",
-      "gscript_path": "benchmarks/table/table_array_access.gs",
-      "lua_path": "benchmarks/lua_ref/table/table_array_access.lua",
+      "script": "benchmarks/table/table_array_access.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/table_array_access.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1318,10 +1818,13 @@
     },
     {
       "id": "table/table_field_access",
-      "group": "table",
+      "domain": "table",
       "name": "table_field_access",
-      "gscript_path": "benchmarks/table/table_field_access.gs",
-      "lua_path": "benchmarks/lua_ref/table/table_field_access.lua",
+      "script": "benchmarks/table/table_field_access.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/table_field_access.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1333,10 +1836,13 @@
     },
     {
       "id": "table/table_sort_proxy",
-      "group": "table",
+      "domain": "table",
       "name": "table_sort_proxy",
-      "gscript_path": "benchmarks/table/table_sort_proxy.gs",
-      "lua_path": "benchmarks/lua_ref/table/table_sort_proxy.lua",
+      "script": "benchmarks/table/table_sort_proxy.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/table/table_sort_proxy.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1348,10 +1854,13 @@
     },
     {
       "id": "calls/call_len_pairs_metamethod",
-      "group": "calls",
+      "domain": "calls",
       "name": "call_len_pairs_metamethod",
-      "gscript_path": "benchmarks/calls/call_len_pairs_metamethod.gs",
-      "lua_path": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua",
+      "script": "benchmarks/calls/call_len_pairs_metamethod.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1363,10 +1872,13 @@
     },
     {
       "id": "calls/calls_vararg_coroutine",
-      "group": "calls",
+      "domain": "calls",
       "name": "calls_vararg_coroutine",
-      "gscript_path": "benchmarks/calls/calls_vararg_coroutine.gs",
-      "lua_path": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
+      "script": "benchmarks/calls/calls_vararg_coroutine.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1378,10 +1890,13 @@
     },
     {
       "id": "calls/closure_accumulator",
-      "group": "calls",
+      "domain": "calls",
       "name": "closure_accumulator",
-      "gscript_path": "benchmarks/calls/closure_accumulator.gs",
-      "lua_path": "benchmarks/lua_ref/calls/closure_accumulator.lua",
+      "script": "benchmarks/calls/closure_accumulator.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/closure_accumulator.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1393,10 +1908,13 @@
     },
     {
       "id": "calls/closure_bench",
-      "group": "calls",
+      "domain": "calls",
       "name": "closure_bench",
-      "gscript_path": "benchmarks/calls/closure_bench.gs",
-      "lua_path": "benchmarks/lua_ref/calls/closure_bench.lua",
+      "script": "benchmarks/calls/closure_bench.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/closure_bench.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1408,10 +1926,13 @@
     },
     {
       "id": "calls/coroutine_bench",
-      "group": "calls",
+      "domain": "calls",
       "name": "coroutine_bench",
-      "gscript_path": "benchmarks/calls/coroutine_bench.gs",
-      "lua_path": "benchmarks/lua_ref/calls/coroutine_bench.lua",
+      "script": "benchmarks/calls/coroutine_bench.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/coroutine_bench.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1423,10 +1944,13 @@
     },
     {
       "id": "calls/method_dispatch",
-      "group": "calls",
+      "domain": "calls",
       "name": "method_dispatch",
-      "gscript_path": "benchmarks/calls/method_dispatch.gs",
-      "lua_path": "benchmarks/lua_ref/calls/method_dispatch.lua",
+      "script": "benchmarks/calls/method_dispatch.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/method_dispatch.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1438,10 +1962,13 @@
     },
     {
       "id": "calls/object_creation",
-      "group": "calls",
+      "domain": "calls",
       "name": "object_creation",
-      "gscript_path": "benchmarks/calls/object_creation.gs",
-      "lua_path": "benchmarks/lua_ref/calls/object_creation.lua",
+      "script": "benchmarks/calls/object_creation.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/calls/object_creation.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1453,10 +1980,13 @@
     },
     {
       "id": "string/log_tokenize_format",
-      "group": "string",
+      "domain": "string",
       "name": "log_tokenize_format",
-      "gscript_path": "benchmarks/string/log_tokenize_format.gs",
-      "lua_path": "benchmarks/lua_ref/string/log_tokenize_format.lua",
+      "script": "benchmarks/string/log_tokenize_format.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/log_tokenize_format.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1468,10 +1998,13 @@
     },
     {
       "id": "string/math_bit_utf8",
-      "group": "string",
+      "domain": "string",
       "name": "math_bit_utf8",
-      "gscript_path": "benchmarks/string/math_bit_utf8.gs",
-      "lua_path": "benchmarks/lua_ref/string/math_bit_utf8.lua",
+      "script": "benchmarks/string/math_bit_utf8.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/math_bit_utf8.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1483,10 +2016,13 @@
     },
     {
       "id": "string/regexp_random",
-      "group": "string",
+      "domain": "string",
       "name": "regexp_random",
-      "gscript_path": "benchmarks/string/regexp_random.gs",
-      "lua_path": "benchmarks/lua_ref/string/regexp_random.lua",
+      "script": "benchmarks/string/regexp_random.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/regexp_random.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1498,10 +2034,13 @@
     },
     {
       "id": "string/string_bench",
-      "group": "string",
+      "domain": "string",
       "name": "string_bench",
-      "gscript_path": "benchmarks/string/string_bench.gs",
-      "lua_path": "benchmarks/lua_ref/string/string_bench.lua",
+      "script": "benchmarks/string/string_bench.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/string_bench.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1513,10 +2052,13 @@
     },
     {
       "id": "string/strings_patterns",
-      "group": "string",
+      "domain": "string",
       "name": "strings_patterns",
-      "gscript_path": "benchmarks/string/strings_patterns.gs",
-      "lua_path": "benchmarks/lua_ref/string/strings_patterns.lua",
+      "script": "benchmarks/string/strings_patterns.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/string/strings_patterns.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1528,10 +2070,10 @@
     },
     {
       "id": "concurrency/context_cancel",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "context_cancel",
-      "gscript_path": "benchmarks/concurrency/context_cancel.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/context_cancel.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1543,10 +2085,10 @@
     },
     {
       "id": "concurrency/goroutine_cpu",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "goroutine_cpu",
-      "gscript_path": "benchmarks/concurrency/goroutine_cpu.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/goroutine_cpu.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1558,10 +2100,10 @@
     },
     {
       "id": "concurrency/goroutine_sleep",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "goroutine_sleep",
-      "gscript_path": "benchmarks/concurrency/goroutine_sleep.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/goroutine_sleep.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1573,10 +2115,10 @@
     },
     {
       "id": "concurrency/mutex_once",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "mutex_once",
-      "gscript_path": "benchmarks/concurrency/mutex_once.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/mutex_once.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1588,10 +2130,13 @@
     },
     {
       "id": "concurrency/producer_consumer_pipeline",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "producer_consumer_pipeline",
-      "gscript_path": "benchmarks/concurrency/producer_consumer_pipeline.gs",
-      "lua_path": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua",
+      "script": "benchmarks/concurrency/producer_consumer_pipeline.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1603,10 +2148,10 @@
     },
     {
       "id": "concurrency/select_blocking",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "select_blocking",
-      "gscript_path": "benchmarks/concurrency/select_blocking.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/select_blocking.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1618,10 +2163,10 @@
     },
     {
       "id": "concurrency/select_comma_ok",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "select_comma_ok",
-      "gscript_path": "benchmarks/concurrency/select_comma_ok.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/select_comma_ok.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1633,10 +2178,10 @@
     },
     {
       "id": "concurrency/select_default",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "select_default",
-      "gscript_path": "benchmarks/concurrency/select_default.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/select_default.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1648,10 +2193,10 @@
     },
     {
       "id": "concurrency/select_timeout",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "select_timeout",
-      "gscript_path": "benchmarks/concurrency/select_timeout.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/select_timeout.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1663,10 +2208,10 @@
     },
     {
       "id": "concurrency/sync_group",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "sync_group",
-      "gscript_path": "benchmarks/concurrency/sync_group.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/sync_group.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1678,10 +2223,10 @@
     },
     {
       "id": "concurrency/waitgroup",
-      "group": "concurrency",
+      "domain": "concurrency",
       "name": "waitgroup",
-      "gscript_path": "benchmarks/concurrency/waitgroup.gs",
-      "lua_path": null,
+      "script": "benchmarks/concurrency/waitgroup.gs",
+      "comparison_reference": null,
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1693,10 +2238,13 @@
     },
     {
       "id": "data/soa_affine_many",
-      "group": "data",
+      "domain": "data",
       "name": "soa_affine_many",
-      "gscript_path": "benchmarks/data/soa_affine_many.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_affine_many.lua",
+      "script": "benchmarks/data/soa_affine_many.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_affine_many.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1708,10 +2256,13 @@
     },
     {
       "id": "data/soa_clamp",
-      "group": "data",
+      "domain": "data",
       "name": "soa_clamp",
-      "gscript_path": "benchmarks/data/soa_clamp.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_clamp.lua",
+      "script": "benchmarks/data/soa_clamp.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_clamp.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1723,10 +2274,13 @@
     },
     {
       "id": "data/soa_dot",
-      "group": "data",
+      "domain": "data",
       "name": "soa_dot",
-      "gscript_path": "benchmarks/data/soa_dot.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_dot.lua",
+      "script": "benchmarks/data/soa_dot.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_dot.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1738,10 +2292,13 @@
     },
     {
       "id": "data/soa_filter_gather",
-      "group": "data",
+      "domain": "data",
       "name": "soa_filter_gather",
-      "gscript_path": "benchmarks/data/soa_filter_gather.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_filter_gather.lua",
+      "script": "benchmarks/data/soa_filter_gather.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_filter_gather.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1753,10 +2310,13 @@
     },
     {
       "id": "data/soa_mask_compare",
-      "group": "data",
+      "domain": "data",
       "name": "soa_mask_compare",
-      "gscript_path": "benchmarks/data/soa_mask_compare.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_mask_compare.lua",
+      "script": "benchmarks/data/soa_mask_compare.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_mask_compare.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1768,10 +2328,13 @@
     },
     {
       "id": "data/soa_masked_aggregate",
-      "group": "data",
+      "domain": "data",
       "name": "soa_masked_aggregate",
-      "gscript_path": "benchmarks/data/soa_masked_aggregate.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_masked_aggregate.lua",
+      "script": "benchmarks/data/soa_masked_aggregate.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_masked_aggregate.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1783,10 +2346,13 @@
     },
     {
       "id": "data/soa_reducers",
-      "group": "data",
+      "domain": "data",
       "name": "soa_reducers",
-      "gscript_path": "benchmarks/data/soa_reducers.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_reducers.lua",
+      "script": "benchmarks/data/soa_reducers.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_reducers.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1798,10 +2364,13 @@
     },
     {
       "id": "data/soa_scan",
-      "group": "data",
+      "domain": "data",
       "name": "soa_scan",
-      "gscript_path": "benchmarks/data/soa_scan.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_scan.lua",
+      "script": "benchmarks/data/soa_scan.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_scan.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1813,10 +2382,13 @@
     },
     {
       "id": "data/soa_scatter",
-      "group": "data",
+      "domain": "data",
       "name": "soa_scatter",
-      "gscript_path": "benchmarks/data/soa_scatter.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_scatter.lua",
+      "script": "benchmarks/data/soa_scatter.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_scatter.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1828,10 +2400,13 @@
     },
     {
       "id": "data/soa_select",
-      "group": "data",
+      "domain": "data",
       "name": "soa_select",
-      "gscript_path": "benchmarks/data/soa_select.gs",
-      "lua_path": "benchmarks/lua_ref/data/soa_select.lua",
+      "script": "benchmarks/data/soa_select.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/data/soa_select.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1843,10 +2418,13 @@
     },
     {
       "id": "app/actors_dispatch_mutation",
-      "group": "app",
+      "domain": "app",
       "name": "actors_dispatch_mutation",
-      "gscript_path": "benchmarks/app/actors_dispatch_mutation.gs",
-      "lua_path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua",
+      "script": "benchmarks/app/actors_dispatch_mutation.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1858,10 +2436,13 @@
     },
     {
       "id": "app/mixed_inventory_sim",
-      "group": "app",
+      "domain": "app",
       "name": "mixed_inventory_sim",
-      "gscript_path": "benchmarks/app/mixed_inventory_sim.gs",
-      "lua_path": "benchmarks/lua_ref/app/mixed_inventory_sim.lua",
+      "script": "benchmarks/app/mixed_inventory_sim.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/app/mixed_inventory_sim.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1873,10 +2454,13 @@
     },
     {
       "id": "app/stdlib_host",
-      "group": "app",
+      "domain": "app",
       "name": "stdlib_host",
-      "gscript_path": "benchmarks/app/stdlib_host.gs",
-      "lua_path": "benchmarks/lua_ref/app/stdlib_host.lua",
+      "script": "benchmarks/app/stdlib_host.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/app/stdlib_host.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1888,10 +2472,13 @@
     },
     {
       "id": "control/defer_protected",
-      "group": "control",
+      "domain": "control",
       "name": "defer_protected",
-      "gscript_path": "benchmarks/control/defer_protected.gs",
-      "lua_path": "benchmarks/lua_ref/control/defer_protected.lua",
+      "script": "benchmarks/control/defer_protected.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/control/defer_protected.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1903,10 +2490,13 @@
     },
     {
       "id": "control/sieve",
-      "group": "control",
+      "domain": "control",
       "name": "sieve",
-      "gscript_path": "benchmarks/control/sieve.gs",
-      "lua_path": "benchmarks/lua_ref/control/sieve.lua",
+      "script": "benchmarks/control/sieve.gs",
+      "comparison_reference": {
+        "kind": "lua",
+        "path": "benchmarks/lua_ref/control/sieve.lua"
+      },
       "params": {},
       "recommended_scale": {
         "hot": {}
@@ -1916,5 +2506,1043 @@
         "control"
       ]
     }
-  ]
+  ],
+  "compatibility": {
+    "historical": {
+      "groups": [
+        "numeric",
+        "recursion",
+        "table",
+        "calls",
+        "string",
+        "concurrency",
+        "data",
+        "app",
+        "control",
+        "precision"
+      ],
+      "benchmarks": [
+        {
+          "id": "numeric/fannkuch",
+          "group": "numeric",
+          "name": "fannkuch",
+          "gscript_path": "benchmarks/numeric/fannkuch.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/fannkuch.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/mandelbrot",
+          "group": "numeric",
+          "name": "mandelbrot",
+          "gscript_path": "benchmarks/numeric/mandelbrot.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/mandelbrot.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/math_intensive",
+          "group": "numeric",
+          "name": "math_intensive",
+          "gscript_path": "benchmarks/numeric/math_intensive.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/math_intensive.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/matmul",
+          "group": "numeric",
+          "name": "matmul",
+          "gscript_path": "benchmarks/numeric/matmul.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/matmul.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/matmul_dense",
+          "group": "numeric",
+          "name": "matmul_dense",
+          "gscript_path": "benchmarks/numeric/matmul_dense.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/matmul_dense.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/matmul_dense_split2",
+          "group": "numeric",
+          "name": "matmul_dense_split2",
+          "gscript_path": "benchmarks/numeric/matmul_dense_split2.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/matmul_dense_split2.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/matmul_dense_tb",
+          "group": "numeric",
+          "name": "matmul_dense_tb",
+          "gscript_path": "benchmarks/numeric/matmul_dense_tb.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/matmul_dense_tb.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/matmul_dense_unroll2",
+          "group": "numeric",
+          "name": "matmul_dense_unroll2",
+          "gscript_path": "benchmarks/numeric/matmul_dense_unroll2.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/matmul_dense_unroll2.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/matmul_row",
+          "group": "numeric",
+          "name": "matmul_row",
+          "gscript_path": "benchmarks/numeric/matmul_row.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/matmul_row.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/nbody",
+          "group": "numeric",
+          "name": "nbody",
+          "gscript_path": "benchmarks/numeric/nbody.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/nbody.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/nbody_dense",
+          "group": "numeric",
+          "name": "nbody_dense",
+          "gscript_path": "benchmarks/numeric/nbody_dense.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/nbody_dense.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/spectral_norm",
+          "group": "numeric",
+          "name": "spectral_norm",
+          "gscript_path": "benchmarks/numeric/spectral_norm.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/spectral_norm.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/spectral_norm_dense",
+          "group": "numeric",
+          "name": "spectral_norm_dense",
+          "gscript_path": "benchmarks/numeric/spectral_norm_dense.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/spectral_norm_dense.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "numeric/sum_primes",
+          "group": "numeric",
+          "name": "sum_primes",
+          "gscript_path": "benchmarks/numeric/sum_primes.gs",
+          "lua_path": "benchmarks/lua_ref/numeric/sum_primes.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "numeric"
+          ]
+        },
+        {
+          "id": "recursion/ack_nested_shifted",
+          "group": "recursion",
+          "name": "ack_nested_shifted",
+          "gscript_path": "benchmarks/recursion/ack_nested_shifted.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/ack_nested_shifted.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "recursion/ackermann",
+          "group": "recursion",
+          "name": "ackermann",
+          "gscript_path": "benchmarks/recursion/ackermann.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/ackermann.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "recursion/binary_trees",
+          "group": "recursion",
+          "name": "binary_trees",
+          "gscript_path": "benchmarks/recursion/binary_trees.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/binary_trees.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "recursion/fib",
+          "group": "recursion",
+          "name": "fib",
+          "gscript_path": "benchmarks/recursion/fib.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/fib.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "recursion/fib_recursive",
+          "group": "recursion",
+          "name": "fib_recursive",
+          "gscript_path": "benchmarks/recursion/fib_recursive.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/fib_recursive.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "recursion/fibonacci_iterative",
+          "group": "recursion",
+          "name": "fibonacci_iterative",
+          "gscript_path": "benchmarks/recursion/fibonacci_iterative.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/fibonacci_iterative.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "recursion/mutual_recursion",
+          "group": "recursion",
+          "name": "mutual_recursion",
+          "gscript_path": "benchmarks/recursion/mutual_recursion.gs",
+          "lua_path": "benchmarks/lua_ref/recursion/mutual_recursion.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "recursion"
+          ]
+        },
+        {
+          "id": "table/events_metamethod",
+          "group": "table",
+          "name": "events_metamethod",
+          "gscript_path": "benchmarks/table/events_metamethod.gs",
+          "lua_path": "benchmarks/lua_ref/table/events_metamethod.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/groupby_nested_agg",
+          "group": "table",
+          "name": "groupby_nested_agg",
+          "gscript_path": "benchmarks/table/groupby_nested_agg.gs",
+          "lua_path": "benchmarks/lua_ref/table/groupby_nested_agg.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/json_table_walk",
+          "group": "table",
+          "name": "json_table_walk",
+          "gscript_path": "benchmarks/table/json_table_walk.gs",
+          "lua_path": "benchmarks/lua_ref/table/json_table_walk.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/nextvar_table",
+          "group": "table",
+          "name": "nextvar_table",
+          "gscript_path": "benchmarks/table/nextvar_table.gs",
+          "lua_path": "benchmarks/lua_ref/table/nextvar_table.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/sort",
+          "group": "table",
+          "name": "sort",
+          "gscript_path": "benchmarks/table/sort.gs",
+          "lua_path": "benchmarks/lua_ref/table/sort.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/sort_mixed_numeric",
+          "group": "table",
+          "name": "sort_mixed_numeric",
+          "gscript_path": "benchmarks/table/sort_mixed_numeric.gs",
+          "lua_path": "benchmarks/lua_ref/table/sort_mixed_numeric.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/table_array_access",
+          "group": "table",
+          "name": "table_array_access",
+          "gscript_path": "benchmarks/table/table_array_access.gs",
+          "lua_path": "benchmarks/lua_ref/table/table_array_access.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/table_field_access",
+          "group": "table",
+          "name": "table_field_access",
+          "gscript_path": "benchmarks/table/table_field_access.gs",
+          "lua_path": "benchmarks/lua_ref/table/table_field_access.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "table/table_sort_proxy",
+          "group": "table",
+          "name": "table_sort_proxy",
+          "gscript_path": "benchmarks/table/table_sort_proxy.gs",
+          "lua_path": "benchmarks/lua_ref/table/table_sort_proxy.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "table"
+          ]
+        },
+        {
+          "id": "calls/call_len_pairs_metamethod",
+          "group": "calls",
+          "name": "call_len_pairs_metamethod",
+          "gscript_path": "benchmarks/calls/call_len_pairs_metamethod.gs",
+          "lua_path": "benchmarks/lua_ref/calls/call_len_pairs_metamethod.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "calls/calls_vararg_coroutine",
+          "group": "calls",
+          "name": "calls_vararg_coroutine",
+          "gscript_path": "benchmarks/calls/calls_vararg_coroutine.gs",
+          "lua_path": "benchmarks/lua_ref/calls/calls_vararg_coroutine.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "calls/closure_accumulator",
+          "group": "calls",
+          "name": "closure_accumulator",
+          "gscript_path": "benchmarks/calls/closure_accumulator.gs",
+          "lua_path": "benchmarks/lua_ref/calls/closure_accumulator.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "calls/closure_bench",
+          "group": "calls",
+          "name": "closure_bench",
+          "gscript_path": "benchmarks/calls/closure_bench.gs",
+          "lua_path": "benchmarks/lua_ref/calls/closure_bench.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "calls/coroutine_bench",
+          "group": "calls",
+          "name": "coroutine_bench",
+          "gscript_path": "benchmarks/calls/coroutine_bench.gs",
+          "lua_path": "benchmarks/lua_ref/calls/coroutine_bench.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "calls/method_dispatch",
+          "group": "calls",
+          "name": "method_dispatch",
+          "gscript_path": "benchmarks/calls/method_dispatch.gs",
+          "lua_path": "benchmarks/lua_ref/calls/method_dispatch.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "calls/object_creation",
+          "group": "calls",
+          "name": "object_creation",
+          "gscript_path": "benchmarks/calls/object_creation.gs",
+          "lua_path": "benchmarks/lua_ref/calls/object_creation.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "calls"
+          ]
+        },
+        {
+          "id": "string/log_tokenize_format",
+          "group": "string",
+          "name": "log_tokenize_format",
+          "gscript_path": "benchmarks/string/log_tokenize_format.gs",
+          "lua_path": "benchmarks/lua_ref/string/log_tokenize_format.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "string"
+          ]
+        },
+        {
+          "id": "string/math_bit_utf8",
+          "group": "string",
+          "name": "math_bit_utf8",
+          "gscript_path": "benchmarks/string/math_bit_utf8.gs",
+          "lua_path": "benchmarks/lua_ref/string/math_bit_utf8.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "string"
+          ]
+        },
+        {
+          "id": "string/regexp_random",
+          "group": "string",
+          "name": "regexp_random",
+          "gscript_path": "benchmarks/string/regexp_random.gs",
+          "lua_path": "benchmarks/lua_ref/string/regexp_random.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "string"
+          ]
+        },
+        {
+          "id": "string/string_bench",
+          "group": "string",
+          "name": "string_bench",
+          "gscript_path": "benchmarks/string/string_bench.gs",
+          "lua_path": "benchmarks/lua_ref/string/string_bench.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "string"
+          ]
+        },
+        {
+          "id": "string/strings_patterns",
+          "group": "string",
+          "name": "strings_patterns",
+          "gscript_path": "benchmarks/string/strings_patterns.gs",
+          "lua_path": "benchmarks/lua_ref/string/strings_patterns.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "string"
+          ]
+        },
+        {
+          "id": "concurrency/context_cancel",
+          "group": "concurrency",
+          "name": "context_cancel",
+          "gscript_path": "benchmarks/concurrency/context_cancel.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/goroutine_cpu",
+          "group": "concurrency",
+          "name": "goroutine_cpu",
+          "gscript_path": "benchmarks/concurrency/goroutine_cpu.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/goroutine_sleep",
+          "group": "concurrency",
+          "name": "goroutine_sleep",
+          "gscript_path": "benchmarks/concurrency/goroutine_sleep.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/mutex_once",
+          "group": "concurrency",
+          "name": "mutex_once",
+          "gscript_path": "benchmarks/concurrency/mutex_once.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/producer_consumer_pipeline",
+          "group": "concurrency",
+          "name": "producer_consumer_pipeline",
+          "gscript_path": "benchmarks/concurrency/producer_consumer_pipeline.gs",
+          "lua_path": "benchmarks/lua_ref/concurrency/producer_consumer_pipeline.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/select_blocking",
+          "group": "concurrency",
+          "name": "select_blocking",
+          "gscript_path": "benchmarks/concurrency/select_blocking.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/select_comma_ok",
+          "group": "concurrency",
+          "name": "select_comma_ok",
+          "gscript_path": "benchmarks/concurrency/select_comma_ok.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/select_default",
+          "group": "concurrency",
+          "name": "select_default",
+          "gscript_path": "benchmarks/concurrency/select_default.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/select_timeout",
+          "group": "concurrency",
+          "name": "select_timeout",
+          "gscript_path": "benchmarks/concurrency/select_timeout.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/sync_group",
+          "group": "concurrency",
+          "name": "sync_group",
+          "gscript_path": "benchmarks/concurrency/sync_group.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "concurrency/waitgroup",
+          "group": "concurrency",
+          "name": "waitgroup",
+          "gscript_path": "benchmarks/concurrency/waitgroup.gs",
+          "lua_path": null,
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "concurrency"
+          ]
+        },
+        {
+          "id": "data/soa_affine_many",
+          "group": "data",
+          "name": "soa_affine_many",
+          "gscript_path": "benchmarks/data/soa_affine_many.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_affine_many.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_clamp",
+          "group": "data",
+          "name": "soa_clamp",
+          "gscript_path": "benchmarks/data/soa_clamp.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_clamp.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_dot",
+          "group": "data",
+          "name": "soa_dot",
+          "gscript_path": "benchmarks/data/soa_dot.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_dot.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_filter_gather",
+          "group": "data",
+          "name": "soa_filter_gather",
+          "gscript_path": "benchmarks/data/soa_filter_gather.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_filter_gather.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_mask_compare",
+          "group": "data",
+          "name": "soa_mask_compare",
+          "gscript_path": "benchmarks/data/soa_mask_compare.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_mask_compare.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_masked_aggregate",
+          "group": "data",
+          "name": "soa_masked_aggregate",
+          "gscript_path": "benchmarks/data/soa_masked_aggregate.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_masked_aggregate.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_reducers",
+          "group": "data",
+          "name": "soa_reducers",
+          "gscript_path": "benchmarks/data/soa_reducers.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_reducers.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_scan",
+          "group": "data",
+          "name": "soa_scan",
+          "gscript_path": "benchmarks/data/soa_scan.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_scan.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_scatter",
+          "group": "data",
+          "name": "soa_scatter",
+          "gscript_path": "benchmarks/data/soa_scatter.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_scatter.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "data/soa_select",
+          "group": "data",
+          "name": "soa_select",
+          "gscript_path": "benchmarks/data/soa_select.gs",
+          "lua_path": "benchmarks/lua_ref/data/soa_select.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "data"
+          ]
+        },
+        {
+          "id": "app/actors_dispatch_mutation",
+          "group": "app",
+          "name": "actors_dispatch_mutation",
+          "gscript_path": "benchmarks/app/actors_dispatch_mutation.gs",
+          "lua_path": "benchmarks/lua_ref/app/actors_dispatch_mutation.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "app"
+          ]
+        },
+        {
+          "id": "app/mixed_inventory_sim",
+          "group": "app",
+          "name": "mixed_inventory_sim",
+          "gscript_path": "benchmarks/app/mixed_inventory_sim.gs",
+          "lua_path": "benchmarks/lua_ref/app/mixed_inventory_sim.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "app"
+          ]
+        },
+        {
+          "id": "app/stdlib_host",
+          "group": "app",
+          "name": "stdlib_host",
+          "gscript_path": "benchmarks/app/stdlib_host.gs",
+          "lua_path": "benchmarks/lua_ref/app/stdlib_host.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "app"
+          ]
+        },
+        {
+          "id": "control/defer_protected",
+          "group": "control",
+          "name": "defer_protected",
+          "gscript_path": "benchmarks/control/defer_protected.gs",
+          "lua_path": "benchmarks/lua_ref/control/defer_protected.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "control"
+          ]
+        },
+        {
+          "id": "control/sieve",
+          "group": "control",
+          "name": "sieve",
+          "gscript_path": "benchmarks/control/sieve.gs",
+          "lua_path": "benchmarks/lua_ref/control/sieve.lua",
+          "params": {},
+          "recommended_scale": {
+            "hot": {}
+          },
+          "time_source_hint": "script_time_line",
+          "tags": [
+            "control"
+          ]
+        }
+      ]
+    }
+  }
 }

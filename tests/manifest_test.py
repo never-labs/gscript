@@ -1,4 +1,5 @@
 import unittest
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -20,7 +21,7 @@ class ManifestTest(unittest.TestCase):
 
         self.assertEqual(manifest.case_id("benchmarks", path), "numeric/matmul")
         self.assertEqual(manifest.domain_for("benchmarks", path), "numeric")
-        self.assertEqual(manifest.tags_for("benchmarks", "numeric", "benchmarks/lua_ref/numeric/matmul.lua"), ["numeric", "benchmark", "lua_ref"])
+        self.assertEqual(manifest.tags_for("benchmarks", "numeric", "benchmarks/lua_ref/numeric/matmul.lua"), ["numeric", "benchmark"])
         self.assertEqual(manifest.status_for("benchmarks"), "active")
 
     def test_iter_gscript_cases_includes_only_benchmark_domains(self):
@@ -78,6 +79,9 @@ class ManifestTest(unittest.TestCase):
                         ("tests/sdk/api_case.gs", "sdk"),
                     ],
                 )
+                discovered = manifest.discover_cases("tests")[0]
+                self.assertIn("reference", discovered)
+                self.assertNotIn("lua_ref", discovered)
             finally:
                 manifest.ROOT = original_root
 
@@ -104,6 +108,50 @@ class ManifestTest(unittest.TestCase):
                 self.assertEqual(
                     manifest.lua_ref_for("benchmarks", root / "benchmarks" / "string" / "case.gs"),
                     "benchmarks/lua_ref/string/case.lua",
+                )
+            finally:
+                manifest.ROOT = original_root
+
+    def test_generated_benchmark_manifest_uses_domain_workloads_and_historical_compatibility(self):
+        original_root = manifest.ROOT
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bench = root / "benchmarks" / "numeric" / "case.gs"
+            bench.parent.mkdir(parents=True)
+            bench.write_text("-- test\n")
+            old_manifest = {
+                "benchmarks": [
+                    {
+                        "id": "numeric/case",
+                        "group": "numeric",
+                        "name": "case",
+                        "gscript_path": "benchmarks/numeric/case.gs",
+                        "lua_path": "benchmarks/lua_ref/numeric/case.lua",
+                        "params": {},
+                        "recommended_scale": {"hot": {}},
+                        "time_source_hint": "script_time_line",
+                        "tags": ["numeric"],
+                    }
+                ],
+                "time_source_hints": {"numeric/case": "script_time_line"},
+            }
+            (root / "benchmarks" / "manifest.json").write_text(json.dumps(old_manifest))
+
+            manifest.ROOT = root
+            try:
+                generated = manifest.generated_manifest("benchmarks")
+                self.assertEqual(generated["schema_version"], manifest.BENCHMARK_SCHEMA_VERSION)
+                self.assertEqual(generated["domains"], list(manifest.BENCHMARK_DOMAINS))
+                self.assertNotIn("groups", generated)
+                self.assertNotIn("benchmarks", generated)
+                self.assertEqual(generated["workloads"][0]["domain"], "numeric")
+                self.assertEqual(
+                    generated["workloads"][0]["comparison_reference"],
+                    {"kind": "lua", "path": "benchmarks/lua_ref/numeric/case.lua"},
+                )
+                self.assertEqual(
+                    generated["compatibility"]["historical"]["benchmarks"][0]["group"],
+                    "numeric",
                 )
             finally:
                 manifest.ROOT = original_root

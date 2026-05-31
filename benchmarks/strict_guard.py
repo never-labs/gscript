@@ -36,8 +36,6 @@ LOGICAL_TIME_BENCHMARKS = {
     "control/defer_protected",
 }
 
-VARIANT_BASES = discovery.VARIANT_BASES
-
 CHECKSUM_RE = re.compile(r"^\s*checksum\s*[:=]\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 EMBEDDED_TIME_RE = re.compile(r"(:\s*)[0-9]+(?:\.[0-9]+)?s(\s+)")
 T2_ATTEMPTED_RE = re.compile(r"^\s*Tier 2 attempted:\s*([0-9]+)\b", re.MULTILINE)

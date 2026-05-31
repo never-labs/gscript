@@ -11,7 +11,8 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+BENCHMARK_SCHEMA_VERSION = 3
 EXCLUDED_DIRS = {
     "__pycache__",
     "lua_ref",
@@ -52,8 +53,6 @@ def tags_for(root_name: str, domain: str, lua_ref: str | None) -> list[str]:
         tags.append("conformance" if domain == "language" else "integration")
     else:
         tags.append("benchmark")
-    if lua_ref:
-        tags.append("lua_ref")
     return tags
 
 
@@ -94,12 +93,49 @@ def discover_cases(root_name: str) -> list[dict[str, Any]]:
                 "path": repo_rel(path),
                 "domain": domain,
                 "kind": "test" if root_name == "tests" else "benchmark",
-                "lua_ref": lua_ref,
+                "reference": {"kind": "lua", "path": lua_ref} if lua_ref else None,
                 "status": status_for(root_name),
                 "tags": tags_for(root_name, domain, lua_ref),
+                "compatibility": {"historical": {"lua_ref": lua_ref}} if lua_ref else {},
             }
         )
     return cases
+
+
+def compatibility_lua_ref(case: dict[str, Any]) -> str | None:
+    reference = case.get("reference")
+    if isinstance(reference, dict) and reference.get("kind") == "lua":
+        path = reference.get("path")
+        return path if isinstance(path, str) else None
+
+    historical = case.get("compatibility", {}).get("historical")
+    if isinstance(historical, dict):
+        path = historical.get("lua_ref")
+        if isinstance(path, str):
+            return path
+
+    path = case.get("lua_ref")
+    return path if isinstance(path, str) else None
+
+
+def domain_workloads(existing: dict[str, Any]) -> list[dict[str, Any]]:
+    workloads: list[dict[str, Any]] = []
+    for row in existing.get("benchmarks", []):
+        if not isinstance(row, dict):
+            continue
+        workload: dict[str, Any] = {
+            "id": row.get("id"),
+            "domain": row.get("group"),
+            "name": row.get("name"),
+            "script": row.get("gscript_path"),
+            "comparison_reference": {"kind": "lua", "path": row.get("lua_path")} if row.get("lua_path") else None,
+            "params": row.get("params", {}),
+            "recommended_scale": row.get("recommended_scale", {}),
+            "time_source_hint": row.get("time_source_hint"),
+            "tags": row.get("tags", []),
+        }
+        workloads.append(workload)
+    return workloads
 
 
 def load_manifest(root_name: str) -> dict[str, Any]:
@@ -116,14 +152,26 @@ def generated_manifest(root_name: str) -> dict[str, Any]:
         "cases": cases,
     }
     if root_name == "benchmarks":
-        manifest["schema_version"] = 2
-        manifest["groups"] = list(BENCHMARK_DOMAINS)
+        manifest["schema_version"] = BENCHMARK_SCHEMA_VERSION
+        manifest["domains"] = list(BENCHMARK_DOMAINS)
         existing_path = ROOT / "benchmarks" / "manifest.json"
+        compatibility: dict[str, Any] = {"historical": {"groups": list(BENCHMARK_DOMAINS)}}
         if existing_path.exists():
             existing = json.loads(existing_path.read_text())
-            for key in ("time_source_hints", "scale_profiles", "benchmarks"):
+            for key in ("time_source_hints", "scale_profiles"):
                 if key in existing:
                     manifest[key] = existing[key]
+            existing_workloads = existing.get("workloads")
+            manifest["workloads"] = existing_workloads if isinstance(existing_workloads, list) else domain_workloads(existing)
+            if "benchmarks" in existing:
+                compatibility["historical"]["benchmarks"] = existing["benchmarks"]
+            else:
+                historical = existing.get("compatibility", {}).get("historical")
+                if isinstance(historical, dict) and "benchmarks" in historical:
+                    compatibility["historical"]["benchmarks"] = historical["benchmarks"]
+        else:
+            manifest["workloads"] = []
+        manifest["compatibility"] = compatibility
     return manifest
 
 
@@ -140,7 +188,7 @@ def validate_manifest(root_name: str) -> list[str]:
 
     discovered_by_path = {case["path"]: case for case in discover_cases(root_name)}
     manifest_by_path: dict[str, dict[str, Any]] = {}
-    required = {"id", "path", "domain", "kind", "lua_ref", "status", "tags"}
+    required = {"id", "path", "domain", "kind", "reference", "status", "tags", "compatibility"}
 
     for index, case in enumerate(cases):
         if not isinstance(case, dict):
@@ -174,6 +222,13 @@ def validate_manifest(root_name: str) -> list[str]:
         if actual is None:
             continue
         for field in required:
+            if field == "compatibility":
+                if compatibility_lua_ref(actual) != compatibility_lua_ref(expected):
+                    errors.append(
+                        f"{repo_rel(manifest_path)}: {expected['path']} field compatibility.historical.lua_ref "
+                        f"is {compatibility_lua_ref(actual)!r}, expected {compatibility_lua_ref(expected)!r}"
+                    )
+                continue
             if actual.get(field) != expected.get(field):
                 errors.append(
                     f"{repo_rel(manifest_path)}: {expected['path']} field {field} "

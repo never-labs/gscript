@@ -30,7 +30,7 @@ class TimingCompareDiagnosticTest(unittest.TestCase):
     def test_discovery_matches_domain_manifest_benchmark_ids(self):
         root = Path(__file__).resolve().parents[1]
         manifest = json.loads((root / "benchmarks" / "manifest.json").read_text())
-        expected = {row["id"] for row in manifest["benchmarks"]}
+        expected = {row["id"] for row in manifest["workloads"]}
         specs = timing.discover_specs(root, timing.GROUPS)
         self.assertEqual({spec.benchmark_id for spec in specs}, expected)
 

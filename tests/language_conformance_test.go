@@ -66,10 +66,13 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 	}
 	var manifest struct {
 		Cases []struct {
-			ID     string `json:"id"`
-			Path   string `json:"path"`
-			Domain string `json:"domain"`
-			LuaRef string `json:"lua_ref"`
+			ID        string `json:"id"`
+			Path      string `json:"path"`
+			Domain    string `json:"domain"`
+			Reference struct {
+				Kind string `json:"kind"`
+				Path string `json:"path"`
+			} `json:"reference"`
 			Status string `json:"status"`
 		} `json:"cases"`
 	}
@@ -79,7 +82,7 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 	var cases []manifestConformanceCase
 	seen := map[string]bool{}
 	for _, entry := range manifest.Cases {
-		if entry.Domain != "language" || entry.LuaRef == "" || entry.Status != "passing" {
+		if entry.Domain != "language" || entry.Reference.Kind != "lua" || entry.Reference.Path == "" || entry.Status != "passing" {
 			continue
 		}
 		name := filepath.Base(entry.ID)
@@ -88,12 +91,12 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 		}
 		seen[name] = true
 		gsPath := filepath.Join(root, filepath.FromSlash(entry.Path))
-		luaPath := filepath.Join(root, filepath.FromSlash(entry.LuaRef))
+		luaPath := filepath.Join(root, filepath.FromSlash(entry.Reference.Path))
 		if _, err := os.Stat(gsPath); err != nil {
 			t.Fatalf("manifest case %s missing GScript file %s: %v", entry.ID, entry.Path, err)
 		}
 		if _, err := os.Stat(luaPath); err != nil {
-			t.Fatalf("manifest case %s missing Lua oracle %s: %v", entry.ID, entry.LuaRef, err)
+			t.Fatalf("manifest case %s missing Lua oracle %s: %v", entry.ID, entry.Reference.Path, err)
 		}
 		cases = append(cases, manifestConformanceCase{
 			Name:        name,
