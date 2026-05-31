@@ -64,22 +64,22 @@ func FastStringFindRet2(sv, pv, initv, plainv Value, nArgs, rawC int) (Value, Va
 		return IntValue(int64(start)), IntValue(int64(end)), 2, true, nil
 	}
 
-	if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
-		loc := findBalancedRange(searchStr, open, close, 0)
+	if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
+		loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
 		if loc == nil {
 			return NilValue(), NilValue(), 1, true, nil
 		}
 		return IntValue(int64(loc[0] + init)), IntValue(int64(loc[1] + init - 1)), 2, true, nil
 	}
 	if simple, ok := cachedSimpleLuaPattern(pattern); ok {
-		if simple.captureCount > 0 && (rawC == 0 || rawC-1 > 2) {
+		if simple.CaptureCount() > 0 && (rawC == 0 || rawC-1 > 2) {
 			return NilValue(), NilValue(), 0, false, nil
 		}
-		m, ok := simple.findNext(searchStr, 0)
+		m, ok := simple.FindNext(searchStr, 0)
 		if !ok {
 			return NilValue(), NilValue(), 1, true, nil
 		}
-		return IntValue(int64(m.start + init)), IntValue(int64(m.end + init - 1)), 2, true, nil
+		return IntValue(int64(m.Start + init)), IntValue(int64(m.End + init - 1)), 2, true, nil
 	}
 	prog, re, err := cachedLuaPatternRegexp(pattern)
 	if err != nil {
@@ -121,29 +121,29 @@ func FastStringMatchRet2(sv, pv, initv Value, nArgs, rawC int) (Value, Value, in
 	}
 	searchStr := s[init-1:]
 
-	if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
-		loc := findBalancedRange(searchStr, open, close, 0)
+	if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
+		loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
 		if loc == nil {
 			return NilValue(), NilValue(), 1, true, nil
 		}
 		return StringValue(searchStr[loc[0]:loc[1]]), NilValue(), 1, true, nil
 	}
 	if simple, ok := cachedSimpleLuaPattern(pattern); ok {
-		if simple.captureCount > 2 && (rawC == 0 || rawC-1 > 2) {
+		if simple.CaptureCount() > 2 && (rawC == 0 || rawC-1 > 2) {
 			return NilValue(), NilValue(), 0, false, nil
 		}
-		m, ok := simple.findNext(searchStr, 0)
+		m, ok := simple.FindNext(searchStr, 0)
 		if !ok {
 			return NilValue(), NilValue(), 1, true, nil
 		}
-		if m.ncap == 0 {
-			return StringValue(searchStr[m.start:m.end]), NilValue(), 1, true, nil
+		if m.NCapture == 0 {
+			return StringValue(searchStr[m.Start:m.End]), NilValue(), 1, true, nil
 		}
-		r0 := StringValue(searchStr[m.caps[0][0]:m.caps[0][1]])
-		if m.ncap == 1 {
+		r0 := StringValue(searchStr[m.Captures[0][0]:m.Captures[0][1]])
+		if m.NCapture == 1 {
 			return r0, NilValue(), 1, true, nil
 		}
-		return r0, StringValue(searchStr[m.caps[1][0]:m.caps[1][1]]), 2, true, nil
+		return r0, StringValue(searchStr[m.Captures[1][0]:m.Captures[1][1]]), 2, true, nil
 	}
 	prog, re, err := cachedLuaPatternRegexp(pattern)
 	if err != nil {
@@ -201,309 +201,30 @@ const (
 	luaPatternCapturePosition
 )
 
-type simpleLuaPatternOpKind uint8
-
-const (
-	simpleLuaPatternLiteral simpleLuaPatternOpKind = iota
-	simpleLuaPatternDigit
-	simpleLuaPatternDigitPlus
-	simpleLuaPatternCaptureStart
-	simpleLuaPatternCaptureEnd
-)
-
-type simpleLuaPatternOp struct {
-	kind simpleLuaPatternOpKind
-	text string
-}
-
-type simpleLuaPattern struct {
-	ops          []simpleLuaPatternOp
-	captureCount int
-	firstLiteral string
-	fast         simpleLuaPatternFast
-}
-
-type simpleLuaPatternFastKind uint8
-
-const (
-	simpleLuaPatternFastNone simpleLuaPatternFastKind = iota
-	simpleLuaPatternFastTwoDigitRuns
-)
-
-type simpleLuaPatternFast struct {
-	kind               simpleLuaPatternFastKind
-	prefix             string
-	middle             string
-	suffix             string
-	firstCapturePrefix bool
-}
-
 type simpleLuaPatternCacheEntry struct {
-	pattern *simpleLuaPattern
+	pattern *stringpattern.SimplePattern
 	ok      bool
 }
 
-type simpleLuaPatternMatch struct {
-	start int
-	end   int
-	ncap  int
-	caps  [4][2]int
-}
-
-func cachedSimpleLuaPattern(pattern string) (*simpleLuaPattern, bool) {
+func cachedSimpleLuaPattern(pattern string) (*stringpattern.SimplePattern, bool) {
 	if cached, ok := simpleLuaPatternCache.Load(pattern); ok {
 		entry := cached.(simpleLuaPatternCacheEntry)
 		return entry.pattern, entry.ok
 	}
-	compiled, ok := compileSimpleLuaPattern(pattern)
+	compiled, ok := stringpattern.CompileSimplePattern(pattern)
 	entry := simpleLuaPatternCacheEntry{pattern: compiled, ok: ok}
 	actual, _ := simpleLuaPatternCache.LoadOrStore(pattern, entry)
 	entry = actual.(simpleLuaPatternCacheEntry)
 	return entry.pattern, entry.ok
 }
 
-func compileSimpleLuaPattern(pattern string) (*simpleLuaPattern, bool) {
-	ops, captures, ok := compileSimpleLuaPatternOps(pattern)
-	if !ok || len(ops) == 0 || captures > 4 {
-		return nil, false
+func simpleMatchValues(s string, m stringpattern.SimplePatternMatch) []Value {
+	if m.NCapture == 0 {
+		return []Value{StringValue(s[m.Start:m.End])}
 	}
-	firstLiteral := ""
-	for _, op := range ops {
-		if op.kind == simpleLuaPatternLiteral && op.text != "" {
-			firstLiteral = op.text
-			break
-		}
-		if op.kind != simpleLuaPatternCaptureStart {
-			break
-		}
-	}
-	return &simpleLuaPattern{ops: ops, captureCount: captures, firstLiteral: firstLiteral, fast: simpleLuaPatternFastForOps(ops, captures)}, true
-}
-
-func compileSimpleLuaPatternOps(pattern string) ([]simpleLuaPatternOp, int, bool) {
-	ops := make([]simpleLuaPatternOp, 0, 8)
-	captures := 0
-	flushLiteral := func(start, end int) {
-		if end > start {
-			ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternLiteral, text: pattern[start:end]})
-		}
-	}
-	for i := 0; i < len(pattern); {
-		litStart := i
-		for i < len(pattern) && pattern[i] != '%' && pattern[i] != '(' && pattern[i] != ')' &&
-			pattern[i] != '[' && pattern[i] != '.' && pattern[i] != '*' && pattern[i] != '?' &&
-			pattern[i] != '-' && pattern[i] != '+' && pattern[i] != '^' && pattern[i] != '$' {
-			i++
-		}
-		flushLiteral(litStart, i)
-		if i >= len(pattern) {
-			break
-		}
-		switch pattern[i] {
-		case '%':
-			if i+1 >= len(pattern) || pattern[i+1] != 'd' {
-				return nil, 0, false
-			}
-			if i+2 < len(pattern) && pattern[i+2] == '+' {
-				ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternDigitPlus})
-				i += 3
-			} else {
-				ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternDigit})
-				i += 2
-			}
-		case '(':
-			end := strings.IndexByte(pattern[i+1:], ')')
-			if end < 0 {
-				return nil, 0, false
-			}
-			inner := pattern[i+1 : i+1+end]
-			if inner == "" || strings.ContainsAny(inner, "()[]^$.*?-") {
-				return nil, 0, false
-			}
-			innerOps, innerCaptures, ok := compileSimpleLuaPatternOps(inner)
-			if !ok || innerCaptures != 0 {
-				return nil, 0, false
-			}
-			ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternCaptureStart})
-			ops = append(ops, innerOps...)
-			ops = append(ops, simpleLuaPatternOp{kind: simpleLuaPatternCaptureEnd})
-			captures++
-			i += end + 2
-		default:
-			return nil, 0, false
-		}
-	}
-	return ops, captures, true
-}
-
-func (p *simpleLuaPattern) findNext(s string, start int) (simpleLuaPatternMatch, bool) {
-	if p.fast.kind == simpleLuaPatternFastTwoDigitRuns {
-		return p.findNextTwoDigitRuns(s, start)
-	}
-	if start < 0 {
-		start = 0
-	}
-	if start > len(s) {
-		return simpleLuaPatternMatch{}, false
-	}
-	for pos := start; pos <= len(s); pos++ {
-		if p.firstLiteral != "" {
-			idx := strings.Index(s[pos:], p.firstLiteral)
-			if idx < 0 {
-				return simpleLuaPatternMatch{}, false
-			}
-			pos += idx
-		}
-		if m, ok := p.matchAt(s, pos); ok {
-			return m, true
-		}
-	}
-	return simpleLuaPatternMatch{}, false
-}
-
-func simpleLuaPatternFastForOps(ops []simpleLuaPatternOp, captures int) simpleLuaPatternFast {
-	if captures != 2 {
-		return simpleLuaPatternFast{}
-	}
-	// Shape A: prefix(%d+)middle%d%dsuffix(%d+)
-	if len(ops) == 11 &&
-		ops[0].kind == simpleLuaPatternLiteral &&
-		ops[1].kind == simpleLuaPatternCaptureStart &&
-		ops[2].kind == simpleLuaPatternDigitPlus &&
-		ops[3].kind == simpleLuaPatternCaptureEnd &&
-		ops[4].kind == simpleLuaPatternLiteral &&
-		ops[5].kind == simpleLuaPatternDigit &&
-		ops[6].kind == simpleLuaPatternDigit &&
-		ops[7].kind == simpleLuaPatternLiteral &&
-		ops[8].kind == simpleLuaPatternCaptureStart &&
-		ops[9].kind == simpleLuaPatternDigitPlus &&
-		ops[10].kind == simpleLuaPatternCaptureEnd {
-		return simpleLuaPatternFast{
-			kind:   simpleLuaPatternFastTwoDigitRuns,
-			prefix: ops[0].text,
-			middle: ops[4].text,
-			suffix: ops[7].text,
-		}
-	}
-	// Shape B: (prefix%d+)middle%d%dsuffix(%d+)
-	if len(ops) == 11 &&
-		ops[0].kind == simpleLuaPatternCaptureStart &&
-		ops[1].kind == simpleLuaPatternLiteral &&
-		ops[2].kind == simpleLuaPatternDigitPlus &&
-		ops[3].kind == simpleLuaPatternCaptureEnd &&
-		ops[4].kind == simpleLuaPatternLiteral &&
-		ops[5].kind == simpleLuaPatternDigit &&
-		ops[6].kind == simpleLuaPatternDigit &&
-		ops[7].kind == simpleLuaPatternLiteral &&
-		ops[8].kind == simpleLuaPatternCaptureStart &&
-		ops[9].kind == simpleLuaPatternDigitPlus &&
-		ops[10].kind == simpleLuaPatternCaptureEnd {
-		return simpleLuaPatternFast{
-			kind:               simpleLuaPatternFastTwoDigitRuns,
-			prefix:             ops[1].text,
-			middle:             ops[4].text,
-			suffix:             ops[7].text,
-			firstCapturePrefix: true,
-		}
-	}
-	return simpleLuaPatternFast{}
-}
-
-func (p *simpleLuaPattern) findNextTwoDigitRuns(s string, start int) (simpleLuaPatternMatch, bool) {
-	if start < 0 {
-		start = 0
-	}
-	if start > len(s) {
-		return simpleLuaPatternMatch{}, false
-	}
-	f := p.fast
-	for search := start; search <= len(s); {
-		idx := strings.Index(s[search:], f.prefix)
-		if idx < 0 {
-			return simpleLuaPatternMatch{}, false
-		}
-		pos := search + idx
-		digits1Start := pos + len(f.prefix)
-		digits1End := stringpattern.ScanASCIIDigits(s, digits1Start)
-		if digits1End == digits1Start || !stringpattern.HasStringAt(s, digits1End, f.middle) {
-			search = pos + 1
-			continue
-		}
-		tagStart := digits1End + len(f.middle)
-		if tagStart+2 > len(s) || !stringpattern.IsASCIIDigit(s[tagStart]) || !stringpattern.IsASCIIDigit(s[tagStart+1]) {
-			search = pos + 1
-			continue
-		}
-		suffixStart := tagStart + 2
-		if !stringpattern.HasStringAt(s, suffixStart, f.suffix) {
-			search = pos + 1
-			continue
-		}
-		digits2Start := suffixStart + len(f.suffix)
-		digits2End := stringpattern.ScanASCIIDigits(s, digits2Start)
-		if digits2End == digits2Start {
-			search = pos + 1
-			continue
-		}
-		cap0Start := digits1Start
-		if f.firstCapturePrefix {
-			cap0Start = pos
-		}
-		return simpleLuaPatternMatch{
-			start: pos,
-			end:   digits2End,
-			ncap:  2,
-			caps: [4][2]int{
-				{cap0Start, digits1End},
-				{digits2Start, digits2End},
-			},
-		}, true
-	}
-	return simpleLuaPatternMatch{}, false
-}
-
-func (p *simpleLuaPattern) matchAt(s string, pos int) (simpleLuaPatternMatch, bool) {
-	m := simpleLuaPatternMatch{start: pos}
-	capStack := [4]int{}
-	for _, op := range p.ops {
-		switch op.kind {
-		case simpleLuaPatternLiteral:
-			if !strings.HasPrefix(s[pos:], op.text) {
-				return simpleLuaPatternMatch{}, false
-			}
-			pos += len(op.text)
-		case simpleLuaPatternDigit:
-			if pos >= len(s) || !stringpattern.IsASCIIDigit(s[pos]) {
-				return simpleLuaPatternMatch{}, false
-			}
-			pos++
-		case simpleLuaPatternDigitPlus:
-			start := pos
-			pos = stringpattern.ScanASCIIDigits(s, pos)
-			if pos == start {
-				return simpleLuaPatternMatch{}, false
-			}
-		case simpleLuaPatternCaptureStart:
-			if m.ncap >= len(m.caps) {
-				return simpleLuaPatternMatch{}, false
-			}
-			capStack[m.ncap] = pos
-		case simpleLuaPatternCaptureEnd:
-			m.caps[m.ncap] = [2]int{capStack[m.ncap], pos}
-			m.ncap++
-		}
-	}
-	m.end = pos
-	return m, true
-}
-
-func simpleMatchValues(s string, m simpleLuaPatternMatch) []Value {
-	if m.ncap == 0 {
-		return []Value{StringValue(s[m.start:m.end])}
-	}
-	out := make([]Value, 0, m.ncap)
-	for i := 0; i < m.ncap; i++ {
-		out = append(out, StringValue(s[m.caps[i][0]:m.caps[i][1]]))
+	out := make([]Value, 0, m.NCapture)
+	for i := 0; i < m.NCapture; i++ {
+		out = append(out, StringValue(s[m.Captures[i][0]:m.Captures[i][1]]))
 	}
 	return out
 }
@@ -991,61 +712,6 @@ func luaNegatedClassContent(kind byte) (string, bool) {
 	}
 }
 
-func parseStandaloneBalancedPattern(pattern string) (bool, byte, byte) {
-	if len(pattern) != 4 || pattern[0] != '%' || pattern[1] != 'b' {
-		return false, 0, 0
-	}
-	return true, pattern[2], pattern[3]
-}
-
-func findBalancedRange(s string, open, close byte, from int) []int {
-	for i := from; i < len(s); i++ {
-		if s[i] != open {
-			continue
-		}
-		if open == close {
-			for j := i + 1; j < len(s); j++ {
-				if s[j] == close {
-					return []int{i, j + 1}
-				}
-			}
-			return nil
-		}
-		depth := 1
-		for j := i + 1; j < len(s); j++ {
-			if s[j] == open {
-				depth++
-			}
-			if s[j] == close {
-				depth--
-				if depth == 0 {
-					return []int{i, j + 1}
-				}
-			}
-		}
-		return nil
-	}
-	return nil
-}
-
-func findAllBalancedRanges(s string, open, close byte) [][]int {
-	var ranges [][]int
-	next := 0
-	for next < len(s) {
-		loc := findBalancedRange(s, open, close, next)
-		if loc == nil {
-			break
-		}
-		ranges = append(ranges, loc)
-		if loc[1] > next {
-			next = loc[1]
-		} else {
-			next++
-		}
-	}
-	return ranges
-}
-
 func replaceBalancedPatternString(s string, open, close byte, repl string, maxRepl int, count *int) string {
 	result, _ := replaceBalancedPattern(s, open, close, maxRepl, count, func(loc []int) (string, error) {
 		return expandLuaReplacement(s, loc, luaPatternProgram{}, repl), nil
@@ -1088,7 +754,7 @@ func replaceBalancedPattern(s string, open, close byte, maxRepl int, count *int,
 		if maxRepl >= 0 && *count >= maxRepl {
 			break
 		}
-		loc := findBalancedRange(s, open, close, next)
+		loc := stringpattern.FindBalancedRange(s, open, close, next)
 		if loc == nil {
 			break
 		}
@@ -1195,7 +861,7 @@ func replaceLuaPatternTable(s string, re *regexp.Regexp, prog luaPatternProgram,
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
+func replaceSimpleLuaPatternFunction(s string, pattern *stringpattern.SimplePattern, fn Value, caller ScriptFunctionCaller, maxRepl int, count *int) (string, error) {
 	if pattern == nil {
 		return s, nil
 	}
@@ -1204,23 +870,23 @@ func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Val
 	last := 0
 	nextStart := 0
 	for maxRepl < 0 || *count < maxRepl {
-		m, ok := pattern.findNext(s, nextStart)
+		m, ok := pattern.FindNext(s, nextStart)
 		if !ok {
 			break
 		}
-		if m.start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		if m.Start < last {
+			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
 		replacement, err := callSimpleReplacementFunction(s, m, fn, caller)
 		if err != nil {
 			return "", err
 		}
-		b.WriteString(s[last:m.start])
+		b.WriteString(s[last:m.Start])
 		b.WriteString(replacement)
-		last = m.end
+		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s, nil
@@ -1229,7 +895,7 @@ func replaceSimpleLuaPatternFunction(s string, pattern *simpleLuaPattern, fn Val
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternString(s string, pattern *simpleLuaPattern, repl string, maxRepl int, count *int) string {
+func replaceSimpleLuaPatternString(s string, pattern *stringpattern.SimplePattern, repl string, maxRepl int, count *int) string {
 	if pattern == nil {
 		return s
 	}
@@ -1238,19 +904,19 @@ func replaceSimpleLuaPatternString(s string, pattern *simpleLuaPattern, repl str
 	last := 0
 	nextStart := 0
 	for maxRepl < 0 || *count < maxRepl {
-		m, ok := pattern.findNext(s, nextStart)
+		m, ok := pattern.FindNext(s, nextStart)
 		if !ok {
 			break
 		}
-		if m.start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		if m.Start < last {
+			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
-		b.WriteString(s[last:m.start])
+		b.WriteString(s[last:m.Start])
 		b.WriteString(expandSimpleLuaReplacement(s, m, repl))
-		last = m.end
+		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s
@@ -1259,7 +925,7 @@ func replaceSimpleLuaPatternString(s string, pattern *simpleLuaPattern, repl str
 	return b.String()
 }
 
-func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Table, maxRepl int, count *int) (string, error) {
+func replaceSimpleLuaPatternTable(s string, pattern *stringpattern.SimplePattern, repl *Table, maxRepl int, count *int) (string, error) {
 	if pattern == nil {
 		return s, nil
 	}
@@ -1268,17 +934,17 @@ func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Tab
 	last := 0
 	nextStart := 0
 	for maxRepl < 0 || *count < maxRepl {
-		m, ok := pattern.findNext(s, nextStart)
+		m, ok := pattern.FindNext(s, nextStart)
 		if !ok {
 			break
 		}
-		if m.start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		if m.Start < last {
+			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
 		key := simpleReplacementTableKey(s, m)
 		val := repl.RawGet(key)
-		replacement := s[m.start:m.end]
+		replacement := s[m.Start:m.End]
 		if !val.IsNil() && !(val.IsBool() && !val.Bool()) {
 			if val.IsString() || val.IsNumber() {
 				replacement = val.String()
@@ -1286,11 +952,11 @@ func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Tab
 				return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
 			}
 		}
-		b.WriteString(s[last:m.start])
+		b.WriteString(s[last:m.Start])
 		b.WriteString(replacement)
-		last = m.end
+		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s, nil
@@ -1299,7 +965,7 @@ func replaceSimpleLuaPatternTable(s string, pattern *simpleLuaPattern, repl *Tab
 	return b.String(), nil
 }
 
-func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string, maxRepl int, count *int) string {
+func replaceSimpleLuaPatternRaw(s string, pattern *stringpattern.SimplePattern, repl string, maxRepl int, count *int) string {
 	if pattern == nil {
 		return s
 	}
@@ -1308,19 +974,19 @@ func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string
 	last := 0
 	nextStart := 0
 	for maxRepl < 0 || *count < maxRepl {
-		m, ok := pattern.findNext(s, nextStart)
+		m, ok := pattern.FindNext(s, nextStart)
 		if !ok {
 			break
 		}
-		if m.start < last {
-			nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		if m.Start < last {
+			nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 			continue
 		}
-		b.WriteString(s[last:m.start])
+		b.WriteString(s[last:m.Start])
 		b.WriteString(repl)
-		last = m.end
+		last = m.End
 		(*count)++
-		nextStart = stringpattern.NextSearchStart(s, m.start, m.end)
+		nextStart = stringpattern.NextSearchStart(s, m.Start, m.End)
 	}
 	if *count == 0 {
 		return s
@@ -1329,13 +995,13 @@ func replaceSimpleLuaPatternRaw(s string, pattern *simpleLuaPattern, repl string
 	return b.String()
 }
 
-func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, caller ScriptFunctionCaller) (string, error) {
+func callSimpleReplacementFunction(s string, m stringpattern.SimplePatternMatch, fn Value, caller ScriptFunctionCaller) (string, error) {
 	args := simpleReplacementFunctionArgsStack(s, m)
 	results, err := callGScriptFunction(fn, args, caller)
 	if err != nil {
 		return "", err
 	}
-	replacement := s[m.start:m.end]
+	replacement := s[m.Start:m.End]
 	if len(results) == 0 {
 		return replacement, nil
 	}
@@ -1349,41 +1015,41 @@ func callSimpleReplacementFunction(s string, m simpleLuaPatternMatch, fn Value, 
 	return "", fmt.Errorf("invalid replacement value (a %s)", val.TypeName())
 }
 
-func simpleReplacementFunctionArgsStack(s string, m simpleLuaPatternMatch) []Value {
+func simpleReplacementFunctionArgsStack(s string, m stringpattern.SimplePatternMatch) []Value {
 	var args [4]Value
-	if m.ncap == 0 {
-		args[0] = StringValue(s[m.start:m.end])
+	if m.NCapture == 0 {
+		args[0] = StringValue(s[m.Start:m.End])
 		return args[:1]
 	}
-	n := m.ncap
+	n := m.NCapture
 	if n > len(args) {
 		n = len(args)
 	}
 	for i := 0; i < n; i++ {
-		args[i] = StringValue(s[m.caps[i][0]:m.caps[i][1]])
+		args[i] = StringValue(s[m.Captures[i][0]:m.Captures[i][1]])
 	}
 	return args[:n]
 }
 
-func simpleReplacementFunctionArgs(s string, m simpleLuaPatternMatch) []Value {
-	if m.ncap == 0 {
-		return []Value{StringValue(s[m.start:m.end])}
+func simpleReplacementFunctionArgs(s string, m stringpattern.SimplePatternMatch) []Value {
+	if m.NCapture == 0 {
+		return []Value{StringValue(s[m.Start:m.End])}
 	}
-	args := make([]Value, 0, m.ncap)
-	for i := 0; i < m.ncap; i++ {
-		args = append(args, StringValue(s[m.caps[i][0]:m.caps[i][1]]))
+	args := make([]Value, 0, m.NCapture)
+	for i := 0; i < m.NCapture; i++ {
+		args = append(args, StringValue(s[m.Captures[i][0]:m.Captures[i][1]]))
 	}
 	return args
 }
 
-func simpleReplacementTableKey(s string, m simpleLuaPatternMatch) Value {
-	if m.ncap == 0 {
-		return StringValue(s[m.start:m.end])
+func simpleReplacementTableKey(s string, m stringpattern.SimplePatternMatch) Value {
+	if m.NCapture == 0 {
+		return StringValue(s[m.Start:m.End])
 	}
-	return StringValue(s[m.caps[0][0]:m.caps[0][1]])
+	return StringValue(s[m.Captures[0][0]:m.Captures[0][1]])
 }
 
-func expandSimpleLuaReplacement(s string, m simpleLuaPatternMatch, repl string) string {
+func expandSimpleLuaReplacement(s string, m stringpattern.SimplePatternMatch, repl string) string {
 	var b strings.Builder
 	for i := 0; i < len(repl); i++ {
 		if repl[i] != '%' || i+1 >= len(repl) {
@@ -1399,11 +1065,11 @@ func expandSimpleLuaReplacement(s string, m simpleLuaPatternMatch, repl string) 
 		if ch >= '0' && ch <= '9' {
 			idx := int(ch - '0')
 			if idx == 0 {
-				b.WriteString(s[m.start:m.end])
-			} else if idx == 1 && m.ncap == 0 {
-				b.WriteString(s[m.start:m.end])
-			} else if idx > 0 && idx <= m.ncap {
-				b.WriteString(s[m.caps[idx-1][0]:m.caps[idx-1][1]])
+				b.WriteString(s[m.Start:m.End])
+			} else if idx == 1 && m.NCapture == 0 {
+				b.WriteString(s[m.Start:m.End])
+			} else if idx > 0 && idx <= m.NCapture {
+				b.WriteString(s[m.Captures[idx-1][0]:m.Captures[idx-1][1]])
 			}
 			continue
 		}

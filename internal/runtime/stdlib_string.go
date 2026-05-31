@@ -301,8 +301,8 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		}
 
 		// Pattern matching
-		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
-			loc := findBalancedRange(searchStr, open, close, 0)
+		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
+			loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
 			if loc == nil {
 				return []Value{NilValue()}, nil
 			}
@@ -311,14 +311,14 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			return []Value{IntValue(int64(start)), IntValue(int64(end))}, nil
 		}
 		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
-			m, ok := simple.findNext(searchStr, 0)
+			m, ok := simple.FindNext(searchStr, 0)
 			if !ok {
 				return []Value{NilValue()}, nil
 			}
-			start := m.start + init
-			end := m.end + init - 1
+			start := m.Start + init
+			end := m.End + init - 1
 			result := []Value{IntValue(int64(start)), IntValue(int64(end))}
-			if simple.captureCount > 0 {
+			if simple.CaptureCount() > 0 {
 				result = append(result, simpleMatchValues(searchStr, m)...)
 			}
 			return result, nil
@@ -369,15 +369,15 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			return []Value{NilValue()}, nil
 		}
 
-		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
-			loc := findBalancedRange(searchStr, open, close, 0)
+		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
+			loc := stringpattern.FindBalancedRange(searchStr, open, close, 0)
 			if loc == nil {
 				return []Value{NilValue()}, nil
 			}
 			return []Value{StringValue(searchStr[loc[0]:loc[1]])}, nil
 		}
 		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
-			m, ok := simple.findNext(searchStr, 0)
+			m, ok := simple.FindNext(searchStr, 0)
 			if !ok {
 				return []Value{NilValue()}, nil
 			}
@@ -437,8 +437,8 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			return []Value{FunctionValue(iter)}, nil
 		}
 
-		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
-			allMatches := findAllBalancedRanges(searchStr, open, close)
+		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
+			allMatches := stringpattern.FindAllBalancedRanges(searchStr, open, close)
 			idx := 0
 			next := func() (Value, Value, int, error) {
 				if idx >= len(allMatches) {
@@ -466,32 +466,32 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 		if simple, ok := cachedSimpleLuaPattern(pattern); ok {
 			nextStart := 0
 			next := func() (Value, Value, int, error) {
-				m, ok := simple.findNext(searchStr, nextStart)
+				m, ok := simple.FindNext(searchStr, nextStart)
 				if !ok {
 					return NilValue(), NilValue(), 1, nil
 				}
-				nextStart = stringpattern.NextSearchStart(searchStr, m.start, m.end)
-				if m.ncap == 0 {
-					return StringValue(searchStr[m.start:m.end]), NilValue(), 1, nil
+				nextStart = stringpattern.NextSearchStart(searchStr, m.Start, m.End)
+				if m.NCapture == 0 {
+					return StringValue(searchStr[m.Start:m.End]), NilValue(), 1, nil
 				}
-				r0 := StringValue(searchStr[m.caps[0][0]:m.caps[0][1]])
-				if m.ncap == 1 {
+				r0 := StringValue(searchStr[m.Captures[0][0]:m.Captures[0][1]])
+				if m.NCapture == 1 {
 					return r0, NilValue(), 1, nil
 				}
-				return r0, StringValue(searchStr[m.caps[1][0]:m.caps[1][1]]), 2, nil
+				return r0, StringValue(searchStr[m.Captures[1][0]:m.Captures[1][1]]), 2, nil
 			}
 			iter := &GoFunction{
 				Name: "gmatch_iterator",
 				Fn: func(_ []Value) ([]Value, error) {
-					m, ok := simple.findNext(searchStr, nextStart)
+					m, ok := simple.FindNext(searchStr, nextStart)
 					if !ok {
 						return []Value{NilValue()}, nil
 					}
-					nextStart = stringpattern.NextSearchStart(searchStr, m.start, m.end)
+					nextStart = stringpattern.NextSearchStart(searchStr, m.Start, m.End)
 					return simpleMatchValues(searchStr, m), nil
 				},
 			}
-			if simple.captureCount <= 2 {
+			if simple.CaptureCount() <= 2 {
 				iter.FastArg2Ret2 = func(_, _ Value) (Value, Value, int, error) {
 					return next()
 				}
@@ -592,7 +592,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			maxRepl = int(toInt(args[3]))
 		}
 
-		if balanced, open, close := parseStandaloneBalancedPattern(pattern); balanced {
+		if balanced, open, close := stringpattern.ParseStandaloneBalancedPattern(pattern); balanced {
 			count := 0
 			var result string
 			if repl.IsString() {
@@ -623,7 +623,7 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 			var result string
 			if repl.IsString() {
 				replStr := repl.Str()
-				if err := validateLuaReplacementString(replStr, simple.captureCount); err != nil {
+				if err := validateLuaReplacementString(replStr, simple.CaptureCount()); err != nil {
 					return nil, err
 				}
 				result = replaceSimpleLuaPatternString(s, simple, replStr, maxRepl, &count)
