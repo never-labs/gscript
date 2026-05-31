@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
@@ -88,6 +89,9 @@ func TestBinaryLittleEndianOffsetAndErrors(t *testing.T) {
 	if !interp.GetGlobal("badErr").IsString() {
 		t.Fatalf("badErr = %v, want string", interp.GetGlobal("badErr"))
 	}
+	if got := interp.GetGlobal("badErr").Str(); !strings.Contains(got, "binary.unpack: data too short") {
+		t.Fatalf("badErr = %q, want binary.unpack api name", got)
+	}
 }
 
 func TestStringPackAliasesUseGoStyleBinaryFormats(t *testing.T) {
@@ -99,6 +103,7 @@ func TestStringPackAliasesUseGoStyleBinaryFormats(t *testing.T) {
 		a, raw, next := string.unpack("be:u16 bytes:2", packed)
 		fixedSize := string.packsize("be:u16 bytes:2")
 		varSize, varErr := string.packsize("string")
+		bad, badErr := string.unpack("u32", "a")
 	`)
 
 	if got := interp.GetGlobal("hex").Str(); got != "0102676f" {
@@ -121,5 +126,20 @@ func TestStringPackAliasesUseGoStyleBinaryFormats(t *testing.T) {
 	}
 	if !interp.GetGlobal("varErr").IsString() {
 		t.Fatalf("varErr = %v, want string", interp.GetGlobal("varErr"))
+	}
+	if !interp.GetGlobal("bad").IsNil() {
+		t.Fatalf("bad = %v, want nil", interp.GetGlobal("bad"))
+	}
+	if got := interp.GetGlobal("badErr").Str(); !strings.Contains(got, "string.unpack: data too short") {
+		t.Fatalf("badErr = %q, want string.unpack api name", got)
+	}
+}
+
+func TestBinaryPackErrorAPINames(t *testing.T) {
+	if err := runProgramExpectError(t, `binary.pack("bytes:2", "x")`); err == nil || !strings.Contains(err.Error(), "binary.pack: bytes:2 got 1 bytes") {
+		t.Fatalf("binary.pack error = %v, want binary.pack api name", err)
+	}
+	if err := runProgramExpectError(t, `string.pack("bytes:2", "x")`); err == nil || !strings.Contains(err.Error(), "string.pack: bytes:2 got 1 bytes") {
+		t.Fatalf("string.pack error = %v, want string.pack api name", err)
 	}
 }
