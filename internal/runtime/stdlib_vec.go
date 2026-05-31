@@ -2,7 +2,8 @@ package runtime
 
 import (
 	"fmt"
-	"math"
+
+	stdvec "github.com/never-labs/gscript/internal/stdlib/data/vec"
 )
 
 // --------------------------------------------------------------------------
@@ -17,6 +18,10 @@ func newVec2Meta() *Table {
 		tbl := v.Table()
 		return toFloat(tbl.RawGet(StringValue("x"))), toFloat(tbl.RawGet(StringValue("y")))
 	}
+	getVec2 := func(v Value) stdvec.Vec2 {
+		x, y := getXY(v)
+		return stdvec.Vec2{X: x, Y: y}
+	}
 
 	// __add: vec2 + vec2
 	mt.RawSet(StringValue("__add"), FunctionValue(&GoFunction{
@@ -25,9 +30,7 @@ func newVec2Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec2.__add requires 2 arguments")
 			}
-			ax, ay := getXY(args[0])
-			bx, by := getXY(args[1])
-			return []Value{makeVec2Value(ax+bx, ay+by)}, nil
+			return []Value{makeVec2ValueFromStd(stdvec.Add2(getVec2(args[0]), getVec2(args[1])))}, nil
 		},
 	}))
 
@@ -38,9 +41,7 @@ func newVec2Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec2.__sub requires 2 arguments")
 			}
-			ax, ay := getXY(args[0])
-			bx, by := getXY(args[1])
-			return []Value{makeVec2Value(ax-bx, ay-by)}, nil
+			return []Value{makeVec2ValueFromStd(stdvec.Sub2(getVec2(args[0]), getVec2(args[1])))}, nil
 		},
 	}))
 
@@ -55,12 +56,12 @@ func newVec2Meta() *Table {
 			if a.IsTable() && (b.IsNumber() || b.IsInt()) {
 				ax, ay := getXY(a)
 				s := toFloat(b)
-				return []Value{makeVec2Value(ax*s, ay*s)}, nil
+				return []Value{makeVec2ValueFromStd(stdvec.Scale2(stdvec.Vec2{X: ax, Y: ay}, s))}, nil
 			}
 			if (a.IsNumber() || a.IsInt()) && b.IsTable() {
 				s := toFloat(a)
 				bx, by := getXY(b)
-				return []Value{makeVec2Value(s*bx, s*by)}, nil
+				return []Value{makeVec2ValueFromStd(stdvec.Scale2(stdvec.Vec2{X: bx, Y: by}, s))}, nil
 			}
 			return nil, fmt.Errorf("vec2.__mul: unsupported operand types")
 		},
@@ -73,12 +74,11 @@ func newVec2Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec2.__div requires 2 arguments")
 			}
-			ax, ay := getXY(args[0])
 			s := toFloat(args[1])
 			if s == 0 {
 				return nil, fmt.Errorf("vec2.__div: division by zero")
 			}
-			return []Value{makeVec2Value(ax/s, ay/s)}, nil
+			return []Value{makeVec2ValueFromStd(stdvec.Div2(getVec2(args[0]), s))}, nil
 		},
 	}))
 
@@ -89,8 +89,7 @@ func newVec2Meta() *Table {
 			if len(args) < 1 {
 				return nil, fmt.Errorf("vec2.__unm requires 1 argument")
 			}
-			ax, ay := getXY(args[0])
-			return []Value{makeVec2Value(-ax, -ay)}, nil
+			return []Value{makeVec2ValueFromStd(stdvec.Neg2(getVec2(args[0])))}, nil
 		},
 	}))
 
@@ -101,9 +100,7 @@ func newVec2Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec2.__eq requires 2 arguments")
 			}
-			ax, ay := getXY(args[0])
-			bx, by := getXY(args[1])
-			return []Value{BoolValue(ax == bx && ay == by)}, nil
+			return []Value{BoolValue(getVec2(args[0]) == getVec2(args[1]))}, nil
 		},
 	}))
 
@@ -123,6 +120,10 @@ func newVec3Meta() *Table {
 			toFloat(tbl.RawGet(StringValue("y"))),
 			toFloat(tbl.RawGet(StringValue("z")))
 	}
+	getVec3 := func(v Value) stdvec.Vec3 {
+		x, y, z := getXYZ(v)
+		return stdvec.Vec3{X: x, Y: y, Z: z}
+	}
 
 	// __add
 	mt.RawSet(StringValue("__add"), FunctionValue(&GoFunction{
@@ -131,9 +132,7 @@ func newVec3Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec3.__add requires 2 arguments")
 			}
-			ax, ay, az := getXYZ(args[0])
-			bx, by, bz := getXYZ(args[1])
-			return []Value{makeVec3Value(ax+bx, ay+by, az+bz)}, nil
+			return []Value{makeVec3ValueFromStd(stdvec.Add3(getVec3(args[0]), getVec3(args[1])))}, nil
 		},
 	}))
 
@@ -144,9 +143,7 @@ func newVec3Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec3.__sub requires 2 arguments")
 			}
-			ax, ay, az := getXYZ(args[0])
-			bx, by, bz := getXYZ(args[1])
-			return []Value{makeVec3Value(ax-bx, ay-by, az-bz)}, nil
+			return []Value{makeVec3ValueFromStd(stdvec.Sub3(getVec3(args[0]), getVec3(args[1])))}, nil
 		},
 	}))
 
@@ -161,12 +158,12 @@ func newVec3Meta() *Table {
 			if a.IsTable() && (b.IsNumber() || b.IsInt()) {
 				ax, ay, az := getXYZ(a)
 				s := toFloat(b)
-				return []Value{makeVec3Value(ax*s, ay*s, az*s)}, nil
+				return []Value{makeVec3ValueFromStd(stdvec.Scale3(stdvec.Vec3{X: ax, Y: ay, Z: az}, s))}, nil
 			}
 			if (a.IsNumber() || a.IsInt()) && b.IsTable() {
 				s := toFloat(a)
 				bx, by, bz := getXYZ(b)
-				return []Value{makeVec3Value(s*bx, s*by, s*bz)}, nil
+				return []Value{makeVec3ValueFromStd(stdvec.Scale3(stdvec.Vec3{X: bx, Y: by, Z: bz}, s))}, nil
 			}
 			return nil, fmt.Errorf("vec3.__mul: unsupported operand types")
 		},
@@ -179,12 +176,11 @@ func newVec3Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec3.__div requires 2 arguments")
 			}
-			ax, ay, az := getXYZ(args[0])
 			s := toFloat(args[1])
 			if s == 0 {
 				return nil, fmt.Errorf("vec3.__div: division by zero")
 			}
-			return []Value{makeVec3Value(ax/s, ay/s, az/s)}, nil
+			return []Value{makeVec3ValueFromStd(stdvec.Div3(getVec3(args[0]), s))}, nil
 		},
 	}))
 
@@ -195,8 +191,7 @@ func newVec3Meta() *Table {
 			if len(args) < 1 {
 				return nil, fmt.Errorf("vec3.__unm requires 1 argument")
 			}
-			ax, ay, az := getXYZ(args[0])
-			return []Value{makeVec3Value(-ax, -ay, -az)}, nil
+			return []Value{makeVec3ValueFromStd(stdvec.Neg3(getVec3(args[0])))}, nil
 		},
 	}))
 
@@ -207,9 +202,7 @@ func newVec3Meta() *Table {
 			if len(args) < 2 {
 				return nil, fmt.Errorf("vec3.__eq requires 2 arguments")
 			}
-			ax, ay, az := getXYZ(args[0])
-			bx, by, bz := getXYZ(args[1])
-			return []Value{BoolValue(ax == bx && ay == by && az == bz)}, nil
+			return []Value{BoolValue(getVec3(args[0]) == getVec3(args[1]))}, nil
 		},
 	}))
 
@@ -235,6 +228,10 @@ func makeVec2Value(x, y float64) Value {
 	return TableValue(t)
 }
 
+func makeVec2ValueFromStd(v stdvec.Vec2) Value {
+	return makeVec2Value(v.X, v.Y)
+}
+
 func makeVec3Value(x, y, z float64) Value {
 	t := NewTable()
 	t.RawSet(StringValue("x"), FloatValue(x))
@@ -243,6 +240,10 @@ func makeVec3Value(x, y, z float64) Value {
 	t.RawSet(StringValue("_type"), StringValue("vec3"))
 	t.SetMetatable(vec3Meta)
 	return TableValue(t)
+}
+
+func makeVec3ValueFromStd(v stdvec.Vec3) Value {
+	return makeVec3Value(v.X, v.Y, v.Z)
 }
 
 // isVec2 checks if a value is a vec2 table (has _type == "vec2").
@@ -321,15 +322,17 @@ func buildVecLib() *Table {
 		tbl := v.Table()
 		return toFloat(tbl.RawGet(StringValue("x"))), toFloat(tbl.RawGet(StringValue("y")))
 	}
+	getVec2 := func(v Value) stdvec.Vec2 {
+		x, y := getXY(v)
+		return stdvec.Vec2{X: x, Y: y}
+	}
 
 	// vec.dot2(v1, v2)
 	set("dot2", func(args []Value) ([]Value, error) {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.dot2'")
 		}
-		ax, ay := getXY(args[0])
-		bx, by := getXY(args[1])
-		return []Value{FloatValue(ax*bx + ay*by)}, nil
+		return []Value{FloatValue(stdvec.Dot2(getVec2(args[0]), getVec2(args[1])))}, nil
 	})
 
 	// vec.length2(v)
@@ -337,8 +340,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.length2'")
 		}
-		x, y := getXY(args[0])
-		return []Value{FloatValue(math.Sqrt(x*x + y*y))}, nil
+		return []Value{FloatValue(stdvec.Length2(getVec2(args[0])))}, nil
 	})
 
 	// vec.lengthSq2(v)
@@ -346,8 +348,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.lengthSq2'")
 		}
-		x, y := getXY(args[0])
-		return []Value{FloatValue(x*x + y*y)}, nil
+		return []Value{FloatValue(stdvec.LengthSq2(getVec2(args[0])))}, nil
 	})
 
 	// vec.normalize2(v)
@@ -355,12 +356,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.normalize2'")
 		}
-		x, y := getXY(args[0])
-		l := math.Sqrt(x*x + y*y)
-		if l == 0 {
-			return []Value{makeVec2Value(0, 0)}, nil
-		}
-		return []Value{makeVec2Value(x/l, y/l)}, nil
+		return []Value{makeVec2ValueFromStd(stdvec.Normalize2(getVec2(args[0])))}, nil
 	})
 
 	// vec.angle2(v)
@@ -368,8 +364,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.angle2'")
 		}
-		x, y := getXY(args[0])
-		return []Value{FloatValue(math.Atan2(y, x))}, nil
+		return []Value{FloatValue(stdvec.Angle2(getVec2(args[0])))}, nil
 	})
 
 	// vec.rotate2(v, angle)
@@ -377,11 +372,8 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.rotate2'")
 		}
-		x, y := getXY(args[0])
 		angle := toFloat(args[1])
-		cos := math.Cos(angle)
-		sin := math.Sin(angle)
-		return []Value{makeVec2Value(x*cos-y*sin, x*sin+y*cos)}, nil
+		return []Value{makeVec2ValueFromStd(stdvec.Rotate2(getVec2(args[0]), angle))}, nil
 	})
 
 	// vec.lerp2(v1, v2, t)
@@ -389,10 +381,8 @@ func buildVecLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'vec.lerp2'")
 		}
-		ax, ay := getXY(args[0])
-		bx, by := getXY(args[1])
 		t := toFloat(args[2])
-		return []Value{makeVec2Value(ax+(bx-ax)*t, ay+(by-ay)*t)}, nil
+		return []Value{makeVec2ValueFromStd(stdvec.Lerp2(getVec2(args[0]), getVec2(args[1]), t))}, nil
 	})
 
 	// vec.dist2(v1, v2)
@@ -400,10 +390,7 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.dist2'")
 		}
-		ax, ay := getXY(args[0])
-		bx, by := getXY(args[1])
-		dx, dy := ax-bx, ay-by
-		return []Value{FloatValue(math.Sqrt(dx*dx + dy*dy))}, nil
+		return []Value{FloatValue(stdvec.Dist2(getVec2(args[0]), getVec2(args[1])))}, nil
 	})
 
 	// vec.distSq2(v1, v2)
@@ -411,10 +398,7 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.distSq2'")
 		}
-		ax, ay := getXY(args[0])
-		bx, by := getXY(args[1])
-		dx, dy := ax-bx, ay-by
-		return []Value{FloatValue(dx*dx + dy*dy)}, nil
+		return []Value{FloatValue(stdvec.DistSq2(getVec2(args[0]), getVec2(args[1])))}, nil
 	})
 
 	// vec.reflect2(v, normal)
@@ -422,10 +406,7 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.reflect2'")
 		}
-		vx, vy := getXY(args[0])
-		nx, ny := getXY(args[1])
-		dot := vx*nx + vy*ny
-		return []Value{makeVec2Value(vx-2*dot*nx, vy-2*dot*ny)}, nil
+		return []Value{makeVec2ValueFromStd(stdvec.Reflect2(getVec2(args[0]), getVec2(args[1])))}, nil
 	})
 
 	// vec.perp2(v) -> (-y, x)
@@ -433,8 +414,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.perp2'")
 		}
-		x, y := getXY(args[0])
-		return []Value{makeVec2Value(-y, x)}, nil
+		return []Value{makeVec2ValueFromStd(stdvec.Perp2(getVec2(args[0])))}, nil
 	})
 
 	// vec.clamp2(v, min, max)
@@ -443,7 +423,7 @@ func buildVecLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'vec.clamp2'")
 		}
-		vx, vy := getXY(args[0])
+		v := getVec2(args[0])
 
 		var minX, minY, maxX, maxY float64
 		if args[1].IsTable() {
@@ -459,9 +439,7 @@ func buildVecLib() *Table {
 			maxY = maxX
 		}
 
-		cx := math.Max(minX, math.Min(maxX, vx))
-		cy := math.Max(minY, math.Min(maxY, vy))
-		return []Value{makeVec2Value(cx, cy)}, nil
+		return []Value{makeVec2ValueFromStd(stdvec.Clamp2(v, stdvec.Vec2{X: minX, Y: minY}, stdvec.Vec2{X: maxX, Y: maxY}))}, nil
 	})
 
 	// vec.isVec2(v)
@@ -481,6 +459,10 @@ func buildVecLib() *Table {
 		return toFloat(tbl.RawGet(StringValue("x"))),
 			toFloat(tbl.RawGet(StringValue("y"))),
 			toFloat(tbl.RawGet(StringValue("z")))
+	}
+	getVec3 := func(v Value) stdvec.Vec3 {
+		x, y, z := getXYZ(v)
+		return stdvec.Vec3{X: x, Y: y, Z: z}
 	}
 
 	// vec.vec3(x, y, z)
@@ -510,9 +492,7 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.dot3'")
 		}
-		ax, ay, az := getXYZ(args[0])
-		bx, by, bz := getXYZ(args[1])
-		return []Value{FloatValue(ax*bx + ay*by + az*bz)}, nil
+		return []Value{FloatValue(stdvec.Dot3(getVec3(args[0]), getVec3(args[1])))}, nil
 	})
 
 	// vec.cross3(v1, v2)
@@ -520,13 +500,7 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.cross3'")
 		}
-		ax, ay, az := getXYZ(args[0])
-		bx, by, bz := getXYZ(args[1])
-		return []Value{makeVec3Value(
-			ay*bz-az*by,
-			az*bx-ax*bz,
-			ax*by-ay*bx,
-		)}, nil
+		return []Value{makeVec3ValueFromStd(stdvec.Cross3(getVec3(args[0]), getVec3(args[1])))}, nil
 	})
 
 	// vec.length3(v)
@@ -534,8 +508,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.length3'")
 		}
-		x, y, z := getXYZ(args[0])
-		return []Value{FloatValue(math.Sqrt(x*x + y*y + z*z))}, nil
+		return []Value{FloatValue(stdvec.Length3(getVec3(args[0])))}, nil
 	})
 
 	// vec.normalize3(v)
@@ -543,12 +516,7 @@ func buildVecLib() *Table {
 		if len(args) < 1 {
 			return nil, fmt.Errorf("bad argument to 'vec.normalize3'")
 		}
-		x, y, z := getXYZ(args[0])
-		l := math.Sqrt(x*x + y*y + z*z)
-		if l == 0 {
-			return []Value{makeVec3Value(0, 0, 0)}, nil
-		}
-		return []Value{makeVec3Value(x/l, y/l, z/l)}, nil
+		return []Value{makeVec3ValueFromStd(stdvec.Normalize3(getVec3(args[0])))}, nil
 	})
 
 	// vec.lerp3(v1, v2, t)
@@ -556,14 +524,8 @@ func buildVecLib() *Table {
 		if len(args) < 3 {
 			return nil, fmt.Errorf("bad argument to 'vec.lerp3'")
 		}
-		ax, ay, az := getXYZ(args[0])
-		bx, by, bz := getXYZ(args[1])
 		t := toFloat(args[2])
-		return []Value{makeVec3Value(
-			ax+(bx-ax)*t,
-			ay+(by-ay)*t,
-			az+(bz-az)*t,
-		)}, nil
+		return []Value{makeVec3ValueFromStd(stdvec.Lerp3(getVec3(args[0]), getVec3(args[1]), t))}, nil
 	})
 
 	// vec.dist3(v1, v2)
@@ -571,10 +533,7 @@ func buildVecLib() *Table {
 		if len(args) < 2 {
 			return nil, fmt.Errorf("bad argument to 'vec.dist3'")
 		}
-		ax, ay, az := getXYZ(args[0])
-		bx, by, bz := getXYZ(args[1])
-		dx, dy, dz := ax-bx, ay-by, az-bz
-		return []Value{FloatValue(math.Sqrt(dx*dx + dy*dy + dz*dz))}, nil
+		return []Value{FloatValue(stdvec.Dist3(getVec3(args[0]), getVec3(args[1])))}, nil
 	})
 
 	// vec.isVec3(v)
