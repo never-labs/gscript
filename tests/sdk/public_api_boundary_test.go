@@ -1,7 +1,12 @@
 package gscript_test
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -95,6 +100,45 @@ func TestRootPackageGoDocHidesRawRuntimeValues(t *testing.T) {
 	} {
 		if strings.Contains(out, forbidden) {
 			t.Fatalf("root package go doc exposes %q:\n%s", forbidden, out)
+		}
+	}
+}
+
+func TestRootPackageLLMProviderImplementationsStayOutOfRoot(t *testing.T) {
+	files := parseRootPackageFiles(t)
+	allowedRootConcrete := map[string]bool{
+		// Existing compatibility providers are still in the root package while
+		// they are migrated. New providers should live under llm/... and be
+		// exposed from root only through compatibility aliases or constructors.
+		"AnthropicCompatibleLLMProvider": true,
+		"OpenAICompatibleLLMProvider":    true,
+	}
+	seenConcrete := map[string]bool{}
+
+	for filename, file := range files {
+		imports := importAliases(file)
+		ast.Inspect(file, func(node ast.Node) bool {
+			spec, ok := node.(*ast.TypeSpec)
+			if !ok || !ast.IsExported(spec.Name.Name) || !strings.Contains(spec.Name.Name, "LLMProvider") {
+				return true
+			}
+			if isTypeAliasToLLMSubpackage(spec, imports) {
+				return true
+			}
+			if _, ok := spec.Type.(*ast.StructType); ok {
+				if allowedRootConcrete[spec.Name.Name] {
+					seenConcrete[spec.Name.Name] = true
+					return true
+				}
+				t.Fatalf("%s defines root LLM provider implementation %s; add provider implementations under github.com/never-labs/gscript/llm/... and keep root as a facade", filepath.Base(filename), spec.Name.Name)
+			}
+			return true
+		})
+	}
+
+	for name := range allowedRootConcrete {
+		if !seenConcrete[name] {
+			t.Fatalf("root concrete provider allowlist contains %s, but it no longer exists; remove the allowlist entry", name)
 		}
 	}
 }
@@ -211,5 +255,55 @@ func assertNoInternalRuntimeType(t *testing.T, name string, typ reflect.Type) {
 	signature := typ.String()
 	if strings.Contains(signature, "/internal/runtime.") || strings.Contains(signature, "runtime.Value") || strings.Contains(signature, "runtime.Interpreter") {
 		t.Fatalf("%s exposes internal runtime in recommended API signature: %s", name, signature)
+	}
+}
+
+func parseRootPackageFiles(t *testing.T) map[string]*ast.File {
+	t.Helper()
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, repoRoot(t), func(info os.FileInfo) bool {
+		return !strings.HasSuffix(info.Name(), "_test.go")
+	}, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse root package: %v", err)
+	}
+	files, ok := pkgs["gscript"]
+	if !ok {
+		t.Fatal("root package gscript not found")
+	}
+	return files.Files
+}
+
+func importAliases(file *ast.File) map[string]string {
+	aliases := map[string]string{}
+	for _, spec := range file.Imports {
+		name := ""
+		if spec.Name != nil {
+			name = spec.Name.Name
+		} else {
+			parts := strings.Split(strings.Trim(spec.Path.Value, `"`), "/")
+			name = parts[len(parts)-1]
+		}
+		aliases[name] = strings.Trim(spec.Path.Value, `"`)
+	}
+	return aliases
+}
+
+func isTypeAliasToLLMSubpackage(spec *ast.TypeSpec, imports map[string]string) bool {
+	if spec.Assign == 0 {
+		return false
+	}
+	switch typ := spec.Type.(type) {
+	case *ast.SelectorExpr:
+		ident, ok := typ.X.(*ast.Ident)
+		if !ok {
+			return false
+		}
+		path := imports[ident.Name]
+		return path == "github.com/never-labs/gscript/llm" || strings.HasPrefix(path, "github.com/never-labs/gscript/llm/")
+	case *ast.Ident:
+		return typ.Name == "LLMProvider"
+	default:
+		return false
 	}
 }
