@@ -54,6 +54,9 @@ func (interp *Interpreter) SetEnvironmentAllowlist(names []string) {
 
 func (interp *Interpreter) refreshOSLib() {
 	if v, ok := interp.globals.Get("os"); ok && v.IsTable() {
+		if v.Table().RawGetString("__stdlibrt_module").Truthy() {
+			return
+		}
 		osLib := TableValue(buildOSLibWithPolicy(
 			interp.environmentRead,
 			interp.environmentWrite,

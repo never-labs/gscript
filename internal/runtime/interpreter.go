@@ -290,6 +290,9 @@ func (interp *Interpreter) refreshFSLib() {
 		return
 	}
 	if v, ok := interp.globals.Get("fs"); ok && v.IsTable() {
+		if v.Table().RawGetString("__stdlibrt_module").Truthy() {
+			return
+		}
 		fs := TableValue(buildFSLibWithCapabilities(interp.filesystemRoot, interp.filesystemRead, interp.filesystemWrite, interp.maxFSReadBytes, interp.maxFSWriteBytes))
 		interp.globals.Define("fs", fs)
 		interp.modules["fs"] = fs

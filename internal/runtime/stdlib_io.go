@@ -220,6 +220,9 @@ func buildIOLib(interps ...*Interpreter) *Table {
 
 func (interp *Interpreter) refreshIOLib() {
 	if v, ok := interp.globals.Get("io"); ok && v.IsTable() {
+		if v.Table().RawGetString("__stdlibrt_module").Truthy() {
+			return
+		}
 		ioLib := TableValue(buildIOLib(interp))
 		interp.globals.Define("io", ioLib)
 		interp.modules["io"] = ioLib
