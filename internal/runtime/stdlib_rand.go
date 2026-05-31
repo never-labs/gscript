@@ -2,9 +2,10 @@ package runtime
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"time"
+
+	stdrand "github.com/never-labs/gscript/internal/stdlib/base/rand"
 )
 
 // buildRandLib creates the "rand" standard library table.
@@ -50,17 +51,17 @@ func buildRandLib() *Table {
 	set("int", func(args []Value) ([]Value, error) {
 		if len(args) == 0 {
 			// Mask to 47 bits to guarantee NaN-boxed int (not float promotion).
-			return []Value{IntValue(rng.Int63() & 0x7FFFFFFFFFFF)}, nil
+			return []Value{IntValue(stdrand.MaskInt48(rng.Int63()))}, nil
 		}
 		if len(args) == 1 {
 			if err := requireNumber("rand.int", 1, args[0]); err != nil {
 				return nil, err
 			}
-			max := toInt(args[0])
-			if max <= 0 {
+			n, err := stdrand.IntBelow(rng.Int63n, toInt(args[0]))
+			if err != nil {
 				return nil, fmt.Errorf("bad argument #1 to 'rand.int' (positive number expected)")
 			}
-			return []Value{IntValue(rng.Int63n(max))}, nil
+			return []Value{IntValue(n)}, nil
 		}
 		if err := requireNumber("rand.int", 1, args[0]); err != nil {
 			return nil, err
@@ -70,10 +71,11 @@ func buildRandLib() *Table {
 		}
 		min := toInt(args[0])
 		max := toInt(args[1])
-		if min > max {
+		span, err := stdrand.InclusiveSpan(min, max)
+		if err != nil {
 			return nil, fmt.Errorf("bad argument to 'rand.int' (min > max)")
 		}
-		return []Value{IntValue(min + rng.Int63n(max-min+1))}, nil
+		return []Value{IntValue(min + rng.Int63n(span))}, nil
 	})
 
 	// rand.float() - random float64 in [0.0, 1.0)
@@ -101,7 +103,11 @@ func buildRandLib() *Table {
 				return nil, fmt.Errorf("bad argument #2 to 'rand.normal' (non-negative stddev expected)")
 			}
 		}
-		return []Value{FloatValue(rng.NormFloat64()*stddev + mean)}, nil
+		n, err := stdrand.Normal(rng.NormFloat64, mean, stddev)
+		if err != nil {
+			return nil, fmt.Errorf("bad argument #2 to 'rand.normal' (non-negative stddev expected)")
+		}
+		return []Value{FloatValue(n)}, nil
 	})
 
 	// rand.exp([rate]) - sample from exponential distribution
@@ -117,7 +123,11 @@ func buildRandLib() *Table {
 				return nil, fmt.Errorf("bad argument #1 to 'rand.exp' (positive rate expected)")
 			}
 		}
-		return []Value{FloatValue(rng.ExpFloat64() / rate)}, nil
+		n, err := stdrand.Exponential(rng.ExpFloat64, rate)
+		if err != nil {
+			return nil, fmt.Errorf("bad argument #1 to 'rand.exp' (positive rate expected)")
+		}
+		return []Value{FloatValue(n)}, nil
 	})
 
 	// rand.bool() - random boolean (50/50)
@@ -177,11 +187,9 @@ func buildRandLib() *Table {
 		tbl := args[0].Table()
 		n := int(toInt(args[1]))
 		length := tbl.Length()
-		if n < 0 {
+		n, err := stdrand.ClampSampleCount(n, length)
+		if err != nil {
 			return nil, fmt.Errorf("bad argument #2 to 'rand.sample' (non-negative count expected)")
-		}
-		if n > length {
-			n = length
 		}
 		// Copy indices
 		indices := make([]int, length)
@@ -204,15 +212,8 @@ func buildRandLib() *Table {
 		for i := range uuid {
 			uuid[i] = byte(rng.Intn(256))
 		}
-		uuid[6] = (uuid[6] & 0x0f) | 0x40 // Version 4
-		uuid[8] = (uuid[8] & 0x3f) | 0x80 // Variant
-		s := fmt.Sprintf("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-			uuid[0], uuid[1], uuid[2], uuid[3],
-			uuid[4], uuid[5],
-			uuid[6], uuid[7],
-			uuid[8], uuid[9],
-			uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15])
-		return []Value{StringValue(s)}, nil
+		stdrand.PrepareUUIDV4(&uuid)
+		return []Value{StringValue(stdrand.FormatUUID(uuid))}, nil
 	})
 
 	// rand.bytes(n) - generate n random bytes as a string
@@ -224,12 +225,9 @@ func buildRandLib() *Table {
 			return nil, err
 		}
 		n := int(toInt(args[0]))
-		if n < 0 {
+		buf, err := stdrand.Bytes(n, func() byte { return byte(rng.Intn(256)) })
+		if err != nil {
 			return nil, fmt.Errorf("bad argument #1 to 'rand.bytes' (non-negative number expected)")
-		}
-		buf := make([]byte, n)
-		for i := range buf {
-			buf[i] = byte(rng.Intn(256))
 		}
 		return []Value{StringValue(string(buf))}, nil
 	})
@@ -253,8 +251,7 @@ func buildRandLib() *Table {
 			return []Value{NilValue()}, nil
 		}
 
-		// Calculate total weight
-		total := 0.0
+		weightValues := make([]float64, length)
 		for i := 1; i <= length; i++ {
 			w := weights.RawGet(IntValue(int64(i)))
 			if w.IsNil() {
@@ -263,28 +260,15 @@ func buildRandLib() *Table {
 			if !w.IsNumber() {
 				return nil, fmt.Errorf("rand.weighted: weight at index %d is not a number", i)
 			}
-			wf := toFloat(w)
-			if math.IsNaN(wf) || wf < 0 {
-				return nil, fmt.Errorf("rand.weighted: negative weight at index %d", i)
-			}
-			total += wf
+			weightValues[i-1] = toFloat(w)
 		}
-		if total == 0 || math.IsInf(total, 0) || math.IsNaN(total) {
-			return nil, fmt.Errorf("rand.weighted: invalid total weight")
+		total, err := stdrand.ValidateWeights(weightValues)
+		if err != nil {
+			return nil, fmt.Errorf("rand.weighted: %s", err)
 		}
 
-		// Pick random point
-		r := rng.Float64() * total
-		cumulative := 0.0
-		for i := 1; i <= length; i++ {
-			w := weights.RawGet(IntValue(int64(i)))
-			cumulative += toFloat(w)
-			if r < cumulative {
-				return []Value{items.RawGet(IntValue(int64(i)))}, nil
-			}
-		}
-		// Fallback to last element (floating point edge case)
-		return []Value{items.RawGet(IntValue(int64(length)))}, nil
+		idx := stdrand.WeightedIndex(weightValues, rng.Float64()*total)
+		return []Value{items.RawGet(IntValue(int64(idx + 1)))}, nil
 	})
 
 	// rand.timeSeed() - seed with current time (convenience)
@@ -292,7 +276,7 @@ func buildRandLib() *Table {
 		seed := time.Now().UnixNano()
 		rng.Seed(seed)
 		// Mask seed to 47 bits to guarantee NaN-boxed int (not float promotion).
-		return []Value{IntValue(seed & 0x7FFFFFFFFFFF)}, nil
+		return []Value{IntValue(stdrand.MaskInt48(seed))}, nil
 	})
 
 	return t
