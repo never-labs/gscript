@@ -178,16 +178,6 @@ func loadOptionalCLIProjectConfig(start string) (*cliProjectConfig, []cliConfigD
 	return report.Config, report.Diagnostics, nil
 }
 
-func flagWasSet(fs *flag.FlagSet, name string) bool {
-	found := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
-}
-
 func printCLIConfigDiagnostics(errw io.Writer, path string, diagnostics []cliConfigDiagnostic) {
 	for _, diag := range diagnostics {
 		if diag.Line > 0 && path != "" {

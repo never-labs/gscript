@@ -22,14 +22,7 @@ func runRunCommand(args []string, outw, errw io.Writer) int {
 		return 2
 	}
 
-	vmExplicit := flagWasSet(fs, "vm")
-	jitExplicit := flagWasSet(fs, "jit")
-	if vmExplicit && !jitExplicit {
-		*useJIT = false
-	}
-	if *useJIT {
-		*useVM = true
-	}
+	resolveVMJITFlags(fs, useVM, useJIT)
 
 	filename := paths[0]
 	if err := runPublicScriptFile(filename, paths[1:], cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}); err != nil {

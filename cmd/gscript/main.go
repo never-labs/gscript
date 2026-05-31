@@ -119,25 +119,7 @@ func main() {
 		}()
 	}
 
-	// Determine which flags were explicitly set by the user.
-	vmExplicit := false
-	jitExplicit := false
-	flag.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "vm":
-			vmExplicit = true
-		case "jit":
-			jitExplicit = true
-		}
-	})
-
-	// -vm without -jit means "VM only, no JIT".
-	if vmExplicit && !jitExplicit {
-		*useJIT = false
-	}
-	if *useJIT {
-		*useVM = true
-	}
+	resolveVMJITFlags(flag.CommandLine, useVM, useJIT)
 
 	runOpts := cliRunOptions{
 		UseVM:        *useVM,

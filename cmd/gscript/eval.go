@@ -22,14 +22,7 @@ func runEvalCommand(args []string, outw, errw io.Writer) int {
 		return 2
 	}
 
-	vmExplicit := flagWasSet(fs, "vm")
-	jitExplicit := flagWasSet(fs, "jit")
-	if vmExplicit && !jitExplicit {
-		*useJIT = false
-	}
-	if *useJIT {
-		*useVM = true
-	}
+	resolveVMJITFlags(fs, useVM, useJIT)
 
 	vm := gscript.New(publicRunOptions(cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}, "<eval>", rest[1:])...)
 	prog, err := gscript.Compile(rest[0], gscript.WithSourceName("<eval>"))
