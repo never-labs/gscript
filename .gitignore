@@ -8,6 +8,19 @@ game_engine
 # Profiling
 *.prof
 __pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local benchmark artifacts
+/benchmarks/data/strict_guard_latest.json
+/benchmarks/data/strict_guard_latest.md
+/benchmarks/data/*_latest.json
+/benchmarks/data/*_latest.md
+/benchmarks/data/*_gate.json
+/benchmarks/data/*_gate.md
+/benchmark_artifacts/
+/benchmark-results/
 
 # IDE / editor
 .idea/
@@ -39,7 +52,3 @@ __pycache__/
 # Local architecture review artifacts
 /docs/methodjit-architecture-optimization-plan.html
 /docs/methodjit-optimizer-pipeline.html
-
-# Transient strict_guard "latest" output (committed snapshots are baseline.json + history/)
-/benchmarks/data/strict_guard_latest.json
-/benchmarks/data/strict_guard_latest.md

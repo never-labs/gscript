@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 import unittest
 from dataclasses import asdict
@@ -26,6 +27,38 @@ def args(**overrides):
 
 
 class TimingCompareDiagnosticTest(unittest.TestCase):
+    def test_discovery_matches_domain_manifest_benchmark_ids(self):
+        root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((root / "benchmarks" / "manifest.json").read_text())
+        expected = {row["id"] for row in manifest["benchmarks"]}
+        specs = timing.discover_specs(root, timing.GROUPS)
+        self.assertEqual({spec.benchmark_id for spec in specs}, expected)
+
+    def test_select_specs_accepts_legacy_group_selector_aliases(self):
+        root = Path(__file__).resolve().parents[1]
+        specs = timing.discover_specs(root, timing.GROUPS)
+
+        self.assertEqual(
+            [spec.benchmark_id for spec in timing.select_specs(specs, ["data_oriented/soa_dot"])],
+            ["data/soa_dot"],
+        )
+        self.assertEqual(
+            [spec.benchmark_id for spec in timing.select_specs(specs, ["extended/goroutine_sleep"])],
+            ["concurrency/goroutine_sleep"],
+        )
+        self.assertEqual(
+            [spec.benchmark_id for spec in timing.select_specs(specs, ["official/events_metamethod_hot"])],
+            ["table/events_metamethod"],
+        )
+
+    def test_scale_overrides_accept_legacy_group_selector_aliases(self):
+        root = Path(__file__).resolve().parents[1]
+        specs = timing.select_specs(timing.discover_specs(root, timing.GROUPS), ["extended/goroutine_sleep"])
+        overrides = timing.parse_scale_overrides(["extended/goroutine_sleep:N=10"])
+
+        timing.validate_scale_selectors(specs, overrides)
+        self.assertEqual(timing.scale_overrides_for(specs[0], overrides), overrides)
+
     def test_conformance_low_resolution_gets_concrete_rerun_advice(self):
         spec = timing.BenchmarkSpec(
             "calls",

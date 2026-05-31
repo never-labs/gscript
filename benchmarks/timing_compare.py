@@ -690,7 +690,35 @@ def canonical_group(group: str) -> list[str]:
 
 
 def canonical_selector(selector: str) -> str:
-    return LEGACY_BENCH_ALIASES.get(selector, selector)
+    if selector in LEGACY_BENCH_ALIASES:
+        return LEGACY_BENCH_ALIASES[selector]
+    if "/" not in selector:
+        return selector
+    group, name = selector.split("/", 1)
+    groups = LEGACY_GROUP_ALIASES.get(group)
+    if groups and len(groups) == 1:
+        return f"{groups[0]}/{name}"
+    return selector
+
+
+def selector_candidates(selector: str) -> list[str]:
+    canonical = canonical_selector(selector)
+    out = [canonical]
+    if canonical != selector or "/" not in selector:
+        return out
+    group, name = selector.split("/", 1)
+    for canonical_group_name in LEGACY_GROUP_ALIASES.get(group, []):
+        candidate = f"{canonical_group_name}/{name}"
+        if candidate not in out:
+            out.append(candidate)
+        hot_candidate = f"{canonical_group_name}/{name.removesuffix('_hot')}"
+        if hot_candidate not in out:
+            out.append(hot_candidate)
+    return out
+
+
+def selector_matches(selector: str, allowed: set[str]) -> bool:
+    return any(candidate in allowed for candidate in selector_candidates(selector))
 
 
 def canonical_groups(groups: list[str]) -> list[str]:
@@ -728,13 +756,13 @@ def select_specs(specs: list[BenchmarkSpec], selectors: list[str] | None) -> lis
         return specs
     out: list[BenchmarkSpec] = []
     for raw_selector in selectors:
-        selector = canonical_selector(raw_selector)
-        matches = [spec for spec in specs if selector in {spec.name, spec.benchmark_id}]
+        candidates = selector_candidates(raw_selector)
+        matches = [spec for spec in specs if spec.name in candidates or spec.benchmark_id in candidates]
         if not matches:
             raise SystemExit(f"unknown benchmark selector: {raw_selector}")
-        if len(matches) > 1 and "/" not in selector:
+        if len(matches) > 1 and "/" not in candidates[0]:
             ids = ", ".join(spec.benchmark_id for spec in matches)
-            raise SystemExit(f"ambiguous benchmark selector {selector!r}; use one of: {ids}")
+            raise SystemExit(f"ambiguous benchmark selector {candidates[0]!r}; use one of: {ids}")
         for match in matches:
             if match not in out:
                 out.append(match)
@@ -764,19 +792,19 @@ def parse_scale_overrides(values: list[str] | None) -> list[ScaleOverride]:
 
 def scale_overrides_for(spec: BenchmarkSpec, overrides: list[ScaleOverride]) -> list[ScaleOverride]:
     selectors = {spec.name, spec.benchmark_id}
-    return [override for override in overrides if override.selector is None or override.selector in selectors]
+    return [override for override in overrides if override.selector is None or selector_matches(override.selector, selectors)]
 
 
 def validate_scale_selectors(specs: list[BenchmarkSpec], overrides: list[ScaleOverride]) -> None:
     selectors = {spec.name for spec in specs} | {spec.benchmark_id for spec in specs}
     for override in overrides:
-        if override.selector is not None and override.selector not in selectors:
+        if override.selector is not None and not selector_matches(override.selector, selectors):
             raise SystemExit(f"unknown --scale/--param selector: {override.selector}")
 
 
 def filter_scale_overrides_for_specs(specs: list[BenchmarkSpec], overrides: list[ScaleOverride]) -> list[ScaleOverride]:
     selectors = {spec.name for spec in specs} | {spec.benchmark_id for spec in specs}
-    return [override for override in overrides if override.selector is None or override.selector in selectors]
+    return [override for override in overrides if override.selector is None or selector_matches(override.selector, selectors)]
 
 
 def format_scale_overrides(overrides: list[ScaleOverride]) -> list[str]:

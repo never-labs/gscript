@@ -1,4 +1,5 @@
 import argparse
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -162,6 +163,12 @@ class StrictGuardReportTest(unittest.TestCase):
         self.assertEqual(sg.repeat_for(overrides, "default", "sieve"), 8)
         self.assertIsNone(sg.repeat_for(overrides, "vm", "sieve"))
 
+    def test_repeat_overrides_accept_legacy_group_selector_aliases(self):
+        overrides = sg.parse_repeat_overrides(["data_oriented/soa_dot=5", "default/extended/goroutine_sleep=7"])
+
+        self.assertEqual(sg.repeat_for(overrides, "vm", "soa_dot", "data/soa_dot"), 5)
+        self.assertEqual(sg.repeat_for(overrides, "default", "goroutine_sleep", "concurrency/goroutine_sleep"), 7)
+
     def test_discovery_includes_all_groups(self):
         root = Path(__file__).resolve().parents[1]
         specs = sg.discover_specs(root, ["numeric", "recursion", "table", "calls", "string", "app", "control"])
@@ -170,6 +177,30 @@ class StrictGuardReportTest(unittest.TestCase):
         self.assertIn("numeric/matmul_dense", ids)
         self.assertIn("table/json_table_walk", ids)
         self.assertIn("numeric/matmul_row", ids)
+
+    def test_discovery_matches_domain_manifest_benchmark_ids(self):
+        root = Path(__file__).resolve().parents[1]
+        manifest = json.loads((root / "benchmarks" / "manifest.json").read_text())
+        expected = {row["id"] for row in manifest["benchmarks"]}
+        specs = sg.discover_specs(root, sg.ALL_GROUPS)
+        self.assertEqual({spec.benchmark_id for spec in specs}, expected)
+
+    def test_select_specs_accepts_legacy_group_selector_aliases(self):
+        root = Path(__file__).resolve().parents[1]
+        specs = sg.discover_specs(root, sg.ALL_GROUPS)
+
+        self.assertEqual(
+            [spec.benchmark_id for spec in sg.select_specs(specs, ["data_oriented/soa_dot"])],
+            ["data/soa_dot"],
+        )
+        self.assertEqual(
+            [spec.benchmark_id for spec in sg.select_specs(specs, ["extended/goroutine_sleep"])],
+            ["concurrency/goroutine_sleep"],
+        )
+        self.assertEqual(
+            [spec.benchmark_id for spec in sg.select_specs(specs, ["official/events_metamethod_hot"])],
+            ["table/events_metamethod"],
+        )
 
     def test_discovery_supports_legacy_official_group_alias(self):
         root = Path(__file__).resolve().parents[1]

@@ -11,6 +11,8 @@ LIST_ONLY=0
 OUT_DIR=""
 ARTIFACT_PLAN=""
 ARTIFACT_COMMAND_LOG=""
+SMOKE_SCRIPT="tests/smoke/01_basic.gs"
+EXPECTED_MODULE_PATH="github.com/never-labs/gscript"
 
 usage() {
     cat <<'EOF'
@@ -182,13 +184,41 @@ add_documentation_references() {
     add_run "Documentation References" "bash scripts/docs_check.sh"
 }
 
+add_manifest_coverage() {
+    if [ ! -f tests/manifest.py ]; then
+        add_skip "Manifest Coverage" "missing tests/manifest.py"
+        return
+    fi
+    if [ ! -f tests/manifest.json ]; then
+        add_skip "Manifest Coverage" "missing tests/manifest.json"
+        return
+    fi
+    if [ ! -f benchmarks/manifest.json ]; then
+        add_skip "Manifest Coverage" "missing benchmarks/manifest.json"
+        return
+    fi
+    if ! have_cmd python3; then
+        add_skip "Manifest Coverage" "missing python3"
+        return
+    fi
+    add_run "Manifest Coverage" "python3 tests/manifest.py check tests benchmarks"
+}
+
+add_module_path_gate() {
+    if ! have_cmd go; then
+        add_skip "Module Path Gate" "missing go"
+        return
+    fi
+    add_run "Module Path Gate" "test \"\$(go list -m)\" = \"$EXPECTED_MODULE_PATH\""
+}
+
 add_release_smoke() {
     if ! have_cmd go; then
         add_skip "Release Smoke" "missing go"
         return
     fi
-    if [ ! -f tests/smoke/01_basic.gs ]; then
-        add_skip "Release Smoke" "missing tests/smoke/01_basic.gs"
+    if [ ! -f "$SMOKE_SCRIPT" ]; then
+        add_skip "Release Smoke" "missing $SMOKE_SCRIPT"
         return
     fi
     if [ ! -f benchmarks/table/table_field_access.gs ]; then
@@ -196,7 +226,7 @@ add_release_smoke() {
         return
     fi
     add_run "Release Smoke" \
-        "go run ./cmd/gscript tests/smoke/01_basic.gs && go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs && go run ./cmd/gscript inspect bytecode tests/smoke/01_basic.gs"
+        "go run ./cmd/gscript $SMOKE_SCRIPT && go run ./cmd/gscript -jit benchmarks/table/table_field_access.gs && go run ./cmd/gscript inspect bytecode $SMOKE_SCRIPT"
 }
 
 build_quick_plan() {
@@ -208,6 +238,8 @@ build_quick_plan() {
         "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
     add_go_test "Stdlib Contract" \
         "go test ./tests -run TestStdlibContract -count=1"
+    add_manifest_coverage
+    add_module_path_gate
     add_documentation_references
 }
 
@@ -220,6 +252,8 @@ build_full_plan() {
         "go test ./tests -run LanguageConformance -count=1"
     add_go_test "Release Matrix Metadata" \
         "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
+    add_manifest_coverage
+    add_module_path_gate
     add_documentation_references
     add_performance_gate
     add_release_smoke

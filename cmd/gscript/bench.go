@@ -13,6 +13,9 @@ import (
 var benchExecCommand = exec.Command
 
 func runBenchCommand(args []string, outw, errw io.Writer) int {
+	if len(args) == 1 && args[0] == "--manifest-check" {
+		return runManifestCheckRoots([]string{"benchmarks"}, outw, errw)
+	}
 	if len(args) == 0 {
 		return runBenchHarness("compare", []string{"--bench", "control/sieve", "--runs", "1", "--warmup", "0", "--timeout", "60"}, outw, errw)
 	}

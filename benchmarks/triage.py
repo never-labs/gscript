@@ -24,6 +24,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import timing_compare as timing_harness
+
 
 PPROF_ROW_RE = re.compile(
     r"^\s*(?P<flat>[0-9.]+)(?P<flat_unit>ns|us|ms|s)?\s+"
@@ -91,7 +93,7 @@ def run_split(cmd: list[str], cwd: Path, timeout: int | None = None) -> subproce
     )
 
 
-BENCHMARK_GROUPS = ("numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control")
+BENCHMARK_GROUPS = tuple(timing_harness.GROUPS)
 
 
 def bench_id_to_path(root: Path, bench: str) -> tuple[str, str, Path] | None:
@@ -103,27 +105,30 @@ def bench_id_to_path(root: Path, bench: str) -> tuple[str, str, Path] | None:
 
 
 def bench_script_path(root: Path, bench: str) -> Path | None:
-    if "/" in bench:
-        group, name = bench.split("/", 1)
-        legacy = {
-            "suite": ("numeric", "recursion", "table", "calls", "string", "control"),
-            "extended": ("app", "table", "string", "concurrency"),
-            "variants": ("recursion", "calls", "numeric", "table"),
-            "official": ("calls", "control", "table", "string", "app"),
-            "data_oriented": ("data",),
-        }
-        if group == "variants":
-            name = {"closure_accumulator_variant": "closure_accumulator", "matmul_row_variant": "matmul_row"}.get(name, name)
-        if group in {"official", "data_oriented"}:
-            name = name.removesuffix("_hot")
-        groups = list(legacy.get(group, (group,)))
-    else:
-        name = bench
-        groups = list(BENCHMARK_GROUPS)
-    for group in groups:
-        path = root / "benchmarks" / group / f"{name}.gs"
-        if path.exists():
-            return path
+    candidates = timing_harness.selector_candidates(bench) if "/" in bench else [bench]
+    for candidate in candidates:
+        if "/" in candidate:
+            group, name = candidate.split("/", 1)
+            groups = [group]
+        else:
+            name = candidate
+            groups = list(BENCHMARK_GROUPS)
+        for group in groups:
+            path = root / "benchmarks" / group / f"{name}.gs"
+            if path.exists():
+                return path
+        variant_name = name.removesuffix("_variant")
+        if variant_name != name:
+            for group in groups:
+                path = root / "benchmarks" / group / f"{variant_name}.gs"
+                if path.exists():
+                    return path
+        hot_name = name.removesuffix("_hot")
+        if hot_name != name:
+            for group in groups:
+                path = root / "benchmarks" / group / f"{hot_name}.gs"
+                if path.exists():
+                    return path
     return None
 
 

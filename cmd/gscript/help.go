@@ -48,7 +48,7 @@ func runHelpCommand(args []string, outw, errw io.Writer) int {
 
 func cliHelpTopics() map[string]cliHelpTopic {
 	topics := []cliHelpTopic{
-		{Command: "bench", Usage: "usage: gscript bench [--quick|--full|--guard|BENCH|compare|strict|diagnose] [benchmark-harness-flags...]", Summary: "Run benchmark and benchmark-diagnostic harnesses."},
+		{Command: "bench", Usage: "usage: gscript bench [--manifest-check|--quick|--full|--guard|BENCH|compare|strict|diagnose] [benchmark-harness-flags...]", Summary: "Run benchmark and benchmark-diagnostic harnesses."},
 		{Command: "capabilities", Usage: "usage: gscript capabilities [--json]", Summary: "Report binary capabilities, stdlib modules, and supported tooling formats."},
 		{Command: "check", Usage: "usage: gscript check [--json] [--no-fmt] [--no-lint] [--no-test] [--no-manifest] [--no-docs] [path-or-dir]", Summary: "Run formatter, linter, manifest, tests, and docs checks as one local gate."},
 		{Command: "ci", Usage: "usage: gscript ci [smoke|pr|perf|release] [--list] [--no-luajit]", Summary: "Run canonical local CI profiles."},
@@ -65,7 +65,7 @@ func cliHelpTopics() map[string]cliHelpTopic {
 		{Command: "mod", Usage: "usage: gscript mod [init|graph|verify] [flags]", Summary: "Manage local module metadata and require graphs."},
 		{Command: "repl", Usage: "usage: gscript repl", Summary: "Start the interactive shell."},
 		{Command: "run", Usage: "usage: gscript run [--vm] [--jit=true|false] <file.gs> [args...]", Summary: "Run a script file."},
-		{Command: "test", Usage: "usage: gscript test [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]", Summary: "Run GScript test files and stdout goldens."},
+		{Command: "test", Usage: "usage: gscript test [--manifest-check] [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]", Summary: "Run GScript test files and stdout goldens."},
 		{Command: "version", Usage: "usage: gscript version [--json]", Summary: "Report binary version and build metadata."},
 	}
 	out := make(map[string]cliHelpTopic, len(topics))

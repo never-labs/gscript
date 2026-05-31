@@ -986,9 +986,17 @@ func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int
 	format := fs.String("format", "text", "output format: text or json")
 	goldenMode := fs.String("golden", "auto", "golden stdout mode: auto, require, ignore, or update")
 	listOnly := fs.Bool("list", false, "list matching .gs test files without running them")
+	manifestCheck := fs.Bool("manifest-check", false, "check tests/manifest.json against discovered test cases")
 	seed := fs.String("seed", "", "set GSCRIPT_TEST_SEED while running tests")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if *manifestCheck {
+		if fs.NArg() != 0 {
+			fmt.Fprintln(errw, "usage: gscript test --manifest-check")
+			return 2
+		}
+		return runManifestCheckRoots([]string{"tests"}, outw, errw)
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {

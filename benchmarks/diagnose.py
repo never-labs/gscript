@@ -597,20 +597,24 @@ def positive_int(value: str) -> int:
 def groups_for_args(args: argparse.Namespace) -> list[str]:
     if args.all_groups:
         return list(timing.GROUPS)
-    groups = list(args.group or timing.GROUPS)
+    root = Path(__file__).resolve().parents[1]
+    groups = timing.canonical_groups(list(args.group or timing.GROUPS))
     for selector in args.bench or []:
         if "/" not in selector:
             continue
-        group, _name = selector.split("/", 1)
-        if group in timing.GROUPS and group not in groups:
-            groups.append(group)
+        for candidate in timing.selector_candidates(selector):
+            if "/" not in candidate:
+                continue
+            group, _name = candidate.split("/", 1)
+            if group in timing.GROUPS and (root / "benchmarks" / group / f"{_name}.gs").exists() and group not in groups:
+                groups.append(group)
     return groups
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bench", action="append", help="benchmark name or group/name; repeatable")
-    parser.add_argument("--group", action="append", choices=timing.GROUPS, help="benchmark group; repeatable")
+    parser.add_argument("--group", action="append", choices=[*timing.GROUPS, *timing.LEGACY_GROUP_ALIASES.keys()], help="benchmark group; repeatable")
     parser.add_argument("--all-groups", action="store_true", help="diagnose all benchmark groups")
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--timeout", type=positive_int, default=120)

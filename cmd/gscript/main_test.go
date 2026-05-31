@@ -301,6 +301,9 @@ func TestHelperProcess(t *testing.T) {
 	case "docs":
 		_, _ = os.Stdout.WriteString("docs helper ok\n")
 		os.Exit(0)
+	case "manifest":
+		_, _ = os.Stdout.WriteString("manifest helper ok\n")
+		os.Exit(0)
 	default:
 		os.Exit(2)
 	}
@@ -411,7 +414,7 @@ func TestCICommandListsProfiles(t *testing.T) {
 		t.Fatalf("runCICommand code = %d, stderr = %q", code, stderr.String())
 	}
 	out := stdout.String()
-	for _, want := range []string{"go test", "gscript check", "worktree_audit.sh"} {
+	for _, want := range []string{"go test", "tests/manifest.py", "github.com/never-labs/gscript", "gscript check", "tests/smoke/01_basic.gs", "worktree_audit.sh"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout = %q, want %q", out, want)
 		}
@@ -518,6 +521,57 @@ func TestCheckCommandReportsFailureAndSkips(t *testing.T) {
 	}
 	if !report.Steps[4].Skipped || !report.Steps[4].OK {
 		t.Fatalf("docs step = %+v, want skipped ok", report.Steps[4])
+	}
+}
+
+func TestTestCommandManifestCheckDispatchesTestsManifest(t *testing.T) {
+	oldCheckExecCommand := checkExecCommand
+	t.Cleanup(func() { checkExecCommand = oldCheckExecCommand })
+	var gotName string
+	var gotArgs []string
+	checkExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "manifest")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runTestCommand([]string{"--manifest-check"}, cliRunOptions{}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runTestCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if gotName != "python3" {
+		t.Fatalf("python command = %q, want python3", gotName)
+	}
+	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("tests", "manifest.py")) || gotArgs[1] != "check" || gotArgs[2] != "tests" {
+		t.Fatalf("args = %#v, want tests/manifest.py check tests", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "manifest helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
+	}
+}
+
+func TestBenchCommandManifestCheckDispatchesBenchmarksManifest(t *testing.T) {
+	oldCheckExecCommand := checkExecCommand
+	t.Cleanup(func() { checkExecCommand = oldCheckExecCommand })
+	var gotArgs []string
+	checkExecCommand = func(name string, args ...string) *exec.Cmd {
+		gotArgs = append([]string(nil), args...)
+		helper, helperArgs := testHelperCommand(t, "manifest")
+		return exec.Command(helper, helperArgs...)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runBenchCommand([]string{"--manifest-check"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runBenchCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	if len(gotArgs) != 3 || !strings.HasSuffix(gotArgs[0], filepath.Join("tests", "manifest.py")) || gotArgs[1] != "check" || gotArgs[2] != "benchmarks" {
+		t.Fatalf("args = %#v, want tests/manifest.py check benchmarks", gotArgs)
+	}
+	if !strings.Contains(stdout.String(), "manifest helper ok") {
+		t.Fatalf("stdout = %q, want helper output", stdout.String())
 	}
 }
 

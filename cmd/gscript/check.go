@@ -108,6 +108,10 @@ func runCheckCommand(args []string, outw, errw io.Writer) int {
 }
 
 func runManifestCheck(outw, errw io.Writer) int {
+	return runManifestCheckRoots([]string{"tests", "benchmarks"}, outw, errw)
+}
+
+func runManifestCheckRoots(roots []string, outw, errw io.Writer) int {
 	script, err := findScriptFromCWD(filepath.Join("tests", "manifest.py"))
 	if err != nil {
 		fmt.Fprintf(errw, "gscript check: %v\n", err)
@@ -117,7 +121,8 @@ func runManifestCheck(outw, errw io.Writer) int {
 	if python == "" {
 		python = "python3"
 	}
-	cmd := checkExecCommand(python, script, "check", "tests", "benchmarks")
+	cmdArgs := append([]string{script, "check"}, roots...)
+	cmd := checkExecCommand(python, cmdArgs...)
 	cmd.Stdout = outw
 	cmd.Stderr = errw
 	cmd.Dir = filepath.Dir(filepath.Dir(script))

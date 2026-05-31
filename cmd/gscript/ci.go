@@ -11,6 +11,11 @@ import (
 
 var ciExecCommand = exec.Command
 
+const (
+	ciSmokeScriptPath    = "tests/smoke/01_basic.gs"
+	ciExpectedModulePath = "github.com/never-labs/gscript"
+)
+
 type ciCommand struct {
 	Name string   `json:"name"`
 	Args []string `json:"args"`
@@ -69,12 +74,16 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 	case "smoke":
 		return []ciCommand{
 			{Name: "Go smoke tests", Args: []string{"go", "test", "./cmd/gscript", "./gscript", "./internal/runtime", "./internal/vm", "-count=1"}},
-			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/gscript", "check", "--no-test", "--no-docs", "tests/smoke/01_basic.gs"}},
+			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
+			{Name: "Module path gate", Args: modulePathGateCommand()},
+			{Name: "Tooling check", Args: []string{"go", "run", "./cmd/gscript", "check", "--no-test", "--no-docs", ciSmokeScriptPath}},
 			{Name: "Worktree audit", Args: []string{"bash", "scripts/worktree_audit.sh"}},
 		}, nil
 	case "pr":
 		return []ciCommand{
 			{Name: "All Go tests", Args: []string{"go", "test", "./...", "-count=1"}},
+			{Name: "Manifest coverage", Args: manifestCoverageCommand()},
+			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Docs check", Args: []string{"go", "run", "./cmd/gscript", "doc", "check"}},
 			{Name: "Performance smoke", Args: appendNoLuaJIT([]string{"bash", "scripts/performance_gate.sh", "--smoke"}, noLuaJIT)},
 		}, nil
@@ -84,12 +93,21 @@ func ciProfileCommands(profile string, noLuaJIT bool) ([]ciCommand, error) {
 		}, nil
 	case "release":
 		return []ciCommand{
+			{Name: "Module path gate", Args: modulePathGateCommand()},
 			{Name: "Production check", Args: []string{"bash", "scripts/production_check.sh", "--full"}},
 			{Name: "Release artifacts check", Args: []string{"bash", "scripts/release_artifacts_check.sh"}},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown ci profile %q (want smoke, pr, perf, or release)", profile)
 	}
+}
+
+func manifestCoverageCommand() []string {
+	return []string{"python3", "tests/manifest.py", "check", "tests", "benchmarks"}
+}
+
+func modulePathGateCommand() []string {
+	return []string{"bash", "-c", fmt.Sprintf("test \"$(go list -m)\" = %q", ciExpectedModulePath)}
 }
 
 func appendNoLuaJIT(args []string, noLuaJIT bool) []string {

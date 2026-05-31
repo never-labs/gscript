@@ -26,6 +26,8 @@ USAGE
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 release_script="$repo_root/scripts/release_artifacts.sh"
+smoke_script="tests/smoke/01_basic.gs"
+expected_module_path="github.com/never-labs/gscript"
 
 build="false"
 out_dir=""
@@ -153,10 +155,15 @@ require_cmd go
 require_cmd grep
 require_cmd awk
 require_file "$release_script"
-require_file "$repo_root/tests/smoke/01_basic.gs"
+require_file "$repo_root/$smoke_script"
 
 goos="$(go env GOOS)"
 goarch="$(go env GOARCH)"
+module_path="$(go list -m)"
+if [[ "$module_path" != "$expected_module_path" ]]; then
+  echo "error: module path = $module_path, want $expected_module_path" >&2
+  exit 1
+fi
 exe_ext=""
 if [[ "$goos" == "windows" ]]; then
   exe_ext=".exe"
@@ -183,6 +190,7 @@ require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/$metadata_nam
 require_contains "$dry_run_log" "dry-run: would write $dry_run_dir/SHA256SUMS"
 require_contains "$dry_run_log" "metadata:"
 require_contains "$dry_run_log" "artifact=$binary_name"
+require_contains "$dry_run_log" "module=$expected_module_path"
 require_contains "$dry_run_log" "version=$version"
 require_contains "$dry_run_log" "goos=$goos"
 require_contains "$dry_run_log" "goarch=$goarch"
@@ -226,12 +234,13 @@ if [[ ! -x "$binary_path" ]]; then
 fi
 
 require_contains "$metadata_path" "artifact=$binary_name"
+require_contains "$metadata_path" "module=$expected_module_path"
 require_contains "$metadata_path" "version=$version"
 require_contains "$metadata_path" "goos=$goos"
 require_contains "$metadata_path" "goarch=$goarch"
 
 verify_checksums "$out_dir"
-"$binary_path" tests/smoke/01_basic.gs >/dev/null
+"$binary_path" "$smoke_script" >/dev/null
 
 echo "release_artifacts_check.sh: build artifacts verified in $out_dir"
 echo "release_artifacts_check.sh: pass"

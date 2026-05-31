@@ -681,9 +681,11 @@ def parse_repeat_overrides(values: list[str] | None) -> dict[tuple[str | None, s
         if "/" in key:
             head, tail = key.split("/", 1)
             if head in DEFAULT_MODES:
-                overrides[(head, canonical_selector(tail))] = count
+                for selector in selector_candidates(tail):
+                    overrides[(head, selector)] = count
             else:
-                overrides[(None, canonical_selector(key))] = count
+                for selector in selector_candidates(key):
+                    overrides[(None, selector)] = count
         else:
             overrides[(None, key)] = count
     return overrides
@@ -736,7 +738,31 @@ def canonical_group(group: str) -> list[str]:
 
 
 def canonical_selector(selector: str) -> str:
-    return LEGACY_BENCH_ALIASES.get(selector, selector)
+    if selector in LEGACY_BENCH_ALIASES:
+        return LEGACY_BENCH_ALIASES[selector]
+    if "/" not in selector:
+        return selector
+    group, name = selector.split("/", 1)
+    groups = LEGACY_GROUP_ALIASES.get(group)
+    if groups and len(groups) == 1:
+        return f"{groups[0]}/{name}"
+    return selector
+
+
+def selector_candidates(selector: str) -> list[str]:
+    canonical = canonical_selector(selector)
+    out = [canonical]
+    if canonical != selector or "/" not in selector:
+        return out
+    group, name = selector.split("/", 1)
+    for canonical_group_name in LEGACY_GROUP_ALIASES.get(group, []):
+        candidate = f"{canonical_group_name}/{name}"
+        if candidate not in out:
+            out.append(candidate)
+        hot_candidate = f"{canonical_group_name}/{name.removesuffix('_hot')}"
+        if hot_candidate not in out:
+            out.append(hot_candidate)
+    return out
 
 
 def canonical_groups(groups: list[str]) -> list[str]:
@@ -773,13 +799,13 @@ def select_specs(specs: list[BenchmarkSpec], selectors: list[str] | None) -> lis
         return specs
     selected: list[BenchmarkSpec] = []
     for raw_selector in selectors:
-        selector = canonical_selector(raw_selector)
-        matches = [spec for spec in specs if selector in {spec.benchmark_id, spec.name}]
+        candidates = selector_candidates(raw_selector)
+        matches = [spec for spec in specs if spec.benchmark_id in candidates or spec.name in candidates]
         if not matches:
             raise SystemExit(f"unknown benchmark selector: {raw_selector}")
-        if len(matches) > 1 and "/" not in selector:
+        if len(matches) > 1 and "/" not in candidates[0]:
             ids = ", ".join(spec.benchmark_id for spec in matches)
-            raise SystemExit(f"ambiguous benchmark selector {selector!r}; use one of: {ids}")
+            raise SystemExit(f"ambiguous benchmark selector {candidates[0]!r}; use one of: {ids}")
         for match in matches:
             if match not in selected:
                 selected.append(match)
