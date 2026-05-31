@@ -77,10 +77,10 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
             {"matmul", "numeric/matmul", "closure_accumulator", "calls/closure_accumulator"},
         )
 
-    def test_selector_candidates_map_historical_prefixes_to_domain_selectors_internally(self):
-        self.assertEqual(discovery.selector_candidates("suite/fib"), ["suite/fib", "fib"])
-        self.assertEqual(discovery.selector_candidates("extended/log_tokenize_format"), ["extended/log_tokenize_format", "log_tokenize_format"])
-        self.assertEqual(discovery.selector_candidates("variants/matmul_row"), ["variants/matmul_row", "matmul_row"])
+    def test_selector_candidates_keep_selectors_literal(self):
+        self.assertEqual(discovery.selector_candidates("recursion/fib"), ["recursion/fib"])
+        self.assertEqual(discovery.selector_candidates("string/log_tokenize_format"), ["string/log_tokenize_format"])
+        self.assertEqual(discovery.selector_candidates("numeric/matmul_row"), ["numeric/matmul_row"])
         self.assertEqual(discovery.selector_candidates("numeric/matmul"), ["numeric/matmul"])
 
     def test_selector_matches_spec_accepts_only_domain_selectors(self):
@@ -122,10 +122,7 @@ class BenchmarkDiscoveryTest(unittest.TestCase):
                 discovery.resolve_script_path(root, "calls/closure_accumulator"),
                 root / "benchmarks" / "calls" / "closure_accumulator.gs",
             )
-            self.assertEqual(
-                discovery.resolve_script_path(root, "variants/closure_accumulator"),
-                root / "benchmarks" / "calls" / "closure_accumulator.gs",
-            )
+            self.assertIsNone(discovery.resolve_script_path(root, "old_group/closure_accumulator"))
             self.assertIsNone(discovery.resolve_script_path(root, "calls/closure_accumulator_unknown"))
 
     def test_resolve_script_identity_returns_domain_group_name_and_path(self):

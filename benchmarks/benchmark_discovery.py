@@ -36,13 +36,12 @@ DEFAULT_ORDER = [
 DOMAIN_GROUPS = ["numeric", "recursion", "table", "calls", "string", "concurrency", "data", "app", "control", "precision"]
 GROUPS = DOMAIN_GROUPS
 
-HISTORICAL_VARIANT_BASES = {
+RELATED_BENCHMARK_BASES = {
     "ack_nested_shifted": "ackermann",
     "sort_mixed_numeric": "sort",
     "matmul_row": "matmul",
     "closure_accumulator": "closure_bench",
 }
-HISTORICAL_SELECTOR_PREFIXES = ("suite", "extended", "variants")
 
 
 @dataclass(frozen=True)
@@ -91,12 +90,7 @@ def canonical_selector(selector: str) -> str:
 
 
 def selector_candidates(selector: str) -> list[str]:
-    candidates = [canonical_selector(selector)]
-    if "/" in selector:
-        head, tail = selector.split("/", 1)
-        if head in HISTORICAL_SELECTOR_PREFIXES and tail:
-            candidates.append(tail)
-    return candidates
+    return [canonical_selector(selector)]
 
 
 def selector_matches(selector: str, allowed: set[str]) -> bool:
@@ -195,7 +189,7 @@ def domain_specs(root: Path, group: str) -> list[DiscoveredBenchmark]:
                 name,
                 bench_dir / f"{name}.gs",
                 luajit if luajit.exists() else None,
-                HISTORICAL_VARIANT_BASES.get(name),
+                RELATED_BENCHMARK_BASES.get(name),
             )
         )
     return specs

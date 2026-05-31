@@ -15,12 +15,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/all_harness_flags_format.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/api_arith_metamethod_chain_more",
@@ -35,12 +30,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/api_arith_metamethod_chain_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/api_metamethod_compare_len_concat_more",
@@ -55,12 +45,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/api_metamethod_compare_len_concat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/api_raw_ops_more",
@@ -75,12 +60,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/api_raw_ops_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/api_table_self_keys_more",
@@ -95,12 +75,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/api_table_self_keys_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/api_testkit_runtime_diagnostics",
@@ -115,12 +90,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/api_testkit_runtime_diagnostics.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/attrib_const_defer_gscript",
@@ -135,12 +105,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/attrib_const_defer_gscript.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/attrib_require_all_stdlib_more",
@@ -155,12 +120,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/attrib_require_all_stdlib_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/attrib_require_builtin_modules_more",
@@ -175,12 +135,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/attrib_require_builtin_modules_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/attrib_require_go_host_modules_more",
@@ -195,12 +150,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/attrib_require_go_host_modules_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/attrib_scope_shadow_more",
@@ -215,12 +165,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/attrib_scope_shadow_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/attrib_unpack_assignment_more",
@@ -235,12 +180,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/attrib_unpack_assignment_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/base64_raw_url_edges_more",
@@ -255,12 +195,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/base64_raw_url_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/big_generated_eval_env_more",
@@ -275,12 +210,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/big_generated_eval_env_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/big_table_growth_more",
@@ -295,12 +225,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/big_table_growth_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/big_table_sparse_pressure_more2",
@@ -315,12 +240,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/big_table_sparse_pressure_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/binary_namespace_more",
@@ -335,12 +255,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/binary_namespace_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/binary_numeric_fields_more",
@@ -355,12 +270,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/binary_numeric_fields_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bits_go_host_more",
@@ -375,12 +285,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bits_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_arshift_more",
@@ -395,12 +300,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_arshift_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_errors",
@@ -415,12 +315,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_errors.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_extract_replace",
@@ -435,12 +330,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_extract_replace.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_float_conversion",
@@ -455,12 +345,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_float_conversion.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_identities",
@@ -475,12 +360,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_identities.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_rotate",
@@ -495,12 +375,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_rotate.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_shift_sweep",
@@ -515,12 +390,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_shift_sweep.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_shifts",
@@ -535,12 +405,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_shifts.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_varargs",
@@ -555,12 +420,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_varargs.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_bit32_wrap_more",
@@ -575,12 +435,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_bit32_wrap_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bitwise_direct_ops_more",
@@ -595,12 +450,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bitwise_direct_ops_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bwcoercion_bit32_numeric_strings",
@@ -615,12 +465,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bwcoercion_bit32_numeric_strings.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bwcoercion_bit32_string_edges_more2",
@@ -635,12 +480,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bwcoercion_bit32_string_edges_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bytes_hash_base64_go_host_more",
@@ -655,12 +495,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bytes_hash_base64_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/bytes_numeric_buffer_more",
@@ -675,12 +510,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/bytes_numeric_buffer_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_anonymous_invocation",
@@ -695,12 +525,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_anonymous_invocation.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_builtin_missing_args",
@@ -715,12 +540,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_builtin_missing_args.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_call_chain",
@@ -735,12 +555,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_call_chain.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_closure_parameter_capture_more",
@@ -755,12 +570,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_closure_parameter_capture_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_extra_builtin_args_more",
@@ -775,12 +585,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_extra_builtin_args_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_fixed_arity_nested_adjust_more",
@@ -795,12 +600,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_fixed_arity_nested_adjust_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_fixedpoint_returns",
@@ -815,12 +615,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_fixedpoint_returns.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_incorrect_args_more",
@@ -835,12 +630,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_incorrect_args_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_inline_function_args",
@@ -855,12 +645,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_inline_function_args.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_inline_table_args",
@@ -875,12 +660,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_inline_table_args.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_long_method_name_more",
@@ -895,12 +675,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_long_method_name_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_method_recursion",
@@ -915,12 +690,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_method_recursion.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_multiline_adjust_more",
@@ -935,12 +705,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_multiline_adjust_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_multireturn",
@@ -955,12 +720,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_multireturn.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_multireturn_adjust_more",
@@ -975,12 +735,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_multireturn_adjust_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_nested_method_more",
@@ -995,12 +750,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_nested_method_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_recursion_error_more",
@@ -1015,12 +765,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_recursion_error_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_ret2_pack_adjust_more",
@@ -1035,12 +780,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_ret2_pack_adjust_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_return_values",
@@ -1055,12 +795,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_return_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_tail_call_metamethod_more",
@@ -1075,12 +810,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_tail_call_metamethod_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_tail_missing_matrix_more",
@@ -1095,12 +825,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_tail_missing_matrix_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_tail_varargs",
@@ -1115,12 +840,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_tail_varargs.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_tail_varargs_more2",
@@ -1135,12 +855,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_tail_varargs_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/calls_type_basic",
@@ -1155,12 +870,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/calls_type_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_break_upvalues",
@@ -1175,12 +885,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_break_upvalues.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_for_control",
@@ -1195,12 +900,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_for_control.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_identity_more",
@@ -1215,12 +915,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_identity_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_if_branch_upvalues_more",
@@ -1235,12 +930,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_if_branch_upvalues_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_loop_mutation_more2",
@@ -1255,12 +945,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_loop_mutation_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_multilevel_state_more",
@@ -1275,12 +960,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_multilevel_state_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_repeat_until_upvalues",
@@ -1295,12 +975,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_repeat_until_upvalues.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_shared_sibling_upvalues_more",
@@ -1315,12 +990,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_shared_sibling_upvalues_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_tailcall_upvalue",
@@ -1335,12 +1005,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_tailcall_upvalue.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/closure_upvalues",
@@ -1355,12 +1020,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/closure_upvalues.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/code_arithmetic_constants_more",
@@ -1375,12 +1035,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/code_arithmetic_constants_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/code_comparison_immediates_more",
@@ -1395,12 +1050,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/code_comparison_immediates_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/code_constant_branch_matrix_more2",
@@ -1415,12 +1065,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/code_constant_branch_matrix_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/code_explicit_spread_more",
@@ -1435,12 +1080,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/code_explicit_spread_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/code_string_constant_closure_more",
@@ -1455,12 +1095,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/code_string_constant_closure_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/compress_error_levels_more",
@@ -1475,12 +1110,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/compress_error_levels_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_boolean_paths_more",
@@ -1495,12 +1125,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_boolean_paths_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_function_branches_more",
@@ -1515,12 +1140,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_function_branches_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_if_expr_tables",
@@ -1535,12 +1155,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_if_expr_tables.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_label_goto_control",
@@ -1555,12 +1170,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_label_goto_control.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_loop_break_count",
@@ -1575,12 +1185,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_loop_break_count.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_loop_break_repeat_more",
@@ -1595,12 +1200,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_loop_break_repeat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_loops_tables",
@@ -1615,12 +1215,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_loops_tables.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_multireturn_tables",
@@ -1635,12 +1230,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_multireturn_tables.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_precedence",
@@ -1655,12 +1245,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_precedence.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_recursive_multireturn_more",
@@ -1675,12 +1260,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_recursive_multireturn_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_short_circuit",
@@ -1695,12 +1275,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_short_circuit.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/constructs_silly_loop_scope_more",
@@ -1715,12 +1290,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/constructs_silly_loop_scope_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/container_sort_go_host_more",
@@ -1735,12 +1305,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/container_sort_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/control_coroutine_defer_more",
@@ -1755,12 +1320,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/control_coroutine_defer_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_create_gofunction",
@@ -1775,12 +1335,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_create_gofunction.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_defer_xpcall_edges_more",
@@ -1795,12 +1350,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_defer_xpcall_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_multi_yield_resume_more",
@@ -1815,12 +1365,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_multi_yield_resume_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_recursive_yield_more",
@@ -1835,12 +1380,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_recursive_yield_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_self_resume_status_more",
@@ -1855,12 +1395,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_self_resume_status_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_status_yieldable_more",
@@ -1875,12 +1410,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_status_yieldable_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_tail_yield_more",
@@ -1895,12 +1425,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_tail_yield_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_wrap_basic",
@@ -1915,12 +1440,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_wrap_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_wrap_sieve_more",
@@ -1935,12 +1455,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_wrap_sieve_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/coroutine_yield_resume_values",
@@ -1955,12 +1470,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/coroutine_yield_resume_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/crypto_go_host_more",
@@ -1975,12 +1485,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/crypto_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/cstack_pattern_complexity_more",
@@ -1995,12 +1500,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/cstack_pattern_complexity_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/cstack_pattern_recursion_small",
@@ -2015,12 +1515,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/cstack_pattern_recursion_small.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/csv_go_host_more",
@@ -2035,12 +1530,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/csv_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/csv_options_quotes_more",
@@ -2055,12 +1545,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/csv_options_quotes_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/db_gscript_diagnostics_more",
@@ -2075,12 +1560,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/db_gscript_diagnostics_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/db_nested_call_flow_more",
@@ -2095,12 +1575,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/db_nested_call_flow_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/db_pcall_nested_errors",
@@ -2115,12 +1590,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/db_pcall_nested_errors.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/db_upvalue_closure_flow",
@@ -2135,12 +1605,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/db_upvalue_closure_flow.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/db_vararg_transfer_values",
@@ -2155,12 +1620,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/db_vararg_transfer_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/db_vm_debug_parity_more",
@@ -2175,12 +1635,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/db_vm_debug_parity_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/debug_host_helpers_more",
@@ -2195,12 +1650,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/debug_host_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/defer_loader_require_edges_more",
@@ -2215,12 +1665,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/defer_loader_require_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/encoding_ini_xml_roundtrip_more",
@@ -2235,12 +1680,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/encoding_ini_xml_roundtrip_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_assert_messages_more",
@@ -2255,12 +1695,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_assert_messages_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_assert_pcall",
@@ -2275,12 +1710,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_assert_pcall.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_call_index_failures_more",
@@ -2295,12 +1725,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_call_index_failures_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_common_runtime_failures",
@@ -2315,12 +1740,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_common_runtime_failures.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_error_edge_values",
@@ -2335,12 +1755,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_error_edge_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_non_string_messages_deeper",
@@ -2355,12 +1770,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_non_string_messages_deeper.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_non_string_messages_more",
@@ -2375,12 +1785,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_non_string_messages_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_pcall_basic",
@@ -2395,12 +1800,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_pcall_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_pcall_xpcall_values",
@@ -2415,12 +1815,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_pcall_xpcall_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_runtime_failures_more",
@@ -2435,12 +1830,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_runtime_failures_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_runtime_messages_more",
@@ -2455,12 +1845,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_runtime_messages_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_xpcall_args_more",
@@ -2475,12 +1860,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_xpcall_args_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_xpcall_handler_more",
@@ -2495,12 +1875,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_xpcall_handler_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/errors_xpcall_nested_error_more",
@@ -2515,12 +1890,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/errors_xpcall_nested_error_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_arith_compare",
@@ -2535,12 +1905,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_arith_compare.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_call_levels",
@@ -2555,12 +1920,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_call_levels.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_compare_compat_more",
@@ -2575,12 +1935,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_compare_compat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_compare_metamethods",
@@ -2595,12 +1950,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_compare_metamethods.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_compare_ordering",
@@ -2615,12 +1965,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_compare_ordering.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_compare_sets",
@@ -2635,12 +1980,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_compare_sets.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_concat_chain_more",
@@ -2655,12 +1995,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_concat_chain_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_concat_metamethod",
@@ -2675,12 +2010,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_concat_metamethod.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_concat_numeric_operand_more",
@@ -2695,12 +2025,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_concat_numeric_operand_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_dynamic_call_metatable",
@@ -2715,12 +2040,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_dynamic_call_metatable.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_eq_invalidate",
@@ -2735,12 +2055,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_eq_invalidate.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_eq_invalidate_more",
@@ -2755,12 +2070,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_eq_invalidate_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_index_chain",
@@ -2775,12 +2085,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_index_chain.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_index_function_parent_more",
@@ -2795,12 +2100,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_index_function_parent_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_index_newindex_call",
@@ -2815,12 +2115,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_index_newindex_call.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_metatable_basic_more",
@@ -2835,12 +2130,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_metatable_basic_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_metatable_protection_more",
@@ -2855,12 +2145,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_metatable_protection_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_newindex_chain",
@@ -2875,12 +2160,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_newindex_chain.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_newindex_existing",
@@ -2895,12 +2175,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_newindex_existing.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_newindex_loop_more",
@@ -2915,12 +2190,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_newindex_loop_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_newindex_self_metatable_more",
@@ -2935,12 +2205,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_newindex_self_metatable_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_newindex_table_redirect_more",
@@ -2955,12 +2220,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_newindex_table_redirect_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_partial_order_more",
@@ -2975,12 +2235,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_partial_order_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_rawget_more2",
@@ -2995,12 +2250,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_rawget_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_rawget_rawset",
@@ -3015,12 +2265,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_rawget_rawset.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_rawlen",
@@ -3035,12 +2280,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_rawlen.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/events_rawlen_more2",
@@ -3055,12 +2295,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/events_rawlen_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_append_read_all_more",
@@ -3075,12 +2310,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_append_read_all_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_file_lines_streams_more",
@@ -3095,12 +2325,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_file_lines_streams_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_io_read_formats_more",
@@ -3115,12 +2340,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_io_read_formats_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_io_read_numbers",
@@ -3135,12 +2355,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_io_read_numbers.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_io_write_read_lines",
@@ -3155,12 +2370,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_io_write_read_lines.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_seek_overwrite_more",
@@ -3175,12 +2385,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_seek_overwrite_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_tmpfile_flush_type_more",
@@ -3195,12 +2400,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_tmpfile_flush_type_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/files_tmpname_remove_rename",
@@ -3215,12 +2415,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/files_tmpname_remove_rename.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/fs_path_glob_cwd_more",
@@ -3235,12 +2430,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/fs_path_glob_cwd_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/fs_path_go_host_more",
@@ -3255,12 +2445,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/fs_path_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_basic_more",
@@ -3275,12 +2460,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_basic_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_collectgarbage_modes",
@@ -3295,12 +2475,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_collectgarbage_modes.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_collectgarbage_more2",
@@ -3315,12 +2490,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_collectgarbage_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_collectgarbage_protocol",
@@ -3335,12 +2505,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_collectgarbage_protocol.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_collectgarbage_stop_step_more",
@@ -3355,12 +2520,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_collectgarbage_stop_step_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_generational_table_barrier_slice",
@@ -3375,12 +2535,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_generational_table_barrier_slice.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gc_stats_defer_cleanup",
@@ -3395,12 +2550,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gc_stats_defer_cleanup.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/gengc_running_mode_restore_more",
@@ -3415,12 +2565,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/gengc_running_mode_restore_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/go_channel_edges_more",
@@ -3435,12 +2580,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/go_channel_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/go_channel_host_more",
@@ -3455,12 +2595,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/go_channel_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/goto_flow_equivalent_more",
@@ -3475,12 +2610,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/goto_flow_equivalent_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/goto_if_branch_equivalent_more",
@@ -3495,12 +2625,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/goto_if_branch_equivalent_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/goto_simple_paths_more",
@@ -3515,12 +2640,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/goto_simple_paths_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/heavy_concat_pressure_more2",
@@ -3535,12 +2655,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/heavy_concat_pressure_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/heavy_generated_concat_more",
@@ -3555,12 +2670,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/heavy_generated_concat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/heavy_string_growth_small",
@@ -3575,12 +2685,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/heavy_string_growth_small.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/http_background_server_more",
@@ -3595,12 +2700,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/http_background_server_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/http_router_json_edges_more",
@@ -3615,12 +2715,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/http_router_json_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/io_current_stream_more",
@@ -3635,12 +2730,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/io_current_stream_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/json_go_host_more",
@@ -3655,12 +2745,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/json_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/literals_control_escapes_more",
@@ -3675,12 +2760,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/literals_control_escapes_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/literals_line_comment_strings_more",
@@ -3695,12 +2775,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/literals_line_comment_strings_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/literals_long_brackets_more",
@@ -3715,12 +2790,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/literals_long_brackets_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/literals_long_string_more",
@@ -3735,12 +2805,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/literals_long_string_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/literals_string_table_more2",
@@ -3755,12 +2820,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/literals_string_table_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/literals_strings_basic",
@@ -3775,12 +2835,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/literals_strings_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/locals_basic_more",
@@ -3795,12 +2850,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/locals_basic_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/locals_block_assignment_scope_more",
@@ -3815,12 +2865,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/locals_block_assignment_scope_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/locals_many_shadow_slots_more2",
@@ -3835,12 +2880,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/locals_many_shadow_slots_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/locals_repeat_shadow_more2",
@@ -3855,12 +2895,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/locals_repeat_shadow_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/locals_scope",
@@ -3875,12 +2910,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/locals_scope.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/locals_shadowing_repeat_more",
@@ -3895,12 +2925,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/locals_shadowing_repeat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/log_go_host_more",
@@ -3915,12 +2940,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/log_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/main_generated_chunk_eval_more",
@@ -3935,12 +2955,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/main_generated_chunk_eval_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/main_multiline_chunk_values",
@@ -3955,12 +2970,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/main_multiline_chunk_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/main_print_write_more",
@@ -3975,12 +2985,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/main_print_write_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/main_script_file_vm_more",
@@ -3995,12 +3000,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/main_script_file_vm_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/main_script_process_more",
@@ -4015,12 +3015,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/main_script_process_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/main_vm_loader_more",
@@ -4035,12 +3030,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/main_vm_loader_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_float_int_order_edges",
@@ -4055,12 +3045,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_float_int_order_edges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_float_notation_coercion",
@@ -4075,12 +3060,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_float_notation_coercion.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_floor_ceil_large_more",
@@ -4095,12 +3075,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_floor_ceil_large_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_floor_ceil_minmax",
@@ -4115,12 +3090,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_floor_ceil_minmax.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_floor_power",
@@ -4135,12 +3105,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_floor_power.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_fmod_integer_more",
@@ -4155,12 +3120,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_fmod_integer_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_fmod_more2",
@@ -4175,12 +3135,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_fmod_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_go_helpers_more",
@@ -4195,12 +3150,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_go_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_implicit_conversion_more",
@@ -4215,12 +3165,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_implicit_conversion_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_lib_basic",
@@ -4235,12 +3180,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_lib_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_log_angle_more",
@@ -4255,12 +3195,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_log_angle_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_minmax_abs_round_more",
@@ -4275,12 +3210,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_minmax_abs_round_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_minmax_more2",
@@ -4295,12 +3225,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_minmax_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_mod_consistency_more",
@@ -4315,12 +3240,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_mod_consistency_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_mod_large_precision_more",
@@ -4335,12 +3255,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_mod_large_precision_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_modf_finite_edges",
@@ -4355,12 +3270,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_modf_finite_edges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_modf_huge",
@@ -4375,12 +3285,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_modf_huge.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_modf_inf_integer",
@@ -4395,12 +3300,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_modf_inf_integer.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_modulo_lua_semantics",
@@ -4415,12 +3315,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_modulo_lua_semantics.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_nan_compare_more",
@@ -4435,12 +3330,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_nan_compare_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_nan_inf_basic",
@@ -4455,12 +3345,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_nan_inf_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_nan_zero_more",
@@ -4475,12 +3360,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_nan_zero_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_negative_powers_more",
@@ -4495,12 +3375,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_negative_powers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_numeric_strings_more",
@@ -4515,12 +3390,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_numeric_strings_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_order_coercion",
@@ -4535,12 +3405,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_order_coercion.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_order_ops",
@@ -4555,12 +3420,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_order_ops.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_random_errors_more",
@@ -4575,12 +3435,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_random_errors_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_random_protocol",
@@ -4595,12 +3450,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_random_protocol.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_random_range_more",
@@ -4615,12 +3465,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_random_range_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_random_small_intervals_more",
@@ -4635,12 +3480,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_random_small_intervals_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_random_unit_edges_more",
@@ -4655,12 +3495,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_random_unit_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tointeger_basic",
@@ -4675,12 +3510,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tointeger_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tointeger_edges_more",
@@ -4695,12 +3525,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tointeger_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_base",
@@ -4715,12 +3540,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_base.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_base_loop_more",
@@ -4735,12 +3555,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_base_loop_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_base_more",
@@ -4755,12 +3570,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_base_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_basic",
@@ -4775,12 +3585,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_decimal_edges",
@@ -4795,12 +3600,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_decimal_edges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_decimal_more2",
@@ -4815,12 +3615,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_decimal_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_hex",
@@ -4835,12 +3630,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_hex.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_hex_more2",
@@ -4855,12 +3645,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_hex_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_invalid_more",
@@ -4875,12 +3660,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_invalid_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_invalid_more2",
@@ -4895,12 +3675,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_invalid_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_long_decimal_more",
@@ -4915,12 +3690,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_long_decimal_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_tonumber_overflow_more",
@@ -4935,12 +3705,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_tonumber_overflow_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_transcendentals",
@@ -4955,12 +3720,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_transcendentals.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_transcendentals_more",
@@ -4975,12 +3735,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_transcendentals_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/math_unsigned_compare",
@@ -4995,12 +3750,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/math_unsigned_compare.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/matrix_host_dense_more",
@@ -5015,12 +3765,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/matrix_host_dense_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/net_http_background_roundtrip_more",
@@ -5035,12 +3780,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/net_http_background_roundtrip_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/net_http_methods_more",
@@ -5055,12 +3795,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/net_http_methods_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_checknext_more",
@@ -5075,12 +3810,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_checknext_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_empty_loops_more",
@@ -5095,12 +3825,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_empty_loops_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_empty_numeric_for",
@@ -5115,12 +3840,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_empty_numeric_for.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_generic_for_multivalue_more",
@@ -5135,12 +3855,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_generic_for_multivalue_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_hash_length_growth",
@@ -5155,12 +3870,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_hash_length_growth.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_ipairs_false_more",
@@ -5175,12 +3885,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_ipairs_false_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_ipairs_index_metamethod",
@@ -5195,12 +3900,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_ipairs_index_metamethod.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_ipairs_next",
@@ -5215,12 +3915,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_ipairs_next.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_ipairs_protocol_more",
@@ -5235,12 +3930,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_ipairs_protocol_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_iterator_errors_more",
@@ -5255,12 +3945,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_iterator_errors_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_length_more",
@@ -5275,12 +3960,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_length_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_length_nil",
@@ -5295,12 +3975,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_length_nil.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_next_function_identity_more",
@@ -5315,12 +3990,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_next_function_identity_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_next_pairs_copy",
@@ -5335,12 +4005,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_next_pairs_copy.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_next_sparse_tail",
@@ -5355,12 +4020,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_next_sparse_tail.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_next_tail_more",
@@ -5375,12 +4035,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_next_tail_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_numeric_for_float_counts",
@@ -5395,12 +4050,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_numeric_for_float_counts.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_numeric_for_fractional_more",
@@ -5415,12 +4065,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_numeric_for_fractional_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_numeric_for_more2",
@@ -5435,12 +4080,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_numeric_for_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_delete",
@@ -5455,12 +4095,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_delete.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_delete_strings_more",
@@ -5475,12 +4110,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_delete_strings_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_key_types_more",
@@ -5495,12 +4125,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_key_types_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_many_string_keys",
@@ -5515,12 +4140,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_many_string_keys.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_metamethod",
@@ -5535,12 +4155,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_metamethod.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_protocol_more2",
@@ -5555,12 +4170,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_protocol_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_return_triple",
@@ -5575,12 +4185,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_return_triple.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_pairs_string_keys",
@@ -5595,12 +4200,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_pairs_string_keys.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_power_keys_more",
@@ -5615,12 +4215,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_power_keys_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_insert_general_more",
@@ -5635,12 +4230,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_insert_general_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_insert_remove_edges",
@@ -5655,12 +4245,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_insert_remove_edges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_insert_remove_proxy_metamethods",
@@ -5675,12 +4260,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_insert_remove_proxy_metamethods.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_insert_string_more",
@@ -5695,12 +4275,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_insert_string_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_length_nils_more",
@@ -5715,12 +4290,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_length_nils_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_maxn",
@@ -5735,12 +4305,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_maxn.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_remove_more",
@@ -5755,12 +4320,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_remove_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/nextvar_table_remove_sequences",
@@ -5775,12 +4335,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/nextvar_table_remove_sequences.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/os_go_host_env_expand_more",
@@ -5795,12 +4350,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/os_go_host_env_expand_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/os_time_date_host_more",
@@ -5815,12 +4365,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/os_time_date_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_captures_basic_more",
@@ -5835,12 +4380,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_captures_basic_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_class_sets_ascii_more",
@@ -5855,12 +4395,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_class_sets_ascii_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_escape_compat_more",
@@ -5875,12 +4410,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_escape_compat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_find_empty_anchor",
@@ -5895,12 +4425,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_find_empty_anchor.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_find_match_more_ascii",
@@ -5915,12 +4440,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_find_match_more_ascii.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_find_nul_more2",
@@ -5935,12 +4455,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_find_nul_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_find_nul_strings",
@@ -5955,12 +4470,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_find_nul_strings.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_frontier_compat_more",
@@ -5975,12 +4485,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_frontier_compat_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gmatch_numeric_pairs_more",
@@ -5995,12 +4500,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gmatch_numeric_pairs_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gmatch_words_more",
@@ -6015,12 +4515,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gmatch_words_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_capture_reorder_more",
@@ -6035,12 +4530,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_capture_reorder_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_captures",
@@ -6055,12 +4545,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_captures.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_empty_match_more",
@@ -6075,12 +4560,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_empty_match_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_error_subset_more",
@@ -6095,12 +4575,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_error_subset_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_function_balanced_more",
@@ -6115,12 +4590,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_function_balanced_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_limit_count_more",
@@ -6135,12 +4605,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_limit_count_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_replacement_more",
@@ -6155,12 +4620,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_replacement_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_table_fallback_more",
@@ -6175,12 +4635,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_table_fallback_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_table_replacement_more",
@@ -6195,12 +4650,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_table_replacement_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_gsub_trim",
@@ -6215,12 +4665,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_gsub_trim.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_malformed_pattern_errors_more",
@@ -6235,12 +4680,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_malformed_pattern_errors_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_match_capture_suffix_more",
@@ -6255,12 +4695,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_match_capture_suffix_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_match_captures_ascii",
@@ -6275,12 +4710,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_match_captures_ascii.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_match_classes_more2",
@@ -6295,12 +4725,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_match_classes_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_match_classes_repetition_more",
@@ -6315,12 +4740,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_match_classes_repetition_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_match_minimal_more",
@@ -6335,12 +4755,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_match_minimal_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_match_repetition",
@@ -6355,12 +4770,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_match_repetition.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_pattern_nul_magic_more",
@@ -6375,12 +4785,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_pattern_nul_magic_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/pm_pattern_runtime_more",
@@ -6395,12 +4800,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/pm_pattern_runtime_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/process_exec_run_more",
@@ -6415,12 +4815,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/process_exec_run_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/process_go_host_entry_exit_more",
@@ -6435,12 +4830,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/process_go_host_entry_exit_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/rand_go_host_more",
@@ -6455,12 +4845,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/rand_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/regexp_go_host_more",
@@ -6475,12 +4860,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/regexp_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/regexp_submatch_limits_more",
@@ -6495,12 +4875,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/regexp_submatch_limits_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_binary_string_order_more",
@@ -6515,12 +4890,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_binary_string_order_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_callback_helpers_more",
@@ -6535,12 +4905,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_callback_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_custom_comparator",
@@ -6555,12 +4920,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_custom_comparator.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_equal_false_more",
@@ -6575,12 +4935,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_equal_false_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_invalid_order_function",
@@ -6595,12 +4950,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_invalid_order_function.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_invalid_order_more2",
@@ -6615,12 +4965,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_invalid_order_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_len_noninteger_more",
@@ -6635,12 +4980,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_len_noninteger_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_metatable_lt_more",
@@ -6655,12 +4995,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_metatable_lt_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_month_names_more",
@@ -6675,12 +5010,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_month_names_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_order",
@@ -6695,12 +5025,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_order.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_pack_nil_counts_more",
@@ -6715,12 +5040,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_pack_nil_counts_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_pack_unpack",
@@ -6735,12 +5055,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_pack_unpack.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_permutation_more",
@@ -6755,12 +5070,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_permutation_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_reverse_closure_more",
@@ -6775,12 +5085,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_reverse_closure_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_table_insert_errors",
@@ -6795,12 +5100,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_table_insert_errors.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_table_insert_remove_concat",
@@ -6815,12 +5115,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_table_insert_remove_concat.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_table_move",
@@ -6835,12 +5130,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_table_move.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_table_proxy_metamethods",
@@ -6855,12 +5145,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_table_proxy_metamethods.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_unpack_assignment_more",
@@ -6875,12 +5160,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_unpack_assignment_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_unpack_ranges",
@@ -6895,12 +5175,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_unpack_ranges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/sort_unpack_sparse_boundary_more",
@@ -6915,12 +5190,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/sort_unpack_sparse_boundary_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_basic",
@@ -6935,12 +5205,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_byte_ascii_indices",
@@ -6955,12 +5220,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_byte_ascii_indices.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_byte_char_edges",
@@ -6975,12 +5235,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_byte_char_edges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_byte_char_more2",
@@ -6995,12 +5250,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_byte_char_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_byte_range_multi_more",
@@ -7015,12 +5265,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_byte_range_multi_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_char_ascii_more",
@@ -7035,12 +5280,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_char_ascii_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_char_errors_more",
@@ -7055,12 +5295,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_char_errors_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_compare_binary_more",
@@ -7075,12 +5310,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_compare_binary_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_find_empty_more",
@@ -7095,12 +5325,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_find_empty_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_find_offsets_more",
@@ -7115,12 +5340,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_find_offsets_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_find_plain_more",
@@ -7135,12 +5355,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_find_plain_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_error_subset_more",
@@ -7155,12 +5370,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_error_subset_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_exponent_more",
@@ -7175,12 +5385,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_exponent_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_flags_extended",
@@ -7195,12 +5400,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_flags_extended.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_flags_more",
@@ -7215,12 +5415,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_flags_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_iso_flags_more",
@@ -7235,12 +5430,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_iso_flags_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_large32_subset_more",
@@ -7255,12 +5445,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_large32_subset_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_long_number_more",
@@ -7275,12 +5460,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_long_number_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_long_precision",
@@ -7295,12 +5475,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_long_precision.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_numbers_flags",
@@ -7315,12 +5490,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_numbers_flags.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_numeric_flags_more",
@@ -7335,12 +5505,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_numeric_flags_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_percent_char_more",
@@ -7355,12 +5520,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_percent_char_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_pointer",
@@ -7375,12 +5535,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_pointer.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_quote_literals",
@@ -7395,12 +5550,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_quote_literals.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_string_values",
@@ -7415,12 +5565,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_string_values.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_tostring",
@@ -7435,12 +5580,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_tostring.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_format_tostring_more2",
@@ -7455,12 +5595,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_format_tostring_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_gmatch_coroutine",
@@ -7475,12 +5610,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_gmatch_coroutine.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_gmatch_coroutine_more2",
@@ -7495,12 +5625,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_gmatch_coroutine_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_go_helpers_more",
@@ -7515,12 +5640,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_go_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_patterns_basic",
@@ -7535,12 +5655,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_patterns_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_pointer_format_more",
@@ -7555,12 +5670,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_pointer_format_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_rep_reverse_tostring",
@@ -7575,12 +5685,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_rep_reverse_tostring.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_rep_separator_more",
@@ -7595,12 +5700,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_rep_separator_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_rep_tostring_ascii_more",
@@ -7615,12 +5715,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_rep_tostring_ascii_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_reverse_ascii_more",
@@ -7635,12 +5730,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_reverse_ascii_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_string_pack_go_style",
@@ -7655,12 +5745,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_string_pack_go_style.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_string_pack_more",
@@ -7675,12 +5760,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_string_pack_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_sub_boundary_more",
@@ -7695,12 +5775,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_sub_boundary_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_sub_find_len_ascii_more",
@@ -7715,12 +5790,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_sub_find_len_ascii_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_sub_method_more",
@@ -7735,12 +5805,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_sub_method_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_binary",
@@ -7755,12 +5820,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_binary.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_empty_errors_more",
@@ -7775,12 +5835,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_empty_errors_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_errors",
@@ -7795,12 +5850,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_errors.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_errors_more2",
@@ -7815,12 +5865,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_errors_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_long_ranges_more",
@@ -7835,12 +5880,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_long_ranges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_more2",
@@ -7855,12 +5895,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_ranges",
@@ -7875,12 +5910,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_ranges.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_table_concat_ranges_more3",
@@ -7895,12 +5925,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_table_concat_ranges_more3.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_tostring_metamethod",
@@ -7915,12 +5940,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_tostring_metamethod.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/strings_transform_basic",
@@ -7935,12 +5955,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/strings_transform_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/table_go_helpers_more",
@@ -7955,12 +5970,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/table_go_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/table_higher_order_vm_callbacks_more",
@@ -7975,12 +5985,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/table_higher_order_vm_callbacks_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/table_proxy_concat_flatten_more",
@@ -7995,12 +6000,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/table_proxy_concat_flatten_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/table_raw_helpers_more",
@@ -8015,12 +6015,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/table_raw_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/time_color_hash_edges_more",
@@ -8035,12 +6030,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/time_color_hash_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/time_compress_encoding_go_host_more",
@@ -8055,12 +6045,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/time_compress_encoding_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/time_process_debug_edges_more",
@@ -8075,12 +6060,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/time_process_debug_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/tpack_pack_count_more",
@@ -8095,12 +6075,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/tpack_pack_count_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/tpack_select_more",
@@ -8115,12 +6090,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/tpack_select_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/tpack_vararg_edges_more",
@@ -8135,12 +6105,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/tpack_vararg_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/tracegc_stats_progress_more",
@@ -8155,12 +6120,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/tracegc_stats_progress_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/url_canonical_edges_more",
@@ -8175,12 +6135,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/url_canonical_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/url_go_host_more",
@@ -8195,12 +6150,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/url_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_basic",
@@ -8215,12 +6165,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_basic.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_boundary_chars_more",
@@ -8235,12 +6180,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_boundary_chars_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_char_codes",
@@ -8255,12 +6195,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_char_codes.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_char_range_errors",
@@ -8275,12 +6210,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_char_range_errors.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_codepoint_bounds",
@@ -8295,12 +6225,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_codepoint_bounds.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_codes_empty_iterator",
@@ -8315,12 +6240,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_codes_empty_iterator.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_codes_iterator",
@@ -8335,12 +6255,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_codes_iterator.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_complex_string_more",
@@ -8355,12 +6270,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_complex_string_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_go_helpers_more",
@@ -8375,12 +6285,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_go_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_invalid_sequences_more",
@@ -8395,12 +6300,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_invalid_sequences_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_len_range_more",
@@ -8415,12 +6315,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_len_range_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_multibyte_offsets",
@@ -8435,12 +6330,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_multibyte_offsets.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_offset_len_errors",
@@ -8455,12 +6345,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_offset_len_errors.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_supplementary_more",
@@ -8475,12 +6360,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_supplementary_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_testkit_edges_more",
@@ -8495,12 +6375,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_testkit_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/utf8_validation_helpers_more",
@@ -8515,12 +6390,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/utf8_validation_helpers_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/uuid_go_host_more",
@@ -8535,12 +6405,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/uuid_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_argument_adjust_more",
@@ -8555,12 +6420,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_argument_adjust_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_call_unpack_more",
@@ -8575,12 +6435,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_call_unpack_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_forwarding",
@@ -8595,12 +6450,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_forwarding.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_long_parameter_list_more",
@@ -8615,12 +6465,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_long_parameter_list_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_method_recursive_more",
@@ -8635,12 +6480,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_method_recursive_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_pack",
@@ -8655,12 +6495,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_pack.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_select",
@@ -8675,12 +6510,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_select.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vararg_tail_missing_args",
@@ -8695,12 +6525,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vararg_tail_missing_args.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vec_color_geometry_hsl_more",
@@ -8715,12 +6540,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vec_color_geometry_hsl_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/vec_color_go_host_more",
@@ -8735,12 +6555,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/vec_color_go_host_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/verybig_many_constants_more2",
@@ -8755,12 +6570,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/verybig_many_constants_more2.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/verybig_method_constants_more",
@@ -8775,12 +6585,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/verybig_method_constants_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/verybig_rk_constants_more",
@@ -8795,12 +6600,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/verybig_rk_constants_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "language/xpcall_iterator_edges_more",
@@ -8815,12 +6615,7 @@
       "tags": [
         "language",
         "conformance"
-      ],
-      "compatibility": {
-        "historical": {
-          "lua_ref": "tests/language/xpcall_iterator_edges_more.lua"
-        }
-      }
+      ]
     },
     {
       "id": "smoke/01_basic",
@@ -8832,8 +6627,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/02_strings",
@@ -8845,8 +6639,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/03_control",
@@ -8858,8 +6651,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/04_functions",
@@ -8871,8 +6663,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/05_tables",
@@ -8884,8 +6675,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/06_closures",
@@ -8897,8 +6687,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/07_metatable",
@@ -8910,8 +6699,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/08_coroutine",
@@ -8923,8 +6711,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/09_error",
@@ -8936,8 +6723,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/10_string_ops",
@@ -8949,8 +6735,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/11_iterator",
@@ -8962,8 +6747,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     },
     {
       "id": "smoke/12_advanced",
@@ -8975,8 +6759,7 @@
       "tags": [
         "smoke",
         "integration"
-      ],
-      "compatibility": {}
+      ]
     }
   ]
 }

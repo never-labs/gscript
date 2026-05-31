@@ -112,7 +112,7 @@ class ManifestTest(unittest.TestCase):
             finally:
                 manifest.ROOT = original_root
 
-    def test_generated_benchmark_manifest_uses_domain_workloads_and_historical_compatibility(self):
+    def test_generated_benchmark_manifest_uses_domain_workloads_without_legacy_entries(self):
         original_root = manifest.ROOT
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -144,14 +144,11 @@ class ManifestTest(unittest.TestCase):
                 self.assertEqual(generated["domains"], list(manifest.BENCHMARK_DOMAINS))
                 self.assertNotIn("groups", generated)
                 self.assertNotIn("benchmarks", generated)
+                self.assertNotIn("compatibility", generated)
                 self.assertEqual(generated["workloads"][0]["domain"], "numeric")
                 self.assertEqual(
                     generated["workloads"][0]["comparison_reference"],
                     {"kind": "lua", "path": "benchmarks/lua_ref/numeric/case.lua"},
-                )
-                self.assertEqual(
-                    generated["compatibility"]["historical"]["benchmarks"][0]["group"],
-                    "numeric",
                 )
             finally:
                 manifest.ROOT = original_root

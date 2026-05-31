@@ -96,26 +96,17 @@ def discover_cases(root_name: str) -> list[dict[str, Any]]:
                 "reference": {"kind": "lua", "path": lua_ref} if lua_ref else None,
                 "status": status_for(root_name),
                 "tags": tags_for(root_name, domain, lua_ref),
-                "compatibility": {"historical": {"lua_ref": lua_ref}} if lua_ref else {},
             }
         )
     return cases
 
 
-def compatibility_lua_ref(case: dict[str, Any]) -> str | None:
+def reference_lua_path(case: dict[str, Any]) -> str | None:
     reference = case.get("reference")
     if isinstance(reference, dict) and reference.get("kind") == "lua":
         path = reference.get("path")
         return path if isinstance(path, str) else None
-
-    historical = case.get("compatibility", {}).get("historical")
-    if isinstance(historical, dict):
-        path = historical.get("lua_ref")
-        if isinstance(path, str):
-            return path
-
-    path = case.get("lua_ref")
-    return path if isinstance(path, str) else None
+    return None
 
 
 def domain_workloads(existing: dict[str, Any]) -> list[dict[str, Any]]:
@@ -155,7 +146,6 @@ def generated_manifest(root_name: str) -> dict[str, Any]:
         manifest["schema_version"] = BENCHMARK_SCHEMA_VERSION
         manifest["domains"] = list(BENCHMARK_DOMAINS)
         existing_path = ROOT / "benchmarks" / "manifest.json"
-        compatibility: dict[str, Any] = {"historical": {"groups": list(BENCHMARK_DOMAINS)}}
         if existing_path.exists():
             existing = json.loads(existing_path.read_text())
             for key in ("time_source_hints", "scale_profiles"):
@@ -163,15 +153,8 @@ def generated_manifest(root_name: str) -> dict[str, Any]:
                     manifest[key] = existing[key]
             existing_workloads = existing.get("workloads")
             manifest["workloads"] = existing_workloads if isinstance(existing_workloads, list) else domain_workloads(existing)
-            if "benchmarks" in existing:
-                compatibility["historical"]["benchmarks"] = existing["benchmarks"]
-            else:
-                historical = existing.get("compatibility", {}).get("historical")
-                if isinstance(historical, dict) and "benchmarks" in historical:
-                    compatibility["historical"]["benchmarks"] = historical["benchmarks"]
         else:
             manifest["workloads"] = []
-        manifest["compatibility"] = compatibility
     return manifest
 
 
@@ -188,7 +171,7 @@ def validate_manifest(root_name: str) -> list[str]:
 
     discovered_by_path = {case["path"]: case for case in discover_cases(root_name)}
     manifest_by_path: dict[str, dict[str, Any]] = {}
-    required = {"id", "path", "domain", "kind", "reference", "status", "tags", "compatibility"}
+    required = {"id", "path", "domain", "kind", "reference", "status", "tags"}
 
     for index, case in enumerate(cases):
         if not isinstance(case, dict):
@@ -222,13 +205,6 @@ def validate_manifest(root_name: str) -> list[str]:
         if actual is None:
             continue
         for field in required:
-            if field == "compatibility":
-                if compatibility_lua_ref(actual) != compatibility_lua_ref(expected):
-                    errors.append(
-                        f"{repo_rel(manifest_path)}: {expected['path']} field compatibility.historical.lua_ref "
-                        f"is {compatibility_lua_ref(actual)!r}, expected {compatibility_lua_ref(expected)!r}"
-                    )
-                continue
             if actual.get(field) != expected.get(field):
                 errors.append(
                     f"{repo_rel(manifest_path)}: {expected['path']} field {field} "
