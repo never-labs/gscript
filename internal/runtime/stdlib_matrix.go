@@ -11,7 +11,11 @@
 
 package runtime
 
-import "fmt"
+import (
+	"fmt"
+
+	stdmatrix "github.com/never-labs/gscript/internal/stdlib/data/matrix"
+)
 
 // buildMatrixLib creates the "matrix" standard library table.
 func buildMatrixLib() *Table {
@@ -77,25 +81,24 @@ func matrixDenseValue(rowsValue, colsValue Value) (Value, error) {
 	if !rowsValue.IsInt() || !colsValue.IsInt() {
 		return NilValue(), fmt.Errorf("matrix.dense: rows and cols must be integers")
 	}
-	rows := int(rowsValue.Int())
-	cols := int(colsValue.Int())
-	if rows < 0 || cols < 0 {
-		return NilValue(), fmt.Errorf("matrix.dense: rows and cols must be non-negative")
+	rows, cols, err := stdmatrix.Shape(rowsValue.Int(), colsValue.Int())
+	if err != nil {
+		return NilValue(), err
 	}
 	return TableValue(NewDenseMatrix(rows, cols)), nil
 }
 
 func matrixGetfValue(matrixValue, rowValue, colValue Value) (Value, error) {
-	m, i, j, stride, err := matrixDenseAccess(matrixValue, rowValue, colValue, "matrix.getf")
+	m, offset, err := matrixDenseAccess(matrixValue, rowValue, colValue, "matrix.getf")
 	if err != nil {
 		return NilValue(), err
 	}
 	flat := (*[1 << 30]float64)(m.dmFlat)
-	return FloatValue(flat[i*stride+j]), nil
+	return FloatValue(flat[offset]), nil
 }
 
 func matrixSetfValue(matrixValue, rowValue, colValue, value Value) (Value, error) {
-	m, i, j, stride, err := matrixDenseAccess(matrixValue, rowValue, colValue, "matrix.setf")
+	m, offset, err := matrixDenseAccess(matrixValue, rowValue, colValue, "matrix.setf")
 	if err != nil {
 		return NilValue(), err
 	}
@@ -109,28 +112,27 @@ func matrixSetfValue(matrixValue, rowValue, colValue, value Value) (Value, error
 		return NilValue(), fmt.Errorf("matrix.setf: value must be numeric")
 	}
 	flat := (*[1 << 30]float64)(m.dmFlat)
-	flat[i*stride+j] = f
+	flat[offset] = f
 	return NilValue(), nil
 }
 
-func matrixDenseAccess(matrixValue, rowValue, colValue Value, name string) (*Table, int, int, int, error) {
+func matrixDenseAccess(matrixValue, rowValue, colValue Value, name string) (*Table, int, error) {
 	if !matrixValue.IsTable() {
-		return nil, 0, 0, 0, fmt.Errorf("%s: argument 1 must be a matrix", name)
+		return nil, 0, fmt.Errorf("%s: argument 1 must be a matrix", name)
 	}
 	m := matrixValue.Table()
 	if m.dmStride <= 0 {
-		return nil, 0, 0, 0, fmt.Errorf("%s: argument 1 is not a DenseMatrix", name)
+		return nil, 0, fmt.Errorf("%s: argument 1 is not a DenseMatrix", name)
 	}
 	if !rowValue.IsInt() || !colValue.IsInt() {
-		return nil, 0, 0, 0, fmt.Errorf("%s: row and column must be integers", name)
+		return nil, 0, fmt.Errorf("%s: row and column must be integers", name)
 	}
-	i := int(rowValue.Int())
-	j := int(colValue.Int())
 	stride := int(m.dmStride)
 	// Bounds check would be via dmRows; we stored stride but not rows. Validate
 	// through the outer array length, matching the semantic fallback.
-	if i < 0 || i >= len(m.array) || j < 0 || j >= stride {
-		return nil, 0, 0, 0, fmt.Errorf("%s: index out of range", name)
+	offset, err := stdmatrix.Offset(name, rowValue.Int(), colValue.Int(), len(m.array), stride)
+	if err != nil {
+		return nil, 0, err
 	}
-	return m, i, j, stride, nil
+	return m, offset, nil
 }
