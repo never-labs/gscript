@@ -6,7 +6,6 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	hostfs "github.com/never-labs/gscript/internal/stdlib/fs"
 )
 
@@ -17,39 +16,40 @@ import (
 // Interpreter is the tree-walking evaluator for GScript programs.
 type Interpreter struct {
 	globals            *Environment
-	output             []string           // captured print output (for testing)
-	currentCo          *Coroutine         // non-nil when running inside a coroutine
-	modules            map[string]Value   // require() cache
-	stringMeta         *Table             // metatable for string values (__index → string lib)
-	scriptDir          string             // directory of the main script (for require path resolution)
-	moduleLoading      bool               // require() may load .gs files from the filesystem
-	filesystemEnabled  bool               // script-side file APIs may access the filesystem
-	filesystemRead     bool               // fs read operations are enabled
-	filesystemWrite    bool               // fs write operations are enabled
-	filesystemRoot     string             // optional root for script-side filesystem access
-	dynamicEval        bool               // script-side string compile/eval is enabled
-	environmentRead    bool               // script-side environment reads are enabled
-	environmentWrite   bool               // script-side environment writes are enabled
-	allowedEnv         map[string]bool    // nil means all environment variables are allowed
-	networkAccess      bool               // net/http host network APIs are enabled
-	processExecution   bool               // process.run/exec/which are enabled
-	processShell       bool               // process.shell is enabled
-	debugAccess        bool               // script-side debug APIs are enabled
-	testkitAccess      bool               // script-side testkit APIs are enabled
-	llmProvider        LLMProvider        // optional host-provided model backend
-	llmProviderFactory LLMProviderFactory // optional model-config provider constructor
-	llmTraceSink       LLMTraceSink       // optional host-side LLM trace sink
-	currentSourceName  string             // source name for diagnostics while executing parsed source
-	args               []string           // current script entrypoint args: [0]=script, [1:]=user args
-	callStack          []DebugFrame       // active runtime calls, oldest to newest
-	deferStack         [][]deferredCall   // active function-scope deferred calls
-	debugHook          Value              // optional GScript diagnostic hook
-	debugOpts          DebugHookOptions   // filters for debugHook
-	debugSink          Value              // optional explicit diagnostic sink
-	debugBusy          bool               // prevents debug hooks from recursively firing
-	gcMode             string             // host-facing collectgarbage mode label
-	gcRunning          bool               // host-facing collectgarbage running flag
-	maxSteps           int64              // <=0 means unlimited
+	output             []string            // captured print output (for testing)
+	currentCo          *Coroutine          // non-nil when running inside a coroutine
+	modules            map[string]Value    // require() cache
+	stdlibModules      map[string]struct{} // installed public stdlib module names
+	stringMeta         *Table              // metatable for string values (__index → string lib)
+	scriptDir          string              // directory of the main script (for require path resolution)
+	moduleLoading      bool                // require() may load .gs files from the filesystem
+	filesystemEnabled  bool                // script-side file APIs may access the filesystem
+	filesystemRead     bool                // fs read operations are enabled
+	filesystemWrite    bool                // fs write operations are enabled
+	filesystemRoot     string              // optional root for script-side filesystem access
+	dynamicEval        bool                // script-side string compile/eval is enabled
+	environmentRead    bool                // script-side environment reads are enabled
+	environmentWrite   bool                // script-side environment writes are enabled
+	allowedEnv         map[string]bool     // nil means all environment variables are allowed
+	networkAccess      bool                // net/http host network APIs are enabled
+	processExecution   bool                // process.run/exec/which are enabled
+	processShell       bool                // process.shell is enabled
+	debugAccess        bool                // script-side debug APIs are enabled
+	testkitAccess      bool                // script-side testkit APIs are enabled
+	llmProvider        LLMProvider         // optional host-provided model backend
+	llmProviderFactory LLMProviderFactory  // optional model-config provider constructor
+	llmTraceSink       LLMTraceSink        // optional host-side LLM trace sink
+	currentSourceName  string              // source name for diagnostics while executing parsed source
+	args               []string            // current script entrypoint args: [0]=script, [1:]=user args
+	callStack          []DebugFrame        // active runtime calls, oldest to newest
+	deferStack         [][]deferredCall    // active function-scope deferred calls
+	debugHook          Value               // optional GScript diagnostic hook
+	debugOpts          DebugHookOptions    // filters for debugHook
+	debugSink          Value               // optional explicit diagnostic sink
+	debugBusy          bool                // prevents debug hooks from recursively firing
+	gcMode             string              // host-facing collectgarbage mode label
+	gcRunning          bool                // host-facing collectgarbage running flag
+	maxSteps           int64               // <=0 means unlimited
 	steps              int64
 	maxNativeCalls     int64 // <=0 means unlimited
 	nativeCalls        int64
@@ -73,6 +73,7 @@ func NewCore() *Interpreter {
 	interp := &Interpreter{
 		globals:           NewEnvironment(nil),
 		modules:           make(map[string]Value),
+		stdlibModules:     make(map[string]struct{}),
 		gcMode:            "incremental",
 		gcRunning:         true,
 		moduleLoading:     true,
@@ -142,8 +143,7 @@ func (interp *Interpreter) ReplaceGlobals(globals map[string]Value) {
 
 // RestrictStdlib removes standard-library globals not present in allowed.
 func (interp *Interpreter) RestrictStdlib(allowed map[string]bool) {
-	for _, module := range catalog.Modules() {
-		name := module.Name
+	for name := range interp.stdlibModules {
 		if allowed[name] {
 			continue
 		}
@@ -179,6 +179,20 @@ func (interp *Interpreter) AssignGlobal(name string, val Value) {
 func (interp *Interpreter) SetModule(name string, val Value) {
 	interp.modules[name] = val
 	interp.markPackageLoaded(name, val)
+}
+
+// MarkStdlibModule records name as part of the installed public standard
+// library surface. Standard-library installers call this so runtime policy code
+// can operate on actually installed modules without importing the stdlib
+// catalog.
+func (interp *Interpreter) MarkStdlibModule(name string) {
+	if interp == nil || name == "" {
+		return
+	}
+	if interp.stdlibModules == nil {
+		interp.stdlibModules = make(map[string]struct{})
+	}
+	interp.stdlibModules[name] = struct{}{}
 }
 
 // GetGlobal retrieves a global variable.
@@ -350,10 +364,7 @@ func (interp *Interpreter) SetFilesystemRoot(root string) {
 }
 
 func (interp *Interpreter) builtinModule(name string) (Value, bool) {
-	for _, module := range catalog.Modules() {
-		if name != module.Name {
-			continue
-		}
+	if _, known := interp.stdlibModules[name]; known {
 		v, ok := interp.globals.Get(name)
 		return v, ok && v.IsTable()
 	}

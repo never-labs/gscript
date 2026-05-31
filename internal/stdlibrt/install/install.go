@@ -170,6 +170,7 @@ func (installer interpreterInstaller) RegisterModule(name string, module runtime
 	}
 	installer.interp.SetGlobal(name, module)
 	installer.interp.SetModule(name, module)
+	installer.interp.MarkStdlibModule(name)
 }
 
 func (installer interpreterInstaller) RegisterTable(name string, table *runtime.Table) {

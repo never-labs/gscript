@@ -25,6 +25,7 @@ func newStdlibInstallContext(interp *Interpreter) *stdlibInstallContext {
 func (ctx *stdlibInstallContext) RegisterModule(name string, module Value) {
 	ctx.interp.globals.Define(name, module)
 	ctx.interp.modules[name] = module
+	ctx.interp.MarkStdlibModule(name)
 	ctx.loaded.RawSetString(name, module)
 }
 
