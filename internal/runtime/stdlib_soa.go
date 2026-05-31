@@ -278,7 +278,8 @@ func buildSoALib() *Table {
 		if len(args) < 3 || !args[2].IsInt() {
 			return nil, fmt.Errorf("soa.slice: argument 3 must be an integer")
 		}
-		out, err := s.Slice(int(args[1].Int()-1), int(args[2].Int()))
+		start, end := stdsoa.SliceRange(args[1].Int(), args[2].Int())
+		out, err := s.Slice(start, end)
 		if err != nil {
 			return nil, err
 		}
@@ -396,11 +397,11 @@ func buildSoALib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		dst, src, scale, err := requireSoAKernelArgs("soa.addScaled", args)
+		kernel, err := requireSoAKernelArgs("soa.addScaled", args)
 		if err != nil {
 			return nil, err
 		}
-		if err := s.AddScaled(dst, src, scale); err != nil {
+		if err := s.AddScaled(kernel.Dst, kernel.Src, kernel.Scale); err != nil {
 			return nil, err
 		}
 		return []Value{BoolValue(true)}, nil
@@ -411,14 +412,15 @@ func buildSoALib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		dst, src, scale, err := requireSoAKernelArgs("soa.affine", args)
+		kernel, err := requireSoAKernelArgs("soa.affine", args)
 		if err != nil {
 			return nil, err
 		}
 		if len(args) < 5 || !args[4].IsNumber() {
 			return nil, fmt.Errorf("soa.affine: argument 5 must be numeric")
 		}
-		if err := s.Affine(dst, src, scale, args[4].Number()); err != nil {
+		affine := stdsoa.NewAffineArgs(kernel.Dst, kernel.Src, kernel.Scale, args[4].Number())
+		if err := s.Affine(affine.Dst, affine.Src, affine.Scale, affine.Bias); err != nil {
 			return nil, err
 		}
 		return []Value{BoolValue(true)}, nil
@@ -429,7 +431,7 @@ func buildSoALib() *Table {
 		if err != nil {
 			return nil, err
 		}
-		dst, src, scale, err := requireSoAKernelArgs("soa.affineWhere", args)
+		kernel, err := requireSoAKernelArgs("soa.affineWhere", args)
 		if err != nil {
 			return nil, err
 		}
@@ -439,7 +441,8 @@ func buildSoALib() *Table {
 		if len(args) < 6 || !args[5].IsNumber() {
 			return nil, fmt.Errorf("soa.affineWhere: argument 6 must be numeric")
 		}
-		if err := s.AffineWhere(dst, src, args[4].DenseArray(), scale, args[5].Number()); err != nil {
+		affine := stdsoa.NewAffineArgs(kernel.Dst, kernel.Src, kernel.Scale, args[5].Number())
+		if err := s.AffineWhere(affine.Dst, affine.Src, args[4].DenseArray(), affine.Scale, affine.Bias); err != nil {
 			return nil, err
 		}
 		return []Value{BoolValue(true)}, nil
@@ -705,17 +708,17 @@ func requireSoAArg(name string, args []Value, index int) (*SoA, error) {
 	return args[index].SoA(), nil
 }
 
-func requireSoAKernelArgs(name string, args []Value) (dst, src string, scale float64, err error) {
+func requireSoAKernelArgs(name string, args []Value) (stdsoa.KernelArgs, error) {
 	if len(args) < 2 || !args[1].IsString() {
-		return "", "", 0, fmt.Errorf("%s: argument 2 must be a string", name)
+		return stdsoa.KernelArgs{}, fmt.Errorf("%s: argument 2 must be a string", name)
 	}
 	if len(args) < 3 || !args[2].IsString() {
-		return "", "", 0, fmt.Errorf("%s: argument 3 must be a string", name)
+		return stdsoa.KernelArgs{}, fmt.Errorf("%s: argument 3 must be a string", name)
 	}
 	if len(args) < 4 || !args[3].IsNumber() {
-		return "", "", 0, fmt.Errorf("%s: argument 4 must be numeric", name)
+		return stdsoa.KernelArgs{}, fmt.Errorf("%s: argument 4 must be numeric", name)
 	}
-	return args[1].Str(), args[2].Str(), args[3].Number(), nil
+	return stdsoa.NewKernelArgs(args[1].Str(), args[2].Str(), args[3].Number()), nil
 }
 
 func soaMaskedAggregateArgs(name string, args []Value, fn func(*SoA, string, *DenseArray) (Value, error)) (Value, error) {
@@ -1303,7 +1306,8 @@ func soaSliceValue(soaValue, firstValue, lastValue Value) (Value, error) {
 	if !lastValue.IsInt() {
 		return NilValue(), fmt.Errorf("soa.slice: argument 3 must be an integer")
 	}
-	out, err := soaValue.SoA().Slice(int(firstValue.Int()-1), int(lastValue.Int()))
+	start, end := stdsoa.SliceRange(firstValue.Int(), lastValue.Int())
+	out, err := soaValue.SoA().Slice(start, end)
 	if err != nil {
 		return NilValue(), err
 	}
@@ -1602,17 +1606,20 @@ func soaAffineTermsFromTableWithVersions(tbl *Table) ([]SoAAffineTerm, []*Table,
 		if !scale.IsNumber() {
 			return nil, nil, nil, fmt.Errorf("soa.affineMany: term %d requires numeric scale", i)
 		}
-		if bias.IsNil() {
-			bias = IntValue(0)
-		}
-		if !bias.IsNumber() {
+		hasBias := !bias.IsNil()
+		if hasBias && !bias.IsNumber() {
 			return nil, nil, nil, fmt.Errorf("soa.affineMany: term %d requires numeric bias", i)
 		}
+		biasNumber := 0.0
+		if hasBias {
+			biasNumber = bias.Number()
+		}
+		term := stdsoa.NewAffineTerm(dst.Str(), src.Str(), scale.Number(), stdsoa.DefaultAffineBias(hasBias, biasNumber))
 		terms = append(terms, SoAAffineTerm{
-			Dst:   dst.Str(),
-			Src:   src.Str(),
-			Scale: scale.Number(),
-			Bias:  bias.Number(),
+			Dst:   term.Dst,
+			Src:   term.Src,
+			Scale: term.Scale,
+			Bias:  term.Bias,
 		})
 		termTables = append(termTables, termTable)
 		termVersions = append(termVersions, termVersion)
