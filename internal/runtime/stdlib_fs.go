@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	hostfs "github.com/never-labs/gscript/internal/stdlib/host/fs"
 )
 
 func (interp *Interpreter) resolveFilesystemPath(path string) (string, error) {
@@ -356,16 +358,11 @@ func buildFSLibWithCapabilities(root string, read, write bool, maxReadBytes, max
 			return []Value{NilValue(), StringValue(err.Error())}, nil
 		}
 		result := NewTable()
-		for i, entry := range entries {
+		for i, entry := range hostfs.ProjectDirEntries(entries) {
 			entryTbl := NewTable()
-			entryTbl.RawSet(StringValue("name"), StringValue(entry.Name()))
-			entryTbl.RawSet(StringValue("isdir"), BoolValue(entry.IsDir()))
-			info, infoErr := entry.Info()
-			if infoErr == nil {
-				entryTbl.RawSet(StringValue("size"), IntValue(info.Size()))
-			} else {
-				entryTbl.RawSet(StringValue("size"), IntValue(0))
-			}
+			entryTbl.RawSet(StringValue("name"), StringValue(entry.Name))
+			entryTbl.RawSet(StringValue("isdir"), BoolValue(entry.IsDir))
+			entryTbl.RawSet(StringValue("size"), IntValue(entry.Size))
 			result.RawSet(IntValue(int64(i+1)), TableValue(entryTbl))
 		}
 		return []Value{TableValue(result)}, nil
