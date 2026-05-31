@@ -22,6 +22,9 @@ func runWithVec(t *testing.T, src string) *Interpreter {
 	}
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
+	mathLib := TableValue(BuildMath())
+	interp.SetGlobal("math", mathLib)
+	interp.SetModule("math", mathLib)
 	interp.SetGlobal("vec", TableValue(BuildVec()))
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)

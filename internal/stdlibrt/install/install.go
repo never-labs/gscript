@@ -79,6 +79,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	installer.RegisterTable("hash", modules.BuildHash())
 	installer.RegisterTable("log", modules.BuildLog())
 	installer.RegisterTable("matrix", modules.BuildMatrix())
+	installer.RegisterTable("math", modules.BuildMath())
 	installer.RegisterTable("path", modules.BuildPath())
 	installer.RegisterTable("rand", modules.BuildRand())
 	installer.RegisterTable("regexp", modules.BuildRegexp())

@@ -56,6 +56,8 @@ func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "encoding", runtime.TableValue(BuildEncoding(interp.MaxHostResultBytes)))
 	installTestModule(interp, "hash", runtime.TableValue(BuildHash()))
 	installTestModule(interp, "log", runtime.TableValue(BuildLog()))
+	installTestModule(interp, "math", runtime.TableValue(BuildMath()))
+	installTestModule(interp, "matrix", runtime.TableValue(BuildMatrix()))
 	installTestModule(interp, "path", runtime.TableValue(BuildPath()))
 	installTestModule(interp, "rand", runtime.TableValue(BuildRand()))
 	installTestModule(interp, "regexp", runtime.TableValue(BuildRegexp()))

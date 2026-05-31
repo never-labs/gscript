@@ -36,8 +36,11 @@ func (interp *Interpreter) installStdlib(includeMigratedHostIO bool) {
 	buildTableHigherOrderWithInterp(interp, tblLib)
 	std.RegisterTable("table", tblLib)
 
-	// Math library
-	std.RegisterTable("math", buildMathLib())
+	if includeMigratedHostIO {
+		// Historical direct-runtime install path. Public embedding now installs
+		// math from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("math", buildMathLib())
+	}
 
 	if includeMigratedHostIO {
 		// Historical direct-runtime install path. Public embedding now installs
