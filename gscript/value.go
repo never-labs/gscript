@@ -67,6 +67,27 @@ func Decode(v interface{}) (Value, error) {
 	return toPublic(rv), nil
 }
 
+// MustDecode is like Decode but panics on error.
+func MustDecode(v interface{}) Value {
+	pv, err := Decode(v)
+	if err != nil {
+		panic(fmt.Sprintf("gscript.MustDecode: %v", err))
+	}
+	return pv
+}
+
+// ToPublicValue converts a Go value into a public GScript value.
+//
+// This is the public Value boundary equivalent of the legacy ToValue helper.
+func ToPublicValue(v interface{}) (Value, error) {
+	return Decode(v)
+}
+
+// MustToPublicValue is like ToPublicValue but panics on error.
+func MustToPublicValue(v interface{}) Value {
+	return MustDecode(v)
+}
+
 // Encode converts a public GScript value back into its default Go
 // representation.
 func Encode(v Value) (interface{}, error) {
@@ -78,6 +99,12 @@ func Encode(v Value) (interface{}, error) {
 		return nil, nil
 	}
 	return rv.Interface(), nil
+}
+
+// FromPublicValue converts a public GScript value to a Go reflect.Value of the
+// target type. If target is nil, it uses the default Go representation.
+func FromPublicValue(v Value, target reflect.Type) (reflect.Value, error) {
+	return FromValue(fromPublic(v), target)
 }
 
 func toPublic(v runtime.Value) Value {

@@ -223,6 +223,40 @@ func TestCallFunctionRoutesBytecodeClosures(t *testing.T) {
 	}
 }
 
+func TestCallPublicValueRoutesBytecodeClosures(t *testing.T) {
+	vm := gs.New(gs.WithVM())
+	if err := vm.Exec(`
+		func add(a, b) {
+			return a + b
+		}
+	`); err != nil {
+		t.Fatal(err)
+	}
+	fn := vm.GetPublicValue("add")
+	if got := fn.Kind(); got != gs.KindFunction {
+		t.Fatalf("add kind = %s, want function", got)
+	}
+	results, err := vm.CallPublicValue(fn, gs.Int(3), gs.Int(4))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Int() != 7 {
+		t.Fatalf("CallPublicValue results = %v, want 7", results)
+	}
+}
+
+func TestPublicValueGlobals(t *testing.T) {
+	vm := gs.New(gs.WithVM())
+	vm.SetPublicValue("answer", gs.Int(42))
+	if err := vm.Exec(`answer = answer + 1`); err != nil {
+		t.Fatal(err)
+	}
+	got := vm.GetPublicValue("answer")
+	if got.Int() != 43 {
+		t.Fatalf("answer = %d, want 43", got.Int())
+	}
+}
+
 func TestCallNotFound(t *testing.T) {
 	vm := gs.New()
 	_, err := vm.Call("nonexistent")

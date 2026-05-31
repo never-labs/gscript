@@ -649,12 +649,32 @@ func (vm *VM) Get(name string) (interface{}, error) {
 	return rv.Interface(), nil
 }
 
+// GetPublicValue gets a global as a public Value.
+func (vm *VM) GetPublicValue(name string) Value {
+	return toPublic(vm.interp.GetGlobal(name))
+}
+
 // GetValue gets a global as a raw runtime.Value.
+//
+// Deprecated: use GetPublicValue to keep internal runtime values out of public
+// embedding code.
 func (vm *VM) GetValue(name string) runtime.Value {
 	return vm.interp.GetGlobal(name)
 }
 
+// SetPublicValue sets a global to a public Value.
+func (vm *VM) SetPublicValue(name string, val Value) {
+	rv := fromPublic(val)
+	vm.interp.SetGlobal(name, rv)
+	if vm.bvm != nil {
+		vm.bvm.SetGlobal(name, rv)
+	}
+}
+
 // SetValue sets a global to a raw runtime.Value.
+//
+// Deprecated: use SetPublicValue to keep internal runtime values out of public
+// embedding code.
 func (vm *VM) SetValue(name string, val runtime.Value) {
 	vm.interp.SetGlobal(name, val)
 	if vm.bvm != nil {
@@ -800,8 +820,36 @@ func (vm *VM) BindMethod(className, methodName string, fn interface{}) error {
 	return nil
 }
 
+// CallPublicValue calls a function held as a public Value.
+func (vm *VM) CallPublicValue(fn Value, args ...Value) ([]Value, error) {
+	rawArgs := make([]runtime.Value, len(args))
+	for i, arg := range args {
+		rawArgs[i] = fromPublic(arg)
+	}
+	var (
+		rawResults []runtime.Value
+		err        error
+	)
+	if vm.bvm != nil {
+		rawResults, err = vm.bvm.CallValue(fromPublic(fn), rawArgs)
+	} else {
+		rawResults, err = vm.interp.CallFunction(fromPublic(fn), rawArgs)
+	}
+	if err != nil {
+		return nil, err
+	}
+	results := make([]Value, len(rawResults))
+	for i, result := range rawResults {
+		results[i] = toPublic(result)
+	}
+	return results, nil
+}
+
 // CallFunction exposes the interpreter's CallFunction for advanced use.
 // Useful when you have a runtime.Value function and want to call it.
+//
+// Deprecated: use CallPublicValue to keep internal runtime values out of public
+// embedding code.
 func (vm *VM) CallFunction(fn runtime.Value, args []runtime.Value) ([]runtime.Value, error) {
 	if vm.bvm != nil {
 		return vm.bvm.CallValue(fn, args)
@@ -811,6 +859,9 @@ func (vm *VM) CallFunction(fn runtime.Value, args []runtime.Value) ([]runtime.Va
 
 // Interpreter returns the underlying runtime.Interpreter.
 // Use for advanced access; prefer the VM methods when possible.
+//
+// Deprecated: this exposes internal runtime state. Prefer VM methods and public
+// Value APIs.
 func (vm *VM) Interpreter() *runtime.Interpreter {
 	return vm.interp
 }

@@ -21,6 +21,9 @@ import (
 //	struct / *struct   -> table (fields + methods via metatable)
 //	func              -> function (reflected, see wrapGoFunc)
 //	runtime.Value     -> passed through as-is
+//
+// Deprecated: use Decode or ToPublicValue to keep internal runtime values out
+// of public embedding code.
 func ToValue(v interface{}) (runtime.Value, error) {
 	if v == nil {
 		return runtime.NilValue(), nil
@@ -39,6 +42,9 @@ func ToValue(v interface{}) (runtime.Value, error) {
 }
 
 // MustToValue is like ToValue but panics on error.
+//
+// Deprecated: use MustDecode or MustToPublicValue to keep internal runtime
+// values out of public embedding code.
 func MustToValue(v interface{}) runtime.Value {
 	rv, err := ToValue(v)
 	if err != nil {
@@ -130,6 +136,9 @@ func reflectToValue(rv reflect.Value) (runtime.Value, error) {
 
 // FromValue converts a GScript Value to a Go value of the target type.
 // If target is nil, uses a default mapping (int64, float64, string, map, etc.)
+//
+// Deprecated: use Value.To, Encode, or FromPublicValue to keep internal runtime
+// values out of public embedding code.
 func FromValue(val runtime.Value, target reflect.Type) (reflect.Value, error) {
 	if target == nil {
 		return fromValueDefault(val)
