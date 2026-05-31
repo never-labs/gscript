@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"context"
@@ -9,19 +9,20 @@ import (
 	"github.com/never-labs/gscript/internal/ast"
 	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/parser"
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 type testLLMProvider struct {
-	requests []LLMTurnRequest
-	res      LLMTurnResult
-	results  []LLMTurnResult
+	requests []runtime.LLMTurnRequest
+	res      runtime.LLMTurnResult
+	results  []runtime.LLMTurnResult
 	err      error
 }
 
-func (p *testLLMProvider) Turn(_ context.Context, req LLMTurnRequest) (LLMTurnResult, error) {
+func (p *testLLMProvider) Turn(_ context.Context, req runtime.LLMTurnRequest) (runtime.LLMTurnResult, error) {
 	p.requests = append(p.requests, req)
 	if p.err != nil {
-		return LLMTurnResult{}, p.err
+		return runtime.LLMTurnResult{}, p.err
 	}
 	if len(p.results) > 0 {
 		res := p.results[0]
@@ -54,12 +55,43 @@ func parseLLMTestProgram(t *testing.T, src string) *ast.Program {
 	return prog
 }
 
-func TestLLMRunAgentOutputValidationMissingField(t *testing.T) {
-	provider := &testLLMProvider{res: LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada"}`}}
-	interp := New()
-	interp.llmProvider = provider
+func runLLMTestProgram(t *testing.T, src string, provider runtime.LLMProvider) *runtime.Interpreter {
+	t.Helper()
+	interp := runtime.NewCore()
+	InstallLLM(interpInstaller{interp: interp}, LLMOptions{
+		Call:     interp.CallFunction,
+		Provider: func() runtime.LLMProvider { return provider },
+		MaxHostResult: func() int64 {
+			return interp.MaxHostResultBytes()
+		},
+		Context: func() context.Context { return context.Background() },
+	})
+	if err := interp.Exec(parseLLMTestProgram(t, src)); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	return interp
+}
 
-	if err := interp.Exec(parseLLMTestProgram(t, `
+type interpInstaller struct {
+	interp *runtime.Interpreter
+}
+
+func (installer interpInstaller) RegisterModule(name string, module runtime.Value) {
+	installer.interp.SetGlobal(name, module)
+	installer.interp.SetModule(name, module)
+}
+
+func (installer interpInstaller) RegisterTable(name string, table *runtime.Table) {
+	installer.RegisterModule(name, runtime.TableValue(table))
+}
+
+func (installer interpInstaller) RegisterAlias(name string, value runtime.Value) {
+	installer.interp.SetGlobal(name, value)
+}
+
+func TestLLMRunAgentOutputValidationMissingField(t *testing.T) {
+	provider := &testLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada"}`}}
+	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
     messages: {llm.user("Extract the contact.")}
@@ -70,9 +102,7 @@ result, err := llm.run_agent({
 })
 err_kind := err.kind
 err_message := err.message
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
 	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != "validation" {
 		t.Fatalf("err_kind = %v, want validation", got)
@@ -90,23 +120,18 @@ err_message := err.message
 }
 
 func TestLLMTurnProviderErrorKindReachesScript(t *testing.T) {
-	provider := &testLLMProvider{err: testLLMProviderKindError(LLMProviderErrorRateLimit)}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	provider := &testLLMProvider{err: testLLMProviderKindError(runtime.LLMProviderErrorRateLimit)}
+	interp := runLLMTestProgram(t, `
 result, err := llm.turn({
     model: "mock"
     messages: {llm.user("hello")}
 })
 err_kind := err.kind
 err_message := err.message
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
-	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != LLMProviderErrorRateLimit {
-		t.Fatalf("err_kind = %v, want %s", got, LLMProviderErrorRateLimit)
+	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != runtime.LLMProviderErrorRateLimit {
+		t.Fatalf("err_kind = %v, want %s", got, runtime.LLMProviderErrorRateLimit)
 	}
 	if got := interp.GetGlobal("err_message"); !got.IsString() || !strings.Contains(got.Str(), "typed provider failure") {
 		t.Fatalf("err_message = %v, want typed provider failure", got)
@@ -115,43 +140,35 @@ err_message := err.message
 
 func TestLLMReactProviderErrorKindReachesScript(t *testing.T) {
 	provider := &testLLMProvider{err: context.DeadlineExceeded}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	interp := runLLMTestProgram(t, `
 result, err := llm.react({
     model: "mock"
     messages: {llm.user("hello")}
     max_steps: 1
 })
 err_kind := err.kind
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
-	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != LLMProviderErrorNetwork {
-		t.Fatalf("err_kind = %v, want %s", got, LLMProviderErrorNetwork)
+	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != runtime.LLMProviderErrorNetwork {
+		t.Fatalf("err_kind = %v, want %s", got, runtime.LLMProviderErrorNetwork)
 	}
 }
 
 func TestClassifyLLMProviderErrorRuntime(t *testing.T) {
-	if got := ClassifyLLMProviderError(testLLMProviderKindError(LLMProviderErrorAuth)); got != LLMProviderErrorAuth {
-		t.Fatalf("typed provider classification = %q, want %q", got, LLMProviderErrorAuth)
+	if got := runtime.ClassifyLLMProviderError(testLLMProviderKindError(runtime.LLMProviderErrorAuth)); got != runtime.LLMProviderErrorAuth {
+		t.Fatalf("typed provider classification = %q, want %q", got, runtime.LLMProviderErrorAuth)
 	}
-	if got := ClassifyLLMProviderError(context.Canceled); got != LLMProviderErrorNetwork {
-		t.Fatalf("context classification = %q, want %q", got, LLMProviderErrorNetwork)
+	if got := runtime.ClassifyLLMProviderError(context.Canceled); got != runtime.LLMProviderErrorNetwork {
+		t.Fatalf("context classification = %q, want %q", got, runtime.LLMProviderErrorNetwork)
 	}
-	if got := ClassifyLLMProviderError(errors.New("plain")); got != LLMProviderErrorProvider {
-		t.Fatalf("plain classification = %q, want %q", got, LLMProviderErrorProvider)
+	if got := runtime.ClassifyLLMProviderError(errors.New("plain")); got != runtime.LLMProviderErrorProvider {
+		t.Fatalf("plain classification = %q, want %q", got, runtime.LLMProviderErrorProvider)
 	}
 }
 
 func TestLLMRunAgentOutputValidationTypeMismatch(t *testing.T) {
-	provider := &testLLMProvider{res: LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","score":"high","ok":true,"meta":{}}`}}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	provider := &testLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","score":"high","ok":true,"meta":{}}`}}
+	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
     messages: {llm.user("Classify the contact.")}
@@ -164,9 +181,7 @@ result, err := llm.run_agent({
 })
 err_kind := err.kind
 err_message := err.message
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
 	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != "validation" {
 		t.Fatalf("err_kind = %v, want validation", got)
@@ -177,11 +192,8 @@ err_message := err.message
 }
 
 func TestLLMRunAgentOutputValidationNestedMissingField(t *testing.T) {
-	provider := &testLLMProvider{res: LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","profile":{"city":"London"}}`}}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	provider := &testLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: `{"name":"Ada","profile":{"city":"London"}}`}}
+	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
     messages: {llm.user("Extract the contact.")}
@@ -195,9 +207,7 @@ result, err := llm.run_agent({
 })
 err_kind := err.kind
 err_message := err.message
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
 	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != "validation" {
 		t.Fatalf("err_kind = %v, want validation", got)
@@ -208,11 +218,8 @@ err_message := err.message
 }
 
 func TestLLMRunAgentOutputValidationArrayElementShape(t *testing.T) {
-	provider := &testLLMProvider{res: LLMTurnResult{Status: "final_answer", Text: `{"items":[{"name":"Ada","score":1},{"name":"Grace","score":"high"}]}`}}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	provider := &testLLMProvider{res: runtime.LLMTurnResult{Status: "final_answer", Text: `{"items":[{"name":"Ada","score":1},{"name":"Grace","score":"high"}]}`}}
+	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
     messages: {llm.user("Rank the contacts.")}
@@ -227,9 +234,7 @@ result, err := llm.run_agent({
 })
 err_kind := err.kind
 err_message := err.message
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
 	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != "validation" {
 		t.Fatalf("err_kind = %v, want validation", got)
@@ -240,14 +245,11 @@ err_message := err.message
 }
 
 func TestLLMRunAgentOutputRepairRetrySucceeds(t *testing.T) {
-	provider := &testLLMProvider{results: []LLMTurnResult{
+	provider := &testLLMProvider{results: []runtime.LLMTurnResult{
 		{Status: "final_answer", Text: `{"name":"Ada"}`},
 		{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`},
 	}}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
     messages: {llm.user("Extract the contact.")}
@@ -259,9 +261,7 @@ result, err := llm.run_agent({
 })
 email := result.value.email
 err_is_nil := err == nil
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
 	if got := interp.GetGlobal("err_is_nil"); !got.Truthy() {
 		t.Fatalf("err_is_nil = %v, want true", got)
@@ -282,14 +282,11 @@ err_is_nil := err == nil
 }
 
 func TestLLMRunAgentOutputRepairConsumesTurnBudget(t *testing.T) {
-	provider := &testLLMProvider{results: []LLMTurnResult{
+	provider := &testLLMProvider{results: []runtime.LLMTurnResult{
 		{Status: "final_answer", Text: `{"name":"Ada"}`},
 		{Status: "final_answer", Text: `{"name":"Ada","email":"ada@example.com"}`},
 	}}
-	interp := New()
-	interp.llmProvider = provider
-
-	if err := interp.Exec(parseLLMTestProgram(t, `
+	interp := runLLMTestProgram(t, `
 result, err := llm.run_agent({
     model: "mock-json"
     messages: {llm.user("Extract the contact.")}
@@ -302,9 +299,7 @@ result, err := llm.run_agent({
 })
 err_kind := err.kind
 err_dimension := err.dimension
-`)); err != nil {
-		t.Fatalf("Exec: %v", err)
-	}
+`, provider)
 
 	if got := interp.GetGlobal("err_kind"); !got.IsString() || got.Str() != "budget" {
 		t.Fatalf("err_kind = %v, want budget", got)

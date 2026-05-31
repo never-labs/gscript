@@ -30,8 +30,10 @@ func runWithLib(t *testing.T, src string, libName string, lib *Table) *Interpret
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
-	interp := New()
-	interp.globals.Define(libName, TableValue(lib))
+	interp := NewCore()
+	module := TableValue(lib)
+	interp.SetGlobal(libName, module)
+	interp.SetModule(libName, module)
 	if err := interp.Exec(prog); err != nil {
 		t.Fatalf("exec error: %v", err)
 	}
