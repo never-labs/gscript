@@ -16,17 +16,23 @@ func Install(interp *runtime.Interpreter) {
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
 		ScriptCaller: interp.CallFunction,
 		Host: modules.HostOptions{
-			NetworkAllowed:     interp.NetworkAccessEnabled,
-			FilesystemRoot:     interp.FilesystemRoot,
-			FilesystemRead:     interp.FilesystemReadEnabled,
-			FilesystemWrite:    interp.FilesystemWriteEnabled,
-			MaxFSReadBytes:     interp.MaxFilesystemReadBytes,
-			MaxFSWriteBytes:    interp.MaxFilesystemWriteBytes,
-			EnvironmentRead:    interp.EnvironmentReadEnabled,
-			EnvironmentWrite:   interp.EnvironmentWriteEnabled,
-			EnvironmentAllowed: interp.EnvironmentAllowed,
-			MaxHostResult:      interp.MaxHostResultBytes,
-			Call:               interp.CallFunction,
+			NetworkAllowed:        interp.NetworkAccessEnabled,
+			FilesystemRoot:        interp.FilesystemRoot,
+			FilesystemRead:        interp.FilesystemReadEnabled,
+			FilesystemWrite:       interp.FilesystemWriteEnabled,
+			MaxFSReadBytes:        interp.MaxFilesystemReadBytes,
+			MaxFSWriteBytes:       interp.MaxFilesystemWriteBytes,
+			EnvironmentRead:       interp.EnvironmentReadEnabled,
+			EnvironmentWrite:      interp.EnvironmentWriteEnabled,
+			EnvironmentAllowed:    interp.EnvironmentAllowed,
+			ProcessExecution:      interp.ProcessExecutionEnabled,
+			ProcessShell:          interp.ProcessShellEnabled,
+			ResolveFilesystemPath: interp.ResolveFilesystemPath,
+			Args:                  interp.Args,
+			SetArgs:               interp.SetArgs,
+			ScriptDir:             interp.ScriptDir,
+			MaxHostResult:         interp.MaxHostResultBytes,
+			Call:                  interp.CallFunction,
 		},
 	})
 	InstallLLM(interp)
@@ -78,6 +84,7 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 		installer.RegisterTable("io", modules.BuildIO(hostOpts))
 		installer.RegisterTable("net", modules.BuildNet(hostOpts))
 		installer.RegisterTable("os", modules.BuildOSWithPolicy(hostOpts))
+		installer.RegisterTable("process", modules.BuildProcessWithPolicy(hostOpts))
 	}
 	installer.RegisterTable("hash", modules.BuildHash())
 	installer.RegisterTable("json", modules.BuildJSON())

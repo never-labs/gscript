@@ -74,7 +74,11 @@ func (interp *Interpreter) installStdlib(includeMigratedCompat bool) {
 	}
 
 	// --- System ---
-	std.RegisterTable("process", buildProcessLib(interp))
+	if includeMigratedCompat {
+		// Historical direct-runtime install path. Public embedding now installs
+		// process from stdlibrt/modules through stdlibrt/install.
+		std.RegisterTable("process", buildProcessLib(interp))
+	}
 	std.RegisterTable("script", buildScriptLib(interp))
 	std.RegisterTable("sync", BuildSyncLibWithCaller(interp.callFunction))
 	std.RegisterTable("debug", buildDebugLib(interp))

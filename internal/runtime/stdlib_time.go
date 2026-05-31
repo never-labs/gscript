@@ -79,15 +79,7 @@ func timeSinceValue(v Value) (Value, error) {
 }
 
 func contextDoneAndErr(v Value) (*Channel, Value, bool) {
-	if !v.IsTable() {
-		return nil, NilValue(), false
-	}
-	t := v.Table()
-	done := t.RawGetString("done")
-	if !done.IsChannel() {
-		return nil, NilValue(), false
-	}
-	return done.Channel(), t.RawGetString("err"), true
+	return ScriptContextDoneAndErr(v)
 }
 
 func contextCancelledValue(done *Channel, errFn Value) (Value, bool) {
@@ -103,15 +95,7 @@ func contextCancelledValue(done *Channel, errFn Value) (Value, bool) {
 }
 
 func contextErrValue(errFn Value) Value {
-	gf := errFn.GoFunction()
-	if gf == nil || gf.Fn == nil {
-		return StringValue("cancelled")
-	}
-	vals, err := gf.Fn(nil)
-	if err != nil || len(vals) == 0 || vals[0].IsNil() {
-		return StringValue("cancelled")
-	}
-	return vals[0]
+	return ScriptContextErrValue(errFn)
 }
 
 // buildTimeLib creates the "time" standard library table.

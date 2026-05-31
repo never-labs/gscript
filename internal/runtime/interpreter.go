@@ -234,9 +234,17 @@ func (interp *Interpreter) SetProcessExecution(enabled bool) {
 	interp.processExecution = enabled
 }
 
+func (interp *Interpreter) ProcessExecutionEnabled() bool {
+	return interp == nil || interp.processExecution
+}
+
 // SetProcessShell controls process.shell.
 func (interp *Interpreter) SetProcessShell(enabled bool) {
 	interp.processShell = enabled
+}
+
+func (interp *Interpreter) ProcessShellEnabled() bool {
+	return interp == nil || interp.processShell
 }
 
 func (interp *Interpreter) FilesystemRoot() string {
@@ -244,6 +252,13 @@ func (interp *Interpreter) FilesystemRoot() string {
 		return ""
 	}
 	return interp.filesystemRoot
+}
+
+func (interp *Interpreter) ResolveFilesystemPath(path string) (string, error) {
+	if interp == nil {
+		return path, nil
+	}
+	return interp.resolveFilesystemPath(path)
 }
 
 func (interp *Interpreter) FilesystemReadEnabled() bool {

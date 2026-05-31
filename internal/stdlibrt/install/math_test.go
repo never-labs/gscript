@@ -46,3 +46,23 @@ func TestInstallModulesRegistersTimeFromStdlibrt(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallModulesRegistersProcessFromStdlibrt(t *testing.T) {
+	interp := runtime.NewCore()
+	interp.InstallRuntimeStdlib()
+	if got := interp.GetGlobal("process"); !got.IsNil() {
+		t.Fatalf("InstallRuntimeStdlib registered migrated process module: %v", got)
+	}
+
+	Install(interp)
+	processLib := interp.GetGlobal("process")
+	if !processLib.IsTable() {
+		t.Fatalf("process global is not a table: %v", processLib)
+	}
+	if !processLib.Table().RawGetString("__stdlibrt_module").Truthy() {
+		t.Fatalf("process global was not installed from stdlibrt")
+	}
+	if run := processLib.Table().RawGetString("run"); !run.IsFunction() {
+		t.Fatalf("process.run is not a function: %v", run)
+	}
+}

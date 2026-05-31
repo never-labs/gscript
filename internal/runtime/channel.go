@@ -169,6 +169,21 @@ func (c *Channel) Recv() (Value, bool) {
 	return val, true
 }
 
+// RecvOrStop waits for a receive or for stop to close. It returns stopped=true
+// when stop wins. This keeps host modules from reaching into Channel internals
+// while still allowing cancellation watchers to shut down cleanly.
+func (c *Channel) RecvOrStop(stop <-chan struct{}) (value Value, ok bool, stopped bool) {
+	select {
+	case val, recvOK := <-c.ch:
+		if !recvOK {
+			return NilValue(), false, false
+		}
+		return val, true, false
+	case <-stop:
+		return NilValue(), false, true
+	}
+}
+
 // Close closes the channel.
 func (c *Channel) Close() error {
 	c.mu.Lock()
