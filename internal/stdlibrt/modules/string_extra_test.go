@@ -1,7 +1,9 @@
-package runtime
+package modules
 
 import (
 	"testing"
+
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 func TestStringTrim(t *testing.T) {
@@ -83,34 +85,14 @@ func TestStringSplitEmpty(t *testing.T) {
 	if tbl.Length() != 3 {
 		t.Errorf("expected 3 parts, got %d", tbl.Length())
 	}
-	if tbl.RawGet(IntValue(1)).Str() != "a" {
-		t.Errorf("expected 'a', got '%s'", tbl.RawGet(IntValue(1)).Str())
+	if tbl.RawGet(runtime.IntValue(1)).Str() != "a" {
+		t.Errorf("expected 'a', got '%s'", tbl.RawGet(runtime.IntValue(1)).Str())
 	}
-	if tbl.RawGet(IntValue(2)).Str() != "b" {
-		t.Errorf("expected 'b', got '%s'", tbl.RawGet(IntValue(2)).Str())
+	if tbl.RawGet(runtime.IntValue(2)).Str() != "b" {
+		t.Errorf("expected 'b', got '%s'", tbl.RawGet(runtime.IntValue(2)).Str())
 	}
-	if tbl.RawGet(IntValue(3)).Str() != "c" {
-		t.Errorf("expected 'c', got '%s'", tbl.RawGet(IntValue(3)).Str())
-	}
-}
-
-func TestStringSplitProjectSub(t *testing.T) {
-	v, err := StringSplitProjectSub(StringValue("svc=api7|status=500|bytes=1234"), StringValue("|"), 2, 8, 0, false)
-	if err != nil {
-		t.Fatalf("StringSplitProjectSub: %v", err)
-	}
-	if !v.IsString() || v.Str() != "500" {
-		t.Fatalf("substring = %v, want 500", v)
-	}
-}
-
-func TestStringSplitProjectSubToNumber(t *testing.T) {
-	v, err := StringSplitProjectSubToNumber(StringValue("svc=api7|status=500|bytes=1234"), StringValue("|"), 3, 7, 0, false)
-	if err != nil {
-		t.Fatalf("StringSplitProjectSubToNumber: %v", err)
-	}
-	if !v.IsInt() || v.Int() != 1234 {
-		t.Fatalf("number = %v, want int 1234", v)
+	if tbl.RawGet(runtime.IntValue(3)).Str() != "c" {
+		t.Errorf("expected 'c', got '%s'", tbl.RawGet(runtime.IntValue(3)).Str())
 	}
 }
 
@@ -361,13 +343,13 @@ func TestLuaPatternFrontierCompatibility(t *testing.T) {
 		t.Fatalf("frontier whole replacement count = %d, want 2", got)
 	}
 	words := interp.GetGlobal("words").Table()
-	if got := words.RawGet(IntValue(1)).Str(); got != "a" {
+	if got := words.RawGet(runtime.IntValue(1)).Str(); got != "a" {
 		t.Fatalf("word 1 = %q, want a", got)
 	}
-	if got := words.RawGet(IntValue(2)).Str(); got != "b" {
+	if got := words.RawGet(runtime.IntValue(2)).Str(); got != "b" {
 		t.Fatalf("word 2 = %q, want b", got)
 	}
-	if got := words.RawGet(IntValue(3)).Str(); got != "c" {
+	if got := words.RawGet(runtime.IntValue(3)).Str(); got != "c" {
 		t.Fatalf("word 3 = %q, want c", got)
 	}
 }

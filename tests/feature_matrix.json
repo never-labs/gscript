@@ -175,7 +175,7 @@
       "spec_sections": ["Lexical Grammar", "Operator Precedence", "Numbers, Strings, And Stdlib"],
       "parser": {"status": "covered", "refs": ["tests/smoke/02_strings.gs"]},
       "bytecode": {"status": "covered", "refs": ["internal/vm/string_concat_lazy_test.go"]},
-      "interpreter": {"status": "covered", "refs": ["internal/runtime/string_ops_test.go", "internal/runtime/native_string_extra_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/runtime/string_ops_test.go", "internal/stdlibrt/modules/string_extra_test.go", "internal/stdlibrt/modules/string_comprehensive_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/tier1_string_compare_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/string_tier2_test.go"]},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/strings_format_flags_more.gs", "tests/language/pm_gsub_captures.gs"]},

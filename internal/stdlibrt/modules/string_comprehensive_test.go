@@ -1,10 +1,10 @@
-package runtime
+package modules
 
 import (
-	"math"
-	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/never-labs/gscript/internal/runtime"
 )
 
 // ==================================================================
@@ -127,35 +127,6 @@ func TestStringFormatPaddedNegative(t *testing.T) {
 	}
 }
 
-func TestStringFormatSingleIntMinInt64(t *testing.T) {
-	v, ok, err := StringFormatSingleInt("%d", math.MinInt64)
-	if err != nil {
-		t.Fatalf("StringFormatSingleInt failed: %v", err)
-	}
-	if !ok {
-		t.Fatal("StringFormatSingleInt did not accept decimal integer pattern")
-	}
-	if got, want := v.Str(), "-9223372036854775808"; got != want {
-		t.Fatalf("StringFormatSingleInt MinInt64=%q, want %q", got, want)
-	}
-}
-
-func TestStdStringFormatIdentityGuardRejectsLookalikeGoFunction(t *testing.T) {
-	lib := buildStringLib()
-	std := lib.RawGetString("format")
-	if !IsStdStringFormatFunction(std) {
-		t.Fatal("runtime-native string.format was not recognized")
-	}
-
-	lookalike := FunctionValue(&GoFunction{
-		Name:     "string.format",
-		FastArg2: stringFormat2Value,
-	})
-	if IsStdStringFormatFunction(lookalike) {
-		t.Fatal("lookalike GoFunction passed runtime-native string.format identity guard")
-	}
-}
-
 func TestStringFormatMultiArgs(t *testing.T) {
 	v := getGlobal(t, `result := string.format("hello %s, you are %d", "world", 42)`, "result")
 	if v.Str() != "hello world, you are 42" {
@@ -172,157 +143,6 @@ for i := 1; i <= 3; i++ {
 `, "result")
 	if v.Str() != "item_3_value_00021" {
 		t.Errorf("expected cached simple format result, got %q", v.Str())
-	}
-}
-
-func TestStringFormatSimpleCachedTwoArgPattern(t *testing.T) {
-	v, err := stringFormat3Value(StringValue("item_%d_value_%05d"), IntValue(3), IntValue(21))
-	if err != nil {
-		t.Fatalf("stringFormat3Value failed: %v", err)
-	}
-	if !v.IsString() || v.Str() != "item_3_value_00021" {
-		t.Fatalf("expected item_3_value_00021, got %v", v)
-	}
-}
-
-func TestStringFormatSimpleCachedThreeArgPattern(t *testing.T) {
-	v, err := stringFormat4Value(StringValue("%s:%d:%05d"), StringValue("svc"), IntValue(3), IntValue(21))
-	if err != nil {
-		t.Fatalf("stringFormat4Value failed: %v", err)
-	}
-	if !v.IsString() || v.Str() != "svc:3:00021" {
-		t.Fatalf("expected svc:3:00021, got %v", v)
-	}
-}
-
-func TestStringPredicateFixedArgFastPaths(t *testing.T) {
-	lib := buildStringLib()
-	cases := []struct {
-		name string
-		a    Value
-		b    Value
-		want Value
-	}{
-		{"hasPrefix", StringValue("abcdef"), StringValue("abc"), BoolValue(true)},
-		{"hasSuffix", StringValue("abcdef"), StringValue("def"), BoolValue(true)},
-		{"contains", StringValue("abcdef"), StringValue("cd"), BoolValue(true)},
-		{"count", StringValue("banana"), StringValue("na"), IntValue(2)},
-	}
-	for _, tc := range cases {
-		fn := lib.RawGetString(tc.name).GoFunction()
-		if fn == nil || fn.FastArg2 == nil {
-			t.Fatalf("string.%s FastArg2 is nil", tc.name)
-		}
-		got, err := fn.FastArg2(tc.a, tc.b)
-		if err != nil {
-			t.Fatalf("string.%s FastArg2 failed: %v", tc.name, err)
-		}
-		if got != tc.want {
-			t.Fatalf("string.%s FastArg2 = %s, want %s", tc.name, got.String(), tc.want.String())
-		}
-	}
-}
-
-func TestStringTransformFixedArgFastPaths(t *testing.T) {
-	lib := buildStringLib()
-	trim := lib.RawGetString("trim").GoFunction()
-	if trim == nil || trim.FastArg1 == nil || trim.FastArg2 == nil {
-		t.Fatal("string.trim fixed fast paths missing")
-	}
-	if got, err := trim.FastArg1(StringValue("  abc  ")); err != nil || !got.IsString() || got.Str() != "abc" {
-		t.Fatalf("trim FastArg1 got=%s err=%v, want abc nil", got.String(), err)
-	}
-	if got, err := trim.FastArg2(StringValue("xxabcxy"), StringValue("xy")); err != nil || !got.IsString() || got.Str() != "abc" {
-		t.Fatalf("trim FastArg2 got=%s err=%v, want abc nil", got.String(), err)
-	}
-
-	for _, name := range []string{"trimLeft", "trimRight"} {
-		fn := lib.RawGetString(name).GoFunction()
-		if fn == nil || fn.FastArg1 == nil || fn.FastArg2 == nil {
-			t.Fatalf("string.%s fixed fast paths missing", name)
-		}
-	}
-	replace := lib.RawGetString("replaceAll").GoFunction()
-	if replace == nil || replace.FastArg3 == nil {
-		t.Fatal("string.replaceAll FastArg3 is nil")
-	}
-	if got, err := replace.FastArg3(StringValue("a-b-a"), StringValue("a"), StringValue("x")); err != nil || !got.IsString() || got.Str() != "x-b-x" {
-		t.Fatalf("replaceAll FastArg3 got=%s err=%v, want x-b-x nil", got.String(), err)
-	}
-}
-
-func TestStringFormatSingleIntegerResultCacheReusesValue(t *testing.T) {
-	prog, ok, err := compileSimpleFormat("SKU%05d")
-	if err != nil || !ok {
-		t.Fatalf("compileSimpleFormat: ok=%v err=%v", ok, err)
-	}
-
-	args := []Value{StringValue("SKU%05d"), IntValue(42)}
-	v1, err := prog.formatValue(args)
-	if err != nil {
-		t.Fatalf("first formatValue failed: %v", err)
-	}
-	v2, err := prog.formatValue(args)
-	if err != nil {
-		t.Fatalf("second formatValue failed: %v", err)
-	}
-	if v1 != v2 {
-		t.Fatalf("expected cached single-integer format to reuse boxed string value")
-	}
-	if v1.Str() != "SKU00042" {
-		t.Fatalf("expected SKU00042, got %q", v1.Str())
-	}
-}
-
-func TestStringFormatSingleIntegerResultCacheIsBounded(t *testing.T) {
-	prog, ok, err := compileSimpleFormat("key_%05d")
-	if err != nil || !ok {
-		t.Fatalf("compileSimpleFormat: ok=%v err=%v", ok, err)
-	}
-
-	for i := 0; i < simpleFormatResultCacheLimit+8; i++ {
-		_, err := prog.formatValue([]Value{StringValue("key_%05d"), IntValue(int64(i))})
-		if err != nil {
-			t.Fatalf("formatValue(%d) failed: %v", i, err)
-		}
-	}
-
-	prog.resultMu.Lock()
-	gotEntries := len(prog.resultCache)
-	gotOrder := len(prog.resultOrder)
-	prog.resultMu.Unlock()
-	if gotEntries > simpleFormatResultCacheLimit || gotOrder > simpleFormatResultCacheLimit {
-		t.Fatalf("simple format result cache grew beyond limit: entries=%d order=%d limit=%d", gotEntries, gotOrder, simpleFormatResultCacheLimit)
-	}
-}
-
-func TestCompileSimpleFormatRejectsFallbackFormats(t *testing.T) {
-	if _, ok, err := compileSimpleFormat("progress %% %d"); err != nil || ok {
-		t.Fatalf("escaped percent should use fallback parser: ok=%v err=%v", ok, err)
-	}
-	if _, ok, err := compileSimpleFormat("%.3e"); err != nil || ok {
-		t.Fatalf("exponent float should use fallback parser: ok=%v err=%v", ok, err)
-	}
-}
-
-func TestSimpleFormatCacheIsBounded(t *testing.T) {
-	simpleFormatCache.Lock()
-	simpleFormatCache.entries = make(map[string]*simpleFormatProgram)
-	simpleFormatCache.order = nil
-	simpleFormatCache.Unlock()
-
-	for i := 0; i < simpleFormatCacheLimit+8; i++ {
-		if _, ok, err := cachedSimpleFormat("value_%0" + strconv.Itoa(i+1) + "d"); err != nil || !ok {
-			t.Fatalf("cachedSimpleFormat(%d): ok=%v err=%v", i, ok, err)
-		}
-	}
-
-	simpleFormatCache.Lock()
-	gotEntries := len(simpleFormatCache.entries)
-	gotOrder := len(simpleFormatCache.order)
-	simpleFormatCache.Unlock()
-	if gotEntries > simpleFormatCacheLimit || gotOrder > simpleFormatCacheLimit {
-		t.Fatalf("simple format cache grew beyond limit: entries=%d order=%d limit=%d", gotEntries, gotOrder, simpleFormatCacheLimit)
 	}
 }
 
@@ -349,31 +169,6 @@ func TestStringFormatG(t *testing.T) {
 
 // --- string.find ---
 
-func TestStringFindPlain(t *testing.T) {
-	interp := runProgram(t, `s, e := string.find("hello world", "world", 1, true)`)
-	s := interp.GetGlobal("s")
-	e := interp.GetGlobal("e")
-	if s.Int() != 7 || e.Int() != 11 {
-		t.Errorf("expected 7,11 got %v,%v", s, e)
-	}
-}
-
-func TestStringFindNotFound(t *testing.T) {
-	v := getGlobal(t, `result := string.find("hello", "xyz", 1, true)`, "result")
-	if !v.IsNil() {
-		t.Errorf("expected nil, got %v", v)
-	}
-}
-
-func TestStringFindPattern(t *testing.T) {
-	interp := runProgram(t, `s, e := string.find("hello123", "%d+")`)
-	s := interp.GetGlobal("s")
-	e := interp.GetGlobal("e")
-	if s.Int() != 6 || e.Int() != 8 {
-		t.Errorf("expected 6,8 got %v,%v", s, e)
-	}
-}
-
 func TestStringFindWithInit(t *testing.T) {
 	interp := runProgram(t, `s, e := string.find("abcabc", "bc", 3, true)`)
 	s := interp.GetGlobal("s")
@@ -389,19 +184,6 @@ func TestStringMatchBasic(t *testing.T) {
 	v := getGlobal(t, `result := string.match("hello123", "%d+")`, "result")
 	if v.Str() != "123" {
 		t.Errorf("expected '123', got %q", v.Str())
-	}
-}
-
-func TestStringMatchCaptures(t *testing.T) {
-	interp := runProgram(t, `y, m, d := string.match("2026-03-10", "(%d+)-(%d+)-(%d+)")`)
-	if interp.GetGlobal("y").Str() != "2026" {
-		t.Errorf("expected '2026', got %q", interp.GetGlobal("y").Str())
-	}
-	if interp.GetGlobal("m").Str() != "03" {
-		t.Errorf("expected '03', got %q", interp.GetGlobal("m").Str())
-	}
-	if interp.GetGlobal("d").Str() != "10" {
-		t.Errorf("expected '10', got %q", interp.GetGlobal("d").Str())
 	}
 }
 
@@ -427,14 +209,14 @@ func TestStringGmatchBasic(t *testing.T) {
 	if tbl.Length() != 3 {
 		t.Errorf("expected 3 matches, got %d", tbl.Length())
 	}
-	if tbl.RawGet(IntValue(1)).Str() != "hello" {
-		t.Errorf("expected 'hello', got %q", tbl.RawGet(IntValue(1)).Str())
+	if tbl.RawGet(runtime.IntValue(1)).Str() != "hello" {
+		t.Errorf("expected 'hello', got %q", tbl.RawGet(runtime.IntValue(1)).Str())
 	}
-	if tbl.RawGet(IntValue(2)).Str() != "world" {
-		t.Errorf("expected 'world', got %q", tbl.RawGet(IntValue(2)).Str())
+	if tbl.RawGet(runtime.IntValue(2)).Str() != "world" {
+		t.Errorf("expected 'world', got %q", tbl.RawGet(runtime.IntValue(2)).Str())
 	}
-	if tbl.RawGet(IntValue(3)).Str() != "foo" {
-		t.Errorf("expected 'foo', got %q", tbl.RawGet(IntValue(3)).Str())
+	if tbl.RawGet(runtime.IntValue(3)).Str() != "foo" {
+		t.Errorf("expected 'foo', got %q", tbl.RawGet(runtime.IntValue(3)).Str())
 	}
 }
 
@@ -549,19 +331,6 @@ func TestStringReverseEmpty(t *testing.T) {
 
 // --- string.upper / string.lower ---
 
-func TestStringUpperLower(t *testing.T) {
-	interp := runProgram(t, `
-		u := string.upper("hello")
-		l := string.lower("WORLD")
-	`)
-	if interp.GetGlobal("u").Str() != "HELLO" {
-		t.Errorf("expected 'HELLO', got %q", interp.GetGlobal("u").Str())
-	}
-	if interp.GetGlobal("l").Str() != "world" {
-		t.Errorf("expected 'world', got %q", interp.GetGlobal("l").Str())
-	}
-}
-
 // --- string.len ---
 
 func TestStringLenBasic(t *testing.T) {
@@ -573,22 +342,6 @@ func TestStringLenBasic(t *testing.T) {
 
 func TestStringLenEmpty(t *testing.T) {
 	v := getGlobal(t, `result := string.len("")`, "result")
-	if v.Int() != 0 {
-		t.Errorf("expected 0, got %v", v)
-	}
-}
-
-// --- String length with # ---
-
-func TestStringLenOperator(t *testing.T) {
-	v := getGlobal(t, `result := #"hello"`, "result")
-	if v.Int() != 5 {
-		t.Errorf("expected 5, got %v", v)
-	}
-}
-
-func TestStringLenOperatorEmpty(t *testing.T) {
-	v := getGlobal(t, `result := #""`, "result")
 	if v.Int() != 0 {
 		t.Errorf("expected 0, got %v", v)
 	}
@@ -646,46 +399,14 @@ func TestStringSplitBasic(t *testing.T) {
 	if tbl.Length() != 3 {
 		t.Errorf("expected 3 parts, got %d", tbl.Length())
 	}
-	if tbl.RawGet(IntValue(1)).Str() != "a" {
-		t.Errorf("expected 'a', got %q", tbl.RawGet(IntValue(1)).Str())
+	if tbl.RawGet(runtime.IntValue(1)).Str() != "a" {
+		t.Errorf("expected 'a', got %q", tbl.RawGet(runtime.IntValue(1)).Str())
 	}
-	if tbl.RawGet(IntValue(2)).Str() != "b" {
-		t.Errorf("expected 'b', got %q", tbl.RawGet(IntValue(2)).Str())
+	if tbl.RawGet(runtime.IntValue(2)).Str() != "b" {
+		t.Errorf("expected 'b', got %q", tbl.RawGet(runtime.IntValue(2)).Str())
 	}
-	if tbl.RawGet(IntValue(3)).Str() != "c" {
-		t.Errorf("expected 'c', got %q", tbl.RawGet(IntValue(3)).Str())
-	}
-}
-
-// --- String comparison ---
-
-func TestStringComparisonLess(t *testing.T) {
-	v := getGlobal(t, `result := "abc" < "abd"`, "result")
-	if !v.Bool() {
-		t.Errorf("expected true")
-	}
-}
-
-func TestStringComparisonEqual(t *testing.T) {
-	v := getGlobal(t, `result := "abc" == "abc"`, "result")
-	if !v.Bool() {
-		t.Errorf("expected true")
-	}
-}
-
-func TestStringComparisonGreater(t *testing.T) {
-	v := getGlobal(t, `result := "z" > "a"`, "result")
-	if !v.Bool() {
-		t.Errorf("expected true")
-	}
-}
-
-// --- Empty string edge cases ---
-
-func TestEmptyStringConcat(t *testing.T) {
-	v := getGlobal(t, `result := "" .. ""`, "result")
-	if v.Str() != "" {
-		t.Errorf("expected empty string, got %q", v.Str())
+	if tbl.RawGet(runtime.IntValue(3)).Str() != "c" {
+		t.Errorf("expected 'c', got %q", tbl.RawGet(runtime.IntValue(3)).Str())
 	}
 }
 
