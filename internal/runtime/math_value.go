@@ -1,6 +1,6 @@
 package runtime
 
-import basemath "github.com/never-labs/gscript/internal/stdlib/math"
+import stdmath "math"
 
 // ToIntegerValue converts a numeric or numeric-string value to an exact integer,
 // returning nil when the conversion is not possible.
@@ -19,8 +19,9 @@ func ToIntegerValue(v Value) Value {
 		return v
 	}
 	if v.IsFloat() {
-		if n, ok := basemath.ToInteger(basemath.Float(v.Float())); ok {
-			return IntValue(n)
+		f := v.Float()
+		if f == stdmath.Trunc(f) && f >= stdmath.MinInt64 && f <= stdmath.MaxInt64 {
+			return IntValue(int64(f))
 		}
 	}
 	return NilValue()
