@@ -29,7 +29,10 @@ func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int6
 	}
 	installer.RegisterTable("array", modules.BuildArray())
 	installer.RegisterTable("base64", modules.BuildBase64(maxHostResult))
+	installer.RegisterTable("binary", modules.BuildBinary(maxHostResult))
 	installer.RegisterTable("bits", modules.BuildBits())
+	installer.RegisterTable("bit32", modules.BuildBit32())
+	installer.RegisterTable("bytes", modules.BuildBytes(maxHostResult))
 	installer.RegisterTable("compress", modules.BuildCompress(maxHostResult))
 	installer.RegisterTable("crypto", modules.BuildCrypto(maxHostResult))
 	installer.RegisterTable("csv", modules.BuildCSV(maxHostResult))

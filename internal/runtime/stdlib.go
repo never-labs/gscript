@@ -92,10 +92,6 @@ func (interp *Interpreter) InstallStdlib() {
 		}
 	}))
 
-	// --- Utilities ---
-	std.RegisterTable("bytes", buildBytesLib(interp))
-	std.RegisterTable("binary", buildBinaryLib(interp))
-
 	// --- Game math ---
 	std.RegisterTable("color", buildColorLib())
 
@@ -104,9 +100,6 @@ func (interp *Interpreter) InstallStdlib() {
 	std.RegisterTable("soa", buildSoALib())
 
 	std.RegisterTable("utf8", buildUTF8Lib(interp))
-
-	// --- Low-level ---
-	std.RegisterTable("bit32", buildBit32Lib())
 
 	// --- Sorting utilities ---
 	std.RegisterTable("sort", buildSortLib(interp))

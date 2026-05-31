@@ -217,7 +217,7 @@
       "spec_sections": ["Operator Precedence", "Numbers, Strings, And Stdlib", "Intentional Differences From Lua"],
       "parser": {"status": "covered", "refs": ["internal/parser/parser_test.go"]},
       "bytecode": {"status": "covered", "refs": ["internal/vm/opcode_test.go"]},
-      "interpreter": {"status": "covered", "refs": ["internal/runtime/bitwise_operator_test.go", "internal/runtime/stdlib_bit32_test.go"]},
+      "interpreter": {"status": "covered", "refs": ["internal/runtime/bitwise_operator_test.go", "internal/stdlibrt/modules/bit32_test.go"]},
       "tier1": {"status": "partial", "refs": ["internal/methodjit/emit_ops_test.go"]},
       "tier2": {"status": "partial", "refs": ["internal/methodjit/pass_int_algebra_simplify_test.go"]},
       "semantic_gate": {"status": "covered", "refs": ["tests/language/bitwise_direct_ops_more.gs", "tests/language/bwcoercion_bit32_numeric_strings.gs"]},

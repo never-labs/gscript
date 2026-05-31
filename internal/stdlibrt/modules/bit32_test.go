@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -240,7 +240,7 @@ func TestBit32ToHex(t *testing.T) {
 }
 
 func TestBit32HotBuiltinsExposeFastArgPaths(t *testing.T) {
-	lib := buildBit32Lib()
+	lib := BuildBit32()
 	for _, name := range []string{"band", "bor", "bxor"} {
 		gf := lib.RawGetString(name).GoFunction()
 		if gf == nil || gf.Fast1 == nil || gf.FastArg1 == nil || gf.FastArg2 == nil || gf.FastArg3 == nil || gf.FastArg4 == nil || gf.FastArg8 == nil {

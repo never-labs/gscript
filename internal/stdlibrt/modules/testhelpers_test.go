@@ -43,7 +43,10 @@ func execOnInterp(t *testing.T, interp *runtime.Interpreter, src string) {
 func installTestModules(interp *runtime.Interpreter) {
 	installTestModule(interp, "array", runtime.TableValue(BuildArray()))
 	installTestModule(interp, "base64", runtime.TableValue(BuildBase64(interp.MaxHostResultBytes)))
+	installTestModule(interp, "binary", runtime.TableValue(BuildBinary(interp.MaxHostResultBytes)))
 	installTestModule(interp, "bits", runtime.TableValue(BuildBits()))
+	installTestModule(interp, "bit32", runtime.TableValue(BuildBit32()))
+	installTestModule(interp, "bytes", runtime.TableValue(BuildBytes(interp.MaxHostResultBytes)))
 	installTestModule(interp, "compress", runtime.TableValue(BuildCompress(interp.MaxHostResultBytes)))
 	installTestModule(interp, "crypto", runtime.TableValue(BuildCrypto(interp.MaxHostResultBytes)))
 	installTestModule(interp, "csv", runtime.TableValue(BuildCSV(interp.MaxHostResultBytes)))

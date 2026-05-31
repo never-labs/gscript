@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"fmt"
@@ -6,8 +6,8 @@ import (
 	bit32lib "github.com/never-labs/gscript/internal/stdlib/bit32"
 )
 
-// buildBit32Lib creates the "bit32" standard library table.
-func buildBit32Lib() *Table {
+// BuildBit32 creates the "bit32" standard library table.
+func BuildBit32() *Table {
 	t := NewTable()
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {

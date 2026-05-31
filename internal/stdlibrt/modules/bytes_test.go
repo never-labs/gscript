@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 
 func TestBytesNew(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.new()
@@ -26,7 +26,7 @@ func TestBytesNew(t *testing.T) {
 
 func TestBytesFromString(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.fromString("hello")
@@ -44,7 +44,7 @@ func TestBytesFromString(t *testing.T) {
 
 func TestBytesWriteByte(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.new()
@@ -61,7 +61,7 @@ func TestBytesWriteByte(t *testing.T) {
 
 func TestBytesToHex(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		result := bytes.toHex("hello")
@@ -74,7 +74,7 @@ func TestBytesToHex(t *testing.T) {
 
 func TestBytesFromHex(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.fromHex("68656c6c6f")
@@ -88,7 +88,7 @@ func TestBytesFromHex(t *testing.T) {
 
 func TestBytesBufferToHex(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.fromString("AB")
@@ -102,7 +102,7 @@ func TestBytesBufferToHex(t *testing.T) {
 
 func TestBytesReset(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.new()
@@ -122,7 +122,7 @@ func TestBytesReset(t *testing.T) {
 
 func TestBytesBufferBytes(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.fromString("AB")
@@ -143,7 +143,7 @@ func TestBytesBufferBytes(t *testing.T) {
 
 func TestBytesReadByte(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.fromString("ABC")
@@ -165,7 +165,7 @@ func TestBytesReadByte(t *testing.T) {
 
 func TestBytesReadString(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.fromString("hello world")
@@ -179,7 +179,7 @@ func TestBytesReadString(t *testing.T) {
 
 func TestBytesXor(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		result := bytes.xor("ab", "cd")
@@ -195,7 +195,7 @@ func TestBytesXor(t *testing.T) {
 
 func TestBytesCompare(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		a := bytes.compare("abc", "abd")
@@ -216,7 +216,7 @@ func TestBytesCompare(t *testing.T) {
 
 func TestBytesRepeat(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		result := bytes.repeat("ab", 3)
@@ -229,7 +229,7 @@ func TestBytesRepeat(t *testing.T) {
 
 func TestBytesConcat(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		result := bytes.concat("hello", " ", "world")
@@ -242,7 +242,7 @@ func TestBytesConcat(t *testing.T) {
 
 func TestBytesWriteInt(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.new()
@@ -261,7 +261,7 @@ func TestBytesWriteInt(t *testing.T) {
 
 func TestBytesWriteInt16(t *testing.T) {
 	interp := New()
-	interp.globals.Define("bytes", TableValue(buildBytesLib()))
+	interp.SetGlobal("bytes", TableValue(BuildBytes(func() int64 { return 0 })))
 
 	execOnInterp(t, interp, `
 		buf := bytes.new()

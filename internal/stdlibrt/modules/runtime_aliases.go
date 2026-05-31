@@ -11,6 +11,11 @@ type (
 	Value           = runtime.Value
 )
 
+const (
+	TypeFloat = runtime.TypeFloat
+	TypeInt   = runtime.TypeInt
+)
+
 var (
 	BoolValue                     = runtime.BoolValue
 	CheckProjectedHostStringBytes = runtime.CheckProjectedHostStringBytes

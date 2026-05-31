@@ -1,11 +1,27 @@
-package runtime
+package modules
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/never-labs/gscript/internal/runtime"
+)
+
+func newBinaryModulesInterp() *runtime.Interpreter {
+	interp := runtime.NewCore()
+	installTestModules(interp)
+	return interp
+}
+
+func newStringPackAliasInterp() *runtime.Interpreter {
+	interp := runtime.New()
+	installTestModule(interp, "bytes", runtime.TableValue(BuildBytes(interp.MaxHostResultBytes)))
+	return interp
+}
 
 func TestBinaryPackUnpackMixedFields(t *testing.T) {
-	interp := New()
+	interp := newBinaryModulesInterp()
 
-	execBinaryIOTest(t, interp, `
+	execOnInterp(t, interp, `
 		packed := binary.pack("be:u16 i32 f32 string bytes:3", 258, -7, 1.5, "go", "abc")
 		hex := bytes.toHex(packed)
 		a, b, c, s, raw, next := binary.unpack("be:u16 i32 f32 string bytes:3", packed)
@@ -46,9 +62,9 @@ func TestBinaryPackUnpackMixedFields(t *testing.T) {
 }
 
 func TestBinaryLittleEndianOffsetAndErrors(t *testing.T) {
-	interp := New()
+	interp := newBinaryModulesInterp()
 
-	execBinaryIOTest(t, interp, `
+	execOnInterp(t, interp, `
 		packed := binary.pack("le u16 u32", 513, 16909060)
 		a, b, next := binary.unpack("le u16 u32", "xx" .. packed, 3)
 		bad, badErr := binary.unpack("u32", "a")
@@ -72,9 +88,9 @@ func TestBinaryLittleEndianOffsetAndErrors(t *testing.T) {
 }
 
 func TestStringPackAliasesUseGoStyleBinaryFormats(t *testing.T) {
-	interp := New()
+	interp := newStringPackAliasInterp()
 
-	execBinaryIOTest(t, interp, `
+	execOnInterp(t, interp, `
 		packed := string.pack("be:u16 bytes:2", 258, "go")
 		hex := bytes.toHex(packed)
 		a, raw, next := string.unpack("be:u16 bytes:2", packed)

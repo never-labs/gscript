@@ -1,4 +1,4 @@
-package runtime
+package modules
 
 import (
 	"bytes"
@@ -10,18 +10,11 @@ import (
 	stdbytes "github.com/never-labs/gscript/internal/stdlib/bytes"
 )
 
-// buildBytesLib creates the "bytes" standard library table.
-func buildBytesLib(interps ...*Interpreter) *Table {
+// BuildBytes creates the "bytes" standard library table.
+func BuildBytes(maxHostResult func() int64) *Table {
 	t := NewTable()
-	var interp *Interpreter
-	if len(interps) > 0 {
-		interp = interps[0]
-	}
-	maxHostResult := func() int64 {
-		if interp == nil {
-			return 0
-		}
-		return interp.maxHostResult
+	if maxHostResult == nil {
+		maxHostResult = func() int64 { return 0 }
 	}
 
 	set := func(name string, fn func([]Value) ([]Value, error)) {
