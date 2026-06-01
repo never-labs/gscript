@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 
 	"github.com/never-labs/gscript/internal/support/hostpath"
@@ -22,6 +24,7 @@ type Interpreter struct {
 	stdlibModules      map[string]struct{} // installed public stdlib module names
 	stringMeta         *Table              // metatable for string values (__index → string lib)
 	scriptDir          string              // directory of the main script (for require path resolution)
+	moduleCollections  map[string]string   // collection prefix -> filesystem root for require("name:pkg")
 	moduleLoading      bool                // require() may load .gs files from the filesystem
 	filesystemEnabled  bool                // script-side file APIs may access the filesystem
 	filesystemRead     bool                // fs read operations are enabled
@@ -209,6 +212,27 @@ func (interp *Interpreter) SetScriptDir(dir string) {
 // ScriptDir returns the directory used for relative script/module loading.
 func (interp *Interpreter) ScriptDir() string {
 	return interp.scriptDir
+}
+
+func (interp *Interpreter) SetModuleCollection(name, root string) {
+	if name == "" {
+		return
+	}
+	if interp.moduleCollections == nil {
+		interp.moduleCollections = make(map[string]string)
+	}
+	interp.moduleCollections[name] = root
+}
+
+func (interp *Interpreter) resolveModulePath(name string) string {
+	if idx := strings.Index(name, ":"); idx > 0 && interp.moduleCollections != nil {
+		prefix := name[:idx]
+		if root := interp.moduleCollections[prefix]; root != "" {
+			rest := strings.ReplaceAll(name[idx+1:], ".", "/") + ".gs"
+			return filepath.Join(root, rest)
+		}
+	}
+	return interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
 }
 
 // SetModuleLoading controls whether require() may load .gs files from the

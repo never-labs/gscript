@@ -269,6 +269,17 @@ func (vm *VM) resolveScriptPath(filename string) string {
 	return vm.resolveScriptPathWithDir(filename, vm.scriptDir)
 }
 
+func (vm *VM) resolveModulePath(name string) string {
+	if idx := strings.Index(name, ":"); idx > 0 && vm.moduleCollections != nil {
+		prefix := name[:idx]
+		if root := vm.moduleCollections[prefix]; root != "" {
+			rest := strings.ReplaceAll(name[idx+1:], ".", "/") + ".gs"
+			return filepath.Join(root, rest)
+		}
+	}
+	return vm.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+}
+
 func (vm *VM) resolveScriptPathWithDir(filename string, dir string) string {
 	if filename == "" || filepath.IsAbs(filename) || dir == "" {
 		return filename
@@ -286,6 +297,16 @@ func (vm *VM) SetScriptDir(dir string) {
 
 func (vm *VM) ScriptDir() string {
 	return vm.scriptDir
+}
+
+func (vm *VM) SetModuleCollection(name, root string) {
+	if name == "" {
+		return
+	}
+	if vm.moduleCollections == nil {
+		vm.moduleCollections = make(map[string]string)
+	}
+	vm.moduleCollections[name] = root
 }
 
 // Execute runs a top-level function prototype.

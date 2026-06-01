@@ -895,7 +895,7 @@ func (vm *VM) RegisterLoaderLib() {
 			vm.setPackageLoaded(name, module)
 			return []runtime.Value{module}, nil
 		}
-		filename := vm.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+		filename := vm.resolveModulePath(name)
 		if _, err := os.Stat(filename); err != nil {
 			return nil, fmt.Errorf("module '%s' not found", name)
 		}

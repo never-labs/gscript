@@ -109,6 +109,7 @@ type vmOptions struct {
 	libs               LibFlags
 	capabilities       CapabilityFlags
 	requirePath        string
+	moduleCollections  map[string]string
 	filesystemRoot     string
 	dynamicEval        bool
 	environmentVars    []string
@@ -437,6 +438,21 @@ func WithSecurity(policy SecurityPolicy) Option {
 // WithRequirePath sets the base directory for require() module loading.
 func WithRequirePath(path string) Option {
 	return func(o *vmOptions) { o.requirePath = path }
+}
+
+// WithModuleCollection maps a require collection prefix to a filesystem root.
+// require("vendor:pkg.util") resolves as ROOT/pkg/util.gs. This mirrors Odin's
+// collection-style package roots while keeping GScript module loading explicit.
+func WithModuleCollection(name, root string) Option {
+	return func(o *vmOptions) {
+		if name == "" {
+			return
+		}
+		if o.moduleCollections == nil {
+			o.moduleCollections = make(map[string]string)
+		}
+		o.moduleCollections[name] = root
+	}
 }
 
 // WithGoImports registers an explicit allowlist of Go-backed modules that

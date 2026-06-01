@@ -709,7 +709,7 @@ func (interp *Interpreter) registerBuiltins() {
 				return nil, fmt.Errorf("module loading disabled")
 			}
 
-			filename := interp.resolveScriptPath(strings.ReplaceAll(name, ".", "/") + ".gs")
+			filename := interp.resolveModulePath(name)
 			resolved, err := interp.resolveFilesystemPath(filename)
 			if err != nil {
 				return nil, err

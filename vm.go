@@ -152,6 +152,9 @@ func newVM(o vmOptions) *VM {
 	if o.requirePath != "" {
 		interp.SetScriptDir(o.requirePath)
 	}
+	for name, root := range o.moduleCollections {
+		interp.SetModuleCollection(name, root)
+	}
 	if o.argsSet {
 		interp.SetArgs(o.argScript, o.args)
 	}
@@ -247,6 +250,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			bvm = bytecodevm.New(globals)
 			bvm.SetStringMeta(vm.interp.StringMeta())
 			bvm.SetScriptDir(vm.interp.ScriptDir())
+			for name, root := range vm.opts.moduleCollections {
+				bvm.SetModuleCollection(name, root)
+			}
 			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
 			vm.applyBytecodeCapabilities(bvm)
 			if vm.opts.maxSteps > 0 {

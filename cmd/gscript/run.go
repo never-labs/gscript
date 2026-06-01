@@ -57,7 +57,8 @@ func canUsePublicRunPath(opts cliRunOptions) bool {
 }
 
 func publicRunOptions(opts cliRunOptions, script string, args []string) []gscript.Option {
-	gsOpts := []gscript.Option{gscript.WithArgs(script, args...)}
+	gsOpts := append([]gscript.Option{}, gscript.ModuleOptionsForScript(script)...)
+	gsOpts = append(gsOpts, gscript.WithArgs(script, args...))
 	if opts.UseJIT {
 		gsOpts = append(gsOpts, gscript.WithJIT())
 	} else if opts.UseVM {

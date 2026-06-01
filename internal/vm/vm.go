@@ -101,6 +101,7 @@ type VM struct {
 	debugSink            runtime.Value
 	debugBusy            bool
 	scriptDir            string
+	moduleCollections    map[string]string
 	maxSteps             int64 // <=0 means unlimited
 	steps                int64
 	maxNativeCalls       int64 // <=0 means unlimited
@@ -1038,6 +1039,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.RegisterScriptLib()
 	child.RegisterLoaderLib()
 	child.scriptDir = parent.scriptDir
+	child.moduleCollections = cloneStringMap(parent.moduleCollections)
 	runtime.RegisterVM(child)
 	child.attachIsolatedChildJIT(parent)
 	return child
@@ -1055,6 +1057,17 @@ func (vm *VM) attachIsolatedChildJIT(parent *VM) {
 	if childEngine != nil {
 		vm.SetMethodJIT(childEngine)
 	}
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
 }
 
 func (vm *VM) launchSyncTask(fn runtime.Value, args []runtime.Value, done func(error)) {
