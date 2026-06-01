@@ -38,11 +38,7 @@ const (
 
 	NativeKindStdSoAAffineMany = runtime.NativeKindStdSoAAffineMany
 
-	LLMProviderErrorAuth      = runtime.LLMProviderErrorAuth
-	LLMProviderErrorNetwork   = runtime.LLMProviderErrorNetwork
-	LLMProviderErrorProvider  = runtime.LLMProviderErrorProvider
-	LLMProviderErrorRateLimit = runtime.LLMProviderErrorRateLimit
-	LLMProviderErrorRequest   = runtime.LLMProviderErrorRequest
+	LLMProviderErrorProvider = runtime.LLMProviderErrorProvider
 )
 
 var (
@@ -65,7 +61,6 @@ var (
 	JSONGoToValue                 = runtime.JSONGoToValue
 	New                           = runtime.NewCore
 	NewAppendArrayTable           = runtime.NewAppendArrayTable
-	NewDenseArrayBool             = runtime.NewDenseArrayBool
 	NewDenseArrayF64              = runtime.NewDenseArrayF64
 	NewDenseArrayI64              = runtime.NewDenseArrayI64
 	NewDenseArrayOfLen            = runtime.NewDenseArrayOfLen
