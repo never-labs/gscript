@@ -22,6 +22,9 @@ packages.
 | `type Pool` | Simple VM pool for concurrent host workloads. |
 | `type HotLoader` | Reload-oriented loader that preserves runtime state where possible. |
 
+See [Hot reload](../hot-reload/index.md) for generation, state-preservation,
+and rollback behavior.
+
 ## Running Code
 
 ```go
