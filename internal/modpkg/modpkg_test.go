@@ -260,6 +260,45 @@ func TestDownloadRejectsNonGitHubModules(t *testing.T) {
 	}
 }
 
+func TestVendorCopiesDownloadedModules(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), "return 1\n")
+
+	report := Vendor(dir, VendorOptions{CacheDir: cache})
+	if !report.OK {
+		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 1 {
+		t.Fatalf("Vendor modules = %#v, want one", report.Modules)
+	}
+	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs")
+	if data, err := os.ReadFile(target); err != nil || string(data) != "return 1\n" {
+		t.Fatalf("vendored file = %q, %v; want copied source", string(data), err)
+	}
+}
+
+func TestVendorRequiresDownloadedCache(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+
+	report := Vendor(dir, VendorOptions{CacheDir: filepath.Join(dir, "cache")})
+	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "GS9113" {
+		t.Fatalf("Vendor = %#v, want missing download diagnostic", report)
+	}
+}
+
 func TestScanStaticRequiresUsesAST(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "main.gs")

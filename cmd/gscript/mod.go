@@ -15,10 +15,11 @@ type modTidyReport = modpkg.TidyReport
 type modExplainReport = modpkg.ExplainReport
 type modListReport = modpkg.ListReport
 type modDownloadReport = modpkg.DownloadReport
+type modVendorReport = modpkg.VendorReport
 
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|download|lock|list|graph|explain|verify] [flags]")
+		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|verify] [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -32,6 +33,8 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "download":
 		return runModDownloadCommand(args[1:], outw, errw)
+	case "vendor":
+		return runModVendorCommand(args[1:], outw, errw)
 	case "lock":
 		return runModLockCommand(args[1:], outw, errw)
 	case "list":
@@ -43,10 +46,10 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 	case "verify":
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|download|lock|list|graph|explain|verify] [flags]")
+		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|verify] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, download, lock, list, graph, explain, or verify)\n", args[0])
+		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, download, vendor, lock, list, graph, explain, or verify)\n", args[0])
 		return 2
 	}
 }
@@ -211,6 +214,52 @@ func runModDownloadCommand(args []string, outw, errw io.Writer) int {
 				extractStatus = "extracted"
 			}
 			fmt.Fprintf(outw, "%s %s@%s -> %s (%s)\n", status, module.Path, module.Version, module.ExtractDir, extractStatus)
+		}
+		for _, diag := range report.Diagnostics {
+			if diag.File != "" {
+				fmt.Fprintf(errw, "%s: %s %s: %s\n", diag.File, diag.Severity, diag.Code, diag.Message)
+			} else {
+				fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
+			}
+		}
+	}
+	if !report.OK {
+		return 1
+	}
+	return 0
+}
+
+func runModVendorCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("mod vendor", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print vendor report as JSON")
+	cacheDir := fs.String("cache", "", "module cache directory")
+	vendorDir := fs.String("vendor-dir", "", "vendor directory")
+	clear := fs.Bool("clear", false, "remove vendor directory before copying modules")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	path := "."
+	if len(fs.Args()) == 1 {
+		path = fs.Args()[0]
+	} else if len(fs.Args()) > 1 {
+		fmt.Fprintln(errw, "usage: gscript mod vendor [--json] [--cache DIR] [--vendor-dir DIR] [--clear] [path]")
+		return 2
+	}
+	report := modpkg.Vendor(path, modpkg.VendorOptions{CacheDir: *cacheDir, VendorDir: *vendorDir, Clear: *clear})
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintf(errw, "gscript mod vendor: %v\n", err)
+			return 1
+		}
+	} else {
+		if report.VendorDir != "" {
+			fmt.Fprintf(outw, "vendor: %s\n", report.VendorDir)
+		}
+		for _, module := range report.Modules {
+			fmt.Fprintf(outw, "copied %s@%s -> %s\n", module.Path, module.Version, module.Target)
 		}
 		for _, diag := range report.Diagnostics {
 			if diag.File != "" {

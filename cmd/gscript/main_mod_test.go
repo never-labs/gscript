@@ -163,6 +163,39 @@ require github.com/acme/toolkit v1.2.3
 	}
 }
 
+func TestModVendorCopiesCache(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "main.gs"), []byte("return 1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"vendor", "--json", "--cache", cache, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod vendor code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report modVendorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON vendor report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Modules) != 1 {
+		t.Fatalf("vendor report = %+v, want one copied module", report)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "main.gs")); err != nil {
+		t.Fatalf("vendored file missing: %v", err)
+	}
+}
+
 func TestModAddAndTidy(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`net := require("example.com/lib/net")
