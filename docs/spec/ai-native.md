@@ -112,6 +112,107 @@ return out.text, out.model_seen, err
 The no-parameter form `agent { ... }` is equivalent to an anonymous agent with
 an empty parameter list.
 
+## Agents And Turns
+
+`agent` and `turn` are different layers:
+
+- an **agent** is a callable workflow frame with configuration, defaults,
+  budget, tools, output handling, tracing, replay, and optional custom `flow`;
+- a **turn** is one provider request made from inside or outside such a frame;
+- a built-in agent without `flow` repeatedly performs turns and dispatches
+  tools for the caller;
+- a custom `flow` performs no hidden turns. It runs ordinary Leia code, and the
+  author must call `turn { ... }`, `llm.dispatch`, or other helpers explicitly.
+
+The default agent loop can be understood as this conceptual shape:
+
+```leia
+agent answer(question) {
+    model: "fast"
+    system: "Use tools when useful."
+    user: question
+    tools: [lookup]
+}
+
+// Calling the agent runs the built-in loop:
+// 1. build messages from system + user;
+// 2. call turn { model, messages, tools };
+// 3. if result.status == "tool_calls", dispatch requested tools;
+// 4. append tool results to history;
+// 5. call another turn with the updated history;
+// 6. stop on final answer, provider stop, budget, cancellation, or error.
+result, err := answer("What changed?")
+```
+
+The same structure can be written manually with a custom `flow` when the
+program needs precise multi-turn control:
+
+```leia
+agent answer(question) {
+    model: "fast"
+    system: "Use tools when useful."
+    tools: [lookup]
+} flow {
+    history := messages {
+        system: system
+        user: question
+    }
+
+    first, err := turn {
+        messages: history
+        tools: tools
+    }
+    if err != nil {
+        return nil, err
+    }
+
+    if first.status == "tool_calls" {
+        call := first.calls[1]
+        value, tool_err := llm.dispatch(call, tools)
+        if tool_err != nil {
+            history[#history + 1] = msg.tool_error(call.id, tool_err.message)
+        } else {
+            history[#history + 1] = msg.assistant_call(call)
+            history[#history + 1] = msg.tool_result(call.id, value)
+        }
+        return turn { messages: history }
+    }
+
+    return first, nil
+}
+```
+
+Both examples use the same `turn` operation at the provider boundary. The
+difference is where the loop policy lives: in the built-in agent loop, or in
+user-written `flow` code.
+
+```leia run all
+agent scripted(question) {
+    model: "local"
+    system: "s"
+    tools: [{name: "lookup"}]
+} flow {
+    planned := messages {
+        system: system
+        user: question
+    }
+    return {
+        inherited_model: model,
+        inherited_tools: #tools,
+        message_count: #planned,
+    }, nil
+}
+
+out, err := scripted("hello")
+return out.inherited_model, out.inherited_tools, out.message_count, err
+```
+
+An important consequence is that `turn {}` never calls tools by itself. Passing
+`tools` to a turn only tells the provider which tool schemas are available. If
+the provider responds with tool calls, either the built-in agent loop or custom
+flow code must dispatch them and then make a later turn with the updated
+history.
+
 ## Agent Configuration
 
 Agent configuration is a table-like field block. The stable fields are:
@@ -274,6 +375,46 @@ the ambient agent configuration. If both `messages` and `user` are absent, an
 ambient agent `system` and `user` are used to synthesize messages. Outside an
 agent, a `turn` must have explicit `messages` or `user`, unless the host
 installs a provider layer with different documented behavior.
+
+Inside a custom `flow`, inheritance and local variables are related but not the
+same thing. Ambient inheritance affects `turn {}` request construction.
+Flow-local injection only creates identifiers such as `model`, `system`, and
+`tools` for fields explicitly written in the agent configuration. For example:
+
+```leia
+agent inherit(q) {
+    model: "fast"
+    system: "Brief."
+    user: q
+} flow {
+    // Uses inherited model, system, and user to build the request.
+    first, err := turn {}
+
+    // Equivalent explicit form for the message list, while still inheriting
+    // model and other omitted request fields.
+    second, err := turn {
+        messages: messages {
+            system: system
+            user: q
+        }
+    }
+
+    return second, err
+}
+```
+
+Outside an agent there is no ambient frame, so request construction must be
+explicit:
+
+```leia
+result, err := turn {
+    model: "fast"
+    messages: messages {
+        system: "Brief."
+        user: "Explain Leia."
+    }
+}
+```
 
 Result fields are stable:
 

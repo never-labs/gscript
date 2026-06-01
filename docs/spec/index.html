@@ -1072,6 +1072,83 @@ value, err <span class="tok-operator">:=</span> search_notes.fn(<span class="tok
 out, err <span class="tok-operator">:=</span> echo(<span class="tok-string">&quot;hello&quot;</span>)
 <span class="tok-keyword">return</span> out.text, out.model_seen, err</code></pre>
 <p>The no-parameter form <code>agent { ... }</code> is equivalent to an anonymous agent with an empty parameter list.</p>
+<h3 id="ai-native-syntax-agents-and-turns">Agents And Turns</h3>
+<p><code>agent</code> and <code>turn</code> are different layers:</p>
+<ul>
+<li>an **agent** is a callable workflow frame with configuration, defaults, budget, tools, output handling, tracing, replay, and optional custom <code>flow</code>;</li>
+<li>a **turn** is one provider request made from inside or outside such a frame;</li>
+<li>a built-in agent without <code>flow</code> repeatedly performs turns and dispatches tools for the caller;</li>
+<li>a custom <code>flow</code> performs no hidden turns. It runs ordinary Leia code, and the author must call <code>turn { ... }</code>, <code>llm.dispatch</code>, or other helpers explicitly.</li>
+</ul>
+<p>The default agent loop can be understood as this conceptual shape:</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> answer(question) {
+    model: <span class="tok-string">&quot;fast&quot;</span>
+    system: <span class="tok-string">&quot;Use tools when useful.&quot;</span>
+    user: question
+    tools: [lookup]
+}
+
+<span class="tok-comment">// Calling the agent runs the built-in loop:</span>
+<span class="tok-comment">// 1. build messages from system + user;</span>
+<span class="tok-comment">// 2. call turn { model, messages, tools };</span>
+<span class="tok-comment">// 3. if result.status == &quot;tool_calls&quot;, dispatch requested tools;</span>
+<span class="tok-comment">// 4. append tool results to history;</span>
+<span class="tok-comment">// 5. call another turn with the updated history;</span>
+<span class="tok-comment">// 6. stop on final answer, provider stop, budget, cancellation, or error.</span>
+result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;What changed?&quot;</span>)</code></pre>
+<p>The same structure can be written manually with a custom <code>flow</code> when the program needs precise multi-turn control:</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> answer(question) {
+    model: <span class="tok-string">&quot;fast&quot;</span>
+    system: <span class="tok-string">&quot;Use tools when useful.&quot;</span>
+    tools: [lookup]
+} <span class="tok-contextual">flow</span> {
+    history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
+        system: system
+        user: question
+    }
+
+    first, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {
+        <span class="tok-contextual">messages</span>: history
+        tools: tools
+    }
+    <span class="tok-keyword">if</span> err <span class="tok-operator">!=</span> <span class="tok-constant">nil</span> {
+        <span class="tok-keyword">return</span> <span class="tok-constant">nil</span>, err
+    }
+
+    <span class="tok-keyword">if</span> first.status <span class="tok-operator">==</span> <span class="tok-string">&quot;tool_calls&quot;</span> {
+        call <span class="tok-operator">:=</span> first.calls[<span class="tok-number">1</span>]
+        value, tool_err <span class="tok-operator">:=</span> llm.dispatch(call, tools)
+        <span class="tok-keyword">if</span> tool_err <span class="tok-operator">!=</span> <span class="tok-constant">nil</span> {
+            history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.tool_error(call.id, tool_err.message)
+        } <span class="tok-keyword">else</span> {
+            history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.assistant_call(call)
+            history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.tool_result(call.id, value)
+        }
+        <span class="tok-keyword">return</span> <span class="tok-contextual">turn</span> { <span class="tok-contextual">messages</span>: history }
+    }
+
+    <span class="tok-keyword">return</span> first, <span class="tok-constant">nil</span>
+}</code></pre>
+<p>Both examples use the same <code>turn</code> operation at the provider boundary. The difference is where the loop policy lives: in the built-in agent loop, or in user-written <code>flow</code> code.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> scripted(question) {
+    model: <span class="tok-string">&quot;local&quot;</span>
+    system: <span class="tok-string">&quot;s&quot;</span>
+    tools: [{name: <span class="tok-string">&quot;lookup&quot;</span>}]
+} <span class="tok-contextual">flow</span> {
+    planned <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
+        system: system
+        user: question
+    }
+    <span class="tok-keyword">return</span> {
+        inherited_model: model,
+        inherited_tools: <span class="tok-operator">#</span>tools,
+        message_count: <span class="tok-operator">#</span>planned,
+    }, <span class="tok-constant">nil</span>
+}
+
+out, err <span class="tok-operator">:=</span> scripted(<span class="tok-string">&quot;hello&quot;</span>)
+<span class="tok-keyword">return</span> out.inherited_model, out.inherited_tools, out.message_count, err</code></pre>
+<p>An important consequence is that <code>turn {}</code> never calls tools by itself. Passing <code>tools</code> to a turn only tells the provider which tool schemas are available. If the provider responds with tool calls, either the built-in agent loop or custom flow code must dispatch them and then make a later turn with the updated history.</p>
 <h3 id="ai-native-syntax-agent-configuration">Agent Configuration</h3>
 <p>Agent configuration is a table-like field block. The stable fields are:</p>
 <div class="table-wrap"><table>
@@ -1182,6 +1259,34 @@ history <span class="tok-operator">:=</span> <span class="tok-contextual">messag
 <tr><td><code>metadata</code></td><td>Host/provider metadata.</td></tr>
 </tbody></table></div>
 <p>If a <code>turn</code> runs inside an agent, absent <code>model</code>, <code>tools</code>, <code>budget</code>, <code>response_format</code>, <code>metadata</code>, <code>max_tokens</code>, and sampling fields inherit from the ambient agent configuration. If both <code>messages</code> and <code>user</code> are absent, an ambient agent <code>system</code> and <code>user</code> are used to synthesize messages. Outside an agent, a <code>turn</code> must have explicit <code>messages</code> or <code>user</code>, unless the host installs a provider layer with different documented behavior.</p>
+<p>Inside a custom <code>flow</code>, inheritance and local variables are related but not the same thing. Ambient inheritance affects <code>turn {}</code> request construction. Flow-local injection only creates identifiers such as <code>model</code>, <code>system</code>, and <code>tools</code> for fields explicitly written in the agent configuration. For example:</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">agent</span> inherit(q) {
+    model: <span class="tok-string">&quot;fast&quot;</span>
+    system: <span class="tok-string">&quot;Brief.&quot;</span>
+    user: q
+} <span class="tok-contextual">flow</span> {
+    <span class="tok-comment">// Uses inherited model, system, and user to build the request.</span>
+    first, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {}
+
+    <span class="tok-comment">// Equivalent explicit form for the message list, while still inheriting</span>
+    <span class="tok-comment">// model and other omitted request fields.</span>
+    second, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {
+        <span class="tok-contextual">messages</span>: <span class="tok-contextual">messages</span> {
+            system: system
+            user: q
+        }
+    }
+
+    <span class="tok-keyword">return</span> second, err
+}</code></pre>
+<p>Outside an agent there is no ambient frame, so request construction must be explicit:</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code">result, err <span class="tok-operator">:=</span> <span class="tok-contextual">turn</span> {
+    model: <span class="tok-string">&quot;fast&quot;</span>
+    <span class="tok-contextual">messages</span>: <span class="tok-contextual">messages</span> {
+        system: <span class="tok-string">&quot;Brief.&quot;</span>
+        user: <span class="tok-string">&quot;Explain Leia.&quot;</span>
+    }
+}</code></pre>
 <p>Result fields are stable:</p>
 <div class="table-wrap"><table>
 <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
