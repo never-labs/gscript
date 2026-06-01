@@ -56,6 +56,35 @@ func TestReleaseMatrixSpecSectionsHaveSemanticGate(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixLanguageSpecMatchesGrammarAppendix(t *testing.T) {
+	root := findRepoRoot(t)
+	spec := normalizeGrammarText(readFileString(t, filepath.Join(root, "docs", "spec", "language.md")))
+	grammar := normalizeGrammarText(readFileString(t, filepath.Join(root, "docs", "spec", "grammar.ebnf")))
+
+	for _, production := range []string{
+		`const_decl = "const" identifier ( "=" | ":=" ) expr ;`,
+	} {
+		if !strings.Contains(spec, production) {
+			t.Fatalf("docs/spec/language.md must include grammar production %q", production)
+		}
+		if !strings.Contains(grammar, production) {
+			t.Fatalf("docs/spec/grammar.ebnf must include grammar production %q", production)
+		}
+	}
+}
+
+func normalizeGrammarText(s string) string {
+	var lines []string
+	for _, line := range strings.Split(s, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		lines = append(lines, strings.Join(fields, " "))
+	}
+	return strings.Join(lines, "\n")
+}
+
 func TestReleaseMatrixConformanceCasesHaveStatusAndClassification(t *testing.T) {
 	root := findRepoRoot(t)
 	pairs := readConformanceCasePairs(t, root)

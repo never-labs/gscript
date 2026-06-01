@@ -94,7 +94,7 @@ label_stmt    = "::" identifier "::" ;
 goto_stmt     = "goto" identifier ;
 go_stmt       = "go" call_expr ;
 defer_stmt    = "defer" call_expr ;
-const_decl    = "const" identifier "=" expr ;
+const_decl    = "const" identifier ( "=" | ":=" ) expr ;
 
 simple_stmt   = assignment | expr ;
 assignment    = expr_list ( "=" | ":=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr_list ;
