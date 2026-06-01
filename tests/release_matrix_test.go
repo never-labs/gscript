@@ -151,6 +151,30 @@ func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixModuleReferenceDocumentsCommandSurface(t *testing.T) {
+	root := findRepoRoot(t)
+	modules := readFileString(t, filepath.Join(root, "docs", "reference", "modules", "index.md"))
+	for _, command := range []string{
+		"leia mod init",
+		"leia mod add",
+		"leia mod tidy",
+		"leia mod check",
+		"leia mod download",
+		"leia mod vendor",
+		"leia mod lock",
+		"leia mod verify",
+		"leia mod list",
+		"leia mod graph",
+		"leia mod explain",
+		"leia mod capability",
+		"leia mod gomod",
+	} {
+		if !strings.Contains(modules, "`"+command+"`") {
+			t.Fatalf("docs/reference/modules/index.md must document %s", command)
+		}
+	}
+}
+
 func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
 	root := findRepoRoot(t)
 	modules := readStdlibContractRows(t, root)

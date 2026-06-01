@@ -52,6 +52,22 @@ leia mod capability --json
 leia mod gomod --write
 ```
 
+| Command | Purpose |
+|---|---|
+| `leia mod init` | Create a `leia.mod` file for a project. |
+| `leia mod add` | Add one or more `require` directives. |
+| `leia mod tidy` | Check local module metadata and report missing or removable entries. |
+| `leia mod check` | Alias for `leia mod verify`; useful in scripts that prefer check-style verbs. |
+| `leia mod download` | Resolve and cache remote Leia modules. |
+| `leia mod vendor` | Copy resolved dependencies into `vendor/` for hermetic execution. |
+| `leia mod lock` | Write or refresh `leia.sum` from the current dependency graph. |
+| `leia mod verify` | Validate `leia.mod`, `leia.sum`, and cached module hashes. |
+| `leia mod list` | Print resolved module metadata. |
+| `leia mod graph` | Print dependency edges discovered from `leia.mod` files. |
+| `leia mod explain` | Explain where a module path resolves from. |
+| `leia mod capability` | Summarize capability requirements across the module graph. |
+| `leia mod gomod` | Generate a Go `go.mod` view for native binding dependencies. |
+
 `leia.sum` records resolved module hashes for downloaded or vendored modules.
 `vendor/` can be used for offline or hermetic execution through `leia run
 --mod=vendor`.
