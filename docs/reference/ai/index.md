@@ -238,9 +238,9 @@ budget { turns: 1, calls: 0, tokens: 256, time: 30 } {
 }
 ```
 
-Budget dimensions currently include `turns`, `calls`, `tokens`, `time`, and
-`money` in the runtime model. Public product docs should avoid promising money
-accounting accuracy unless a provider supplies cost data.
+Public budget dimensions are `turns`, `calls`, `tokens`, and `time`. Provider
+usage may include cost metadata, but Leia does not promise money accounting as
+a stable script-level budget dimension.
 
 ## Record, Replay, And Trace
 

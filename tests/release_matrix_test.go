@@ -562,6 +562,16 @@ func TestReleaseMatrixAINativeDocsUsePublicLLMSurface(t *testing.T) {
 			t.Fatalf("AI-native docs mention %s but llm go doc does not expose it", api)
 		}
 	}
+
+	aiRef := readFileString(t, filepath.Join(root, "docs", "reference", "ai", "index.md"))
+	if strings.Contains(aiRef, "`money`") || strings.Contains(aiRef, "money accounting accuracy") {
+		t.Fatal("AI reference must not promise money as a stable script-level budget dimension")
+	}
+	for _, dimension := range []string{"`turns`", "`calls`", "`tokens`", "`time`"} {
+		if !strings.Contains(aiRef, dimension) {
+			t.Fatalf("AI reference must document public budget dimension %s", dimension)
+		}
+	}
 }
 
 func TestReleaseMatrixAINativeExamplesStayRunnable(t *testing.T) {
