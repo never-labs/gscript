@@ -184,6 +184,22 @@ add_documentation_references() {
     add_run "Documentation References" "bash scripts/docs_check.sh"
 }
 
+add_editor_assets() {
+    if [ ! -f scripts/editor_check.sh ]; then
+        add_skip "Editor Assets" "missing scripts/editor_check.sh"
+        return
+    fi
+    if ! have_cmd python3; then
+        add_skip "Editor Assets" "missing python3"
+        return
+    fi
+    if ! have_cmd node; then
+        add_skip "Editor Assets" "missing node"
+        return
+    fi
+    add_run "Editor Assets" "bash scripts/editor_check.sh"
+}
+
 add_manifest_coverage() {
     if [ ! -f tests/manifest.py ]; then
         add_skip "Manifest Coverage" "missing tests/manifest.py"
@@ -243,6 +259,7 @@ build_quick_plan() {
     add_manifest_coverage
     add_module_path_gate
     add_documentation_references
+    add_editor_assets
 }
 
 build_full_plan() {
@@ -260,6 +277,7 @@ build_full_plan() {
     add_manifest_coverage
     add_module_path_gate
     add_documentation_references
+    add_editor_assets
     add_performance_gate
     add_release_smoke
 }

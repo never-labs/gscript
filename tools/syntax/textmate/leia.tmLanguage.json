@@ -1,0 +1,141 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Leia",
+  "scopeName": "source.leia",
+  "patterns": [
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#contextual"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#functions"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.leia",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.leia",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.leia",
+          "match": "^\\s*//\\s*leia:(?:build|test|cap|feature|requires|param)\\b.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.leia",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.leia",
+              "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-9]{1,3})"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.leia",
+          "begin": "`",
+          "end": "`"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.leia",
+          "match": "\\b(?:[0-9][0-9_]*\\.[0-9_]*(?:[eE][+-]?[0-9_]+)?|[0-9][0-9_]*(?:[eE][+-]?[0-9_]+))\\b"
+        },
+        {
+          "name": "constant.numeric.integer.leia",
+          "match": "\\b(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|0[oO][0-7_]+|[0-9][0-9_]*)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.leia",
+          "match": "\\b(?:if|else|elseif|for|range|in|switch|case|default|break|continue|goto|return|defer|go|select)\\b"
+        },
+        {
+          "name": "storage.type.function.leia",
+          "match": "\\b(?:func|var|const|chan)\\b"
+        },
+        {
+          "name": "constant.language.leia",
+          "match": "\\b(?:true|false|nil)\\b"
+        }
+      ]
+    },
+    "contextual": {
+      "patterns": [
+        {
+          "name": "keyword.control.ai.leia",
+          "match": "\\b(?:agent|models|tool|turn|messages|flow|budget|react)\\b"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.leia",
+          "match": "\\b(?:assert|error|pcall|xpcall|print|println|type|tostring|tonumber|pairs|ipairs|next|len|rawget|rawset|setmetatable|getmetatable|require|close|sleep|spawn|wait|send|recv|select)\\b(?=\\s*\\()"
+        },
+        {
+          "name": "support.module.leia",
+          "match": "\\b(?:string|table|math|json|time|os|env|fs|http|process|debug|llm|msg|history|loop|soa|matrix|vec|csv|binary|bits|bit32|regexp|url|path|uuid|base64|hash|compress|sync)\\b(?=\\.)"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.leia",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.leia",
+          "match": "\\+\\+|--|\\+=|-=|\\*=|/=|%=|:=|==|!=|<=|>=|&&|\\|\\||&\\^|<<|>>|<-|\\.\\.\\.?|\\*\\*|[+\\-*/%#!=<>|&^.:,;]"
+        }
+      ]
+    }
+  }
+}

@@ -32,6 +32,148 @@ CHAPTERS = [
     ("implementation.md", "Implementation requirements"),
 ]
 
+LEIA_KEYWORDS = frozenset(
+    """
+    break case continue defer default else elseif fallthrough for go goto if
+    import in range return select switch chan const func tool var
+    """.split()
+)
+
+LEIA_CONTEXTUAL = frozenset(
+    "agent budget capabilities cap flow messages models turn".split()
+)
+
+LEIA_CONSTANTS = frozenset("false nil true".split())
+
+LEIA_BUILTINS = frozenset(
+    """
+    assert close delete error getmetatable ipairs len make next pairs pcall print
+    rawequal rawget rawlen rawset require select setmetatable spread tonumber
+    tostring type xpcall
+    """.split()
+)
+
+LEIA_OPERATOR_RE = re.compile(
+    r"\+\+|--|\+=|-=|\*=|/=|%=|:=|==|!=|<=|>=|&&|\|\||&\^|<<|>>|<-|\.\.\.|\.\.|\*\*|[+\-*/%=<>!#&|^]"
+)
+
+LEIA_NUMBER_RE = re.compile(
+    r"""
+    (?:
+      0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*
+      |0[bB][01](?:_?[01])*
+      |0[oO][0-7](?:_?[0-7])*
+      |(?:[0-9](?:_?[0-9])*)\.(?:[0-9](?:_?[0-9])*)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?
+      |(?:[0-9](?:_?[0-9])*)[eE][+-]?[0-9](?:_?[0-9])*
+      |[0-9](?:_?[0-9])*
+    )
+    """,
+    re.VERBOSE,
+)
+
+LEIA_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def is_leia_fence(info: str) -> bool:
+    return info.split()[0] == "leia" if info.split() else False
+
+
+def span(class_name: str, text: str) -> str:
+    return f'<span class="{class_name}">{escape(text)}</span>'
+
+
+def highlight_leia(source: str) -> str:
+    out: list[str] = []
+    i = 0
+    while i < len(source):
+        text = source[i:]
+        if text.startswith("/*"):
+            end = source.find("*/", i + 2)
+            if end == -1:
+                end = len(source)
+            else:
+                end += 2
+            out.append(span("tok-comment", source[i:end]))
+            i = end
+            continue
+        if text.startswith("//"):
+            end = source.find("\n", i)
+            if end == -1:
+                end = len(source)
+            comment = source[i:end]
+            if comment.startswith("//leia:"):
+                out.append(span("tok-directive", comment))
+            else:
+                out.append(span("tok-comment", comment))
+            i = end
+            continue
+        char = source[i]
+        if char == '"':
+            j = i + 1
+            escaped = False
+            while j < len(source):
+                current = source[j]
+                if escaped:
+                    escaped = False
+                elif current == "\\":
+                    escaped = True
+                elif current == '"':
+                    j += 1
+                    break
+                j += 1
+            out.append(span("tok-string", source[i:j]))
+            i = j
+            continue
+        if char == "`":
+            j = source.find("`", i + 1)
+            if j == -1:
+                j = len(source)
+            else:
+                j += 1
+            out.append(span("tok-string", source[i:j]))
+            i = j
+            continue
+        number = LEIA_NUMBER_RE.match(source, i)
+        if number:
+            out.append(span("tok-number", number.group(0)))
+            i = number.end()
+            continue
+        ident = LEIA_IDENTIFIER_RE.match(source, i)
+        if ident:
+            value = ident.group(0)
+            if value in LEIA_KEYWORDS:
+                out.append(span("tok-keyword", value))
+            elif value in LEIA_CONTEXTUAL:
+                out.append(span("tok-contextual", value))
+            elif value in LEIA_CONSTANTS:
+                out.append(span("tok-constant", value))
+            elif value in LEIA_BUILTINS:
+                out.append(span("tok-builtin", value))
+            else:
+                out.append(escape(value))
+            i = ident.end()
+            continue
+        operator = LEIA_OPERATOR_RE.match(source, i)
+        if operator:
+            out.append(span("tok-operator", operator.group(0)))
+            i = operator.end()
+            continue
+        out.append(escape(char))
+        i += 1
+    return "".join(out)
+
+
+def render_code_block(source: str, info: str = "") -> str:
+    language = info.split()[0] if info.split() else ""
+    if is_leia_fence(info):
+        classes = "language-leia leia-code"
+        return f'<pre class="{classes}"><code class="{classes}">{highlight_leia(source)}</code></pre>'
+    if language:
+        class_attr = f' class="language-{escape(language)}"'
+    else:
+        class_attr = ""
+    return f"<pre{class_attr}><code{class_attr}>" + escape(source) + "</code></pre>"
+
 
 def slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
@@ -87,6 +229,7 @@ def markdown_to_html(text: str, prefix: str) -> str:
     paragraph: list[str] = []
     code: list[str] = []
     in_code = False
+    code_info = ""
     in_ul = False
     in_ol = False
 
@@ -112,11 +255,13 @@ def markdown_to_html(text: str, prefix: str) -> str:
             close_paragraph()
             close_lists()
             if in_code:
-                out.append("<pre><code>" + escape("\n".join(code)) + "</code></pre>")
+                out.append(render_code_block("\n".join(code), code_info))
                 code = []
+                code_info = ""
                 in_code = False
             else:
                 in_code = True
+                code_info = line[3:].strip()
             i += 1
             continue
         if in_code:
@@ -189,7 +334,7 @@ def markdown_to_html(text: str, prefix: str) -> str:
     close_paragraph()
     close_lists()
     if in_code:
-        out.append("<pre><code>" + escape("\n".join(code)) + "</code></pre>")
+        out.append(render_code_block("\n".join(code), code_info))
     return "\n".join(out)
 
 
@@ -206,7 +351,7 @@ def render(spec_dir: Path) -> str:
     grammar = (spec_dir / "grammar.ebnf").read_text(encoding="utf-8")
     nav.append('<li><a href="#grammar-appendix">Grammar appendix</a></li>')
     sections.append(
-        '<section><h2 id="grammar-appendix">Grammar appendix</h2><pre><code>'
+        '<section><h2 id="grammar-appendix">Grammar appendix</h2><pre class="language-ebnf"><code class="language-ebnf">'
         + escape(grammar)
         + "</code></pre></section>"
     )
@@ -307,6 +452,19 @@ code {{ font-family:Menlo, Consolas, 'Liberation Mono', monospace; font-size:.92
 p code, li code {{ background:var(--code-bg); border:1px solid #e5e7eb; border-radius:3px; padding:1px 4px; }}
 pre {{ background:var(--code-bg); border:1px solid var(--line); border-radius:4px; overflow:auto; padding:14px 16px; max-width:920px; }}
 pre code {{ background:transparent; border:0; padding:0; color:#111827; }}
+pre.leia-code {{
+  background:#f8fbfd;
+  border-color:#cfe3ea;
+}}
+.tok-comment {{ color:#6a737d; font-style:italic; }}
+.tok-directive {{ color:#0f766e; font-weight:600; }}
+.tok-string {{ color:#0b7285; }}
+.tok-number {{ color:#8a4baf; }}
+.tok-keyword {{ color:#005f73; font-weight:600; }}
+.tok-contextual {{ color:#7c3aed; font-weight:600; }}
+.tok-constant {{ color:#9a3412; font-weight:600; }}
+.tok-builtin {{ color:#0369a1; }}
+.tok-operator {{ color:#6b21a8; }}
 .table-wrap {{ max-width:920px; overflow-x:auto; margin:14px 0 18px; }}
 table {{ width:100%; border-collapse:collapse; border-top:1px solid var(--line); border-bottom:1px solid var(--line); font-size:14px; }}
 th, td {{ text-align:left; vertical-align:top; padding:8px 10px; border-bottom:1px solid #e5e7eb; }}

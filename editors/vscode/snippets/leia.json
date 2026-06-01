@@ -1,0 +1,71 @@
+{
+  "function": {
+    "prefix": "func",
+    "body": [
+      "func ${1:name}(${2:args}) {",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Define a Leia function"
+  },
+  "agent": {
+    "prefix": "agent",
+    "body": [
+      "agent ${1:name}(${2:input}) {",
+      "    model: \"${3:default}\"",
+      "    system: \"${4:Be concise.}\"",
+      "    user: ${2:input}",
+      "}",
+      "",
+      "${5:result}, err := ${1:name}(${6:value})"
+    ],
+    "description": "Define and call an AI-native agent"
+  },
+  "tool": {
+    "prefix": "tool",
+    "body": [
+      "// ${1:Describe what this tool does.}",
+      "//leia:requires ${2:none}",
+      "tool ${3:name}(${4:arg}) {",
+      "    ${0:return nil, nil}",
+      "}"
+    ],
+    "description": "Define an AI-native tool with capability metadata"
+  },
+  "turn": {
+    "prefix": "turn",
+    "body": [
+      "result, err := turn {",
+      "    model: \"${1:default}\"",
+      "    messages: messages {",
+      "        system: \"${2:Be precise.}\"",
+      "        user: ${3:question}",
+      "    }",
+      "    max_tokens: ${4:256}",
+      "}"
+    ],
+    "description": "Run one LLM provider turn"
+  },
+  "test": {
+    "prefix": "test",
+    "body": [
+      "//leia:test",
+      "func test_${1:name}() {",
+      "    ${0:assert(true)}",
+      "}"
+    ],
+    "description": "Create a Leia test function"
+  },
+  "go routine": {
+    "prefix": "go",
+    "body": [
+      "ch := chan()",
+      "go func() {",
+      "    defer close(ch)",
+      "    ${1:send(ch, value)}",
+      "}()",
+      "${0:result := recv(ch)}"
+    ],
+    "description": "Start a concurrent task and communicate through a channel"
+  }
+}

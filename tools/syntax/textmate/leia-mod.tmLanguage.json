@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Leia Module",
+  "scopeName": "source.leia.mod",
+  "fileTypes": [
+    "mod"
+  ],
+  "patterns": [
+    {
+      "name": "comment.line.double-slash.leia-mod",
+      "match": "//.*$"
+    },
+    {
+      "name": "keyword.control.leia-mod",
+      "match": "^\\s*(?:module|leia|require|replace|collection|capability|cap|go)\\b"
+    },
+    {
+      "name": "keyword.operator.arrow.leia-mod",
+      "match": "=>"
+    },
+    {
+      "name": "constant.other.version.leia-mod",
+      "match": "\\bv[0-9][A-Za-z0-9._+-]*\\b"
+    },
+    {
+      "name": "string.unquoted.path.leia-mod",
+      "match": "(?:github\\.com|go:|\\./|\\.\\./|/)[A-Za-z0-9._~:/@+-]+"
+    }
+  ]
+}

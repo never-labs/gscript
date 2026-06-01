@@ -1,0 +1,208 @@
+{
+  "name": "leia-vscode",
+  "displayName": "Leia",
+  "description": "Language support and common Leia CLI actions for VS Code.",
+  "version": "0.1.0",
+  "publisher": "never-labs",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:leia",
+    "onLanguage:leia-mod",
+    "onCommand:leia.runFile",
+    "onCommand:leia.testWorkspace",
+    "onCommand:leia.formatFile",
+    "onCommand:leia.lintWorkspace",
+    "onCommand:leia.checkWorkspace",
+    "onCommand:leia.previewSpec",
+    "onTaskType:leia"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "leia",
+        "aliases": [
+          "Leia",
+          "leia"
+        ],
+        "extensions": [
+          ".leia"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "leia-mod",
+        "aliases": [
+          "Leia Module",
+          "leia.mod"
+        ],
+        "filenames": [
+          "leia.mod",
+          "leia.sum"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "leia",
+        "scopeName": "source.leia",
+        "path": "./syntaxes/leia.tmLanguage.json"
+      },
+      {
+        "language": "leia-mod",
+        "scopeName": "source.leia.mod",
+        "path": "./syntaxes/leia-mod.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "leia",
+        "path": "./snippets/leia.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "leia.runFile",
+        "title": "Leia: Run Current File",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.testWorkspace",
+        "title": "Leia: Test Workspace",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.formatFile",
+        "title": "Leia: Format Current File",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.lintWorkspace",
+        "title": "Leia: Lint Workspace",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.checkWorkspace",
+        "title": "Leia: Check Workspace",
+        "category": "Leia"
+      },
+      {
+        "command": "leia.previewSpec",
+        "title": "Leia: Preview Language Spec",
+        "category": "Leia"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "leia.runFile",
+          "when": "resourceLangId == leia",
+          "group": "navigation"
+        },
+        {
+          "command": "leia.formatFile",
+          "when": "resourceLangId == leia",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "leia.runFile",
+          "when": "resourceLangId == leia",
+          "group": "1_run"
+        },
+        {
+          "command": "leia.formatFile",
+          "when": "resourceLangId == leia",
+          "group": "1_run"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "leia.runFile"
+        },
+        {
+          "command": "leia.testWorkspace"
+        },
+        {
+          "command": "leia.formatFile"
+        },
+        {
+          "command": "leia.lintWorkspace"
+        },
+        {
+          "command": "leia.checkWorkspace"
+        },
+        {
+          "command": "leia.previewSpec"
+        }
+      ]
+    },
+    "taskDefinitions": [
+      {
+        "type": "leia",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Leia CLI command to run.",
+            "enum": [
+              "run",
+              "test",
+              "fmt",
+              "lint",
+              "check",
+              "specPreview"
+            ]
+          },
+          "file": {
+            "type": "string",
+            "description": "File path for file-oriented commands."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path argument for workspace-oriented commands."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Additional CLI arguments."
+          }
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Leia",
+      "properties": {
+        "leia.executable": {
+          "type": "string",
+          "default": "leia",
+          "description": "Path to the Leia CLI executable."
+        },
+        "leia.specPreviewScript": {
+          "type": "string",
+          "default": "scripts/spec_preview.py",
+          "description": "Workspace-relative path to the spec HTML generator."
+        },
+        "leia.specPreviewOutput": {
+          "type": "string",
+          "default": "docs/spec/index.html",
+          "description": "Workspace-relative path to the generated spec HTML file."
+        }
+      }
+    }
+  }
+}
