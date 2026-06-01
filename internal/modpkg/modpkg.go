@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/never-labs/gscript/internal/ast"
+	"github.com/never-labs/gscript/internal/lexer"
 	"github.com/never-labs/gscript/internal/modfile"
+	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	"github.com/never-labs/gscript/internal/support/modresolve"
 )
@@ -86,8 +88,6 @@ type SumEntry struct {
 	Target  string `json:"target"`
 	Hash    string `json:"hash"`
 }
-
-var requireStringRE = regexp.MustCompile(`require\s*\(\s*"([^"]+)"\s*\)`)
 
 func Init(opts InitOptions) (string, error) {
 	dir := opts.Dir
@@ -171,10 +171,17 @@ func ScanStaticRequires(file string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	tokens, err := lexer.New(string(src)).Tokenize()
+	if err != nil {
+		return nil, err
+	}
+	prog, err := parser.New(tokens).Parse()
+	if err != nil {
+		return nil, err
+	}
 	seen := map[string]bool{}
 	var requires []string
-	for _, match := range requireStringRE.FindAllStringSubmatch(string(src), -1) {
-		req := strings.TrimSpace(match[1])
+	for _, req := range collectStaticRequires(prog) {
 		if req == "" || seen[req] {
 			continue
 		}
@@ -183,6 +190,175 @@ func ScanStaticRequires(file string) ([]string, error) {
 	}
 	sort.Strings(requires)
 	return requires, nil
+}
+
+func collectStaticRequires(prog *ast.Program) []string {
+	if prog == nil {
+		return nil
+	}
+	var requires []string
+	for _, stmt := range prog.Stmts {
+		requires = collectStmtRequires(requires, stmt)
+	}
+	return requires
+}
+
+func collectStmtRequires(out []string, stmt ast.Stmt) []string {
+	switch s := stmt.(type) {
+	case *ast.AssignStmt:
+		return collectExprListRequires(out, s.Values)
+	case *ast.DeclareStmt:
+		return collectExprListRequires(out, s.Values)
+	case *ast.CompoundAssignStmt:
+		return collectExprRequires(out, s.Value)
+	case *ast.IncDecStmt:
+		return collectExprRequires(out, s.Target)
+	case *ast.CallStmt:
+		return collectExprRequires(out, s.Call)
+	case *ast.GoStmt:
+		return collectExprRequires(out, s.Call)
+	case *ast.DeferStmt:
+		return collectExprRequires(out, s.Call)
+	case *ast.SendStmt:
+		out = collectExprRequires(out, s.Channel)
+		return collectExprRequires(out, s.Value)
+	case *ast.SelectStmt:
+		for _, c := range s.Cases {
+			out = collectExprRequires(out, c.Channel)
+			out = collectExprRequires(out, c.SendValue)
+			out = collectBlockRequires(out, c.Body)
+		}
+		return collectBlockRequires(out, s.Default)
+	case *ast.IfStmt:
+		out = collectExprRequires(out, s.Cond)
+		out = collectBlockRequires(out, s.Body)
+		for _, ei := range s.ElseIfs {
+			out = collectExprRequires(out, ei.Cond)
+			out = collectBlockRequires(out, ei.Body)
+		}
+		return collectBlockRequires(out, s.ElseBody)
+	case *ast.ForNumStmt:
+		out = collectStmtRequires(out, s.Init)
+		out = collectExprRequires(out, s.Cond)
+		out = collectStmtRequires(out, s.Post)
+		return collectBlockRequires(out, s.Body)
+	case *ast.ForRangeStmt:
+		out = collectExprRequires(out, s.Iter)
+		return collectBlockRequires(out, s.Body)
+	case *ast.ForStmt:
+		out = collectExprRequires(out, s.Cond)
+		return collectBlockRequires(out, s.Body)
+	case *ast.ReturnStmt:
+		return collectExprListRequires(out, s.Values)
+	case *ast.FuncDeclStmt:
+		return collectBlockRequires(out, s.Body)
+	case *ast.ToolDeclStmt:
+		return collectBlockRequires(out, s.Body)
+	case *ast.AgentDeclStmt:
+		out = collectConfigRequires(out, s.Config)
+		return collectBlockRequires(out, s.Flow)
+	case *ast.AgentDefaultsDeclStmt:
+		return collectConfigRequires(out, s.Config)
+	case *ast.ModelsDeclStmt:
+		return collectConfigRequires(out, s.Config)
+	case *ast.BudgetStmt:
+		out = collectConfigRequires(out, s.Config)
+		return collectBlockRequires(out, s.Body)
+	}
+	return out
+}
+
+func collectBlockRequires(out []string, block *ast.BlockStmt) []string {
+	if block == nil {
+		return out
+	}
+	for _, stmt := range block.Stmts {
+		out = collectStmtRequires(out, stmt)
+	}
+	return out
+}
+
+func collectExprListRequires(out []string, exprs []ast.Expr) []string {
+	for _, expr := range exprs {
+		out = collectExprRequires(out, expr)
+	}
+	return out
+}
+
+func collectExprRequires(out []string, expr ast.Expr) []string {
+	switch e := expr.(type) {
+	case nil:
+		return out
+	case *ast.BinaryExpr:
+		out = collectExprRequires(out, e.Left)
+		return collectExprRequires(out, e.Right)
+	case *ast.UnaryExpr:
+		return collectExprRequires(out, e.Operand)
+	case *ast.ParenExpr:
+		return collectExprRequires(out, e.Inner)
+	case *ast.IndexExpr:
+		out = collectExprRequires(out, e.Table)
+		return collectExprRequires(out, e.Index)
+	case *ast.FieldExpr:
+		return collectExprRequires(out, e.Table)
+	case *ast.CallExpr:
+		if req, ok := staticRequireCall(e); ok {
+			out = append(out, req)
+		}
+		out = collectExprRequires(out, e.Func)
+		return collectExprListRequires(out, e.Args)
+	case *ast.MethodCallExpr:
+		out = collectExprRequires(out, e.Object)
+		return collectExprListRequires(out, e.Args)
+	case *ast.FuncLitExpr:
+		return collectBlockRequires(out, e.Body)
+	case *ast.AgentLitExpr:
+		out = collectConfigRequires(out, e.Config)
+		return collectBlockRequires(out, e.Flow)
+	case *ast.TurnExpr:
+		return collectConfigRequires(out, e.Config)
+	case *ast.MessagesExpr:
+		return collectTableFieldsRequires(out, e.Fields)
+	case *ast.ListLitExpr:
+		return collectExprListRequires(out, e.Values)
+	case *ast.TableLitExpr:
+		return collectTableFieldsRequires(out, e.Fields)
+	case *ast.DenseLitExpr:
+		return collectExprListRequires(out, e.Values)
+	case *ast.RecvExpr:
+		return collectExprRequires(out, e.Channel)
+	case *ast.MakeChanExpr:
+		return collectExprRequires(out, e.Size)
+	}
+	return out
+}
+
+func collectTableFieldsRequires(out []string, fields []ast.TableField) []string {
+	for _, field := range fields {
+		out = collectExprRequires(out, field.Key)
+		out = collectExprRequires(out, field.Value)
+	}
+	return out
+}
+
+func collectConfigRequires(out []string, fields []ast.ConfigField) []string {
+	for _, field := range fields {
+		out = collectExprRequires(out, field.Key)
+		out = collectExprRequires(out, field.Value)
+	}
+	return out
+}
+
+func staticRequireCall(call *ast.CallExpr) (string, bool) {
+	ident, ok := call.Func.(*ast.IdentExpr)
+	if !ok || ident.Name != "require" || len(call.Args) == 0 {
+		return "", false
+	}
+	arg, ok := call.Args[0].(*ast.StringLit)
+	if !ok {
+		return "", false
+	}
+	return strings.TrimSpace(arg.Value), true
 }
 
 func Verify(path string) VerifyReport {

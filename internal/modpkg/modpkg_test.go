@@ -153,6 +153,29 @@ func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
 	}
 }
 
+func TestScanStaticRequiresUsesAST(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "main.gs")
+	writeFile(t, file, strings.Join([]string{
+		`literal := "require(\"ignored.string\")"`,
+		`// require("ignored.comment")`,
+		`direct := require("example.com/direct")`,
+		`func nested() { return require("example.com/nested") }`,
+		`dynamic := require(name)`,
+		`again := require("example.com/direct")`,
+		"",
+	}, "\n"))
+
+	got, err := ScanStaticRequires(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"example.com/direct", "example.com/nested"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("ScanStaticRequires = %#v, want %#v", got, want)
+	}
+}
+
 func newLockedModule(t *testing.T) string {
 	t.Helper()
 
