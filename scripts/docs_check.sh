@@ -13,6 +13,7 @@ Usage: scripts/docs_check.sh [--help]
 Checks README/docs Markdown for:
   - relative .md links whose target file exists;
   - fenced code blocks that mention release scripts whose files exist and are executable.
+  - non-archive docs do not reintroduce retired GScript-era names.
   - release-readiness docs keep machine-checkable language and AI-native gates.
 
 The release-script check covers:
@@ -81,6 +82,7 @@ checked_links = 0
 checked_script_mentions = 0
 checked_release_gate_docs = 0
 checked_retired_paths = 0
+checked_retired_names = 0
 
 retired_paths = {
     "docs/language-spec.md": "docs/spec/language.md",
@@ -93,6 +95,8 @@ retired_paths = {
     "docs/production-readiness-checklist.md": "docs/release/index.md",
     "docs/stdlib.md": "docs/reference/stdlib/index.md",
 }
+
+retired_name_re = re.compile(r"\bGScript\b|\bgscript\b|\.gs\b|//gs:")
 
 
 def strip_link_destination(raw: str) -> str:
@@ -150,6 +154,19 @@ def check_retired_paths(path: Path) -> None:
             continue
         checked_retired_paths += 1
         errors.append(f"{rel}: references retired docs path {old}; use {new}")
+
+
+def check_retired_names(path: Path) -> None:
+    global checked_retired_names
+    text = path.read_text(encoding="utf-8")
+    rel = path.relative_to(root)
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        if not retired_name_re.search(line):
+            continue
+        checked_retired_names += 1
+        errors.append(
+            f"{rel}:{line_no}: references retired GScript-era naming; use Leia naming"
+        )
 
 
 def check_script_mentions(path: Path) -> None:
@@ -237,6 +254,7 @@ for doc_file in doc_files:
         check_markdown_links(doc_file)
         check_script_mentions(doc_file)
         check_retired_paths(doc_file)
+        check_retired_names(doc_file)
 
 check_release_gate_docs()
 
@@ -252,6 +270,7 @@ print(
     f"{checked_script_mentions} release-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
     f"{checked_retired_paths} retired-path mentions, "
+    f"{checked_retired_names} retired-name mentions, "
     "2 generated reference docs."
 )
 PY
