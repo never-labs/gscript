@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type releaseFeatureMatrix struct {
@@ -173,6 +174,26 @@ func TestReleaseMatrixModuleReferenceDocumentsCommandSurface(t *testing.T) {
 			t.Fatalf("docs/reference/modules/index.md must document %s", command)
 		}
 	}
+}
+
+func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, path := range []string{
+		"README.md",
+		"docs/tutorial/getting-started.md",
+		"docs/guides/tooling.md",
+	} {
+		data := readFileString(t, filepath.Join(root, filepath.FromSlash(path)))
+		if strings.Contains(data, "go run ./cmd/leia test tests/smoke\n") {
+			t.Fatalf("%s must not document the whole smoke directory as a stable test command", path)
+		}
+		if !strings.Contains(data, "go run ./cmd/leia test tests/smoke/01_basic.leia") {
+			t.Fatalf("%s must document the stable single-file smoke test command", path)
+		}
+	}
+
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "eval", `print("hello from leia")`)
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "test", "tests/smoke/01_basic.leia")
 }
 
 func TestReleaseMatrixStdlibContractHasConformanceCoverageEntry(t *testing.T) {
