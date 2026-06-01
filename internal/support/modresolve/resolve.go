@@ -16,6 +16,12 @@ type Replace struct {
 	Root string
 }
 
+type CacheModule struct {
+	Path    string
+	Version string
+	Root    string
+}
+
 type Result struct {
 	Kind string
 	Path string
@@ -25,10 +31,17 @@ type Result struct {
 }
 
 func Resolve(module string, collections []Collection, replaces []Replace, root string) Result {
+	return ResolveWithCache(module, collections, replaces, nil, root)
+}
+
+func ResolveWithCache(module string, collections []Collection, replaces []Replace, cacheModules []CacheModule, root string) Result {
 	if result, ok := ResolveCollection(module, collections); ok {
 		return result
 	}
 	if result, ok := ResolveReplace(module, replaces); ok {
+		return result
+	}
+	if result, ok := ResolveCache(module, cacheModules); ok {
 		return result
 	}
 	file := moduleFile(module)
@@ -80,6 +93,33 @@ func ResolveReplace(module string, replaces []Replace) (Result, bool) {
 	rel := strings.TrimPrefix(module[len(best.Path):], "/")
 	rel = strings.ReplaceAll(rel, ".", "/") + ".gs"
 	return Result{Kind: "replace", Path: best.Path, Root: best.Root, Rel: rel, File: filepath.Join(best.Root, rel)}, true
+}
+
+func ResolveCache(module string, cacheModules []CacheModule) (Result, bool) {
+	var best CacheModule
+	for _, cached := range cacheModules {
+		if cached.Path == "" || cached.Root == "" {
+			continue
+		}
+		if module != cached.Path && !strings.HasPrefix(module, cached.Path+"/") {
+			continue
+		}
+		if len(cached.Path) > len(best.Path) {
+			best = cached
+		}
+	}
+	if best.Path == "" {
+		return Result{}, false
+	}
+	rel := ""
+	if module != best.Path {
+		rel = strings.TrimPrefix(module[len(best.Path):], "/")
+	}
+	if rel == "" {
+		rel = filepath.Base(best.Path)
+	}
+	rel = strings.ReplaceAll(rel, ".", "/") + ".gs"
+	return Result{Kind: "cache", Path: best.Path, Root: best.Root, Rel: rel, File: filepath.Join(best.Root, rel)}, true
 }
 
 func moduleFile(module string) string {

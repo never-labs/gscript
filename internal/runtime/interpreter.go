@@ -25,34 +25,35 @@ type Interpreter struct {
 	scriptDir          string              // directory of the main script (for require path resolution)
 	moduleCollections  map[string]string   // collection prefix -> filesystem root for require("name:pkg")
 	moduleReplaces     map[string]string   // module path prefix -> filesystem root for gscript.mod replace
-	moduleLoading      bool                // require() may load .gs files from the filesystem
-	filesystemEnabled  bool                // script-side file APIs may access the filesystem
-	filesystemRead     bool                // fs read operations are enabled
-	filesystemWrite    bool                // fs write operations are enabled
-	filesystemRoot     string              // optional root for script-side filesystem access
-	dynamicEval        bool                // script-side string compile/eval is enabled
-	environmentRead    bool                // script-side environment reads are enabled
-	environmentWrite   bool                // script-side environment writes are enabled
-	allowedEnv         map[string]bool     // nil means all environment variables are allowed
-	networkAccess      bool                // net/http host network APIs are enabled
-	processExecution   bool                // process.run/exec/which are enabled
-	processShell       bool                // process.shell is enabled
-	debugAccess        bool                // script-side debug APIs are enabled
-	testkitAccess      bool                // script-side testkit APIs are enabled
-	llmProvider        LLMProvider         // optional host-provided model backend
-	llmProviderFactory LLMProviderFactory  // optional model-config provider constructor
-	llmTraceSink       LLMTraceSink        // optional host-side LLM trace sink
-	currentSourceName  string              // source name for diagnostics while executing parsed source
-	args               []string            // current script entrypoint args: [0]=script, [1:]=user args
-	callStack          []DebugFrame        // active runtime calls, oldest to newest
-	deferStack         [][]deferredCall    // active function-scope deferred calls
-	debugHook          Value               // optional GScript diagnostic hook
-	debugOpts          DebugHookOptions    // filters for debugHook
-	debugSink          Value               // optional explicit diagnostic sink
-	debugBusy          bool                // prevents debug hooks from recursively firing
-	gcMode             string              // host-facing collectgarbage mode label
-	gcRunning          bool                // host-facing collectgarbage running flag
-	maxSteps           int64               // <=0 means unlimited
+	moduleCacheModules []modresolve.CacheModule
+	moduleLoading      bool               // require() may load .gs files from the filesystem
+	filesystemEnabled  bool               // script-side file APIs may access the filesystem
+	filesystemRead     bool               // fs read operations are enabled
+	filesystemWrite    bool               // fs write operations are enabled
+	filesystemRoot     string             // optional root for script-side filesystem access
+	dynamicEval        bool               // script-side string compile/eval is enabled
+	environmentRead    bool               // script-side environment reads are enabled
+	environmentWrite   bool               // script-side environment writes are enabled
+	allowedEnv         map[string]bool    // nil means all environment variables are allowed
+	networkAccess      bool               // net/http host network APIs are enabled
+	processExecution   bool               // process.run/exec/which are enabled
+	processShell       bool               // process.shell is enabled
+	debugAccess        bool               // script-side debug APIs are enabled
+	testkitAccess      bool               // script-side testkit APIs are enabled
+	llmProvider        LLMProvider        // optional host-provided model backend
+	llmProviderFactory LLMProviderFactory // optional model-config provider constructor
+	llmTraceSink       LLMTraceSink       // optional host-side LLM trace sink
+	currentSourceName  string             // source name for diagnostics while executing parsed source
+	args               []string           // current script entrypoint args: [0]=script, [1:]=user args
+	callStack          []DebugFrame       // active runtime calls, oldest to newest
+	deferStack         [][]deferredCall   // active function-scope deferred calls
+	debugHook          Value              // optional GScript diagnostic hook
+	debugOpts          DebugHookOptions   // filters for debugHook
+	debugSink          Value              // optional explicit diagnostic sink
+	debugBusy          bool               // prevents debug hooks from recursively firing
+	gcMode             string             // host-facing collectgarbage mode label
+	gcRunning          bool               // host-facing collectgarbage running flag
+	maxSteps           int64              // <=0 means unlimited
 	steps              int64
 	maxNativeCalls     int64 // <=0 means unlimited
 	nativeCalls        int64
@@ -234,6 +235,10 @@ func (interp *Interpreter) SetModuleReplace(path, root string) {
 	interp.moduleReplaces[path] = root
 }
 
+func (interp *Interpreter) SetModuleCacheModules(modules []modresolve.CacheModule) {
+	interp.moduleCacheModules = append([]modresolve.CacheModule(nil), modules...)
+}
+
 func (interp *Interpreter) resolveModulePath(name string) string {
 	collections := make([]modresolve.Collection, 0, len(interp.moduleCollections))
 	for name, root := range interp.moduleCollections {
@@ -243,7 +248,7 @@ func (interp *Interpreter) resolveModulePath(name string) string {
 	for path, root := range interp.moduleReplaces {
 		replaces = append(replaces, modresolve.Replace{Path: path, Root: root})
 	}
-	result := modresolve.Resolve(name, collections, replaces, interp.scriptDir)
+	result := modresolve.ResolveWithCache(name, collections, replaces, interp.moduleCacheModules, interp.scriptDir)
 	return result.File
 }
 

@@ -1,6 +1,9 @@
 package gscript
 
-import "github.com/never-labs/gscript/llm"
+import (
+	"github.com/never-labs/gscript/internal/support/modresolve"
+	"github.com/never-labs/gscript/llm"
+)
 
 // LibFlags controls which standard libraries are loaded.
 type LibFlags uint64
@@ -111,6 +114,8 @@ type vmOptions struct {
 	requirePath        string
 	moduleCollections  map[string]string
 	moduleReplaces     map[string]string
+	moduleCacheDir     string
+	moduleCacheModules []modresolve.CacheModule
 	filesystemRoot     string
 	dynamicEval        bool
 	environmentVars    []string
@@ -468,6 +473,20 @@ func WithModuleReplace(path, root string) Option {
 			o.moduleReplaces = make(map[string]string)
 		}
 		o.moduleReplaces[path] = root
+	}
+}
+
+// WithModuleCache enables read-only module resolution from a module cache
+// populated by gscript mod download. It never downloads modules at runtime.
+func WithModuleCache(root string) Option {
+	return func(o *vmOptions) {
+		o.moduleCacheDir = root
+	}
+}
+
+func withModuleCacheModules(modules []modresolve.CacheModule) Option {
+	return func(o *vmOptions) {
+		o.moduleCacheModules = append([]modresolve.CacheModule(nil), modules...)
 	}
 }
 

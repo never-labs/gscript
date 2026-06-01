@@ -280,7 +280,7 @@ func (vm *VM) resolveModulePath(name string) string {
 	for path, root := range vm.moduleReplaces {
 		replaces = append(replaces, modresolve.Replace{Path: path, Root: root})
 	}
-	result := modresolve.Resolve(name, collections, replaces, vm.scriptDir)
+	result := modresolve.ResolveWithCache(name, collections, replaces, vm.moduleCacheModules, vm.scriptDir)
 	return result.File
 }
 
@@ -321,6 +321,10 @@ func (vm *VM) SetModuleReplace(path, root string) {
 		vm.moduleReplaces = make(map[string]string)
 	}
 	vm.moduleReplaces[path] = root
+}
+
+func (vm *VM) SetModuleCacheModules(modules []modresolve.CacheModule) {
+	vm.moduleCacheModules = append([]modresolve.CacheModule(nil), modules...)
 }
 
 // Execute runs a top-level function prototype.

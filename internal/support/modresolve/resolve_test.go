@@ -77,6 +77,43 @@ func TestResolveExactReplaceToGSFile(t *testing.T) {
 	}
 }
 
+func TestResolveCacheUsesDownloadedModule(t *testing.T) {
+	got := ResolveWithCache(
+		"github.com/acme/toolkit/sub.mod",
+		nil,
+		nil,
+		[]CacheModule{{Path: "github.com/acme/toolkit", Version: "v1.2.3", Root: "/cache/github.com/acme/toolkit@v1.2.3"}},
+		"/project/root",
+	)
+
+	if got.Kind != "cache" {
+		t.Fatalf("Resolve kind = %q, want cache", got.Kind)
+	}
+	if got.Path != "github.com/acme/toolkit" {
+		t.Fatalf("Resolve path = %q, want github.com/acme/toolkit", got.Path)
+	}
+	if got.File != filepath.Join("/cache/github.com/acme/toolkit@v1.2.3", "sub", "mod.gs") {
+		t.Fatalf("Resolve file = %q, want cache sub module", got.File)
+	}
+}
+
+func TestResolveCacheUsesLongestPrefix(t *testing.T) {
+	got := ResolveWithCache(
+		"github.com/acme/toolkit/pkg/util",
+		nil,
+		nil,
+		[]CacheModule{
+			{Path: "github.com/acme/toolkit", Version: "v1.2.3", Root: "/cache/repo"},
+			{Path: "github.com/acme/toolkit/pkg", Version: "v1.2.3", Root: "/cache/repo/pkg"},
+		},
+		"/project/root",
+	)
+
+	if got.Kind != "cache" || got.Path != "github.com/acme/toolkit/pkg" || got.File != filepath.Join("/cache/repo/pkg", "util.gs") {
+		t.Fatalf("Resolve = %#v, want longest cache prefix", got)
+	}
+}
+
 func TestResolveCollectionMissFallsBackToModuleRoot(t *testing.T) {
 	collections := []Collection{{Name: "vendor", Root: "/project/vendor"}}
 

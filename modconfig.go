@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/never-labs/gscript/internal/modfile"
+	"github.com/never-labs/gscript/internal/modpkg"
+	"github.com/never-labs/gscript/internal/support/modresolve"
 )
 
 // ModuleOptionsForScript discovers the nearest gscript.mod for script and
@@ -50,7 +52,29 @@ func ModuleOptionsForScript(script string) []Option {
 		}
 		opts = append(opts, WithModuleReplace(rep.Path, root))
 	}
+	if cacheDir, err := modpkg.ModuleCacheDir(""); err == nil {
+		if modules := cacheModulesForManifest(cacheDir, manifest); len(modules) > 0 {
+			opts = append(opts, WithModuleCache(cacheDir), withModuleCacheModules(modules))
+		}
+	}
 	return opts
+}
+
+func cacheModulesForManifest(cacheDir string, manifest modfile.File) []modresolve.CacheModule {
+	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
+	for _, req := range manifest.Require {
+		if !strings.HasPrefix(req.Path, "github.com/") || req.Version == "" {
+			continue
+		}
+		root := filepath.Join(cacheDir, "extract", filepath.FromSlash(req.Path+"@"+req.Version))
+		if _, err := os.Stat(root); err != nil {
+			// A missing cache entry is not an error here. Runtime loading remains
+			// offline and will fail normally if the file is unavailable.
+			continue
+		}
+		modules = append(modules, modresolve.CacheModule{Path: req.Path, Version: req.Version, Root: root})
+	}
+	return modules
 }
 
 func findModuleFile(start string) (string, string, bool) {

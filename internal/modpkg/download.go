@@ -140,6 +140,10 @@ func parseGitHubModule(modulePath string) (githubModule, bool) {
 }
 
 func moduleCacheDir(override string) (string, error) {
+	return ModuleCacheDir(override)
+}
+
+func ModuleCacheDir(override string) (string, error) {
 	if override != "" {
 		return filepath.Abs(override)
 	}

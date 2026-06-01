@@ -10,6 +10,7 @@ import (
 
 	"github.com/never-labs/gscript/internal/runtime"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
+	"github.com/never-labs/gscript/internal/support/modresolve"
 )
 
 const (
@@ -103,6 +104,7 @@ type VM struct {
 	scriptDir            string
 	moduleCollections    map[string]string
 	moduleReplaces       map[string]string
+	moduleCacheModules   []modresolve.CacheModule
 	maxSteps             int64 // <=0 means unlimited
 	steps                int64
 	maxNativeCalls       int64 // <=0 means unlimited
@@ -1042,6 +1044,7 @@ func newIsolatedChildVM(parent *VM) *VM {
 	child.scriptDir = parent.scriptDir
 	child.moduleCollections = cloneStringMap(parent.moduleCollections)
 	child.moduleReplaces = cloneStringMap(parent.moduleReplaces)
+	child.moduleCacheModules = append([]modresolve.CacheModule(nil), parent.moduleCacheModules...)
 	runtime.RegisterVM(child)
 	child.attachIsolatedChildJIT(parent)
 	return child
