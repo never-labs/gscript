@@ -1,8 +1,12 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,6 +128,41 @@ collection vendor ./vendor
 	}
 }
 
+func TestModDownloadFetchesGitHubArchive(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	archive := testCommandGitHubZip(t, "toolkit-1.2.3/main.gs", "return 1\n")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acme/toolkit/archive/refs/tags/v1.2.3.zip" {
+			t.Fatalf("download path = %q", r.URL.Path)
+		}
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	var stdout, stderr bytes.Buffer
+	cache := filepath.Join(dir, "cache")
+	code := runModCommand([]string{"download", "--json", "--cache", cache, "--github-base", server.URL, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod download code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report modDownloadReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON download report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Modules) != 1 || !report.Modules[0].Downloaded || !report.Modules[0].Extracted {
+		t.Fatalf("download report = %+v, want downloaded and extracted module", report)
+	}
+	if _, err := os.Stat(filepath.Join(report.Modules[0].ExtractDir, "main.gs")); err != nil {
+		t.Fatalf("extracted module file missing: %v", err)
+	}
+}
+
 func TestModAddAndTidy(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`net := require("example.com/lib/net")
@@ -179,6 +218,24 @@ collection vendor ./vendor
 	if strings.Contains(got, "json") || strings.Contains(got, "vendor:foo") || strings.Contains(got, "pkg.helper") {
 		t.Fatalf("manifest after tidy added non-third-party require: %q", got)
 	}
+}
+
+func testCommandGitHubZip(t *testing.T, name, data string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fmt.Fprint(w, data); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
 func TestModTidyReportsMissingExternalRequire(t *testing.T) {

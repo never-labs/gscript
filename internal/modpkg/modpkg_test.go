@@ -1,6 +1,11 @@
 package modpkg
 
 import (
+	"archive/zip"
+	"bytes"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,6 +202,64 @@ func TestListReportsManifestEntriesAndLocalResolution(t *testing.T) {
 	}
 }
 
+func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require github.com/acme/toolkit/pkg v1.2.3",
+		"",
+	}, "\n"))
+	archive := testGitHubZip(t, "toolkit-1.2.3/main.gs", "return 1\n")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acme/toolkit/archive/refs/tags/v1.2.3.zip" {
+			t.Fatalf("download path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/zip")
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	cache := filepath.Join(dir, "cache")
+	report := Download(dir, DownloadOptions{CacheDir: cache, GitHubBaseURL: server.URL})
+	if !report.OK {
+		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 1 {
+		t.Fatalf("Download modules = %#v, want one", report.Modules)
+	}
+	got := report.Modules[0]
+	if got.Repo != "github.com/acme/toolkit" || got.Subdir != "pkg" || !got.Downloaded || !got.Extracted {
+		t.Fatalf("Download entry = %#v, want github repo/subdir downloaded and extracted", got)
+	}
+	if _, err := os.Stat(filepath.Join(got.ExtractDir, "main.gs")); err != nil {
+		t.Fatalf("extracted main.gs missing: %v", err)
+	}
+
+	again := Download(dir, DownloadOptions{CacheDir: cache, GitHubBaseURL: server.URL})
+	if !again.OK || len(again.Modules) != 1 {
+		t.Fatalf("second Download = %#v, want cached ok", again)
+	}
+	if again.Modules[0].Downloaded || again.Modules[0].Extracted {
+		t.Fatalf("second Download entry = %#v, want cache hit", again.Modules[0])
+	}
+}
+
+func TestDownloadRejectsNonGitHubModules(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require example.com/lib v1.0.0",
+		"",
+	}, "\n"))
+
+	report := Download(dir, DownloadOptions{CacheDir: filepath.Join(dir, "cache")})
+	if report.OK || len(report.Diagnostics) != 1 || report.Diagnostics[0].Code != "GS9111" {
+		t.Fatalf("Download = %#v, want unsupported github diagnostic", report)
+	}
+}
+
 func TestScanStaticRequiresUsesAST(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "main.gs")
@@ -218,6 +281,24 @@ func TestScanStaticRequiresUsesAST(t *testing.T) {
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("ScanStaticRequires = %#v, want %#v", got, want)
 	}
+}
+
+func testGitHubZip(t *testing.T, name, data string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fmt.Fprint(w, data); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
 func newLockedModule(t *testing.T) string {
