@@ -157,6 +157,19 @@ func TestReleaseMatrixModuleHelpSurfaceIsUsable(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixNestedCommandHelpIsSuccessful(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, args := range [][]string{
+		{"inspect", "bytecode", "--help"},
+		{"inspect", "directives", "--help"},
+		{"bench", "compare", "--help"},
+		{"bench", "strict", "--help"},
+		{"bench", "diagnose", "--help"},
+	} {
+		runCommand(t, root, 30*time.Second, "go", append([]string{"run", "./cmd/leia"}, args...)...)
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
