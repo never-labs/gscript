@@ -367,7 +367,7 @@ func writePlaygroundJSON(w http.ResponseWriter, status int, value interface{}) {
 }
 
 func playgroundAIProfileOptions() []leia.Option {
-	return []leia.Option{
+	opts := []leia.Option{
 		leia.WithLibs(leia.LibSafe | leia.LibOS | leia.LibLLM),
 		leia.WithCapabilities(leia.CapEnvironmentRead),
 		leia.WithEnvironmentRead(true),
@@ -385,6 +385,39 @@ func playgroundAIProfileOptions() []leia.Option {
 		leia.WithNetworkAccess(true),
 		leia.WithLLMProviderFactory(playgroundLLMProviderFactory),
 	}
+	if provider, ok := playgroundGLMProviderFromEnv(); ok {
+		opts = append(opts, leia.WithLLMProvider(provider))
+	}
+	return opts
+}
+
+func playgroundGLMProviderFromEnv() (llm.Provider, bool) {
+	key := firstNonEmptyEnv("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+	if key == "" {
+		return nil, false
+	}
+	return anthropic.Provider{
+		Endpoint: firstNonEmptyEnvOr("https://open.bigmodel.cn/api/anthropic", "LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL"),
+		APIKey:   key,
+		Model:    firstNonEmptyEnvOr("GLM-5.1", "LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL"),
+		Timeout:  60 * time.Second,
+	}, true
+}
+
+func firstNonEmptyEnv(names ...string) string {
+	for _, name := range names {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstNonEmptyEnvOr(fallback string, names ...string) string {
+	if value := firstNonEmptyEnv(names...); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func playgroundLLMProviderFactory(cfg llm.ProviderConfig) (llm.Provider, error) {
@@ -416,12 +449,8 @@ func playgroundAIProfileSource(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	prefix := playgroundAIPrefix()
-	if bytes.Contains(src, []byte("models {")) {
-		prefix = playgroundAIEnvHelper()
-	}
 	out := filepath.Join(filepath.Dir(path), "main_ai.leia")
-	if err := os.WriteFile(out, append([]byte(prefix), src...), 0600); err != nil {
+	if err := os.WriteFile(out, append([]byte(playgroundAIEnvHelper()), src...), 0600); err != nil {
 		return "", err
 	}
 	return out, nil
@@ -436,21 +465,6 @@ func playgroundAIEnvHelper() string {
     v = os.getenv(c)
     if v != "" { return v }
     return fallback
-}
-
-`
-}
-
-func playgroundAIPrefix() string {
-	return playgroundAIEnvHelper() + `models {
-    default: "glm"
-    glm: {
-        provider: "glm"
-        protocol: "anthropic_compatible"
-        base_url: __leia_playground_env_first("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL", "", "https://open.bigmodel.cn/api/anthropic")
-        api_key: __leia_playground_env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
-        provider_model: __leia_playground_env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "glm-5.1")
-    }
 }
 
 `
@@ -695,7 +709,7 @@ print("live turns need an LLM provider")`,
         protocol: "anthropic_compatible"
         base_url: __leia_playground_env_first("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL", "", "https://open.bigmodel.cn/api/anthropic")
         api_key: __leia_playground_env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
-        provider_model: __leia_playground_env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "glm-5.1")
+        provider_model: __leia_playground_env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "GLM-5.1")
     }
 }
 
