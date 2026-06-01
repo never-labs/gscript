@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+
+	toolsource "github.com/never-labs/gscript/internal/support/source"
 )
 
 type lintDiagnostic struct {
@@ -76,7 +78,7 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 
 	diagnostics := []lintDiagnostic{}
 	for _, path := range paths {
-		files, err := gscriptFiles(path)
+		files, err := toolsource.Files(path)
 		if err != nil {
 			diagnostic := newLintDiagnostic(path, "GS0001", "error", err)
 			diagnostic.text = fmt.Sprintf("%s: %v", path, err)
@@ -84,7 +86,7 @@ func runLintCommand(args []string, outw, errw io.Writer) int {
 			continue
 		}
 		for _, filename := range files {
-			if err := parseGScriptFile(filename); err != nil {
+			if err := toolsource.ParseFile(filename); err != nil {
 				diagnostics = append(diagnostics, newLintDiagnostic(filename, "GS1001", "error", err))
 			}
 		}

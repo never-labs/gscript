@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/never-labs/gscript/internal/lexer"
+	toolsource "github.com/never-labs/gscript/internal/support/source"
 )
 
 func runFmtCommand(args []string, outw, errw io.Writer) int {
@@ -43,7 +44,7 @@ func runFmtCommand(args []string, outw, errw io.Writer) int {
 	writeFiles := *write || !*check
 	ok := true
 	for _, path := range paths {
-		files, err := gscriptFiles(path)
+		files, err := toolsource.Files(path)
 		if err != nil {
 			fmt.Fprintf(errw, "%s: %v\n", path, err)
 			ok = false
@@ -115,7 +116,7 @@ func formatFile(filename string, write bool) (bool, error) {
 }
 
 func formatSource(filename string, src []byte) ([]byte, error) {
-	if err := parseGScriptSource(filename, src); err != nil {
+	if err := toolsource.Parse(filename, src); err != nil {
 		return nil, err
 	}
 

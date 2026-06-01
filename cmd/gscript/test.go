@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	toolsource "github.com/never-labs/gscript/internal/support/source"
 )
 
 func runTestCommand(args []string, opts cliRunOptions, outw, errw io.Writer) int {
@@ -328,5 +330,5 @@ func stdoutDiff(expected, got []byte) string {
 }
 
 func testFiles(path string) ([]string, error) {
-	return gscriptFiles(path)
+	return toolsource.Files(path)
 }

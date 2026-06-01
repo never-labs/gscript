@@ -17,6 +17,7 @@ import (
 	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/stdlib/catalog"
 	"github.com/never-labs/gscript/internal/support/modresolve"
+	toolsource "github.com/never-labs/gscript/internal/support/source"
 )
 
 const SumFileName = "gscript.sum"
@@ -143,7 +144,7 @@ func Graph(path string) (GraphReport, error) {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
 		return report, err
 	}
-	files, err := gscriptFiles(abs)
+	files, err := toolsource.Files(abs)
 	if err != nil {
 		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
 		return report, err
@@ -867,35 +868,4 @@ func verifyLocalPath(root, path string) error {
 		return err
 	}
 	return nil
-}
-
-func gscriptFiles(path string) ([]string, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-	if !info.IsDir() {
-		if filepath.Ext(path) != ".gs" {
-			return nil, fmt.Errorf("file must have .gs extension")
-		}
-		return []string{path}, nil
-	}
-	var files []string
-	err = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if filepath.Ext(p) == ".gs" {
-			files = append(files, p)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	sort.Strings(files)
-	return files, nil
 }
