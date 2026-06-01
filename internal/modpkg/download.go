@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -93,27 +94,52 @@ func downloadRequirement(modulePath, version, cacheDir string, opts DownloadOpti
 		Zip:        zipPath,
 		ExtractDir: extractDir,
 	}
-	if _, err := os.Stat(zipPath); err == nil {
-		entry.Downloaded = false
-	} else if err != nil && !os.IsNotExist(err) {
-		return entry, err
-	} else {
-		if err := fetchFile(url, zipPath, opts.Client); err != nil {
-			return entry, err
-		}
-		entry.Downloaded = true
-	}
 	if _, err := os.Stat(extractDir); err == nil {
 		entry.Extracted = false
 		return entry, nil
 	} else if err != nil && !os.IsNotExist(err) {
 		return entry, err
 	}
+	if _, err := os.Stat(zipPath); err == nil {
+		entry.Downloaded = false
+	} else if err != nil && !os.IsNotExist(err) {
+		return entry, err
+	} else {
+		if err := fetchFile(url, zipPath, opts.Client); err != nil {
+			cloneURL := fmt.Sprintf("https://github.com/%s/%s.git", github.Owner, github.RepoName)
+			if cloneErr := cloneGitTag(cloneURL, version, extractDir); cloneErr != nil {
+				return entry, fmt.Errorf("%v; git fallback failed: %v", err, cloneErr)
+			}
+			entry.Downloaded = true
+			entry.Extracted = true
+			return entry, nil
+		}
+		entry.Downloaded = true
+	}
 	if err := extractGitHubArchive(zipPath, extractDir); err != nil {
 		return entry, err
 	}
 	entry.Extracted = true
 	return entry, nil
+}
+
+func cloneGitTag(url, version, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+	tmp := dst + ".tmp"
+	_ = os.RemoveAll(tmp)
+	cmd := exec.Command("git", "clone", "--depth", "1", "--branch", version, url, tmp)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		_ = os.RemoveAll(tmp)
+		return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
+	}
+	_ = os.RemoveAll(filepath.Join(tmp, ".git"))
+	if err := os.RemoveAll(dst); err != nil {
+		_ = os.RemoveAll(tmp)
+		return err
+	}
+	return os.Rename(tmp, dst)
 }
 
 type githubModule struct {
