@@ -83,6 +83,26 @@ func TestPlaygroundExamplesAPI(t *testing.T) {
 	}
 }
 
+func TestPlaygroundExamplesExecute(t *testing.T) {
+	for _, example := range playgroundExamples() {
+		t.Run(example.Name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := dir + "/main.leia"
+			if err := os.WriteFile(path, []byte(example.Source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			var stdout, stderr bytes.Buffer
+			code := runPlaygroundExecCommand([]string{"--max-steps=2000000", path}, &stdout, &stderr)
+			if code != 0 {
+				t.Fatalf("example failed with code %d\nstdout:\n%s\nstderr:\n%s\nsource:\n%s", code, stdout.String(), stderr.String(), example.Source)
+			}
+			if strings.TrimSpace(stdout.String()) == "" {
+				t.Fatalf("example produced no stdout\nsource:\n%s", example.Source)
+			}
+		})
+	}
+}
+
 func TestPlaygroundCommandRejectsBadFlags(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := runPlaygroundCommand([]string{"--timeout=0s"}, &stdout, &stderr)

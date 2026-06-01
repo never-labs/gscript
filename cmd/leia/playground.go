@@ -342,15 +342,13 @@ for name, score := range scores {
 print("avg", total / 3)`,
 		},
 		{
-			Name: "Agent Shape",
-			Source: `agent summarize(topic) {
-    system: "Summarize in one sentence."
-    user: topic
-    output: { summary: "short answer" }
-}
+			Name: "Channels",
+			Source: `ch := make(chan, 2)
+ch <- "alpha"
+ch <- "beta"
 
-print("agent declarations compile in the playground")
-print("configure an LLM provider in an embedding host to execute turns")`,
+print(<-ch)
+print(<-ch)`,
 		},
 	}
 }
@@ -444,17 +442,66 @@ button.primary {
   color: var(--accent-text);
   font-weight: 650;
 }
-textarea {
+.codewrap {
+  position: relative;
   width: 100%;
   min-height: calc(100vh - 130px);
-  resize: vertical;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 14px;
   background: var(--code);
-  color: #f4f4f0;
+  overflow: hidden;
+}
+.highlight, textarea {
+  margin: 0;
+  padding: 14px;
   font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   tab-size: 4;
+  white-space: pre;
+  overflow: auto;
+}
+.highlight {
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #f4f4f0;
+  pointer-events: none;
+}
+textarea {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: #f4f4f0;
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+textarea::selection {
+  background: rgba(105, 167, 255, 0.35);
+}
+.tok-keyword { color: #78a8ff; font-weight: 650; }
+.tok-string { color: #9bd67d; }
+.tok-number { color: #e7c56e; }
+.tok-comment { color: #7d8793; font-style: italic; }
+.tok-builtin { color: #82d8d8; }
+.tok-agent { color: #d8a8ff; font-weight: 650; }
+.tok-op { color: #c8d0d9; }
+.tok-ident { color: #f4f4f0; }
+.tok-error { color: #ff9a9a; }
+@media (prefers-color-scheme: light) {
+  .tok-keyword { color: #064fa8; }
+  .tok-string { color: #257a2c; }
+  .tok-number { color: #875f00; }
+  .tok-comment { color: #667085; }
+  .tok-builtin { color: #006c82; }
+  .tok-agent { color: #7a3db8; }
 }
 pre {
   min-height: 220px;
@@ -477,7 +524,7 @@ pre {
 @media (max-width: 820px) {
   main { grid-template-columns: 1fr; }
   .editor { border-right: 0; border-bottom: 1px solid var(--border); }
-  textarea { min-height: 420px; }
+  .codewrap { min-height: 420px; }
 }
 </style>
 </head>
@@ -496,7 +543,10 @@ pre {
       </select>
       <button class="primary" id="run">Run</button>
     </div>
-    <textarea id="source" spellcheck="false"></textarea>
+    <div class="codewrap">
+      <pre class="highlight" id="highlight" aria-hidden="true"></pre>
+      <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+    </div>
   </section>
   <section class="output">
     <p class="status" id="status">Ready.</p>
@@ -505,10 +555,106 @@ pre {
 </main>
 <script>
 const source = document.getElementById("source");
+const highlight = document.getElementById("highlight");
 const output = document.getElementById("output");
 const statusLine = document.getElementById("status");
 const examples = document.getElementById("examples");
 const mode = document.getElementById("mode");
+
+const leiaKeywords = new Set([
+  "agent", "and", "break", "continue", "defer", "do", "else", "elseif", "end",
+  "evaluate", "false", "flow", "for", "func", "go", "if", "in", "local", "nil",
+  "not", "or", "return", "then", "tool", "true", "turn", "while"
+]);
+const leiaBuiltins = new Set([
+  "print", "pairs", "ipairs", "range", "len", "type", "tostring", "tonumber",
+  "error", "pcall", "xpcall", "require", "assert", "make", "close", "sleep"
+]);
+const leiaAgentFields = new Set([
+  "model", "tools", "system", "user", "output", "example", "history", "messages",
+  "budget", "parallel", "metric", "fail_if", "record_to", "filter", "seed"
+]);
+
+function escapeHTML(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function span(cls, text) {
+  return "<span class=\"" + cls + "\">" + escapeHTML(text) + "</span>";
+}
+
+function highlightLeia(text) {
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1] || "";
+    if (ch === "-" && next === "-") {
+      let j = i + 2;
+      while (j < text.length && text[j] !== "\n") j++;
+      out += span("tok-comment", text.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (ch === "\"" || ch === "'") {
+      const quote = ch;
+      let j = i + 1;
+      while (j < text.length) {
+        if (text[j] === "\\") {
+          j += 2;
+          continue;
+        }
+        if (text[j] === quote) {
+          j++;
+          break;
+        }
+        j++;
+      }
+      out += span("tok-string", text.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (/[0-9]/.test(ch)) {
+      let j = i + 1;
+      while (j < text.length && /[0-9_]/.test(text[j])) j++;
+      if (text[j] === "." && /[0-9]/.test(text[j + 1] || "")) {
+        j++;
+        while (j < text.length && /[0-9_]/.test(text[j])) j++;
+      }
+      out += span("tok-number", text.slice(i, j));
+      i = j;
+      continue;
+    }
+    if (/[A-Za-z_]/.test(ch)) {
+      let j = i + 1;
+      while (j < text.length && /[A-Za-z0-9_]/.test(text[j])) j++;
+      const word = text.slice(i, j);
+      const k = j;
+      while (j < text.length && /[ \t]/.test(text[j])) j++;
+      const isField = leiaAgentFields.has(word) && text[j] === ":";
+      if (isField) out += span("tok-agent", word);
+      else if (leiaKeywords.has(word)) out += span("tok-keyword", word);
+      else if (leiaBuiltins.has(word)) out += span("tok-builtin", word);
+      else out += span("tok-ident", word);
+      i = k;
+      continue;
+    }
+    if ("+-*/%=<>!&|.#:;,.(){}[]".includes(ch)) {
+      out += span("tok-op", ch);
+      i++;
+      continue;
+    }
+    out += escapeHTML(ch);
+    i++;
+  }
+  return out.endsWith("\n") ? out + " " : out;
+}
+
+function refreshHighlight() {
+  highlight.innerHTML = highlightLeia(source.value);
+  highlight.scrollTop = source.scrollTop;
+  highlight.scrollLeft = source.scrollLeft;
+}
 
 async function loadExamples() {
   const res = await fetch("/api/examples");
@@ -520,12 +666,18 @@ async function loadExamples() {
     examples.appendChild(opt);
   }
   examples._items = data;
-  if (data.length) source.value = data[0].source;
+  if (data.length) {
+    source.value = data[0].source;
+    refreshHighlight();
+  }
 }
 
 examples.addEventListener("change", () => {
   const item = (examples._items || []).find(x => x.name === examples.value);
-  if (item) source.value = item.source;
+  if (item) {
+    source.value = item.source;
+    refreshHighlight();
+  }
 });
 
 async function run() {
@@ -554,8 +706,24 @@ async function run() {
 }
 
 document.getElementById("run").addEventListener("click", run);
+source.addEventListener("input", refreshHighlight);
+source.addEventListener("scroll", () => {
+  highlight.scrollTop = source.scrollTop;
+  highlight.scrollLeft = source.scrollLeft;
+});
 source.addEventListener("keydown", (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") run();
+  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    run();
+    return;
+  }
+  if (event.key === "Tab") {
+    event.preventDefault();
+    const start = source.selectionStart;
+    const end = source.selectionEnd;
+    source.value = source.value.slice(0, start) + "    " + source.value.slice(end);
+    source.selectionStart = source.selectionEnd = start + 4;
+    refreshHighlight();
+  }
 });
 loadExamples();
 </script>
