@@ -224,6 +224,70 @@ func TestListReportsVendoredRequireResolution(t *testing.T) {
 	}
 }
 
+func TestCapabilityReportsMainAndDirectDependencyCapabilities(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"capability fs.read",
+		"cap net.client, tool.exec",
+		"require example.com/lib v1.2.3",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(dir, "local", "lib", "gscript.mod"), strings.Join([]string{
+		"module example.com/lib",
+		"gs 0.1",
+		"capability db.query",
+		"cap fs.read",
+		"",
+	}, "\n"))
+
+	report := Capability(dir)
+	if !report.OK {
+		t.Fatalf("Capability OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Modules) != 2 {
+		t.Fatalf("Capability modules = %#v, want main and dependency", report.Modules)
+	}
+	if !containsModpkgString(report.Capabilities, "db.query") || !containsModpkgString(report.Capabilities, "fs.read") || !containsModpkgString(report.Capabilities, "net.client") || !containsModpkgString(report.Capabilities, "tool.exec") {
+		t.Fatalf("Capability capabilities = %#v", report.Capabilities)
+	}
+	if !report.Matrix["example.com/app"]["net.client"] || report.Matrix["example.com/lib"]["net.client"] {
+		t.Fatalf("Capability matrix = %#v, want module capability booleans", report.Matrix)
+	}
+	if !report.Matrix["example.com/lib"]["db.query"] || !report.Matrix["example.com/lib"]["fs.read"] {
+		t.Fatalf("Capability matrix = %#v, want dependency capabilities", report.Matrix)
+	}
+}
+
+func TestCapabilityWarnsForUnavailableDependency(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require example.com/missing v1.2.3",
+		"",
+	}, "\n"))
+
+	report := Capability(dir)
+	if !report.OK {
+		t.Fatalf("Capability OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Diagnostics) != 1 || report.Diagnostics[0].Severity != "warning" || report.Diagnostics[0].Code != "GS9114" {
+		t.Fatalf("Capability diagnostics = %#v, want unavailable dependency warning", report.Diagnostics)
+	}
+}
+
+func containsModpkgString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
@@ -267,6 +331,44 @@ func TestDownloadFetchesGitHubTagArchiveIntoCache(t *testing.T) {
 	}
 }
 
+func TestDownloadWritesRemoteModuleSumAndVerifyChecksCache(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require github.com/acme/toolkit v1.2.3",
+		"",
+	}, "\n"))
+	archive := testGitHubZip(t, "toolkit-1.2.3/main.gs", "return 1\n")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(archive)
+	}))
+	defer server.Close()
+
+	cache := filepath.Join(dir, "cache")
+	report := Download(dir, DownloadOptions{CacheDir: cache, GitHubBaseURL: server.URL})
+	if !report.OK {
+		t.Fatalf("Download OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	sumEntries, err := readSumFile(filepath.Join(dir, SumFileName))
+	if err != nil {
+		t.Fatalf("readSumFile error = %v", err)
+	}
+	assertSumEntry(t, sumEntries, SumEntry{
+		Kind:    "module",
+		Path:    "github.com/acme/toolkit",
+		Version: "v1.2.3",
+		Target:  "github.com/acme/toolkit@v1.2.3",
+	})
+	if diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache}); len(diags) != 0 {
+		t.Fatalf("VerifySumWithOptions diagnostics = %#v, want none", diags)
+	}
+
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "main.gs"), "return 2\n")
+	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
+	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for github.com/acme/toolkit")
+}
+
 func TestDownloadRejectsNonGitHubModules(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
@@ -303,6 +405,37 @@ func TestVendorCopiesDownloadedModules(t *testing.T) {
 	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs")
 	if data, err := os.ReadFile(target); err != nil || string(data) != "return 1\n" {
 		t.Fatalf("vendored file = %q, %v; want copied source", string(data), err)
+	}
+	if diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache}); len(diags) != 0 {
+		t.Fatalf("VerifySumWithOptions diagnostics = %#v, want none", diags)
+	}
+
+	writeFile(t, target, "return 2\n")
+	diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache})
+	assertDiagnostic(t, diags, "GS9109", "checksum mismatch for github.com/acme/toolkit")
+}
+
+func TestVendorCopiesDownloadedGitHubSubdirModule(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require github.com/acme/toolkit/pkg v1.2.3",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), "return 3\n")
+
+	report := Vendor(dir, VendorOptions{CacheDir: cache})
+	if !report.OK {
+		t.Fatalf("Vendor OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	target := filepath.Join(dir, "vendor", "github.com", "acme", "toolkit", "pkg@v1.2.3", "util.gs")
+	if data, err := os.ReadFile(target); err != nil || string(data) != "return 3\n" {
+		t.Fatalf("vendored subdir file = %q, %v; want copied source", string(data), err)
+	}
+	if diags := VerifySumWithOptions(dir, VerifyOptions{CacheDir: cache}); len(diags) != 0 {
+		t.Fatalf("VerifySumWithOptions diagnostics = %#v, want none", diags)
 	}
 }
 

@@ -13,19 +13,25 @@ func runRunCommand(args []string, outw, errw io.Writer) int {
 	fs.SetOutput(errw)
 	useVM := fs.Bool("vm", false, "use bytecode VM without JIT")
 	useJIT := fs.Bool("jit", true, "use bytecode VM with JIT compilation")
+	modMode := fs.String("mod", string(gscript.ModuleModeMod), "module mode: readonly, vendor, or mod")
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	moduleMode := gscript.ModuleMode(*modMode)
+	if !gscript.ValidModuleMode(moduleMode) {
+		fmt.Fprintf(errw, "gscript run: invalid --mod=%q (want readonly, vendor, or mod)\n", *modMode)
 		return 2
 	}
 	paths := fs.Args()
 	if len(paths) == 0 {
-		fmt.Fprintln(errw, "usage: gscript run [--vm] [--jit=true|false] <file.gs> [args...]")
+		fmt.Fprintln(errw, "usage: gscript run [--vm] [--jit=true|false] [--mod=readonly|vendor|mod] <file.gs> [args...]")
 		return 2
 	}
 
 	resolveVMJITFlags(fs, useVM, useJIT)
 
 	filename := paths[0]
-	if err := runPublicScriptFile(filename, paths[1:], cliRunOptions{UseVM: *useVM, UseJIT: *useJIT}); err != nil {
+	if err := runPublicScriptFile(filename, paths[1:], cliRunOptions{UseVM: *useVM, UseJIT: *useJIT, ModuleMode: moduleMode}); err != nil {
 		if code, ok := processExitCode(err); ok {
 			return code
 		}
@@ -57,7 +63,7 @@ func canUsePublicRunPath(opts cliRunOptions) bool {
 }
 
 func publicRunOptions(opts cliRunOptions, script string, args []string) []gscript.Option {
-	gsOpts := append([]gscript.Option{}, gscript.ModuleOptionsForScript(script)...)
+	gsOpts := append([]gscript.Option{}, gscript.ModuleOptionsForScriptMode(script, opts.ModuleMode)...)
 	gsOpts = append(gsOpts, gscript.WithArgs(script, args...))
 	if opts.UseJIT {
 		gsOpts = append(gsOpts, gscript.WithJIT())

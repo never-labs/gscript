@@ -129,6 +129,40 @@ require github.com/acme/toolkit v1.2.3
 	}
 }
 
+func TestModuleOptionsForScriptLoadsDownloadedGitHubSubdirCache(t *testing.T) {
+	dir := t.TempDir()
+	cache := filepath.Join(dir, "cache")
+	t.Setenv("GSCRIPT_CACHE", cache)
+	if err := os.MkdirAll(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 92 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
+gs 0.1
+require github.com/acme/toolkit/pkg v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "main.gs")
+	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	vm := New(ModuleOptionsForScript(mainPath)...)
+	if err := vm.ExecFile(mainPath); err != nil {
+		t.Fatal(err)
+	}
+	got, err := vm.Get("result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != int64(92) {
+		t.Fatalf("result = %#v, want subdir cache module value", got)
+	}
+}
+
 func TestModuleOptionsForScriptPrefersVendorOverCache(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("GSCRIPT_CACHE", filepath.Join(dir, "cache"))
@@ -165,5 +199,47 @@ require github.com/acme/toolkit v1.2.3
 	}
 	if got != int64(123) {
 		t.Fatalf("result = %#v, want vendored module value", got)
+	}
+}
+
+func TestModuleOptionsForScriptModeVendorIgnoresCache(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GSCRIPT_CACHE", filepath.Join(dir, "cache"))
+	if err := os.MkdirAll(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "cache", "extract", "github.com", "acme", "toolkit@v1.2.3", "pkg", "util.gs"), []byte(`return { value: 91 }`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/app
+gs 0.1
+require github.com/acme/toolkit v1.2.3
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "main.gs")
+	if err := os.WriteFile(mainPath, []byte(`u := require("github.com/acme/toolkit/pkg/util"); result := u.value`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, mode := range []ModuleMode{ModuleModeMod, ModuleModeReadonly} {
+		t.Run(string(mode), func(t *testing.T) {
+			vm := New(ModuleOptionsForScriptMode(mainPath, mode)...)
+			if err := vm.ExecFile(mainPath); err != nil {
+				t.Fatal(err)
+			}
+			got, err := vm.Get("result")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != int64(91) {
+				t.Fatalf("result = %#v, want cached module value", got)
+			}
+		})
+	}
+
+	vm := New(ModuleOptionsForScriptMode(mainPath, ModuleModeVendor)...)
+	if err := vm.ExecFile(mainPath); err == nil {
+		t.Fatal("vendor mode unexpectedly loaded cache-only module")
 	}
 }

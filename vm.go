@@ -9,6 +9,7 @@ import (
 	"github.com/never-labs/gscript/internal/llmbridge"
 	"github.com/never-labs/gscript/internal/runtime"
 	stdlibinstall "github.com/never-labs/gscript/internal/stdlibrt/install"
+	"github.com/never-labs/gscript/internal/support/modresolve"
 	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
@@ -26,6 +27,7 @@ func New(opts ...Option) *VM {
 	o := vmOptions{
 		libs:          LibAll,
 		capabilities:  CapAll,
+		moduleMode:    ModuleModeMod,
 		dynamicEval:   true,
 		networkAccess: true,
 		debugAccess:   true,
@@ -56,6 +58,19 @@ func (vm *VM) Reset() {
 	fresh := newVM(vm.opts)
 	vm.interp = fresh.interp
 	vm.bvm = nil
+}
+
+func effectiveModuleCacheModules(o vmOptions) []modresolve.CacheModule {
+	if normalizeModuleMode(o.moduleMode) != ModuleModeVendor {
+		return o.moduleCacheModules
+	}
+	vendor := make([]modresolve.CacheModule, 0, len(o.moduleCacheModules))
+	for _, module := range o.moduleCacheModules {
+		if module.Kind == "vendor" {
+			vendor = append(vendor, module)
+		}
+	}
+	return vendor
 }
 
 func newVM(o vmOptions) *VM {
@@ -158,8 +173,9 @@ func newVM(o vmOptions) *VM {
 	for path, root := range o.moduleReplaces {
 		interp.SetModuleReplace(path, root)
 	}
-	if len(o.moduleCacheModules) > 0 {
-		interp.SetModuleCacheModules(o.moduleCacheModules)
+	moduleCacheModules := effectiveModuleCacheModules(o)
+	if len(moduleCacheModules) > 0 {
+		interp.SetModuleCacheModules(moduleCacheModules)
 	}
 	if o.argsSet {
 		interp.SetArgs(o.argScript, o.args)
@@ -262,8 +278,9 @@ func (vm *VM) RunContext(ctx context.Context, prog *Program) error {
 			for path, root := range vm.opts.moduleReplaces {
 				bvm.SetModuleReplace(path, root)
 			}
-			if len(vm.opts.moduleCacheModules) > 0 {
-				bvm.SetModuleCacheModules(vm.opts.moduleCacheModules)
+			moduleCacheModules := effectiveModuleCacheModules(vm.opts)
+			if len(moduleCacheModules) > 0 {
+				bvm.SetModuleCacheModules(moduleCacheModules)
 			}
 			bvm.RestrictStdlib(stdlibAllowedNames(vm.opts.libs))
 			vm.applyBytecodeCapabilities(bvm)

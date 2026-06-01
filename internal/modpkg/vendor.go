@@ -68,6 +68,16 @@ func Vendor(path string, opts VendorOptions) VendorReport {
 		}
 		report.Modules = append(report.Modules, entry)
 	}
+	if len(report.Diagnostics) == 0 {
+		entries, diags := remoteSumEntries(abs, manifest, cacheDir)
+		report.Diagnostics = append(report.Diagnostics, diags...)
+		if len(diags) == 0 {
+			sumPath := filepath.Join(abs, SumFileName)
+			if err := updateSumFile(sumPath, entries); err != nil {
+				report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9109", Message: err.Error(), File: sumPath})
+			}
+		}
+	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
 }
@@ -76,7 +86,7 @@ func vendorRequirement(cacheDir, vendorDir, modulePath, version string) (VendorE
 	if version == "" {
 		return VendorEntry{}, fmt.Errorf("%s: require version is empty", modulePath)
 	}
-	source := filepath.Join(cacheDir, "extract", filepath.FromSlash(modulePath+"@"+version))
+	source := cachedRequirementRoot(cacheDir, modulePath, version)
 	if _, err := os.Stat(source); err != nil {
 		return VendorEntry{}, fmt.Errorf("%s@%s is not downloaded; run gscript mod download", modulePath, version)
 	}

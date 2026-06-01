@@ -112,6 +112,7 @@ type vmOptions struct {
 	libs               LibFlags
 	capabilities       CapabilityFlags
 	requirePath        string
+	moduleMode         ModuleMode
 	moduleCollections  map[string]string
 	moduleReplaces     map[string]string
 	moduleCacheDir     string
@@ -175,6 +176,38 @@ type SecurityPolicy struct {
 
 // Option configures a VM instance.
 type Option func(*vmOptions)
+
+// ModuleMode selects how module metadata is used when configuring runtime
+// require() resolution from gscript.mod.
+type ModuleMode string
+
+const (
+	// ModuleModeMod uses local replaces, vendor entries, and the module cache.
+	ModuleModeMod ModuleMode = "mod"
+	// ModuleModeReadonly is explicit non-mutating module mode. Runtime loading
+	// remains offline and may use existing vendor/cache entries.
+	ModuleModeReadonly ModuleMode = "readonly"
+	// ModuleModeVendor restricts remote module resolution to vendor entries.
+	ModuleModeVendor ModuleMode = "vendor"
+)
+
+func normalizeModuleMode(mode ModuleMode) ModuleMode {
+	if mode == "" {
+		return ModuleModeMod
+	}
+	return mode
+}
+
+// ValidModuleMode reports whether mode is accepted by module-aware runtime
+// configuration.
+func ValidModuleMode(mode ModuleMode) bool {
+	switch normalizeModuleMode(mode) {
+	case ModuleModeMod, ModuleModeReadonly, ModuleModeVendor:
+		return true
+	default:
+		return false
+	}
+}
 
 // WithArgs sets the script entrypoint arguments. The global arg table follows
 // GScript's Lua-compatible convention: arg[0] is script and arg[1..n] are args.
@@ -481,6 +514,15 @@ func WithModuleReplace(path, root string) Option {
 func WithModuleCache(root string) Option {
 	return func(o *vmOptions) {
 		o.moduleCacheDir = root
+	}
+}
+
+// WithModuleMode records the module resolution mode used by module-aware
+// runtime setup. Vendor mode filters non-vendor cache entries before require()
+// resolution.
+func WithModuleMode(mode ModuleMode) Option {
+	return func(o *vmOptions) {
+		o.moduleMode = normalizeModuleMode(mode)
 	}
 }
 

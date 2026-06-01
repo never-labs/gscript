@@ -10,6 +10,8 @@ func TestParseFormatModuleFile(t *testing.T) {
 module example.com/app
 gs 0.1
 
+capability net.client
+cap fs.read,tool.exec
 require example.com/lib v0.2.0
 replace example.com/lib => ../lib
 collection vendor ./vendor
@@ -23,6 +25,9 @@ collection vendor ./vendor
 	if len(f.Require) != 1 || f.Require[0].Path != "example.com/lib" || f.Require[0].Version != "v0.2.0" {
 		t.Fatalf("requires = %#v", f.Require)
 	}
+	if !containsCapability(f.Capability, "fs.read") || !containsCapability(f.Capability, "net.client") || !containsCapability(f.Capability, "tool.exec") {
+		t.Fatalf("capabilities = %#v", f.Capability)
+	}
 	if len(f.Replace) != 1 || f.Replace[0].NewPath != "../lib" {
 		t.Fatalf("replace = %#v", f.Replace)
 	}
@@ -33,6 +38,9 @@ collection vendor ./vendor
 	for _, want := range []string{
 		"module example.com/app\n",
 		"gs 0.1\n",
+		"capability fs.read\n",
+		"capability net.client\n",
+		"capability tool.exec\n",
 		"require example.com/lib v0.2.0\n",
 		"replace example.com/lib => ../lib\n",
 		"collection vendor ./vendor\n",
@@ -40,6 +48,16 @@ collection vendor ./vendor
 		if !strings.Contains(out, want) {
 			t.Fatalf("Format missing %q in:\n%s", want, out)
 		}
+	}
+}
+
+func TestParseCapabilityDirectiveRejectsInvalidNames(t *testing.T) {
+	_, diags := Parse("gscript.mod", strings.NewReader(`module example.com/app
+capability fs.read "bad"
+cap
+`))
+	if len(diags) != 2 {
+		t.Fatalf("diagnostics = %#v, want 2", diags)
 	}
 }
 
@@ -118,4 +136,13 @@ func TestAddRequireUpdatesExistingPath(t *testing.T) {
 	if len(f.Require) != 1 || f.Require[0].Version != "v0.2.0" {
 		t.Fatalf("requires = %#v", f.Require)
 	}
+}
+
+func containsCapability(caps []string, want string) bool {
+	for _, cap := range caps {
+		if cap == want {
+			return true
+		}
+	}
+	return false
 }

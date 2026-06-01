@@ -65,6 +65,16 @@ func Download(path string, opts DownloadOptions) DownloadReport {
 		}
 		report.Modules = append(report.Modules, entry)
 	}
+	if len(report.Diagnostics) == 0 {
+		entries, diags := remoteSumEntries(abs, manifest, cacheDir)
+		report.Diagnostics = append(report.Diagnostics, diags...)
+		if len(diags) == 0 {
+			sumPath := filepath.Join(abs, SumFileName)
+			if err := updateSumFile(sumPath, entries); err != nil {
+				report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9109", Message: err.Error(), File: sumPath})
+			}
+		}
+	}
 	report.OK = len(report.Diagnostics) == 0
 	return report
 }

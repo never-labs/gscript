@@ -128,6 +128,46 @@ collection vendor ./vendor
 	}
 }
 
+func TestModCapabilityReportsMatrix(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+capability net.client
+require example.com/lib v1.2.3
+replace example.com/lib => ./lib
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "lib"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "lib", "gscript.mod"), []byte(`module example.com/lib
+gs 0.1
+cap fs.read, db.query
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"capability", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod capability code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var report modCapabilityReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("stdout is not JSON capability report: %v; stdout = %q", err, stdout.String())
+	}
+	if !report.OK || len(report.Modules) != 2 {
+		t.Fatalf("capability report = %+v, want two modules", report)
+	}
+	if !report.Matrix["example.com/demo"]["net.client"] || report.Matrix["example.com/demo"]["fs.read"] {
+		t.Fatalf("capability matrix = %#v, want main capabilities", report.Matrix)
+	}
+	if !report.Matrix["example.com/lib"]["fs.read"] || !report.Matrix["example.com/lib"]["db.query"] {
+		t.Fatalf("capability matrix = %#v, want dependency capabilities", report.Matrix)
+	}
+}
+
 func TestModDownloadFetchesGitHubArchive(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
@@ -160,6 +200,26 @@ require github.com/acme/toolkit v1.2.3
 	}
 	if _, err := os.Stat(filepath.Join(report.Modules[0].ExtractDir, "main.gs")); err != nil {
 		t.Fatalf("extracted module file missing: %v", err)
+	}
+	sumPath := filepath.Join(dir, "gscript.sum")
+	if data, err := os.ReadFile(sumPath); err != nil || !strings.Contains(string(data), "module github.com/acme/toolkit v1.2.3 github.com/acme/toolkit@v1.2.3 h1:") {
+		t.Fatalf("gscript.sum = %q, %v; want remote module sum", string(data), err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", "--cache", cache, dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod verify --cache code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	if err := os.WriteFile(filepath.Join(report.Modules[0].ExtractDir, "main.gs"), []byte("return 2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = runModCommand([]string{"verify", "--json", "--cache", cache, dir}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("mod verify --cache after mutation code = %d, want 1; stderr = %q stdout = %q", code, stderr.String(), stdout.String())
 	}
 }
 

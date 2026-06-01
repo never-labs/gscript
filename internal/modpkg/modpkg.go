@@ -96,6 +96,25 @@ type ListCollection struct {
 	Root string `json:"root"`
 }
 
+type CapabilityReport struct {
+	SchemaVersion int                        `json:"schema_version"`
+	OK            bool                       `json:"ok"`
+	Manifest      string                     `json:"manifest,omitempty"`
+	Capabilities  []string                   `json:"capabilities,omitempty"`
+	Modules       []CapabilityModule         `json:"modules,omitempty"`
+	Matrix        map[string]map[string]bool `json:"matrix,omitempty"`
+	Diagnostics   []Diagnostic               `json:"diagnostics,omitempty"`
+}
+
+type CapabilityModule struct {
+	Path         string   `json:"path"`
+	Version      string   `json:"version,omitempty"`
+	Kind         string   `json:"kind"`
+	Root         string   `json:"root,omitempty"`
+	Manifest     string   `json:"manifest,omitempty"`
+	Capabilities []string `json:"capabilities,omitempty"`
+}
+
 type Diagnostic struct {
 	Severity string `json:"severity"`
 	Code     string `json:"code"`
@@ -106,6 +125,10 @@ type Diagnostic struct {
 type InitOptions struct {
 	Module string
 	Dir    string
+}
+
+type VerifyOptions struct {
+	CacheDir string
 }
 
 type SumReport struct {
@@ -397,6 +420,10 @@ func staticRequireCall(call *ast.CallExpr) (string, bool) {
 }
 
 func Verify(path string) VerifyReport {
+	return VerifyWithOptions(path, VerifyOptions{})
+}
+
+func VerifyWithOptions(path string, opts VerifyOptions) VerifyReport {
 	abs, err := filepath.Abs(path)
 	report := VerifyReport{SchemaVersion: 1}
 	if err != nil {
@@ -417,7 +444,7 @@ func Verify(path string) VerifyReport {
 	}
 	report.Diagnostics = append(report.Diagnostics, report.Graph.Diagnostics...)
 	report.Diagnostics = append(report.Diagnostics, verifyDependencies(abs, manifest, report.Graph)...)
-	report.Diagnostics = append(report.Diagnostics, VerifySum(abs)...)
+	report.Diagnostics = append(report.Diagnostics, VerifySumWithOptions(abs, opts)...)
 	report.OK = len(report.Diagnostics) == 0
 	return report
 }
@@ -556,6 +583,151 @@ func List(path string) ListReport {
 	return report
 }
 
+func Capability(path string) CapabilityReport {
+	abs, err := filepath.Abs(path)
+	report := CapabilityReport{SchemaVersion: 1}
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		return report
+	}
+	manifest, manifestPath, err := ReadFileWithPath(abs)
+	report.Manifest = manifestPath
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		return report
+	}
+	report.Modules = append(report.Modules, CapabilityModule{
+		Path:         manifest.Module,
+		Kind:         "main",
+		Root:         abs,
+		Manifest:     manifestPath,
+		Capabilities: sortedStrings(manifest.Capability),
+	})
+
+	for _, req := range manifest.Require {
+		module := CapabilityModule{Path: req.Path, Version: req.Version, Kind: "module"}
+		root, kind, ok := dependencyRoot(abs, manifest, req)
+		if !ok {
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{
+				Severity: "warning",
+				Code:     "GS9114",
+				Message:  fmt.Sprintf("%s@%s is not available locally; run gscript mod download or add a local replace/vendor copy", req.Path, req.Version),
+			})
+			report.Modules = append(report.Modules, module)
+			continue
+		}
+		module.Kind = kind
+		module.Root = root
+		depManifestPath := filepath.Join(root, modfile.FileName)
+		depManifest, err := ReadFile(root)
+		if err != nil {
+			report.Diagnostics = append(report.Diagnostics, Diagnostic{
+				Severity: "warning",
+				Code:     "GS9115",
+				Message:  fmt.Sprintf("%s@%s manifest is unavailable: %v", req.Path, req.Version, err),
+				File:     depManifestPath,
+			})
+			report.Modules = append(report.Modules, module)
+			continue
+		}
+		module.Manifest = depManifestPath
+		module.Capabilities = sortedStrings(depManifest.Capability)
+		report.Modules = append(report.Modules, module)
+	}
+	report.Capabilities = capabilityUniverse(report.Modules)
+	report.Matrix = capabilityMatrix(report.Modules, report.Capabilities)
+	report.OK = !hasErrorDiagnostic(report.Diagnostics)
+	return report
+}
+
+func dependencyRoot(root string, manifest modfile.File, req modfile.Require) (string, string, bool) {
+	if repRoot, ok := replacementRoot(root, manifest, req); ok {
+		return repRoot, "replace", true
+	}
+	vendorRoot := filepath.Join(root, "vendor", filepath.FromSlash(req.Path+"@"+req.Version))
+	if _, err := os.Stat(vendorRoot); err == nil {
+		return vendorRoot, "vendor", true
+	}
+	if cacheDir, err := ModuleCacheDir(""); err == nil {
+		cacheRoot := cachedRequirementRoot(cacheDir, req.Path, req.Version)
+		if _, statErr := os.Stat(cacheRoot); statErr == nil {
+			return cacheRoot, "cache", true
+		}
+	}
+	return "", "", false
+}
+
+func replacementRoot(root string, manifest modfile.File, req modfile.Require) (string, bool) {
+	var best modfile.Replace
+	for _, rep := range manifest.Replace {
+		if rep.Path != req.Path {
+			continue
+		}
+		if rep.Version != "" && rep.Version != req.Version {
+			continue
+		}
+		if !isLocalPath(rep.NewPath) || len(rep.Path) < len(best.Path) {
+			continue
+		}
+		best = rep
+	}
+	if best.Path == "" {
+		return "", false
+	}
+	repRoot := cleanLocalRoot(root, best.NewPath)
+	if filepath.Ext(repRoot) == ".gs" {
+		repRoot = filepath.Dir(repRoot)
+	}
+	return repRoot, true
+}
+
+func capabilityUniverse(modules []CapabilityModule) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, module := range modules {
+		for _, cap := range module.Capabilities {
+			if seen[cap] {
+				continue
+			}
+			seen[cap] = true
+			out = append(out, cap)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func capabilityMatrix(modules []CapabilityModule, caps []string) map[string]map[string]bool {
+	matrix := make(map[string]map[string]bool, len(modules))
+	for _, module := range modules {
+		row := make(map[string]bool, len(caps))
+		have := map[string]bool{}
+		for _, cap := range module.Capabilities {
+			have[cap] = true
+		}
+		for _, cap := range caps {
+			row[cap] = have[cap]
+		}
+		matrix[module.Path] = row
+	}
+	return matrix
+}
+
+func sortedStrings(values []string) []string {
+	out := append([]string(nil), values...)
+	sort.Strings(out)
+	return out
+}
+
+func hasErrorDiagnostic(diags []Diagnostic) bool {
+	for _, diag := range diags {
+		if diag.Severity == "error" {
+			return true
+		}
+	}
+	return false
+}
+
 func listVendorModules(root string, manifest modfile.File) []modresolve.CacheModule {
 	modules := make([]modresolve.CacheModule, 0, len(manifest.Require))
 	for _, req := range manifest.Require {
@@ -577,7 +749,7 @@ func listCacheModules(cacheDir string, manifest modfile.File) []modresolve.Cache
 		if req.Version == "" {
 			continue
 		}
-		cacheRoot := filepath.Join(cacheDir, "extract", filepath.FromSlash(req.Path+"@"+req.Version))
+		cacheRoot := cachedRequirementRoot(cacheDir, req.Path, req.Version)
 		if _, err := os.Stat(cacheRoot); err != nil {
 			continue
 		}
@@ -612,6 +784,10 @@ func Lock(path string) SumReport {
 }
 
 func VerifySum(path string) []Diagnostic {
+	return VerifySumWithOptions(path, VerifyOptions{})
+}
+
+func VerifySumWithOptions(path string, opts VerifyOptions) []Diagnostic {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return []Diagnostic{{Severity: "error", Code: "GS9101", Message: err.Error()}}
@@ -628,7 +804,7 @@ func VerifySum(path string) []Diagnostic {
 	if err != nil {
 		return []Diagnostic{{Severity: "error", Code: "GS9108", Message: err.Error(), File: sumPath}}
 	}
-	got, diags := sumEntries(abs, manifest)
+	got, diags := sumEntriesWithCache(abs, manifest, opts.CacheDir)
 	if len(diags) > 0 {
 		return diags
 	}
@@ -647,7 +823,50 @@ func VerifySum(path string) []Diagnostic {
 			out = append(out, Diagnostic{Severity: "error", Code: "GS9109", Message: fmt.Sprintf("checksum mismatch for %s", entry.Path)})
 		}
 	}
+	gotMap := map[string]bool{}
+	for _, entry := range got {
+		gotMap[sumKey(entry)] = true
+	}
+	for _, entry := range want {
+		if entry.Kind == "module" && !gotMap[sumKey(entry)] {
+			out = append(out, Diagnostic{Severity: "error", Code: "GS9109", Message: fmt.Sprintf("missing cached or vendored module for %s", entry.Path)})
+		}
+	}
 	return out
+}
+
+func updateSumFile(path string, updates []SumEntry) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	var entries []SumEntry
+	if _, err := os.Stat(path); err == nil {
+		var readErr error
+		entries, readErr = readSumFile(path)
+		if readErr != nil {
+			return readErr
+		}
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	entryMap := make(map[string]SumEntry, len(entries)+len(updates))
+	for _, entry := range entries {
+		entryMap[sumKey(entry)] = entry
+	}
+	for _, entry := range updates {
+		if prev, ok := entryMap[sumKey(entry)]; ok && prev.Hash != entry.Hash {
+			return fmt.Errorf("checksum mismatch for %s", entry.Path)
+		}
+		entryMap[sumKey(entry)] = entry
+	}
+	entries = entries[:0]
+	for _, entry := range entryMap {
+		entries = append(entries, entry)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return sumKey(entries[i]) < sumKey(entries[j])
+	})
+	return writeSumFile(path, entries)
 }
 
 func ReadFile(dir string) (modfile.File, error) {
@@ -817,6 +1036,10 @@ func cleanLocalRoot(root, path string) string {
 }
 
 func sumEntries(root string, manifest modfile.File) ([]SumEntry, []Diagnostic) {
+	return sumEntriesWithCache(root, manifest, "")
+}
+
+func sumEntriesWithCache(root string, manifest modfile.File, cacheDir string) ([]SumEntry, []Diagnostic) {
 	var entries []SumEntry
 	var diags []Diagnostic
 	for _, col := range manifest.Collections {
@@ -857,10 +1080,91 @@ func sumEntries(root string, manifest modfile.File) ([]SumEntry, []Diagnostic) {
 			Hash:    hash,
 		})
 	}
+	remoteEntries, remoteDiags := remoteSumEntries(root, manifest, cacheDir)
+	entries = append(entries, remoteEntries...)
+	diags = append(diags, remoteDiags...)
 	sort.Slice(entries, func(i, j int) bool {
 		return sumKey(entries[i]) < sumKey(entries[j])
 	})
 	return entries, diags
+}
+
+func remoteSumEntries(root string, manifest modfile.File, cacheDir string) ([]SumEntry, []Diagnostic) {
+	hasRemoteRequire := false
+	for _, req := range manifest.Require {
+		if req.Version != "" {
+			hasRemoteRequire = true
+			break
+		}
+	}
+	if !hasRemoteRequire {
+		return nil, nil
+	}
+	if cacheDir == "" {
+		var err error
+		cacheDir, err = ModuleCacheDir("")
+		if err != nil {
+			return nil, []Diagnostic{{Severity: "error", Code: "GS9110", Message: err.Error()}}
+		}
+	}
+	var entries []SumEntry
+	var diags []Diagnostic
+	for _, req := range manifest.Require {
+		if req.Version == "" {
+			continue
+		}
+		roots := remoteModuleRoots(root, cacheDir, req.Path, req.Version)
+		if len(roots) == 0 {
+			continue
+		}
+		for _, moduleRoot := range roots {
+			hash, err := hashModulePath("", moduleRoot)
+			if err != nil {
+				diags = append(diags, Diagnostic{
+					Severity: "error",
+					Code:     "GS9108",
+					Message:  fmt.Sprintf("module %s@%s path %s: %v", req.Path, req.Version, moduleRoot, err),
+					File:     moduleRoot,
+				})
+				continue
+			}
+			entries = append(entries, SumEntry{
+				Kind:    "module",
+				Path:    req.Path,
+				Version: req.Version,
+				Target:  req.Path + "@" + req.Version,
+				Hash:    hash,
+			})
+		}
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return sumKey(entries[i]) < sumKey(entries[j])
+	})
+	return entries, diags
+}
+
+func remoteModuleRoots(root, cacheDir, modulePath, version string) []string {
+	var roots []string
+	vendorRoot := filepath.Join(root, "vendor", filepath.FromSlash(modulePath+"@"+version))
+	if _, err := os.Stat(vendorRoot); err == nil {
+		roots = append(roots, vendorRoot)
+	}
+	cacheRoot := cachedRequirementRoot(cacheDir, modulePath, version)
+	if _, err := os.Stat(cacheRoot); err == nil {
+		roots = append(roots, cacheRoot)
+	}
+	return roots
+}
+
+func cachedRequirementRoot(cacheDir, modulePath, version string) string {
+	if github, ok := parseGitHubModule(modulePath); ok {
+		root := filepath.Join(cacheDir, "extract", filepath.FromSlash(github.Repo+"@"+version))
+		if github.Subdir != "" {
+			root = filepath.Join(root, filepath.FromSlash(github.Subdir))
+		}
+		return root
+	}
+	return filepath.Join(cacheDir, "extract", filepath.FromSlash(modulePath+"@"+version))
 }
 
 func writeSumFile(path string, entries []SumEntry) error {
@@ -869,6 +1173,8 @@ func writeSumFile(path string, entries []SumEntry) error {
 		switch entry.Kind {
 		case "collection":
 			fmt.Fprintf(&b, "collection %s %s %s\n", entry.Path, entry.Target, entry.Hash)
+		case "module":
+			fmt.Fprintf(&b, "module %s %s %s %s\n", entry.Path, entry.Version, entry.Target, entry.Hash)
 		case "replace":
 			version := entry.Version
 			if version == "" {
@@ -898,6 +1204,11 @@ func readSumFile(path string) ([]SumEntry, error) {
 				return nil, fmt.Errorf("%s:%d: collection sum entry must be: collection NAME TARGET HASH", path, lineNo+1)
 			}
 			entries = append(entries, SumEntry{Kind: "collection", Path: fields[1], Target: fields[2], Hash: fields[3]})
+		case "module":
+			if len(fields) != 5 {
+				return nil, fmt.Errorf("%s:%d: module sum entry must be: module PATH VERSION TARGET HASH", path, lineNo+1)
+			}
+			entries = append(entries, SumEntry{Kind: "module", Path: fields[1], Version: fields[2], Target: fields[3], Hash: fields[4]})
 		case "replace":
 			if len(fields) != 5 {
 				return nil, fmt.Errorf("%s:%d: replace sum entry must be: replace PATH VERSION TARGET HASH", path, lineNo+1)

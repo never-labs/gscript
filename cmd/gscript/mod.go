@@ -14,12 +14,13 @@ type modVerifyReport = modpkg.VerifyReport
 type modTidyReport = modpkg.TidyReport
 type modExplainReport = modpkg.ExplainReport
 type modListReport = modpkg.ListReport
+type modCapabilityReport = modpkg.CapabilityReport
 type modDownloadReport = modpkg.DownloadReport
 type modVendorReport = modpkg.VendorReport
 
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|verify] [flags]")
+		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|verify] [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -43,13 +44,15 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 		return runModGraphCommand(args[1:], outw, errw)
 	case "explain":
 		return runModExplainCommand(args[1:], outw, errw)
+	case "capability", "capabilities", "cap":
+		return runModCapabilityCommand(args[1:], outw, errw)
 	case "verify":
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|verify] [flags]")
+		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|verify] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, download, vendor, lock, list, graph, explain, or verify)\n", args[0])
+		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, download, vendor, lock, list, graph, explain, capability, or verify)\n", args[0])
 		return 2
 	}
 }
@@ -422,10 +425,10 @@ func runModExplainCommand(args []string, outw, errw io.Writer) int {
 	return 0
 }
 
-func runModVerifyCommand(args []string, outw, errw io.Writer) int {
-	fs := flag.NewFlagSet("mod verify", flag.ContinueOnError)
+func runModCapabilityCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("mod capability", flag.ContinueOnError)
 	fs.SetOutput(errw)
-	jsonOut := fs.Bool("json", false, "print verification as JSON")
+	jsonOut := fs.Bool("json", false, "print capability matrix as JSON")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -433,10 +436,59 @@ func runModVerifyCommand(args []string, outw, errw io.Writer) int {
 	if len(fs.Args()) == 1 {
 		path = fs.Args()[0]
 	} else if len(fs.Args()) > 1 {
-		fmt.Fprintln(errw, "usage: gscript mod verify [--json] [path]")
+		fmt.Fprintln(errw, "usage: gscript mod capability [--json] [path]")
 		return 2
 	}
-	report := modpkg.Verify(path)
+	report := modpkg.Capability(path)
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintf(errw, "gscript mod capability: %v\n", err)
+			return 1
+		}
+	} else {
+		for _, module := range report.Modules {
+			version := ""
+			if module.Version != "" {
+				version = "@" + module.Version
+			}
+			fmt.Fprintf(outw, "%s%s (%s)", module.Path, version, module.Kind)
+			for _, cap := range module.Capabilities {
+				fmt.Fprintf(outw, " %s", cap)
+			}
+			fmt.Fprintln(outw)
+		}
+		for _, diag := range report.Diagnostics {
+			if diag.File != "" {
+				fmt.Fprintf(errw, "%s: %s %s: %s\n", diag.File, diag.Severity, diag.Code, diag.Message)
+			} else {
+				fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
+			}
+		}
+	}
+	if !report.OK {
+		return 1
+	}
+	return 0
+}
+
+func runModVerifyCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("mod verify", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print verification as JSON")
+	cacheDir := fs.String("cache", "", "module cache directory")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	path := "."
+	if len(fs.Args()) == 1 {
+		path = fs.Args()[0]
+	} else if len(fs.Args()) > 1 {
+		fmt.Fprintln(errw, "usage: gscript mod verify [--json] [--cache DIR] [path]")
+		return 2
+	}
+	report := modpkg.VerifyWithOptions(path, modpkg.VerifyOptions{CacheDir: *cacheDir})
 	if *jsonOut {
 		enc := json.NewEncoder(outw)
 		enc.SetIndent("", "  ")

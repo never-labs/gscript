@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 
+	gscript "github.com/never-labs/gscript"
 	bytecodevm "github.com/never-labs/gscript/internal/vm"
 )
 
@@ -46,6 +47,7 @@ type cliRunOptions struct {
 	UseVM        bool
 	UseJIT       bool
 	ShowJITStats bool
+	ModuleMode   gscript.ModuleMode
 	JIT          jitCLIOptions
 }
 

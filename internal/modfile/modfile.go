@@ -15,6 +15,7 @@ const FileName = "gscript.mod"
 type File struct {
 	Module      string
 	GS          string
+	Capability  []string
 	Require     []Require
 	Replace     []Replace
 	Collections []Collection
@@ -75,6 +76,7 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 	seenRequire := map[string]int{}
 	seenReplace := map[string]int{}
 	seenCollection := map[string]bool{}
+	seenCapability := map[string]bool{}
 	seenGS := 0
 
 	scanner := bufio.NewScanner(r)
@@ -125,6 +127,19 @@ func Parse(name string, r io.Reader) (File, []Diagnostic) {
 			}
 			seenRequire[fields[1]] = lineNo
 			f.Require = append(f.Require, Require{Path: fields[1], Version: fields[2]})
+		case "cap", "capability":
+			caps, err := parseCapabilityFields(fields[1:])
+			if err != nil {
+				diags = append(diags, diag(lineNo, err.Error()))
+				continue
+			}
+			for _, cap := range caps {
+				if seenCapability[cap] {
+					continue
+				}
+				seenCapability[cap] = true
+				f.Capability = append(f.Capability, cap)
+			}
 		case "replace":
 			idx := indexField(fields, "=>")
 			if idx == -1 || idx < 2 || idx >= len(fields)-1 {
@@ -192,6 +207,7 @@ func Format(f File) []byte {
 	if f.GS != "" {
 		fmt.Fprintf(&b, "gs %s\n", f.GS)
 	}
+	writeCapabilities(&b, f.Capability)
 	writeRequires(&b, f.Require)
 	writeReplaces(&b, f.Replace)
 	writeCollections(&b, f.Collections)
@@ -247,6 +263,63 @@ func validCollectionName(name string) bool {
 		return false
 	}
 	return true
+}
+
+func parseCapabilityFields(fields []string) ([]string, error) {
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("capability expects at least one name")
+	}
+	seen := map[string]bool{}
+	var caps []string
+	for _, field := range fields {
+		for _, part := range strings.Split(field, ",") {
+			cap := strings.TrimSpace(part)
+			if cap == "" {
+				continue
+			}
+			if !validCapabilityName(cap) {
+				return nil, fmt.Errorf("invalid capability name")
+			}
+			if seen[cap] {
+				continue
+			}
+			seen[cap] = true
+			caps = append(caps, cap)
+		}
+	}
+	if len(caps) == 0 {
+		return nil, fmt.Errorf("invalid capability name")
+	}
+	return caps, nil
+}
+
+func validCapabilityName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			continue
+		}
+		switch r {
+		case '.', '-', '_', '/', ':':
+			continue
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func writeCapabilities(b *strings.Builder, caps []string) {
+	if len(caps) == 0 {
+		return
+	}
+	sort.Strings(caps)
+	b.WriteByte('\n')
+	for _, cap := range caps {
+		fmt.Fprintf(b, "capability %s\n", cap)
+	}
 }
 
 func writeRequires(b *strings.Builder, reqs []Require) {
