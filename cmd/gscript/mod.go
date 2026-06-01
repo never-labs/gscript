@@ -13,10 +13,11 @@ type modGraphReport = modpkg.GraphReport
 type modVerifyReport = modpkg.VerifyReport
 type modTidyReport = modpkg.TidyReport
 type modExplainReport = modpkg.ExplainReport
+type modListReport = modpkg.ListReport
 
 func runModCommand(args []string, outw, errw io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|lock|graph|explain|verify] [flags]")
+		fmt.Fprintln(errw, "usage: gscript mod [init|add|tidy|check|lock|list|graph|explain|verify] [flags]")
 		return 2
 	}
 	switch args[0] {
@@ -30,6 +31,8 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "lock":
 		return runModLockCommand(args[1:], outw, errw)
+	case "list":
+		return runModListCommand(args[1:], outw, errw)
 	case "graph":
 		return runModGraphCommand(args[1:], outw, errw)
 	case "explain":
@@ -37,10 +40,10 @@ func runModCommand(args []string, outw, errw io.Writer) int {
 	case "verify":
 		return runModVerifyCommand(args[1:], outw, errw)
 	case "help", "-h", "--help":
-		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|lock|graph|explain|verify] [flags]")
+		fmt.Fprintln(outw, "usage: gscript mod [init|add|tidy|check|lock|list|graph|explain|verify] [flags]")
 		return 0
 	default:
-		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, lock, graph, explain, or verify)\n", args[0])
+		fmt.Fprintf(errw, "gscript mod: unknown mode %q (want init, add, tidy, check, lock, list, graph, explain, or verify)\n", args[0])
 		return 2
 	}
 }
@@ -203,6 +206,70 @@ func runModGraphCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
 	}
 	if err != nil {
+		return 1
+	}
+	return 0
+}
+
+func runModListCommand(args []string, outw, errw io.Writer) int {
+	fs := flag.NewFlagSet("mod list", flag.ContinueOnError)
+	fs.SetOutput(errw)
+	jsonOut := fs.Bool("json", false, "print module list as JSON")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	path := "."
+	if len(fs.Args()) == 1 {
+		path = fs.Args()[0]
+	} else if len(fs.Args()) > 1 {
+		fmt.Fprintln(errw, "usage: gscript mod list [--json] [path]")
+		return 2
+	}
+	report := modpkg.List(path)
+	if *jsonOut {
+		enc := json.NewEncoder(outw)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(report); err != nil {
+			fmt.Fprintf(errw, "gscript mod list: %v\n", err)
+			return 1
+		}
+	} else {
+		if report.Module != "" {
+			fmt.Fprintf(outw, "module %s\n", report.Module)
+		}
+		if report.GS != "" {
+			fmt.Fprintf(outw, "gs %s\n", report.GS)
+		}
+		for _, req := range report.Requires {
+			fmt.Fprintf(outw, "require %s %s", req.Path, req.Version)
+			if req.Kind != "" {
+				fmt.Fprintf(outw, " (%s", req.Kind)
+				if req.Source != "" {
+					fmt.Fprintf(outw, ":%s", req.Source)
+				}
+				fmt.Fprint(outw, ")")
+			}
+			fmt.Fprintln(outw)
+		}
+		for _, rep := range report.Replaces {
+			version := ""
+			if rep.Version != "" {
+				version = " " + rep.Version
+			}
+			fmt.Fprintf(outw, "replace %s%s => %s\n", rep.Path, version, rep.NewPath)
+		}
+		for _, col := range report.Collections {
+			fmt.Fprintf(outw, "collection %s %s\n", col.Name, col.Path)
+		}
+		for _, diag := range report.Diagnostics {
+			if diag.File != "" {
+				fmt.Fprintf(errw, "%s: %s %s: %s\n", diag.File, diag.Severity, diag.Code, diag.Message)
+			} else {
+				fmt.Fprintf(errw, "%s %s: %s\n", diag.Severity, diag.Code, diag.Message)
+			}
+		}
+	}
+	if !report.OK {
 		return 1
 	}
 	return 0

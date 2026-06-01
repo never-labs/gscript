@@ -62,6 +62,40 @@ type ExplainReport struct {
 	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
 }
 
+type ListReport struct {
+	SchemaVersion int              `json:"schema_version"`
+	OK            bool             `json:"ok"`
+	Manifest      string           `json:"manifest,omitempty"`
+	Module        string           `json:"module,omitempty"`
+	GS            string           `json:"gs,omitempty"`
+	Requires      []ListRequire    `json:"requires,omitempty"`
+	Replaces      []ListReplace    `json:"replaces,omitempty"`
+	Collections   []ListCollection `json:"collections,omitempty"`
+	Diagnostics   []Diagnostic     `json:"diagnostics,omitempty"`
+}
+
+type ListRequire struct {
+	Path    string `json:"path"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+	Source  string `json:"source,omitempty"`
+	File    string `json:"file,omitempty"`
+}
+
+type ListReplace struct {
+	Path    string `json:"path"`
+	Version string `json:"version,omitempty"`
+	NewPath string `json:"new_path"`
+	Local   bool   `json:"local"`
+	Root    string `json:"root,omitempty"`
+}
+
+type ListCollection struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Root string `json:"root"`
+}
+
 type Diagnostic struct {
 	Severity string `json:"severity"`
 	Code     string `json:"code"`
@@ -460,6 +494,61 @@ func Explain(path, module string) ExplainReport {
 	}
 	report.Root = result.Root
 	report.File = result.File
+	return report
+}
+
+func List(path string) ListReport {
+	abs, err := filepath.Abs(path)
+	report := ListReport{SchemaVersion: 1}
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9101", Message: err.Error()})
+		return report
+	}
+	manifest, manifestPath, err := ReadFileWithPath(abs)
+	report.Manifest = manifestPath
+	if err != nil {
+		report.Diagnostics = append(report.Diagnostics, Diagnostic{Severity: "error", Code: "GS9103", Message: err.Error(), File: manifestPath})
+		return report
+	}
+	report.Module = manifest.Module
+	report.GS = manifest.GS
+
+	collections := moduleCollections(abs, manifest)
+	replaces := moduleReplaces(abs, manifest)
+	for _, req := range manifest.Require {
+		result := modresolve.Resolve(req.Path, collections, replaces, abs)
+		item := ListRequire{
+			Path:    req.Path,
+			Version: req.Version,
+			Kind:    result.Kind,
+			Source:  result.Path,
+			File:    result.File,
+		}
+		if item.Source == "" && result.Kind == "module" {
+			item.Source = req.Path
+		}
+		report.Requires = append(report.Requires, item)
+	}
+	for _, rep := range manifest.Replace {
+		item := ListReplace{
+			Path:    rep.Path,
+			Version: rep.Version,
+			NewPath: rep.NewPath,
+			Local:   isLocalPath(rep.NewPath),
+		}
+		if item.Local {
+			item.Root = cleanLocalRoot(abs, rep.NewPath)
+		}
+		report.Replaces = append(report.Replaces, item)
+	}
+	for _, col := range manifest.Collections {
+		report.Collections = append(report.Collections, ListCollection{
+			Name: col.Name,
+			Path: col.Path,
+			Root: cleanLocalRoot(abs, col.Path),
+		})
+	}
+	report.OK = len(report.Diagnostics) == 0
 	return report
 }
 

@@ -153,6 +153,50 @@ func TestExplainResolvesStdlibCollectionReplaceAndModuleRoot(t *testing.T) {
 	}
 }
 
+func TestListReportsManifestEntriesAndLocalResolution(t *testing.T) {
+	dir := newLockedModule(t)
+
+	report := List(dir)
+	if !report.OK {
+		t.Fatalf("List OK = false, diagnostics = %#v", report.Diagnostics)
+	}
+	if report.Module != "example.com/app" || report.GS != "0.1" {
+		t.Fatalf("List module/gs = %q/%q, want example.com/app/0.1", report.Module, report.GS)
+	}
+	if len(report.Requires) != 0 {
+		t.Fatalf("List requires = %#v, want none before adding require", report.Requires)
+	}
+	writeFile(t, filepath.Join(dir, "gscript.mod"), strings.Join([]string{
+		"module example.com/app",
+		"gs 0.1",
+		"require example.com/lib v1.2.3",
+		"collection vendor ./vendor",
+		"replace example.com/lib v1.2.3 => ./local/lib",
+		"",
+	}, "\n"))
+
+	report = List(dir)
+	if !report.OK {
+		t.Fatalf("List OK = false after require, diagnostics = %#v", report.Diagnostics)
+	}
+	if len(report.Requires) != 1 {
+		t.Fatalf("List requires = %#v, want one", report.Requires)
+	}
+	req := report.Requires[0]
+	if req.Path != "example.com/lib" || req.Version != "v1.2.3" || req.Kind != "replace" || req.Source != "example.com/lib" {
+		t.Fatalf("List require = %#v, want replace resolution", req)
+	}
+	if !strings.HasSuffix(req.File, filepath.Join("local", "lib.gs")) {
+		t.Fatalf("List require file = %q, want local replace file", req.File)
+	}
+	if len(report.Replaces) != 1 || !report.Replaces[0].Local {
+		t.Fatalf("List replaces = %#v, want local replace", report.Replaces)
+	}
+	if len(report.Collections) != 1 || report.Collections[0].Name != "vendor" {
+		t.Fatalf("List collections = %#v, want vendor collection", report.Collections)
+	}
+}
+
 func TestScanStaticRequiresUsesAST(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "main.gs")

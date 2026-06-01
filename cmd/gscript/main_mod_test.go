@@ -99,6 +99,31 @@ func TestModCheckRunsVerification(t *testing.T) {
 	}
 }
 
+func TestModListReportsManifest(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gscript.mod"), []byte(`module example.com/demo
+gs 0.1
+require example.com/lib v1.2.3
+replace example.com/lib => ./local/lib
+collection vendor ./vendor
+`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runModCommand([]string{"list", "--json", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("mod list code = %d, stderr = %q stdout = %q", code, stderr.String(), stdout.String())
+	}
+	var list modListReport
+	if err := json.Unmarshal(stdout.Bytes(), &list); err != nil {
+		t.Fatalf("stdout is not JSON list report: %v; stdout = %q", err, stdout.String())
+	}
+	if !list.OK || list.Module != "example.com/demo" || len(list.Requires) != 1 || list.Requires[0].Kind != "replace" {
+		t.Fatalf("list = %+v, want module and resolved replace require", list)
+	}
+}
+
 func TestModAddAndTidy(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "main.gs"), []byte(`net := require("example.com/lib/net")

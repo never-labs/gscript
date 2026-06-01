@@ -31,7 +31,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "help", Usage: "usage: gscript help [command]", Summary: "Show command help.", Run: runHelpCommand},
 		{Name: "inspect", Usage: "usage: gscript inspect bytecode [--proto NAME] <file.gs>\n       gscript inspect directives [--json] <file.gs>", Summary: "Inspect compiled artifacts and file directives.", Run: runInspectCommand},
 		{Name: "lint", Usage: "usage: gscript lint [--format=text|json|sarif] <path-or-dir> [...]", Summary: "Report source diagnostics.", Run: runLintCommand},
-		{Name: "mod", Usage: "usage: gscript mod [init|add|tidy|lock|graph|explain|verify] [flags]", Summary: "Manage local module metadata and require graphs.", Run: runModCommand},
+		{Name: "mod", Usage: "usage: gscript mod [init|add|tidy|check|lock|list|graph|explain|verify] [flags]", Summary: "Manage local module metadata and require graphs.", Run: runModCommand},
 		{Name: "repl", Usage: "usage: gscript repl", Summary: "Start the interactive shell.", Run: runREPLCommand},
 		{Name: "run", Usage: "usage: gscript run [--vm] [--jit=true|false] <file.gs> [args...]", Summary: "Run a script file.", Run: runRunCommand},
 		{Name: "test", Usage: "usage: gscript test [--manifest-check] [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]", Summary: "Run GScript test files and stdout goldens.", Run: runDefaultTestCommand},
