@@ -54,3 +54,7 @@ go test ./...
 
 Security-sensitive changes should also mention enabled capabilities, host APIs,
 and whether untrusted scripts can reach the changed behavior.
+
+Issue and pull request templates live under `.github/`. Use the language
+proposal template for syntax or semantic changes so spec, grammar, feature
+matrix, and tests stay connected.
