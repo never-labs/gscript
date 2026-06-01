@@ -32,6 +32,7 @@ func cliCommands() []cliCommandSpec {
 		{Name: "inspect", Usage: "usage: leia inspect bytecode [--proto NAME] <file.leia>\n       leia inspect directives [--json] <file.leia>", Summary: "Inspect compiled artifacts and file directives.", Run: runInspectCommand},
 		{Name: "lint", Usage: "usage: leia lint [--format=text|json|sarif] <path-or-dir> [...]", Summary: "Report source diagnostics.", Run: runLintCommand},
 		{Name: "mod", Usage: "usage: leia mod [init|add|tidy|check|download|vendor|lock|list|graph|explain|capability|gomod|verify] [flags]", Summary: "Manage local module metadata and require graphs.", Run: runModCommand},
+		{Name: "playground", Usage: "usage: leia playground [--addr ADDR] [--timeout DURATION] [--max-source-bytes N] [--max-steps N]", Summary: "Serve the local backend-powered Leia playground.", Run: runPlaygroundCommand},
 		{Name: "repl", Usage: "usage: leia repl", Summary: "Start the interactive shell.", Run: runREPLCommand},
 		{Name: "run", Usage: "usage: leia run [--vm] [--jit=true|false] [--mod=readonly|vendor|mod] <file.leia> [args...]", Summary: "Run a script file.", Run: runRunCommand},
 		{Name: "test", Usage: "usage: leia test [--manifest-check] [--format=text|json] [--golden=auto|require|ignore|update] [--list] [--seed SEED] [path-or-dir]", Summary: "Run Leia test files and stdout goldens.", Run: runDefaultTestCommand},

@@ -19,6 +19,7 @@ Generated from the current `leia` binary capabilities.
 | `inspect` | Inspect compiled artifacts and file directives. |
 | `lint` | Report source diagnostics. |
 | `mod` | Manage local module metadata and require graphs. |
+| `playground` | Serve the local backend-powered Leia playground. |
 | `repl` | Start the interactive shell. |
 | `run` | Run a script file. |
 | `test` | Run Leia test files and stdout goldens. |
