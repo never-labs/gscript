@@ -7,6 +7,7 @@ import (
 	"github.com/never-labs/gscript/internal/parser"
 	"github.com/never-labs/gscript/internal/runtime"
 	syncrt "github.com/never-labs/gscript/internal/stdlibrt/concurrency"
+	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
 )
 
 func runProgram(t *testing.T, src string) *runtime.Interpreter {
@@ -88,7 +89,7 @@ func installTestModules(interp *runtime.Interpreter) {
 	stringLib := BuildString(interp.CallFunction, interp.MaxHostResultBytes)
 	interp.SetStringLibrary(stringLib)
 	installTestModule(interp, "string", runtime.TableValue(stringLib))
-	installTestModule(interp, "table", runtime.TableValue(BuildTable(TableOptions{
+	installTestModule(interp, "table", runtime.TableValue(BuildTable(tablehooks.Options{
 		Call: interp.CallFunction,
 		Less: interp.ValueLessThan,
 		Len:  interp.TableLen,

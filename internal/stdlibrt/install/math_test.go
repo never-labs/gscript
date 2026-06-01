@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/never-labs/gscript/internal/runtime"
-	"github.com/never-labs/gscript/internal/stdlibrt/modules"
+	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
 )
 
 func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {
@@ -143,7 +143,7 @@ func TestInstallModulesRegistersTableFromStdlibrt(t *testing.T) {
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{
 		ScriptCaller: interp.CallFunction,
-		Table: modules.TableOptions{
+		Table: tablehooks.Options{
 			Call: interp.CallFunction,
 			Less: interp.ValueLessThan,
 			Len:  interp.TableLen,

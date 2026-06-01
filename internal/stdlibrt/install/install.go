@@ -8,6 +8,7 @@ import (
 	"github.com/never-labs/gscript/internal/stdlibrt/host"
 	llmrt "github.com/never-labs/gscript/internal/stdlibrt/llm"
 	"github.com/never-labs/gscript/internal/stdlibrt/modules"
+	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
 	testkitrt "github.com/never-labs/gscript/internal/stdlibrt/testkit"
 )
 
@@ -38,7 +39,7 @@ func Install(interp *runtime.Interpreter) {
 			MaxHostResult:         interp.MaxHostResultBytes,
 			Call:                  interp.CallFunction,
 		},
-		Table: modules.TableOptions{
+		Table: tablehooks.Options{
 			Call: interp.CallFunction,
 			Less: interp.ValueLessThan,
 			Len:  interp.TableLen,
@@ -54,7 +55,7 @@ type ModuleOptions struct {
 	ScriptCaller runtime.ScriptFunctionCaller
 	Less         modules.ValueLessFunc
 	Host         host.Options
-	Table        modules.TableOptions
+	Table        tablehooks.Options
 	SkipTable    bool
 }
 

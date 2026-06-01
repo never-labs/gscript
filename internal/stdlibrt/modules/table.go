@@ -6,48 +6,34 @@ import (
 	"strings"
 
 	tablelib "github.com/never-labs/gscript/internal/stdlib/table"
+	tablehooks "github.com/never-labs/gscript/internal/stdlibrt/tablehooks"
 )
 
-type TableSortCaller func(Value, []Value) ([]Value, error)
-type TableSortLess func(Value, Value) (bool, error)
-type TableSortLen func(Value) (int64, error)
-type TableSortGet func(Value, Value) (Value, error)
-type TableSortSet func(Value, Value, Value) error
-type TableSortTryPlainArraySort func(Value, int64) bool
-type TableMoveGet func(Value, Value) (Value, error)
-type TableMoveSet func(Value, Value, Value) error
-type TableMoveTryPlainArrayMove func(src, dst Value, first, last, target int64) bool
-type TableInsertLen func(Value) (int64, error)
-type TableInsertGet func(Value, Value) (Value, error)
-type TableInsertSet func(Value, Value, Value) error
-type TableInsertTryPlainArrayInsert func(Value, int64, Value, int64) bool
-type TableRemoveLen func(Value) (int64, error)
-type TableRemoveGet func(Value, Value) (Value, error)
-type TableRemoveSet func(Value, Value, Value) error
-type TableRemoveTryPlainArrayRemove func(Value, int64, int64) (Value, bool)
-type TableUnpackLen func(Value) (int64, error)
-type TableUnpackGet func(Value, Value) (Value, error)
-
-// TableOptions provides the execution-engine hooks needed by table helpers
-// that must respect script-visible metamethods and callbacks.
-type TableOptions struct {
-	Call ScriptFunctionCaller
-	Less TableSortLess
-	Len  TableSortLen
-	Get  TableSortGet
-	Set  TableSortSet
-
-	TryPlainSort   TableSortTryPlainArraySort
-	TryPlainMove   TableMoveTryPlainArrayMove
-	TryPlainInsert TableInsertTryPlainArrayInsert
-	TryPlainRemove TableRemoveTryPlainArrayRemove
-}
+type TableSortCaller = tablehooks.Caller
+type TableSortLess = tablehooks.Less
+type TableSortLen = tablehooks.Len
+type TableSortGet = tablehooks.Get
+type TableSortSet = tablehooks.Set
+type TableSortTryPlainArraySort = tablehooks.TryPlainArraySort
+type TableMoveGet = tablehooks.MoveGet
+type TableMoveSet = tablehooks.MoveSet
+type TableMoveTryPlainArrayMove = tablehooks.TryPlainArrayMove
+type TableInsertLen = tablehooks.InsertLen
+type TableInsertGet = tablehooks.InsertGet
+type TableInsertSet = tablehooks.InsertSet
+type TableInsertTryPlainArrayInsert = tablehooks.TryPlainArrayInsert
+type TableRemoveLen = tablehooks.RemoveLen
+type TableRemoveGet = tablehooks.RemoveGet
+type TableRemoveSet = tablehooks.RemoveSet
+type TableRemoveTryPlainArrayRemove = tablehooks.TryPlainArrayRemove
+type TableUnpackLen = tablehooks.UnpackLen
+type TableUnpackGet = tablehooks.UnpackGet
 
 // BuildTable creates the "table" standard-library module. By default it uses
-// raw table access. Supplying TableOptions upgrades the helpers that need
+// raw table access. Supplying tablehooks.Options upgrades the helpers that need
 // execution-engine semantics, such as table.sort callbacks and proxy-aware
 // table access.
-func BuildTable(options ...TableOptions) *Table {
+func BuildTable(options ...tablehooks.Options) *Table {
 	opts := defaultTableOptions()
 	if len(options) > 0 {
 		opts = mergeTableOptions(opts, options[0])
@@ -63,13 +49,13 @@ func BuildTable(options ...TableOptions) *Table {
 
 	if opts.Call != nil {
 		lib.RawSet(StringValue("sort"), FunctionValue(BuildTableSortFunction(TableSortCaller(opts.Call), opts.Less, opts.Len, opts.Get, opts.Set, opts.TryPlainSort)))
-		BuildTableHigherOrderLibWithCaller(opts.Call, lib)
+		BuildTableHigherOrderLibWithCaller(ScriptFunctionCaller(opts.Call), lib)
 	}
 	return lib
 }
 
-func defaultTableOptions() TableOptions {
-	return TableOptions{
+func defaultTableOptions() tablehooks.Options {
+	return tablehooks.Options{
 		Less: func(a, b Value) (bool, error) {
 			less, ok := a.LessThan(b)
 			return ok && less, nil
@@ -99,7 +85,7 @@ func defaultTableOptions() TableOptions {
 	}
 }
 
-func mergeTableOptions(base TableOptions, override TableOptions) TableOptions {
+func mergeTableOptions(base tablehooks.Options, override tablehooks.Options) tablehooks.Options {
 	if override.Call != nil {
 		base.Call = override.Call
 	}
