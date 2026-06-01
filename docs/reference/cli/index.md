@@ -1,29 +1,25 @@
 # Leia CLI Reference
 
-This page describes the stable command families. Detailed generated command
-tables are emitted by:
+Generated from the current `leia` binary capabilities.
 
-```bash
-go run ./cmd/leia doc generate --output docs/reference/generated
-```
-
-Stable commands:
-
-| Command | Purpose |
+| Command | Summary |
 |---|---|
-| `leia run` | Run a script file. |
-| `leia eval` | Run source passed on the command line. |
-| `leia repl` | Start the interactive shell. |
-| `leia fmt` | Normalize source formatting. |
-| `leia lint` | Report syntax and source diagnostics. |
-| `leia test` | Run `.leia` tests and optional stdout goldens. |
-| `leia check` | Run local formatter, linter, test, manifest, and docs gates. |
-| `leia bench` | Run benchmark harnesses. |
-| `leia diag` / `leia diagnose` | Collect runtime and JIT diagnostics. |
-| `leia mod` | Manage `leia.mod`, `leia.sum`, vendoring, and module checks. |
-| `leia doc` | Generate or check documentation. |
-| `leia ci` | Run canonical local CI profiles. |
-| `leia capabilities` | Print binary capabilities and tooling support. |
-| `leia env` | Print environment, cache, project, and platform state. |
-| `leia version` | Print version and build metadata. |
-
+| `bench` | Run benchmark and benchmark-diagnostic harnesses. |
+| `capabilities` | Report binary capabilities, stdlib modules, and supported tooling formats. |
+| `check` | Run formatter, linter, manifest, tests, and docs checks as one local gate. |
+| `ci` | Run canonical local CI profiles. |
+| `config` | Discover and validate project configuration. |
+| `diag` | Run production diagnostic dump and bundle tools. |
+| `diagnose` | Collect benchmark timing, exit, and Tier 2 diagnostics. |
+| `doc` | Generate reference docs or validate repository docs. |
+| `env` | Report toolchain, project, cache, and platform environment. |
+| `eval` | Execute source passed on the command line. |
+| `fmt` | Normalize source formatting. |
+| `help` | Show command help. |
+| `inspect` | Inspect compiled artifacts and file directives. |
+| `lint` | Report source diagnostics. |
+| `mod` | Manage local module metadata and require graphs. |
+| `repl` | Start the interactive shell. |
+| `run` | Run a script file. |
+| `test` | Run Leia test files and stdout goldens. |
+| `version` | Report binary version and build metadata. |

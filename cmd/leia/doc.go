@@ -36,11 +36,16 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("doc generate", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	outputDir := fs.String("output", "", "write generated docs to a directory")
+	layout := fs.String("layout", "flat", "output layout: flat or site")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if len(fs.Args()) != 0 {
-		fmt.Fprintln(errw, "usage: leia doc generate [--output DIR]")
+		fmt.Fprintln(errw, "usage: leia doc generate [--output DIR] [--layout flat|site]")
+		return 2
+	}
+	if *layout != "flat" && *layout != "site" {
+		fmt.Fprintf(errw, "leia doc generate: unknown layout %q (want flat or site)\n", *layout)
 		return 2
 	}
 
@@ -65,12 +70,13 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintf(errw, "leia doc generate: %v\n", err)
 		return 1
 	}
-	files := map[string][]byte{
-		"cli.md":    cliDoc,
-		"stdlib.md": stdlibDoc,
-	}
+	files := generatedDocFiles(*layout, cliDoc, stdlibDoc)
 	for name, content := range files {
 		path := filepath.Join(*outputDir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			fmt.Fprintf(errw, "leia doc generate: %v\n", err)
+			return 1
+		}
 		if err := os.WriteFile(path, content, 0644); err != nil {
 			fmt.Fprintf(errw, "leia doc generate: %v\n", err)
 			return 1
@@ -78,6 +84,19 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 		fmt.Fprintln(outw, path)
 	}
 	return 0
+}
+
+func generatedDocFiles(layout string, cliDoc, stdlibDoc []byte) map[string][]byte {
+	if layout == "site" {
+		return map[string][]byte{
+			filepath.Join("reference", "cli", "index.md"):    cliDoc,
+			filepath.Join("reference", "stdlib", "index.md"): stdlibDoc,
+		}
+	}
+	return map[string][]byte{
+		"cli.md":    cliDoc,
+		"stdlib.md": stdlibDoc,
+	}
 }
 
 func runDocCheckCommand(args []string, outw, errw io.Writer) int {

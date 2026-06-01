@@ -32,6 +32,27 @@ func TestDocGenerateWritesReferenceFiles(t *testing.T) {
 	}
 }
 
+func TestDocGenerateWritesSiteLayout(t *testing.T) {
+	dir := t.TempDir()
+	var stdout, stderr bytes.Buffer
+	code := runDocCommand([]string{"generate", "--layout", "site", "--output", dir}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("runDocCommand code = %d, stderr = %q", code, stderr.String())
+	}
+	cliPath := filepath.Join(dir, "reference", "cli", "index.md")
+	stdlibPath := filepath.Join(dir, "reference", "stdlib", "index.md")
+	if _, err := os.Stat(cliPath); err != nil {
+		t.Fatalf("missing site cli doc: %v", err)
+	}
+	stdlibDoc, err := os.ReadFile(stdlibPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(stdlibDoc, []byte("Generated from the current runtime stdlib catalog.")) {
+		t.Fatalf("stdlib site doc = %q, want generated stdlib inventory", string(stdlibDoc))
+	}
+}
+
 func TestDocCheckDispatchesDocsScript(t *testing.T) {
 	oldDocExecCommand := docExecCommand
 	t.Cleanup(func() { docExecCommand = oldDocExecCommand })

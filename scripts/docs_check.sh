@@ -42,6 +42,16 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 1
 fi
 
+TMP_DOCS="$(mktemp -d)"
+trap 'rm -rf "$TMP_DOCS"' EXIT
+go run ./cmd/leia doc generate --layout site --output "$TMP_DOCS" >/dev/null
+for generated in reference/cli/index.md reference/stdlib/index.md; do
+    if ! cmp -s "$TMP_DOCS/$generated" "docs/$generated"; then
+        echo "error: docs/$generated is stale; run: go run ./cmd/leia doc generate --layout site --output docs" >&2
+        exit 1
+    fi
+done
+
 python3 - <<'PY'
 import os
 import re
@@ -241,6 +251,7 @@ print(
     f"{checked_links} relative .md links, "
     f"{checked_script_mentions} release-script code-block mentions, "
     f"{checked_release_gate_docs} release-gate docs, "
-    f"{checked_retired_paths} retired-path mentions."
+    f"{checked_retired_paths} retired-path mentions, "
+    "2 generated reference docs."
 )
 PY

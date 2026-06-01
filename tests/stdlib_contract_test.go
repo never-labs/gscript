@@ -49,7 +49,7 @@ func readStdlibContractRows(t *testing.T, root string) map[string]bool {
 		t.Fatalf("read stdlib contract: %v", err)
 	}
 
-	rowRE := regexp.MustCompile("^\\|\\s*`([^`]+)`\\s*\\|")
+	rowRE := regexp.MustCompile("^\\|\\s*`([^`]+)`\\s*\\|\\s*`([^`]+)`\\s*\\|")
 	rows := map[string]bool{}
 	for lineNo, line := range strings.Split(string(data), "\n") {
 		match := rowRE.FindStringSubmatch(line)
@@ -60,12 +60,12 @@ func readStdlibContractRows(t *testing.T, root string) map[string]bool {
 		if len(columns) != 7 {
 			t.Fatalf("docs/reference/stdlib/index.md:%d row for %q has %d table columns, want 5", lineNo+1, match[1], len(columns)-2)
 		}
-		for i := 2; i <= 5; i++ {
+		for i := 1; i <= 5; i++ {
 			if strings.TrimSpace(columns[i]) == "" {
-				t.Fatalf("docs/reference/stdlib/index.md:%d row for %q has empty contract field", lineNo+1, match[1])
+				t.Fatalf("docs/reference/stdlib/index.md:%d row for %q has empty contract field", lineNo+1, match[2])
 			}
 		}
-		name := match[1]
+		name := match[2]
 		if rows[name] {
 			t.Fatalf("docs/reference/stdlib/index.md:%d duplicate module row %q", lineNo+1, name)
 		}

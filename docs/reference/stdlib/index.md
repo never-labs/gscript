@@ -1,70 +1,51 @@
-# Leia Standard Library
+# Leia Standard Library Inventory
 
-This page is the machine-checkable standard-library contract index. It is
-organized from the runtime catalog in `internal/stdlib/catalog`; future detailed
-function pages should be generated from module-owned comments and metadata.
+Generated from the current runtime stdlib catalog.
 
-Safety levels:
-
-- `Pure`: deterministic in-process computation with no host I/O.
-- `Bounded host`: uses bounded host services or ambient state.
-- `Privileged host`: can mutate host state, open listeners, spawn processes, or
-  expose sensitive diagnostics.
-- `Test-only`: intended for conformance diagnostics.
-
-| Module | Safety | Host capability | Error model | JIT fast path |
+| Layer | Module | Description | Safe default | Capabilities |
 |---|---|---|---|---|
-| `array` | Pure | none | runtime error for bad argument shape | VM fallback; runtime specialization candidate |
-| `base64` | Pure | none | runtime error; `nil, err` for malformed decode | VM fallback |
-| `binary` | Pure | none | runtime error; `nil, err` for malformed fields or bounds | VM fallback |
-| `bit32` | Pure | none | runtime error | native identity for selected bit ops; VM fallback |
-| `bits` | Pure | none | runtime error | VM fallback |
-| `bytes` | Pure | none | runtime error; `nil, err` for malformed hex/bounds | VM fallback |
-| `chat` | Bounded host | `llm.turn` through installed provider when used with model calls | runtime error; provider failures as structured errors | VM fallback |
-| `color` | Pure | none | runtime error | VM fallback |
-| `compress` | Pure | CPU/memory only | runtime error; `nil, err` for malformed compressed data | VM fallback |
-| `container` | Pure | none | runtime error; sentinel nil/false for empty pop/peek/lookup | VM callback and VM fallback |
-| `context` | Bounded host | cancellation and timeout state | runtime error; sentinel nil for uncancelled state | VM fallback |
-| `crypto` | Bounded host | random source and cryptographic primitives | runtime error; `nil, err` for invalid keys/ciphertext | VM fallback |
-| `csv` | Pure | none | runtime error; `nil, err` for malformed input | VM fallback |
-| `debug` | Privileged host | `debug` | runtime error; result tables for stack/value data | VM fallback |
-| `encoding` | Pure | none | runtime error; `nil, err` for malformed input | VM fallback |
-| `fs` | Privileged host | `fs.read`, `fs.write` | runtime error; `nil, err` for OS failures | VM fallback |
-| `hash` | Pure | none | runtime error | VM fallback |
-| `history` | Pure | none | runtime error | VM fallback |
-| `http` | Privileged host | `net.listen`, network client/server capability | runtime error; `nil, err` or result table for network failures | runtime specialization for guarded host drivers; VM fallback |
-| `io` | Privileged host | `io`, filesystem-backed handles where enabled | runtime error; `nil, err`; sentinel for EOF | VM fallback |
-| `json` | Pure | none | runtime error; `nil, err` for malformed JSON or unsupported values | runtime specialization for guarded hot paths; VM fallback |
-| `llm` | Bounded host | `llm.turn` | runtime error; `(nil, err-table)` for provider/validation failures | VM callback and VM fallback |
-| `log` | Bounded host | `io.write` | runtime error; sentinel empty data for no records | VM fallback |
-| `loop` | Bounded host | `llm.turn` | runtime error; `(nil, err-table)` for provider/validation failures | VM callback and VM fallback |
-| `math` | Pure | none | runtime error | intrinsic/native identity for selected functions |
-| `matrix` | Pure | none | runtime error | guarded matrix/table fast paths; VM fallback |
-| `msg` | Pure | none | runtime error | VM fallback |
-| `net` | Privileged host | `net.http` | runtime error; `nil, err` or result table for network failures | runtime specialization for guarded host drivers; VM fallback |
-| `os` | Privileged host | `env.read`, `env.write`, process metadata and selected file operations | runtime error; `nil, err` or sentinel depending on API | VM fallback |
-| `path` | Bounded host | host filepath rules | runtime error; `nil, err` for invalid rel/match cases | VM fallback |
-| `process` | Privileged host | `process.exec`, `process.shell` | runtime error; result tables; `nil, err` for setup failures | runtime specialization for guarded host drivers; VM fallback |
-| `rand` | Bounded host | PRNG state and random bytes | runtime error | VM fallback |
-| `regexp` | Pure | none | runtime error; `nil, err` for invalid patterns in non-must APIs | runtime specialization for hot regexp paths; VM fallback |
-| `script` | Privileged host | `script.eval`, `module.load` | runtime error; sentinel nil/empty for unavailable metadata | VM fallback |
-| `soa` | Pure | none | runtime error | runtime specialization for recognized column kernels; VM fallback |
-| `sort` | Pure | none plus script callback execution when provided | runtime error | runtime specialization for numeric sort cases; VM callback and fallback |
-| `string` | Pure | none | runtime error | native identity for selected helpers; VM fallback |
-| `sync` | Bounded host | in-process synchronization primitives | runtime error | VM fallback |
-| `table` | Pure | none | runtime error; sentinel nil/empty for absent values | native identity for selected raw helpers/iterators; VM fallback |
-| `testkit` | Test-only | `testkit` diagnostics | runtime error; diagnostic result tables | VM fallback |
-| `time` | Bounded host | wall clock, timers, sleep | runtime error; `nil, err` for parse/cancel failures | VM fallback |
-| `url` | Pure | none | runtime error; `nil, err` for malformed URLs | VM fallback |
-| `utf8` | Pure | none | runtime error; sentinel nil/false for invalid positions | native identity for selected helpers; runtime specialization candidates |
-| `uuid` | Bounded host | random UUID generation | runtime error; `nil, err` for malformed UUID input | VM fallback |
-| `vec` | Pure | none | runtime error | VM fallback |
-
-Contract rules:
-
-- Every listed module must be obtainable through `require(name)` when enabled.
-- Pure modules must not perform ambient host I/O.
-- Host-backed modules must remain capability-gated by embedders.
-- JIT and runtime specializations are optional accelerators and must preserve VM
-  results when disabled, declined, or deoptimized.
-
+| `base` | `base64` | Base64 and URL-safe base64 encode/decode helpers. | true | none |
+| `base` | `bits` | Go math/bits-style integer bit counting and rotation helpers. | true | none |
+| `base` | `bytes` | Byte-string transforms, buffers, hex helpers, and byte comparisons. | true | none |
+| `base` | `color` | RGBA colors, color-space conversion, interpolation, and common constants. | true | none |
+| `base` | `compress` | Compression and decompression helpers over strings. | true | none |
+| `base` | `container` | Sets, queues, stacks, deques, and heaps implemented in process. | true | none |
+| `base` | `context` | Cancellation, timeout, and done-channel helpers. | true | none |
+| `base` | `crypto` | Secure random data and high-level cryptographic primitives. | true | none |
+| `base` | `encoding` | Text and byte encoding conversion helpers. | true | none |
+| `base` | `hash` | Hash digest helpers over strings and byte data. | true | none |
+| `base` | `json` | JSON encode/decode/validate helpers over Leia values. | true | none |
+| `base` | `math` | Numeric functions, constants, and Lua-compatible math helpers. | true | none |
+| `base` | `path` | Host filepath join, clean, split, match, rel, and separator helpers. | true | none |
+| `base` | `rand` | Pseudo-random values, ranges, bytes, and seedable random helpers. | true | none |
+| `base` | `regexp` | Go RE2 regular expression compile, match, find, replace, and split helpers. | true | none |
+| `base` | `sort` | Sort helpers for arrays, numbers, tables, and callback-based ordering. | true | none |
+| `base` | `string` | Lua-style byte-string helpers plus Go-style string utilities. | true | none |
+| `base` | `sync` | In-process waitgroup, mutex, rwmutex, and once primitives. | true | none |
+| `base` | `table` | Lua-compatible table helpers plus higher-order table utilities. | true | none |
+| `base` | `time` | Wall-clock, duration, sleep, parse, format, and timeout helpers. | true | none |
+| `base` | `url` | URL parse, escape, query, and construction helpers. | true | none |
+| `base` | `utf8` | UTF-8 validation, codepoint, length, and offset helpers. | true | none |
+| `base` | `uuid` | UUID generation, parsing, validation, and metadata helpers. | true | none |
+| `host` | `debug` | Runtime stack, globals, hook, and diagnostic helpers. | false | debug |
+| `host` | `fs` | Filesystem read, write, stat, directory, glob, and path-affecting operations. | false | fs.read, fs.write |
+| `host` | `http` | HTTP client/server helpers and request/response adaptation. | false | net.listen |
+| `host` | `io` | File handles, process stdio, and stream helpers. | false | io |
+| `host` | `log` | In-process log sink, levels, and log records. | false | io.write |
+| `host` | `net` | Network helpers and HTTP-facing host integration. | false | net.http |
+| `host` | `os` | Environment, process metadata, temporary names, and Lua-style OS helpers. | false | env.read, env.write |
+| `host` | `process` | Subprocess execution, shell execution, lookup, args, and entry metadata. | false | process.exec, process.shell |
+| `host` | `script` | Script compilation, evaluation, loader, source, and entrypoint helpers. | false | script.eval, module.load |
+| `host` | `testkit` | Conformance and diagnostic helpers intended for tests. | false | testkit |
+| `llm` | `chat` | Lightweight chat and conversation helpers for AI-native scripts. | false | llm.turn |
+| `llm` | `history` | Conversation history search, append, and recall helpers. | false | none |
+| `llm` | `llm` | Model turns, tools, validation, record/replay, and provider-backed AI calls. | false | llm.turn |
+| `llm` | `loop` | Reusable AI agent loop drivers such as react and plan/execute. | false | llm.turn |
+| `llm` | `msg` | Normalized LLM message constructors for system, user, assistant, and tool roles. | false | none |
+| `data` | `array` | Dense typed arrays and conversion helpers for hot data loops. | true | none |
+| `data` | `binary` | Binary pack/unpack over Leia strings using declarative field formats. | true | none |
+| `data` | `csv` | CSV parse and encode helpers backed by Go's CSV behavior. | true | none |
+| `data` | `matrix` | Dense matrix values and numeric matrix helpers. | true | none |
+| `data` | `soa` | Structure-of-arrays records and column-oriented data processing. | true | none |
+| `data` | `vec` | Vector construction, arithmetic, geometry, and numeric helpers. | true | none |
+| `compat` | `bit32` | Lua-compatible 32-bit bit operations. | true | none |
