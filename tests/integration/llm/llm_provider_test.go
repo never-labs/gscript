@@ -13,13 +13,14 @@ import (
 	leia "github.com/never-labs/leia"
 	"github.com/never-labs/leia/llm"
 	"github.com/never-labs/leia/llm/anthropic"
+	"github.com/never-labs/leia/llm/command"
 	"github.com/never-labs/leia/llm/openai"
 )
 
 func TestLLMCommandProvider(t *testing.T) {
 	vm := leia.New(
 		leia.WithLibs(leia.LibString|leia.LibLLM),
-		leia.WithLLMCommand("sh", "-c", `printf 'mock:%s' "$0"`),
+		leia.WithLLMProvider(command.Provider{Command: "sh", Args: []string{"-c", `printf 'mock:%s' "$0"`}}),
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hello")}})
@@ -115,7 +116,7 @@ func TestAnthropicCompatibleLLMProvider(t *testing.T) {
 	}
 }
 
-func TestClassifyLLMProviderError(t *testing.T) {
+func TestClassifyProviderError(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
@@ -133,7 +134,7 @@ func TestClassifyLLMProviderError(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := llm.ClassifyProviderError(tc.err); got != tc.want {
-				t.Fatalf("ClassifyLLMProviderError(%T) = %q, want %q", tc.err, got, tc.want)
+				t.Fatalf("ClassifyProviderError(%T) = %q, want %q", tc.err, got, tc.want)
 			}
 		})
 	}

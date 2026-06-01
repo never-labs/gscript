@@ -185,7 +185,7 @@ func TestOpenAICompatibleLLMProviderTimeout(t *testing.T) {
 	}
 }
 
-func TestWithOpenAICompatibleLLM(t *testing.T) {
+func TestOpenAIProviderThroughEmbeddingOption(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"ok"}}]}`)
@@ -193,7 +193,7 @@ func TestWithOpenAICompatibleLLM(t *testing.T) {
 	defer server.Close()
 	vm := leia.New(
 		leia.WithLibs(leia.LibString|leia.LibLLM),
-		leia.WithOpenAICompatibleLLM(server.URL, "", "mock-fast"),
+		leia.WithLLMProvider(openai.Provider{Endpoint: server.URL, Model: "mock-fast", Client: server.Client()}),
 	)
 	if err := vm.Exec(`
 result, err := llm.turn({messages: {llm.user("hello")}})

@@ -11,7 +11,7 @@ runtime behavior visible through `leia/`, `internal/runtime`,
 The public import path is:
 
 ```go
-import leia "github.com/Never-Labs/leia/leia"
+import leia "github.com/never-labs/leia"
 ```
 
 The current API is useful for tests, demos, and controlled in-process
@@ -26,8 +26,8 @@ extensions:
 - Globals: `Set`, `Get`, `SetValue`, and `GetValue`.
 - Go binding: `RegisterFunc`, `RegisterTable`, `RegisterModule`, `BindStruct`,
   `BindStructWithConstructor`, and `BindMethod`.
-- Native LLM integration: `WithLLMProvider`, `WithLLMCommand`,
-  `WithLLMTrace`, `WithLLMRecorder`, `WithLLMReplay`, and the `llm`
+- Native LLM integration: `WithLLMProvider`, `WithLLMTrace`,
+  `WithLLMRecorder`, `WithLLMReplay`, and the `llm`
   standard library module.
 - Hot loading: `HotLoader`, `ModuleHandle`, and `HotInstance`.
 - Value conversion: `ToValue`, `MustToValue`, and `FromValue`.
@@ -92,8 +92,8 @@ Go hosts install a backend:
 ```go
 type Provider struct{}
 
-func (Provider) Turn(ctx context.Context, req leia.LLMTurnRequest) (leia.LLMTurnResult, error) {
-    return leia.LLMTurnResult{Status: "final_answer", Text: "ok"}, nil
+func (Provider) Turn(ctx context.Context, req llm.TurnRequest) (llm.TurnResult, error) {
+    return llm.TurnResult{Status: "final_answer", Text: "ok"}, nil
 }
 
 vm := leia.New(leia.WithLibs(leia.LibString|leia.LibLLM), leia.WithLLMProvider(Provider{}))
@@ -105,29 +105,29 @@ HTTP adapter:
 ```go
 vm := leia.New(
     leia.WithLibs(leia.LibString|leia.LibLLM),
-    leia.WithOpenAICompatibleLLM(
-        "https://api.openai.com/v1/chat/completions",
-        os.Getenv("OPENAI_API_KEY"),
-        "gpt-4.1-mini",
-    ),
+    leia.WithLLMProvider(openai.Provider{
+        Endpoint: "https://api.openai.com/v1/chat/completions",
+        APIKey: os.Getenv("OPENAI_API_KEY"),
+        Model: "gpt-4.1-mini",
+    }),
 )
 ```
 
-`OpenAICompatibleLLMProvider` exposes the same adapter as a struct for custom
+`openai.Provider` exposes the adapter as a struct for custom
 HTTP clients, headers, local gateways, test servers, request timeouts, and
 bounded retries on transient network failures or `408` / `409` / `429` / `5xx`
-HTTP responses. Non-2xx HTTP responses return `*leia.OpenAICompatibleLLMError`
+HTTP responses. Non-2xx HTTP responses return `*openai.Error`
 with `StatusCode`, trimmed `Body`, and `Retryable` fields for host policy.
-`leia.ClassifyLLMProviderError(err)` maps built-in provider status errors,
+`llm.ClassifyProviderError(err)` maps built-in provider status errors,
 context cancellation/deadlines, and network errors into stable diagnostic
 categories: `network`, `auth`, `rate_limit`, `request`, or `provider`. The
 classifier never inspects prompt text, messages, or token values.
 
 Anthropic-compatible gateways are supported through
-`AnthropicCompatibleLLMProvider` and `WithAnthropicCompatibleLLM`. Hosts pass
+`anthropic.Provider` with `WithLLMProvider`. Hosts pass
 their own endpoint, API key, model, timeout, retry, and header policy explicitly;
 Leia does not encode vendor-specific local wrapper conventions.
-`*leia.AnthropicCompatibleLLMError` exposes the same status fields and
+`*anthropic.Error` exposes the same status fields and
 provider error classification behavior as the OpenAI-compatible adapter.
 
 AI-native `models {}` declarations can also construct these built-in adapters
@@ -372,11 +372,14 @@ Both functions also accept an optional store table with `save(token, snapshot)`,
 `load(token)`, and `delete(token)` functions, so approval tokens can survive
 outside the current VM process.
 
-For local command-backed experiments, `WithLLMCommand` can wrap an executable
+For local command-backed experiments, `command.Provider` can wrap an executable
 that reads the prompt from the final argument:
 
 ```go
-vm := leia.New(leia.WithLLMCommand("my-llm-command", "--plain"))
+vm := leia.New(leia.WithLLMProvider(command.Provider{
+    Command: "my-llm-command",
+    Args: []string{"--plain"},
+}))
 ```
 
 Structured errors use standard Go error APIs:
