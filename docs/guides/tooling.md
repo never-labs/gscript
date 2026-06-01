@@ -40,6 +40,19 @@ Profiles:
 Use `--list` before running a profile when you want to see exactly which shell
 commands will execute.
 
+The checked-in CI profile is the source of truth for hosted or local automation.
+If hosted CI is unavailable, contributors can still reproduce the same command
+set locally:
+
+```bash
+go run ./cmd/leia ci smoke --list
+go run ./cmd/leia ci pr --list
+go run ./cmd/leia ci release --list
+```
+
+Run `smoke` before small changes, `pr` before review, and `release` only when
+preparing a tag or release candidate.
+
 ## Manifest And Worktree Checks
 
 ```bash

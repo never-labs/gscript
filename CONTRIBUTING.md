@@ -22,6 +22,14 @@ go run ./cmd/leia test tests/smoke
 bash scripts/docs_check.sh
 ```
 
+CI profiles are inspectable and reproducible locally:
+
+```bash
+go run ./cmd/leia ci smoke --list
+go run ./cmd/leia ci pr --list
+go run ./cmd/leia ci smoke
+```
+
 ## Change Expectations
 
 - Language-visible behavior needs a spec update in `docs/spec/language.md`.
