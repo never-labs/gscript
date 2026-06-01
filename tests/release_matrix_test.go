@@ -219,6 +219,67 @@ func TestReleaseMatrixSecurityDocsUseModuleScopedCapabilityCommand(t *testing.T)
 	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "capability", "--json", tmp)
 }
 
+func TestReleaseMatrixEmbeddingDocsUsePublicSDKSurface(t *testing.T) {
+	root := findRepoRoot(t)
+	docs := strings.Join([]string{
+		readFileString(t, filepath.Join(root, "docs", "reference", "embedding", "index.md")),
+		readFileString(t, filepath.Join(root, "docs", "guides", "embedding.md")),
+	}, "\n")
+	goDoc := runCommand(t, root, 30*time.Second, "go", "doc", "-all", ".")
+	for _, api := range []string{
+		"New",
+		"Compile",
+		"CompileFile",
+		"SecuritySandbox",
+		"WithLibs",
+		"WithCapabilities",
+		"WithModuleMode",
+		"ModuleOptionsForScript",
+		"WithLLMProvider",
+		"NewHotLoader",
+		"WithHotLoaderVMOptions",
+		"ModuleFrom",
+		"WithGoImports",
+		"LibSafe",
+		"LibApp",
+		"LibGame",
+		"CapSafe",
+		"ModuleModeVendor",
+	} {
+		if !strings.Contains(docs, api) {
+			t.Fatalf("embedding docs must mention public API %s", api)
+		}
+		if !strings.Contains(goDoc, api) {
+			t.Fatalf("embedding docs mention %s but root go doc does not expose it", api)
+		}
+	}
+	for _, method := range []string{
+		"Exec",
+		"ExecContext",
+		"Run",
+		"RunContext",
+		"Call",
+		"CallContext",
+		"RegisterFunc",
+		"RegisterTable",
+		"RegisterModule",
+		"RegisterModuleFrom",
+		"BindStruct",
+		"BindStructWithConstructor",
+		"BindMethod",
+		"Reset",
+	} {
+		if !strings.Contains(docs, method) {
+			t.Fatalf("embedding docs must mention VM.%s", method)
+		}
+		if !strings.Contains(goDoc, method) {
+			t.Fatalf("embedding docs mention VM.%s but root go doc does not expose it", method)
+		}
+	}
+
+	runCommand(t, root, 30*time.Second, "go", "test", "./examples/embedding", "-run", "Example", "-count=1")
+}
+
 func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{

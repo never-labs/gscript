@@ -48,8 +48,10 @@ if err := vm.Run(prog); err != nil {
 out, err := vm.Call("add", 2, 3)
 ```
 
-Context-aware methods exist for compile, run, exec, and call paths. Context
-cancellation is checked at entry/exit and runtime checkpoints.
+Context-aware methods exist for compile, run, exec, and call paths:
+`CompileContext`, `CompileFileContext`, `ExecContext`, `ExecFileContext`,
+`RunContext`, `CallContext`, and `CallValueContext`. Context cancellation is
+checked at entry/exit and runtime checkpoints.
 
 ## Host Bindings
 
