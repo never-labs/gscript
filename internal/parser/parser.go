@@ -153,6 +153,9 @@ func (p *Parser) parseStmt() (ast.Stmt, error) {
 		if p.peek().Value == "budget" && p.peekAt(1).Type == lexer.TOKEN_LBRACE {
 			return p.parseBudgetStmt()
 		}
+		if p.peek().Value == "evaluate" && p.peekAt(1).Type == lexer.TOKEN_STRING && p.peekAt(2).Type == lexer.TOKEN_LBRACE {
+			return p.parseEvaluateBlockStmt()
+		}
 		if p.isLabelStmt() {
 			return p.parseLabelStmt()
 		}
@@ -502,6 +505,20 @@ func (p *Parser) parseBudgetStmt() (ast.Stmt, error) {
 		return nil, err
 	}
 	return &ast.BudgetStmt{P: pos, Config: config, Body: body}, nil
+}
+
+func (p *Parser) parseEvaluateBlockStmt() (ast.Stmt, error) {
+	tok := p.advance() // consume 'evaluate'
+	pos := p.tokenPos(tok)
+	nameTok, err := p.expect(lexer.TOKEN_STRING)
+	if err != nil {
+		return nil, err
+	}
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+	return &ast.EvaluateBlockStmt{P: pos, Name: nameTok.Value, Body: body}, nil
 }
 
 func (p *Parser) parseFuncParams() ([]ast.FuncParam, error) {

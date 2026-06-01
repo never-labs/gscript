@@ -133,6 +133,15 @@ func (interp *Interpreter) tableSetDepth(t Value, key, val Value, depth int) err
 		}
 		return fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}
+	if t.IsDenseArray() {
+		if i, ok, err := DenseArrayIndexFromValue(key, t.DenseArray().Len()); ok || err != nil {
+			if err != nil {
+				return err
+			}
+			return t.DenseArray().Set(i, val)
+		}
+		return fmt.Errorf("attempt to index a %s value", t.TypeName())
+	}
 	if !t.IsTable() {
 		return fmt.Errorf("attempt to index a %s value", t.TypeName())
 	}

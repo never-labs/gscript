@@ -388,6 +388,18 @@ func (s *BudgetStmt) nodeType() string { return "BudgetStmt" }
 func (s *BudgetStmt) GetPos() Pos      { return s.P }
 func (s *BudgetStmt) stmtNode()        {}
 
+// EvaluateBlockStmt represents an agent regression case:
+// evaluate "case name" { body }
+type EvaluateBlockStmt struct {
+	P    Pos
+	Name string
+	Body *BlockStmt
+}
+
+func (s *EvaluateBlockStmt) nodeType() string { return "EvaluateBlockStmt" }
+func (s *EvaluateBlockStmt) GetPos() Pos      { return s.P }
+func (s *EvaluateBlockStmt) stmtNode()        {}
+
 // ConfigField represents a field inside agent, turn, budget, or models blocks.
 type ConfigField struct {
 	P     Pos

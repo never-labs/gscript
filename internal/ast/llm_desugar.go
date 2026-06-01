@@ -119,6 +119,10 @@ func desugarStmt(stmt Stmt) Stmt {
 			configTable(s.P, s.Config),
 			&FuncLitExpr{P: s.P, Body: desugarBlock(s.Body)},
 		)}
+	case *EvaluateBlockStmt:
+		// Evaluate blocks are collected by tooling and are runtime no-ops in
+		// ordinary script execution until the evaluate runner owns semantics.
+		return &BlockStmt{P: s.P}
 	default:
 		return stmt
 	}

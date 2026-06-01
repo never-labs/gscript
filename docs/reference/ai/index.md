@@ -100,6 +100,31 @@ history[#history + 1] = msg.tool_error(call.id, "not found")
 Message tables use normalized roles: `system`, `user`, `assistant`, and
 `tool`.
 
+## Agents, Turns, Histories, And Tools
+
+The AI surface has four distinct responsibilities:
+
+- `agent` defines a callable workflow frame: defaults, tools, budgets, output
+  validation, tracing, replay, and optional `flow` code.
+- `turn` performs exactly one provider request. It returns provider output and
+  never dispatches tools by itself.
+- `messages`/`history` hold the ordered context passed from one turn to the
+  next.
+- `tools` describe callable capabilities available to a turn or agent; actual
+  tool execution happens in the built-in agent loop or in explicit flow code
+  through `llm.dispatch`.
+
+For an agent without a custom `flow`, Leia runs the built-in loop: synthesize
+messages from `system` and `user`, call one `turn`, dispatch any returned tool
+calls, append assistant tool-call and tool-result messages, and repeat until
+the provider returns a final answer or the workflow stops.
+
+For an agent with `flow`, no hidden turns or dispatches occur. The flow decides
+when to call `turn`, which `tools` list to pass, which tool calls to dispatch,
+and what history to send into the next turn. The runnable example
+[`examples/llm/manual_tool_history.leia`](../../../examples/llm/manual_tool_history.leia)
+shows this manual pattern under a mock provider.
+
 ## Single Turns
 
 `turn { ... }` performs one provider request and returns `(result, err)`.

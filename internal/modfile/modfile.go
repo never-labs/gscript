@@ -316,6 +316,10 @@ func indexField(fields []string, value string) int {
 	return -1
 }
 
+func ValidModulePath(path string) bool {
+	return validModulePath(path)
+}
+
 func validModulePath(path string) bool {
 	if path == "" || strings.Contains(path, "\\") || strings.Contains(path, "..") {
 		return false

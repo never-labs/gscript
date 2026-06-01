@@ -161,6 +161,19 @@ replace example.com/lib v1.0.0 => ./other-lib-v1
 	}
 }
 
+func TestValidModulePath(t *testing.T) {
+	for _, path := range []string{"example.com/app", "github.com/acme/toolkit:demo"} {
+		if !ValidModulePath(path) {
+			t.Fatalf("ValidModulePath(%q) = false, want true", path)
+		}
+	}
+	for _, path := range []string{"", "bad module", "../outside", "example.com\\app", "example.com/app\nrequire bad v1.0.0"} {
+		if ValidModulePath(path) {
+			t.Fatalf("ValidModulePath(%q) = true, want false", path)
+		}
+	}
+}
+
 func TestAddRequireUpdatesExistingPath(t *testing.T) {
 	f := File{Module: "example.com/app"}
 	var err error

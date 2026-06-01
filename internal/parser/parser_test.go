@@ -326,6 +326,45 @@ agent answer(q) {
 	}
 }
 
+func TestEvaluateBlockSyntax(t *testing.T) {
+	prog := mustParse(t, `
+evaluate "answer uses lookup" {
+    //leia:requires none
+    tool lookup(q) {
+        return q, nil
+    }
+
+    agent answer(q) {
+        model: "mock"
+        user: q
+        tools: [lookup]
+    }
+}
+`)
+	if len(prog.Stmts) != 1 {
+		t.Fatalf("statements = %d, want 1", len(prog.Stmts))
+	}
+	eval, ok := prog.Stmts[0].(*ast.EvaluateBlockStmt)
+	if !ok {
+		t.Fatalf("stmt = %T, want EvaluateBlockStmt", prog.Stmts[0])
+	}
+	if eval.Name != "answer uses lookup" || eval.GetPos() != (ast.Pos{Line: 2, Column: 1}) {
+		t.Fatalf("evaluate block = %#v", eval)
+	}
+	if eval.Body == nil || len(eval.Body.Stmts) != 2 {
+		t.Fatalf("evaluate body = %#v", eval.Body)
+	}
+	if _, ok := eval.Body.Stmts[0].(*ast.ToolDeclStmt); !ok {
+		t.Fatalf("body[0] = %T, want ToolDeclStmt", eval.Body.Stmts[0])
+	}
+	if _, ok := eval.Body.Stmts[1].(*ast.AgentDeclStmt); !ok {
+		t.Fatalf("body[1] = %T, want AgentDeclStmt", eval.Body.Stmts[1])
+	}
+	if err := ast.ValidateLLM(prog); err != nil {
+		t.Fatalf("ValidateLLM error = %v", err)
+	}
+}
+
 func TestLLMValidationReportsStaticToolListElementLine(t *testing.T) {
 	for _, tc := range []struct {
 		name string

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	toolformat "github.com/never-labs/leia/internal/tooling/format"
 )
 
 const (
@@ -19,6 +21,7 @@ const (
 	errCodeParseError     = -32700
 	errCodeInvalidRequest = -32600
 	errCodeMethodNotFound = -32601
+	errCodeInvalidParams  = -32602
 )
 
 // Server is a minimal Leia Language Server Protocol endpoint.
@@ -114,19 +117,25 @@ func (s *Server) handle(payload []byte) error {
 		return s.didChange(req.Params)
 	case "textDocument/didClose":
 		return s.didClose(req.Params)
+	case "textDocument/formatting":
+		return s.formatting(req.ID, req.Params)
+	case "textDocument/completion":
+		return s.completion(req.ID, req.Params)
 	default:
 		return s.respondMaybe(req.ID, nil, &responseError{Code: errCodeMethodNotFound, Message: "method not found: " + req.Method})
 	}
 }
 
 func initializeResult() map[string]any {
-	// TODO(lsp): add format, completion, hover, and navigation handlers as
-	// shared tooling APIs become available outside cmd/leia internals.
 	return map[string]any{
 		"capabilities": map[string]any{
 			"textDocumentSync": map[string]any{
 				"openClose": true,
 				"change":    1,
+			},
+			"documentFormattingProvider": true,
+			"completionProvider": map[string]any{
+				"triggerCharacters": []string{".", ":"},
 			},
 		},
 		"serverInfo": map[string]any{
@@ -212,6 +221,109 @@ func (s *Server) didClose(params json.RawMessage) error {
 	delete(s.docs, p.TextDocument.URI)
 	s.mu.Unlock()
 	return s.publishDiagnostics(p.TextDocument.URI, nil)
+}
+
+type formattingParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type textEdit struct {
+	Range   lspRange `json:"range"`
+	NewText string   `json:"newText"`
+}
+
+func (s *Server) formatting(id *json.RawMessage, params json.RawMessage) error {
+	var p formattingParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	if p.TextDocument.URI == "" {
+		return s.respondMaybe(id, []textEdit{}, nil)
+	}
+
+	s.mu.Lock()
+	src, ok := s.docs[p.TextDocument.URI]
+	s.mu.Unlock()
+	if !ok {
+		return s.respondMaybe(id, []textEdit{}, nil)
+	}
+
+	formatted, err := toolformat.Source(p.TextDocument.URI, []byte(src))
+	if err != nil {
+		return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+	}
+	if string(formatted) == src {
+		return s.respondMaybe(id, []textEdit{}, nil)
+	}
+	return s.respondMaybe(id, []textEdit{{
+		Range:   fullDocumentRange(src),
+		NewText: string(formatted),
+	}}, nil)
+}
+
+type completionParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Position     position               `json:"position"`
+}
+
+type completionItem struct {
+	Label      string `json:"label"`
+	Kind       int    `json:"kind,omitempty"`
+	Detail     string `json:"detail,omitempty"`
+	InsertText string `json:"insertText,omitempty"`
+}
+
+func (s *Server) completion(id *json.RawMessage, params json.RawMessage) error {
+	var p completionParams
+	if len(params) > 0 {
+		if err := json.Unmarshal(params, &p); err != nil {
+			return s.respondMaybe(id, nil, &responseError{Code: errCodeInvalidParams, Message: err.Error()})
+		}
+	}
+	return s.respondMaybe(id, completionItems(), nil)
+}
+
+func completionItems() []completionItem {
+	const keywordKind = 14
+	return []completionItem{
+		{Label: "agent", Kind: keywordKind, Detail: "Leia declaration"},
+		{Label: "break", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "chan", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "const", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "continue", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "defer", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "else", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "elseif", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "false", Kind: keywordKind, Detail: "Leia literal"},
+		{Label: "for", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "func", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "go", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "goto", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "if", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "in", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "nil", Kind: keywordKind, Detail: "Leia literal"},
+		{Label: "range", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "return", Kind: keywordKind, Detail: "Leia keyword"},
+		{Label: "tool", Kind: keywordKind, Detail: "Leia declaration"},
+		{Label: "true", Kind: keywordKind, Detail: "Leia literal"},
+		{Label: "var", Kind: keywordKind, Detail: "Leia keyword"},
+	}
+}
+
+func fullDocumentRange(src string) lspRange {
+	line, char := 0, 0
+	for _, r := range src {
+		if r == '\n' {
+			line++
+			char = 0
+			continue
+		}
+		char++
+	}
+	return lspRange{
+		Start: position{Line: 0, Character: 0},
+		End:   position{Line: line, Character: char},
+	}
 }
 
 func (s *Server) publishDiagnostics(uri string, diagnostics []diagnostic) error {

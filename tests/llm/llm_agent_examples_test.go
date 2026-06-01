@@ -107,3 +107,73 @@ func TestLLMAgentScenarioIncidentResponseExampleSmoke(t *testing.T) {
 		})
 	}
 }
+
+func TestLLMAgentScenarioManualToolHistoryExampleSmoke(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []leia.Option
+	}{
+		{name: "interpreter"},
+		{name: "bytecode", opts: []leia.Option{leia.WithVM()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			provider := &mockLLMProvider{results: []llm.TurnResult{
+				{
+					Status: "tool_calls",
+					Calls: []llm.ToolCall{{
+						ID:   "call_doc_1",
+						Tool: "lookup_doc",
+						Args: map[string]any{"topic": "agent history"},
+					}},
+				},
+				{Status: "final_answer", Text: "Manual flows append tool evidence before the next turn."},
+			}}
+			vm := leia.New(llmScenarioOptions(provider, tc.opts...)...)
+
+			if err := vm.ExecFile(filepath.Join(repoRoot(t), "examples", "llm", "manual_tool_history.leia")); err != nil {
+				t.Fatalf("ExecFile: %v", err)
+			}
+
+			if len(provider.requests) != 2 {
+				t.Fatalf("requests = %d, want 2", len(provider.requests))
+			}
+			first := provider.requests[0]
+			if first.Model != "mock-manual" || len(first.Tools) != 1 || first.Tools[0].Name != "lookup_doc" {
+				t.Fatalf("first request = %#v", first)
+			}
+			if len(first.Messages) != 2 ||
+				first.Messages[0].Role != "system" ||
+				first.Messages[1].Text != "Find docs for agent history" {
+				t.Fatalf("first messages = %#v", first.Messages)
+			}
+
+			second := provider.requests[1]
+			if second.Model != "mock-manual" || second.MaxTokens != 128 || len(second.Tools) != 1 {
+				t.Fatalf("second request = %#v", second)
+			}
+			if len(second.Messages) != 4 ||
+				second.Messages[2].Role != "assistant" ||
+				second.Messages[2].ToolCall == nil ||
+				second.Messages[2].ToolCall.ID != "call_doc_1" ||
+				second.Messages[3].Role != "tool" ||
+				second.Messages[3].ToolUseID != "call_doc_1" ||
+				second.Messages[3].Value != "doc:agent history" {
+				t.Fatalf("second messages = %#v", second.Messages)
+			}
+
+			for name, want := range map[string]any{
+				"manual_text":        "Manual flows append tool evidence before the next turn.",
+				"manual_evidence":    "doc:agent history",
+				"manual_history_len": int64(4),
+			} {
+				got, err := vm.Get(name)
+				if err != nil {
+					t.Fatalf("Get %s: %v", name, err)
+				}
+				if got != want {
+					t.Fatalf("%s = %#v, want %#v", name, got, want)
+				}
+			}
+		})
+	}
+}

@@ -11,6 +11,37 @@ An AI operation is deterministic until it reaches a provider, host callback, or
 tool body with side effects. Tests and replay fixtures should therefore record
 provider turns at the host boundary.
 
+## Evaluate Blocks
+
+`evaluate "case name" { ... }` declares a source-level agent regression case.
+The case name is a required string literal. The block body uses ordinary Leia
+statements, so tools can parse declarations, setup code, agent calls, and later
+assertion syntax without relying on an external fixture format.
+
+In ordinary script execution an evaluate block has no runtime effect. The
+`leia evaluate` command owns discovery and evaluation semantics. The P0 runner
+discovers cases, reports their source position, and validates the body with the
+same parser and AI-native syntax checks used for normal code; provider
+execution, scoring, record/replay, golden updates, and tool/file assertions are
+reserved for later evaluate phases.
+
+```leia
+//leia:requires none
+tool lookup(topic) {
+    return "docs:" .. topic, nil
+}
+
+agent answer(question) {
+    model: "mock"
+    user: question
+    tools: [lookup]
+}
+
+evaluate "answer can use lookup" {
+    result, err := answer("what changed?")
+}
+```
+
 ## Models
 
 `models { ... }` declares module-scoped model aliases and provider
@@ -345,6 +376,53 @@ return #history, history[1].role, history[3].tool_call.tool, history[4].value.su
 For histories built across multiple turns, append helper results explicitly:
 `msg.system`, `msg.user`, `msg.assistant`, `msg.assistant_call`,
 `msg.tool_result`, and `msg.tool_error`.
+
+Histories are the only stable handoff between provider turns. A tool list in a
+request is schema/context for the provider; it is not evidence by itself. When
+a provider requests a tool call, the call and its result become visible to a
+later turn only if the surrounding agent loop or custom flow appends both an
+assistant tool-call message and a matching tool-result or tool-error message to
+the next history.
+
+Tool-call messages and tool-result messages are paired by call id. The
+assistant message records the provider's requested tool name and arguments. The
+tool message records the local dispatch result, recoverable dispatch error, and
+the same call id. Implementations must preserve this pairing when lowering the
+built-in agent loop, and user-written flows should preserve it when constructing
+manual histories.
+
+```leia run all
+//leia:requires none
+//leia:param topic topic to look up
+tool lookup(topic) {
+    return "note:" .. topic, nil
+}
+
+history := messages {
+    system: "Use tool evidence."
+    user: "Find docs for Leia."
+}
+
+first := {
+    status: "tool_calls",
+    calls: {{
+        id: "call_lookup_1",
+        tool: "lookup",
+        args: {topic: "Leia"},
+    }},
+}
+
+call := first.calls[1]
+value, err := llm.dispatch(call, [lookup])
+if err != nil {
+    history[#history + 1] = msg.tool_error(call.id, err.message)
+} else {
+    history[#history + 1] = msg.assistant_call(call)
+    history[#history + 1] = msg.tool_result(call.id, value)
+}
+
+return #history, history[3].tool_call.tool, history[4].tool_use_id, history[4].value, err
+```
 
 ## Turns
 

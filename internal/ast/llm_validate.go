@@ -172,6 +172,13 @@ func (ctx *aiValidationContext) validateLLMStmt(stmt Stmt, topLevel bool) error 
 		}
 	case *BudgetStmt:
 		return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
+	case *EvaluateBlockStmt:
+		if s.Name == "" {
+			return fmt.Errorf("line %d: evaluate block name must not be empty", s.P.Line)
+		}
+		if s.Body != nil {
+			return ctx.child().validateLLMStmtList(s.Body.Stmts, false)
+		}
 	case *IfStmt:
 		if err := ctx.validateLLMExpr(s.Cond); err != nil {
 			return err

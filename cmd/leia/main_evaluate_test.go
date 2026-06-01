@@ -19,6 +19,10 @@ agent answer(question) {
     model: "mock"
     user: question
 }
+
+evaluate "answer baseline" {
+    result, err := answer("hello")
+}
 `
 	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
 		t.Fatal(err)
@@ -36,8 +40,11 @@ agent answer(question) {
 	if report.SchemaVersion != 1 || report.Phase != "syntax-static" {
 		t.Fatalf("report = %#v", report)
 	}
-	if report.Summary.Agents != 1 || report.Summary.TODOs != 1 {
+	if report.Summary.Agents != 1 || report.Summary.EvaluateBlocks != 1 || report.Summary.TODOs != 1 {
 		t.Fatalf("summary = %#v", report.Summary)
+	}
+	if len(report.Cases) != 1 || report.Cases[0].Name != "answer baseline" {
+		t.Fatalf("cases = %#v", report.Cases)
 	}
 }
 
@@ -52,7 +59,7 @@ func TestEvaluateCommandTextFormat(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("runEvaluateCommand code = %d, stderr = %q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "1 todos") {
+	if !strings.Contains(stdout.String(), "evaluate: ok") || !strings.Contains(stdout.String(), "0 cases") || !strings.Contains(stdout.String(), "1 todos") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 }

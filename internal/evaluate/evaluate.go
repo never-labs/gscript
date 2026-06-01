@@ -27,23 +27,38 @@ type Report struct {
 	Status        string    `json:"status"`
 	Summary       Summary   `json:"summary"`
 	Inputs        []Input   `json:"inputs"`
+	Cases         []Case    `json:"cases"`
 	Findings      []Finding `json:"findings"`
 	Notes         []string  `json:"notes"`
 }
 
 type Summary struct {
-	Files       int `json:"files"`
-	ParsedFiles int `json:"parsed_files"`
-	Agents      int `json:"agents"`
-	Tools       int `json:"tools"`
-	Models      int `json:"models"`
-	Budgets     int `json:"budgets"`
-	TODOs       int `json:"todos"`
+	Files          int `json:"files"`
+	ParsedFiles    int `json:"parsed_files"`
+	EvaluateBlocks int `json:"evaluate_blocks"`
+	Agents         int `json:"agents"`
+	Tools          int `json:"tools"`
+	Models         int `json:"models"`
+	Budgets        int `json:"budgets"`
+	TODOs          int `json:"todos"`
 }
 
 type Input struct {
 	Path   string `json:"path"`
 	Status string `json:"status"`
+}
+
+type Case struct {
+	CaseID     string      `json:"case_id"`
+	Name       string      `json:"name"`
+	SourcePath string      `json:"source_path"`
+	Range      SourceRange `json:"range"`
+	Status     string      `json:"status"`
+}
+
+type SourceRange struct {
+	StartLine   int `json:"start_line"`
+	StartColumn int `json:"start_column"`
 }
 
 type Finding struct {
@@ -69,6 +84,7 @@ func Run(opts Options) (Report, error) {
 		Phase:         "syntax-static",
 		Status:        "ok",
 		Inputs:        []Input{},
+		Cases:         []Case{},
 		Findings:      []Finding{},
 		Notes: []string{
 			"evaluate P0 performs syntax-level discovery only; it does not run providers, tools, or agent workflows.",
@@ -87,12 +103,14 @@ func Run(opts Options) (Report, error) {
 		}
 		report.Findings = append(report.Findings, todoFindings(file, src)...)
 		if strings.HasSuffix(file, ".leia") {
-			counts, findings := parseLeia(file, src)
+			counts, cases, findings := parseLeia(file, src)
 			report.Summary.ParsedFiles += counts.ParsedFiles
+			report.Summary.EvaluateBlocks += counts.EvaluateBlocks
 			report.Summary.Agents += counts.Agents
 			report.Summary.Tools += counts.Tools
 			report.Summary.Models += counts.Models
 			report.Summary.Budgets += counts.Budgets
+			report.Cases = append(report.Cases, cases...)
 			if len(findings) > 0 {
 				input.Status = "error"
 				report.Status = "failed"
@@ -211,91 +229,108 @@ func todoMarkerIndex(text string) int {
 	return -1
 }
 
-func parseLeia(path string, src []byte) (Summary, []Finding) {
+func parseLeia(path string, src []byte) (Summary, []Case, []Finding) {
 	tokens, err := lexer.New(string(src)).Tokenize()
 	if err != nil {
-		return Summary{}, []Finding{{Kind: "lex_error", Severity: "error", Message: err.Error(), Path: path}}
+		return Summary{}, nil, []Finding{{Kind: "lex_error", Severity: "error", Message: err.Error(), Path: path}}
 	}
 	prog, err := parser.New(tokens).Parse()
 	if err != nil {
-		return Summary{}, []Finding{{Kind: "parse_error", Severity: "error", Message: err.Error(), Path: path}}
+		return Summary{}, nil, []Finding{{Kind: "parse_error", Severity: "error", Message: err.Error(), Path: path}}
 	}
 	counts := Summary{ParsedFiles: 1}
-	countLLMStmts(prog.Stmts, &counts)
+	var cases []Case
+	countLLMStmts(path, prog.Stmts, &counts, &cases)
 	if err := ast.ValidateLLM(prog); err != nil {
-		return counts, []Finding{{Kind: "ai_syntax_error", Severity: "error", Message: err.Error(), Path: path}}
+		return counts, cases, []Finding{{Kind: "ai_syntax_error", Severity: "error", Message: err.Error(), Path: path}}
 	}
-	return counts, nil
+	return counts, cases, nil
 }
 
-func countLLMStmts(stmts []ast.Stmt, counts *Summary) {
+func countLLMStmts(path string, stmts []ast.Stmt, counts *Summary, cases *[]Case) {
 	for _, stmt := range stmts {
 		switch s := stmt.(type) {
 		case *ast.AgentDeclStmt:
 			counts.Agents++
 			if s.Flow != nil {
-				countLLMStmts(s.Flow.Stmts, counts)
+				countLLMStmts(path, s.Flow.Stmts, counts, cases)
 			}
 		case *ast.ToolDeclStmt:
 			counts.Tools++
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 		case *ast.ModelsDeclStmt:
 			counts.Models++
 		case *ast.BudgetStmt:
 			counts.Budgets++
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
+			}
+		case *ast.EvaluateBlockStmt:
+			counts.EvaluateBlocks++
+			*cases = append(*cases, Case{
+				CaseID:     fmt.Sprintf("%s:%d:%d", path, s.P.Line, s.P.Column),
+				Name:       s.Name,
+				SourcePath: path,
+				Range: SourceRange{
+					StartLine:   s.P.Line,
+					StartColumn: s.P.Column,
+				},
+				Status: "discovered",
+			})
+			if s.Body != nil {
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 		case *ast.BlockStmt:
-			countLLMStmts(s.Stmts, counts)
+			countLLMStmts(path, s.Stmts, counts, cases)
 		case *ast.FuncDeclStmt:
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 		case *ast.IfStmt:
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 			for _, elseif := range s.ElseIfs {
 				if elseif.Body != nil {
-					countLLMStmts(elseif.Body.Stmts, counts)
+					countLLMStmts(path, elseif.Body.Stmts, counts, cases)
 				}
 			}
 			if s.ElseBody != nil {
-				countLLMStmts(s.ElseBody.Stmts, counts)
+				countLLMStmts(path, s.ElseBody.Stmts, counts, cases)
 			}
 		case *ast.ForStmt:
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 		case *ast.ForNumStmt:
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 		case *ast.ForRangeStmt:
 			if s.Body != nil {
-				countLLMStmts(s.Body.Stmts, counts)
+				countLLMStmts(path, s.Body.Stmts, counts, cases)
 			}
 		case *ast.SelectStmt:
 			for _, c := range s.Cases {
 				if c.Body != nil {
-					countLLMStmts(c.Body.Stmts, counts)
+					countLLMStmts(path, c.Body.Stmts, counts, cases)
 				}
 			}
 			if s.Default != nil {
-				countLLMStmts(s.Default.Stmts, counts)
+				countLLMStmts(path, s.Default.Stmts, counts, cases)
 			}
 		}
 	}
 }
 
 func FormatText(report Report) string {
-	return fmt.Sprintf("evaluate: %s (%d files, %d parsed, %d agents, %d tools, %d todos)\n",
+	return fmt.Sprintf("evaluate: %s (%d files, %d parsed, %d cases, %d agents, %d tools, %d todos)\n",
 		report.Status,
 		report.Summary.Files,
 		report.Summary.ParsedFiles,
+		report.Summary.EvaluateBlocks,
 		report.Summary.Agents,
 		report.Summary.Tools,
 		report.Summary.TODOs,

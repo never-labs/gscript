@@ -674,21 +674,21 @@ print(result.text)`,
 			ID:       "ai-agent-shape",
 			Title:    "Agent Shape",
 			Section:  "AI Basics",
-			Summary:  "Agents package prompt, input, model choice, and output shape as a callable value.",
+			Summary:  "Agents package prompt, input, and model choice as a callable value.",
 			Runnable: true,
 			Concepts: []string{
-				"`agent` declarations compile in the playground.",
-				"Actual model calls require a provider configured by the embedding host.",
-				"Use this shape for prompt and output design before wiring live credentials.",
+				"`agent` declarations create callable AI values.",
+				"The host-provided GLM profile supplies the default model.",
+				"Use plain text for the simplest live agent path.",
 			},
 			Source: `agent summarize(topic) {
-    system: "Summarize in one sentence."
+    system: "Summarize in one sentence. Return plain text only."
     user: topic
-    output: { summary: "short answer" }
 }
 
-print("agent declared")
-print("live turns need an LLM provider")`,
+result, err := summarize("Leia is a Go-native scripting language with hot reload and AI agents.")
+if err != nil { print(err.message); return }
+print(result.text)`,
 		},
 		{
 			ID:       "ai-models",
@@ -702,19 +702,7 @@ print("live turns need an LLM provider")`,
 				"Environment variables keep API keys out of source files.",
 				"Agents can select a model by its alias.",
 			},
-			Source: `models {
-    default: "glm"
-    glm: {
-        provider: "glm"
-        protocol: "anthropic_compatible"
-        base_url: __leia_playground_env_first("LEIA_GLM_BASE_URL", "ANTHROPIC_BASE_URL", "", "https://open.bigmodel.cn/api/anthropic")
-        api_key: __leia_playground_env_first("LEIA_GLM_API_KEY", "SENTINEL_GLM_API_KEY", "GLM_API_KEY", "")
-        provider_model: __leia_playground_env_first("LEIA_GLM_MODEL", "GLM_MODEL", "ANTHROPIC_MODEL", "GLM-5.1")
-    }
-}
-
-result, err := turn {
-    model: "glm"
+			Source: `result, err := turn {
     user: "Reply exactly: MODEL_ALIAS_OK"
     max_tokens: 16
     temperature: 0
@@ -731,7 +719,7 @@ print(result.text)`,
 			Concepts: []string{
 				"`tool` declares a callable function that an agent can expose to a model.",
 				"`//leia:requires` documents required host capabilities.",
-				"Tool bodies can be tested without a live model.",
+				"Agents receive tools as an ordinary list.",
 			},
 			Source: `//leia:requires docs.read
 //leia:param query search query
@@ -739,8 +727,15 @@ tool lookup(query) {
     return "doc:" .. query, nil
 }
 
-print("tool lookup declared")
-print("agents can expose lookup to a model")`,
+agent answer_with_lookup(question) {
+    system: "Use lookup when useful. Reply in one short sentence."
+    user: question
+    tools: [lookup]
+}
+
+result, err := answer_with_lookup("What does lookup return for agent memory?")
+if err != nil { print(err.message); return }
+print(result.text)`,
 		},
 		{
 			ID:       "ai-memory",
@@ -814,18 +809,14 @@ tool read_file(path) {
 }
 
 agent coding_agent(task) {
-    system: "Inspect files, then propose a small patch plan. Do not mutate files."
+    system: "Inspect files, then propose a small patch plan. Do not mutate files. Return plain text only."
     user: task
     tools: [read_file]
-    output: {
-        summary: "what changed"
-        files: ["path"]
-        risk: "low"
-    }
 }
 
-print("coding agent declared")
-print("wire read_file to a safe host binding before live execution")`,
+result, err := coding_agent("Inspect cmd/leia/playground.go and suggest a tiny UI improvement.")
+if err != nil { print(err.message); return }
+print(result.text)`,
 		},
 	}
 }
@@ -894,7 +885,10 @@ func playgroundExamplesRoot() string {
 func repositoryExampleRunnable(path string) bool {
 	return !strings.Contains(path, "/llm/") &&
 		!strings.Contains(path, "/web/") &&
-		!strings.Contains(path, "/game_engine/")
+		!strings.Contains(path, "/game_engine/") &&
+		!strings.Contains(path, "/concurrency/context_process.leia") &&
+		!strings.Contains(path, "/concurrency/goroutine_errors.leia") &&
+		!strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia")
 }
 
 func repositoryExampleRequires(path string) string {
@@ -905,6 +899,12 @@ func repositoryExampleRequires(path string) string {
 		return "network/server host access"
 	case strings.Contains(path, "/game_engine/"):
 		return "game/window host access"
+	case strings.Contains(path, "/concurrency/context_process.leia"):
+		return "process host access"
+	case strings.Contains(path, "/concurrency/goroutine_errors.leia"):
+		return "debug event sink host access"
+	case strings.Contains(path, "/data_processing/data_oriented/particle_integration.leia"):
+		return "higher playground step budget"
 	default:
 		return ""
 	}

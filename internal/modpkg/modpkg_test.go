@@ -68,6 +68,24 @@ func TestParseRequireTarget(t *testing.T) {
 	}
 }
 
+func TestInitRejectsInvalidModulePath(t *testing.T) {
+	dir := t.TempDir()
+
+	path, err := Init(InitOptions{Module: "bad module", Dir: dir})
+	if err == nil {
+		t.Fatalf("Init invalid module error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "invalid module path") {
+		t.Fatalf("Init invalid module error = %v, want module path diagnostic", err)
+	}
+	if path != filepath.Join(dir, "leia.mod") {
+		t.Fatalf("Init invalid module path = %q, want leia.mod path", path)
+	}
+	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+		t.Fatalf("Init wrote invalid manifest: stat error = %v", statErr)
+	}
+}
+
 func TestLockWritesCollectionAndLocalReplaceSums(t *testing.T) {
 	dir := newLockedModule(t)
 

@@ -170,6 +170,9 @@ func Init(opts InitOptions) (string, error) {
 	if module == "" {
 		module = filepath.Base(absDir)
 	}
+	if err := validateModulePath(module); err != nil {
+		return filepath.Join(absDir, modfile.FileName), err
+	}
 	if err := os.MkdirAll(absDir, 0755); err != nil {
 		return "", err
 	}
@@ -184,6 +187,13 @@ func Init(opts InitOptions) (string, error) {
 		return path, err
 	}
 	return path, nil
+}
+
+func validateModulePath(module string) error {
+	if modfile.ValidModulePath(module) {
+		return nil
+	}
+	return errors.New("invalid module path")
 }
 
 func AddRequirements(dir string, targets []string) (string, error) {

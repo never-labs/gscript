@@ -1,0 +1,36 @@
+//leia:requires llm.turn
+
+import "std/fs" as fs
+
+models {
+    default: "demo"
+    demo: { provider_model: "mock" }
+}
+
+tool lookup(query) {
+    return "doc:" .. query, nil
+}
+
+agent answer(question) {
+    model: "demo"
+    system: "Use local docs."
+    user: question
+    tools: [lookup]
+    budget: { turns: 4, calls: 4, time: 30s }
+} flow {
+    history := messages {
+        system: system
+        user: question
+    }
+    ids := [3]i64{1, 2, 3}
+    result, err := turn {
+        model: model
+        messages: history
+    }
+    return result, err
+}
+
+go func() {
+    ch := chan()
+    ch <- answer("What is Leia?")
+}()

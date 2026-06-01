@@ -23,6 +23,14 @@ agent answer(question) {
     user: question
     tools: [echo]
 }
+
+evaluate "answer echoes through tool" {
+    agent case_answer(question) {
+        model: "mock"
+        user: question
+        tools: [echo]
+    }
+}
 `
 	path := filepath.Join(dir, "agent.leia")
 	if err := os.WriteFile(path, []byte(src), 0644); err != nil {
@@ -39,8 +47,17 @@ agent answer(question) {
 	if report.Summary.Files != 1 || report.Summary.ParsedFiles != 1 {
 		t.Fatalf("summary files = %#v", report.Summary)
 	}
-	if report.Summary.Agents != 1 || report.Summary.Tools != 1 || report.Summary.Models != 1 {
+	if report.Summary.Agents != 2 || report.Summary.Tools != 1 || report.Summary.Models != 1 {
 		t.Fatalf("summary LLM counts = %#v", report.Summary)
+	}
+	if report.Summary.EvaluateBlocks != 1 {
+		t.Fatalf("summary evaluate blocks = %#v", report.Summary)
+	}
+	if len(report.Cases) != 1 || report.Cases[0].Name != "answer echoes through tool" || report.Cases[0].Status != "discovered" {
+		t.Fatalf("cases = %#v", report.Cases)
+	}
+	if report.Cases[0].SourcePath != path || report.Cases[0].Range.StartLine == 0 || report.Cases[0].CaseID == "" {
+		t.Fatalf("case source metadata = %#v", report.Cases[0])
 	}
 	if report.Summary.TODOs != 1 {
 		t.Fatalf("summary TODOs = %#v", report.Summary)

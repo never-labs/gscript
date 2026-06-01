@@ -18,6 +18,7 @@ statement      = func_decl
                | agent_decl
                | models_decl
                | budget_stmt
+               | evaluate_block
                | if_stmt
                | for_stmt
                | select_stmt
@@ -36,6 +37,7 @@ import_decl    = "import" string_lit "as" identifier ;
 tool_decl      = "tool" identifier param_list block ;
 models_decl    = "models" config_block ;
 budget_stmt    = "budget" config_block block ;
+evaluate_block = "evaluate" string_lit block ;
 
 agent_defaults_decl
                = "agent" "defaults" config_block ;

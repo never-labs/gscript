@@ -1,0 +1,65 @@
+// Manual tool-history handoff demo.
+//
+// This example is intended for host tests with a mock or replay provider. It
+// demonstrates the custom-flow shape behind the built-in agent loop: a turn may
+// return tool calls, but the flow must dispatch them and append tool evidence to
+// the history before making the next turn.
+
+//leia:requires docs.read
+//leia:param topic documentation topic
+tool lookup_doc(topic) {
+    return "doc:" .. topic, nil
+}
+
+agent manual_research(topic) {
+    model: "mock-manual"
+    system: "Use tool evidence before answering."
+    tools: [lookup_doc]
+    budget: {turns: 2, calls: 1, tokens: 512}
+} flow {
+    history := messages {
+        system: system
+        user: "Find docs for " .. topic
+    }
+
+    first, first_err := turn {
+        model: model
+        messages: history
+        tools: tools
+    }
+    if first_err != nil {
+        return nil, first_err
+    }
+
+    if first.status != "tool_calls" {
+        return first, nil
+    }
+
+    call := first.calls[1]
+    evidence, dispatch_err := llm.dispatch(call, tools)
+    if dispatch_err != nil {
+        history[#history + 1] = msg.assistant_call(call)
+        history[#history + 1] = msg.tool_error(call.id, dispatch_err.message)
+    } else {
+        history[#history + 1] = msg.assistant_call(call)
+        history[#history + 1] = msg.tool_result(call.id, evidence)
+    }
+
+    final, final_err := turn {
+        model: model
+        messages: history
+        tools: tools
+        max_tokens: 128
+    }
+    return {
+        first_status: first.status,
+        text: final.text,
+        evidence: evidence,
+        history_len: #history
+    }, final_err
+}
+
+manual, manual_err := manual_research("agent history")
+manual_text := manual.text
+manual_evidence := manual.evidence
+manual_history_len := manual.history_len

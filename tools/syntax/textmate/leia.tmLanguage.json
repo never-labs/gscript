@@ -76,6 +76,10 @@
     "numbers": {
       "patterns": [
         {
+          "name": "constant.numeric.duration.leia",
+          "match": "\\b[0-9][0-9_]*(?:ns|us|µs|ms|s|m|h)\\b"
+        },
+        {
           "name": "constant.numeric.float.leia",
           "match": "\\b(?:[0-9][0-9_]*\\.[0-9_]*(?:[eE][+-]?[0-9_]+)?|[0-9][0-9_]*(?:[eE][+-]?[0-9_]+))\\b"
         },
@@ -93,11 +97,15 @@
         },
         {
           "name": "storage.type.function.leia",
-          "match": "\\b(?:func|var|const|chan)\\b"
+          "match": "\\b(?:func|import|var|const|chan)\\b"
         },
         {
           "name": "constant.language.leia",
           "match": "\\b(?:true|false|nil)\\b"
+        },
+        {
+          "name": "support.type.primitive.leia",
+          "match": "\\b(?:i8|i16|i32|i64|u8|u16|u32|u64|f32|f64|bool)\\b"
         }
       ]
     },

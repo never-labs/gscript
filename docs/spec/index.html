@@ -1022,6 +1022,23 @@ last <span class="tok-operator">:=</span> <span class="tok-number">0</span>
 <p>JIT, bytecode, and interpreter execution must preserve concurrency-visible behavior: communication order, channel close behavior, synchronization results, select readiness, protected error boundaries, and host cancellation boundaries must not change when optimizations are enabled. Optimizations may change timing, scheduling, or whether a task reaches a cancellation checkpoint before another task, except where the program has established ordering through channels or a specified synchronization library.</p></section><section><h2 id="ai-native-syntax">AI-Native Syntax</h2>
 <p>Leia&#x27;s AI-native syntax is a language layer over the <code>llm</code>, <code>msg</code>, <code>history</code>, and <code>loop</code> standard-library modules. The syntax is stable only when it uses the same provider, tracing, record/replay, cancellation, budget, and capability paths as direct library calls. Implementations must desugar the syntax to those runtime paths rather than maintaining a separate AI execution engine.</p>
 <p>An AI operation is deterministic until it reaches a provider, host callback, or tool body with side effects. Tests and replay fixtures should therefore record provider turns at the host boundary.</p>
+<h3 id="ai-native-syntax-evaluate-blocks">Evaluate Blocks</h3>
+<p><code>evaluate &quot;case name&quot; { ... }</code> declares a source-level agent regression case. The case name is a required string literal. The block body uses ordinary Leia statements, so tools can parse declarations, setup code, agent calls, and later assertion syntax without relying on an external fixture format.</p>
+<p>In ordinary script execution an evaluate block has no runtime effect. The <code>leia evaluate</code> command owns discovery and evaluation semantics. The P0 runner discovers cases, reports their source position, and validates the body with the same parser and AI-native syntax checks used for normal code; provider execution, scoring, record/replay, golden updates, and tool/file assertions are reserved for later evaluate phases.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:requires none</span>
+<span class="tok-keyword">tool</span> lookup(topic) {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;docs:&quot;</span> <span class="tok-operator">..</span> topic, <span class="tok-constant">nil</span>
+}
+
+<span class="tok-contextual">agent</span> answer(question) {
+    model: <span class="tok-string">&quot;mock&quot;</span>
+    user: question
+    tools: [lookup]
+}
+
+evaluate <span class="tok-string">&quot;answer can use lookup&quot;</span> {
+    result, err <span class="tok-operator">:=</span> answer(<span class="tok-string">&quot;what changed?&quot;</span>)
+}</code></pre>
 <h3 id="ai-native-syntax-models">Models</h3>
 <p><code>models { ... }</code> declares module-scoped model aliases and provider configuration. A field key is the public alias used by script code. A field value is either another alias string or a provider configuration table.</p>
 <pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-contextual">models</span> {
@@ -1240,6 +1257,38 @@ history <span class="tok-operator">:=</span> <span class="tok-contextual">messag
 
 <span class="tok-keyword">return</span> <span class="tok-operator">#</span>history, history[<span class="tok-number">1</span>].role, history[<span class="tok-number">3</span>].tool_call.<span class="tok-keyword">tool</span>, history[<span class="tok-number">4</span>].value.summary</code></pre>
 <p>For histories built across multiple turns, append helper results explicitly: <code>msg.system</code>, <code>msg.user</code>, <code>msg.assistant</code>, <code>msg.assistant_call</code>, <code>msg.tool_result</code>, and <code>msg.tool_error</code>.</p>
+<p>Histories are the only stable handoff between provider turns. A tool list in a request is schema/context for the provider; it is not evidence by itself. When a provider requests a tool call, the call and its result become visible to a later turn only if the surrounding agent loop or custom flow appends both an assistant tool-call message and a matching tool-result or tool-error message to the next history.</p>
+<p>Tool-call messages and tool-result messages are paired by call id. The assistant message records the provider&#x27;s requested tool name and arguments. The tool message records the local dispatch result, recoverable dispatch error, and the same call id. Implementations must preserve this pairing when lowering the built-in agent loop, and user-written flows should preserve it when constructing manual histories.</p>
+<pre class="language-leia leia-code"><code class="language-leia leia-code"><span class="tok-directive">//leia:requires none</span>
+<span class="tok-directive">//leia:param topic topic to look up</span>
+<span class="tok-keyword">tool</span> lookup(topic) {
+    <span class="tok-keyword">return</span> <span class="tok-string">&quot;note:&quot;</span> <span class="tok-operator">..</span> topic, <span class="tok-constant">nil</span>
+}
+
+history <span class="tok-operator">:=</span> <span class="tok-contextual">messages</span> {
+    system: <span class="tok-string">&quot;Use tool evidence.&quot;</span>
+    user: <span class="tok-string">&quot;Find docs for Leia.&quot;</span>
+}
+
+first <span class="tok-operator">:=</span> {
+    status: <span class="tok-string">&quot;tool_calls&quot;</span>,
+    calls: {{
+        id: <span class="tok-string">&quot;call_lookup_1&quot;</span>,
+        <span class="tok-keyword">tool</span>: <span class="tok-string">&quot;lookup&quot;</span>,
+        args: {topic: <span class="tok-string">&quot;Leia&quot;</span>},
+    }},
+}
+
+call <span class="tok-operator">:=</span> first.calls[<span class="tok-number">1</span>]
+value, err <span class="tok-operator">:=</span> llm.dispatch(call, [lookup])
+<span class="tok-keyword">if</span> err <span class="tok-operator">!=</span> <span class="tok-constant">nil</span> {
+    history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.tool_error(call.id, err.message)
+} <span class="tok-keyword">else</span> {
+    history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.assistant_call(call)
+    history[<span class="tok-operator">#</span>history <span class="tok-operator">+</span> <span class="tok-number">1</span>] <span class="tok-operator">=</span> msg.tool_result(call.id, value)
+}
+
+<span class="tok-keyword">return</span> <span class="tok-operator">#</span>history, history[<span class="tok-number">3</span>].tool_call.<span class="tok-keyword">tool</span>, history[<span class="tok-number">4</span>].tool_use_id, history[<span class="tok-number">4</span>].value, err</code></pre>
 <h3 id="ai-native-syntax-turns">Turns</h3>
 <p><code>turn { ... }</code> performs exactly one provider request and returns <code>(result, err)</code>. It never dispatches tools by itself. If the provider returns tool calls, the result has <code>status: &quot;tool_calls&quot;</code> and the caller or surrounding agent loop decides whether to dispatch them.</p>
 <p>Stable request fields include:</p>
@@ -1521,6 +1570,7 @@ statement      = func_decl
                | agent_decl
                | models_decl
                | budget_stmt
+               | evaluate_block
                | if_stmt
                | for_stmt
                | select_stmt
@@ -1539,6 +1589,7 @@ import_decl    = &quot;import&quot; string_lit &quot;as&quot; identifier ;
 tool_decl      = &quot;tool&quot; identifier param_list block ;
 models_decl    = &quot;models&quot; config_block ;
 budget_stmt    = &quot;budget&quot; config_block block ;
+evaluate_block = &quot;evaluate&quot; string_lit block ;
 
 agent_defaults_decl
                = &quot;agent&quot; &quot;defaults&quot; config_block ;

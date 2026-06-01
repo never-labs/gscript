@@ -33,6 +33,12 @@ func TestServerInitializeShutdown(t *testing.T) {
 	if caps["textDocumentSync"] == nil {
 		t.Fatalf("initialize result missing textDocumentSync: %#v", result)
 	}
+	if caps["documentFormattingProvider"] != true {
+		t.Fatalf("initialize result missing formatting capability: %#v", caps)
+	}
+	if caps["completionProvider"] == nil {
+		t.Fatalf("initialize result missing completion capability: %#v", caps)
+	}
 	if got := msgs[1]["id"]; got != float64(2) {
 		t.Fatalf("shutdown id = %#v, want 2", got)
 	}
@@ -107,6 +113,91 @@ func TestDidChangeClearsSyntaxDiagnostics(t *testing.T) {
 	diagnostics := params["diagnostics"].([]any)
 	if len(diagnostics) != 0 {
 		t.Fatalf("expected no diagnostics, got %#v", diagnostics)
+	}
+}
+
+func TestFormattingReturnsWholeDocumentEdit(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"method":  "textDocument/didOpen",
+			"params": map[string]any{
+				"textDocument": map[string]any{
+					"uri":        "file:///tmp/format.leia",
+					"languageId": "leia",
+					"version":    1,
+					"text":       "if true {\nreturn 1  \n}\n\n",
+				},
+			},
+		},
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      7,
+			"method":  "textDocument/formatting",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/format.leia"},
+				"options":      map[string]any{"tabSize": 4, "insertSpaces": true},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 2 {
+		t.Fatalf("expected diagnostics notification and formatting response, got %d: %#v", len(msgs), msgs)
+	}
+	resp := msgs[1]
+	if got := resp["id"]; got != float64(7) {
+		t.Fatalf("formatting response id = %#v, want 7", got)
+	}
+	edits := resp["result"].([]any)
+	if len(edits) != 1 {
+		t.Fatalf("expected one formatting edit, got %#v", edits)
+	}
+	edit := edits[0].(map[string]any)
+	if got, want := edit["newText"], "if true {\n    return 1\n}\n"; got != want {
+		t.Fatalf("formatted text = %q, want %q", got, want)
+	}
+}
+
+func TestCompletionReturnsLeiaKeywords(t *testing.T) {
+	input := mustEncodeMessages(t,
+		map[string]any{
+			"jsonrpc": "2.0",
+			"id":      3,
+			"method":  "textDocument/completion",
+			"params": map[string]any{
+				"textDocument": map[string]any{"uri": "file:///tmp/completion.leia"},
+				"position":     map[string]any{"line": 0, "character": 0},
+			},
+		},
+	)
+	var out bytes.Buffer
+	err := NewServer().Run(context.Background(), bytes.NewReader(input), &out)
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	msgs := readOutputMessages(t, out.Bytes())
+	if len(msgs) != 1 {
+		t.Fatalf("expected one completion response, got %d: %#v", len(msgs), msgs)
+	}
+	items := msgs[0]["result"].([]any)
+	if len(items) == 0 {
+		t.Fatalf("expected completion items")
+	}
+	labels := map[string]bool{}
+	for _, item := range items {
+		labels[item.(map[string]any)["label"].(string)] = true
+	}
+	for _, want := range []string{"func", "return", "agent", "tool"} {
+		if !labels[want] {
+			t.Fatalf("completion labels missing %q: %#v", want, labels)
+		}
 	}
 }
 

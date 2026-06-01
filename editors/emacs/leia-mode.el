@@ -44,7 +44,7 @@
   '("chan" "const" "func" "import" "tool" "var"))
 
 (defconst leia--contextual-keywords
-  '("agent" "budget" "capabilities" "flow" "messages" "models" "turn"))
+  '("agent" "budget" "capabilities" "flow" "messages" "models" "react" "turn"))
 
 (defconst leia--constants
   '("false" "nil" "true"))
@@ -52,12 +52,17 @@
 (defconst leia--builtins
   '("assert" "cap" "close" "delete" "error" "getmetatable" "ipairs" "len"
     "make" "next" "pairs" "pcall" "print" "rawequal" "rawget" "rawlen"
-    "rawset" "require" "select" "setmetatable" "spread" "tonumber" "tostring"
-    "type" "xpcall"))
+    "rawset" "recv" "require" "select" "send" "setmetatable" "sleep" "spawn"
+    "spread" "tonumber" "tostring" "type" "wait" "xpcall"))
 
 (defconst leia--modules
-  '("base64" "bytes" "csv" "fs" "hash" "http" "json" "llm" "math"
-    "matrix" "os" "path" "regexp" "string" "table" "time" "url" "uuid"))
+  '("base64" "binary" "bits" "bit32" "bytes" "compress" "csv" "debug" "env"
+    "fs" "hash" "history" "http" "json" "llm" "loop" "math" "matrix" "msg"
+    "os" "path" "process" "regexp" "soa" "string" "sync" "table" "time"
+    "url" "uuid" "vec"))
+
+(defconst leia--primitive-types
+  '("bool" "f32" "f64" "i8" "i16" "i32" "i64" "u8" "u16" "u32" "u64"))
 
 (defconst leia-font-lock-keywords
   `((,(rx "//leia:" (+ (or word "_" "." "-"))) . font-lock-preprocessor-face)
@@ -65,6 +70,7 @@
     (,(regexp-opt leia--declarations 'symbols) . font-lock-type-face)
     (,(regexp-opt leia--contextual-keywords 'symbols) . font-lock-keyword-face)
     (,(regexp-opt leia--constants 'symbols) . font-lock-constant-face)
+    (,(regexp-opt leia--primitive-types 'symbols) . font-lock-type-face)
     (,(regexp-opt leia--builtins 'symbols) . font-lock-builtin-face)
     (,(regexp-opt leia--modules 'symbols) . font-lock-constant-face)
     (,(rx symbol-start (group (+ (or word "_"))) (* space) "(")
