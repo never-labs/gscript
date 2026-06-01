@@ -100,6 +100,41 @@ expressions, tool declarations, and message blocks are expressions or
 declarations layered on this core grammar. AI-native syntax desugars to the
 `llm`, `msg`, `history`, and `loop` standard-library modules.
 
+## AI-Native Syntax
+
+AI-native syntax is part of the language surface, but it is deliberately a
+desugaring layer over the standard library rather than a separate execution
+engine. The parser accepts `models`, `tool`, `agent defaults`, named `agent`
+declarations, anonymous `agent` expressions, `turn` expressions, `messages`
+blocks, `flow` blocks, and `budget` blocks as described in
+[`grammar.ebnf`](grammar.ebnf).
+
+The stable lowering target is the `llm`, `msg`, `history`, and `loop` module
+family. That keeps scripted and embedded agents on the same runtime path:
+provider selection, tool dispatch, output validation, record/replay, tracing,
+and cancellation must behave the same whether the user writes AI-native syntax
+or calls the library directly.
+
+An `agent` is a callable value. Its configuration fields are defaults for the
+turns executed by that agent: explicit fields on a `turn` expression override
+agent configuration, and agent configuration overrides process or host defaults.
+A `flow` block provides the agent body when the default one-turn behavior is not
+enough. The flow body is lexical code; the implementation may inject documented
+bindings for the agent configuration, but those bindings must be specified and
+testable before they are treated as stable.
+
+`messages { ... }` constructs ordered message tables. It is intended for common
+system/user/assistant/tool histories; advanced or computed histories may still
+use the message helper modules directly. `tool` declarations produce tool values
+with a callable body and optional comment-derived metadata. Agents may be used
+as tools when the runtime can derive a stable tool schema from the agent's
+configuration and output contract.
+
+Recoverable provider, budget, validation, and tool failures return structured
+`nil, err` results unless the API explicitly documents a panic-style runtime
+error. Host-provided model credentials and endpoints are embedding policy, not
+source-level secrets.
+
 ## Core Behavioral Rules
 
 Leia is dynamically typed. Values are nil, booleans, numbers, strings, tables,

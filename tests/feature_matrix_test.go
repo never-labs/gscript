@@ -103,6 +103,41 @@ func TestFeatureMatrixSchema(t *testing.T) {
 	assertLanguageSpecSectionsCovered(t, specSections, referencedSpecSections)
 }
 
+func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
+	root := findRepoRoot(t)
+	spec := readFileString(t, filepath.Join(root, "docs", "spec", "language.md"))
+	grammar := readFileString(t, filepath.Join(root, "docs", "spec", "grammar.ebnf"))
+
+	for _, snippet := range []string{
+		"[`grammar.ebnf`](grammar.ebnf)",
+		"AI-native syntax is part of the language surface",
+		"desugaring layer over the standard library",
+	} {
+		if !strings.Contains(spec, snippet) {
+			t.Fatalf("language spec must document grammar appendix and AI-native lowering; missing %q", snippet)
+		}
+	}
+
+	requiredProductions := []string{
+		`import_decl    = "import" string_lit "as" identifier ;`,
+		`tool_decl      = "tool" identifier param_list block ;`,
+		`models_decl    = "models" config_block ;`,
+		`budget_stmt    = "budget" config_block block ;`,
+		`agent_defaults_decl`,
+		`agent_decl     = "agent" identifier [ param_list ] config_block [ flow_block ] ;`,
+		`agent_lit      = "agent" [ param_list ] config_block [ flow_block ] ;`,
+		`turn_expr      = "turn" config_block ;`,
+		`messages_expr  = "messages" "{"`,
+		`select_stmt    = "select" "{" { select_case } "}" ;`,
+		`dense_lit      = "[" [ integer_lit ] "]" dense_type "{"`,
+	}
+	for _, production := range requiredProductions {
+		if !strings.Contains(grammar, production) {
+			t.Fatalf("grammar appendix missing stable production snippet %q", production)
+		}
+	}
+}
+
 func decodeRequiredString(t *testing.T, feature map[string]json.RawMessage, index int, field string) string {
 	t.Helper()
 	raw, ok := feature[field]
