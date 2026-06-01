@@ -127,6 +127,7 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 
 	requiredProductions := []string{
 		`import_decl    = "import" string_lit "as" identifier ;`,
+		`const_decl     = "const" identifier ( "=" | ":=" ) expr ;`,
 		`tool_decl      = "tool" identifier param_list block ;`,
 		`models_decl    = "models" config_block ;`,
 		`budget_stmt    = "budget" config_block block ;`,
