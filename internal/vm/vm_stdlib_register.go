@@ -9,11 +9,10 @@ import (
 	"strings"
 
 	"github.com/never-labs/leia/internal/runtime"
+	stdbind "github.com/never-labs/leia/internal/stdlib/bind"
 	"github.com/never-labs/leia/internal/stdlib/catalog"
-	tablelib "github.com/never-labs/leia/internal/stdlib/table"
-	"github.com/never-labs/leia/internal/stdlibrt"
-	stdlibinstall "github.com/never-labs/leia/internal/stdlibrt/install"
-	"github.com/never-labs/leia/internal/stdlibrt/modules"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlib/install"
+	tablelib "github.com/never-labs/leia/internal/stdlib/lib/table"
 )
 
 func (vm *VM) RestrictStdlib(allowed map[string]bool) {
@@ -71,7 +70,7 @@ func (vm *VM) RegisterStdlibRuntimeModules() {
 		ScriptCaller: vm.callValue,
 		Less:         vm.valueLessThan,
 		SkipTable:    true,
-		Host: stdlibrt.HostOptions{
+		Host: stdbind.HostOptions{
 			SkipHostIO:     true,
 			NetworkAllowed: func() bool { return vm.networkAccess },
 			MaxHostResult:  func() int64 { return vm.maxHostResult },
@@ -191,7 +190,7 @@ func (vm *VM) RegisterTableSortLib() {
 }
 
 func (vm *VM) newTableSortFunction() *runtime.GoFunction {
-	return modules.BuildTableSortFunction(
+	return stdbind.BuildTableSortFunction(
 		vm.callValue,
 		vm.valueLessThan,
 		vm.tableLenInt,
@@ -214,7 +213,7 @@ func (vm *VM) RegisterTableHigherOrderLib() {
 	if !ok || !tblVal.IsTable() {
 		return
 	}
-	modules.BuildTableHigherOrderLibWithCaller(vm.callValue, tblVal.Table())
+	stdbind.BuildTableHigherOrderLibWithCaller(vm.callValue, tblVal.Table())
 }
 
 // RegisterSortCallbackLib installs VM-aware sort namespace helpers whose
@@ -225,7 +224,7 @@ func (vm *VM) RegisterSortCallbackLib() {
 	if !ok || !sortVal.IsTable() {
 		return
 	}
-	built := modules.BuildSortLibWithCallerAndLess(vm.callValue, vm.valueLessThan)
+	built := stdbind.BuildSortLibWithCallerAndLess(vm.callValue, vm.valueLessThan)
 	dst := sortVal.Table()
 	for _, name := range []string{"by", "byKey", "partition", "min", "max"} {
 		dst.RawSetString(name, built.RawGetString(name))
@@ -690,9 +689,9 @@ func (vm *VM) RegisterStringLib() {
 	std := vm.newStdlibInstallContext()
 	var strLib *runtime.Table
 	if existing, ok := vm.globals["string"]; ok && existing.IsTable() {
-		strLib = modules.RefreshString(existing.Table(), vm.callValue, func() int64 { return vm.maxHostResult })
+		strLib = stdbind.RefreshString(existing.Table(), vm.callValue, func() int64 { return vm.maxHostResult })
 	} else {
-		strLib = modules.BuildString(vm.callValue, func() int64 { return vm.maxHostResult })
+		strLib = stdbind.BuildString(vm.callValue, func() int64 { return vm.maxHostResult })
 	}
 	std.RegisterTable("string", strLib)
 	meta := runtime.NewTable()
@@ -701,7 +700,7 @@ func (vm *VM) RegisterStringLib() {
 }
 
 func (vm *VM) RegisterLLMLib() {
-	modules.InstallLLM(vm.newStdlibInstallContext(), stdlibrt.LLMOptions{
+	stdbind.InstallLLM(vm.newStdlibInstallContext(), stdbind.LLMOptions{
 		Call: vm.callValue,
 		Provider: func() runtime.LLMProvider {
 			return vm.llmProvider
@@ -728,7 +727,7 @@ func (vm *VM) RegisterLLMLib() {
 
 func (vm *VM) RegisterHTTPLib() {
 	std := vm.newStdlibInstallContext()
-	httpLib := runtime.TableValue(modules.BuildHTTPWithCallerAndPolicy(vm.callValue, func() bool {
+	httpLib := runtime.TableValue(stdbind.BuildHTTPWithCallerAndPolicy(vm.callValue, func() bool {
 		return vm.networkAccess
 	}, func() int64 {
 		return vm.maxHostResult
@@ -738,7 +737,7 @@ func (vm *VM) RegisterHTTPLib() {
 
 func (vm *VM) RegisterSyncLib() {
 	std := vm.newStdlibInstallContext()
-	syncLib := runtime.TableValue(modules.BuildSync(stdlibrt.ConcurrencyOptions{
+	syncLib := runtime.TableValue(stdbind.BuildSync(stdbind.ConcurrencyOptions{
 		Call:   vm.callValue,
 		Launch: vm.launchSyncTask,
 	}))

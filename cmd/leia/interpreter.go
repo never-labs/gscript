@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/never-labs/leia/internal/runtime"
-	stdlibinstall "github.com/never-labs/leia/internal/stdlibrt/install"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlib/install"
 )
 
 func newCLIInterpreter() *runtime.Interpreter {

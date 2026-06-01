@@ -7,7 +7,7 @@ import (
 	"github.com/never-labs/leia/internal/lexer"
 	"github.com/never-labs/leia/internal/parser"
 	"github.com/never-labs/leia/internal/runtime"
-	stdlibinstall "github.com/never-labs/leia/internal/stdlibrt/install"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlib/install"
 )
 
 func execRuntimeTestProgram(t *testing.T, interp *runtime.Interpreter, src string) {

@@ -72,7 +72,7 @@ type Interpreter struct {
 
 // NewCore creates an Interpreter with only language builtins installed.
 // Standard-library modules are installed explicitly by InstallStdlib or by the
-// public embedding layer through internal/stdlibrt.
+// public embedding layer through internal/stdlib/bind.
 func NewCore() *Interpreter {
 	interp := &Interpreter{
 		globals:           NewEnvironment(nil),
@@ -99,7 +99,7 @@ func NewCore() *Interpreter {
 }
 
 // New creates a new core Interpreter with language builtins only.
-// Public embedding entry points install stdlib through internal/stdlibrt.
+// Public embedding entry points install stdlib through internal/stdlib/bind.
 func New() *Interpreter {
 	return NewCore()
 }
@@ -398,7 +398,7 @@ func (interp *Interpreter) SetFilesystemCapabilities(read, write bool) {
 }
 
 // SetFilesystemRoot confines script-side file paths to root when root is not
-// empty. stdlibrt host modules read the current root through HostOptions, so
+// empty. stdlib host bindings read the current root through HostOptions, so
 // existing module tables observe policy changes without being rebuilt.
 func (interp *Interpreter) SetFilesystemRoot(root string) {
 	interp.filesystemRoot = root

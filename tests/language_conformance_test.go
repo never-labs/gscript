@@ -53,9 +53,9 @@ func TestLanguageConformanceTranslatedCases(t *testing.T) {
 }
 
 type manifestConformanceCase struct {
-	Name        string
+	Name     string
 	LeiaPath string
-	LuaPath     string
+	LuaPath  string
 }
 
 func readManifestConformanceCases(t *testing.T, root string) []manifestConformanceCase {
@@ -99,9 +99,9 @@ func readManifestConformanceCases(t *testing.T, root string) []manifestConforman
 			t.Fatalf("manifest case %s missing Lua oracle %s: %v", entry.ID, entry.Reference.Path, err)
 		}
 		cases = append(cases, manifestConformanceCase{
-			Name:        name,
+			Name:     name,
 			LeiaPath: gsPath,
-			LuaPath:     luaPath,
+			LuaPath:  luaPath,
 		})
 	}
 	if len(cases) == 0 {

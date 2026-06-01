@@ -8,7 +8,7 @@ import (
 )
 
 // These adapters back the runtime-native string.pack/unpack/packsize entries.
-// The binary stdlib module has its own thin Value adapter in stdlibrt/modules;
+// The binary stdlib module has its own thin Value adapter in stdlib bindings/modules;
 // both paths share the format codec in internal/support/binaryfmt.
 func binaryPackValues(apiName string, args []Value, maxHostResult int64) ([]Value, error) {
 	if len(args) < 1 || !args[0].IsString() {

@@ -11,8 +11,8 @@ import (
 
 const (
 	// NativeKindStdString* names are retained as stable VM/JIT identity tags for
-	// the runtime-owned native string substrate. The stdlibrt string module is
-	// assembled in internal/stdlibrt/modules/string.go.
+	// the runtime-owned native string substrate. The stdlib string binding is
+	// assembled in internal/stdlib/bind/string.go.
 	NativeKindStdStringFormat  uint8 = 2
 	NativeKindStdStringSplit   uint8 = 100
 	NativeKindStdStringSub     uint8 = 101
@@ -91,8 +91,8 @@ func NativeStringFormatIntCachePtr() unsafe.Pointer {
 // BuildStringLibWithCaller creates the runtime-owned native string substrate
 // using caller for execution-engine callbacks such as function-valued gsub
 // replacements. It is retained for existing runtime callers and for identities
-// consumed by VM/JIT guards; the stdlibrt "string" module is assembled in
-// internal/stdlibrt/modules/string.go.
+// consumed by VM/JIT guards; the stdlib bindings "string" module is assembled in
+// internal/stdlib/bind/string.go.
 func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...func() int64) *Table {
 	t := NewTable()
 	maxHostResult := func() int64 {
@@ -1030,8 +1030,8 @@ func BuildStringLibWithCaller(caller ScriptFunctionCaller, maxHostResults ...fun
 }
 
 // RefreshStringLibWithCaller refreshes the runtime-native string substrate in
-// place for existing runtime callers. The stdlibrt module refresh path lives in
-// internal/stdlibrt/modules/string.go.
+// place for existing runtime callers. The stdlib binding refresh path lives in
+// internal/stdlib/bind/string.go.
 func RefreshStringLibWithCaller(t *Table, caller ScriptFunctionCaller, maxHostResults ...func() int64) *Table {
 	if t == nil {
 		return BuildStringLibWithCaller(caller, maxHostResults...)

@@ -1,7 +1,6 @@
 package leia_test
 
 import (
-	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -15,9 +14,10 @@ import (
 func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 	root := repoRoot(t)
 	stdlibRoot := filepath.Join(root, "internal", "stdlib")
+	libRoot := filepath.Join(stdlibRoot, "lib")
 
-	for _, module := range []string{"catalog", "llm", "table", "soa", "fs", "http"} {
-		dir := filepath.Join(stdlibRoot, module)
+	for _, module := range []string{"catalog", "lib/llm", "lib/table", "lib/soa", "lib/fs", "lib/http", "bind", "install"} {
+		dir := filepath.Join(stdlibRoot, filepath.FromSlash(module))
 		info, err := os.Stat(dir)
 		if err != nil {
 			t.Fatalf("internal/stdlib module %q missing: %v", module, err)
@@ -29,11 +29,16 @@ func TestInternalStdlibLayerStaysBelowRuntime(t *testing.T) {
 			t.Fatalf("internal/stdlib module %q has no Go implementation files", module)
 		}
 	}
-	forEachGoFile(t, stdlibRoot, func(path string) {
+	forEachGoFile(t, libRoot, func(path string) {
 		for _, importPath := range parseImports(t, path) {
 			if importPath == "github.com/never-labs/leia/internal/runtime" ||
-				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/runtime/") {
-				t.Fatalf("%s imports %s; internal/stdlib must stay pure and below runtime adapters", relativeToRoot(t, path), importPath)
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/runtime/") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/vm") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/jit") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/methodjit") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/stdlib/bind") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/stdlib/install") {
+				t.Fatalf("%s imports %s; internal/stdlib/lib must stay pure and below runtime bindings", relativeToRoot(t, path), importPath)
 			}
 		}
 	})
@@ -66,7 +71,7 @@ func TestRuntimeDoesNotImportStdlibImplementations(t *testing.T) {
 		for _, importPath := range parseImports(t, path) {
 			if importPath == "github.com/never-labs/leia/internal/stdlib" ||
 				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/stdlib/") {
-				t.Fatalf("%s imports %s; runtime must depend on shared substrates or stdlibrt adapters, not stdlib implementation packages", relativeToRoot(t, path), importPath)
+				t.Fatalf("%s imports %s; runtime must depend on shared substrates or stdlib bindings, not stdlib implementation packages", relativeToRoot(t, path), importPath)
 			}
 		}
 	})
@@ -74,6 +79,7 @@ func TestRuntimeDoesNotImportStdlibImplementations(t *testing.T) {
 
 func TestInternalStdlibDirsRepresentCatalogModules(t *testing.T) {
 	stdlibRoot := filepath.Join(repoRoot(t), "internal", "stdlib")
+	libRoot := filepath.Join(stdlibRoot, "lib")
 	moduleNames := map[string]bool{}
 	for _, module := range catalog.Modules() {
 		moduleNames[module.Name] = true
@@ -87,83 +93,75 @@ func TestInternalStdlibDirsRepresentCatalogModules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read internal/stdlib: %v", err)
 	}
+	allowedRoot := map[string]bool{
+		"catalog": true,
+		"lib":     true,
+		"bind":    true,
+		"install": true,
+	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		dir := entry.Name()
-		if dir == "catalog" {
-			continue
-		}
-		module := dir
-		if mapped := dirToModule[dir]; mapped != "" {
-			module = mapped
-		}
-		if !moduleNames[module] {
-			t.Fatalf("internal/stdlib/%s is not a catalog stdlib module; shared substrates belong in neutral internal packages", dir)
+		if !allowedRoot[dir] {
+			t.Fatalf("internal/stdlib/%s is not an approved stdlib layer; expected catalog, lib, bind, or install", dir)
 		}
 	}
-}
 
-func TestStdlibrtModulesDoNotOwnAdapterContracts(t *testing.T) {
-	modulesRoot := filepath.Join(repoRoot(t), "internal", "stdlibrt", "modules")
-
-	forEachGoFile(t, modulesRoot, func(path string) {
-		if strings.HasSuffix(path, "_test.go") {
-			return
-		}
-		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", path, err)
-		}
-		for _, decl := range file.Decls {
-			gen, ok := decl.(*ast.GenDecl)
-			if !ok || gen.Tok != token.TYPE {
-				continue
-			}
-			for _, spec := range gen.Specs {
-				typeSpec, ok := spec.(*ast.TypeSpec)
-				if !ok {
-					continue
-				}
-				name := typeSpec.Name.Name
-				if strings.HasSuffix(name, "Options") {
-					t.Fatalf("%s defines adapter option type %s; stdlibrt adapter contracts belong in dedicated internal/stdlibrt/* packages", relativeToRoot(t, path), name)
-				}
-				if strings.HasSuffix(name, "Runtime") {
-					if _, ok := typeSpec.Type.(*ast.InterfaceType); ok {
-						t.Fatalf("%s defines runtime adapter interface %s; stdlibrt adapter contracts belong in dedicated internal/stdlibrt/* packages", relativeToRoot(t, path), name)
-					}
-				}
-			}
-		}
-	})
-}
-
-func TestStdlibrtKeepsThinContractsInRootPackage(t *testing.T) {
-	root := filepath.Join(repoRoot(t), "internal", "stdlibrt")
-	allowedSubdirs := map[string]bool{
-		"install": true,
-		"modules": true,
-	}
-
-	entries, err := os.ReadDir(root)
+	entries, err = os.ReadDir(libRoot)
 	if err != nil {
-		t.Fatalf("read internal/stdlibrt: %v", err)
+		t.Fatalf("read internal/stdlib/lib: %v", err)
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		if !allowedSubdirs[entry.Name()] {
-			t.Fatalf("internal/stdlibrt/%s is a thin adapter subpackage; keep adapter contracts in internal/stdlibrt or put real module bindings under modules", entry.Name())
+		dir := entry.Name()
+		module := dir
+		if mapped := dirToModule[dir]; mapped != "" {
+			module = mapped
+		}
+		if !moduleNames[module] {
+			t.Fatalf("internal/stdlib/lib/%s is not a catalog stdlib module; shared substrates belong in neutral internal packages", dir)
 		}
 	}
 }
 
+func TestStdlibBindOwnsRuntimeAdapterContracts(t *testing.T) {
+	bindRoot := filepath.Join(repoRoot(t), "internal", "stdlib", "bind")
+	installRoot := filepath.Join(repoRoot(t), "internal", "stdlib", "install")
+
+	forEachGoFile(t, bindRoot, func(path string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, importPath := range parseImports(t, path) {
+			if strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/vm") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/jit") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/methodjit") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/stdlib/install") {
+				t.Fatalf("%s imports %s; stdlib/bind may adapt runtime and lib packages only", relativeToRoot(t, path), importPath)
+			}
+		}
+	})
+	forEachGoFile(t, installRoot, func(path string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, importPath := range parseImports(t, path) {
+			if strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/vm") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/jit") ||
+				strings.HasPrefix(importPath, "github.com/never-labs/leia/internal/methodjit") {
+				t.Fatalf("%s imports %s; stdlib/install should only compose runtime and stdlib/bind", relativeToRoot(t, path), importPath)
+			}
+		}
+	})
+}
+
 func TestInternalSupportPackagesStayGrouped(t *testing.T) {
 	root := repoRoot(t)
-	for _, name := range []string{"binaryfmt", "debugstate", "filemode", "hostpath", "outputlimit", "stringlib"} {
+	for _, name := range []string{"binaryfmt", "hostpath", "modresolve", "source", "stringlib"} {
 		if _, err := os.Stat(filepath.Join(root, "internal", name)); !os.IsNotExist(err) {
 			t.Fatalf("internal/%s should not be a top-level architecture package; keep shared support code under internal/support/%s", name, name)
 		}
@@ -193,7 +191,6 @@ func TestInternalTopLevelPackagesStayArchitectural(t *testing.T) {
 		"parser":    true,
 		"runtime":   true,
 		"stdlib":    true,
-		"stdlibrt":  true,
 		"support":   true,
 		"testutil":  true,
 		"vm":        true,

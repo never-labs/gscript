@@ -14,7 +14,7 @@ const FileName = "leia.mod"
 
 type File struct {
 	Module      string
-	Leia          string
+	Leia        string
 	Go          string
 	Capability  []string
 	Require     []Require

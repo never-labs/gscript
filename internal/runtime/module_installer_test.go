@@ -60,10 +60,10 @@ func TestStdlibInstallerDefaultModuleIdentity(t *testing.T) {
 		t.Fatal("toolof alias was inserted into require cache")
 	}
 	if got := interp.GetGlobal("llm"); !got.IsNil() {
-		t.Fatalf("llm global = %v, want nil before stdlibrt install", got)
+		t.Fatalf("llm global = %v, want nil before stdlib install", got)
 	}
 	if got := interp.GetGlobal("string"); !got.IsNil() {
-		t.Fatalf("string global = %v, want nil before stdlibrt install", got)
+		t.Fatalf("string global = %v, want nil before stdlib install", got)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestExplicitInstallStdlibOmitsMigratedHostIOTables(t *testing.T) {
 	interp.InstallStdlib()
 	for _, name := range []string{"fs", "http", "io", "net", "os", "string", "table"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
-			t.Fatalf("%s global = %v, want nil before stdlibrt install", name, got)
+			t.Fatalf("%s global = %v, want nil before stdlib install", name, got)
 		}
 	}
 }
@@ -94,10 +94,10 @@ func TestInstallRuntimeStdlibOmitsMigratedHostIOTables(t *testing.T) {
 	interp.InstallRuntimeStdlib()
 	for _, name := range []string{"fs", "http", "io", "net", "os", "string", "table"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
-			t.Fatalf("%s global = %v, want nil before stdlibrt install", name, got)
+			t.Fatalf("%s global = %v, want nil before stdlib install", name, got)
 		}
 		if _, ok := interp.modules[name]; ok {
-			t.Fatalf("%s was inserted into require cache before stdlibrt install", name)
+			t.Fatalf("%s was inserted into require cache before stdlib install", name)
 		}
 	}
 }

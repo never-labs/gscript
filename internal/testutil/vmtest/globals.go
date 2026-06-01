@@ -2,11 +2,11 @@ package vmtest
 
 import (
 	"github.com/never-labs/leia/internal/runtime"
-	"github.com/never-labs/leia/internal/stdlibrt/install"
+	"github.com/never-labs/leia/internal/stdlib/install"
 )
 
 // NewInterpreterGlobals returns globals for VM/JIT tests that need the full
-// stdlib surface. It builds that surface through the stdlibrt installer instead
+// stdlib surface. It builds that surface through the stdlib installer instead
 // of depending on runtime.New(), keeping the runtime core usable without the
 // complete standard library.
 func NewInterpreterGlobals() map[string]runtime.Value {

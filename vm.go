@@ -8,7 +8,7 @@ import (
 
 	"github.com/never-labs/leia/internal/llmbridge"
 	"github.com/never-labs/leia/internal/runtime"
-	stdlibinstall "github.com/never-labs/leia/internal/stdlibrt/install"
+	stdlibinstall "github.com/never-labs/leia/internal/stdlib/install"
 	"github.com/never-labs/leia/internal/support/modresolve"
 	bytecodevm "github.com/never-labs/leia/internal/vm"
 )
