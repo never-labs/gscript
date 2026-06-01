@@ -40,6 +40,9 @@ func runDocGenerateCommand(args []string, outw, errw io.Writer) int {
 	layout := fs.String("layout", "flat", "output layout: flat or site")
 	format := fs.String("format", "markdown", "output format: markdown or json")
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if len(fs.Args()) != 0 {
@@ -146,6 +149,9 @@ func runDocCheckCommand(args []string, outw, errw io.Writer) int {
 	fs := flag.NewFlagSet("doc check", flag.ContinueOnError)
 	fs.SetOutput(errw)
 	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return 0
+		}
 		return 2
 	}
 	if len(fs.Args()) != 0 {

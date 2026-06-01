@@ -100,6 +100,23 @@ func TestDocGenerateWritesCombinedJSONToStdout(t *testing.T) {
 	}
 }
 
+func TestDocHelpFlagsExitSuccessfully(t *testing.T) {
+	for _, args := range [][]string{
+		{"help"},
+		{"generate", "--help"},
+		{"check", "--help"},
+	} {
+		var stdout, stderr bytes.Buffer
+		code := runDocCommand(args, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("runDocCommand(%v) code = %d, stderr = %q", args, code, stderr.String())
+		}
+		if stdout.Len() == 0 && stderr.Len() == 0 {
+			t.Fatalf("runDocCommand(%v) produced no help output", args)
+		}
+	}
+}
+
 func TestDocCheckDispatchesDocsScript(t *testing.T) {
 	oldDocExecCommand := docExecCommand
 	t.Cleanup(func() { docExecCommand = oldDocExecCommand })
