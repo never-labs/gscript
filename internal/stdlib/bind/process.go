@@ -335,5 +335,5 @@ func BuildProcessWithPolicy(opts HostOptions) *Table {
 		return nil, &runtime.ProcessExitError{Code: code}
 	})
 
-	return markRuntimeModule(t)
+	return markStdlibBoundModule(t)
 }

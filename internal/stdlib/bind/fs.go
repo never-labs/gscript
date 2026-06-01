@@ -27,7 +27,7 @@ func BuildFS(roots ...string) *Table {
 }
 
 func BuildFSWithPolicy(opts HostOptions) *Table {
-	t := markRuntimeModule(NewTable())
+	t := markStdlibBoundModule(NewTable())
 	root := func() string { return HostString(opts.FilesystemRoot) }
 	read := func() bool { return HostBool(opts.FilesystemRead, true) }
 	write := func() bool { return HostBool(opts.FilesystemWrite, true) }

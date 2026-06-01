@@ -24,7 +24,7 @@ func BuildHTTPWithCallerAndNetworkPolicy(call ScriptFunctionCaller, networkAllow
 }
 
 func BuildHTTPWithCallerAndPolicy(call ScriptFunctionCaller, networkAllowed func() bool, maxHostResult func() int64) *Table {
-	t := markRuntimeModule(NewTable())
+	t := markStdlibBoundModule(NewTable())
 	var handlerMu sync.Mutex
 	maxResult := func() int64 {
 		return hostResultLimit(maxHostResult)

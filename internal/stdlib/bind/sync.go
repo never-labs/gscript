@@ -63,7 +63,7 @@ func BuildSync(options ConcurrencyOptions) *Table {
 			return syncGroupFromArgs(call, launch, args)
 		},
 	}))
-	return markRuntimeModule(t)
+	return markStdlibBoundModule(t)
 }
 
 func syncGroupFromArgs(call ScriptFunctionCaller, launch TaskLauncher, args []Value) ([]Value, error) {

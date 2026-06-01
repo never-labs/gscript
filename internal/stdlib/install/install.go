@@ -54,7 +54,7 @@ type ModuleOptions struct {
 	SkipTable    bool
 }
 
-// InstallModules registers runtime module-owned modules on a runtime-compatible
+// InstallModules registers stdlib-bound modules on a stdlib-compatible
 // installer. VM and tree-walker entry points use this shared module plan so
 // the public standard library has one registration path.
 func InstallModules(installer runtime.StdlibInstaller, maxHostResult func() int64, options ...ModuleOptions) {

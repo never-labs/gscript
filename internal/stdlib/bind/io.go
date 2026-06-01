@@ -25,7 +25,7 @@ type leiaFileHandle struct {
 
 // BuildIO creates the "io" standard library table.
 func BuildIO(opts HostOptions) *Table {
-	t := markRuntimeModule(NewTable())
+	t := markStdlibBoundModule(NewTable())
 	root := func() string { return HostString(opts.FilesystemRoot) }
 	fsRead := func() bool { return HostBool(opts.FilesystemRead, true) }
 	fsWrite := func() bool { return HostBool(opts.FilesystemWrite, true) }

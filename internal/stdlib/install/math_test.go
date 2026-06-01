@@ -7,11 +7,11 @@ import (
 	stdbind "github.com/never-labs/leia/internal/stdlib/bind"
 )
 
-func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersMathFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("math"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned math module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound math module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
@@ -29,11 +29,11 @@ func TestInstallModulesRegistersMathFromStdlibrt(t *testing.T) {
 	}
 }
 
-func TestInstallModulesRegistersTimeFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersTimeFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("time"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned time module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound time module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
@@ -48,11 +48,11 @@ func TestInstallModulesRegistersTimeFromStdlibrt(t *testing.T) {
 	}
 }
 
-func TestInstallModulesRegistersProcessFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersProcessFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("process"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned process module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound process module: %v", got)
 	}
 
 	Install(interp)
@@ -60,7 +60,7 @@ func TestInstallModulesRegistersProcessFromStdlibrt(t *testing.T) {
 	if !processLib.IsTable() {
 		t.Fatalf("process global is not a table: %v", processLib)
 	}
-	if !processLib.Table().RawGetString("__runtime_module").Truthy() {
+	if !processLib.Table().RawGetString("__stdlib_bound_module").Truthy() {
 		t.Fatalf("process global was not installed from stdlib bindings")
 	}
 	if run := processLib.Table().RawGetString("run"); !run.IsFunction() {
@@ -68,11 +68,11 @@ func TestInstallModulesRegistersProcessFromStdlibrt(t *testing.T) {
 	}
 }
 
-func TestInstallModulesRegistersSOAFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersSOAFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("soa"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned soa module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound soa module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes)
@@ -86,11 +86,11 @@ func TestInstallModulesRegistersSOAFromStdlibrt(t *testing.T) {
 	}
 }
 
-func TestInstallModulesRegistersSyncFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersSyncFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("sync"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned sync module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound sync module: %v", got)
 	}
 
 	Install(interp)
@@ -98,7 +98,7 @@ func TestInstallModulesRegistersSyncFromStdlibrt(t *testing.T) {
 	if !syncLib.IsTable() {
 		t.Fatalf("sync global is not a table: %v", syncLib)
 	}
-	if !syncLib.Table().RawGetString("__runtime_module").Truthy() {
+	if !syncLib.Table().RawGetString("__stdlib_bound_module").Truthy() {
 		t.Fatalf("sync global was not installed from stdlib bindings")
 	}
 	for _, name := range []string{"waitgroup", "mutex", "rwmutex", "once", "group"} {
@@ -108,11 +108,11 @@ func TestInstallModulesRegistersSyncFromStdlibrt(t *testing.T) {
 	}
 }
 
-func TestInstallModulesRegistersStringFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersStringFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("string"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned string module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound string module: %v", got)
 	}
 	if got := interp.StringMeta(); got != nil {
 		t.Fatalf("InstallRuntimeStdlib installed string metatable: %v", got)
@@ -134,11 +134,11 @@ func TestInstallModulesRegistersStringFromStdlibrt(t *testing.T) {
 	}
 }
 
-func TestInstallModulesRegistersTableFromStdlibrt(t *testing.T) {
+func TestInstallModulesRegistersTableFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	if got := interp.GetGlobal("table"); !got.IsNil() {
-		t.Fatalf("InstallRuntimeStdlib registered runtime module-owned table module: %v", got)
+		t.Fatalf("InstallRuntimeStdlib registered stdlib-bound table module: %v", got)
 	}
 
 	InstallModules(interpreterInstaller{interp: interp}, interp.MaxHostResultBytes, ModuleOptions{

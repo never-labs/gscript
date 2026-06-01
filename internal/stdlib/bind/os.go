@@ -29,7 +29,7 @@ func BuildOSWithEnvironment(envRead, envWrite bool, allowedEnv map[string]bool) 
 }
 
 func BuildOSWithPolicy(opts HostOptions) *Table {
-	t := markRuntimeModule(NewTable())
+	t := markStdlibBoundModule(NewTable())
 	envRead := func() bool { return HostBool(opts.EnvironmentRead, true) }
 	envWrite := func() bool { return HostBool(opts.EnvironmentWrite, true) }
 	fsRoot := func() string { return HostString(opts.FilesystemRoot) }

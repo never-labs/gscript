@@ -6,7 +6,7 @@ import (
 	"github.com/never-labs/leia/internal/runtime"
 )
 
-func TestInstallUsesStdlibrtHostIOModules(t *testing.T) {
+func TestInstallUsesStdlibBoundHostIOModules(t *testing.T) {
 	interp := runtime.NewCore()
 	Install(interp)
 
@@ -15,8 +15,8 @@ func TestInstallUsesStdlibrtHostIOModules(t *testing.T) {
 		if !global.IsTable() {
 			t.Fatalf("%s global is not a table", name)
 		}
-		if !global.Table().RawGetString("__runtime_module").Truthy() {
-			t.Fatalf("%s global is not marked as a runtime module", name)
+		if !global.Table().RawGetString("__stdlib_bound_module").Truthy() {
+			t.Fatalf("%s global is not marked as a stdlib-bound module", name)
 		}
 		pkg := interp.GetGlobal("package")
 		if !pkg.IsTable() {

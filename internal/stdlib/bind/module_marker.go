@@ -1,12 +1,12 @@
 package bind
 
-func markRuntimeModule(t *Table) *Table {
+func markStdlibBoundModule(t *Table) *Table {
 	if t != nil {
-		t.RawSetString("__runtime_module", BoolValue(true))
+		t.RawSetString("__stdlib_bound_module", BoolValue(true))
 	}
 	return t
 }
 
-func IsStdlibrtModule(t *Table) bool {
-	return t != nil && t.RawGetString("__runtime_module").Truthy()
+func IsStdlibBoundModule(t *Table) bool {
+	return t != nil && t.RawGetString("__stdlib_bound_module").Truthy()
 }

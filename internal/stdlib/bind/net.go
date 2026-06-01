@@ -11,7 +11,7 @@ import (
 
 // BuildNet creates the "net" standard library table for HTTP client operations.
 func BuildNet(opts HostOptions) *Table {
-	t := markRuntimeModule(NewTable())
+	t := markStdlibBoundModule(NewTable())
 	networkAllowed := func() bool { return HostBool(opts.NetworkAllowed, true) }
 	maxHostResult := func() int64 { return hostResultLimit(opts.MaxHostResult) }
 

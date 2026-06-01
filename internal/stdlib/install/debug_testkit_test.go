@@ -6,12 +6,12 @@ import (
 	"github.com/never-labs/leia/internal/runtime"
 )
 
-func TestInstallDebugAndTestkitFromStdlibrt(t *testing.T) {
+func TestInstallDebugAndTestkitFromStdlibInstall(t *testing.T) {
 	interp := runtime.NewCore()
 	interp.InstallRuntimeStdlib()
 	for _, name := range []string{"debug", "testkit"} {
 		if got := interp.GetGlobal(name); !got.IsNil() {
-			t.Fatalf("InstallRuntimeStdlib registered runtime module-owned %s module: %v", name, got)
+			t.Fatalf("InstallRuntimeStdlib registered stdlib-bound %s module: %v", name, got)
 		}
 	}
 
