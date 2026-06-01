@@ -56,7 +56,7 @@ type({})      // "table"
 type(func() {}) // "function"
 ```
 
-```leia run
+```leia run all
 assert(type(nil) == "nil")
 assert(type(true) == "boolean")
 assert(type(1) == "number")

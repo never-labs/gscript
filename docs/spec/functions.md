@@ -28,7 +28,7 @@ func count(...) {
 count(1, 2, 3) // 3
 ```
 
-```leia run
+```leia run all
 func count(...) {
     args := {...}
     return #args
@@ -99,7 +99,7 @@ next() // 1
 next() // 2
 ```
 
-```leia run
+```leia run all
 func counter() {
     n := 0
     return func() {

@@ -237,7 +237,7 @@ build_quick_plan() {
     add_go_test "Release Matrix Metadata" \
         "go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1"
     add_go_test "Spec Runnable Examples" \
-        "go test ./tests -run TestSpecRunnableExamplesInterpreterSemantics -count=1"
+        "go test ./tests -run TestSpecRunnableExamples -count=1"
     add_go_test "Stdlib Contract" \
         "go test ./tests -run TestStdlibContract -count=1"
     add_manifest_coverage

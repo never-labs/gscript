@@ -9,7 +9,7 @@ Leia uses several test layers:
 - Benchmark manifests and performance gates under `benchmarks/`.
 - Documentation and release evidence checks.
 - Runnable examples embedded in `docs/spec/*.md` code fences marked
-  `leia run`.
+  `leia run` or `leia run all`.
 
 Important inputs:
 
@@ -24,7 +24,7 @@ Release-gate commands:
 
 ```bash
 go test ./tests -run 'TestFeatureMatrixSchema|TestReleaseMatrix' -count=1
-go test ./tests -run TestSpecRunnableExamplesInterpreterSemantics -count=1
+go test ./tests -run TestSpecRunnableExamples -count=1
 go test ./tests -run 'TestFeatureMatrix|TestLanguageConformanceTranslatedCases' -count=1
 go test ./...
 bash scripts/docs_check.sh

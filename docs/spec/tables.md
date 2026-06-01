@@ -56,7 +56,7 @@ t := setmetatable({}, { __len: func(_) { return 99 } })
 rawlen(t) // 0
 ```
 
-```leia run
+```leia run all
 t := setmetatable({}, { __len: func(_) { return 99 } })
 assert(#t == 99)
 assert(rawlen(t) == 0)

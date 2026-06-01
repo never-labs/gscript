@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestSpecRunnableExamplesInterpreterSemantics(t *testing.T) {
+func TestSpecRunnableExamples(t *testing.T) {
 	root := findRepoRoot(t)
 	examples := collectRunnableSpecExamples(t, root)
 	if len(examples) == 0 {
@@ -22,7 +22,14 @@ func TestSpecRunnableExamplesInterpreterSemantics(t *testing.T) {
 			if err := os.WriteFile(path, []byte(example.source), 0o644); err != nil {
 				t.Fatalf("write example: %v", err)
 			}
-			runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "run", "-jit=false", path)
+			for _, mode := range example.modes {
+				mode := mode
+				t.Run(mode.name, func(t *testing.T) {
+					args := append([]string{"run", "./cmd/leia", "run"}, mode.flags...)
+					args = append(args, path)
+					runCommand(t, root, 30*time.Second, "go", args...)
+				})
+			}
 		})
 	}
 }
@@ -30,6 +37,12 @@ func TestSpecRunnableExamplesInterpreterSemantics(t *testing.T) {
 type runnableSpecExample struct {
 	name   string
 	source string
+	modes  []specExampleMode
+}
+
+type specExampleMode struct {
+	name  string
+	flags []string
 }
 
 func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExample {
@@ -49,6 +62,7 @@ func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExampl
 		inRunnableFence := false
 		startLine := 0
 		var block []string
+		var currentModes []specExampleMode
 		for i, line := range lines {
 			lineNo := i + 1
 			if strings.HasPrefix(line, "```") {
@@ -57,15 +71,19 @@ func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExampl
 					examples = append(examples, runnableSpecExample{
 						name:   strings.TrimSuffix(entry.Name(), ".md") + "_line_" + strconv.Itoa(startLine),
 						source: strings.Join(block, "\n") + "\n",
+						modes:  append([]specExampleMode(nil), currentModes...),
 					})
 					inRunnableFence = false
 					block = nil
+					currentModes = nil
 					continue
 				}
-				if info == "leia run" {
+				modes, ok := specExampleModes(info)
+				if ok {
 					inRunnableFence = true
 					startLine = lineNo
 					block = nil
+					currentModes = modes
 				}
 				continue
 			}
@@ -78,4 +96,19 @@ func collectRunnableSpecExamples(t *testing.T, root string) []runnableSpecExampl
 		}
 	}
 	return examples
+}
+
+func specExampleModes(info string) ([]specExampleMode, bool) {
+	switch info {
+	case "leia run":
+		return []specExampleMode{{name: "interpreter", flags: []string{"-jit=false"}}}, true
+	case "leia run all":
+		return []specExampleMode{
+			{name: "interpreter", flags: []string{"-jit=false"}},
+			{name: "vm", flags: []string{"-vm"}},
+			{name: "default", flags: nil},
+		}, true
+	default:
+		return nil, false
+	}
 }
