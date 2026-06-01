@@ -16,6 +16,15 @@ Use `ModuleHandle` when each request has its own VM. Use `HotInstance` when
 one live script instance should keep counters, tables, caches, and other
 runtime state across reloads.
 
+## Loader Options
+
+`NewHotLoader` accepts:
+
+| Option | Use |
+|---|---|
+| `WithHotLoaderCompileOptions(...)` | Apply source-name and future compile options to every load or reload. |
+| `WithHotLoaderVMOptions(...)` | Apply VM options to VMs created for `HotInstance`. |
+
 ## Module Handles
 
 ```go
@@ -35,6 +44,14 @@ fails, the old generation remains active.
 `ReloadIfChanged` hashes source bytes and skips unchanged files. Unchanged
 reloads do not advance the generation.
 
+`ModuleHandle.Call` runs the latest top-level program on the supplied VM before
+calling the named function. Hosts that need to avoid replaying top-level side
+effects should call `handle.Run(vm)` once and then call `vm.Call(...)`
+directly.
+
+Context-aware forms are available as `LoadContext`, `ReloadContext`,
+`ReloadIfChangedContext`, `RunContext`, and `CallContext`.
+
 ## Hot Instances
 
 ```go
@@ -52,6 +69,9 @@ _, _ = inst.Call("tick")
 `HotInstance` runs the program in a persistent VM. On reload it rewrites the
 new program before execution so existing non-function globals are preserved by
 default and changed functions are replaced.
+
+Context-aware forms are available as `LoadInstanceContext`, `ReloadContext`,
+`ReloadIfChangedContext`, and `CallContext`.
 
 ## State Preservation
 
@@ -92,7 +112,8 @@ use `inst.VM()` concurrently with `HotInstance` methods.
 
 ## Watcher Pattern
 
-Use `ReloadIfChanged` from a watcher or polling loop:
+Use `ReloadIfChanged` from a watcher or polling loop. It returns a
+`ReloadResult` with `Changed` and `Generation` fields:
 
 ```go
 result, err := inst.ReloadIfChanged()

@@ -280,6 +280,53 @@ func TestReleaseMatrixEmbeddingDocsUsePublicSDKSurface(t *testing.T) {
 	runCommand(t, root, 30*time.Second, "go", "test", "./examples/embedding", "-run", "Example", "-count=1")
 }
 
+func TestReleaseMatrixHotReloadDocsUsePublicSDKSurface(t *testing.T) {
+	root := findRepoRoot(t)
+	docs := readFileString(t, filepath.Join(root, "docs", "reference", "hot-reload", "index.md"))
+	goDoc := runCommand(t, root, 30*time.Second, "go", "doc", "-all", ".")
+	for _, api := range []string{
+		"NewHotLoader",
+		"WithHotLoaderCompileOptions",
+		"WithHotLoaderVMOptions",
+		"HotLoader",
+		"ModuleHandle",
+		"HotInstance",
+		"ReloadResult",
+		"Load",
+		"LoadContext",
+		"Reload",
+		"ReloadContext",
+		"ReloadIfChanged",
+		"ReloadIfChangedContext",
+		"LoadInstance",
+		"LoadInstanceContext",
+		"Generation",
+		"Program",
+		"Run",
+		"RunContext",
+		"Call",
+		"CallContext",
+		"VM",
+	} {
+		if !strings.Contains(docs, api) {
+			t.Fatalf("hot reload docs must mention public API/semantic term %s", api)
+		}
+		if !strings.Contains(goDoc, api) {
+			t.Fatalf("hot reload docs mention %s but root go doc does not expose it", api)
+		}
+	}
+	for _, snippet := range []string{
+		"does not start a filesystem watcher",
+		"does not register files into `require()`",
+		"`ModuleHandle.Call` runs the latest top-level program",
+		"running goroutines are not migrated",
+	} {
+		if !strings.Contains(docs, snippet) {
+			t.Fatalf("hot reload docs missing semantic warning %q", snippet)
+		}
+	}
+}
+
 func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
