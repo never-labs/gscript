@@ -170,6 +170,29 @@ func TestReleaseMatrixNestedCommandHelpIsSuccessful(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixDocumentedCIProfilesAreInspectable(t *testing.T) {
+	root := findRepoRoot(t)
+	for _, path := range []string{
+		"CONTRIBUTING.md",
+		"docs/guides/tooling.md",
+	} {
+		data := readFileString(t, filepath.Join(root, filepath.FromSlash(path)))
+		for _, profile := range []string{"smoke", "pr"} {
+			command := "go run ./cmd/leia ci " + profile + " --list"
+			if !strings.Contains(data, command) {
+				t.Fatalf("%s must document inspectable CI command %q", path, command)
+			}
+		}
+	}
+
+	for _, profile := range []string{"smoke", "pr", "release"} {
+		out := runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "ci", profile, "--list")
+		if !strings.Contains(out, "github.com/never-labs/leia") {
+			t.Fatalf("ci %s --list must include module path gate output; got:\n%s", profile, out)
+		}
+	}
+}
+
 func TestReleaseMatrixCommunityEntrypointsAreLinked(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{
