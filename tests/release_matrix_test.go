@@ -176,6 +176,32 @@ func TestReleaseMatrixModuleReferenceDocumentsCommandSurface(t *testing.T) {
 	}
 }
 
+func TestReleaseMatrixModuleDocsKeepFirstRunCommandsLocal(t *testing.T) {
+	root := findRepoRoot(t)
+	gettingStarted := readFileString(t, filepath.Join(root, "docs", "tutorial", "getting-started.md"))
+	for _, forbidden := range []string{
+		"mod add github.com/never-labs/leia-raylib",
+		"mod download",
+		"mod vendor",
+	} {
+		if strings.Contains(gettingStarted, forbidden) {
+			t.Fatalf("getting-started module path must stay local-only; found %q", forbidden)
+		}
+	}
+
+	tmp := t.TempDir()
+	runCommand(t, root, 30*time.Second, "go", "run", "./cmd/leia", "mod", "init", "--module", "github.com/example/project", "--dir", tmp)
+	for _, args := range [][]string{
+		{"run", "./cmd/leia", "mod", "list", "--json", tmp},
+		{"run", "./cmd/leia", "mod", "graph", "--json", tmp},
+		{"run", "./cmd/leia", "mod", "capability", "--json", tmp},
+		{"run", "./cmd/leia", "mod", "verify", "--json", tmp},
+		{"run", "./cmd/leia", "mod", "gomod", tmp},
+	} {
+		runCommand(t, root, 30*time.Second, "go", args...)
+	}
+}
+
 func TestReleaseMatrixDocumentedSmokeCommandsStayRunnable(t *testing.T) {
 	root := findRepoRoot(t)
 	for _, path := range []string{

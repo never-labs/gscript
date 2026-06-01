@@ -95,9 +95,8 @@ capability summaries:
 
 ```bash
 go run ./cmd/leia mod init --module github.com/example/tool
-go run ./cmd/leia mod add github.com/never-labs/leia-raylib@v0.1.0
-go run ./cmd/leia mod tidy
-go run ./cmd/leia mod verify
+go run ./cmd/leia mod list --json
+go run ./cmd/leia mod verify --json
 ```
 
 Next steps:

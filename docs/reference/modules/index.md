@@ -39,17 +39,27 @@ Comments begin with `//`. Unknown directives are diagnostics.
 
 ## Commands
 
+Local metadata commands do not need network access:
+
 ```bash
 leia mod init --module github.com/example/project
-leia mod add github.com/never-labs/leia-raylib@v0.1.0
-leia mod tidy
-leia mod download
-leia mod verify
-leia mod vendor
 leia mod list --json
 leia mod graph --json
 leia mod capability --json
-leia mod gomod --write
+leia mod verify --json
+leia mod gomod
+```
+
+Dependency commands operate on `require` directives in `leia.mod`. `tidy` may
+remove requirements that are not used by source files, so run it after imports
+or `require(...)` calls exist in the project.
+
+```bash
+leia mod add github.com/never-labs/leia-raylib@v0.1.0
+leia mod tidy
+leia mod download
+leia mod vendor
+leia mod verify --json
 ```
 
 | Command | Purpose |
