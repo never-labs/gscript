@@ -233,6 +233,8 @@ def check_release_gate_docs() -> None:
             "docs/spec/language.md",
             "tests/language/MISSING_CAPABILITIES.md",
             "docs/reference/stdlib/index.md",
+            "docs/reference/security/index.md",
+            "docs/reference/performance/index.md",
         ],
     )
     require_snippets(
@@ -245,6 +247,9 @@ def check_release_gate_docs() -> None:
             "bash scripts/performance_gate.sh --feature-smoke",
             "tests/language/MANIFEST.md",
             "tests/language/KNOWN_FAILURES.md",
+            "docs/reference/hot-reload/index.md",
+            "docs/reference/ai/index.md",
+            "docs/reference/data-oriented/index.md",
         ],
     )
 

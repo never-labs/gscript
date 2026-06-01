@@ -21,7 +21,16 @@ The release evidence should cite:
 - `tests/language/KNOWN_FAILURES.md`
 - `tests/language/MISSING_CAPABILITIES.md`
 - `docs/reference/stdlib/index.md`
+- `docs/reference/cli/index.md`
+- `docs/reference/modules/index.md`
+- `docs/reference/embedding/index.md`
+- `docs/reference/security/index.md`
+- `docs/reference/hot-reload/index.md`
+- `docs/reference/ai/index.md`
+- `docs/reference/concurrency/index.md`
+- `docs/reference/data-oriented/index.md`
+- `docs/reference/performance/index.md`
+- `docs/reference/diagnostics/index.md`
 
 Before a public tag, update install instructions, examples, compatibility
 notes, known issues, benchmark caveats, and security notes.
-
