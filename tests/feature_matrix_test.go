@@ -114,6 +114,8 @@ func TestLanguageGrammarAppendixDocumentsStableSyntax(t *testing.T) {
 		"desugaring layer over the standard library",
 		"[`../reference/directives/index.md`](../reference/directives/index.md)",
 		"`import \"go:...\" as name` is source syntax for explicit host-provided Go",
+		"Only `model`, `system`, `tools`, and\n`capabilities` are injected as flow-local bindings",
+		"including `user`,\n`budget`, `response_format`, and `metadata`, are not injected as variables",
 	} {
 		if !strings.Contains(spec, snippet) {
 			t.Fatalf("language spec must document grammar appendix and AI-native lowering; missing %q", snippet)

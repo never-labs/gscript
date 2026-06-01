@@ -181,8 +181,11 @@ defaults.
 ## Custom Flow
 
 Use `flow { ... }` when the built-in agent turn loop is not enough. The flow
-body can access the agent config fields as lexical bindings such as `model`,
-`system`, `user`, and `tools`.
+body can access the merged agent config fields `model`, `system`, `tools`, and
+`capabilities` as lexical bindings. These names are ordinary locals and can be
+shadowed inside the flow body. Other config fields, including `user`, `budget`,
+`response_format`, and `metadata`, are not injected as variables; `turn {}` can
+still inherit them through the ambient agent configuration.
 
 ```leia
 agent incident_brief(service) {

@@ -125,9 +125,13 @@ An `agent` is a callable value. Its configuration fields are defaults for the
 turns executed by that agent: explicit fields on a `turn` expression override
 agent configuration, and agent configuration overrides process or host defaults.
 A `flow` block provides the agent body when the default one-turn behavior is not
-enough. The flow body is lexical code; the implementation may inject documented
-bindings for the agent configuration, but those bindings must be specified and
-testable before they are treated as stable.
+enough. The flow body is lexical code. Only `model`, `system`, `tools`, and
+`capabilities` are injected as flow-local bindings from merged agent
+configuration. They are ordinary lexical bindings: user declarations in the
+flow body may shadow them. Other agent config fields, including `user`,
+`budget`, `response_format`, and `metadata`, are not injected as variables; they
+remain ambient agent configuration consumed by `turn {}` and lower-level
+standard-library helpers.
 
 `messages { ... }` constructs ordered message tables. It is intended for common
 system/user/assistant/tool histories; advanced or computed histories may still
